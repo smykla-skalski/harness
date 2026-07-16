@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::fmt::Display;
 use std::fs;
 use std::io::{self, Read};
 
@@ -148,13 +149,13 @@ impl PolicyInputAccumulator {
                 ),
             ));
         }
-        if let Some(workspace) = bundle.workspace {
-            if self.workspace.replace(workspace).is_some() {
-                return Err(CliErrorKind::workflow_parse(
-                    "multiple policy inputs contain workspace metadata".to_string(),
-                )
-                .into());
-            }
+        if let Some(workspace) = bundle.workspace
+            && self.workspace.replace(workspace).is_some()
+        {
+            return Err(CliErrorKind::workflow_parse(
+                "multiple policy inputs contain workspace metadata".to_string(),
+            )
+            .into());
         }
         self.absorb_policies(label, bundle.policies)
     }
@@ -213,7 +214,7 @@ fn validate_replace_all(replace_all: bool, bundle: &PolicyTransferBundle) -> Res
     Ok(())
 }
 
-fn policy_parse_error(label: &str, detail: impl std::fmt::Display) -> CliError {
+fn policy_parse_error(label: &str, detail: impl Display) -> CliError {
     CliErrorKind::workflow_parse(format!("invalid policy input '{label}': {detail}")).into()
 }
 

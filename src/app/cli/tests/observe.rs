@@ -70,24 +70,11 @@ fn reject_legacy_observe_scan_doctor_action() {
 }
 
 #[test]
-fn top_level_lifecycle_commands_accept_project_dir() {
-    fn extract(cmd: Command) -> Option<String> {
-        match cmd {
-            Command::SessionStart(SessionStartArgs { project_dir }) => project_dir,
-            Command::SessionStop(SessionStopArgs { project_dir }) => project_dir,
-            Command::PreCompact(PreCompactArgs { project_dir }) => project_dir,
-            _ => panic!("expected lifecycle command"),
-        }
-    }
+fn removed_top_level_lifecycle_commands_are_rejected() {
     for subcmd in ["session-start", "session-stop", "pre-compact"] {
-        let cli =
-            Cli::try_parse_from(["harness", subcmd, "--project-dir", "/tmp/project"]).unwrap();
-        let project_dir = extract(cli.command);
-        assert_eq!(
-            project_dir.as_deref(),
-            Some("/tmp/project"),
-            "subcmd: {subcmd}"
-        );
+        let error = Cli::try_parse_from(["harness", subcmd, "--project-dir", "/tmp/project"])
+            .expect_err("legacy lifecycle route must be a hard cut");
+        assert_eq!(error.kind(), ErrorKind::InvalidSubcommand, "{subcmd}");
     }
 }
 

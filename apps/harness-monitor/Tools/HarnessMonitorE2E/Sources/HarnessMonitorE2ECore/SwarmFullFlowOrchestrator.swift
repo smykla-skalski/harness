@@ -210,7 +210,12 @@ private final class SwarmFullFlowRunner {
     )
     try runLoggedCommand(
       executable: repoRoot.appendingPathComponent("scripts/cargo-local.sh"),
-      arguments: ["build", "--bin", "harness"],
+      arguments: [
+        "build",
+        "--package", "harness",
+        "--package", "harness-daemon",
+        "--bins",
+      ],
       logURL: layout.harnessBuildLog
     )
 

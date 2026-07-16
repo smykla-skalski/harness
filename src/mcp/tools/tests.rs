@@ -11,6 +11,11 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixListener;
 use tokio::task::JoinHandle;
 
+use super::shared::{resolve_get_element_with, resolve_list_elements_with};
+use super::{
+    ClickElementTool, DragDropTool, GetElementTool, ListElementsTool, ListWindowsTool,
+    PressElementTool, ScrollTool, register_all,
+};
 use crate::mcp::automation::{AccessibilityQueryError, INPUT_OVERRIDE_ENV};
 use crate::mcp::protocol::ContentBlock;
 use crate::mcp::registry::RegistryClient;
@@ -18,13 +23,6 @@ use crate::mcp::registry::{
     ElementKind, GetElementResult, ListElementsResult, Rect, RegistryElement,
 };
 use crate::mcp::tool::Tool;
-use crate::workspace::socket_paths::session_socket;
-
-use super::shared::{resolve_get_element_with, resolve_list_elements_with};
-use super::{
-    ClickElementTool, DragDropTool, GetElementTool, ListElementsTool, ListWindowsTool,
-    PressElementTool, ScrollTool, register_all,
-};
 
 mod interaction_tests;
 mod registry_tool_tests;
@@ -32,7 +30,7 @@ mod resolve_list_elements_tests;
 mod task_board_tests;
 
 fn socket_path(dir: &TempDir) -> PathBuf {
-    session_socket(dir.path(), "testid00", "registry")
+    dir.path().join("registry.sock")
 }
 
 fn spawn_single_response(path: &Path, response: String) -> JoinHandle<String> {

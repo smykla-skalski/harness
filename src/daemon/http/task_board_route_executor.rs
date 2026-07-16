@@ -209,7 +209,9 @@ async fn start_claimed_workers(
                     .await
                 {
                     Ok(item) => claim.applied.item = item,
-                    Err(error) => warn!(board_item_id = %task.board_item_id, %error, "task board worker started but intent completion failed"),
+                    Err(error) => {
+                        warn!(board_item_id = %task.board_item_id, %error, "task board worker started but intent completion failed");
+                    }
                 }
                 kept.push(claim.applied);
             }

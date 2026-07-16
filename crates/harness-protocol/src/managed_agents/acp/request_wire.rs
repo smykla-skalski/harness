@@ -1,8 +1,8 @@
 use serde::de::Error as DeError;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::{AcpAgentStartRequest, default_acp_role};
-use crate::session::types::SessionRole;
+use super::models::{AcpAgentStartRequest, default_acp_role};
+use crate::session::SessionRole;
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -142,7 +142,7 @@ mod tests {
         .expect("decode request");
 
         assert_eq!(request.agent, "copilot");
-        assert_eq!(request.role, crate::session::types::SessionRole::Reviewer);
+        assert_eq!(request.role, crate::session::SessionRole::Reviewer);
         assert_eq!(request.task_id.as_deref(), Some("task-1"));
         assert_eq!(request.board_item_id.as_deref(), Some("board-item-1"));
         assert_eq!(request.workflow_execution_id.as_deref(), Some("workflow-1"));
@@ -183,8 +183,8 @@ mod tests {
     fn acp_start_request_serializes_canonical_descriptor_field() {
         let request = AcpAgentStartRequest {
             agent: "copilot".into(),
-            role: crate::session::types::SessionRole::Reviewer,
-            fallback_role: Some(crate::session::types::SessionRole::Observer),
+            role: crate::session::SessionRole::Reviewer,
+            fallback_role: Some(crate::session::SessionRole::Observer),
             capabilities: vec!["fs.read".into()],
             name: Some("Copilot Reviewer".into()),
             prompt: Some("Run it".into()),

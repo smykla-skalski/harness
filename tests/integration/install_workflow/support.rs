@@ -23,14 +23,33 @@ pub(super) fn write_fake_shell_tool(path: &Path, body: &str) {
         .expect("chmod fake shell tool");
 }
 
-/// Write both managed adapter binaries (`harness-codex-acp` +
-/// `harness-openrouter-agent`) into the target `release/` dir so the install
-/// script's adapter-presence checks pass. Both stubs exit 0 on `--probe` so
-/// the install script's probe assertion succeeds too.
-pub(super) fn write_fake_managed_adapters(target_dir: &Path) {
-    let stub = "#!/bin/sh\nif [ \"$1\" = \"--probe\" ]; then\n  exit 0\nfi\nexit 1\n";
-    write_fake_shell_tool(&target_dir.join("release/harness-codex-acp"), stub);
-    write_fake_shell_tool(&target_dir.join("release/harness-openrouter-agent"), stub);
+pub(super) fn write_fake_harness_release_set(target_dir: &Path, version: &str) {
+    let release_dir = target_dir.join("release");
+    write_fake_harness_binary(&release_dir.join("harness"), version);
+
+    for name in [
+        "harness-daemon",
+        "harness-bridge",
+        "harness-mcp",
+        "harness-hook",
+    ] {
+        write_fake_versioned_binary(&release_dir.join(name), name, version);
+    }
+    for name in ["harness-codex-acp", "harness-openrouter-agent"] {
+        let body = format!(
+            "#!/bin/sh\nif [ \"$1\" = \"--probe\" ]; then\n  echo '{name}'\n  exit 0\nfi\nexit 1\n"
+        );
+        write_fake_shell_tool(&release_dir.join(name), &body);
+    }
+}
+
+fn write_fake_versioned_binary(path: &Path, name: &str, version: &str) {
+    write_fake_shell_tool(
+        path,
+        &format!(
+            "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then\n  echo '{name} {version}'\n  exit 0\nfi\nexit 0\n"
+        ),
+    );
 }
 
 pub(super) fn run_harness_version(path: &Path) -> String {

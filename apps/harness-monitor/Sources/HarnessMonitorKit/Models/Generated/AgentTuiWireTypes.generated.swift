@@ -4,6 +4,31 @@
 
 import Foundation
 
+public struct AgentTuiSizeWire: Codable, Equatable, Sendable {
+  public var rows: UInt16
+  public var cols: UInt16
+
+  public init(rows: UInt16, cols: UInt16) {
+    self.rows = rows
+    self.cols = cols
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case rows
+    case cols
+  }
+}
+
+public enum AgentTuiStatusWire: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case starting = "starting"
+  case running = "running"
+  case exited = "exited"
+  case failed = "failed"
+  case stopped = "stopped"
+
+  public var id: String { rawValue }
+}
+
 public struct TerminalScreenSnapshotWire: Codable, Equatable, Sendable {
   public var rows: UInt16
   public var cols: UInt16
@@ -26,46 +51,6 @@ public struct TerminalScreenSnapshotWire: Codable, Equatable, Sendable {
     case cursorCol = "cursor_col"
     case text
   }
-}
-
-public struct AgentTuiSizeWire: Codable, Equatable, Sendable {
-  public var rows: UInt16
-  public var cols: UInt16
-
-  public init(rows: UInt16, cols: UInt16) {
-    self.rows = rows
-    self.cols = cols
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case rows
-    case cols
-  }
-}
-
-public struct AgentTuiLaunchProfileWire: Codable, Equatable, Sendable {
-  public var runtime: String
-  public var argv: [String]
-
-  public init(runtime: String, argv: [String]) {
-    self.runtime = runtime
-    self.argv = argv
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case runtime
-    case argv
-  }
-}
-
-public enum AgentTuiStatusWire: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
-  case starting = "starting"
-  case running = "running"
-  case exited = "exited"
-  case failed = "failed"
-  case stopped = "stopped"
-
-  public var id: String { rawValue }
 }
 
 public struct AgentTuiStartRequestWire: Codable, Equatable, Sendable {
@@ -227,5 +212,20 @@ public struct AgentTuiSnapshotWire: Codable, Equatable, Sendable {
     case error
     case createdAt = "created_at"
     case updatedAt = "updated_at"
+  }
+}
+
+public struct AgentTuiLaunchProfileWire: Codable, Equatable, Sendable {
+  public var runtime: String
+  public var argv: [String]
+
+  public init(runtime: String, argv: [String]) {
+    self.runtime = runtime
+    self.argv = argv
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case runtime
+    case argv
   }
 }

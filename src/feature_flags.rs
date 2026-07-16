@@ -12,7 +12,7 @@
 //! - `HARNESS_FEATURE_REVIEWS_BACKGROUND_AUTO=1` enables background Reviews
 //!   policy runs. It is off by default because it can approve or merge GitHub
 //!   pull requests without a same-moment user confirmation.
-//! - `harness daemon serve --disable-acp` / `--enable-acp` applies the same
+//! - `harness-daemon serve --disable-acp` / `--enable-acp` applies the same
 //!   gate as a process-scoped override without mutating the caller shell env.
 //!
 //! Resolution order: explicit process-scoped daemon override (when supplied)
@@ -56,7 +56,7 @@ pub fn reviews_background_auto_enabled_from_env() -> bool {
 
 /// Apply a process-scoped ACP enablement override for the lifetime of the guard.
 ///
-/// This is used by `harness daemon serve` / `daemon dev` so one daemon process
+/// This is used by `harness-daemon serve` / `harness-daemon dev` so one daemon process
 /// can explicitly opt in or out without mutating the caller's shell env. The
 /// override wins over `HARNESS_FEATURE_ACP` while the guard is alive.
 #[must_use]

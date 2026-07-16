@@ -61,9 +61,9 @@ public enum BridgeSpawner {
     throws -> Process
   {
     let process = Process()
-    process.executableURL = client.binary
+    process.executableURL = client.bridgeBinary
     process.arguments = [
-      "bridge", "start",
+      "start",
       "--capability", "codex",
       "--capability", "agent-tui",
       "--capability", "acp",

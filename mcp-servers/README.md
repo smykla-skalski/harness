@@ -4,7 +4,7 @@ MCP pieces that let agents drive the Harness Monitor macOS app.
 
 | Path | Language | What it does |
 |------|----------|--------------|
-| `harness mcp serve` (in `../src/mcp/`) | Rust (part of `harness` CLI) | stdio MCP JSON-RPC server with 11 tools for enumerating Harness Monitor windows and elements, driving the mouse and keyboard, semantically pressing registered controls, scrolling registered targets, dragging between registered targets, and capturing screenshots. `list_elements` and `get_element` consult the app-side registry first and fall back to the bundled AX query helper when needed. |
+| `harness-mcp serve` (in `../src/mcp/`) | Rust | stdio MCP JSON-RPC server with 11 tools for enumerating Harness Monitor windows and elements, driving the mouse and keyboard, semantically pressing registered controls, scrolling registered targets, dragging between registered targets, and capturing screenshots. `list_elements` and `get_element` consult the app-side registry first and fall back to the bundled AX query helper when needed. |
 | [`harness-monitor-registry/`](harness-monitor-registry/) | Swift (SPM) | App-side actor + POSIX Unix-socket NDJSON listener that the Rust server connects to. Includes `.trackWindow(...)` for scene-root auto-harvest, `.trackAccessibility(...)` for explicit per-view registration, and the bundled `harness-monitor-input` helper for input, screenshots, and AX fallback queries. |
 
 The old Node.js implementation under `harness-monitor/` was replaced by the native Rust server to drop the Node.js runtime dependency. The JSON wire protocol to the Swift host is unchanged.
@@ -18,7 +18,7 @@ Claude Code / MCP client
         | stdio (MCP JSON-RPC 2.0, protocol version 2025-11-25)
         v
 +--------------------------------+
-| harness mcp serve (Rust)       |
+| harness-mcp serve (Rust)       |
 |  - tools/list                  |
 |  - tools/call                  |
 |  - NDJSON over Unix socket ----+-----+
@@ -50,8 +50,8 @@ Add to your repo or user `.mcp.json`:
 {
   "mcpServers": {
     "harness-monitor": {
-      "command": "harness",
-      "args": ["mcp", "serve"]
+      "command": "harness-mcp",
+      "args": ["serve"]
     }
   }
 }
@@ -63,8 +63,8 @@ Point `--socket` at a custom path for unsandboxed dev:
 {
   "mcpServers": {
     "harness-monitor": {
-      "command": "harness",
-      "args": ["mcp", "serve", "--socket", "/tmp/mcp.sock"]
+      "command": "harness-mcp",
+      "args": ["serve", "--socket", "/tmp/mcp.sock"]
     }
   }
 }
@@ -73,18 +73,18 @@ Point `--socket` at a custom path for unsandboxed dev:
 Override the socket via environment instead:
 
 ```
-HARNESS_MONITOR_MCP_SOCKET=/tmp/mcp.sock harness mcp serve
+HARNESS_MONITOR_MCP_SOCKET=/tmp/mcp.sock harness-mcp serve
 ```
 
 Override the input helper binary:
 
 ```
-HARNESS_MONITOR_INPUT_BIN=/path/to/harness-monitor-input harness mcp serve
+HARNESS_MONITOR_INPUT_BIN=/path/to/harness-monitor-input harness-mcp serve
 ```
 
 The server requires:
 
-- Accessibility permission for the process that runs `harness` (for `harness-monitor-input` / `cliclick` to synthesize CGEvents and query the AX tree)
+- Accessibility permission for the process that runs `harness-mcp` (for `harness-monitor-input` / `cliclick` to synthesize CGEvents and query the AX tree)
 - Screen Recording permission for window-scoped screenshots
 
 If neither `harness-monitor-input` (the bundled Swift helper) nor `cliclick` is on the machine, input tools fail closed until one of those backends is available.

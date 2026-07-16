@@ -4,8 +4,6 @@ use std::path::{Path, PathBuf};
 use std::string::ToString;
 
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{validate_safe_segment, write_text};
@@ -13,97 +11,10 @@ use crate::infra::io::{validate_safe_segment, write_text};
 #[cfg(test)]
 mod tests;
 
-/// A signal file sent to an agent session.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Signal {
-    pub signal_id: String,
-    pub version: u32,
-    pub created_at: String,
-    pub expires_at: String,
-    pub source_agent: String,
-    pub command: String,
-    pub priority: SignalPriority,
-    pub payload: SignalPayload,
-    pub delivery: DeliveryConfig,
-}
-
-/// Signal priority level.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum SignalPriority {
-    Low,
-    Normal,
-    High,
-    Urgent,
-}
-
-/// Signal payload content.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SignalPayload {
-    pub message: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub action_hint: Option<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub related_files: Vec<String>,
-    #[serde(default, skip_serializing_if = "Value::is_null")]
-    pub metadata: Value,
-}
-
-/// Delivery configuration for retry semantics.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DeliveryConfig {
-    pub max_retries: u32,
-    #[serde(default)]
-    pub retry_count: u32,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub idempotency_key: Option<String>,
-}
-
-/// Acknowledgment written after a signal is processed.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SignalAck {
-    pub signal_id: String,
-    pub acknowledged_at: String,
-    pub result: AckResult,
-    pub agent: String,
-    pub session_id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub details: Option<String>,
-}
-
-/// Result of signal processing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum AckResult {
-    Accepted,
-    Rejected,
-    Deferred,
-    Expired,
-}
-
-/// Whether a signal belongs to one orchestration session when it was loaded
-/// from a possibly shared runtime-session signal directory.
-#[must_use]
-pub fn signal_matches_session(
-    signal: &Signal,
-    acknowledgment: Option<&SignalAck>,
-    orchestration_session_id: &str,
-    agent_id: &str,
-    signal_session_id: &str,
-) -> bool {
-    if signal_session_id == orchestration_session_id {
-        return true;
-    }
-
-    if let Some(idempotency_key) = signal.delivery.idempotency_key.as_deref() {
-        let mut parts = idempotency_key.splitn(3, ':');
-        return parts.next() == Some(orchestration_session_id)
-            && parts.next() == Some(agent_id)
-            && parts.next().is_some();
-    }
-
-    acknowledgment.is_some_and(|ack| ack.session_id == orchestration_session_id)
-}
+pub use harness_protocol::agent::{
+    AckResult, DeliveryConfig, Signal, SignalAck, SignalPayload, SignalPriority,
+    signal_matches_session,
+};
 
 /// Compute the pending signals directory for an agent session.
 #[must_use]

@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::mem;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, Weak};
@@ -8,7 +8,10 @@ use agent_client_protocol::schema::{
     PermissionOption, PermissionOptionKind, RequestPermissionOutcome, RequestPermissionResponse,
     SelectedPermissionOutcome,
 };
-use serde::{Deserialize, Serialize};
+pub use harness_protocol::managed_agents::acp::{
+    AcpPermissionBatch, AcpPermissionDecision, AcpPermissionItem, AcpPermissionOption,
+};
+use serde::Serialize;
 use serde_json::Value;
 use tokio::sync::mpsc;
 use tokio::sync::{Notify, broadcast::Sender as BroadcastSender, oneshot};
@@ -26,34 +29,7 @@ pub(crate) const DEFAULT_PERMISSION_CAP: usize = 8;
 const BRIDGE_CHANNEL_BUFFER: usize = 64;
 
 mod runtime;
-mod wire;
 use runtime::{PermissionBridgeRuntime, spawn_batch_expiration};
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct AcpPermissionItem {
-    pub request_id: String,
-    pub session_id: String,
-    pub tool_call: Value,
-    pub options: Vec<PermissionOption>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct AcpPermissionBatch {
-    pub batch_id: String,
-    pub acp_id: String,
-    pub session_id: String,
-    pub requests: Vec<AcpPermissionItem>,
-    pub created_at: String,
-    pub expires_at: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(tag = "decision", rename_all = "snake_case")]
-pub enum AcpPermissionDecision {
-    ApproveAll,
-    ApproveSome { request_ids: BTreeSet<String> },
-    DenyAll,
-}
 
 #[derive(Clone)]
 pub struct PermissionBridgeHandle {
@@ -184,7 +160,7 @@ impl PermissionBridgeHandle {
         Some(pending.batch)
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "daemon-runtime"))]
     pub(in crate::daemon::agent_acp) fn poison_pending_lock_for_test(&self) {
         let state = Arc::clone(&self.state);
         let _ = std::thread::spawn(move || {
@@ -200,16 +176,6 @@ impl PermissionBridgeHandle {
     #[cfg(test)]
     pub(in crate::daemon::agent_acp) fn expiration_task_count(&self) -> usize {
         self.runtime.expiration_task_count()
-    }
-}
-
-impl AcpPermissionDecision {
-    fn allows(&self, request_id: &str) -> bool {
-        match self {
-            Self::ApproveAll => true,
-            Self::ApproveSome { request_ids } => request_ids.contains(request_id),
-            Self::DenyAll => false,
-        }
     }
 }
 
@@ -370,7 +336,12 @@ fn enqueue_batch_locked(
             // so batch metadata and item metadata stay aligned.
             session_id: state.session_id.clone(),
             tool_call,
-            options: request.request.options.clone(),
+            options: request
+                .request
+                .options
+                .iter()
+                .map(permission_option_to_wire)
+                .collect(),
         });
         responders.push(PendingResponder {
             request_id,
@@ -401,6 +372,13 @@ fn enqueue_batch_locked(
         },
     );
     (batch, deadline)
+}
+
+fn permission_option_to_wire(option: &PermissionOption) -> AcpPermissionOption {
+    let value = serde_json::to_value(option)
+        .expect("ACP permission option serialization should be infallible");
+    serde_json::from_value(value)
+        .expect("ACP permission option runtime and wire schemas must stay compatible")
 }
 
 fn expire_batch(state: &PermissionBridgeState, batch_id: &str) {

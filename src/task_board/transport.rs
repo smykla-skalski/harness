@@ -256,7 +256,7 @@ impl Execute for TaskBoardCommand {
 pub(super) fn daemon_client() -> Result<DaemonClient, CliError> {
     let client = DaemonClient::try_connect().ok_or_else(|| {
         CliError::from(CliErrorKind::workflow_io(
-            "task-board commands require a running daemon; start Harness Monitor or run `harness daemon dev`",
+            "task-board commands require a running daemon; start Harness Monitor or run `harness-daemon dev`",
         ))
     })?;
     client.require_database_task_board()?;

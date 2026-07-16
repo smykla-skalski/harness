@@ -21,6 +21,8 @@ use std::process::ExitCode;
 
 use clap::Parser;
 
+const PROBE_IDENTITY: &str = "harness-openrouter-agent";
+
 /// Entry-point CLI surface. The harness daemon launches the binary with
 /// `--stdio --api-key-file PATH`; the catalog descriptor's doctor probe uses
 /// `--probe`.
@@ -45,6 +47,7 @@ struct Cli {
 fn main() -> ExitCode {
     let cli = Cli::parse();
     if cli.probe {
+        println!("{PROBE_IDENTITY}");
         return ExitCode::SUCCESS;
     }
     if let Err(error) = init_tracing() {

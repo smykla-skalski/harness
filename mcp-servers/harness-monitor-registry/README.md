@@ -1,6 +1,6 @@
 # HarnessMonitorRegistry
 
-Swift package that exposes Harness Monitor's accessibility elements to the Rust `harness mcp serve` server over a Unix domain socket.
+Swift package that exposes Harness Monitor's accessibility elements to the Rust `harness-mcp serve` server over a Unix domain socket.
 
 ## What's inside
 

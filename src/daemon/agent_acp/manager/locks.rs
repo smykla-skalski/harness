@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, MutexGuard};
 use tokio::time::Instant;
 
-use super::{AcpAgentManagerHandle, ActiveAcpProcess, ActiveAcpSession, DaemonDb};
+use super::{AcpAgentManagerHandle, ActiveAcpProcess, ActiveAcpSession};
 use crate::errors::{CliError, CliErrorKind};
 
 type SessionRegistry = BTreeMap<String, Arc<ActiveAcpSession>>;
@@ -52,12 +52,6 @@ impl AcpAgentManagerHandle {
             &self.state.quarantined_process_keys,
             "ACP quarantined process keys lock",
         )
-    }
-
-    pub(in crate::daemon::agent_acp) fn daemon_db_guard(
-        db: &Arc<Mutex<DaemonDb>>,
-    ) -> Result<MutexGuard<'_, DaemonDb>, CliError> {
-        lock_named(db, "daemon database lock")
     }
 }
 

@@ -10,8 +10,8 @@ use self::canvas::{
     dispatch_policy_approval_grant_resolve, dispatch_policy_approval_grant_revoke,
     dispatch_policy_approval_grants_list, dispatch_policy_canvas_create,
     dispatch_policy_canvas_delete, dispatch_policy_canvas_duplicate, dispatch_policy_canvas_rename,
-    dispatch_policy_canvas_set_active,
-    dispatch_policy_canvas_set_global_enforcement, dispatch_policy_canvas_set_spawn_kill_switch,
+    dispatch_policy_canvas_set_active, dispatch_policy_canvas_set_global_enforcement,
+    dispatch_policy_canvas_set_spawn_kill_switch,
     dispatch_policy_canvas_set_spawn_requires_live_policy, dispatch_policy_canvas_workspace_get,
 };
 use self::io::{dispatch_policy_export, dispatch_policy_import};

@@ -27,16 +27,16 @@ impl CodexControllerHandle {
         self.bound_task_has_completion_evidence(run)
     }
 
-    fn bound_task_has_completion_evidence(
-        &self,
-        run: &CodexRunSnapshot,
-    ) -> Result<bool, CliError> {
+    fn bound_task_has_completion_evidence(&self, run: &CodexRunSnapshot) -> Result<bool, CliError> {
         let session_id = run.session_id.clone();
         let run_async = run.clone();
         if let Some(result) = self.run_with_async_db(|async_db| async move {
-            Ok(async_db.resolve_session(&session_id).await?.is_some_and(|resolved| {
-                bound_task_has_completion_evidence(&resolved.state, &run_async)
-            }))
+            Ok(async_db
+                .resolve_session(&session_id)
+                .await?
+                .is_some_and(|resolved| {
+                    bound_task_has_completion_evidence(&resolved.state, &run_async)
+                }))
         }) {
             return result;
         }
@@ -50,9 +50,7 @@ impl CodexControllerHandle {
 
 pub(super) fn record_clean_worktree_baseline(snapshot: &mut CodexRunSnapshot) {
     let (tree, summary) = match clean_worktree_tree(&snapshot.project_dir) {
-        WorktreeBaseline::Clean(tree) => {
-            (Some(tree), "Recorded clean worker worktree baseline")
-        }
+        WorktreeBaseline::Clean(tree) => (Some(tree), "Recorded clean worker worktree baseline"),
         WorktreeBaseline::Dirty => (None, "Worker worktree was not clean at turn start"),
         WorktreeBaseline::Unavailable => (
             None,
@@ -92,11 +90,13 @@ pub(super) fn bound_task_has_completion_evidence(
     };
     state.tasks.get(task_id).is_some_and(|task| {
         task.status == TaskStatus::Done
-            || (matches!(task.status, TaskStatus::AwaitingReview | TaskStatus::InReview)
-                && task
-                    .awaiting_review
-                    .as_ref()
-                    .is_some_and(|review| review.submitter_agent_id == agent_id))
+            || (matches!(
+                task.status,
+                TaskStatus::AwaitingReview | TaskStatus::InReview
+            ) && task
+                .awaiting_review
+                .as_ref()
+                .is_some_and(|review| review.submitter_agent_id == agent_id))
     })
 }
 
@@ -110,7 +110,12 @@ pub(super) fn missing_completion_evidence_error(run: &CodexRunSnapshot) -> Strin
     let prefix = "Codex turn completed without submit-for-review or a worktree change";
     detail.map_or_else(
         || prefix.to_string(),
-        |detail| format!("{prefix}: {}", truncate_chars(detail, COMPLETION_DETAIL_LIMIT)),
+        |detail| {
+            format!(
+                "{prefix}: {}",
+                truncate_chars(detail, COMPLETION_DETAIL_LIMIT)
+            )
+        },
     )
 }
 

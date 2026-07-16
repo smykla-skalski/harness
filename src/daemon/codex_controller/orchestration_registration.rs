@@ -73,17 +73,11 @@ pub(super) fn register_async(
                     Some(managed_agent.clone()),
                 )?;
                 let effective_role = state.agents[&agent_id].role;
-                let task_binding_before = task_binding_before(
-                    state,
-                    request.task_id.as_deref(),
-                    &agent_id,
-                );
+                let task_binding_before =
+                    task_binding_before(state, request.task_id.as_deref(), &agent_id);
                 bind_requested_task(state, request.task_id.as_deref(), &agent_id, &now)?;
-                let task_binding_rollback = task_binding_rollback(
-                    state,
-                    &agent_id,
-                    task_binding_before,
-                );
+                let task_binding_rollback =
+                    task_binding_rollback(state, &agent_id, task_binding_before);
                 Ok((
                     agent_id,
                     effective_role,
@@ -142,11 +136,9 @@ pub(super) fn register_sync(
         Some(managed_agent.clone()),
     )?;
     let effective_role = state.agents[&agent_id].role;
-    let task_binding_before =
-        task_binding_before(&state, request.task_id.as_deref(), &agent_id);
+    let task_binding_before = task_binding_before(&state, request.task_id.as_deref(), &agent_id);
     bind_requested_task(&mut state, request.task_id.as_deref(), &agent_id, &now)?;
-    let task_binding_rollback =
-        task_binding_rollback(&state, &agent_id, task_binding_before);
+    let task_binding_rollback = task_binding_rollback(&state, &agent_id, task_binding_before);
     let mutation = RegistrationMutation {
         newly_joined,
         task_binding_rollback,
@@ -198,8 +190,7 @@ fn rollback_sync_registration(
     let restore_result = db
         .project_id_for_session(session_id)
         .and_then(|project_id| {
-            project_id
-                .ok_or_else(|| daemon_service::session_not_found(session_id))
+            project_id.ok_or_else(|| daemon_service::session_not_found(session_id))
         })
         .and_then(|project_id| db.save_session_state(&project_id, original_state));
     if let Err(error) = restore_result {
@@ -210,7 +201,10 @@ fn rollback_sync_registration(
         );
         return;
     }
-    if let Err(error) = db.bump_change(session_id).and_then(|()| db.bump_change("global")) {
+    if let Err(error) = db
+        .bump_change(session_id)
+        .and_then(|()| db.bump_change("global"))
+    {
         tracing::warn!(
             %error,
             session_id,
@@ -239,14 +233,8 @@ pub(super) async fn finalize_async_registration(
         return Ok(());
     };
     if (mutation.newly_joined || mutation.task_binding_rollback.is_some())
-        && let Err(rollback_error) = rollback_registration(
-            async_db,
-            session_id,
-            agent_id,
-            managed_agent,
-            mutation,
-        )
-        .await
+        && let Err(rollback_error) =
+            rollback_registration(async_db, session_id, agent_id, managed_agent, mutation).await
     {
         tracing::warn!(
             %rollback_error,
@@ -315,9 +303,7 @@ fn task_binding_before(
     agent_id: &str,
 ) -> Option<TaskBindingBefore> {
     let task = state.tasks.get(task_id?)?;
-    if task.status == TaskStatus::InProgress
-        && task.assigned_to.as_deref() == Some(agent_id)
-    {
+    if task.status == TaskStatus::InProgress && task.assigned_to.as_deref() == Some(agent_id) {
         return None;
     }
     let agent = state.agents.get(agent_id)?;

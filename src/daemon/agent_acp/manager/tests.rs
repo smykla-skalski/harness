@@ -1,5 +1,4 @@
 use std::path::Path;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use harness_testkit::with_isolated_harness_env;
@@ -83,7 +82,10 @@ fn load_session_state(
     manager: &AcpAgentManagerHandle,
     session_id: &str,
 ) -> crate::session::types::SessionState {
-    let Some(db) = manager.state.db.get().map(Arc::clone) else {
+    let Some(db) = manager
+        .daemon_db_slot()
+        .and_then(|slot| slot.get().cloned())
+    else {
         unreachable!();
     };
     let Ok(db) = db.lock() else {
@@ -101,7 +103,10 @@ fn load_session_state(
 fn archive_session_state(manager: &AcpAgentManagerHandle, session_id: &str) {
     let mut state = load_session_state(manager, session_id);
     state.archived_at = Some("2026-05-05T19:15:30Z".into());
-    let Some(db) = manager.state.db.get().map(Arc::clone) else {
+    let Some(db) = manager
+        .daemon_db_slot()
+        .and_then(|slot| slot.get().cloned())
+    else {
         unreachable!();
     };
     let Ok(db) = db.lock() else {
@@ -234,7 +239,10 @@ fn assert_signal_pending(signal_dir: &Path, signal_id: &str) {
 }
 
 fn repoint_project_dir(manager: &AcpAgentManagerHandle, project_dir: &Path) {
-    let Some(db) = manager.state.db.get().map(Arc::clone) else {
+    let Some(db) = manager
+        .daemon_db_slot()
+        .and_then(|slot| slot.get().cloned())
+    else {
         unreachable!();
     };
     let Ok(db) = db.lock() else {

@@ -5,9 +5,9 @@ use reqwest::Method;
 use serde_json::json;
 use std::time::Duration;
 
-use crate::daemon::service::BlobTextProjection;
 use crate::errors::{CliError, CliErrorKind};
 use crate::github_api::{GitHubCachePolicy, GitHubPriority, GitHubRequestDescriptor};
+use crate::reviews::files::blob::BlobTextProjection;
 use crate::reviews::files::blob::blob_exceeds_cap;
 use crate::reviews::files::patch_rest::split_repo_full_name;
 

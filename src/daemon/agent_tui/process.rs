@@ -15,7 +15,8 @@ use crate::workspace::utc_now;
 use super::input::AgentTuiInput;
 use super::input_request::AgentTuiInputSequence;
 use super::model::{
-    AgentTuiLaunchProfile, AgentTuiSize, AgentTuiSnapshot, AgentTuiSpawnSpec, AgentTuiStatus,
+    AgentTuiLaunchProfile, AgentTuiSize, AgentTuiSizeExt, AgentTuiSnapshot, AgentTuiSpawnSpec,
+    AgentTuiStatus,
 };
 use super::readiness::{ReadinessSignal, new_readiness_signal, spawn_reader_thread};
 use super::screen::{TerminalScreenParser, TerminalScreenSnapshot};
@@ -290,7 +291,7 @@ impl AgentTuiProcess {
     /// Returns a workflow I/O error on PTY allocation, command spawn, or stream setup failure.
     pub fn spawn(spec: &AgentTuiSpawnSpec) -> Result<Self, CliError> {
         let pty_system = native_pty_system();
-        let pair = pty_system.openpty(spec.size.into()).map_err(|error| {
+        let pair = pty_system.openpty(spec.size.pty_size()).map_err(|error| {
             CliErrorKind::workflow_io(format!("open terminal agent PTY: {error}"))
         })?;
         let cmd = command_builder(spec);
@@ -363,7 +364,7 @@ impl AgentTuiProcess {
     pub fn resize(&self, size: AgentTuiSize) -> Result<(), CliError> {
         let size = size.validate()?;
         lock(&self.master, "terminal agent PTY master")?
-            .resize(size.into())
+            .resize(size.pty_size())
             .map_err(|error| {
                 CliErrorKind::workflow_io(format!("resize terminal agent PTY: {error}"))
             })?;
@@ -480,6 +481,7 @@ impl AgentTuiProcess {
         guard.ready
     }
 
+    #[cfg(feature = "daemon-runtime")]
     pub(crate) fn readiness_signal(&self) -> ReadinessSignal {
         Arc::clone(&self.readiness)
     }

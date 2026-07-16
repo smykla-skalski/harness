@@ -6,8 +6,8 @@ use std::thread;
 use harness::app::{AppContext, Execute};
 use harness::daemon::protocol::{
     PolicyApprovalGrantResolveResponse, PolicyApprovalGrantRevokeResponse,
-    PolicyApprovalGrantsListResponse,
-    PolicyCanvasWorkspaceResponse, TaskBoardDispatchDeliverResponse, TaskBoardDispatchPickResponse,
+    PolicyApprovalGrantsListResponse, PolicyCanvasWorkspaceResponse,
+    TaskBoardDispatchDeliverResponse, TaskBoardDispatchPickResponse,
 };
 use harness::daemon::state::{self, DaemonManifest, DaemonOwnership, HostBridgeManifest};
 use harness::task_board::dispatch::DispatchLifecycle;

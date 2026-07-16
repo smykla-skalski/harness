@@ -201,6 +201,9 @@ fn install_script_resolves_build_binary_from_cargo_local_target_dir() {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
+    let expected_target = expected_target
+        .canonicalize()
+        .expect("canonicalize cargo-local target dir");
     assert_eq!(
         String::from_utf8_lossy(&output.stdout).trim(),
         expected_target
@@ -233,6 +236,9 @@ fn install_script_prefers_explicit_cargo_target_dir_when_present() {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
+    let explicit_target = explicit_target
+        .canonicalize()
+        .expect("canonicalize explicit target dir");
     assert_eq!(
         String::from_utf8_lossy(&output.stdout).trim(),
         explicit_target

@@ -139,12 +139,14 @@ impl ObserverState {
 
     /// Whether the observer state is safe for handoff to another observer.
     /// True when no active workers are running and at least one scan completed.
+    #[cfg(not(feature = "standalone-daemon"))]
     #[must_use]
     pub fn handoff_safe(&self) -> bool {
         self.active_workers.is_empty() && !self.last_scan_time.is_empty()
     }
 
     /// Whether a baseline has been captured.
+    #[cfg(not(feature = "standalone-daemon"))]
     #[must_use]
     pub fn has_baseline(&self) -> bool {
         !self.baseline_issue_ids.is_empty()

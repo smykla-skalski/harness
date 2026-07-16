@@ -255,4 +255,5 @@ impl SessionAdopter {
 }
 
 #[cfg(test)]
+#[path = "adopter/tests.rs"]
 mod tests;

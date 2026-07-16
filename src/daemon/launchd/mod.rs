@@ -42,7 +42,6 @@ pub fn render_launch_agent_plist(binary_path: &Path) -> String {
   <key>ProgramArguments</key>
   <array>
     <string>{binary}</string>
-    <string>daemon</string>
     <string>serve</string>
   </array>
   <key>RunAtLoad</key>

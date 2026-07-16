@@ -3,7 +3,7 @@ import Foundation
 /// Preference keys and defaults for the in-app MCP accessibility registry
 /// host. When the host is enabled, `HarnessMonitorMCPAccessibilityService`
 /// binds a Unix-domain socket inside the app-group container so the
-/// `harness mcp serve` client can connect to it.
+/// `harness-mcp serve` client can connect to it.
 ///
 /// MCP is a product-level contract: the registry host is **on by default**.
 /// Users must explicitly disable it via the Settings toggle to opt out.

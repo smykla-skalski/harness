@@ -337,12 +337,14 @@ pub struct SpawnConfig {
 }
 
 impl SpawnConfig {
-    #[must_use]
-    pub fn resolved_command_for_identity(&self) -> String {
-        resolve_program(&self.command)
-            .unwrap_or_else(|| self.command.clone().into())
-            .display()
-            .to_string()
+    /// Resolve the executable used as part of the process-pool identity.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a managed Harness executable is not available as
+    /// a sibling of the current process, or the current executable is unknown.
+    pub fn resolved_command_for_identity(&self) -> io::Result<String> {
+        Ok(resolve_program(&self.command)?.display().to_string())
     }
 
     #[must_use]
@@ -373,7 +375,7 @@ impl SpawnConfig {
         use std::os::unix::process::CommandExt;
         use std::process::Command;
 
-        let program = resolve_program(&self.command).unwrap_or_else(|| self.command.clone().into());
+        let program = resolve_program(&self.command)?;
         let mut cmd = Command::new(program);
         cmd.args(&self.args)
             .current_dir(&self.working_dir)
@@ -410,7 +412,7 @@ impl SpawnConfig {
     pub fn spawn(&self) -> io::Result<Child> {
         use std::process::Command;
 
-        let program = resolve_program(&self.command).unwrap_or_else(|| self.command.clone().into());
+        let program = resolve_program(&self.command)?;
         let mut cmd = Command::new(program);
         cmd.args(&self.args)
             .current_dir(&self.working_dir)

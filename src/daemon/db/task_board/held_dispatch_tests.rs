@@ -34,9 +34,7 @@ async fn held_fixture() -> HeldFixture {
     item.planning.summary = Some("Implement held policy validation".to_string());
     item.planning.approved_by = Some("operator".to_string());
     item.planning.approved_at = Some("2026-07-14T10:00:00Z".to_string());
-    db.create_task_board_item(item)
-    .await
-    .expect("create item");
+    db.create_task_board_item(item).await.expect("create item");
     let graph = approval_graph(7);
     let mut workspace = PolicyCanvasWorkspace::seeded();
     let canvas = workspace.active_canvas_mut().expect("active canvas");

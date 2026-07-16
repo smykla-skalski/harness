@@ -56,8 +56,8 @@ set -euo pipefail
 printf 'build-for-testing-script-called\\n' > "{runner_args_log}"
 daemon_dir="${{XCODEBUILD_DERIVED_DATA_PATH}}/Build/Products/Debug/Harness Monitor.app/Contents/Helpers"
 mkdir -p "$daemon_dir"
-touch "$daemon_dir/harness"
-chmod 755 "$daemon_dir/harness"
+touch "$daemon_dir/harness-daemon"
+chmod 755 "$daemon_dir/harness-daemon"
 """,
             )
             write_executable(fake_log, "#!/bin/bash\nset -euo pipefail\n")

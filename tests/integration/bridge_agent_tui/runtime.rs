@@ -8,8 +8,8 @@ fn bridge_reconfigure_requires_force_to_disable_agent_tui_with_active_sessions()
     crate::integration::daemon_control::process::init_git_repo(&project);
 
     let mut bridge = ManagedChild::spawn(
-        Command::new(harness_binary())
-            .args(["bridge", "start", "--capability", "agent-tui"])
+        Command::new(bridge_binary())
+            .args(["start", "--capability", "agent-tui"])
             .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
             .env("XDG_DATA_HOME", tmp.path())
             .env("HARNESS_HOST_HOME", &host_home)
@@ -63,7 +63,7 @@ fn bridge_reconfigure_requires_force_to_disable_agent_tui_with_active_sessions()
         },
     );
 
-    let output = run_bridge(&tmp, &["bridge", "reconfigure", "--disable", "agent-tui"]);
+    let output = run_bridge(&tmp, &["reconfigure", "--disable", "agent-tui"]);
     assert!(
         !output.status.success(),
         "disable should fail without force: {}",
@@ -74,14 +74,7 @@ fn bridge_reconfigure_requires_force_to_disable_agent_tui_with_active_sessions()
 
     let forced_output = run_bridge(
         &tmp,
-        &[
-            "bridge",
-            "reconfigure",
-            "--disable",
-            "agent-tui",
-            "--force",
-            "--json",
-        ],
+        &["reconfigure", "--disable", "agent-tui", "--force", "--json"],
     );
     assert!(
         forced_output.status.success(),
@@ -92,7 +85,7 @@ fn bridge_reconfigure_requires_force_to_disable_agent_tui_with_active_sessions()
         serde_json::from_slice(&forced_output.stdout).expect("parse status");
     assert!(!report.capabilities.contains_key("agent-tui"));
 
-    let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
+    let stop_output = run_bridge(&tmp, &["stop"]);
     assert!(
         stop_output.status.success(),
         "cleanup stop: {}",
@@ -109,8 +102,8 @@ fn bridge_does_not_resend_auto_join_for_cli_prompt_runtimes() {
     crate::integration::daemon_control::process::init_git_repo(&project);
 
     let mut bridge = ManagedChild::spawn(
-        Command::new(harness_binary())
-            .args(["bridge", "start", "--capability", "agent-tui"])
+        Command::new(bridge_binary())
+            .args(["start", "--capability", "agent-tui"])
             .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
             .env("XDG_DATA_HOME", tmp.path())
             .env("HARNESS_HOST_HOME", &host_home)
@@ -199,7 +192,7 @@ fn bridge_does_not_resend_auto_join_for_cli_prompt_runtimes() {
         },
     );
 
-    let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
+    let stop_output = run_bridge(&tmp, &["stop"]);
     assert!(
         stop_output.status.success(),
         "cleanup stop: {}",
@@ -216,8 +209,8 @@ fn bridge_accepts_timed_input_sequences() {
     crate::integration::daemon_control::process::init_git_repo(&project);
 
     let mut bridge = ManagedChild::spawn(
-        Command::new(harness_binary())
-            .args(["bridge", "start", "--capability", "agent-tui"])
+        Command::new(bridge_binary())
+            .args(["start", "--capability", "agent-tui"])
             .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
             .env("XDG_DATA_HOME", tmp.path())
             .env("HARNESS_HOST_HOME", &host_home)
@@ -313,7 +306,7 @@ fn bridge_accepts_timed_input_sequences() {
         },
     );
 
-    let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
+    let stop_output = run_bridge(&tmp, &["stop"]);
     assert!(
         stop_output.status.success(),
         "cleanup stop: {}",
@@ -330,8 +323,8 @@ fn sandboxed_agent_tui_publishes_live_refresh_over_bridge() {
     crate::integration::daemon_control::process::init_git_repo(&project);
 
     let mut bridge = ManagedChild::spawn(
-        Command::new(harness_binary())
-            .args(["bridge", "start", "--capability", "agent-tui"])
+        Command::new(bridge_binary())
+            .args(["start", "--capability", "agent-tui"])
             .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
             .env("XDG_DATA_HOME", tmp.path())
             .env("HARNESS_HOST_HOME", &host_home)
@@ -461,7 +454,7 @@ fn sandboxed_agent_tui_publishes_live_refresh_over_bridge() {
         },
     );
 
-    let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
+    let stop_output = run_bridge(&tmp, &["stop"]);
     assert!(
         stop_output.status.success(),
         "cleanup stop: {}",

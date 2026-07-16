@@ -44,7 +44,7 @@ struct HarnessMonitorStoreHostBridgeTests {
       store.hostBridgeStartCommand(
         for: "agent-tui",
         environment: hostBridgeCommandTestEnvironment
-      ) == "harness bridge start"
+      ) == "harness-bridge start"
     )
   }
 
@@ -81,13 +81,13 @@ struct HarnessMonitorStoreHostBridgeTests {
       store.hostBridgeStartCommand(
         for: "codex",
         environment: hostBridgeCommandTestEnvironment
-      ) == "harness bridge start"
+      ) == "harness-bridge start"
     )
     #expect(
       store.hostBridgeStartCommand(
         for: "agent-tui",
         environment: hostBridgeCommandTestEnvironment
-      ) == "harness bridge start"
+      ) == "harness-bridge start"
     )
   }
 
@@ -106,7 +106,7 @@ struct HarnessMonitorStoreHostBridgeTests {
     let expectedCommand = """
       HARNESS_MONITOR_RUNTIME_LANE='dev-profile' \
       HARNESS_DAEMON_DATA_HOME='/tmp/harness-profile-home' \
-      HARNESS_CODEX_WS_PORT='31337' harness bridge start
+      HARNESS_CODEX_WS_PORT='31337' harness-bridge start
       """
 
     #expect(

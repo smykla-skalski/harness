@@ -10,9 +10,8 @@ fn bridge_start_waits_for_codex_readiness_before_publishing_state() {
     let codex_endpoint = format!("ws://127.0.0.1:{codex_port}");
 
     let mut bridge = ManagedChild::spawn(
-        Command::new(harness_binary())
+        Command::new(bridge_binary())
             .args([
-                "bridge",
                 "start",
                 "--capability",
                 "codex",
@@ -59,7 +58,7 @@ fn bridge_start_waits_for_codex_readiness_before_publishing_state() {
         "expected readiness success event, got: {events}"
     );
 
-    let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
+    let stop_output = run_bridge(&tmp, &["stop"]);
     assert!(
         stop_output.status.success(),
         "stop: {}",
@@ -76,9 +75,8 @@ fn bridge_start_records_error_when_codex_exits_before_readiness() {
     let codex_port = unused_local_port();
     let codex_port_text = codex_port.to_string();
 
-    let output = Command::new(harness_binary())
+    let output = Command::new(bridge_binary())
         .args([
-            "bridge",
             "start",
             "--capability",
             "codex",
@@ -133,9 +131,8 @@ fn bridge_start_fails_when_codex_port_is_already_bound() {
         .port();
     let codex_port_text = codex_port.to_string();
 
-    let output = Command::new(harness_binary())
+    let output = Command::new(bridge_binary())
         .args([
-            "bridge",
             "start",
             "--capability",
             "codex",
@@ -182,9 +179,8 @@ fn bridge_start_records_error_when_codex_readiness_times_out() {
     let codex_port = unused_local_port();
     let codex_port_text = codex_port.to_string();
 
-    let output = Command::new(harness_binary())
+    let output = Command::new(bridge_binary())
         .args([
-            "bridge",
             "start",
             "--capability",
             "codex",

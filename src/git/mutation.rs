@@ -4,6 +4,7 @@ use std::path::Path;
 use std::sync::atomic::AtomicBool;
 
 use fs_err as fs;
+use gix::index::write::Options as IndexWriteOptions;
 use gix::progress::Discard;
 use gix::refs::{
     FullName,
@@ -117,7 +118,7 @@ fn checkout_head(repo: &gix::Repository, error_path: &Path) -> GitResult<()> {
     .map_err(|error| GitError::mutation(error_path, error))?;
 
     index
-        .write(gix::index::write::Options::default())
+        .write(IndexWriteOptions::default())
         .map_err(|error| GitError::mutation(error_path, error))?;
 
     Ok(())

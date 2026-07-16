@@ -9,7 +9,9 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::validate_safe_segment;
 
 use super::manager::{ActiveAgentTui, AgentTuiManagerHandle};
-use super::model::{AgentTuiSnapshot, AgentTuiStartRequest, AgentTuiStatus};
+use super::model::{
+    AgentTuiSnapshot, AgentTuiStartRequest, AgentTuiStartRequestExt, AgentTuiStatus,
+};
 use super::process::{AgentTuiProcess, AgentTuiSnapshotContext, snapshot_from_process};
 use super::spawn::{
     build_auto_join_prompt, deliver_deferred_prompts, send_initial_prompt, spawn_agent_tui_process,

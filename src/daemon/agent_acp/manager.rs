@@ -1,154 +1,52 @@
 use std::collections::{BTreeMap, BTreeSet};
+#[cfg(feature = "daemon-runtime")]
+use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, OnceLock, Weak};
+use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 
-use tokio::time::Instant;
-
-use serde::{Deserialize, Serialize};
+pub(crate) use harness_protocol::managed_agents::acp::{
+    AcpAgentInspectResponse, AcpAgentInspectSnapshot, AcpAgentSnapshot, AcpAgentStartRequest,
+};
 use tokio::sync::broadcast;
+use tokio::time::Instant;
 
 use super::active::{ActiveAcpProcess, ActiveAcpSession, process_incident_from_snapshot};
 use super::permission_bridge::{AcpPermissionBatch, AcpPermissionDecision};
 use crate::agents::acp::catalog;
 use crate::agents::kind::DisconnectReason;
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ensure_shared_db};
 use crate::daemon::protocol::StreamEvent;
-use crate::daemon::service;
 use crate::errors::{CliError, CliErrorKind};
 use crate::feature_flags;
-use crate::session::service as orchestration_service;
-use crate::session::types::{AgentStatus, SessionRole};
+#[cfg(all(test, feature = "daemon-runtime"))]
+use crate::session::types::AgentStatus;
 use crate::workspace::utc_now;
 
 pub(super) const PERMISSION_RESPONSE_DEADLINE: Duration = Duration::from_mins(5);
 const PROCESS_KEY_BACKOFF: Duration = Duration::from_secs(1);
 
-fn default_acp_role() -> SessionRole {
-    SessionRole::Worker
-}
-
-const fn default_acp_inspect_available() -> bool {
-    true
-}
-
-#[derive(Debug, Clone)]
-pub(in crate::daemon::agent_acp) struct AcpOrchestrationRegistration {
-    pub agent_id: String,
-    pub display_name: String,
-}
-
 mod locks;
+#[cfg(feature = "daemon-runtime")]
 mod orchestration;
+mod port;
 mod process_fault;
 mod process_pool;
 mod reconcile;
-mod request_wire;
 mod send_prompt;
 mod session_access;
-#[cfg(test)]
+#[cfg(all(test, feature = "daemon-runtime"))]
 mod shutdown_tests;
-mod snapshot_wire;
-#[cfg(test)]
+#[cfg(all(test, feature = "daemon-runtime"))]
 mod test_support;
+#[cfg(feature = "daemon-runtime")]
+use orchestration::DaemonAcpManagerPort;
+use port::BridgeAcpManagerPort;
+pub(in crate::daemon::agent_acp) use port::{AcpManagerPort, AcpOrchestrationRegistration};
 pub(in crate::daemon::agent_acp) use process_fault::process_fault_policy_enabled;
 pub(in crate::daemon::agent_acp) use process_pool::process_pooling_disabled;
 pub use reconcile::AcpAgentReconcileResponse;
+#[cfg(feature = "daemon-runtime")]
 pub use session_access::AcpWakePrompt;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AcpAgentStartRequest {
-    pub agent: String,
-    pub role: SessionRole,
-    pub fallback_role: Option<SessionRole>,
-    pub capabilities: Vec<String>,
-    pub name: Option<String>,
-    pub prompt: Option<String>,
-    pub project_dir: Option<String>,
-    pub persona: Option<String>,
-    pub task_id: Option<String>,
-    pub board_item_id: Option<String>,
-    pub workflow_execution_id: Option<String>,
-    pub model: Option<String>,
-    pub effort: Option<String>,
-    pub allow_custom_model: bool,
-    pub record_permissions: bool,
-}
-
-impl Default for AcpAgentStartRequest {
-    fn default() -> Self {
-        Self {
-            agent: String::new(),
-            role: default_acp_role(),
-            fallback_role: None,
-            capabilities: Vec::new(),
-            name: None,
-            prompt: None,
-            project_dir: None,
-            persona: None,
-            task_id: None,
-            board_item_id: None,
-            workflow_execution_id: None,
-            model: None,
-            effort: None,
-            allow_custom_model: false,
-            record_permissions: false,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct AcpAgentSnapshot {
-    pub acp_id: String,
-    pub session_id: String,
-    pub agent_id: String,
-    pub display_name: String,
-    pub status: AgentStatus,
-    pub pid: u32,
-    pub pgid: i32,
-    pub project_dir: String,
-    pub process_key: String,
-    pub pending_permissions: usize,
-    pub permission_queue_depth: usize,
-    pub pending_permission_batches: Vec<AcpPermissionBatch>,
-    pub permission_mode: String,
-    pub permission_log_path: Option<String>,
-    pub terminal_count: usize,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AcpAgentInspectSnapshot {
-    pub acp_id: String,
-    pub session_id: String,
-    pub agent_id: String,
-    pub display_name: String,
-    pub pid: u32,
-    pub pgid: i32,
-    pub process_key: String,
-    pub uptime_ms: u64,
-    pub last_update_at: String,
-    pub last_client_call_at: Option<String>,
-    pub watchdog_state: String,
-    pub permission_mode: String,
-    pub permission_log_path: Option<String>,
-    pub pending_permissions: usize,
-    pub permission_queue_depth: usize,
-    pub terminal_count: usize,
-    pub prompt_deadline_remaining_ms: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct AcpAgentInspectResponse {
-    pub agents: Vec<AcpAgentInspectSnapshot>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub daemon_perceived_now: Option<String>,
-    #[serde(default = "default_acp_inspect_available")]
-    pub available: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub issue_message: Option<String>,
-}
 
 #[derive(Clone)]
 pub struct AcpAgentManagerHandle {
@@ -156,9 +54,7 @@ pub struct AcpAgentManagerHandle {
 }
 
 pub(in crate::daemon::agent_acp) struct AcpAgentManagerState {
-    pub(in crate::daemon::agent_acp) sender: broadcast::Sender<StreamEvent>,
-    pub(in crate::daemon::agent_acp) db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
-    pub(in crate::daemon::agent_acp) async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
+    pub(in crate::daemon::agent_acp) port: Arc<dyn AcpManagerPort>,
     pub(in crate::daemon::agent_acp) process_lifecycle: Mutex<()>,
     pub(in crate::daemon::agent_acp) shutdown_requested: AtomicBool,
     pub(in crate::daemon::agent_acp) sessions: Mutex<BTreeMap<String, Arc<ActiveAcpSession>>>,
@@ -177,29 +73,39 @@ pub(in crate::daemon::agent_acp) struct AcpAgentManagerState {
     /// `session/prompt`. `dispatch_wake_prompt` skips spawning when the key is
     /// already present so a signal storm against one ACP session cannot fan
     /// out unbounded threads. The thread removes its own entry on exit.
+    #[cfg(feature = "daemon-runtime")]
     pub(in crate::daemon::agent_acp) wake_in_flight: Mutex<BTreeSet<(String, String)>>,
 }
 
 impl AcpAgentManagerHandle {
+    #[cfg(feature = "daemon-runtime")]
     #[must_use]
     pub fn new(
         sender: broadcast::Sender<StreamEvent>,
-        db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
+        db: Arc<std::sync::OnceLock<Arc<Mutex<crate::daemon::db::DaemonDb>>>>,
     ) -> Self {
         Self::new_with_async_db(sender, db, Arc::new(OnceLock::new()))
     }
 
+    #[cfg(feature = "daemon-runtime")]
     #[must_use]
     pub(crate) fn new_with_async_db(
         sender: broadcast::Sender<StreamEvent>,
-        db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
-        async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
+        db: Arc<std::sync::OnceLock<Arc<Mutex<crate::daemon::db::DaemonDb>>>>,
+        async_db: Arc<std::sync::OnceLock<Arc<crate::daemon::db::AsyncDaemonDb>>>,
     ) -> Self {
+        Self::with_port(Arc::new(DaemonAcpManagerPort::new(sender, db, async_db)))
+    }
+
+    #[must_use]
+    pub(crate) fn new_bridge(sender: broadcast::Sender<StreamEvent>) -> Self {
+        Self::with_port(Arc::new(BridgeAcpManagerPort::new(sender)))
+    }
+
+    fn with_port(port: Arc<dyn AcpManagerPort>) -> Self {
         Self {
             state: Arc::new(AcpAgentManagerState {
-                sender,
-                db,
-                async_db,
+                port,
                 process_lifecycle: Mutex::new(()),
                 shutdown_requested: AtomicBool::new(false),
                 sessions: Mutex::new(BTreeMap::new()),
@@ -212,13 +118,10 @@ impl AcpAgentManagerHandle {
                 process_key_failures: Mutex::new(BTreeMap::new()),
                 process_key_backoff_until: Mutex::new(BTreeMap::new()),
                 quarantined_process_keys: Mutex::new(BTreeSet::new()),
+                #[cfg(feature = "daemon-runtime")]
                 wake_in_flight: Mutex::new(BTreeSet::new()),
             }),
         }
-    }
-
-    fn db(&self) -> Result<Arc<Mutex<DaemonDb>>, CliError> {
-        ensure_shared_db(&self.state.db)
     }
 
     /// Start an ACP agent session using a built-in descriptor.
@@ -253,18 +156,56 @@ impl AcpAgentManagerHandle {
                 request.agent
             )))
         })?;
-        if service::sandboxed_from_env() {
+        if crate::daemon::sandboxed_from_env() {
             return self.start_via_bridge_with_pooling_disabled(
                 session_id,
                 request,
                 disable_pooling,
             );
         }
-        self.start_descriptor_with_pooling_disabled(
+        #[cfg(feature = "daemon-runtime")]
+        let openrouter_token = if descriptor.id.as_str() == "openrouter" {
+            crate::daemon::state::task_board_openrouter_token()
+        } else {
+            None
+        };
+        #[cfg(not(feature = "daemon-runtime"))]
+        let openrouter_token: Option<String> = None;
+        self.start_descriptor_with_pooling_and_openrouter_token(
             session_id,
             request,
             descriptor,
             disable_pooling,
+            openrouter_token.as_deref(),
+        )
+    }
+
+    pub(in crate::daemon) fn start_with_bridge_openrouter_token(
+        &self,
+        session_id: &str,
+        request: &AcpAgentStartRequest,
+        disable_pooling: bool,
+        openrouter_token: Option<&str>,
+    ) -> Result<AcpAgentSnapshot, CliError> {
+        if !feature_flags::acp_enabled_from_env() {
+            return Err(CliErrorKind::workflow_parse(format!(
+                "ACP managed agents are disabled; set {}=1 to enable",
+                feature_flags::ACP_ENV
+            ))
+            .into());
+        }
+        let descriptor = catalog::find_builtin(request.agent.trim()).ok_or_else(|| {
+            CliError::from(CliErrorKind::workflow_parse(format!(
+                "unknown ACP agent '{}'",
+                request.agent
+            )))
+        })?;
+        self.start_descriptor_with_pooling_and_openrouter_token(
+            session_id,
+            request,
+            descriptor,
+            disable_pooling,
+            openrouter_token,
         )
     }
 
@@ -273,7 +214,7 @@ impl AcpAgentManagerHandle {
     /// # Errors
     /// Returns [`CliError`] when a live refresh fails.
     pub fn list(&self, session_id: &str) -> Result<Vec<AcpAgentSnapshot>, CliError> {
-        if service::sandboxed_from_env() {
+        if crate::daemon::sandboxed_from_env() {
             return self.list_via_bridge(session_id);
         }
         let sessions = self.sessions_for(session_id)?;
@@ -297,7 +238,7 @@ impl AcpAgentManagerHandle {
     /// # Errors
     /// Returns [`CliError`] when the live session registry is unavailable.
     pub fn inspect(&self, session_id: Option<&str>) -> Result<AcpAgentInspectResponse, CliError> {
-        if service::sandboxed_from_env() {
+        if crate::daemon::sandboxed_from_env() {
             return Ok(self.inspect_via_bridge(session_id));
         }
         let sessions = self
@@ -332,7 +273,7 @@ impl AcpAgentManagerHandle {
     /// # Errors
     /// Returns [`CliError`] when the session is unknown.
     pub fn get(&self, acp_id: &str) -> Result<AcpAgentSnapshot, CliError> {
-        if service::sandboxed_from_env() {
+        if crate::daemon::sandboxed_from_env() {
             return self.get_via_bridge(acp_id);
         }
         let session = self.session(acp_id)?;
@@ -344,7 +285,7 @@ impl AcpAgentManagerHandle {
     /// # Errors
     /// Returns [`CliError`] when the session is unknown.
     pub fn stop(&self, acp_id: &str) -> Result<AcpAgentSnapshot, CliError> {
-        if service::sandboxed_from_env() {
+        if crate::daemon::sandboxed_from_env() {
             return self.stop_via_bridge(acp_id);
         }
         let session = self.session(acp_id)?;
@@ -373,7 +314,7 @@ impl AcpAgentManagerHandle {
     /// Returns [`CliError`] when the live ACP registry cannot be drained
     /// cleanly during daemon shutdown.
     pub fn shutdown_all(&self) -> Result<(), CliError> {
-        if service::sandboxed_from_env() {
+        if crate::daemon::sandboxed_from_env() {
             Self::shutdown_all_via_bridge();
             return Ok(());
         }
@@ -434,10 +375,10 @@ impl AcpAgentManagerHandle {
         };
         self.sync_orchestration_disconnect_best_effort(&snapshot);
         for incident in incidents {
-            let _ = self.state.sender.send(incident);
+            let _ = self.sender().send(incident);
         }
         let payload = serde_json::to_value(&snapshot).unwrap_or_default();
-        let _ = self.state.sender.send(StreamEvent {
+        let _ = self.sender().send(StreamEvent {
             event: "acp_agent_disconnected".to_string(),
             recorded_at: utc_now(),
             session_id: Some(snapshot.session_id),
@@ -452,7 +393,7 @@ impl AcpAgentManagerHandle {
     /// Returns [`CliError`] when the sandbox bridge inspect call fails.
     ///
     pub fn count_live_sessions(&self) -> Result<usize, CliError> {
-        if service::sandboxed_from_env() {
+        if crate::daemon::sandboxed_from_env() {
             return Self::live_session_count_via_bridge();
         }
         let sessions: Vec<_> = self.sessions_guard()?.values().cloned().collect();
@@ -497,19 +438,19 @@ impl AcpAgentManagerHandle {
             self.sync_orchestration_disconnect_best_effort(&after);
         }
         for event in incidents {
-            let _ = self.state.sender.send(event);
+            let _ = self.sender().send(event);
         }
         Ok(after)
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "daemon-runtime"))]
 mod disconnect_tests;
-#[cfg(test)]
+#[cfg(all(test, feature = "daemon-runtime"))]
 mod lock_recovery_tests;
-#[cfg(test)]
+#[cfg(all(test, feature = "daemon-runtime"))]
 mod multiplexing_fault_tests;
-#[cfg(test)]
+#[cfg(all(test, feature = "daemon-runtime"))]
 mod multiplexing_tests;
-#[cfg(test)]
+#[cfg(all(test, feature = "daemon-runtime"))]
 mod tests;

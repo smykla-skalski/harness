@@ -256,7 +256,7 @@ private struct SettingsHostBridgeSnapshot: Equatable {
 }
 
 private struct HostBridgeCommandsView: View {
-  private let startCommand = "harness bridge start"
+  private let startCommand = "harness-bridge start"
   private let installCommand = "harness bridge install-launch-agent"
 
   var body: some View {

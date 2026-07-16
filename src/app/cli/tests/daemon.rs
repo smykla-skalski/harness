@@ -1,210 +1,83 @@
 use super::*;
 
+fn rendered(args: Vec<std::ffi::OsString>) -> Vec<String> {
+    args.into_iter()
+        .map(|arg| arg.to_string_lossy().into_owned())
+        .collect()
+}
+
 #[test]
-fn parse_daemon_stop_json_flag() {
-    for (argv, expected_json) in [
-        (vec!["harness", "daemon", "stop"], false),
-        (vec!["harness", "daemon", "stop", "--json"], true),
+fn parse_daemon_stop_arguments_for_worker() {
+    for (argv, expected) in [
+        (vec!["harness", "daemon", "stop"], Vec::<&str>::new()),
+        (vec!["harness", "daemon", "stop", "--json"], vec!["--json"]),
     ] {
         let cli = Cli::try_parse_from(argv).unwrap();
         match cli.command {
             Command::Daemon {
-                command: DaemonCommand::Stop(args),
-            } => assert_eq!(args.json, expected_json),
-            _ => panic!("expected daemon stop command"),
+                command: DaemonRoute::Stop(args),
+            } => assert_eq!(rendered(args.args), expected),
+            _ => panic!("expected daemon stop route"),
         }
     }
 }
 
 #[test]
-fn parse_daemon_dev() {
-    let cli = Cli::try_parse_from(["harness", "daemon", "dev"]).unwrap();
-    match cli.command {
-        Command::Daemon {
-            command: DaemonCommand::Dev(args),
-        } => {
-            assert_eq!(args.host, "127.0.0.1");
-            assert_eq!(args.port, 0);
-            assert_eq!(args.app_group_id, HARNESS_MONITOR_APP_GROUP_ID);
-            assert!(args.codex_ws_url.is_none());
-        }
-        _ => panic!("expected daemon dev command"),
-    }
-}
-
-#[test]
-fn parse_daemon_remote_serve() {
-    let cli = Cli::try_parse_from([
-        "harness",
-        "daemon",
-        "remote",
-        "serve",
-        "--domain",
-        "daemon.example.com",
-        "--acme-email",
-        "ops@example.com",
-    ])
-    .unwrap();
-
-    match cli.command {
-        Command::Daemon {
-            command:
-                DaemonCommand::Remote {
-                    command,
-                    systemd_unit,
-                },
-        } => match command {
-            crate::daemon::transport::DaemonRemoteCommand::Serve(args) => {
-                assert_eq!(systemd_unit, None);
-                assert_eq!(args.domain, "daemon.example.com");
-                assert_eq!(args.host, "0.0.0.0");
-                assert_eq!(args.https_port, 443);
-            }
-            other => panic!("expected daemon remote serve, got {other:?}"),
-        },
-        _ => panic!("expected daemon remote command"),
-    }
-}
-
-#[test]
-fn parse_daemon_remote_systemd_unit_after_nested_command() {
-    let cli = Cli::try_parse_from([
-        "harness",
-        "daemon",
-        "remote",
-        "pair",
-        "create",
-        "--systemd-unit",
-        "harness-remote-proof",
-    ])
-    .expect("parse remote systemd unit");
-
-    match cli.command {
-        Command::Daemon {
-            command: DaemonCommand::Remote { systemd_unit, .. },
-        } => assert_eq!(systemd_unit.as_deref(), Some("harness-remote-proof")),
-        _ => panic!("expected daemon remote command"),
-    }
-}
-
-#[test]
-fn parse_daemon_restart_json_flag() {
-    for (argv, expected_json) in [
-        (vec!["harness", "daemon", "restart"], false),
-        (vec!["harness", "daemon", "restart", "--json"], true),
-    ] {
-        let cli = Cli::try_parse_from(argv).unwrap();
-        match cli.command {
-            Command::Daemon {
-                command: DaemonCommand::Restart(args),
-            } => assert_eq!(args.json, expected_json),
-            _ => panic!("expected daemon restart command"),
-        }
-    }
-}
-
-#[test]
-fn parse_bridge_start_defaults_to_all_capabilities() {
-    let cli = Cli::try_parse_from(["harness", "bridge", "start"]).unwrap();
-    match cli.command {
-        Command::Bridge {
-            command: BridgeCommand::Start(args),
-        } => {
-            assert!(args.config.capabilities.is_empty());
-            assert!(!args.daemon);
-        }
-        _ => panic!("expected bridge start command"),
-    }
-}
-
-#[test]
-fn parse_bridge_start_with_explicit_capabilities() {
-    let cli = Cli::try_parse_from([
-        "harness",
-        "bridge",
-        "start",
-        "--daemon",
-        "--capability",
-        "codex",
-        "--capability",
-        "agent-tui",
-        "--codex-port",
-        "14500",
-        "--codex-path",
-        "/tmp/mock-codex",
-    ])
-    .unwrap();
-    match cli.command {
-        Command::Bridge {
-            command: BridgeCommand::Start(args),
-        } => {
-            assert!(args.daemon);
-            assert_eq!(
-                args.config.capabilities,
-                vec![BridgeCapability::Codex, BridgeCapability::AgentTui]
-            );
-            assert_eq!(args.config.codex_port, Some(14500));
-            assert_eq!(
-                args.config.codex_path.as_deref(),
-                Some(Path::new("/tmp/mock-codex"))
-            );
-        }
-        _ => panic!("expected bridge start command"),
-    }
-}
-
-#[test]
-fn parse_bridge_reconfigure_enable_and_disable() {
+fn parse_bridge_control_arguments_for_worker() {
     let cli = Cli::try_parse_from([
         "harness",
         "bridge",
         "reconfigure",
         "--enable",
         "codex",
-        "--disable",
-        "agent-tui",
         "--force",
-        "--json",
     ])
     .unwrap();
     match cli.command {
         Command::Bridge {
-            command: BridgeCommand::Reconfigure(args),
-        } => {
-            assert_eq!(args.enable, vec![BridgeCapability::Codex]);
-            assert_eq!(args.disable, vec![BridgeCapability::AgentTui]);
-            assert!(args.force);
-            assert!(args.json);
-        }
-        _ => panic!("expected bridge reconfigure command"),
+            command: BridgeRoute::Reconfigure(args),
+        } => assert_eq!(rendered(args.args), ["--enable", "codex", "--force"]),
+        _ => panic!("expected bridge reconfigure route"),
     }
 }
 
 #[test]
-fn parse_agents_prompt_submit() {
-    let cli = Cli::try_parse_from([
-        "harness",
-        "agents",
-        "prompt-submit",
-        "--agent",
-        "codex",
-        "--project-dir",
-        "/tmp/project",
-    ])
-    .unwrap();
-    match cli.command {
-        Command::Agents {
-            command:
-                AgentsCommand::PromptSubmit(AgentPromptSubmitArgs {
-                    agent,
-                    project_dir,
-                    session_id,
-                }),
-        } => {
-            assert_eq!(agent, HookAgent::Codex);
-            assert_eq!(project_dir.as_deref(), Some("/tmp/project"));
-            assert!(session_id.is_none());
-        }
-        _ => panic!("expected agents prompt-submit command"),
+fn worker_leaf_help_is_delegated() {
+    for argv in [
+        vec!["harness", "daemon", "stop", "--help"],
+        vec!["harness", "bridge", "reconfigure", "--help"],
+    ] {
+        let cli = Cli::try_parse_from(argv).expect("worker should own leaf help");
+        let args = match cli.command {
+            Command::Daemon {
+                command: DaemonRoute::Stop(args),
+            }
+            | Command::Bridge {
+                command: BridgeRoute::Reconfigure(args),
+            } => args,
+            _ => panic!("expected delegated worker route"),
+        };
+        assert_eq!(rendered(args.args), ["--help"]);
     }
+}
+
+#[test]
+fn runtime_worker_routes_are_rejected_by_root_cli() {
+    for argv in [
+        vec!["harness", "daemon", "serve"],
+        vec!["harness", "daemon", "dev"],
+        vec!["harness", "daemon", "remote", "doctor"],
+        vec!["harness", "bridge", "start"],
+    ] {
+        let error =
+            Cli::try_parse_from(argv).expect_err("runtime route must use its worker binary");
+        assert_eq!(error.kind(), ErrorKind::InvalidSubcommand);
+    }
+}
+
+#[test]
+fn removed_agent_lifecycle_route_is_rejected() {
+    let error = Cli::try_parse_from(["harness", "agents", "prompt-submit", "--agent", "codex"])
+        .expect_err("legacy lifecycle route must be a hard cut");
+    assert_eq!(error.kind(), ErrorKind::InvalidSubcommand);
 }

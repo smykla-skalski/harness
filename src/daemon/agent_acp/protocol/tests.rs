@@ -179,6 +179,7 @@ async fn prompt_turn_against_sdk_cookbook_style_agent_streams_events() {
                     command_rx,
                     session_guard: Arc::new(SessionRouteGuard::default()),
                     manager,
+                    credential: None,
                 })
                 .await
             })
@@ -273,6 +274,7 @@ async fn protocol_rejects_notification_with_unknown_session_id() {
                     command_rx,
                     session_guard: Arc::new(SessionRouteGuard::default()),
                     manager,
+                    credential: None,
                 })
                 .await
             })
@@ -365,6 +367,7 @@ async fn run_connection_applies_session_configuration_before_first_prompt() {
                     command_rx,
                     session_guard: Arc::new(SessionRouteGuard::default()),
                     manager,
+                    credential: None,
                 })
                 .await
             })

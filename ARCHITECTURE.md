@@ -193,7 +193,7 @@ flowchart TD
 The main cross-agent path now looks like this:
 
 1. Bootstrap one host with `harness setup bootstrap --agents <claude|codex|gemini|copilot|opencode>`.
-2. Let lifecycle hooks call back into `harness agents session-start`, `session-stop`, or `prompt-submit`.
+2. Let lifecycle hooks call `harness-hook session-start`, `session-stop`, or `prompt-submit`.
 3. Use `observe` to inspect live sessions, route fixes, and improve suites or runtime behavior while the shared state is still active.
 4. Read the resulting shared agent state back through `observe`, hooks, or other harness commands.
 

@@ -1,105 +1,140 @@
-use tokio::task;
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
-use super::catalog;
-use super::orchestration_service;
-use super::service;
-use super::utc_now;
-use super::{
-    AcpAgentManagerHandle, AcpAgentSnapshot, AcpAgentStartRequest, AcpOrchestrationRegistration,
-};
+use async_trait::async_trait;
+use tokio::sync::broadcast;
+
 use crate::agents::kind::DisconnectReason;
+use crate::agents::runtime::event::ConversationEvent;
+use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ensure_shared_db};
+use crate::daemon::protocol::StreamEvent;
+use crate::daemon::service;
 use crate::errors::{CliError, CliErrorKind};
+use crate::session::service as orchestration_service;
 use crate::session::types::{AgentStatus, ManagedAgentRef, SessionState};
+use crate::workspace::utc_now;
 
-impl AcpAgentManagerHandle {
-    pub(in crate::daemon::agent_acp) fn register_orchestration_agent(
+use super::port::{
+    AcpManagerPort, AcpRegistrationRequest, AcpRuntimeBinding, AcpWakeAcceptRequest,
+};
+use super::{AcpAgentSnapshot, AcpOrchestrationRegistration};
+
+pub(super) struct DaemonAcpManagerPort {
+    sender: broadcast::Sender<StreamEvent>,
+    db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
+    async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
+}
+
+impl DaemonAcpManagerPort {
+    pub(super) const fn new(
+        sender: broadcast::Sender<StreamEvent>,
+        db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
+        async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
+    ) -> Self {
+        Self {
+            sender,
+            db,
+            async_db,
+        }
+    }
+
+    fn db(&self) -> Result<Arc<Mutex<DaemonDb>>, CliError> {
+        ensure_shared_db(&self.db)
+    }
+
+    fn lock_db(db: &Arc<Mutex<DaemonDb>>) -> Result<MutexGuard<'_, DaemonDb>, CliError> {
+        db.lock().map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "daemon database lock poisoned: {error}"
+            )))
+        })
+    }
+}
+
+#[async_trait]
+impl AcpManagerPort for DaemonAcpManagerPort {
+    fn event_sender(&self) -> broadcast::Sender<StreamEvent> {
+        self.sender.clone()
+    }
+
+    fn ensure_session_accepts_start(&self, session_id: &str) -> Result<(), CliError> {
+        let db = self.db()?;
+        let db = Self::lock_db(&db)?;
+        if db.load_session_state_for_mutation(session_id)?.is_some()
+            && db.session_accepts_managed_agent_start(session_id)?
+        {
+            return Ok(());
+        }
+        Err(service::session_not_found(session_id))
+    }
+
+    fn register_agent(
         &self,
-        session_id: &str,
-        acp_id: &str,
-        request: &AcpAgentStartRequest,
-        descriptor: &catalog::AcpAgentDescriptor,
-        display_name: &str,
-        agent_session_id: Option<&str>,
+        request: AcpRegistrationRequest<'_>,
     ) -> Result<AcpOrchestrationRegistration, CliError> {
         let db = self.db()?;
-        let db = Self::daemon_db_guard(&db)?;
-        let Some(mut state) = db.load_session_state_for_mutation(session_id)? else {
-            return Err(service::session_not_found(session_id));
+        let db = Self::lock_db(&db)?;
+        let Some(mut state) = db.load_session_state_for_mutation(request.session_id)? else {
+            return Err(service::session_not_found(request.session_id));
         };
         let now = utc_now();
-        let joined_role =
-            orchestration_service::resolve_join_role(&state, request.role, request.fallback_role)?;
+        let joined_role = orchestration_service::resolve_join_role(
+            &state,
+            request.request.role,
+            request.request.fallback_role,
+        )?;
         let agent_id = orchestration_service::apply_join_session(
             &mut state,
-            display_name,
-            &descriptor.id,
+            request.display_name,
+            &request.descriptor.id,
             joined_role,
-            &request.capabilities,
-            agent_session_id,
+            &request.request.capabilities,
+            request.agent_session_id,
             &now,
-            request.persona.as_deref(),
-            Some(ManagedAgentRef::acp(acp_id)),
+            request.request.persona.as_deref(),
+            Some(ManagedAgentRef::acp(request.acp_id)),
         )?;
         let project_id = db
-            .project_id_for_session(session_id)?
-            .ok_or_else(|| service::session_not_found(session_id))?;
+            .project_id_for_session(request.session_id)?
+            .ok_or_else(|| service::session_not_found(request.session_id))?;
         db.save_session_state(&project_id, &state)?;
         db.append_log_entry(&service::build_log_entry(
-            session_id,
-            orchestration_service::log_agent_joined(&agent_id, joined_role, &descriptor.id),
+            request.session_id,
+            orchestration_service::log_agent_joined(&agent_id, joined_role, &request.descriptor.id),
             None,
             None,
         ))?;
-        db.bump_change(session_id)?;
+        db.bump_change(request.session_id)?;
         db.bump_change("global")?;
-        log_registered_orchestration_agent(
-            session_id,
-            acp_id,
-            &agent_id,
-            &descriptor.id,
-            agent_session_id,
-        );
         Ok(AcpOrchestrationRegistration {
             agent_id,
-            display_name: display_name.to_string(),
+            display_name: request.display_name.to_string(),
         })
     }
 
-    pub(in crate::daemon::agent_acp) fn bind_orchestration_runtime_session(
-        &self,
-        session_id: &str,
-        acp_id: &str,
-        runtime_name: &str,
-        agent_session_id: &str,
-    ) -> Result<bool, CliError> {
+    fn bind_runtime_session(&self, binding: AcpRuntimeBinding<'_>) -> Result<bool, CliError> {
         let db = self.db()?;
-        let db = Self::daemon_db_guard(&db)?;
-        let Some(mut state) = db.load_session_state_for_mutation(session_id)? else {
-            return Ok(false);
-        };
-        let now = utc_now();
-        let registered = orchestration_service::apply_register_agent_runtime_session(
-            &mut state,
-            runtime_name,
-            &ManagedAgentRef::acp(acp_id),
-            agent_session_id,
-            &now,
-        )?;
-        if !registered {
-            log_skipped_runtime_bind(session_id, acp_id, runtime_name, agent_session_id);
-            return Ok(false);
-        }
-        let project_id = db
-            .project_id_for_session(session_id)?
-            .ok_or_else(|| service::session_not_found(session_id))?;
-        db.save_session_state(&project_id, &state)?;
-        db.bump_change(session_id)?;
-        db.bump_change("global")?;
-        log_bound_runtime_session(session_id, acp_id, runtime_name, agent_session_id);
-        Ok(true)
+        bind_runtime_session_sync(&db, &OwnedRuntimeBinding::from(binding))
     }
 
-    pub(in crate::daemon::agent_acp) fn rollback_orchestration_registration(
+    async fn bind_runtime_session_async(
+        &self,
+        binding: AcpRuntimeBinding<'_>,
+    ) -> Result<bool, CliError> {
+        if let Some(async_db) = self.async_db.get().cloned() {
+            return bind_runtime_session_async(&async_db, binding).await;
+        }
+        let db = self.db()?;
+        let binding = OwnedRuntimeBinding::from(binding);
+        tokio::task::spawn_blocking(move || bind_runtime_session_sync(&db, &binding))
+            .await
+            .map_err(|error| {
+                CliError::from(CliErrorKind::workflow_io(format!(
+                    "join ACP runtime bind task: {error}"
+                )))
+            })?
+    }
+
+    fn rollback_registration(
         &self,
         session_id: &str,
         acp_id: &str,
@@ -107,7 +142,7 @@ impl AcpAgentManagerHandle {
         reason_label: &str,
     ) -> Result<bool, CliError> {
         let db = self.db()?;
-        let db = Self::daemon_db_guard(&db)?;
+        let db = Self::lock_db(&db)?;
         let Some(mut state) = db.load_session_state_for_mutation(session_id)? else {
             return Ok(false);
         };
@@ -130,114 +165,17 @@ impl AcpAgentManagerHandle {
         ))?;
         db.bump_change(session_id)?;
         db.bump_change("global")?;
-        log_rolled_back_incomplete_registration(session_id, acp_id, agent_id, reason_label);
         Ok(true)
     }
 
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-    )]
-    pub(in crate::daemon::agent_acp) fn rollback_orchestration_registration_best_effort(
-        &self,
-        session_id: &str,
-        acp_id: &str,
-        agent_id: &str,
-        reason_label: &str,
-    ) {
-        match self.rollback_orchestration_registration(session_id, acp_id, agent_id, reason_label) {
-            Ok(true) => {}
-            Ok(false) => tracing::debug!(
-                session_id,
-                acp_id,
-                agent_id,
-                reason = reason_label,
-                "skipped ACP orchestration rollback because registration was already complete or missing"
-            ),
-            Err(error) => tracing::warn!(
-                session_id,
-                acp_id,
-                agent_id,
-                reason = reason_label,
-                %error,
-                "failed to roll back ACP orchestration registration after startup error"
-            ),
-        }
-    }
-
-    pub(in crate::daemon::agent_acp) async fn bind_orchestration_runtime_session_async(
-        &self,
-        session_id: &str,
-        acp_id: &str,
-        runtime_name: &str,
-        agent_session_id: &str,
-    ) -> Result<bool, CliError> {
-        if let Some(async_db) = self.state.async_db.get().cloned() {
-            let now = utc_now();
-            let managed_agent = ManagedAgentRef::acp(acp_id);
-            let registered = match async_db
-                .update_session_state_immediate(session_id, |state| {
-                    orchestration_service::apply_register_agent_runtime_session(
-                        state,
-                        runtime_name,
-                        &managed_agent,
-                        agent_session_id,
-                        &now,
-                    )
-                })
-                .await
-            {
-                Ok(registered) => registered,
-                Err(error) if error.code() == "KSRCLI090" => return Ok(false),
-                Err(error) => return Err(error),
-            };
-            if !registered {
-                return Ok(false);
-            }
-            async_db.bump_change(session_id).await?;
-            async_db.bump_change("global").await?;
-            return Ok(true);
-        }
-
-        let manager = self.clone();
-        let session_id = session_id.to_string();
-        let acp_id = acp_id.to_string();
-        let runtime_name = runtime_name.to_string();
-        let agent_session_id = agent_session_id.to_string();
-        task::spawn_blocking(move || {
-            manager.bind_orchestration_runtime_session(
-                &session_id,
-                &acp_id,
-                &runtime_name,
-                &agent_session_id,
-            )
-        })
-        .await
-        .map_err(|error| {
-            CliError::from(CliErrorKind::workflow_io(format!(
-                "join ACP runtime bind task: {error}"
-            )))
-        })?
-    }
-
-    pub(in crate::daemon::agent_acp) fn sync_orchestration_disconnect(
-        &self,
-        snapshot: &AcpAgentSnapshot,
-    ) -> Result<bool, CliError> {
-        let Some((reason, stderr_tail)) = disconnected_status_parts(snapshot) else {
-            return Ok(false);
-        };
-        self.persist_orchestration_disconnect(snapshot, reason, stderr_tail)
-    }
-
-    fn persist_orchestration_disconnect(
+    fn sync_disconnect(
         &self,
         snapshot: &AcpAgentSnapshot,
         reason: &DisconnectReason,
         stderr_tail: Option<&String>,
     ) -> Result<bool, CliError> {
         let db = self.db()?;
-        let db = Self::daemon_db_guard(&db)?;
+        let db = Self::lock_db(&db)?;
         let Some(mut state) = db.load_session_state_for_mutation(&snapshot.session_id)? else {
             return Ok(false);
         };
@@ -266,61 +204,27 @@ impl AcpAgentManagerHandle {
         db.save_session_state(&project_id, &state)?;
         db.append_log_entry(&service::build_log_entry(
             &snapshot.session_id,
-            orchestration_service::log_agent_disconnected(
-                &snapshot.agent_id,
-                disconnect_reason_label(reason),
-            ),
+            orchestration_service::log_agent_disconnected(&snapshot.agent_id, reason.log_label()),
             None,
             None,
         ))?;
         db.bump_change(&snapshot.session_id)?;
         db.bump_change("global")?;
-        if rolled_back {
-            log_rolled_back_incomplete_registration(
-                &snapshot.session_id,
-                &snapshot.acp_id,
-                &snapshot.agent_id,
-                disconnect_reason_label(reason),
-            );
-        }
         Ok(true)
     }
 
-    pub(in crate::daemon::agent_acp) fn sync_orchestration_disconnect_best_effort(
-        &self,
-        snapshot: &AcpAgentSnapshot,
-    ) {
-        if let Err(error) = self.sync_orchestration_disconnect(snapshot) {
-            warn_disconnect_sync_failure(snapshot, &error);
-        }
-    }
-
-    pub(in crate::daemon::agent_acp) fn sync_orchestration_runtime_status(
-        &self,
-        snapshot: &AcpAgentSnapshot,
-    ) -> Result<bool, CliError> {
-        let status = match &snapshot.status {
-            AgentStatus::Active => AgentStatus::Active,
-            AgentStatus::Idle => AgentStatus::Idle,
-            AgentStatus::AwaitingReview
-            | AgentStatus::Disconnected { .. }
-            | AgentStatus::Removed => return Ok(false),
-        };
-        self.persist_orchestration_runtime_status(snapshot, status)
-    }
-
-    fn persist_orchestration_runtime_status(
+    fn sync_runtime_status(
         &self,
         snapshot: &AcpAgentSnapshot,
         status: AgentStatus,
     ) -> Result<bool, CliError> {
         let db = self.db()?;
-        let db = Self::daemon_db_guard(&db)?;
+        let db = Self::lock_db(&db)?;
         let Some(mut state) = db.load_session_state_for_mutation(&snapshot.session_id)? else {
             return Ok(false);
         };
         let now = utc_now();
-        if !update_orchestration_runtime_status(&mut state, snapshot, status, &now) {
+        if !update_runtime_status(&mut state, snapshot, status, &now) {
             return Ok(false);
         }
         orchestration_service::refresh_session(&mut state, &now);
@@ -333,61 +237,135 @@ impl AcpAgentManagerHandle {
         Ok(true)
     }
 
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "tracing macro expansion in best-effort logging wrapper"
-    )]
-    pub(in crate::daemon::agent_acp) fn sync_orchestration_runtime_status_best_effort(
+    fn project_dir_for_session(&self, session_id: &str) -> Result<Option<String>, CliError> {
+        let Some(db) = self.db.get() else {
+            return Ok(None);
+        };
+        Self::lock_db(db)?.project_dir_for_session(session_id)
+    }
+
+    fn persist_conversation_events(
         &self,
-        snapshot: &AcpAgentSnapshot,
-    ) {
-        if let Err(error) = self.sync_orchestration_runtime_status(snapshot) {
-            tracing::warn!(
-                session_id = snapshot.session_id,
-                acp_id = snapshot.acp_id,
-                agent_id = snapshot.agent_id,
-                %error,
-                "failed to sync ACP runtime status into orchestration state"
-            );
+        session_id: &str,
+        agent_id: &str,
+        runtime: &str,
+        events: &[ConversationEvent],
+    ) -> Result<(), CliError> {
+        Self::lock_db(&self.db()?)?
+            .append_conversation_events(session_id, agent_id, runtime, events)
+    }
+
+    fn sync_wake_accept(&self, request: AcpWakeAcceptRequest<'_>) -> Result<(), CliError> {
+        let db = self.db()?;
+        let db = Self::lock_db(&db)?;
+        service::record_signal_ack_and_broadcast(
+            request.session_id,
+            request.agent_id,
+            request.signal_id,
+            request.result,
+            request.project_dir,
+            Some(&db),
+            Some(&self.sender),
+        )
+    }
+
+    #[cfg(test)]
+    fn daemon_db_slot(&self) -> Option<Arc<OnceLock<Arc<Mutex<DaemonDb>>>>> {
+        Some(Arc::clone(&self.db))
+    }
+}
+
+#[derive(Clone)]
+struct OwnedRuntimeBinding {
+    session_id: String,
+    acp_id: String,
+    runtime_name: String,
+    agent_session_id: String,
+}
+
+impl From<AcpRuntimeBinding<'_>> for OwnedRuntimeBinding {
+    fn from(binding: AcpRuntimeBinding<'_>) -> Self {
+        Self {
+            session_id: binding.session_id.to_string(),
+            acp_id: binding.acp_id.to_string(),
+            runtime_name: binding.runtime_name.to_string(),
+            agent_session_id: binding.agent_session_id.to_string(),
         }
     }
 }
 
-fn update_orchestration_runtime_status(
+async fn bind_runtime_session_async(
+    db: &AsyncDaemonDb,
+    binding: AcpRuntimeBinding<'_>,
+) -> Result<bool, CliError> {
+    let now = utc_now();
+    let managed_agent = ManagedAgentRef::acp(binding.acp_id);
+    let registered = match db
+        .update_session_state_immediate(binding.session_id, |state| {
+            orchestration_service::apply_register_agent_runtime_session(
+                state,
+                binding.runtime_name,
+                &managed_agent,
+                binding.agent_session_id,
+                &now,
+            )
+        })
+        .await
+    {
+        Ok(registered) => registered,
+        Err(error) if error.code() == "KSRCLI090" => return Ok(false),
+        Err(error) => return Err(error),
+    };
+    if registered {
+        db.bump_change(binding.session_id).await?;
+        db.bump_change("global").await?;
+    }
+    Ok(registered)
+}
+
+fn bind_runtime_session_sync(
+    db: &Arc<Mutex<DaemonDb>>,
+    binding: &OwnedRuntimeBinding,
+) -> Result<bool, CliError> {
+    let db = DaemonAcpManagerPort::lock_db(db)?;
+    let Some(mut state) = db.load_session_state_for_mutation(&binding.session_id)? else {
+        return Ok(false);
+    };
+    let registered = orchestration_service::apply_register_agent_runtime_session(
+        &mut state,
+        &binding.runtime_name,
+        &ManagedAgentRef::acp(binding.acp_id.as_str()),
+        &binding.agent_session_id,
+        &utc_now(),
+    )?;
+    if registered {
+        let project_id = db
+            .project_id_for_session(&binding.session_id)?
+            .ok_or_else(|| service::session_not_found(&binding.session_id))?;
+        db.save_session_state(&project_id, &state)?;
+        db.bump_change(&binding.session_id)?;
+        db.bump_change("global")?;
+    }
+    Ok(registered)
+}
+
+fn update_runtime_status(
     state: &mut SessionState,
     snapshot: &AcpAgentSnapshot,
     status: AgentStatus,
-    now: &String,
+    now: &str,
 ) -> bool {
     let Some(agent) = state.agents.get_mut(&snapshot.agent_id) else {
         return false;
     };
-    if agent.managed_agent != Some(ManagedAgentRef::acp(snapshot.acp_id.as_str())) {
-        return false;
-    }
-    if agent.status == status {
+    if agent.managed_agent != Some(ManagedAgentRef::acp(snapshot.acp_id.as_str()))
+        || agent.status == status
+    {
         return false;
     }
     agent.status = status;
-    agent.updated_at.clone_from(now);
+    agent.updated_at = now.to_string();
     true
-}
-
-fn disconnected_status_parts(
-    snapshot: &AcpAgentSnapshot,
-) -> Option<(&DisconnectReason, Option<&String>)> {
-    let AgentStatus::Disconnected {
-        reason,
-        stderr_tail,
-    } = &snapshot.status
-    else {
-        return None;
-    };
-    Some((reason, stderr_tail.as_ref()))
-}
-
-fn disconnect_reason_label(reason: &DisconnectReason) -> &'static str {
-    reason.log_label()
 }
 
 fn should_rollback_incomplete_registration(
@@ -399,96 +377,4 @@ fn should_rollback_incomplete_registration(
         agent.managed_agent.as_ref() == Some(&ManagedAgentRef::acp(acp_id))
             && agent.agent_session_id.is_none()
     })
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion in leaf logging helper"
-)]
-fn log_registered_orchestration_agent(
-    session_id: &str,
-    acp_id: &str,
-    agent_id: &str,
-    runtime_name: &str,
-    agent_session_id: Option<&str>,
-) {
-    tracing::info!(
-        session_id,
-        acp_id,
-        agent_id,
-        runtime_name,
-        runtime_session_bound = agent_session_id.is_some(),
-        "registered ACP orchestration agent"
-    );
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion in leaf logging helper"
-)]
-fn log_bound_runtime_session(
-    session_id: &str,
-    acp_id: &str,
-    runtime_name: &str,
-    agent_session_id: &str,
-) {
-    tracing::info!(
-        session_id,
-        acp_id,
-        runtime_name,
-        runtime_session_id = agent_session_id,
-        "bound ACP runtime session into orchestration"
-    );
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion in leaf logging helper"
-)]
-fn log_skipped_runtime_bind(
-    session_id: &str,
-    acp_id: &str,
-    runtime_name: &str,
-    agent_session_id: &str,
-) {
-    tracing::debug!(
-        session_id,
-        acp_id,
-        runtime_name,
-        runtime_session_id = agent_session_id,
-        "skipped ACP runtime bind because orchestration registration was missing or unchanged"
-    );
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion in leaf logging helper"
-)]
-fn log_rolled_back_incomplete_registration(
-    session_id: &str,
-    acp_id: &str,
-    agent_id: &str,
-    reason_label: &str,
-) {
-    tracing::warn!(
-        session_id,
-        acp_id,
-        agent_id,
-        reason = reason_label,
-        "rolled back incomplete ACP orchestration registration"
-    );
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion in leaf logging helper"
-)]
-fn warn_disconnect_sync_failure(snapshot: &AcpAgentSnapshot, error: &CliError) {
-    tracing::warn!(
-        acp_id = %snapshot.acp_id,
-        session_id = %snapshot.session_id,
-        agent_id = %snapshot.agent_id,
-        %error,
-        "failed to sync ACP disconnect into session orchestration"
-    );
 }

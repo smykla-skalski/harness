@@ -18,7 +18,7 @@ use tempfile::tempdir;
 use tokio::sync::broadcast;
 
 use self::support::{
-    ensure_host_home, harness_binary, output_text, run_bridge, run_bridge_with_data_home,
+    bridge_binary, ensure_host_home, output_text, run_bridge, run_bridge_with_data_home,
     wait_for_bridge_exit, wait_for_bridge_state,
 };
 use super::helpers::{ManagedChild, test_session_uuid};

@@ -3,16 +3,34 @@ use crate::daemon::agent_acp::{
     AcpPermissionDecision,
 };
 use crate::errors::CliError;
+use harness_protocol::managed_agents::acp::AcpRuntimeProbeResponse;
 
 use super::acp_rpc::{
     BridgeAcpEventsRequest, BridgeAcpEventsResponse, BridgeAcpGetRequest, BridgeAcpInspectRequest,
-    BridgeAcpListRequest, BridgeAcpReconcileRequest, BridgeAcpResolvePermissionRequest,
-    BridgeAcpStartRequest,
+    BridgeAcpListRequest, BridgeAcpProbeRequest, BridgeAcpProbeResponse, BridgeAcpReconcileRequest,
+    BridgeAcpResolvePermissionRequest, BridgeAcpStartRequest,
 };
 use super::client::BridgeClient;
 use super::types::BridgeCapability;
 
 impl BridgeClient {
+    /// Return the host bridge's latest cached ACP runtime probe snapshot.
+    ///
+    /// A missing snapshot means the bridge scheduled its first background
+    /// probe and has not completed it yet.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the bridge rejects the request or payload
+    /// decoding fails.
+    pub fn acp_probe(&self) -> Result<Option<AcpRuntimeProbeResponse>, CliError> {
+        let response: BridgeAcpProbeResponse = self.typed_capability_request(
+            BridgeCapability::Acp,
+            "probe",
+            &BridgeAcpProbeRequest::default(),
+        )?;
+        Ok(response.probe)
+    }
+
     /// Start one bridge-managed ACP session.
     ///
     /// # Errors
@@ -23,6 +41,7 @@ impl BridgeClient {
         session_id: &str,
         request: &AcpAgentStartRequest,
         disable_pooling: bool,
+        openrouter_token: Option<&str>,
     ) -> Result<AcpAgentSnapshot, CliError> {
         self.typed_capability_request(
             BridgeCapability::Acp,
@@ -31,6 +50,7 @@ impl BridgeClient {
                 session_id: session_id.to_string(),
                 request: request.clone(),
                 disable_pooling,
+                openrouter_token: openrouter_token.map(ToOwned::to_owned),
             },
         )
     }

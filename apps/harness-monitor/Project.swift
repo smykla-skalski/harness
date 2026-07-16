@@ -752,7 +752,7 @@ private let monitorAppTarget: Target = .target(
 
 // External-daemon variant: same sources and dependencies as `HarnessMonitor`
 // but built without the macOS app sandbox so the running app can reach a
-// developer-launched `harness daemon dev` outside its own container. SMAppService
+// developer-launched `harness-daemon dev` outside its own container. SMAppService
 // registration is skipped at runtime via `HARNESS_MONITOR_EXTERNAL_DAEMON=1`, so
 // the bundled managed plist stays inert; we still ship the helper binary in the
 // .app to keep the layout identical to the sandboxed product.

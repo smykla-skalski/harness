@@ -199,31 +199,15 @@ impl RemoteDaemonProcess {
     }
 
     pub fn create_pairing(&self, role: &str) -> Result<Value, String> {
-        self.run_json(&[
-            "daemon", "remote", "pair", "create", "--role", role, "--ttl", "10m",
-        ])
+        self.run_json(&["remote", "pair", "create", "--role", role, "--ttl", "10m"])
     }
 
     pub fn revoke_client(&self, client_id: &str) -> Result<Value, String> {
-        self.run_json(&[
-            "daemon",
-            "remote",
-            "clients",
-            "revoke",
-            "--client-id",
-            client_id,
-        ])
+        self.run_json(&["remote", "clients", "revoke", "--client-id", client_id])
     }
 
     pub fn rotate_client(&self, client_id: &str) -> Result<Value, String> {
-        self.run_json(&[
-            "daemon",
-            "remote",
-            "clients",
-            "rotate",
-            "--client-id",
-            client_id,
-        ])
+        self.run_json(&["remote", "clients", "rotate", "--client-id", client_id])
     }
 
     fn run_json(&self, args: &[&str]) -> Result<Value, String> {
@@ -330,7 +314,7 @@ impl Drop for RemoteDaemonProcess {
 }
 
 fn harness_binary() -> PathBuf {
-    assert_cmd::cargo::cargo_bin("harness")
+    assert_cmd::cargo::cargo_bin("harness-daemon")
 }
 
 fn remote_daemon_command(
@@ -341,7 +325,6 @@ fn remote_daemon_command(
 ) -> Command {
     let mut command = Command::new(harness_binary());
     command.args([
-        "daemon",
         "remote",
         "serve",
         "--domain",

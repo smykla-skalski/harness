@@ -1,47 +1,17 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::BTreeMap;
 
+pub use harness_protocol::daemon::{WsErrorPayload, WsRequest, WsResponse};
+
+#[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 use crate::agents::acp::catalog::AcpAgentDescriptor;
+#[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 use crate::agents::acp::probe::AcpRuntimeProbeResponse;
 use crate::agents::runtime::models::RuntimeModelCatalog;
 use crate::daemon::agent_acp::AcpAgentInspectResponse;
 use crate::session::types::AgentPersona;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WsRequest {
-    pub id: String,
-    pub method: String,
-    #[serde(default)]
-    pub params: Value,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub trace_context: Option<BTreeMap<String, String>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WsResponse {
-    pub id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub result: Option<Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<WsErrorPayload>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub batch_index: Option<usize>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub batch_count: Option<usize>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WsErrorPayload {
-    pub code: String,
-    pub message: String,
-    #[serde(default)]
-    pub details: Vec<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub status_code: Option<u16>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub data: Option<Value>,
-}
+#[cfg(not(any(feature = "bridge-runtime", feature = "daemon-runtime")))]
+use harness_protocol::managed_agents::acp::{AcpAgentDescriptor, AcpRuntimeProbeResponse};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WsPushEvent {
@@ -94,6 +64,8 @@ mod tests {
     use serde_json::json;
     use std::collections::BTreeMap;
 
+    fn accept_canonical_request(_request: harness_protocol::daemon::WsRequest) {}
+
     #[test]
     fn ws_request_serializes_trace_context_when_present() {
         let request = WsRequest {
@@ -107,6 +79,8 @@ mod tests {
         };
 
         let serialized = serde_json::to_value(&request).expect("serialize websocket request");
+
+        accept_canonical_request(request);
 
         assert_eq!(
             serialized["trace_context"]["traceparent"],

@@ -24,7 +24,7 @@ extension DaemonController {
   /// disposition record.
   ///
   /// Skips when:
-  /// - ownership is `.external` (`harness daemon dev` lifecycle)
+  /// - ownership is `.external` (`harness-daemon dev` lifecycle)
   /// - the persisted stamp matches the current helper (no rebuild — the
   ///   live daemon is healthy and tearing it down would just bounce every
   ///   sibling WS for no gain)

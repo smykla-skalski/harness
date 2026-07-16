@@ -1,6 +1,6 @@
 //! Model Context Protocol (MCP) server integration.
 //!
-//! Exposes `harness mcp serve` which speaks the MCP JSON-RPC protocol over
+//! Exposes `harness-mcp serve`, which speaks the MCP JSON-RPC protocol over
 //! stdio and drives the Harness Monitor macOS app through an accessibility
 //! registry Unix socket, plus `CGEvent` and `screencapture` for input and
 //! screenshot automation.

@@ -135,4 +135,5 @@ fn which_kubectl_validate() -> Option<PathBuf> {
 }
 
 #[cfg(test)]
+#[path = "kubectl_validate/tests.rs"]
 mod tests;

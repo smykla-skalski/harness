@@ -39,7 +39,9 @@ async fn start_descriptor_lazily_opens_canonical_db_for_orchestration_registrati
                 .expect("start with lazy-opened daemon db");
 
             assert!(
-                manager.state.db.get().is_some(),
+                manager
+                    .daemon_db_slot()
+                    .is_some_and(|slot| slot.get().is_some()),
                 "manager should cache opened db"
             );
             let state = super::load_session_state(&manager, "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc");

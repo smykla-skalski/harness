@@ -4,38 +4,37 @@ use std::path::PathBuf;
 use portable_pty::PtySize;
 use serde::{Deserialize, Serialize};
 
-use crate::agents::runtime::models;
-use crate::agents::runtime::{InitialPromptDelivery, runtime_for_name};
-use crate::errors::{CliError, CliErrorKind};
-use crate::session::types::SessionRole;
+#[cfg(feature = "daemon-runtime")]
+pub use harness_protocol::managed_agents::tui::{AgentTuiListResponse, AgentTuiStartRequest};
+pub use harness_protocol::managed_agents::tui::{
+    AgentTuiResizeRequest, AgentTuiSize, AgentTuiSnapshot, AgentTuiStatus,
+};
 
+use crate::agents::runtime::InitialPromptDelivery;
+#[cfg(feature = "daemon-runtime")]
+use crate::agents::runtime::{models, runtime_for_name};
+use crate::errors::{CliError, CliErrorKind};
+
+#[cfg(feature = "daemon-runtime")]
 use super::effort::apply_effort_to_profile;
 use super::process::AgentTuiProcess;
-use super::screen::TerminalScreenSnapshot;
+#[cfg(all(test, feature = "daemon-runtime"))]
 use super::{DEFAULT_COLS, DEFAULT_ROWS};
 
-/// Terminal dimensions used when spawning or resizing a terminal agent.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AgentTuiSize {
-    pub rows: u16,
-    pub cols: u16,
-}
-
-impl Default for AgentTuiSize {
-    fn default() -> Self {
-        Self {
-            rows: DEFAULT_ROWS,
-            cols: DEFAULT_COLS,
-        }
-    }
-}
-
-impl AgentTuiSize {
+pub(crate) trait AgentTuiSizeExt {
     /// Validate that the PTY has a usable non-zero size.
     ///
     /// # Errors
     /// Returns a workflow parse error when either dimension is zero.
-    pub fn validate(self) -> Result<Self, CliError> {
+    fn validate(self) -> Result<Self, CliError>
+    where
+        Self: Sized;
+
+    fn pty_size(self) -> PtySize;
+}
+
+impl AgentTuiSizeExt for AgentTuiSize {
+    fn validate(self) -> Result<Self, CliError> {
         if self.rows == 0 || self.cols == 0 {
             return Err(CliErrorKind::workflow_parse(
                 "terminal agent rows and cols must be greater than zero",
@@ -44,13 +43,11 @@ impl AgentTuiSize {
         }
         Ok(self)
     }
-}
 
-impl From<AgentTuiSize> for PtySize {
-    fn from(size: AgentTuiSize) -> Self {
-        Self {
-            rows: size.rows,
-            cols: size.cols,
+    fn pty_size(self) -> PtySize {
+        PtySize {
+            rows: self.rows,
+            cols: self.cols,
             pixel_width: 0,
             pixel_height: 0,
         }
@@ -181,41 +178,7 @@ impl AgentTuiBackend for PortablePtyAgentTuiBackend {
     }
 }
 
-/// Lifecycle status for a managed terminal agent process.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum AgentTuiStatus {
-    Starting,
-    Running,
-    Exited,
-    Failed,
-    Stopped,
-}
-
-impl AgentTuiStatus {
-    #[must_use]
-    pub(crate) const fn as_str(self) -> &'static str {
-        match self {
-            Self::Starting => "starting",
-            Self::Running => "running",
-            Self::Exited => "exited",
-            Self::Failed => "failed",
-            Self::Stopped => "stopped",
-        }
-    }
-
-    pub(crate) fn from_str(value: &str) -> Result<Self, String> {
-        match value {
-            "starting" => Ok(Self::Starting),
-            "running" => Ok(Self::Running),
-            "exited" => Ok(Self::Exited),
-            "failed" => Ok(Self::Failed),
-            "stopped" => Ok(Self::Stopped),
-            _ => Err(format!("unknown terminal agent status '{value}'")),
-        }
-    }
-}
-
+#[cfg(feature = "daemon-runtime")]
 pub(super) const fn session_disconnect_reason(status: AgentTuiStatus) -> Option<&'static str> {
     match status {
         AgentTuiStatus::Exited => Some("managed terminal agent exited"),
@@ -225,61 +188,25 @@ pub(super) const fn session_disconnect_reason(status: AgentTuiStatus) -> Option<
     }
 }
 
-/// Request body for starting an agent runtime in an interactive PTY.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AgentTuiStartRequest {
-    pub runtime: String,
-    #[serde(default = "default_agent_tui_role")]
-    pub role: SessionRole,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub fallback_role: Option<SessionRole>,
-    #[serde(default)]
-    pub capabilities: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub prompt: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub project_dir: Option<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub argv: Vec<String>,
-    #[serde(default = "default_agent_tui_rows")]
-    pub rows: u16,
-    #[serde(default = "default_agent_tui_cols")]
-    pub cols: u16,
-    /// Persona identifier to resolve and attach to the agent registration.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub persona: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub task_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub board_item_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub workflow_execution_id: Option<String>,
-    /// Optional model identifier validated against the runtime's catalog.
-    /// `None` means use the runtime default.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub model: Option<String>,
-    /// Optional reasoning/thinking effort level. Must be a member of the
-    /// selected model's `effort_values`; ignored silently when the model does
-    /// not support effort. `None` skips effort selection entirely.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub effort: Option<String>,
-    /// When `true`, the `model` field is accepted as-is without catalog
-    /// validation and any effort value is forwarded without checking the
-    /// model's `effort_values`. Surfaces the "Custom..." picker option in the
-    /// UI for models Harness does not pre-register.
-    #[serde(default, skip_serializing_if = "core::ops::Not::not")]
-    pub allow_custom_model: bool,
-}
-
-impl AgentTuiStartRequest {
+#[cfg(feature = "daemon-runtime")]
+pub(crate) trait AgentTuiStartRequestExt {
     /// Resolve and validate the runtime profile used for PTY spawning.
     ///
     /// # Errors
     /// Returns a workflow parse error when the runtime or argv is invalid, or
     /// when the requested model is not in the runtime's catalog.
-    pub fn launch_profile(&self) -> Result<AgentTuiLaunchProfile, CliError> {
+    fn launch_profile(&self) -> Result<AgentTuiLaunchProfile, CliError>;
+
+    /// Resolve and validate the requested PTY size.
+    ///
+    /// # Errors
+    /// Returns a workflow parse error when either dimension is zero.
+    fn size(&self) -> Result<AgentTuiSize, CliError>;
+}
+
+#[cfg(feature = "daemon-runtime")]
+impl AgentTuiStartRequestExt for AgentTuiStartRequest {
+    fn launch_profile(&self) -> Result<AgentTuiLaunchProfile, CliError> {
         let default_profile = AgentTuiLaunchProfile::for_runtime(&self.runtime)?;
         let mut profile = if self.argv.is_empty() {
             default_profile
@@ -296,11 +223,7 @@ impl AgentTuiStartRequest {
         Ok(profile)
     }
 
-    /// Resolve and validate the requested PTY size.
-    ///
-    /// # Errors
-    /// Returns a workflow parse error when either dimension is zero.
-    pub fn size(&self) -> Result<AgentTuiSize, CliError> {
+    fn size(&self) -> Result<AgentTuiSize, CliError> {
         AgentTuiSize {
             rows: self.rows,
             cols: self.cols,
@@ -315,6 +238,7 @@ impl AgentTuiStartRequest {
 /// Runtimes that do not accept a `--model` flag are accepted silently with a
 /// warning logged. Unknown runtimes or models are rejected with a workflow
 /// parse error.
+#[cfg(feature = "daemon-runtime")]
 fn apply_model_to_profile(
     profile: &mut AgentTuiLaunchProfile,
     model: &str,
@@ -356,19 +280,16 @@ fn apply_model_to_profile(
     Ok(())
 }
 
-/// Request body for resizing an active terminal agent PTY.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AgentTuiResizeRequest {
-    pub rows: u16,
-    pub cols: u16,
-}
-
-impl AgentTuiResizeRequest {
+pub(crate) trait AgentTuiResizeRequestExt {
     /// Resolve and validate the requested PTY size.
     ///
     /// # Errors
     /// Returns a workflow parse error when either dimension is zero.
-    pub fn size(self) -> Result<AgentTuiSize, CliError> {
+    fn size(self) -> Result<AgentTuiSize, CliError>;
+}
+
+impl AgentTuiResizeRequestExt for AgentTuiResizeRequest {
+    fn size(self) -> Result<AgentTuiSize, CliError> {
         AgentTuiSize {
             rows: self.rows,
             cols: self.cols,
@@ -377,50 +298,10 @@ impl AgentTuiResizeRequest {
     }
 }
 
-/// List response for managed terminal agent snapshots.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AgentTuiListResponse {
-    pub tuis: Vec<AgentTuiSnapshot>,
-}
-
-/// Persisted, API-facing snapshot for a managed interactive agent runtime.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AgentTuiSnapshot {
-    pub tui_id: String,
-    pub session_id: String,
-    pub agent_id: String,
-    pub runtime: String,
-    pub status: AgentTuiStatus,
-    pub argv: Vec<String>,
-    pub project_dir: String,
-    pub size: AgentTuiSize,
-    pub screen: TerminalScreenSnapshot,
-    pub transcript_path: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub exit_code: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub signal: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-fn default_agent_tui_role() -> SessionRole {
-    SessionRole::Worker
-}
-
-const fn default_agent_tui_rows() -> u16 {
-    DEFAULT_ROWS
-}
-
-const fn default_agent_tui_cols() -> u16 {
-    DEFAULT_COLS
-}
-
-#[cfg(test)]
+#[cfg(all(test, feature = "daemon-runtime"))]
 mod model_selection_tests {
     use super::*;
+    use crate::session::types::SessionRole;
 
     fn base_request(runtime: &str) -> AgentTuiStartRequest {
         AgentTuiStartRequest {

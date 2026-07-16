@@ -9,7 +9,10 @@ use crate::workspace::utc_now;
 
 use super::input_request::AgentTuiInputRequest;
 use super::manager::AgentTuiManagerHandle;
-use super::model::{AgentTuiLaunchProfile, AgentTuiListResponse, AgentTuiSnapshot, AgentTuiStatus};
+use super::model::{
+    AgentTuiLaunchProfile, AgentTuiListResponse, AgentTuiResizeRequestExt, AgentTuiSnapshot,
+    AgentTuiStatus,
+};
 use super::process::{AgentTuiSnapshotContext, snapshot_from_process};
 use super::readiness::signal_readiness_ready;
 use super::support::lock_db;

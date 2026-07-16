@@ -98,7 +98,7 @@ public struct SettingsMCPSection: View {
       "When enabled, Harness Monitor binds a Unix-domain socket inside the "
         + "app-group container so the "
     )
-    var code = AttributedString("harness mcp serve")
+    var code = AttributedString("harness-mcp serve")
     code.font = .footnote.monospaced()
     code.backgroundColor = HarnessMonitorTheme.accent.opacity(0.12)
     code.foregroundColor = HarnessMonitorTheme.ink

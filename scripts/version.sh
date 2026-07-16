@@ -10,6 +10,26 @@ sanitize_xcode_only_swift_environment
 CARGO_TOML="$ROOT/Cargo.toml"
 TESTKIT_CARGO_TOML="$ROOT/testkit/Cargo.toml"
 AFF_CARGO_TOML="$ROOT/aff/Cargo.toml"
+CORE_PACKAGE_MANIFESTS=(
+  "$ROOT/crates/harness-command/Cargo.toml"
+  "$ROOT/crates/harness-daemon-client/Cargo.toml"
+  "$ROOT/crates/harness-daemon/Cargo.toml"
+  "$ROOT/crates/harness-bridge/Cargo.toml"
+  "$ROOT/crates/harness-mcp/Cargo.toml"
+  "$ROOT/crates/harness-hook/Cargo.toml"
+  "$ROOT/crates/harness-protocol/Cargo.toml"
+  "$ROOT/crates/harness-telemetry/Cargo.toml"
+)
+CORE_PACKAGE_NAMES=(
+  "harness-command"
+  "harness-daemon-client"
+  "harness-daemon"
+  "harness-bridge"
+  "harness-mcp"
+  "harness-hook"
+  "harness-protocol"
+  "harness-telemetry"
+)
 CARGO_LOCK="$ROOT/Cargo.lock"
 MONITOR_APP_ROOT="$ROOT/apps/harness-monitor"
 MONITOR_BUILD_SETTINGS="$ROOT/apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift"
@@ -65,6 +85,41 @@ manifest_package_version() {
       exit 0;
     }
     exit 1;
+  ' "$manifest"
+}
+
+manifest_harness_dependency_versions() {
+  local manifest="$1"
+  perl -ne '
+    if (/^(harness-[A-Za-z0-9-]+)\s*=\s*\{([^}]*)\}/) {
+      my ($name, $attributes) = ($1, $2);
+      my $version = $attributes =~ /\bversion\s*=\s*"([^"]+)"/
+        ? $1
+        : "<missing>";
+      print "$name\t$version\n";
+    }
+  ' "$manifest"
+}
+
+is_core_package_name() {
+  local candidate="$1"
+  local package_name
+  for package_name in "${CORE_PACKAGE_NAMES[@]}"; do
+    [ "$candidate" = "$package_name" ] && return 0
+  done
+  return 1
+}
+
+manifest_has_dependency() {
+  local manifest="$1"
+  local dependency_name="$2"
+  DEPENDENCY_NAME="$dependency_name" perl -ne '
+    BEGIN { $found = 0; }
+    if (/^\Q$ENV{DEPENDENCY_NAME}\E\s*=/) {
+      $found = 1;
+      last;
+    }
+    END { exit($found ? 0 : 1); }
   ' "$manifest"
 }
 
@@ -134,6 +189,17 @@ set_manifest_package_version() {
   PACKAGE_NAME="$package_name" NEW_VERSION="$version" perl -0pi -e '
     my $count = s/(\[package\]\s*name = "\Q$ENV{PACKAGE_NAME}\E"\s*version = ")[^"]+(")/$1.$ENV{NEW_VERSION}.$2/se;
     die "failed to update $ENV{PACKAGE_NAME} version in $ARGV\n" unless $count;
+  ' "$manifest"
+}
+
+set_manifest_dependency_version() {
+  local manifest="$1"
+  local dependency_name="$2"
+  local version="$3"
+
+  DEPENDENCY_NAME="$dependency_name" NEW_VERSION="$version" perl -0pi -e '
+    my $count = s/(^\Q$ENV{DEPENDENCY_NAME}\E\s*=\s*\{[^}\n]*\bversion\s*=\s*")[^"]+(")/$1.$ENV{NEW_VERSION}.$2/gme;
+    die "failed to update $ENV{DEPENDENCY_NAME} dependency version in $ARGV\n" unless $count;
   ' "$manifest"
 }
 
@@ -222,6 +288,8 @@ check_sync() {
   local -a generated_marketing_versions=()
   local -a generated_current_versions=()
   local -a errors=()
+  local index package_name package_version lock_package_version_value
+  local dependency_manifest dependency_name dependency_version
 
   version="$(canonical_version)"
   testkit_version="$(manifest_package_version "$TESTKIT_CARGO_TOML" "harness-testkit")"
@@ -243,6 +311,19 @@ check_sync() {
   [ "$lock_harness_version" = "$version" ] || errors+=("Cargo.lock harness version $lock_harness_version != Cargo.toml version $version")
   [ "$lock_testkit_version" = "$version" ] || errors+=("Cargo.lock harness-testkit version $lock_testkit_version != Cargo.toml version $version")
   [ "$lock_aff_version" = "$version" ] || errors+=("Cargo.lock aff version $lock_aff_version != Cargo.toml version $version")
+  for index in "${!CORE_PACKAGE_MANIFESTS[@]}"; do
+    package_name="${CORE_PACKAGE_NAMES[$index]}"
+    package_version="$(manifest_package_version "${CORE_PACKAGE_MANIFESTS[$index]}" "$package_name")"
+    lock_package_version_value="$(lock_package_version "$CARGO_LOCK" "$package_name")"
+    [ "$package_version" = "$version" ] || errors+=("${CORE_PACKAGE_MANIFESTS[$index]#"$ROOT/"} version $package_version != Cargo.toml version $version")
+    [ "$lock_package_version_value" = "$version" ] || errors+=("Cargo.lock $package_name version $lock_package_version_value != Cargo.toml version $version")
+  done
+  for dependency_manifest in "$CARGO_TOML" "${CORE_PACKAGE_MANIFESTS[@]}"; do
+    while IFS=$'\t' read -r dependency_name dependency_version; do
+      is_core_package_name "$dependency_name" || continue
+      [ "$dependency_version" = "$version" ] || errors+=("${dependency_manifest#"$ROOT/"} $dependency_name dependency version $dependency_version != Cargo.toml version $version")
+    done < <(manifest_harness_dependency_versions "$dependency_manifest")
+  done
   [ "$marketing_version" = "$version" ] || errors+=("apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift MARKETING_VERSION $marketing_version != Cargo.toml version $version")
   [ "$current_version" = "$version" ] || errors+=("apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift CURRENT_PROJECT_VERSION $current_version != Cargo.toml version $version")
   if [ "$(uname -s)" = "Darwin" ]; then
@@ -290,9 +371,23 @@ check_sync() {
 
 sync_all() {
   local version="$1"
+  local dependency_manifest dependency_name index package_name
 
   set_manifest_package_version "$TESTKIT_CARGO_TOML" "harness-testkit" "$version"
   set_manifest_package_version "$AFF_CARGO_TOML" "aff" "$version"
+  for index in "${!CORE_PACKAGE_MANIFESTS[@]}"; do
+    package_name="${CORE_PACKAGE_NAMES[$index]}"
+    set_manifest_package_version "${CORE_PACKAGE_MANIFESTS[$index]}" "$package_name" "$version"
+    set_lock_package_version "$package_name" "$version"
+  done
+  for dependency_manifest in "$CARGO_TOML" "${CORE_PACKAGE_MANIFESTS[@]}"; do
+    for dependency_name in "${CORE_PACKAGE_NAMES[@]}"; do
+      if manifest_has_dependency "$dependency_manifest" "$dependency_name"; then
+        set_manifest_dependency_version \
+          "$dependency_manifest" "$dependency_name" "$version"
+      fi
+    done
+  done
   set_lock_package_version "harness" "$version"
   set_lock_package_version "harness-testkit" "$version"
   set_lock_package_version "aff" "$version"

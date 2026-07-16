@@ -17,10 +17,10 @@ pub(super) fn spawn_daemon_serve_with_args(
     xdg: &Path,
     extra_args: &[&str],
 ) -> ManagedChild {
-    let mut args = vec!["daemon", "serve", "--host", "127.0.0.1", "--port", "0"];
+    let mut args = vec!["serve", "--host", "127.0.0.1", "--port", "0"];
     args.extend(extra_args);
     ManagedChild::spawn(
-        Command::new(harness_binary())
+        Command::new(daemon_binary())
             .args(&args)
             .env("HARNESS_HOST_HOME", home)
             .env("HOME", home)
@@ -36,10 +36,10 @@ pub(super) fn spawn_daemon_serve_with_args(
 pub(super) fn spawn_bridge(home: &Path, xdg: &Path, extra_args: &[&str]) -> ManagedChild {
     let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
     loop {
-        let mut args = vec!["bridge", "start"];
+        let mut args = vec!["start"];
         args.extend(extra_args);
         let mut child = ManagedChild::spawn(
-            Command::new(harness_binary())
+            Command::new(bridge_binary())
                 .args(&args)
                 .env("HARNESS_HOST_HOME", home)
                 .env("HOME", home)
@@ -167,6 +167,14 @@ pub(super) fn unused_local_port() -> u16 {
 
 pub(super) fn harness_binary() -> PathBuf {
     assert_cmd::cargo::cargo_bin("harness")
+}
+
+pub(super) fn daemon_binary() -> PathBuf {
+    assert_cmd::cargo::cargo_bin("harness-daemon")
+}
+
+pub(super) fn bridge_binary() -> PathBuf {
+    assert_cmd::cargo::cargo_bin("harness-bridge")
 }
 
 pub(super) fn output_text(output: &Output) -> String {

@@ -740,6 +740,34 @@ resolve_local_harness_binary() {
   printf '%s\n' "$OBSERVABILITY_LOCAL_HARNESS_BINARY"
 }
 
+resolve_local_worker_binary() {
+  local binary_name="$1"
+  local configured_path="$2"
+  local binary_path target_dir
+
+  binary_path="$(normalize_env_value "$configured_path" || true)"
+  if [ -n "$binary_path" ]; then
+    if [ ! -x "$binary_path" ]; then
+      printf 'configured %s smoke binary is not executable: %s\n' \
+        "$binary_name" "$binary_path" >&2
+      exit 1
+    fi
+    printf '%s\n' "$binary_path"
+    return
+  fi
+
+  target_dir="$(resolve_local_cargo_target_dir)"
+  "$ROOT/scripts/cargo-local.sh" build --quiet \
+    --package "$binary_name" --bin "$binary_name" >/dev/null
+  binary_path="$target_dir/debug/$binary_name"
+  if [ ! -x "$binary_path" ]; then
+    printf 'failed to resolve built local %s binary at %s\n' \
+      "$binary_name" "$binary_path" >&2
+    exit 1
+  fi
+  printf '%s\n' "$binary_path"
+}
+
 # Use the built binary directly so long-lived smoke commands do not hold cargo-run locks.
 run_with_cleared_otel_env() {
   OTEL_EXPORTER_OTLP_ENDPOINT='' \
@@ -757,13 +785,27 @@ run_local_harness() {
   run_with_cleared_otel_env "$binary_path" "$@"
 }
 
+run_local_harness_hook() {
+  local binary_path
+  binary_path="$(resolve_local_worker_binary \
+    harness-hook "${HARNESS_OBSERVABILITY_HOOK_BIN:-}")"
+  run_with_cleared_otel_env "$binary_path" "$@"
+}
+
+run_local_harness_daemon() {
+  local binary_path
+  binary_path="$(resolve_local_worker_binary \
+    harness-daemon "${HARNESS_OBSERVABILITY_DAEMON_BIN:-}")"
+  run_with_cleared_otel_env "$binary_path" "$@"
+}
+
 run_cli_smoke() {
   run_local_harness session list --json >/dev/null
 }
 
 run_hook_smoke() {
   printf '%s' '{"hook_event_name":"PreToolUse","session_id":"observability-smoke-session","tool_name":"Read","tool_input":{"file_path":"Cargo.toml"}}' \
-    | run_local_harness hook --agent codex suite:run tool-guard >/dev/null
+    | run_local_harness_hook tool-guard --agent codex --skill suite:run >/dev/null
 }
 
 run_bridge_smoke() {
@@ -800,7 +842,7 @@ run_daemon_server_smoke() {
   trap cleanup_daemon_server_smoke RETURN
 
   HARNESS_DAEMON_DATA_HOME="$daemon_home" \
-  run_local_harness daemon serve --host 127.0.0.1 --port 0 \
+  run_local_harness_daemon serve --host 127.0.0.1 --port 0 \
     >"$daemon_log" 2>&1 &
   daemon_pid="$!"
 

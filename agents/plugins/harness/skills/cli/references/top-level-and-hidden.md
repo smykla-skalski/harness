@@ -1,42 +1,43 @@
-# Top-level and hidden commands
+# CLI executable map
 
 ## Visible top-level commands
 
 | Command | Purpose |
 | --- | --- |
-| `hook` | Run a harness hook for a skill |
 | `run` | Suite:run commands grouped by domain |
 | `create` | Suite:create commands grouped by domain |
 | `setup` | Setup environment and cluster commands |
-| `agents` | Shared harness-managed agent lifecycle commands |
 | `observe` | Observe and classify harness-managed agent session logs |
 | `session` | Multi-agent session orchestration |
 | `task-board` | Cross-project task board |
-| `daemon` | Local daemon for the Harness app |
-| `bridge` | Supervise host capabilities for sandboxed Codex and terminal agent flows |
+| `daemon` | Control the local Harness daemon through `harness-daemon` |
+| `bridge` | Control the host bridge through `harness-bridge` |
 
-Sources: `cargo run --quiet -- --help`; `cargo run --quiet -- task-board --help`; `src/app/cli.rs:96-158`; `src/task_board/transport.rs:25-47`.
+Sources: `harness --help`; `harness task-board --help`; `src/app/cli.rs`; `src/task_board/transport.rs`.
 
-## Hidden top-level commands
+## Dedicated executables
 
-| Command | Purpose | Source note |
-| --- | --- | --- |
-| `session-start` | Handle session start hook | Hidden with `#[command(hide = true)]` |
-| `session-stop` | Handle session stop cleanup | Hidden with `#[command(hide = true)]` |
-| `pre-compact` | Save compact handoff before compaction | Hidden with `#[command(hide = true)]` |
+| Executable | Purpose |
+| --- | --- |
+| `harness-hook` | Run lifecycle and suite hooks |
+| `harness-daemon` | Run daemon services, including `serve` and `remote serve` |
+| `harness-bridge` | Run the long-lived host bridge with `start` |
+| `harness-mcp` | Run the Harness Monitor MCP server |
 
-Sources: `src/app/cli.rs:127-137`.
+The v48 command surface is a hard cut: lifecycle, hook, MCP, and runtime entrypoints no longer run as hidden or nested `harness` commands.
+
+Sources: `crates/harness-hook/src/main.rs`; `crates/harness-daemon/src/main.rs`; `crates/harness-bridge/src/main.rs`; `crates/harness-mcp/src/main.rs`.
 
 ## Global `--delay`
 
 | Surface | Value |
 | --- | --- |
 | Flag | `--delay <DELAY>` |
-| Scope | Global; inherited by top-level commands and subcommands |
+| Scope | Global within each executable; inherited by its subcommands |
 | Default | `0` |
 | Meaning | Waits before executing the chosen command |
 | Notes | Accepts fractional seconds such as `0.5`; prefer it over `sleep N && harness ...` |
 
-Implementation: `Cli.delay` is declared with `#[arg(long, default_value = "0", global = true)]`, and `run()` sleeps with `thread::sleep(Duration::from_secs_f64(cli.delay))` when the value is greater than zero.
+Each executable applies its own `Cli.delay` once. When the root CLI delegates a control command, it removes the already-applied `--delay` from the worker argument vector.
 
-Sources: `cargo run --quiet -- --help`; `src/app/cli.rs:29-39`; `src/app/cli.rs:236-240`.
+Sources: `harness --help`; `crates/harness-command/src/lib.rs`; `src/app/cli.rs`; `crates/harness-daemon/src/main.rs`.

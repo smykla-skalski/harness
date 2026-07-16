@@ -8,8 +8,7 @@ use tokio::sync::broadcast;
 
 use crate::daemon::bridge::{BridgeCapability, BridgeClient};
 use crate::daemon::protocol::StreamEvent;
-use crate::daemon::service;
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 use super::manager::{
@@ -46,7 +45,34 @@ impl AcpAgentManagerHandle {
         disable_pooling: bool,
     ) -> Result<AcpAgentSnapshot, CliError> {
         let bridge = BridgeClient::for_capability(BridgeCapability::Acp)?;
-        let snapshot = bridge.acp_start(session_id, request, disable_pooling)?;
+        let mut bridge_request = request.clone();
+        if bridge_request
+            .project_dir
+            .as_deref()
+            .is_none_or(|value| value.trim().is_empty())
+        {
+            bridge_request.project_dir = self.project_dir_from_db(session_id)?;
+        }
+        if bridge_request.project_dir.is_none() {
+            return Err(CliErrorKind::session_not_active(format!(
+                "session '{session_id}' does not have a project directory for host bridge startup"
+            ))
+            .into());
+        }
+        #[cfg(feature = "daemon-runtime")]
+        let openrouter_token = if bridge_request.agent.trim() == "openrouter" {
+            crate::daemon::state::task_board_openrouter_token()
+        } else {
+            None
+        };
+        #[cfg(not(feature = "daemon-runtime"))]
+        let openrouter_token: Option<String> = None;
+        let snapshot = bridge.acp_start(
+            session_id,
+            &bridge_request,
+            disable_pooling,
+            openrouter_token.as_deref(),
+        )?;
         self.ensure_sandbox_event_poller();
         Ok(snapshot)
     }
@@ -131,7 +157,7 @@ impl AcpAgentManagerHandle {
     }
 
     fn ensure_sandbox_event_poller(&self) {
-        if !service::sandboxed_from_env() || self.swap_sandbox_event_poller_running() {
+        if !crate::daemon::sandboxed_from_env() || self.swap_sandbox_event_poller_running() {
             return;
         }
         let manager = self.clone();
@@ -411,5 +437,5 @@ fn maybe_emit_pool_key_mismatch_incident(
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "daemon-runtime"))]
 mod tests;

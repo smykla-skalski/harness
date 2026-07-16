@@ -10,10 +10,10 @@ fn mcp_serve_non_macos_refuses_with_workflow_io_error() {
 
     use assert_cmd::cargo::cargo_bin;
 
-    let output = Command::new(cargo_bin("harness"))
-        .args(["mcp", "serve"])
+    let output = Command::new(cargo_bin("harness-mcp"))
+        .arg("serve")
         .output()
-        .expect("run harness mcp serve");
+        .expect("run harness-mcp serve");
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(

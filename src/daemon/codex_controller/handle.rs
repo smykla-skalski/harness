@@ -42,7 +42,7 @@ impl CodexControllerHandle {
     ///
     /// `sandboxed` is the daemon's sandbox-mode flag. Transport selection is
     /// re-evaluated on every [`Self::current_transport_kind`] call so runs
-    /// pick up a bridge endpoint the moment `harness bridge start`
+    /// pick up a bridge endpoint the moment `harness-bridge start`
     /// publishes it, without having to restart the daemon.
     #[must_use]
     pub fn new(

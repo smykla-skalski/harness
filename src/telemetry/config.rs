@@ -31,6 +31,7 @@ pub enum RuntimeService {
     Hook,
     Daemon,
     Bridge,
+    Mcp,
 }
 
 impl RuntimeService {
@@ -41,6 +42,7 @@ impl RuntimeService {
             Self::Hook => "harness-hook",
             Self::Daemon => "harness-daemon",
             Self::Bridge => "harness-bridge",
+            Self::Mcp => "harness-mcp",
         }
     }
 }
@@ -83,10 +85,23 @@ pub fn shared_config_path() -> PathBuf {
 
 #[must_use]
 pub fn runtime_service_from_args<S: AsRef<str>>(args: &[S]) -> RuntimeService {
+    let program = args
+        .first()
+        .map(AsRef::as_ref)
+        .and_then(|value| std::path::Path::new(value).file_name())
+        .and_then(std::ffi::OsStr::to_str);
+    match program {
+        Some("harness-hook") => return RuntimeService::Hook,
+        Some("harness-daemon") => return RuntimeService::Daemon,
+        Some("harness-bridge") => return RuntimeService::Bridge,
+        Some("harness-mcp") => return RuntimeService::Mcp,
+        _ => {}
+    }
     match args.get(1).map(AsRef::as_ref) {
         Some("hook") => RuntimeService::Hook,
         Some("daemon") => RuntimeService::Daemon,
         Some("bridge") => RuntimeService::Bridge,
+        Some("mcp") => RuntimeService::Mcp,
         _ => RuntimeService::Cli,
     }
 }

@@ -4,6 +4,7 @@ use crate::daemon::protocol::{
     TaskBoardUpdateIdentityClears, TaskBoardUpdateItemRequest, TaskBoardUpdateStateClears,
 };
 use crate::errors::CliError;
+use crate::task_board::TaskBoardWorkflowKind;
 use crate::task_board::types::{ExternalRef, TaskBoardItem};
 
 use super::{
@@ -18,7 +19,7 @@ impl Execute for TaskBoardCreateArgs {
             body: self.body.clone(),
             priority: self.priority,
             agent_mode: self.agent_mode,
-            workflow_kind: Default::default(),
+            workflow_kind: TaskBoardWorkflowKind::default(),
             execution_repository: None,
             tags: self.tag.clone(),
             project_id: self.project_id.clone(),

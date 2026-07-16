@@ -310,8 +310,8 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        approval_policy, approval_result, permission_profile, runtime_workspace_roots,
-        workspace_permission_config_with_signing_socket, WORKSPACE_PERMISSION_PROFILE,
+        WORKSPACE_PERMISSION_PROFILE, approval_policy, approval_result, permission_profile,
+        runtime_workspace_roots, workspace_permission_config_with_signing_socket,
     };
     use crate::daemon::protocol::{CodexApprovalDecision, CodexRunMode};
     use crate::git::mutation::create_linked_worktree;
@@ -338,19 +338,17 @@ mod tests {
         let worker = root.path().join("worker");
         harness_testkit::init_git_repo_with_seed(&origin);
         let head = harness_testkit::git_head_sha(&origin, "HEAD");
-        create_linked_worktree(
-            &origin,
-            "worker",
-            &worker,
-            "harness/worker",
-            &head,
-        )
-        .expect("create linked worktree");
+        create_linked_worktree(&origin, "worker", &worker, "harness/worker", &head)
+            .expect("create linked worktree");
 
         assert_eq!(
             runtime_workspace_roots(worker.to_str().expect("utf8 worker")),
             vec![
-                worker.canonicalize().expect("canonical worker").display().to_string(),
+                worker
+                    .canonicalize()
+                    .expect("canonical worker")
+                    .display()
+                    .to_string(),
                 origin
                     .join(".git")
                     .canonicalize()

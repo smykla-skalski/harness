@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+#[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 use crate::agents::acp::probe::AcpRuntimeProbeResponse;
 use crate::daemon::launchd::LaunchAgentStatus;
 use crate::daemon::state::{DaemonAuditEvent, DaemonDiagnostics, DaemonManifest};
@@ -12,6 +13,8 @@ use crate::session::types::{
     AgentRegistration, PendingLeaderTransfer, SessionMetrics, SessionSignalRecord, SessionStatus,
     WorkItem,
 };
+#[cfg(not(any(feature = "bridge-runtime", feature = "daemon-runtime")))]
+use harness_protocol::managed_agents::acp::AcpRuntimeProbeResponse;
 
 /// Daemon HTTP/WS wire-protocol version. Increment on a breaking schema
 /// change so the Mac app can detect version skew on connect.
@@ -450,10 +453,4 @@ pub struct SessionExtensionsPayload {
     pub agent_activity: Option<Vec<AgentToolActivitySummary>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StreamEvent {
-    pub event: String,
-    pub recorded_at: String,
-    pub session_id: Option<String>,
-    pub payload: Value,
-}
+pub use harness_protocol::daemon::StreamEvent;

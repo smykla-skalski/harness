@@ -7,7 +7,7 @@
 		<string>io.harnessmonitor.app</string>
 	</array>
 	<key>BundleProgram</key>
-	<string>Contents/Helpers/harness</string>
+	<string>Contents/Helpers/harness-daemon</string>
 	<key>EnvironmentVariables</key>
 	<dict>
 		<key>HARNESS_APP_GROUP_ID</key>
@@ -34,8 +34,7 @@
 	<string>Interactive</string>
 	<key>ProgramArguments</key>
 	<array>
-		<string>harness</string>
-		<string>daemon</string>
+		<string>harness-daemon</string>
 		<string>serve</string>
 		<string>--host</string>
 		<string>127.0.0.1</string>

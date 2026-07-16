@@ -1,0 +1,45 @@
+#[path = "../../../src/telemetry/config.rs"]
+mod config;
+#[path = "../../../src/telemetry/console_fields.rs"]
+mod console_fields;
+mod daemon_file;
+#[path = "../../../src/telemetry/guard.rs"]
+mod guard;
+#[path = "../../../src/telemetry/metrics.rs"]
+mod metrics;
+#[path = "../../../src/telemetry/profiler.rs"]
+mod profiler;
+#[path = "../../../src/telemetry/providers.rs"]
+mod providers;
+#[path = "../../../src/telemetry/reachability.rs"]
+mod reachability;
+#[path = "../../../src/telemetry/subscriber.rs"]
+mod subscriber;
+
+use std::sync::{Mutex, MutexGuard, OnceLock};
+
+pub use config::{
+    DEFAULT_OTLP_GRPC_ENDPOINT, DEFAULT_OTLP_HTTP_ENDPOINT, ExportProtocol,
+    ResolvedTelemetryConfig, RuntimeService, SharedObservabilityConfig, TelemetryConfigSource,
+    resolve_telemetry_config, runtime_service_from_args, runtime_service_from_current_process,
+    shared_config_path,
+};
+pub use guard::TelemetryGuard;
+pub use metrics::{
+    TelemetryBaggage, apply_current_baggage_to_span, apply_parent_context_from_headers,
+    apply_parent_context_from_text_map, current_trace_headers, current_trace_id,
+    install_text_map_propagator, record_daemon_client_metrics, record_daemon_db_health_counts,
+    record_daemon_db_operation_metrics, record_daemon_db_pool_state, record_daemon_http_metrics,
+    record_hook_metrics, with_active_baggage,
+};
+pub use profiler::DaemonProfiler;
+pub use subscriber::{init_tracing_subscriber, init_tracing_subscriber_for};
+
+#[doc(hidden)]
+pub fn telemetry_test_guard() -> MutexGuard<'static, ()> {
+    static GUARD: OnceLock<Mutex<()>> = OnceLock::new();
+    GUARD
+        .get_or_init(|| Mutex::new(()))
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}

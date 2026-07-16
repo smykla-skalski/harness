@@ -31,7 +31,10 @@ async fn run_dispatch_pick_with_empty_body() {
     .await;
 
     let response = client
-        .post(format!("{base_url}{}", http_paths::TASK_BOARD_DISPATCH_PICK))
+        .post(format!(
+            "{base_url}{}",
+            http_paths::TASK_BOARD_DISPATCH_PICK
+        ))
         .bearer_auth("token")
         .send()
         .await
@@ -42,7 +45,11 @@ async fn run_dispatch_pick_with_empty_body() {
         .await
         .expect("decode dispatch-pick response");
 
-    assert_eq!(status, StatusCode::OK, "bodyless dispatch pick returned {picked}");
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "bodyless dispatch pick returned {picked}"
+    );
     assert_eq!(
         picked["selection"]["item"]["id"].as_str(),
         Some("board-pick-high")

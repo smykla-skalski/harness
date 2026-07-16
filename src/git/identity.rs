@@ -151,7 +151,7 @@ pub fn canonical_checkout_root(path: &Path) -> PathBuf {
     )
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "standalone-worker")))]
 mod tests {
     use std::process::Command;
 

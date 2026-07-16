@@ -25,6 +25,6 @@ pub fn execute(ctx: &HookContext) -> Result<HookOutcome, CliError> {
     )
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "standalone-worker")))]
 #[path = "audit/tests.rs"]
 mod tests;

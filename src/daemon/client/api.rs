@@ -1,3 +1,4 @@
+#[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 use crate::agents::acp::probe::AcpRuntimeProbeResponse;
 use crate::daemon::agent_acp::{AcpAgentInspectResponse, AcpAgentStartRequest};
 use crate::daemon::agent_tui::{AgentTuiInputRequest, AgentTuiResizeRequest, AgentTuiStartRequest};
@@ -16,6 +17,8 @@ use crate::daemon::protocol::{
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::service::{ImproverApplyOutcome, ResolvedRuntimeSessionAgent};
 use crate::session::types::SessionState;
+#[cfg(not(any(feature = "bridge-runtime", feature = "daemon-runtime")))]
+use harness_protocol::managed_agents::acp::AcpRuntimeProbeResponse;
 
 use super::DaemonClient;
 

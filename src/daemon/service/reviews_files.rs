@@ -36,7 +36,6 @@ mod tests;
 mod token;
 mod viewed;
 
-pub(crate) use blob::BlobTextProjection;
 pub use blob::fetch_review_file_blob;
 pub use clones::{delete_review_local_clone, list_review_local_clones};
 pub use gc::{GcReport, run_local_clone_gc};

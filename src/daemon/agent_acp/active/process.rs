@@ -7,9 +7,9 @@ use std::time::{Duration, Instant};
 
 use tokio::task::JoinHandle;
 
-use crate::agents::acp::supervision::{
-    AcpSessionSupervisor, WatchdogEventEmitter, kill_process_group,
-};
+#[cfg(feature = "daemon-runtime")]
+use crate::agents::acp::supervision::WatchdogEventEmitter;
+use crate::agents::acp::supervision::{AcpSessionSupervisor, kill_process_group};
 use crate::agents::kind::DisconnectReason;
 
 use super::SharedStderrTail;
@@ -92,6 +92,7 @@ impl ActiveAcpProcess {
         recover_lock(&self.logical_acp_ids, "ACP process logical session lock").len()
     }
 
+    #[cfg(feature = "daemon-runtime")]
     pub(in crate::daemon::agent_acp) fn event_emitter(
         &self,
     ) -> Option<Arc<dyn WatchdogEventEmitter>> {

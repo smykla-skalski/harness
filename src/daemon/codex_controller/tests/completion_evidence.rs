@@ -5,12 +5,12 @@ use serde_json::json;
 use crate::daemon::protocol::CodexRunStatus;
 use crate::session::types::TaskStatus;
 
-use super::durable_run_request;
 use super::super::completion_evidence::{
     bound_task_has_completion_evidence, record_clean_worktree_baseline,
     worktree_changed_since_baseline,
 };
 use super::super::handle::record_snapshot_event;
+use super::durable_run_request;
 use super::test_support::{
     codex_run_snapshot, controller_with_session_state, sample_session_state_with_open_task,
 };
@@ -24,12 +24,7 @@ fn reconciliation_returns_normalized_failure_without_evidence() {
     let mut request = durable_run_request();
     request.task_id = Some("task-1".into());
     let agent_id = controller
-        .register_orchestration_agent(
-            SESSION_ID,
-            "codex-run-1",
-            &request,
-            "Codex Worker",
-        )
+        .register_orchestration_agent(SESSION_ID, "codex-run-1", &request, "Codex Worker")
         .expect("register worker")
         .agent_id;
     let mut run = codex_run_snapshot(CodexRunStatus::Completed);
@@ -66,8 +61,7 @@ fn empty_commit_is_not_work_but_untracked_file_is() {
     run_git(worktree.path(), &["commit", "--allow-empty", "-m", "empty"]);
     assert!(!worktree_changed_since_baseline(&run));
 
-    fs_err::write(worktree.path().join("real-change.txt"), "changed\n")
-        .expect("write real change");
+    fs_err::write(worktree.path().join("real-change.txt"), "changed\n").expect("write real change");
     assert!(worktree_changed_since_baseline(&run));
 }
 
@@ -123,10 +117,7 @@ fn dirty_follow_up_start_does_not_reuse_an_older_clean_baseline() {
 
     record_clean_worktree_baseline(&mut run);
     let event = run.events.last().expect("dirty baseline event");
-    assert_eq!(
-        event.summary,
-        "Worker worktree was not clean at turn start"
-    );
+    assert_eq!(event.summary, "Worker worktree was not clean at turn start");
     assert!(event.payload["tree"].is_null());
     assert!(!worktree_changed_since_baseline(&run));
 }
@@ -145,10 +136,7 @@ fn not_a_repository_reports_unavailable_worktree_baseline() {
         event.summary,
         "Worker worktree baseline could not be computed at turn start"
     );
-    assert_ne!(
-        event.summary,
-        "Worker worktree was not clean at turn start"
-    );
+    assert_ne!(event.summary, "Worker worktree was not clean at turn start");
     assert!(event.payload["tree"].is_null());
 }
 

@@ -1,0 +1,18 @@
+[package]
+name = "harness-protocol"
+version = "48.0.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+
+[dependencies]
+clap = { version = "4.6.0", features = ["derive"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+tracing = "0.1.44"
+
+[lints.clippy]
+pedantic = { level = "deny", priority = 1 }
+
+[lints.rust]
+unused = { level = "deny", priority = 1 }

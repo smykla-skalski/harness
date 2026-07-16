@@ -31,7 +31,8 @@ struct RemoteControlPlaneActor {
 /// Recognize a transport-bound local or write-capable remote control-plane actor.
 /// Untrusted payload actors must be rebound before reaching this check.
 #[must_use]
-pub(crate) fn is_control_plane_actor_id(actor_id: &str) -> bool {
+#[doc(hidden)]
+pub fn is_control_plane_actor_id(actor_id: &str) -> bool {
     if actor_id == CONTROL_PLANE_ACTOR_ID {
         return true;
     }

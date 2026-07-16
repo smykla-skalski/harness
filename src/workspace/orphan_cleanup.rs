@@ -92,4 +92,5 @@ pub fn run_startup_sweep() {
 }
 
 #[cfg(test)]
+#[path = "orphan_cleanup/tests.rs"]
 mod tests;

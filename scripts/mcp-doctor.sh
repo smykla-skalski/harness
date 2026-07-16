@@ -51,15 +51,15 @@ section() {
   printf '\n\033[1m%s\033[0m\n' "$1"
 }
 
-# 1. Rust CLI
+# 1. Rust MCP server
 
-section "Rust CLI"
-if harness_bin=$(command -v harness 2>/dev/null); then
-  version=$("$harness_bin" --version 2>/dev/null | head -1 || echo "unknown")
-  path="$harness_bin"
-  ok "harness on PATH" "$version" "$path"
+section "Rust MCP server"
+if mcp_bin=$(command -v harness-mcp 2>/dev/null); then
+  version=$("$mcp_bin" --version 2>/dev/null | head -1 || echo "unknown")
+  path="$mcp_bin"
+  ok "harness-mcp on PATH" "$version" "$path"
 else
-  fail_critical "harness not on PATH" "Run: mise run install"
+  fail_critical "harness-mcp not on PATH" "Run: mise run install"
 fi
 
 # 2. Input helper
@@ -138,9 +138,9 @@ fi
 # 5. Protocol round-trip
 
 section "Protocol round-trip"
-if [[ -n "${harness_bin:-}" ]]; then
+if [[ -n "${mcp_bin:-}" ]]; then
   probe_request='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","clientInfo":{"name":"doctor","version":"0"},"capabilities":{}}}'
-  probe_response=$(printf '%s\n' "$probe_request" | "$harness_bin" mcp serve 2>/dev/null | head -1 || true)
+  probe_response=$(printf '%s\n' "$probe_request" | "$mcp_bin" serve 2>/dev/null | head -1 || true)
   if [[ -n "$probe_response" ]] \
     && printf '%s' "$probe_response" | grep -q '"protocolVersion":"2025-11-25"'; then
     ok "initialize round-trip succeeded (protocolVersion 2025-11-25)"
@@ -148,7 +148,7 @@ if [[ -n "${harness_bin:-}" ]]; then
     fail_critical "initialize round-trip failed" "got: ${probe_response:-<no response>}"
   fi
 else
-  note "skipped (harness not on PATH)"
+  note "skipped (harness-mcp not on PATH)"
 fi
 
 # 6. .mcp.json registration
@@ -156,7 +156,7 @@ fi
 section "Claude Code .mcp.json"
 if [[ -f .mcp.json ]]; then
   if command -v jq >/dev/null 2>&1; then
-    if jq -e '.mcpServers["harness-monitor"].command == "harness"' .mcp.json >/dev/null 2>&1; then
+    if jq -e '.mcpServers["harness-monitor"].command == "harness-mcp" and .mcpServers["harness-monitor"].args == ["serve"]' .mcp.json >/dev/null 2>&1; then
       ok "harness-monitor entry present in .mcp.json"
     else
       warn "harness-monitor not registered in .mcp.json" \

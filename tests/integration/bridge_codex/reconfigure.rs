@@ -10,9 +10,8 @@ fn bridge_reconfigure_enables_codex_without_restarting_bridge() {
     let codex_endpoint = format!("ws://127.0.0.1:{codex_port}");
 
     let mut bridge = ManagedChild::spawn(
-        Command::new(harness_binary())
+        Command::new(bridge_binary())
             .args([
-                "bridge",
                 "start",
                 "--capability",
                 "agent-tui",
@@ -34,10 +33,7 @@ fn bridge_reconfigure_enables_codex_without_restarting_bridge() {
     .expect("spawn bridge");
 
     let initial_state = wait_for_bridge_state_with_capabilities(tmp.path(), &["agent-tui"]);
-    let output = run_bridge(
-        &tmp,
-        &["bridge", "reconfigure", "--enable", "codex", "--json"],
-    );
+    let output = run_bridge(&tmp, &["reconfigure", "--enable", "codex", "--json"]);
     assert!(
         output.status.success(),
         "reconfigure: {}",
@@ -54,7 +50,7 @@ fn bridge_reconfigure_enables_codex_without_restarting_bridge() {
         Some(codex_port_text.as_str())
     );
 
-    let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
+    let stop_output = run_bridge(&tmp, &["stop"]);
     assert!(
         stop_output.status.success(),
         "stop: {}",
@@ -72,14 +68,8 @@ fn bridge_reconfigure_persists_capabilities_across_restart() {
     let codex_port_text = codex_port.to_string();
 
     let mut bridge = ManagedChild::spawn(
-        Command::new(harness_binary())
-            .args([
-                "bridge",
-                "start",
-                "--codex-port",
-                &codex_port_text,
-                "--codex-path",
-            ])
+        Command::new(bridge_binary())
+            .args(["start", "--codex-port", &codex_port_text, "--codex-path"])
             .arg(&mock_codex)
             .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
             .env("XDG_DATA_HOME", tmp.path())
@@ -95,10 +85,7 @@ fn bridge_reconfigure_persists_capabilities_across_restart() {
 
     let _initial_state =
         wait_for_bridge_state_with_capabilities(tmp.path(), &["codex", "agent-tui"]);
-    let output = run_bridge(
-        &tmp,
-        &["bridge", "reconfigure", "--disable", "codex", "--json"],
-    );
+    let output = run_bridge(&tmp, &["reconfigure", "--disable", "codex", "--json"]);
     assert!(
         output.status.success(),
         "reconfigure: {}",
@@ -108,7 +95,7 @@ fn bridge_reconfigure_persists_capabilities_across_restart() {
     assert!(report.capabilities.contains_key("agent-tui"));
     assert!(!report.capabilities.contains_key("codex"));
 
-    let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
+    let stop_output = run_bridge(&tmp, &["stop"]);
     assert!(
         stop_output.status.success(),
         "stop: {}",
@@ -117,8 +104,8 @@ fn bridge_reconfigure_persists_capabilities_across_restart() {
     wait_for_bridge_exit(&mut bridge);
 
     let mut restarted = ManagedChild::spawn(
-        Command::new(harness_binary())
-            .args(["bridge", "start"])
+        Command::new(bridge_binary())
+            .arg("start")
             .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
             .env("XDG_DATA_HOME", tmp.path())
             .env("HARNESS_HOST_HOME", &host_home)
@@ -135,7 +122,7 @@ fn bridge_reconfigure_persists_capabilities_across_restart() {
     assert!(restarted_state.capabilities.contains_key("agent-tui"));
     assert!(!restarted_state.capabilities.contains_key("codex"));
 
-    let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
+    let stop_output = run_bridge(&tmp, &["stop"]);
     assert!(
         stop_output.status.success(),
         "cleanup stop: {}",

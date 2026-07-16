@@ -123,7 +123,10 @@ fn creates_worktree_and_branch() {
     WorktreeController::create(origin.path(), &layout, None).expect("create");
     assert!(layout.workspace().join("README.md").exists());
     assert!(layout.memory().exists());
-    assert_eq!(git_stdout(&layout.workspace(), &["status", "--porcelain"]), "");
+    assert_eq!(
+        git_stdout(&layout.workspace(), &["status", "--porcelain"]),
+        ""
+    );
 }
 
 #[test]

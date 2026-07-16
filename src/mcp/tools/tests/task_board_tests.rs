@@ -14,15 +14,11 @@ use tokio::net::TcpListener;
 use tokio::sync::{Mutex as AsyncMutex, oneshot};
 use tokio::task::JoinHandle;
 
-use crate::daemon::protocol::{
-    WS_CONFIG_EVENT, WsConfigPayload, WsPushEvent, WsRequest, http_paths, ws_methods,
-};
+use crate::daemon::protocol::{WsRequest, http_paths, ws_methods};
 use crate::daemon::state::{self, DaemonManifest, ScopedDaemonRootOverride};
 use crate::mcp::protocol::{ContentBlock, ToolResult};
 use crate::mcp::registry::RegistryClient;
 use crate::mcp::tool::ToolRegistry;
-use crate::task_board::PolicyPipelineDocument;
-use crate::workspace::utc_now;
 
 use super::{register_all, socket_path};
 
@@ -57,28 +53,6 @@ async fn ws_handler(
 }
 
 async fn handle_socket(mut socket: WebSocket, state: WsServerState, authorization: Option<String>) {
-    let config = WsPushEvent {
-        event: WS_CONFIG_EVENT.to_string(),
-        recorded_at: utc_now(),
-        session_id: None,
-        payload: serde_json::to_value(WsConfigPayload {
-            personas: Vec::new(),
-            runtime_models: Vec::new(),
-            acp_agents: Vec::new(),
-            runtime_probe: None,
-        })
-        .expect("serialize config payload"),
-        seq: 0,
-    };
-    socket
-        .send(Message::Text(
-            serde_json::to_string(&config)
-                .expect("serialize config event")
-                .into(),
-        ))
-        .await
-        .expect("send config event");
-
     let Some(Ok(Message::Text(text))) = socket.recv().await else {
         return;
     };
@@ -149,17 +123,8 @@ async fn call_task_board_tool(
     let token_path = state::auth_token_path();
     fs::write(&token_path, "test-token").expect("write auth token");
     let manifest = DaemonManifest {
-        version: env!("CARGO_PKG_VERSION").to_string(),
-        pid: std::process::id(),
         endpoint,
-        started_at: utc_now(),
         token_path: token_path.display().to_string(),
-        sandboxed: false,
-        host_bridge: Default::default(),
-        revision: 0,
-        updated_at: String::new(),
-        binary_stamp: None,
-        ownership: Default::default(),
     };
     let _ = state::write_manifest(&manifest).expect("write manifest");
 
@@ -184,7 +149,9 @@ fn text_result_json(result: &ToolResult) -> Value {
     assert_eq!(result.content.len(), 1);
     match &result.content[0] {
         ContentBlock::Text { text } => serde_json::from_str(text).expect("tool json content"),
-        other => panic!("expected text content, got {other:?}"),
+        other @ ContentBlock::Image { .. } => {
+            panic!("expected text content, got {other:?}")
+        }
     }
 }
 
@@ -303,7 +270,7 @@ async fn orchestrator_settings_update_tool_proxies_to_running_daemon() {
 #[tokio::test(flavor = "current_thread")]
 async fn policy_save_draft_tool_proxies_to_running_daemon() {
     let arguments = json!({
-        "document": PolicyPipelineDocument::default(),
+        "document": {},
     });
     let (result, captured) = call_task_board_tool(
         ws_methods::POLICY_PIPELINE_SAVE_DRAFT,
@@ -432,8 +399,11 @@ fn create_schema_covers_every_public_field() {
         "work_item_id": "work-1",
         "id": "item-1",
     });
-    serde_json::from_value::<crate::daemon::protocol::TaskBoardCreateItemRequest>(probe)
-        .expect("create request should accept every schema field");
+    let schema = task_board_tool_schema(ws_methods::TASK_BOARD_CREATE);
+    let properties = schema["properties"].as_object().expect("properties");
+    for field in probe.as_object().expect("probe object").keys() {
+        assert!(properties.contains_key(field), "schema omitted `{field}`");
+    }
 }
 
 #[test]

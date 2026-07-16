@@ -52,7 +52,7 @@ pub(super) fn run_bridge(tmp: &tempfile::TempDir, args: &[&str]) -> Output {
 
 pub(super) fn run_bridge_with_data_home(data_home: &Path, args: &[&str]) -> Output {
     let host_home = ensure_host_home(data_home);
-    Command::new(harness_binary())
+    Command::new(bridge_binary())
         .args(args)
         .env("HARNESS_DAEMON_DATA_HOME", data_home)
         .env("XDG_DATA_HOME", data_home)
@@ -61,7 +61,7 @@ pub(super) fn run_bridge_with_data_home(data_home: &Path, args: &[&str]) -> Outp
         .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_SANDBOXED")
         .output()
-        .expect("run harness")
+        .expect("run harness-bridge")
 }
 
 pub(super) fn ensure_host_home(data_home: &Path) -> PathBuf {
@@ -147,8 +147,8 @@ pub(super) fn unused_local_port() -> u16 {
         .port()
 }
 
-pub(super) fn harness_binary() -> PathBuf {
-    assert_cmd::cargo::cargo_bin("harness")
+pub(super) fn bridge_binary() -> PathBuf {
+    assert_cmd::cargo::cargo_bin("harness-bridge")
 }
 
 pub(super) fn output_text(output: &Output) -> String {

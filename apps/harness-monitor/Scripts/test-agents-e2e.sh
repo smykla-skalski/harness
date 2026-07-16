@@ -201,7 +201,11 @@ resolve_supported_codex_launch
 run_stale_preflight
 
 "$ROOT/Scripts/generate.sh"
-"$CHECKOUT_ROOT/scripts/cargo-local.sh" build --bin harness
+"$CHECKOUT_ROOT/scripts/cargo-local.sh" build \
+  --package harness \
+  --package harness-daemon \
+  --package harness-bridge \
+  --bins
 
 TEST_ARGS=(
   -workspace "$ROOT/HarnessMonitor.xcworkspace"

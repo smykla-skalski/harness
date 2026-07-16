@@ -33,6 +33,7 @@ use crate::daemon::agent_acp::prompt_gate::PromptLease;
 use crate::hooks::runner_policy::managed_cluster_binaries;
 
 use super::manager::{AcpAgentManagerHandle, AcpAgentStartRequest};
+use super::spawn_credential::{SpawnCredential, release_after_initialization};
 mod commands;
 mod context;
 mod runtime_helpers;
@@ -68,6 +69,7 @@ pub(super) struct SpawnProtocolInput<'a> {
     pub permission_mode: PermissionMode,
     pub initial_prompt_lease: Option<PromptLease>,
     pub manager: AcpAgentManagerHandle,
+    pub credential: Option<SpawnCredential>,
 }
 
 pub(super) fn spawn_protocol_task(
@@ -86,6 +88,7 @@ pub(super) fn spawn_protocol_task(
         permission_mode,
         initial_prompt_lease,
         manager,
+        credential,
     } = input;
     let stdin = child
         .stdin
@@ -142,6 +145,7 @@ pub(super) fn spawn_protocol_task(
         disconnect_tx,
         start_rx,
         manager,
+        credential,
     }));
     Ok(SpawnedAcpProtocol {
         events: batcher.events,
@@ -171,6 +175,7 @@ struct RunProtocolArgs {
     disconnect_tx: mpsc::Sender<DisconnectReason>,
     start_rx: oneshot::Receiver<()>,
     manager: AcpAgentManagerHandle,
+    credential: Option<SpawnCredential>,
 }
 
 #[expect(
@@ -196,6 +201,7 @@ async fn run_protocol(args: RunProtocolArgs) {
         disconnect_tx,
         start_rx,
         manager,
+        credential,
     } = args;
     if start_rx.await.is_err() {
         return;
@@ -311,6 +317,7 @@ async fn run_protocol(args: RunProtocolArgs) {
                 command_rx,
                 session_guard,
                 manager,
+                credential,
             })
             .await
         })
@@ -333,13 +340,14 @@ async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
         mut command_rx,
         session_guard,
         manager,
+        credential,
     } = args;
     let prompt_timeout = supervisor.config().prompt_timeout;
     // The route is registered inside `initialize_and_bind_runtime_session` between the
     // runtime's `new_session` response and the orchestration bind, so notifications fired
     // by the runtime during the bind window land on the route guard instead of being
     // dropped with `routing_not_initialized`.
-    let started_session = initialize_and_bind_runtime_session(
+    let initialization = initialize_and_bind_runtime_session(
         &manager,
         &supervisor,
         &connection,
@@ -349,7 +357,8 @@ async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
         &runtime_name,
         &session_guard,
     )
-    .await?;
+    .await;
+    let started_session = release_after_initialization(initialization, credential)?;
     let acp_session_id = started_session.session_id.clone();
     let run_result = async {
         apply_requested_session_configuration(
@@ -413,6 +422,7 @@ struct RunConnectionArgs {
     command_rx: mpsc::UnboundedReceiver<ProtocolCommand>,
     session_guard: Arc<SessionRouteGuard>,
     manager: AcpAgentManagerHandle,
+    credential: Option<SpawnCredential>,
 }
 
 async fn send_initialize(
@@ -490,5 +500,5 @@ fn send_cancel_notification(
     connection.send_notification(CancelNotification::new(session_id))
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "daemon-runtime"))]
 mod tests;

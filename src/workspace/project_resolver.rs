@@ -69,4 +69,5 @@ fn digest_suffix(canonical_path: &Path) -> String {
 }
 
 #[cfg(test)]
+#[path = "project_resolver/tests.rs"]
 mod tests;

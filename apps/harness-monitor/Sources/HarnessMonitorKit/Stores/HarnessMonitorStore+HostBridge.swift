@@ -127,7 +127,7 @@ extension HarnessMonitorStore {
     if hostBridge.running {
       baseCommand = "harness bridge reconfigure --enable \(capability)"
     } else {
-      baseCommand = "harness bridge start"
+      baseCommand = "harness-bridge start"
     }
     return HarnessMonitorPaths.shellCommand(baseCommand, using: environment)
   }

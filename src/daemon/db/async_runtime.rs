@@ -368,7 +368,7 @@ impl AsyncAgentTuiRow {
             session_id: self.session_id,
             agent_id: self.agent_id,
             runtime: self.runtime,
-            status: AgentTuiStatus::from_str(&self.status)
+            status: AgentTuiStatus::parse(&self.status)
                 .map_err(|error| parse_async_runtime_error("terminal agent status", &error))?,
             argv: serde_json::from_str(&self.argv_json)
                 .map_err(|error| db_error(format!("parse async terminal agent argv: {error}")))?,
@@ -400,7 +400,7 @@ struct AsyncAgentTuiLiveRefreshStateRow {
 impl AsyncAgentTuiLiveRefreshStateRow {
     fn into_state(self) -> Result<AgentTuiLiveRefreshState, CliError> {
         Ok(AgentTuiLiveRefreshState {
-            status: AgentTuiStatus::from_str(&self.status).map_err(|error| {
+            status: AgentTuiStatus::parse(&self.status).map_err(|error| {
                 parse_async_runtime_error("terminal agent live-refresh status", &error)
             })?,
             updated_at: self.updated_at,

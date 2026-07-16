@@ -59,19 +59,19 @@ sock.close()
 PY
 }
 
-write_fake_harness() {
+write_fake_harness_mcp() {
   local bin_dir="$1"
   mkdir -p "$bin_dir"
-  cat >"$bin_dir/harness" <<'EOF'
+  cat >"$bin_dir/harness-mcp" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
 if [[ "${1:-}" == "--version" ]]; then
-  printf 'harness 0.0.0-test\n'
+  printf 'harness-mcp 0.0.0-test\n'
   exit 0
 fi
 
-if [[ "${1:-}" == "mcp" && "${2:-}" == "serve" ]]; then
+if [[ "${1:-}" == "serve" ]]; then
   while IFS= read -r line; do
     case "$line" in
       *'"method":"initialize"'*)
@@ -88,10 +88,10 @@ if [[ "${1:-}" == "mcp" && "${2:-}" == "serve" ]]; then
   exit 0
 fi
 
-printf 'unexpected fake harness args: %s\n' "$*" >&2
+printf 'unexpected fake harness-mcp args: %s\n' "$*" >&2
 exit 2
 EOF
-  chmod +x "$bin_dir/harness"
+  chmod +x "$bin_dir/harness-mcp"
 }
 
 scenario_wait_socket_rejects_stale_socket() {
@@ -122,7 +122,7 @@ scenario_doctor_fails_stale_socket() {
   local socket_path="$SANDBOX/doctor-stale.sock"
   local fake_bin="$SANDBOX/fake-bin"
   make_stale_socket "$socket_path"
-  write_fake_harness "$fake_bin"
+  write_fake_harness_mcp "$fake_bin"
 
   local output status=0
   output="$(PATH="$fake_bin:$PATH" HARNESS_MONITOR_MCP_SOCKET="$socket_path" \
@@ -139,14 +139,32 @@ scenario_doctor_fails_stale_socket() {
   if (( ok )); then pass; fi
 }
 
+scenario_register_uses_dedicated_mcp_binary() {
+  start_test "registration uses the dedicated MCP binary"
+  local project_dir="$SANDBOX/register-project"
+  mkdir -p "$project_dir"
+
+  if (
+    cd "$project_dir"
+    "$ROOT/scripts/mcp-register-claude.sh" >/dev/null
+    jq -e \
+      '.mcpServers["harness-monitor"] == {"command":"harness-mcp","args":["serve"]}' \
+      .mcp.json >/dev/null
+  ); then
+    pass
+  else
+    fail "registration did not use harness-mcp serve"
+  fi
+}
+
 scenario_smoke_fails_tool_error_result() {
   start_test "smoke fails when tool call returns isError"
   local fake_bin="$SANDBOX/smoke-bin"
-  write_fake_harness "$fake_bin"
+  write_fake_harness_mcp "$fake_bin"
 
   local output status=0
   output="$(
-    HARNESS_MCP_SMOKE_HARNESS_BIN="$fake_bin/harness" \
+    HARNESS_MCP_SMOKE_BIN="$fake_bin/harness-mcp" \
       "$ROOT/scripts/mcp-smoke.sh" list_windows 2>&1
   )" || status=$?
 
@@ -164,6 +182,7 @@ scenario_smoke_fails_tool_error_result() {
 run_all() {
   scenario_wait_socket_rejects_stale_socket
   scenario_doctor_fails_stale_socket
+  scenario_register_uses_dedicated_mcp_binary
   scenario_smoke_fails_tool_error_result
 }
 

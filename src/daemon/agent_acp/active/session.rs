@@ -3,7 +3,9 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use tokio::task::JoinHandle;
 
-use crate::agents::acp::supervision::{WatchdogEventEmitter, WatchdogState};
+#[cfg(feature = "daemon-runtime")]
+use crate::agents::acp::supervision::WatchdogEventEmitter;
+use crate::agents::acp::supervision::WatchdogState;
 use crate::agents::kind::DisconnectReason;
 use crate::daemon::agent_acp::manager::{AcpAgentInspectSnapshot, AcpAgentSnapshot};
 use crate::daemon::agent_acp::permission_bridge::{
@@ -53,6 +55,7 @@ impl ActiveAcpSession {
         Arc::clone(&self.process)
     }
 
+    #[cfg(feature = "daemon-runtime")]
     pub(in crate::daemon::agent_acp) fn event_emitter(
         &self,
     ) -> Option<Arc<dyn WatchdogEventEmitter>> {
@@ -279,7 +282,7 @@ impl ActiveAcpSession {
         self.process.shutdown(pending_permissions);
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "daemon-runtime"))]
     pub(in crate::daemon::agent_acp) fn poison_permission_bridge_pending_lock_for_test(&self) {
         self.permissions.poison_pending_lock_for_test();
     }

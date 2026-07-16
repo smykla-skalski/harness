@@ -84,7 +84,7 @@ fi
 # live signature. The daemon helper binary still needs to exist in the built
 # product unless the bundle step was explicitly disabled.
 APP_PATH="$DERIVED_DATA_PATH/Build/Products/Debug/Harness Monitor.app"
-DAEMON_PATH="$APP_PATH/Contents/Helpers/harness"
+DAEMON_PATH="$APP_PATH/Contents/Helpers/harness-daemon"
 
 if [[ ! -d "$APP_PATH" ]]; then
   echo "built app missing at $APP_PATH" >&2

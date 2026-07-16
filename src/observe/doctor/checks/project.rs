@@ -218,9 +218,9 @@ fn file_contains_all(path: &Path, needles: &[&str]) -> bool {
 
 fn check_lifecycle_file(path: &Path, code: &'static str, kind: &'static str) -> DoctorCheck {
     let expected = [
-        "harness pre-compact --project-dir",
-        "harness agents session-start --agent claude --project-dir",
-        "harness agents session-stop --agent claude --project-dir",
+        "harness-hook pre-compact --project-dir",
+        "harness-hook session-start --agent claude --project-dir",
+        "harness-hook session-stop --agent claude --project-dir",
     ];
     let legacy = legacy_lifecycle_needles();
 
@@ -245,7 +245,7 @@ fn check_lifecycle_file(path: &Path, code: &'static str, kind: &'static str) -> 
                     Some(path),
                     true,
                     Some(
-                        "Replace grouped `harness setup ...` lifecycle commands with `harness agents ...` or other current top-level lifecycle commands.",
+                        "Regenerate lifecycle configuration with `harness-hook` commands by rerunning `mise run setup:bootstrap`.",
                     ),
                 );
             }
@@ -284,10 +284,14 @@ fn check_lifecycle_file(path: &Path, code: &'static str, kind: &'static str) -> 
     }
 }
 
-fn legacy_lifecycle_needles() -> [String; 3] {
-    [
+fn legacy_lifecycle_needles() -> Vec<String> {
+    vec![
         ["harness", " setup", " pre-compact"].concat(),
         ["harness", " setup", " session-start"].concat(),
         ["harness", " setup", " session-stop"].concat(),
+        ["harness", " pre-compact"].concat(),
+        ["harness", " agents", " session-start"].concat(),
+        ["harness", " agents", " session-stop"].concat(),
+        ["harness", " hook"].concat(),
     ]
 }

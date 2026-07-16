@@ -7,7 +7,6 @@ mod vibe;
 
 use std::path::PathBuf;
 
-use clap::ValueEnum;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -22,22 +21,9 @@ pub use claude::ClaudeAdapter;
 pub use codex::CodexAdapter;
 pub use copilot::CopilotAdapter;
 pub use gemini::GeminiAdapter;
+pub use harness_protocol::agent::HookAgent;
 pub use opencode::OpenCodeAdapter;
 pub use vibe::VibeAdapter;
-
-/// Supported hook transports/adapters.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-#[value(rename_all = "kebab-case")]
-pub enum HookAgent {
-    Claude,
-    Copilot,
-    Codex,
-    Gemini,
-    #[value(name = "vibe")]
-    Vibe,
-    #[value(name = "opencode")]
-    OpenCode,
-}
 
 /// Adapter-rendered process response.
 #[derive(Debug, Clone, PartialEq, Eq)]

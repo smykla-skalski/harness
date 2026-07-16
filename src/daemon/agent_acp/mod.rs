@@ -44,18 +44,32 @@
 //!   session-bound starts are re-enabled later, they must preserve the same
 //!   per-logical-session registration and disconnect guarantees.
 
+#[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 mod active;
+#[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 mod event_frame;
+#[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 mod local_runtime;
+#[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 mod manager;
+#[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 pub(crate) mod permission_bridge;
+#[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 mod pool_key;
+#[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 mod prompt_gate;
+#[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 mod protocol;
+#[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 mod sandbox_proxy;
+#[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
+mod spawn_credential;
 
-pub use manager::{
-    AcpAgentInspectResponse, AcpAgentInspectSnapshot, AcpAgentManagerHandle,
-    AcpAgentReconcileResponse, AcpAgentSnapshot, AcpAgentStartRequest, AcpWakePrompt,
+pub use harness_protocol::managed_agents::acp::{
+    AcpAgentInspectResponse, AcpAgentInspectSnapshot, AcpAgentSnapshot, AcpAgentStartRequest,
+    AcpPermissionBatch, AcpPermissionDecision, AcpPermissionItem, AcpPermissionOption,
 };
-pub use permission_bridge::{AcpPermissionBatch, AcpPermissionDecision, AcpPermissionItem};
+#[cfg(feature = "daemon-runtime")]
+pub use manager::AcpWakePrompt;
+#[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
+pub use manager::{AcpAgentManagerHandle, AcpAgentReconcileResponse};

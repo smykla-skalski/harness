@@ -90,7 +90,7 @@ impl HookCommand {
     }
 }
 
-/// Arguments for `harness hook`.
+/// Arguments for `harness-hook`.
 #[derive(Debug, Clone, Args)]
 pub struct HookArgs {
     /// Hook transport/agent protocol.

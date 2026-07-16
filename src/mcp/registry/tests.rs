@@ -15,10 +15,8 @@ use super::path::{
     TOKEN_FILENAME, TOKEN_OVERRIDE_ENV, default_socket_path, default_token_path,
 };
 use super::types::{ListWindowsResult, RegistryRequest, RegistrySemanticAction};
-use crate::workspace::socket_paths::session_socket;
-
 fn socket_path(dir: &TempDir) -> PathBuf {
-    session_socket(dir.path(), "testid00", "registry")
+    dir.path().join("registry.sock")
 }
 
 fn spawn_fake_server<F>(path: PathBuf, responder: F) -> oneshot::Receiver<String>

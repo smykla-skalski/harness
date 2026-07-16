@@ -275,15 +275,18 @@ fn features_include_universal_only_items() {
 fn lifecycle_features_use_top_level_commands() {
     let feature_map = features();
     let pre_compact = feature_map.get(&Feature::PreCompactHandoff).unwrap();
-    assert_eq!(pre_compact.command.as_deref(), Some("harness pre-compact"));
+    assert_eq!(
+        pre_compact.command.as_deref(),
+        Some("harness-hook pre-compact")
+    );
 
     let session = feature_map.get(&Feature::SessionLifecycle).unwrap();
     assert_eq!(
         session.commands.as_deref(),
         Some(
             &[
-                "harness agents session-start".to_string(),
-                "harness agents session-stop".to_string(),
+                "harness-hook session-start".to_string(),
+                "harness-hook session-stop".to_string(),
             ][..]
         )
     );

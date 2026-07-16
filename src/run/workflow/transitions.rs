@@ -192,7 +192,7 @@ pub(super) fn apply_suite_fix(
 }
 
 /// Produce a human-readable label for a workflow event.
-#[cfg(test)]
+#[cfg(all(test, not(feature = "standalone-worker")))]
 pub(super) fn event_label(event: &str) -> String {
     RunnerEvent::try_from(event).map_or_else(
         |_| {

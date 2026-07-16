@@ -17,7 +17,7 @@ impl Execute for SessionStopArgs {
     }
 }
 
-/// Arguments for `harness session-start`.
+/// Arguments for `harness-hook session-start`.
 #[derive(Debug, Clone, Args)]
 pub struct SessionStartArgs {
     /// Project directory to restore session state for.
@@ -25,7 +25,7 @@ pub struct SessionStartArgs {
     pub project_dir: Option<String>,
 }
 
-/// Arguments for `harness session-stop`.
+/// Arguments for `harness-hook session-stop`.
 #[derive(Debug, Clone, Args)]
 pub struct SessionStopArgs {
     /// Project directory to clean up.

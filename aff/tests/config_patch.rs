@@ -25,7 +25,7 @@ fn codex_hooks() -> &'static str {
         "hooks": [
           {
             "type": "command",
-            "command": "harness hook --agent codex suite:run tool-guard",
+            "command": "harness-hook tool-guard --agent codex --skill suite:run",
             "timeout": 10
           }
         ]
@@ -36,7 +36,7 @@ fn codex_hooks() -> &'static str {
         "hooks": [
           {
             "type": "command",
-            "command": "harness agents session-start --agent codex --project-dir \"$PWD\"",
+            "command": "harness-hook session-start --agent codex --project-dir \"$PWD\"",
             "timeout": 10
           }
         ]
@@ -90,7 +90,7 @@ fn bootstrap_patches_claude_settings_with_aff_hooks() {
         "hooks": [
           {
             "type": "command",
-            "command": "harness hook --agent claude suite:run tool-guard"
+            "command": "harness-hook tool-guard --agent claude --skill suite:run"
           }
         ]
       }
@@ -100,7 +100,7 @@ fn bootstrap_patches_claude_settings_with_aff_hooks() {
         "hooks": [
           {
             "type": "command",
-            "command": "harness agents session-start --agent claude --project-dir \"$CLAUDE_PROJECT_DIR\""
+            "command": "harness-hook session-start --agent claude --project-dir \"$CLAUDE_PROJECT_DIR\""
           }
         ]
       }
@@ -123,7 +123,7 @@ fn bootstrap_patches_claude_settings_with_aff_hooks() {
         .success();
 
     let updated = read_file(&settings_path);
-    assert!(!updated.contains("harness hook --agent claude suite:run tool-guard"));
+    assert!(!updated.contains("harness-hook tool-guard --agent claude --skill suite:run"));
     assert_aff_commands(&updated, "claude", false);
 }
 
@@ -147,7 +147,7 @@ fn bootstrap_patches_codex_hooks_with_aff_hooks() {
         .success();
 
     let updated = read_file(&hooks_path);
-    assert!(!updated.contains("harness hook --agent codex suite:run tool-guard"));
+    assert!(!updated.contains("harness-hook tool-guard --agent codex --skill suite:run"));
     assert_aff_commands(&updated, "codex", false);
 }
 
@@ -190,7 +190,7 @@ fn bootstrap_patches_gemini_settings_with_aff_hooks() {
         "hooks": [
           {
             "type": "command",
-            "command": "harness hook --agent gemini suite:run tool-guard",
+            "command": "harness-hook tool-guard --agent gemini --skill suite:run",
             "timeout": 5000
           }
         ]
@@ -201,7 +201,7 @@ fn bootstrap_patches_gemini_settings_with_aff_hooks() {
         "hooks": [
           {
             "type": "command",
-            "command": "harness agents session-start --agent gemini --project-dir \"${CLAUDE_PROJECT_DIR:-$GEMINI_PROJECT_DIR}\"",
+            "command": "harness-hook session-start --agent gemini --project-dir \"${CLAUDE_PROJECT_DIR:-$GEMINI_PROJECT_DIR}\"",
             "timeout": 5000
           }
         ]
@@ -225,7 +225,7 @@ fn bootstrap_patches_gemini_settings_with_aff_hooks() {
         .success();
 
     let updated = read_file(&settings_path);
-    assert!(!updated.contains("harness hook --agent gemini suite:run tool-guard"));
+    assert!(!updated.contains("harness-hook tool-guard --agent gemini --skill suite:run"));
     assert_aff_commands(&updated, "gemini", false);
 }
 
@@ -245,7 +245,7 @@ fn bootstrap_patches_copilot_hooks_with_aff_hooks() {
     "preToolUse": [
       {
         "type": "command",
-        "bash": "harness hook --agent copilot suite:run tool-guard",
+        "bash": "harness-hook tool-guard --agent copilot --skill suite:run",
         "cwd": ".",
         "timeoutSec": 30
       }
@@ -253,7 +253,7 @@ fn bootstrap_patches_copilot_hooks_with_aff_hooks() {
     "sessionStart": [
       {
         "type": "command",
-        "bash": "harness agents session-start --agent copilot --project-dir \"$PWD\"",
+        "bash": "harness-hook session-start --agent copilot --project-dir \"$PWD\"",
         "cwd": ".",
         "timeoutSec": 30
       }
@@ -276,7 +276,7 @@ fn bootstrap_patches_copilot_hooks_with_aff_hooks() {
         .success();
 
     let updated = read_file(&config_path);
-    assert!(!updated.contains("harness hook --agent copilot suite:run tool-guard"));
+    assert!(!updated.contains("harness-hook tool-guard --agent copilot --skill suite:run"));
     assert_aff_commands(&updated, "copilot", false);
 }
 
@@ -291,13 +291,13 @@ fn bootstrap_patches_vibe_hooks_with_aff_hooks() {
     {
       "name": "tool-guard",
       "event": "tool.execute.before",
-      "command": "harness hook --agent vibe suite:run tool-guard",
+      "command": "harness-hook tool-guard --agent vibe --skill suite:run",
       "matcher": ".*"
     },
     {
       "name": "session-start",
       "event": "session.created",
-      "command": "harness agents session-start --agent vibe --project-dir \"$PWD\""
+      "command": "harness-hook session-start --agent vibe --project-dir \"$PWD\""
     }
   ]
 }"#,
@@ -317,7 +317,7 @@ fn bootstrap_patches_vibe_hooks_with_aff_hooks() {
         .success();
 
     let updated = read_file(&hooks_path);
-    assert!(!updated.contains("harness hook --agent vibe suite:run tool-guard"));
+    assert!(!updated.contains("harness-hook tool-guard --agent vibe --skill suite:run"));
     assert_aff_commands(&updated, "vibe", false);
 }
 
@@ -332,13 +332,13 @@ fn bootstrap_patches_opencode_hooks_with_aff_hooks() {
     {
       "name": "tool-guard",
       "event": "tool.execute.before",
-      "command": "harness hook --agent opencode suite:run tool-guard",
+      "command": "harness-hook tool-guard --agent opencode --skill suite:run",
       "matcher": ".*"
     },
     {
       "name": "session-start",
       "event": "session.created",
-      "command": "harness agents session-start --agent opencode --project-dir \"$PWD\""
+      "command": "harness-hook session-start --agent opencode --project-dir \"$PWD\""
     }
   ]
 }"#,
@@ -358,7 +358,7 @@ fn bootstrap_patches_opencode_hooks_with_aff_hooks() {
         .success();
 
     let updated = read_file(&hooks_path);
-    assert!(!updated.contains("harness hook --agent opencode suite:run tool-guard"));
+    assert!(!updated.contains("harness-hook tool-guard --agent opencode --skill suite:run"));
     assert_aff_commands(&updated, "opencode", false);
 }
 

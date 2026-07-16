@@ -2,14 +2,16 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::process::id as process_id;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 
 use serde_json::Value;
 use tokio::runtime::{Builder, Runtime};
 use tokio::sync::broadcast;
 use uuid::Uuid;
 
+use crate::agents::acp::probe;
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
+use crate::daemon::agent_tui::AgentTuiResizeRequestExt;
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::state::{self, HostBridgeCapabilityManifest};
 use crate::errors::{CliError, CliErrorKind};
@@ -17,7 +19,8 @@ use crate::workspace::utc_now;
 
 use super::acp_rpc::{
     BridgeAcpEventsRequest, BridgeAcpGetRequest, BridgeAcpInspectRequest, BridgeAcpListRequest,
-    BridgeAcpReconcileRequest, BridgeAcpResolvePermissionRequest, BridgeAcpStartRequest,
+    BridgeAcpProbeRequest, BridgeAcpProbeResponse, BridgeAcpReconcileRequest,
+    BridgeAcpResolvePermissionRequest, BridgeAcpStartRequest,
 };
 use super::bridge_state::{write_bridge_config, write_bridge_state};
 use super::client::{
@@ -94,7 +97,7 @@ impl BridgeServer {
             active_tuis: Mutex::new(BTreeMap::new()),
             codex: Mutex::new(None),
             acp_runtime,
-            acp_agent_manager: AcpAgentManagerHandle::new(acp_sender, Arc::new(OnceLock::new())),
+            acp_agent_manager: AcpAgentManagerHandle::new_bridge(acp_sender),
             acp_events,
             shutdown: AtomicBool::new(false),
         }
@@ -306,12 +309,21 @@ impl BridgeServer {
         payload: Value,
     ) -> Result<BridgeHandleResult, CliError> {
         match action {
+            "probe" => {
+                self.ensure_acp_capability()?;
+                let _: BridgeAcpProbeRequest = parse_bridge_payload(payload)?;
+                let response = BridgeAcpProbeResponse {
+                    probe: probe::local_cached_probe_snapshot(),
+                };
+                Ok(BridgeResponse::ok_payload(&response)?.into())
+            }
             "start" => {
                 let request: BridgeAcpStartRequest = parse_bridge_payload(payload)?;
                 let snapshot = self.start_acp(
                     &request.session_id,
                     &request.request,
                     request.disable_pooling,
+                    request.openrouter_token.as_deref(),
                 )?;
                 Ok(BridgeResponse::ok_payload(&snapshot)?.into())
             }

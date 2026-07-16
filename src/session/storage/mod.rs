@@ -25,10 +25,12 @@ pub(crate) use journal::{
     append_log_entry, append_task_checkpoint, load_log_entries, load_task_checkpoints,
 };
 pub(crate) use journal::{append_review, load_reviews};
+#[cfg(any(test, feature = "daemon-runtime"))]
+pub(crate) use registry::record_adopted_session_root;
 pub(crate) use registry::{
     ActiveRegistry, ProjectOriginRecord, deregister_active, load_active_registry_for,
-    load_active_registry_for_context_root, load_project_origin, record_adopted_session_root,
-    record_project_origin, register_active,
+    load_active_registry_for_context_root, load_project_origin, record_project_origin,
+    register_active,
 };
 pub(crate) use state_store::{
     create_state, load_state, save_state, update_state, update_state_if_changed,

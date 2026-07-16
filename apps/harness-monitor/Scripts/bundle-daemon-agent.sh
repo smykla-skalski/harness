@@ -66,6 +66,10 @@ if [ ! -x "$daemon_source" ]; then
 fi
 
 resolve_package_version() {
+  local package_manifest="$repo_root/crates/harness-daemon/Cargo.toml"
+  if [ ! -f "$package_manifest" ]; then
+    package_manifest="$repo_root/Cargo.toml"
+  fi
   /usr/bin/awk '
     /^\[package\]$/ { in_package = 1; next }
     /^\[/ && in_package { exit }
@@ -74,7 +78,7 @@ resolve_package_version() {
       print $3
       exit
     }
-  ' "$repo_root/Cargo.toml"
+  ' "$package_manifest"
 }
 
 validate_package_version() {
@@ -86,7 +90,7 @@ validate_package_version() {
   fi
 
   if [ -z "$package_version" ]; then
-    printf 'Unable to determine Harness package version from %s\n' "$repo_root/Cargo.toml" >&2
+    printf 'Unable to determine Harness daemon package version\n' >&2
     exit 1
   fi
 
@@ -120,7 +124,7 @@ file_stat_signature() {
 
 helpers_dir="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers"
 launch_agents_dir="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Library/LaunchAgents"
-daemon_target="$helpers_dir/harness"
+daemon_target="$helpers_dir/harness-daemon"
 plist_name="Q498EB36N4.io.harnessmonitor.daemon.plist"
 plist_target="$launch_agents_dir/$plist_name"
 # The bundled plist's `Label` MUST equal the plist filename without its
@@ -224,7 +228,7 @@ package_version="$(resolve_package_version)"
 validate_package_version "$package_version" "${MARKETING_VERSION:-}"
 
 # `cp -p` preserves the linker-signed cs_mtime alignment from
-# `target/debug/harness` (rustc/lld embeds an ad-hoc CodeDirectory whose
+# `target/debug/harness-daemon` (rustc/lld embeds an ad-hoc CodeDirectory whose
 # cs_mtime is captured at link time). Plain `cp` updates the destination
 # mtime to NOW, which leaves cs_mtime in the embedded signature
 # pointing at link-time — kernel page validation then rejects the

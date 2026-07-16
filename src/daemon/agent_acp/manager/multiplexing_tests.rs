@@ -413,7 +413,12 @@ fn session_managed_agent(
     session_id: &str,
     acp_id: &str,
 ) -> Option<crate::session::types::AgentRegistration> {
-    let db = assert_some(manager.state.db.get().cloned(), "seeded manager db");
+    let db = assert_some(
+        manager
+            .daemon_db_slot()
+            .and_then(|slot| slot.get().cloned()),
+        "seeded manager db",
+    );
     let db = assert_ok(db.lock(), "seeded manager db lock");
     let state = assert_some(
         assert_ok(db.load_session_state(session_id), "load session state"),

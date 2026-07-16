@@ -7,8 +7,8 @@ use crate::hook_agent::HookAgent;
 use crate::hook_payload::HookEvent;
 use crate::hook_render::{HookResult, RenderedHookResponse, render_pre_tool_use_output};
 use crate::policy_spec::{
-    BINARY_POLICIES, EXACT_CHAIN_POLICIES, HARNESS_ROUTES, NAMESPACE_POLICIES, SCRIPT_POLICIES,
-    VERSION_ROUTES, WordRoute,
+    BINARY_POLICIES, EXACT_CHAIN_POLICIES, HARNESS_MCP_ROUTES, HARNESS_ROUTES, NAMESPACE_POLICIES,
+    SCRIPT_POLICIES, VERSION_ROUTES, WordRoute,
 };
 
 mod wrapped;
@@ -253,6 +253,7 @@ fn command_head_task(env_prefix: &[String], words: &[String], head: &str) -> Opt
 
     match head {
         "harness" => harness_task(env_prefix, &words[1..]),
+        "harness-mcp" => route_task(env_prefix, &words[1..], HARNESS_MCP_ROUTES),
         // These remain code because the routing depends on flag presence rather
         // than a stable prefix table. Keep them narrow and test-backed.
         "python" | "python3" if is_monitor_script_test_command(words) => {
@@ -433,6 +434,33 @@ mod tests {
                 example.command
             );
         }
+    }
+
+    #[test]
+    fn standalone_mcp_server_routes_through_mise() {
+        let reason = manual_command_denial_reason("harness-mcp serve")
+            .expect("standalone MCP command should parse")
+            .expect("standalone MCP command should be blocked");
+
+        assert!(reason.contains("mise run mcp:serve"));
+    }
+
+    #[test]
+    fn removed_root_mcp_route_has_no_policy_suggestion() {
+        assert!(
+            manual_command_denial_reason(concat!("harness", " mcp serve"))
+                .expect("legacy MCP command should parse")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn standalone_mcp_non_serve_command_has_no_policy_suggestion() {
+        assert!(
+            manual_command_denial_reason("harness-mcp --help")
+                .expect("standalone MCP help command should parse")
+                .is_none()
+        );
     }
 
     #[test]

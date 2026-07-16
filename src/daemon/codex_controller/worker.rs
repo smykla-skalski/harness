@@ -104,8 +104,8 @@ impl CodexRunWorker {
         };
         let runtime_workspace_roots = runtime_workspace_roots(&self.snapshot.project_dir);
         let uses_workspace_profile = self.snapshot.mode == CodexRunMode::WorkspaceWrite;
-        let permission_config = uses_workspace_profile
-            .then(|| workspace_permission_config(&self.snapshot.project_dir));
+        let permission_config =
+            uses_workspace_profile.then(|| workspace_permission_config(&self.snapshot.project_dir));
         let params = wire::thread_params(wire::ThreadParamsInput {
             cwd: &self.snapshot.project_dir,
             runtime_workspace_roots: &runtime_workspace_roots,
@@ -317,10 +317,7 @@ impl CodexRunWorker {
     }
 
     fn finish_completed_turn(&mut self, summary: &str) -> Result<(), CliError> {
-        if self
-            .controller
-            .completed_run_has_evidence(&self.snapshot)?
-        {
+        if self.controller.completed_run_has_evidence(&self.snapshot)? {
             return self.transition(CodexRunStatus::Completed, Some(summary), None);
         }
         let error = super::completion_evidence::missing_completion_evidence_error(&self.snapshot);

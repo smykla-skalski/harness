@@ -11,6 +11,7 @@ COMMON_REPO_ROOT="$(resolve_common_repo_root "$ROOT")"
 lease_dir="$COMMON_REPO_ROOT/target/.cargo-local/leases"
 lease_path=""
 active_build_count=1
+skip_build_lease="${HARNESS_CARGO_SKIP_LEASE:-0}"
 
 first_nonempty_env() {
   local var_name value
@@ -226,8 +227,17 @@ session_id="$(first_nonempty_env \
   COPILOT_SESSION_ID \
   OPENCODE_SESSION_ID || true)"
 
-register_build_lease
-trap release_build_lease EXIT
+if [[ "$skip_build_lease" == "1" ]]; then
+  active_build_count="${HARNESS_CARGO_ACTIVE_BUILD_COUNT:-1}"
+  if [[ ! "$active_build_count" =~ ^[0-9]+$ ]] || (( active_build_count < 1 )); then
+    printf 'HARNESS_CARGO_ACTIVE_BUILD_COUNT must be a positive integer (got %s)\n' \
+      "$active_build_count" >&2
+    exit 2
+  fi
+else
+  register_build_lease
+  trap release_build_lease EXIT
+fi
 
 target_segment="local"
 if [[ -n "$session_id" ]]; then
@@ -257,6 +267,7 @@ fi
 if [[ "${1:-}" == "--print-env" ]]; then
   printf 'CARGO_TARGET_DIR=%s\n' "$CARGO_TARGET_DIR"
   printf 'CARGO_BUILD_JOBS=%s\n' "$CARGO_BUILD_JOBS"
+  printf 'CARGO_BUILD_BUILD_DIR=%s\n' "${CARGO_BUILD_BUILD_DIR:-}"
   printf 'ACTIVE_BUILD_COUNT=%s\n' "$active_build_count"
   if [[ -n "$session_id" ]]; then
     printf 'SESSION_MODE=agent\n'
@@ -280,14 +291,30 @@ if [[ "${1:-}" == "--print-env" ]]; then
   exit 0
 fi
 
+if [[ "${1:-}" == "--with-group-lease" ]]; then
+  shift
+  if (( $# == 0 )); then
+    printf 'usage: %s --with-group-lease <command> [args...]\n' "${0##*/}" >&2
+    exit 2
+  fi
+  export HARNESS_CARGO_SKIP_LEASE=1
+  export HARNESS_CARGO_ACTIVE_BUILD_COUNT="$active_build_count"
+  harness_run_step "cargo-local build group" "$@"
+  exit $?
+fi
+
 if (( active_build_count > 1 )); then
   printf 'cargo-local: build contention (%d concurrent builds, using %s jobs) - if tests fail, retry after other builds finish before debugging\n' \
     "$active_build_count" "$CARGO_BUILD_JOBS" >&2
 fi
 
-cargo_bin="cargo"
+cargo_bin="${HARNESS_CARGO_BIN:-cargo}"
 if ! cargo_bin_usable "$cargo_bin" && [[ -x "${HOME}/.cargo/bin/cargo" ]]; then
   cargo_bin="${HOME}/.cargo/bin/cargo"
+fi
+
+if [[ "${HARNESS_CARGO_GROUP_CHILD:-0}" == "1" ]]; then
+  exec "$cargo_bin" "$@"
 fi
 
 harness_run_step "cargo-local command" "$cargo_bin" "$@"

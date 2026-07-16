@@ -1,26 +1,6 @@
-use serde::{Deserialize, Serialize};
+pub use harness_protocol::managed_agents::tui::TerminalScreenSnapshot;
 
 use super::model::AgentTuiSize;
-
-/// Parsed terminal screen state exposed to API and CLI consumers.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TerminalScreenSnapshot {
-    pub rows: u16,
-    pub cols: u16,
-    pub cursor_row: u16,
-    pub cursor_col: u16,
-    pub text: String,
-}
-
-impl TerminalScreenSnapshot {
-    #[must_use]
-    pub const fn size(&self) -> AgentTuiSize {
-        AgentTuiSize {
-            rows: self.rows,
-            cols: self.cols,
-        }
-    }
-}
 
 /// Strip leading lines that are empty or contain only whitespace.
 ///

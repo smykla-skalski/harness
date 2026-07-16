@@ -13,19 +13,19 @@ fn legacy_flags() -> RuntimeHookFlags {
 fn lifecycle_commands_include_project_dirs() {
     assert_eq!(
         lifecycle_command(HookAgent::Claude, "session-start"),
-        "harness agents session-start --agent claude --project-dir \"$CLAUDE_PROJECT_DIR\""
+        "harness-hook session-start --agent claude --project-dir \"$CLAUDE_PROJECT_DIR\""
     );
     assert_eq!(
         lifecycle_command(HookAgent::Gemini, "pre-compact"),
-        "harness pre-compact --project-dir \"${CLAUDE_PROJECT_DIR:-$GEMINI_PROJECT_DIR}\""
+        "harness-hook pre-compact --project-dir \"${CLAUDE_PROJECT_DIR:-$GEMINI_PROJECT_DIR}\""
     );
     assert_eq!(
         lifecycle_command(HookAgent::Codex, "session-stop"),
-        "harness agents session-stop --agent codex --project-dir \"$PWD\""
+        "harness-hook session-stop --agent codex --project-dir \"$PWD\""
     );
     assert_eq!(
         lifecycle_command(HookAgent::Copilot, "prompt-submit"),
-        "harness agents prompt-submit --agent copilot --project-dir \"$PWD\""
+        "harness-hook prompt-submit --agent copilot --project-dir \"$PWD\""
     );
 }
 
@@ -63,7 +63,7 @@ fn claude_runtime_config_contains_expected_lifecycle_commands() {
         .as_str()
         .unwrap();
     assert_eq!(
-        stop_command, "harness hook --agent claude suite:run guard-stop",
+        stop_command, "harness-hook guard-stop --agent claude --skill suite:run",
         "Stop lifecycle command drifted"
     );
 }
@@ -206,7 +206,7 @@ fn write_agent_bootstrap_writes_only_copilot_runtime_config() {
             "\"version\": 1",
             "\"preToolUse\"",
             "\"userPromptSubmitted\"",
-            "\"harness agents session-start --agent copilot --project-dir \\\"$PWD\\\"\"",
+            "\"harness-hook session-start --agent copilot --project-dir \\\"$PWD\\\"\"",
         ],
     );
     assert!(!plugin_skill.exists());

@@ -19,7 +19,7 @@ use self::support::*;
 #[test]
 fn bridge_status_reports_not_running_when_clean() {
     let tmp = tempdir().expect("tempdir");
-    let output = run_bridge(&tmp, &["bridge", "status"]);
+    let output = run_bridge(&tmp, &["status"]);
     assert!(output.status.success(), "status: {}", output_text(&output));
 
     let report: BridgeStatusReport = serde_json::from_slice(&output.stdout).expect("parse status");
@@ -31,7 +31,7 @@ fn bridge_status_reports_not_running_when_clean() {
 #[test]
 fn bridge_status_plain_prints_not_running() {
     let tmp = tempdir().expect("tempdir");
-    let output = run_bridge(&tmp, &["bridge", "status", "--plain"]);
+    let output = run_bridge(&tmp, &["status", "--plain"]);
     assert!(output.status.success(), "status: {}", output_text(&output));
 
     let text = String::from_utf8_lossy(&output.stdout);
@@ -41,7 +41,7 @@ fn bridge_status_plain_prints_not_running() {
 #[test]
 fn bridge_stop_is_idempotent_when_not_running() {
     let tmp = tempdir().expect("tempdir");
-    let output = run_bridge(&tmp, &["bridge", "stop"]);
+    let output = run_bridge(&tmp, &["stop"]);
     assert!(output.status.success(), "stop: {}", output_text(&output));
 
     let text = String::from_utf8_lossy(&output.stdout);
@@ -52,15 +52,15 @@ fn bridge_stop_is_idempotent_when_not_running() {
 fn bridge_start_refuses_when_sandboxed() {
     let tmp = tempdir().expect("tempdir");
     let host_home = ensure_host_home(tmp.path());
-    let output = Command::new(harness_binary())
-        .args(["bridge", "start", "--capability", "codex"])
+    let output = Command::new(bridge_binary())
+        .args(["start", "--capability", "codex"])
         .env("HARNESS_SANDBOXED", "1")
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
         .env("HARNESS_HOST_HOME", &host_home)
         .env("HOME", &host_home)
         .output()
-        .expect("run harness");
+        .expect("run harness-bridge");
     assert!(!output.status.success());
 
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -80,9 +80,8 @@ fn bridge_start_with_mock_codex_publishes_codex_capability() {
     let codex_endpoint = format!("ws://127.0.0.1:{codex_port}");
 
     let mut bridge = ManagedChild::spawn(
-        Command::new(harness_binary())
+        Command::new(bridge_binary())
             .args([
-                "bridge",
                 "start",
                 "--capability",
                 "codex",
@@ -112,7 +111,7 @@ fn bridge_start_with_mock_codex_publishes_codex_capability() {
         Some(codex_port_text.as_str())
     );
 
-    let status_output = run_bridge(&tmp, &["bridge", "status"]);
+    let status_output = run_bridge(&tmp, &["status"]);
     assert!(
         status_output.status.success(),
         "status: {}",
@@ -123,7 +122,7 @@ fn bridge_start_with_mock_codex_publishes_codex_capability() {
     assert!(report.capabilities.contains_key("codex"));
     assert!(!report.capabilities.contains_key("agent-tui"));
 
-    let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
+    let stop_output = run_bridge(&tmp, &["stop"]);
     assert!(
         stop_output.status.success(),
         "stop: {}",
@@ -155,14 +154,8 @@ fn bridge_start_without_capability_flag_enables_all_compiled_capabilities() {
     let codex_port_text = codex_port.to_string();
 
     let mut bridge = ManagedChild::spawn(
-        Command::new(harness_binary())
-            .args([
-                "bridge",
-                "start",
-                "--codex-port",
-                &codex_port_text,
-                "--codex-path",
-            ])
+        Command::new(bridge_binary())
+            .args(["start", "--codex-port", &codex_port_text, "--codex-path"])
             .arg(&mock_codex)
             .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
             .env("XDG_DATA_HOME", tmp.path())
@@ -180,7 +173,7 @@ fn bridge_start_without_capability_flag_enables_all_compiled_capabilities() {
     assert!(state.capabilities.contains_key("codex"));
     assert!(state.capabilities.contains_key("agent-tui"));
 
-    let status_output = run_bridge(&tmp, &["bridge", "status"]);
+    let status_output = run_bridge(&tmp, &["status"]);
     assert!(
         status_output.status.success(),
         "status: {}",
@@ -191,7 +184,7 @@ fn bridge_start_without_capability_flag_enables_all_compiled_capabilities() {
     assert!(report.capabilities.contains_key("codex"));
     assert!(report.capabilities.contains_key("agent-tui"));
 
-    let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
+    let stop_output = run_bridge(&tmp, &["stop"]);
     assert!(
         stop_output.status.success(),
         "stop: {}",
@@ -215,15 +208,15 @@ fn bridge_start_without_capability_flag_enables_all_compiled_capabilities() {
 fn bridge_install_launch_agent_refuses_when_sandboxed() {
     let tmp = tempdir().expect("tempdir");
     let host_home = ensure_host_home(tmp.path());
-    let output = Command::new(harness_binary())
-        .args(["bridge", "install-launch-agent", "--capability", "codex"])
+    let output = Command::new(bridge_binary())
+        .args(["install-launch-agent", "--capability", "codex"])
         .env("HARNESS_SANDBOXED", "1")
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
         .env("HARNESS_HOST_HOME", &host_home)
         .env("HOME", &host_home)
         .output()
-        .expect("run harness");
+        .expect("run harness-bridge");
     assert!(!output.status.success());
 
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -237,14 +230,14 @@ fn bridge_install_launch_agent_refuses_when_sandboxed() {
 fn bridge_remove_launch_agent_is_idempotent() {
     let tmp = tempdir().expect("tempdir");
     let host_home = ensure_host_home(tmp.path());
-    let output = Command::new(harness_binary())
-        .args(["bridge", "remove-launch-agent"])
+    let output = Command::new(bridge_binary())
+        .arg("remove-launch-agent")
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
         .env("HARNESS_HOST_HOME", &host_home)
         .env("HOME", &host_home)
         .output()
-        .expect("run harness");
+        .expect("run harness-bridge");
     assert!(output.status.success(), "remove: {}", output_text(&output));
 
     let text = String::from_utf8_lossy(&output.stdout);

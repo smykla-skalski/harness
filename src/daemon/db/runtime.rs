@@ -238,7 +238,7 @@ impl DaemonDb {
             |row| {
                 let status_raw: String = row.get(0)?;
                 Ok(AgentTuiLiveRefreshState {
-                    status: AgentTuiStatus::from_str(&status_raw).map_err(parse_error_to_sql)?,
+                    status: AgentTuiStatus::parse(&status_raw).map_err(parse_error_to_sql)?,
                     updated_at: row.get(1)?,
                 })
             },
@@ -334,7 +334,7 @@ fn agent_tui_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<AgentTuiSnaps
         session_id: row.get(1)?,
         agent_id: row.get(2)?,
         runtime: row.get(3)?,
-        status: AgentTuiStatus::from_str(&status_raw).map_err(parse_error_to_sql)?,
+        status: AgentTuiStatus::parse(&status_raw).map_err(parse_error_to_sql)?,
         argv: serde_json::from_str(&argv_json)
             .map_err(|error| parse_error_to_sql(format!("parse terminal agent argv: {error}")))?,
         project_dir: row.get(6)?,

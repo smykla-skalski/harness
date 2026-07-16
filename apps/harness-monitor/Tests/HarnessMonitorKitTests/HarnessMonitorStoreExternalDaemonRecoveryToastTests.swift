@@ -23,7 +23,7 @@ struct ExternalDaemonRecoveryToastTests {
     #expect(feedback.title == "Start background helper")
     #expect(feedback.severity == .warning)
     #expect(feedback.details?.disclosureLabel == "restart details")
-    #expect(feedback.details?.command?.contains("harness daemon dev") == true)
+    #expect(feedback.details?.command?.contains("harness-daemon dev") == true)
     #expect(feedback.details?.rows.contains { $0.value == manifestPath } == true)
     #expect(feedback.primaryAction?.title == "Copy Terminal restart command")
   }
@@ -47,7 +47,7 @@ struct ExternalDaemonRecoveryToastTests {
     #expect(feedback.title == "Restart background helper")
     #expect(feedback.message.contains("restart the helper in Terminal"))
     #expect(feedback.details?.summary?.contains("does not delete lane data") == true)
-    #expect(feedback.details?.command?.contains("harness daemon dev") == true)
+    #expect(feedback.details?.command?.contains("harness-daemon dev") == true)
     #expect(feedback.details?.rows.contains { $0.value == manifestPath } == true)
     #expect(feedback.primaryAction?.successAnnouncement == "Terminal restart command copied")
   }

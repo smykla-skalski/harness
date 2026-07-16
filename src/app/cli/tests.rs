@@ -3,9 +3,6 @@ use std::path::Path;
 use clap::{CommandFactory, error::ErrorKind};
 
 use super::*;
-use crate::agents::transport::AgentPromptSubmitArgs;
-use crate::daemon::bridge::BridgeCapability;
-use crate::daemon::transport::{DaemonCommand, HARNESS_MONITOR_APP_GROUP_ID};
 use crate::hooks::adapters::HookAgent;
 use crate::observe::{ObserveArgs, ObserveMode};
 use crate::run::{
@@ -90,52 +87,16 @@ fn all_expected_subcommands_registered() {
     let cmd = Cli::command();
     let names: Vec<&str> = cmd.get_subcommands().map(clap::Command::get_name).collect();
     for expected in [
+        "bridge",
         "create",
-        "hook",
+        "daemon",
         "observe",
-        "pre-compact",
         "run",
-        "session-start",
-        "session-stop",
+        "session",
         "setup",
         "task-board",
     ] {
         assert!(names.contains(&expected), "missing subcommand: {expected}");
-    }
-}
-
-#[test]
-fn hook_subcommand_lists_all_hooks() {
-    let cmd = Cli::command();
-    let hook_cmd = cmd
-        .get_subcommands()
-        .find(|s| s.get_name() == "hook")
-        .expect("hook subcommand missing");
-    let hook_names: Vec<&str> = hook_cmd
-        .get_subcommands()
-        .map(clap::Command::get_name)
-        .collect();
-    for expected in [
-        "tool-guard",
-        "guard-stop",
-        "tool-result",
-        "tool-failure",
-        "context-agent",
-        "validate-agent",
-    ] {
-        assert!(hook_names.contains(&expected), "missing hook: {expected}");
-    }
-}
-
-#[test]
-fn parse_hook_command() {
-    let cli = Cli::try_parse_from(["harness", "hook", "suite:run", "tool-guard"]).unwrap();
-    match cli.command {
-        Command::Hook(HookArgs { skill, hook, .. }) => {
-            assert_eq!(skill, "suite:run");
-            assert_eq!(hook.name(), "tool-guard");
-        }
-        _ => panic!("expected Hook command"),
     }
 }
 

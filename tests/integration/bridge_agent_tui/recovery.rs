@@ -27,9 +27,8 @@ fn sandboxed_recovery_prompt_routes_through_bridge() {
     let path_env = prefixed_path_env(&mock_bin);
 
     let mut bridge = ManagedChild::spawn(
-        Command::new(harness_binary())
+        Command::new(bridge_binary())
             .args([
-                "bridge",
                 "start",
                 "--capability",
                 "agent-tui",
@@ -107,7 +106,7 @@ fn sandboxed_recovery_prompt_routes_through_bridge() {
     assert!(shown.screen.text.contains("policy-preset:swarm-default"));
 
     with_bridge_env(tmp.path(), &host_home, || manager.stop(&snapshot.tui_id)).expect("stop");
-    let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
+    let stop_output = run_bridge(&tmp, &["stop"]);
     assert!(
         stop_output.status.success(),
         "bridge stop failed: {}",

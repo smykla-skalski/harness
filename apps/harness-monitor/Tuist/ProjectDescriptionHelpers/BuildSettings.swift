@@ -32,7 +32,7 @@ public enum BuildSettings {
         "COMPILATION_CACHE_ENABLE_DIAGNOSTIC_REMARKS": .string(
             compilationCacheDiagnosticRemarksSetting
         ),
-        "CURRENT_PROJECT_VERSION": "47.1.0", // VERSION_MARKER_CURRENT
+        "CURRENT_PROJECT_VERSION": "48.0.0", // VERSION_MARKER_CURRENT
         "DEVELOPMENT_TEAM": "Q498EB36N4",
         "DEAD_CODE_STRIPPING": "YES",
         "ENABLE_HARDENED_RUNTIME": "YES",
@@ -61,7 +61,7 @@ public enum BuildSettings {
         "HARNESS_MONITOR_BUILD_GIT_COMMIT": "local-dev",
         "HARNESS_MONITOR_BUILD_GIT_DIRTY": "false",
         "HARNESS_MONITOR_BUILD_WORKSPACE_FINGERPRINT": "local-dev",
-        "MARKETING_VERSION": "47.1.0" // VERSION_MARKER_MARKETING
+        "MARKETING_VERSION": "48.0.0" // VERSION_MARKER_MARKETING
     ]
 
     public static let previewOverrides: SettingsDictionary = [

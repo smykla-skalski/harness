@@ -78,6 +78,8 @@ export HARNESS_STALE_SCAN_TMP_ROOT="$TMP_BRIDGE_ROOT"
 TMP_MARKERS=()
 SPAWNED_PIDS=()
 LAST_SPAWN_PID=""
+# shellcheck disable=SC2016  # expanded by the labelled inner Bash process
+SPAWN_HOLD_SCRIPT='child=""; cleanup_child() { if [[ -n "$child" ]]; then kill "$child" 2>/dev/null || true; fi; }; trap "cleanup_child; exit 0" TERM INT; trap cleanup_child EXIT; /bin/sleep 300 & child=$!; wait "$child"'
 PASS_COUNT=0
 FAIL_COUNT=0
 SKIP_COUNT=0
@@ -194,7 +196,7 @@ wait_for_pid_registered() {
 }
 
 # Wait until the argv of `pid` contains the given substring. Needed because
-# our spawn pattern is `nohup bash -c 'exec -a $label sleep 300'`, and ps may
+# our spawn pattern execs a labelled Bash that waits on `/bin/sleep`, and ps may
 # still show the interim bash argv for a handful of ms after the pid becomes
 # visible but before exec completes. Without this, the per-triple spawn
 # scenarios occasionally race the stale_scan_matching_pids regex.
@@ -240,7 +242,8 @@ wait_for_pid_in_bucket() {
 spawn_labelled() {
   local label="$1"
   # shellcheck disable=SC2016  # $1 is resolved by the inner bash, not this shell
-  nohup bash -c 'exec -a "$1" sleep 300' bash-spawner "$label" >/dev/null 2>&1 &
+  nohup bash -c 'exec -a "$1" bash -c "$2"' \
+    bash-spawner "$label" "$SPAWN_HOLD_SCRIPT" >/dev/null 2>&1 &
   LAST_SPAWN_PID=$!
   SPAWNED_PIDS+=("$LAST_SPAWN_PID")
   wait_for_pid_registered "$LAST_SPAWN_PID" || return 1
@@ -254,7 +257,8 @@ spawn_labelled_with_runtime_lane() {
   local label="$2"
   # shellcheck disable=SC2016  # $1 is resolved by the inner bash, not this shell
   nohup env HARNESS_MONITOR_RUNTIME_LANE="$lane" \
-    bash -c 'exec -a "$1" sleep 300' bash-spawner "$label" >/dev/null 2>&1 &
+    bash -c 'exec -a "$1" bash -c "$2"' \
+    bash-spawner "$label" "$SPAWN_HOLD_SCRIPT" >/dev/null 2>&1 &
   LAST_SPAWN_PID=$!
   SPAWNED_PIDS+=("$LAST_SPAWN_PID")
   wait_for_pid_registered "$LAST_SPAWN_PID" || return 1
@@ -267,8 +271,8 @@ spawn_labelled_with_open_lock() {
   mkdir -p "$(dirname "$lock_path")"
   : >"$lock_path"
   # shellcheck disable=SC2016  # $1/$2 are resolved by the inner bash, not this shell
-  nohup bash -c 'exec 9>>"$2"; exec -a "$1" sleep 300' \
-    bash-spawner "$label" "$lock_path" >/dev/null 2>&1 &
+  nohup bash -c 'exec 9>>"$2"; exec -a "$1" bash -c "$3"' \
+    bash-spawner "$label" "$lock_path" "$SPAWN_HOLD_SCRIPT" >/dev/null 2>&1 &
   LAST_SPAWN_PID=$!
   SPAWNED_PIDS+=("$LAST_SPAWN_PID")
   wait_for_pid_registered "$LAST_SPAWN_PID" || return 1
@@ -283,8 +287,8 @@ spawn_labelled_with_runtime_lane_and_open_lock() {
   : >"$lock_path"
   # shellcheck disable=SC2016  # $1/$2 are resolved by the inner bash, not this shell
   nohup env HARNESS_MONITOR_RUNTIME_LANE="$lane" \
-    bash -c 'exec 9>>"$2"; exec -a "$1" sleep 300' \
-    bash-spawner "$label" "$lock_path" >/dev/null 2>&1 &
+    bash -c 'exec 9>>"$2"; exec -a "$1" bash -c "$3"' \
+    bash-spawner "$label" "$lock_path" "$SPAWN_HOLD_SCRIPT" >/dev/null 2>&1 &
   LAST_SPAWN_PID=$!
   SPAWNED_PIDS+=("$LAST_SPAWN_PID")
   wait_for_pid_registered "$LAST_SPAWN_PID" || return 1
@@ -299,8 +303,8 @@ spawn_labelled_with_daemon_data_home_and_open_lock() {
   : >"$lock_path"
   # shellcheck disable=SC2016  # $1/$2 are resolved by the inner bash, not this shell
   nohup env HARNESS_DAEMON_DATA_HOME="$daemon_data_home" \
-    bash -c 'exec 9>>"$2"; exec -a "$1" sleep 300' \
-    bash-spawner "$label" "$lock_path" >/dev/null 2>&1 &
+    bash -c 'exec 9>>"$2"; exec -a "$1" bash -c "$3"' \
+    bash-spawner "$label" "$lock_path" "$SPAWN_HOLD_SCRIPT" >/dev/null 2>&1 &
   LAST_SPAWN_PID=$!
   SPAWNED_PIDS+=("$LAST_SPAWN_PID")
   wait_for_pid_registered "$LAST_SPAWN_PID" || return 1
@@ -330,25 +334,25 @@ kill_spawned_repo_gate_fixtures() {
 }
 
 # Spawn a background process whose ps line contains a synthesized target-dir
-# harness invocation (e.g. "/sandbox/target/debug/harness daemon 300"), which
+# worker invocation (for example, "/sandbox/target/debug/harness-daemon 300"), which
 # is exactly what the awk regex in stale_scan_matching_pids matches against.
 # Writes the resulting pid to LAST_SPAWN_PID.
-spawn_target_harness() {
+spawn_target_worker() {
   local subpath="$1"
-  local subcommand="$2"
+  local worker="$2"
   local dir="$SANDBOX/$subpath"
   mkdir -p "$dir"
-  spawn_labelled "$dir/harness $subcommand"
+  spawn_labelled "$dir/harness-$worker"
   wait_for_pid_in_bucket "$LAST_SPAWN_PID" build || return 1
 }
 
-spawn_target_harness_with_open_lock() {
+spawn_target_worker_with_open_lock() {
   local subpath="$1"
-  local subcommand="$2"
+  local worker="$2"
   local lock_path="$3"
   local dir="$SANDBOX/$subpath"
   mkdir -p "$dir"
-  spawn_labelled_with_open_lock "$dir/harness $subcommand" "$lock_path"
+  spawn_labelled_with_open_lock "$dir/harness-$worker" "$lock_path"
   wait_for_pid_in_bucket "$LAST_SPAWN_PID" build || return 1
 }
 
@@ -363,7 +367,7 @@ start_test() {
 # ---------------------------------------------------------------------------
 scenario_debug_orphan() {
   start_test "debug build orphan detected"
-  spawn_target_harness "target/debug" daemon || { fail "spawn failed"; return; }
+  spawn_target_worker "target/debug" daemon || { fail "spawn failed"; return; }
   local pid="$LAST_SPAWN_PID"
   stale_scan_refresh_ps
   local pids
@@ -376,7 +380,7 @@ scenario_debug_orphan() {
 # ---------------------------------------------------------------------------
 scenario_release_orphan() {
   start_test "release build orphan detected"
-  spawn_target_harness "target/release" bridge || { fail "spawn failed"; return; }
+  spawn_target_worker "target/release" bridge || { fail "spawn failed"; return; }
   local pid="$LAST_SPAWN_PID"
   stale_scan_refresh_ps
   local pids
@@ -389,7 +393,7 @@ scenario_release_orphan() {
 # ---------------------------------------------------------------------------
 scenario_per_triple_debug_orphan() {
   start_test "per-triple debug orphan detected"
-  spawn_target_harness "target/dev/aarch64-apple-darwin/debug" daemon || { fail "spawn failed"; return; }
+  spawn_target_worker "target/dev/aarch64-apple-darwin/debug" daemon || { fail "spawn failed"; return; }
   local pid="$LAST_SPAWN_PID"
   stale_scan_refresh_ps
   local pids
@@ -402,7 +406,7 @@ scenario_per_triple_debug_orphan() {
 # ---------------------------------------------------------------------------
 scenario_per_triple_release_orphan() {
   start_test "per-triple release orphan detected"
-  spawn_target_harness "target/dev/x86_64-apple-darwin/release" bridge || { fail "spawn failed"; return; }
+  spawn_target_worker "target/dev/x86_64-apple-darwin/release" bridge || { fail "spawn failed"; return; }
   local pid="$LAST_SPAWN_PID"
   stale_scan_refresh_ps
   local pids
@@ -411,16 +415,41 @@ scenario_per_triple_release_orphan() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 5: live bucket matches daemon serve / bridge start argv
+# Scenario 5: live bucket matches the dedicated worker argv
 # ---------------------------------------------------------------------------
 scenario_live_bucket() {
-  start_test "live bucket matches 'daemon serve' argv"
-  spawn_labelled "/opt/fake/harness daemon serve" || { fail "spawn failed"; return; }
+  start_test "live bucket matches 'harness-daemon serve' argv"
+  spawn_labelled "/opt/fake/harness-daemon serve" || { fail "spawn failed"; return; }
   local pid="$LAST_SPAWN_PID"
   stale_scan_refresh_ps
   local pids
   pids="$(stale_scan_matching_pids live)"
   assert_in_list "$pid" "live-bucket pid" "$pids" && pass
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 5b: v47 worker commands remain cleanup targets during upgrades.
+# ---------------------------------------------------------------------------
+scenario_legacy_worker_commands_still_detected() {
+  start_test "legacy v47 worker commands remain stale cleanup targets"
+  mkdir -p "$SANDBOX/target/debug"
+  spawn_labelled "$SANDBOX/target/debug/harness daemon" || {
+    fail "spawn legacy build worker failed"
+    return
+  }
+  local build_pid="$LAST_SPAWN_PID"
+  spawn_labelled "/opt/fake/harness bridge start" || {
+    fail "spawn legacy live worker failed"
+    return
+  }
+  local live_pid="$LAST_SPAWN_PID"
+  stale_scan_refresh_ps
+  local build_pids live_pids ok=1
+  build_pids="$(stale_scan_matching_pids build)"
+  live_pids="$(stale_scan_matching_pids live)"
+  assert_in_list "$build_pid" "legacy build-bucket pid" "$build_pids" || ok=0
+  assert_in_list "$live_pid" "legacy live-bucket pid" "$live_pids" || ok=0
+  if (( ok )); then pass; fi
 }
 
 # ---------------------------------------------------------------------------
@@ -517,14 +546,14 @@ scenario_lane_scoped_daemon_root() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 9b: cargo-built harness daemon/bridge processes that still hold a
+# Scenario 9b: cargo-built harness-daemon/harness-bridge processes that hold a
 # real Harness lock are live work, not orphan cleanup targets.
 # ---------------------------------------------------------------------------
 scenario_lock_holding_build_process_not_orphaned() {
   start_test "lock-holding cargo-built harness process is not treated as orphan"
   local fake_root="$SANDBOX/lane-build-root-$RUN_ID/harness/daemon"
   local lock_path="$fake_root/bridge.lock"
-  spawn_target_harness_with_open_lock "target/debug" bridge "$lock_path" || {
+  spawn_target_worker_with_open_lock "target/debug" bridge "$lock_path" || {
     fail "spawn failed"
     return
   }
@@ -551,7 +580,7 @@ scenario_lock_holding_build_process_in_external_partition_not_orphaned() {
   start_test "lock-holding cargo-built harness in external/ partition is not treated as orphan"
   local fake_root="$SANDBOX/lane-partition-build-root-$RUN_ID/harness/daemon/external"
   local lock_path="$fake_root/daemon.lock"
-  spawn_target_harness_with_open_lock "target/debug" daemon "$lock_path" || {
+  spawn_target_worker_with_open_lock "target/debug" daemon "$lock_path" || {
     fail "spawn failed"
     return
   }
@@ -568,7 +597,7 @@ scenario_lock_holding_build_process_in_managed_partition_not_orphaned() {
   start_test "lock-holding cargo-built harness in managed/ partition is not treated as orphan"
   local fake_root="$SANDBOX/lane-partition-build-root-managed-$RUN_ID/harness/daemon/managed"
   local lock_path="$fake_root/daemon.lock"
-  spawn_target_harness_with_open_lock "target/debug" daemon "$lock_path" || {
+  spawn_target_worker_with_open_lock "target/debug" daemon "$lock_path" || {
     fail "spawn failed"
     return
   }
@@ -584,9 +613,9 @@ scenario_lock_holding_build_process_in_managed_partition_not_orphaned() {
 # ---------------------------------------------------------------------------
 # Scenario 9d: the dev-daemon supervisor wrapper (run-harness-command.py) is
 # NOT a cargo-built harness process. run-daemon-dev.sh execs
-#   python3 run-harness-command.py ... -- <target>/debug/harness daemon dev
-# so the wrapper's argv embeds the cargo harness path as an argument, but the
-# wrapper holds no daemon lock - the in-process `daemon dev` child does. The
+#   python3 run-harness-command.py ... -- <target>/debug/harness-daemon dev
+# so the wrapper's argv embeds the cargo worker path as an argument, but the
+# wrapper holds no daemon lock - the in-process `harness-daemon dev` child does. The
 # build bucket must key on the process executable (argv[0]), not a substring of
 # the argv. Otherwise the wrapper is reaped as an orphan by any parallel agent's
 # clean:stale, and run-harness-command.py forwards that SIGTERM to the child's
@@ -595,7 +624,7 @@ scenario_lock_holding_build_process_in_managed_partition_not_orphaned() {
 scenario_daemon_dev_supervisor_not_build_orphan() {
   start_test "dev-daemon supervisor wrapper is not a build-bucket orphan"
   mkdir -p "$SANDBOX/target/debug"
-  local label="python3 $SANDBOX/Scripts/run-harness-command.py --child-new-session -- $SANDBOX/target/debug/harness daemon dev"
+  local label="python3 $SANDBOX/Scripts/run-harness-command.py --child-new-session -- $SANDBOX/target/debug/harness-daemon dev"
   spawn_labelled "$label" || { fail "spawn failed"; return; }
   local pid="$LAST_SPAWN_PID"
   stale_scan_refresh_ps
@@ -609,13 +638,13 @@ scenario_daemon_dev_supervisor_not_build_orphan() {
 
 # ---------------------------------------------------------------------------
 # Scenario 9e: symmetric guard for the live bucket. A supervisor wrapping
-# `harness daemon serve` / `bridge start` embeds the harness path as an
+# `harness-daemon serve` / `harness-bridge start` embeds the worker path as an
 # argument; the live bucket must likewise key on argv[0] so the wrapper is not
 # mistaken for the serving process.
 # ---------------------------------------------------------------------------
 scenario_serve_supervisor_not_live_bucket() {
   start_test "daemon-serve supervisor wrapper is not in the live bucket"
-  local label="python3 $SANDBOX/Scripts/run-harness-command.py -- /usr/local/bin/harness daemon serve"
+  local label="python3 $SANDBOX/Scripts/run-harness-command.py -- /usr/local/bin/harness-daemon serve"
   spawn_labelled "$label" || { fail "spawn failed"; return; }
   local pid="$LAST_SPAWN_PID"
   stale_scan_refresh_ps
@@ -663,7 +692,7 @@ scenario_laned_live_lock_holder_not_stale() {
   local lock_path="$fake_root/bridge.lock"
   spawn_labelled_with_runtime_lane_and_open_lock \
     "bartsmykla" \
-    "/opt/fake/harness bridge start" \
+    "/opt/fake/harness-bridge start" \
     "$lock_path" || {
     fail "spawn failed"
     return
@@ -692,7 +721,7 @@ scenario_data_home_scoped_live_lock_holder_not_stale() {
   local lock_path="$fake_root/bridge.lock"
   spawn_labelled_with_daemon_data_home_and_open_lock \
     "$daemon_data_home" \
-    "/opt/fake/harness bridge start" \
+    "/opt/fake/harness-bridge start" \
     "$lock_path" || {
     fail "spawn failed"
     return
@@ -721,7 +750,7 @@ scenario_lane_from_lock_path_without_env() {
   start_test "lane is derived from the runtime-lanes lock path without env"
   local fake_root="$SANDBOX/runtime-lanes/lockpath-lane/harness/daemon/external"
   local lock_path="$fake_root/daemon.lock"
-  spawn_labelled_with_open_lock "/opt/fake/harness daemon serve" "$lock_path" || {
+  spawn_labelled_with_open_lock "/opt/fake/harness-daemon serve" "$lock_path" || {
     fail "spawn failed"
     return
   }
@@ -747,7 +776,7 @@ scenario_unscoped_live_lock_holder_still_stale() {
   start_test "unscoped live lock holder remains stale cleanup target"
   local fake_root="$SANDBOX/unscoped-live-root-$RUN_ID/harness/daemon"
   local lock_path="$fake_root/bridge.lock"
-  spawn_labelled_with_open_lock "/opt/fake/harness bridge start" "$lock_path" || {
+  spawn_labelled_with_open_lock "/opt/fake/harness-bridge start" "$lock_path" || {
     fail "spawn failed"
     return
   }
@@ -795,12 +824,12 @@ EOF
   chmod +x "$fake_bin/pgrep" "$fake_bin/launchctl" "$fake_bin/osascript"
   printf '{"bridge":"legacy"}\n' >"$legacy_state"
 
-  spawn_labelled_with_open_lock "/opt/fake/harness daemon serve" "$legacy_lock" || {
+  spawn_labelled_with_open_lock "/opt/fake/harness-daemon serve" "$legacy_lock" || {
     fail "spawn live holder failed"
     return
   }
   live_pid="$LAST_SPAWN_PID"
-  spawn_target_harness "target/release" bridge || {
+  spawn_target_worker "target/release" bridge || {
     fail "spawn orphan build failed"
     return
   }
@@ -903,18 +932,18 @@ EOF
 
   spawn_labelled_with_runtime_lane_and_open_lock \
     "bartsmykla" \
-    "$SANDBOX/target/debug/harness bridge" \
+    "$SANDBOX/target/debug/harness-bridge" \
     "$shared_lock" || {
     fail "spawn laned holder failed"
     return
   }
   laned_pid="$LAST_SPAWN_PID"
-  spawn_labelled_with_open_lock "/opt/fake/harness daemon serve" "$legacy_lock" || {
+  spawn_labelled_with_open_lock "/opt/fake/harness-daemon serve" "$legacy_lock" || {
     fail "spawn unscoped holder failed"
     return
   }
   unscoped_pid="$LAST_SPAWN_PID"
-  spawn_target_harness "target/release" bridge || {
+  spawn_target_worker "target/release" bridge || {
     fail "spawn orphan build failed"
     return
   }
@@ -987,12 +1016,12 @@ EOF
 # ---------------------------------------------------------------------------
 scenario_pid_describe_format() {
   start_test "pid_describe emits PID + etime + command"
-  spawn_target_harness "target/debug" daemon || { fail "spawn failed"; return; }
+  spawn_target_worker "target/debug" daemon || { fail "spawn failed"; return; }
   local pid="$LAST_SPAWN_PID"
   stale_scan_refresh_ps
   local desc
   desc="$(stale_scan_pid_describe "$pid")"
-  if [[ "$desc" =~ ^${pid}[[:space:]]+[^[:space:]]+[[:space:]]+.*target/debug/harness[[:space:]]+daemon ]]; then
+  if [[ "$desc" =~ ^${pid}[[:space:]]+[^[:space:]]+[[:space:]]+.*target/debug/harness-daemon ]]; then
     pass
   else
     fail "describe output did not match expected shape: '$desc'"
@@ -1014,7 +1043,7 @@ scenario_ancestor_exclusion() {
   # same pid throughout.
   pushd "$ROOT" >/dev/null || { fail "pushd $ROOT failed"; return; }
   # shellcheck disable=SC2016  # $1 is resolved by the inner bash, not this shell
-  nohup bash -c 'exec -a "$1" sleep 300' bash-spawner "mise run check" >/dev/null 2>&1 &
+  nohup bash -c 'exec -a "$1" /bin/sleep 300' bash-spawner "mise run check" >/dev/null 2>&1 &
   local sibling_pid=$!
   popd >/dev/null || { fail "popd failed"; return; }
   SPAWNED_PIDS+=("$sibling_pid")
@@ -1059,7 +1088,7 @@ scenario_common_root_gate_helper_detection() {
 
   pushd "$sibling_root" >/dev/null || { fail "pushd $sibling_root failed"; return; }
   # shellcheck disable=SC2016  # $1 is resolved by the inner bash, not this shell
-  nohup bash -c 'exec -a "$1" sleep 300' bash-spawner "mise run check" >/dev/null 2>&1 &
+  nohup bash -c 'exec -a "$1" /bin/sleep 300' bash-spawner "mise run check" >/dev/null 2>&1 &
   local sibling_pid=$!
   popd >/dev/null || { fail "popd failed"; return; }
   SPAWNED_PIDS+=("$sibling_pid")
@@ -1152,11 +1181,11 @@ scenario_lane_scoped_gate_helper_ignores_other_lanes() {
 # ---------------------------------------------------------------------------
 scenario_congested_env() {
   start_test "multi-leak congestion surfaces every pid"
-  spawn_target_harness "target/debug" daemon || { fail "spawn a failed"; return; }
+  spawn_target_worker "target/debug" daemon || { fail "spawn a failed"; return; }
   local pid_a="$LAST_SPAWN_PID"
-  spawn_target_harness "target/release" bridge || { fail "spawn b failed"; return; }
+  spawn_target_worker "target/release" bridge || { fail "spawn b failed"; return; }
   local pid_b="$LAST_SPAWN_PID"
-  spawn_target_harness "target/dev/aarch64-apple-darwin/debug" daemon || { fail "spawn c failed"; return; }
+  spawn_target_worker "target/dev/aarch64-apple-darwin/debug" daemon || { fail "spawn c failed"; return; }
   local pid_c="$LAST_SPAWN_PID"
 
   stale_scan_refresh_ps
@@ -1237,12 +1266,12 @@ scenario_clean_tmp_removal_is_idempotent() {
 
 # ---------------------------------------------------------------------------
 # Scenario 14: installed-binary false positive prevention.
-# An installed harness at ~/.local/bin/harness must match 'live' (needing a
+# An installed harness-daemon must match 'live' (needing a
 # real lock to escalate) but never 'build'.
 # ---------------------------------------------------------------------------
 scenario_installed_not_in_build_bucket() {
-  start_test "installed /usr/local/bin/harness does not trigger build bucket"
-  spawn_labelled "/usr/local/bin/harness daemon serve" || { fail "spawn failed"; return; }
+  start_test "installed harness-daemon does not trigger build bucket"
+  spawn_labelled "/usr/local/bin/harness-daemon serve" || { fail "spawn failed"; return; }
   local pid="$LAST_SPAWN_PID"
   stale_scan_refresh_ps
   local build_pids
@@ -1258,7 +1287,7 @@ scenario_refresh_updates_cache() {
   stale_scan_refresh_ps
   local before
   before="$(stale_scan_matching_pids build)"
-  spawn_target_harness "target/debug" bridge || { fail "spawn failed"; return; }
+  spawn_target_worker "target/debug" bridge || { fail "spawn failed"; return; }
   local pid="$LAST_SPAWN_PID"
   # Without refresh, the old snapshot must not contain the new pid.
   assert_not_in_list "$pid" "pre-refresh pid" "$before" || return
@@ -1281,7 +1310,7 @@ scenario_refresh_invalidates_ppid_map() {
 
   pushd "$ROOT" >/dev/null || { fail "pushd $ROOT failed"; return; }
   # shellcheck disable=SC2016  # $1 is resolved by the inner bash, not this shell
-  nohup bash -c 'exec -a "$1" sleep 300' bash-spawner "mise run check" >/dev/null 2>&1 &
+  nohup bash -c 'exec -a "$1" /bin/sleep 300' bash-spawner "mise run check" >/dev/null 2>&1 &
   local sibling_pid=$!
   popd >/dev/null || { fail "popd failed"; return; }
   SPAWNED_PIDS+=("$sibling_pid")
@@ -1519,13 +1548,13 @@ scenario_foreign_ws_listener() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 28: harness-labelled listener is NOT flagged as foreign. We write
-# the listener script at a path containing target/debug/harness so macOS ps
+# Scenario 28: worker-labelled listener is NOT flagged as foreign. We write
+# the listener script at a path containing target/debug/harness-daemon so macOS ps
 # (which ignores exec -a for framework-wrapped Python) still surfaces an
 # argv line that matches the build-bucket regex.
 # ---------------------------------------------------------------------------
 scenario_harness_ws_listener_not_flagged() {
-  start_test "harness-labelled TCP listener is not flagged as foreign"
+  start_test "harness-daemon-labelled TCP listener is not flagged as foreign"
   local script_path="$SANDBOX/ws-listener-$RUN_ID.py"
   cat >"$script_path" <<'EOF'
 import socket, sys, os
@@ -1538,15 +1567,15 @@ os.set_inheritable(s.fileno(), True)
 os.execv("/bin/sleep", [sys.argv[1], "300"])
 EOF
 
-  local target_harness="$SANDBOX/target/debug/harness"
+  local target_worker="$SANDBOX/target/debug/harness-daemon"
   local port_file="$SANDBOX/harness-$RUN_ID.port"
   # The bootstrap binds a real LISTEN socket, writes the port, then execs
-  # /bin/sleep with argv[0] = the cargo harness path, inheriting the socket fd.
+  # /bin/sleep with argv[0] = the cargo worker path, inheriting the socket fd.
   # This mirrors the real daemon: a process whose executable (argv[0]) is
-  # target/debug/harness holds the Codex WS listener. A plain python listener
+  # target/debug/harness-daemon holds the Codex WS listener. A plain python listener
   # cannot stand in - the framework python re-execs and overwrites argv[0];
-  # /bin/sleep does not, so the inherited listen fd stays on a harness-named pid.
-  nohup python3 "$script_path" "$target_harness daemon" "$port_file" >/dev/null 2>&1 &
+  # /bin/sleep does not, so the inherited listen fd stays on a worker-named pid.
+  nohup python3 "$script_path" "$target_worker" "$port_file" >/dev/null 2>&1 &
   local pid=$!
   SPAWNED_PIDS+=("$pid")
   wait_for_pid_registered "$pid" || { fail "listener never started"; return; }
@@ -1561,7 +1590,7 @@ EOF
   port="$(cat "$port_file")"
 
   # Wait for the exec into /bin/sleep to land so the post-exec argv[0]
-  # (target/debug/harness) is what the build bucket sees before the sweep.
+  # (target/debug/harness-daemon) is what the build bucket sees before the sweep.
   wait_for_pid_in_bucket "$pid" build || { fail "listener never entered build bucket"; return; }
   stale_scan_refresh_ps
 
@@ -1625,7 +1654,7 @@ scenario_live_codex_app_server_listener_not_stale() {
 
   spawn_labelled_with_daemon_data_home_and_open_lock \
     "$daemon_data_home" \
-    "/opt/fake/harness bridge start" \
+    "/opt/fake/harness-bridge start" \
     "$lock_path" || {
     fail "spawn live holder failed"
     return
@@ -1921,7 +1950,7 @@ scenario_autoclean_blocks_on_live_repo_gate_helpers() {
 
   pushd "$ROOT" >/dev/null || { fail "pushd $ROOT failed"; return; }
   # shellcheck disable=SC2016  # $1 is resolved by the inner bash, not this shell
-  nohup bash -c 'exec -a "$1" sleep 300' bash-spawner "mise run check" >/dev/null 2>&1 &
+  nohup bash -c 'exec -a "$1" /bin/sleep 300' bash-spawner "mise run check" >/dev/null 2>&1 &
   local sibling_pid=$!
   popd >/dev/null || { fail "popd failed"; return; }
   SPAWNED_PIDS+=("$sibling_pid")
@@ -2047,6 +2076,7 @@ run_all() {
   scenario_per_triple_debug_orphan
   scenario_per_triple_release_orphan
   scenario_live_bucket
+  scenario_legacy_worker_commands_still_detected
   scenario_gate_bucket
   scenario_test_runners_not_gate_bucket
   scenario_tmp_artifacts

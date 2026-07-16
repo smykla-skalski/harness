@@ -224,9 +224,9 @@ pub(super) fn lifecycle_command(agent: HookAgent, subcommand: &str) -> String {
     };
     match subcommand {
         "session-start" | "session-stop" | "prompt-submit" => {
-            format!("harness agents {subcommand} --agent {agent_name} --project-dir {project_dir}")
+            format!("harness-hook {subcommand} --agent {agent_name} --project-dir {project_dir}")
         }
-        _ => format!("harness {subcommand} --project-dir {project_dir}"),
+        _ => format!("harness-hook {subcommand} --project-dir {project_dir}"),
     }
 }
 
@@ -241,7 +241,7 @@ fn hook_registration(
         event,
         matcher: matcher.map(ToString::to_string),
         command: format!(
-            "harness hook --agent {} suite:run {name}",
+            "harness-hook {name} --agent {} --skill suite:run",
             adapter_for(agent).name()
         ),
     }

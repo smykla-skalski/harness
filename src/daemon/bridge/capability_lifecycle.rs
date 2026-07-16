@@ -229,10 +229,10 @@ impl BridgeServer {
         if !plist_path.is_file() {
             return Ok(());
         }
-        let harness_binary = current_exe().map_err(|error| {
-            CliErrorKind::workflow_io(format!("resolve current harness binary: {error}"))
+        let bridge_binary = current_exe().map_err(|error| {
+            CliErrorKind::workflow_io(format!("resolve current harness-bridge binary: {error}"))
         })?;
-        write_text(&plist_path, &render_launch_agent_plist(&harness_binary))
+        write_text(&plist_path, &render_launch_agent_plist(&bridge_binary))
     }
 
     pub(super) fn shutdown_requested(&self) -> bool {

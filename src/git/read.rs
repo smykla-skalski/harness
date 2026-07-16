@@ -2,8 +2,11 @@
 
 use std::path::{Path, PathBuf};
 
+use gix::bstr::BString;
+use gix::progress::Discard;
 use gix::refs::TargetRef;
 use gix::remote;
+use gix::status::UntrackedFiles;
 
 use crate::git::{GitError, GitResult};
 
@@ -99,11 +102,11 @@ impl GitRepository {
     pub(crate) fn has_changes_including_untracked(&self) -> GitResult<bool> {
         let repo = self.open_gix()?;
         let platform = repo
-            .status(gix::progress::Discard)
+            .status(Discard)
             .map_err(|error| GitError::read(self.path(), error))?;
         let mut statuses = platform
-            .untracked_files(gix::status::UntrackedFiles::Files)
-            .into_iter(Vec::<gix::bstr::BString>::new())
+            .untracked_files(UntrackedFiles::Files)
+            .into_iter(Vec::<BString>::new())
             .map_err(|error| GitError::read(self.path(), error))?;
         let has_untracked = match statuses.next() {
             None => false,

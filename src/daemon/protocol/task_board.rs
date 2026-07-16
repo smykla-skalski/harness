@@ -112,6 +112,10 @@ pub struct TaskBoardUpdateItemRequest {
     pub work_item_id: Option<String>,
 }
 
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "wire contract exposes independent identity-clear switches"
+)]
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct TaskBoardUpdateIdentityClears {
     #[serde(default)]

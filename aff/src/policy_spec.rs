@@ -52,6 +52,10 @@ pub(crate) const ENFORCEMENT_EXAMPLES: &[EnforcementExample] = &[
         replacement: "mise run setup:bootstrap -- --agents codex",
     },
     EnforcementExample {
+        command: "harness-mcp serve",
+        replacement: "mise run mcp:serve",
+    },
+    EnforcementExample {
         command: "./scripts/version.sh check",
         replacement: "mise run version:check",
     },
@@ -261,15 +265,14 @@ pub(crate) const VERSION_ROUTES: &[WordRoute] = &[
     },
 ];
 
-pub(crate) const HARNESS_ROUTES: &[WordRoute] = &[
-    WordRoute {
-        path: &["setup", "bootstrap"],
-        task: "setup:bootstrap",
-        passthrough_start: Some(2),
-    },
-    WordRoute {
-        path: &["mcp", "serve"],
-        task: "mcp:serve",
-        passthrough_start: None,
-    },
-];
+pub(crate) const HARNESS_ROUTES: &[WordRoute] = &[WordRoute {
+    path: &["setup", "bootstrap"],
+    task: "setup:bootstrap",
+    passthrough_start: Some(2),
+}];
+
+pub(crate) const HARNESS_MCP_ROUTES: &[WordRoute] = &[WordRoute {
+    path: &["serve"],
+    task: "mcp:serve",
+    passthrough_start: None,
+}];

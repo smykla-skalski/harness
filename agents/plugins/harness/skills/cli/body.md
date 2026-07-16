@@ -17,4 +17,4 @@ Use this skill to answer `harness` CLI questions from checked-in references back
 - `references/setup-create.md` — `setup` and `create` command surfaces, key flags, bootstrap/generate shortcuts
 - `references/run.md` — `run`, especially resume / status / doctor / repair recovery work.
 - `references/observe-session.md` — `observe`, `session`, and `session start` flag surfaces.
-- `references/agents-daemon-bridge.md` — `agents`, `daemon`, `bridge`, and wrapper lifecycle command shapes.
+- `references/agents-daemon-bridge.md` — `harness-hook`, daemon, bridge, and wrapper lifecycle command shapes.

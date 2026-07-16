@@ -229,7 +229,7 @@ extension HarnessMonitorStore {
   }
 
   func bootstrapExternalDaemon() async {
-    let daemonCommand = HarnessMonitorPaths.shellCommand("harness daemon dev")
+    let daemonCommand = HarnessMonitorPaths.shellCommand("harness-daemon dev")
     let registrationState = await daemonController.launchAgentRegistrationState()
     if registrationState == .enabled {
       appendConnectionEvent(

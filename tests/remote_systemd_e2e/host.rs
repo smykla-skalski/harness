@@ -38,7 +38,7 @@ impl RemoteSystemdHost {
         let unit = format!("harness-remote-e2e-{}-{nonce}", std::process::id());
         let (https_port, http_port) = available_low_port_pair()?;
         Ok(Self {
-            binary_source: assert_cmd::cargo::cargo_bin("harness"),
+            binary_source: assert_cmd::cargo::cargo_bin("harness-daemon"),
             binary_path: PathBuf::from(format!("/usr/local/libexec/{unit}")),
             unit_path: PathBuf::from(format!("/etc/systemd/system/{unit}.service")),
             env_path: PathBuf::from(format!("/etc/harness/{unit}.env")),
@@ -124,7 +124,6 @@ impl RemoteSystemdHost {
     pub fn install(&self) -> Result<Value, String> {
         let mut command = sudo([self.binary_path.as_os_str()]);
         command.args([
-            "daemon",
             "remote",
             "install-systemd",
             "--unit",
@@ -154,7 +153,6 @@ impl RemoteSystemdHost {
     pub fn uninstall(&self) -> Result<Value, String> {
         let mut command = sudo([self.binary_path.as_os_str()]);
         command.args([
-            "daemon",
             "remote",
             "uninstall-systemd",
             "--unit",
@@ -176,9 +174,7 @@ impl RemoteSystemdHost {
             ))
             .arg("HARNESS_DAEMON_OWNERSHIP=external")
             .arg(&self.binary_path)
-            .args([
-                "daemon", "remote", "pair", "create", "--role", role, "--ttl", "10m",
-            ]);
+            .args(["remote", "pair", "create", "--role", role, "--ttl", "10m"]);
         json_output(command, "create remote pairing from systemd state")
     }
 
@@ -196,7 +192,7 @@ impl RemoteSystemdHost {
 
     pub fn assert_cli_status(&self) -> Result<(), String> {
         let mut command = sudo([self.binary_path.as_os_str()]);
-        command.args(["daemon", "remote", "status", "--unit", &self.unit, "--json"]);
+        command.args(["remote", "status", "--unit", &self.unit, "--json"]);
         command.arg("--env-file").arg(&self.env_path);
         let value = json_output(command, "query remote systemd status")?;
         if value["exit_code"].as_i64() == Some(0) {

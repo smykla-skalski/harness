@@ -190,7 +190,7 @@ fn extended_features() -> BTreeMap<Feature, FeatureInfo> {
         (
             Feature::PreCompactHandoff,
             FeatureInfo::new("context compaction before session handoff")
-                .command("harness pre-compact"),
+                .command("harness-hook pre-compact"),
         ),
         (
             Feature::ProgressHeartbeat,
@@ -224,10 +224,7 @@ fn extended_features() -> BTreeMap<Feature, FeatureInfo> {
             FeatureInfo::new(
                 "start and stop session boundaries for observation and state tracking",
             )
-            .commands(&[
-                "harness agents session-start",
-                "harness agents session-stop",
-            ]),
+            .commands(&["harness-hook session-start", "harness-hook session-stop"]),
         ),
         (
             Feature::StateCapture,
@@ -275,7 +272,7 @@ fn operational_features() -> BTreeMap<Feature, FeatureInfo> {
                  tool-result, tool-failure, guard-stop, audit-turn, context-agent, \
                  validate-agent",
             )
-            .command("harness hook"),
+            .command("harness-hook"),
         ),
         (
             Feature::IdempotentGroupReporting,

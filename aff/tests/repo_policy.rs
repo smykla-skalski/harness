@@ -62,6 +62,7 @@ fn denied_commands_contain_replacement() {
             "harness setup bootstrap --agents codex",
             &["mise run setup:bootstrap -- --agents codex"],
         ),
+        ("harness-mcp serve", &["mise run mcp:serve"]),
         (
             "env XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests \
              bash -lc 'mise run monitor:test'",
@@ -83,7 +84,12 @@ fn denied_commands_contain_replacement() {
 
 #[test]
 fn allowed_commands_pass_through() {
-    let cases = ["mise run check", "curl 'https://example.com?a=1&b=2'"];
+    let cases = [
+        "mise run check",
+        "curl 'https://example.com?a=1&b=2'",
+        concat!("harness", " mcp serve"),
+        "harness-mcp --help",
+    ];
     for cmd in cases {
         assert!(
             manual_command_denial_reason(cmd)

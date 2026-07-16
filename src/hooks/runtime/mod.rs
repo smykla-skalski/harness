@@ -424,5 +424,5 @@ fn warn_formatted(message: &str) {
     Event::dispatch(&META, &META.fields().value_set_all(values));
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "standalone-worker")))]
 mod tests;

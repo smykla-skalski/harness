@@ -18,7 +18,7 @@ fn ownership_override() -> Option<DaemonOwnership> {
 /// Which entry point owns this daemon process.
 ///
 /// Managed daemons are launched by `SMAppService` from the bundled Harness
-/// Monitor app. External daemons are launched by `harness daemon dev` from a
+/// Monitor app. External daemons are launched by `harness-daemon dev` from a
 /// CLI shell. The two kinds run side-by-side without colliding because they
 /// keep their state in separate `<root>/daemon/<ownership>/` subtrees and use
 /// distinct launchd labels and bridge ports.
@@ -70,7 +70,7 @@ impl DaemonOwnership {
 
 /// Process-local ownership override that restores the previous value on drop.
 /// Mirrors the pattern of `ScopedDaemonRootOverride`. Use from CLI entry
-/// points (e.g., `harness daemon dev`) to pin ownership without mutating the
+/// points (e.g., `harness-daemon dev`) to pin ownership without mutating the
 /// process environment.
 pub struct ScopedOwnershipOverride {
     previous: Option<DaemonOwnership>,

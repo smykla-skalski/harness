@@ -17,11 +17,16 @@ impl BridgeServer {
         session_id: &str,
         request: &AcpAgentStartRequest,
         disable_pooling: bool,
+        openrouter_token: Option<&str>,
     ) -> Result<AcpAgentSnapshot, CliError> {
         self.ensure_acp_capability()?;
         let snapshot = self.with_acp_runtime(|| {
-            self.acp_agent_manager
-                .start_with_pooling_disabled(session_id, request, disable_pooling)
+            self.acp_agent_manager.start_with_bridge_openrouter_token(
+                session_id,
+                request,
+                disable_pooling,
+                openrouter_token,
+            )
         })?;
         self.update_acp_metadata()?;
         Ok(snapshot)
@@ -106,7 +111,7 @@ impl BridgeServer {
         action()
     }
 
-    fn ensure_acp_capability(&self) -> Result<(), CliError> {
+    pub(super) fn ensure_acp_capability(&self) -> Result<(), CliError> {
         if self.capabilities()?.contains_key(BRIDGE_CAPABILITY_ACP) {
             return Ok(());
         }

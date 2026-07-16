@@ -17,6 +17,18 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use serde::{Deserialize, Serialize};
 
+/// Lightweight projection returned by GitHub blob fetches before a daemon
+/// response is assembled.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub(crate) struct BlobTextProjection {
+    #[serde(default)]
+    pub repository_full_name: Option<String>,
+    pub content_base64: String,
+    pub byte_size: u64,
+    pub is_truncated: bool,
+    pub is_too_large: bool,
+}
+
 use super::ReviewsRateLimitSnapshot;
 
 /// Cap on a single blob byte size we'll return to the client. Larger blobs

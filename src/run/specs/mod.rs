@@ -1,7 +1,7 @@
 mod frontmatter;
 mod suite;
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "standalone-worker")))]
 mod tests;
 
 pub use frontmatter::{HelmValueEntry, SuiteFrontmatter};

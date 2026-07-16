@@ -165,7 +165,9 @@ final class AuditPrimitivesTests: AuditTempDirectoryTestCase {
         let psOutput = """
           111 /tmp/perf/harness-monitor-instruments/staged-host/Harness Monitor UI Testing Audit.app/Contents/MacOS/Harness Monitor UI Testing -ApplePersistenceIgnoreState YES
           222 /tmp/perf/harness-monitor-instruments/staged-host/Harness Monitor UI Testing.app/Contents/MacOS/Harness Monitor UI Testing -ApplePersistenceIgnoreState YES
-          333 /Applications/Other.app/Contents/MacOS/Other
+          333 /tmp/harness/target/debug/harness-daemon serve --host 127.0.0.1
+          444 /tmp/harness/target/debug/harness-bridge start --capability codex
+          555 /Applications/Other.app/Contents/MacOS/Other
         """
         var signalled: [Int32] = []
 
@@ -173,6 +175,6 @@ final class AuditPrimitivesTests: AuditTempDirectoryTestCase {
             signalled.append(pid)
         }
 
-        XCTAssertEqual(signalled, [111, 222])
+        XCTAssertEqual(signalled, [111, 222, 333, 444])
     }
 }

@@ -5,12 +5,14 @@ pub mod external;
 pub mod git_identity_defaults;
 pub mod github;
 #[allow(dead_code)]
+#[cfg(feature = "daemon-runtime")]
 pub(crate) mod legacy_import;
 pub mod machines;
 pub mod orchestrator;
 pub mod planning;
 pub mod policy;
 pub mod policy_graph;
+#[cfg(feature = "daemon-runtime")]
 pub mod policy_runtime;
 pub mod runtime_config;
 pub mod store;
@@ -25,6 +27,7 @@ pub use dispatch::{
     DispatchFailureKind, DispatchPlan, DispatchReadiness, EvaluatorIntent, FollowUpPhase,
     ReviewerIntent, SessionIntent, TaskCreationIntent, WorkerIntent,
 };
+#[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use dispatch::{
     SpawnGateSwitches, build_dispatch_plans_with_policy, consumed_grant_id,
     dispatch_policy_from_graph, machine_mismatch_plan_with_policy,
@@ -48,6 +51,7 @@ pub use external::{
     GitHubSyncClient, HARNESS_GITHUB_REPOSITORY_ENV, HARNESS_GITHUB_TOKEN_ENV,
     HARNESS_TODOIST_TOKEN_ENV, TodoistSyncClient, configured_sync_clients,
 };
+#[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use external::{
     TaskBoardSyncStore, configured_sync_clients_without_review_requests,
     imported_review_references_from_items, reconcile_review_item_from_snapshots,
@@ -106,7 +110,9 @@ pub use runtime_config::{
 };
 #[cfg(test)]
 pub use store::TaskBoardStore;
+#[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use store::default_board_root;
+#[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use summary::build_audit_summary_with_policy;
 pub use summary::{
     TaskBoardAuditSummary, TaskBoardMachineSummary, TaskBoardProjectSummary,
@@ -122,4 +128,6 @@ pub use types::{
     TaskBoardItem, TaskBoardPriority, TaskBoardStatus, TaskBoardWorkflowState,
     TaskBoardWorkflowStatus, TaskUsage,
 };
-pub(crate) use worker_prompt::{WorkerPromptContext, plan_worker_prompt, render_worker_prompt};
+pub(crate) use worker_prompt::plan_worker_prompt;
+#[cfg(any(test, feature = "daemon-runtime"))]
+pub(crate) use worker_prompt::{WorkerPromptContext, render_worker_prompt};

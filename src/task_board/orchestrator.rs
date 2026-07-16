@@ -33,6 +33,7 @@ use self::run_record::{
     RunRecordInput, new_run_id, read_or_default, run_items_for_machine, run_record,
     workflow_statuses,
 };
+#[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use self::settings::parse_persisted_settings_read_only;
 #[cfg(test)]
 use self::settings::{

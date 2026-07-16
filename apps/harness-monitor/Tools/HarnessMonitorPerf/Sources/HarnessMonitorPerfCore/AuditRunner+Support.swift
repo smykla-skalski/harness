@@ -274,6 +274,8 @@ extension AuditRunner {
             guard let pid = Int32(pidString) else { continue }
             if command.contains("Harness Monitor UI Testing.app/Contents/MacOS/Harness Monitor UI Testing")
                 || command.contains("Harness Monitor UI Testing Audit.app/Contents/MacOS/Harness Monitor UI Testing")
+                || command.contains("target/debug/harness-daemon serve")
+                || command.contains("target/debug/harness-bridge start")
                 || command.contains("target/debug/harness daemon serve")
                 || command.contains("target/debug/harness bridge start")
                 || command.contains("/mock-codex") {
