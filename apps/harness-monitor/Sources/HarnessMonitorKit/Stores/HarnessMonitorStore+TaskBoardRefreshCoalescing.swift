@@ -132,8 +132,11 @@ extension HarnessMonitorStore {
       self.cacheWriteSync.pendingTaskBoardPolicyPipelineRefresh = false
       self.cacheWriteSync.pendingTaskBoardFallbackStatus = nil
 
+      let stepModeConfirmationRevision =
+        self.taskBoardRuntimeState.stepModeMutation.confirmationRevision
       let snapshot = await Self.loadTaskBoardRefreshSnapshot(
         using: client,
+        stepModeConfirmationRevision: stepModeConfirmationRevision,
         includeItems: includeItems,
         includeOrchestratorStatus: includeOrchestratorStatus
       )

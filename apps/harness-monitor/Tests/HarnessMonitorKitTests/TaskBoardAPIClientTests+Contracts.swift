@@ -60,6 +60,7 @@ extension TaskBoardAPIClientTests {
     )
     let settings = try await client.updateTaskBoardOrchestratorSettings(
       request: TaskBoardOrchestratorSettingsUpdateRequest(
+        stepMode: true,
         clearDispatchStatusFilter: true,
         clearProjectDir: true,
         githubInbox: TaskBoardGitHubInboxConfig(repositories: ["example/harness", "example/aff"]),
@@ -90,6 +91,7 @@ extension TaskBoardAPIClientTests {
     #expect(runtimeConfig.global.authorName == "Harness Bot")
     #expect(runOnce.lastRun?.sync.total == 1)
     #expect(runOnce.lastRun?.policyTraceIds == ["trace-1"])
+    #expect(settings.stepMode)
     #expect(settings.githubInbox.repositories == ["example/harness", "example/aff"])
     #expect(settings.policyVersion == "task-board-policy-v3")
     #expect(updatedRuntimeConfig.repositoryOverrides.first?.repository == "example/harness")
@@ -107,6 +109,7 @@ extension TaskBoardAPIClientTests {
           projectDir: "/tmp/harness"
         ),
         .updateTaskBoardOrchestratorSettings(
+          stepMode: true,
           policyVersion: "task-board-policy-v3",
           clearProjectDir: true,
           clearDispatchStatusFilter: true

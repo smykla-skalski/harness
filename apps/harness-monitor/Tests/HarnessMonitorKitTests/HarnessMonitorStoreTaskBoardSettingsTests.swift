@@ -165,7 +165,7 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
       keychainBundle: keychainBundle
     )
     let baselineCallCount = client.recordedCalls().count
-    let snapshot = makeSettingsSnapshot()
+    let snapshot = makeSettingsSnapshot(stepMode: true)
 
     let success = await store.updateTaskBoardGitSettings(
       snapshot: snapshot,
@@ -181,6 +181,10 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
       } == false
     )
     #expect(store.currentSuccessFeedbackMessage == "Saved task board settings")
+    #expect(store.globalTaskBoardOrchestratorStatus?.stepMode == true)
+    #expect(store.globalTaskBoardOrchestratorStatus?.settings.stepMode == true)
+    #expect(store.contentUI.dashboard.taskBoardOrchestratorStatus?.stepMode == true)
+    #expect(store.contentUI.dashboard.taskBoardOrchestratorStatus?.settings.stepMode == true)
     #expect(credentialPersistence.github.savedSnapshots == [snapshot.githubCredentials])
     #expect(keychainBundle.ssh.recorded.isEmpty)
   }
@@ -314,9 +318,10 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
     #expect(reloaded.isEmpty)
   }
 
-  private func makeSettingsSnapshot() -> TaskBoardGitSettingsSnapshot {
+  private func makeSettingsSnapshot(stepMode: Bool = false) -> TaskBoardGitSettingsSnapshot {
     TaskBoardGitSettingsSnapshot(
       orchestratorSettings: TaskBoardOrchestratorSettings(
+        stepMode: stepMode,
         enabledWorkflows: [.defaultTask],
         dryRunDefault: true,
         dispatchStatusFilter: .todo,

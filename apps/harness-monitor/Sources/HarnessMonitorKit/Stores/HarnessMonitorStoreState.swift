@@ -21,6 +21,21 @@ struct CacheWriteSyncState {
   var pendingSessionDetailCacheWrites: [String: PendingSessionDetailCacheWrite] = [:]
 }
 
+struct TaskBoardRuntimeState {
+  var connection = TaskBoardConnectionState()
+  var stepModeMutation = TaskBoardStepModeMutationState()
+}
+
+struct TaskBoardStepModeMutationState {
+  var latestGeneration: UInt64 = 0
+  var desiredValue: Bool?
+  var lastAuthoritativeSettings: TaskBoardOrchestratorSettings?
+  var confirmationRevision: UInt64 = 0
+  var confirmedSettings: TaskBoardOrchestratorSettings?
+  var isRequestLocked = false
+  var requestWaiters: [CheckedContinuation<Void, Never>] = []
+}
+
 struct SelectedTimelineLoadState {
   var pageLoadTask: Task<Void, Never>?
   var pageLoadKey: HarnessMonitorStore.SelectedTimelinePageLoadKey?
