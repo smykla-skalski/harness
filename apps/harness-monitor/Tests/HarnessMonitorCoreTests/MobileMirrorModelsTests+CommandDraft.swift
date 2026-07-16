@@ -137,7 +137,7 @@ extension MobileMirrorModelsCommandTests {
     }
   }
 
-  func testCommandDraftAcceptsBacklogAndRejectsLegacyUmbrellaStatus() {
+  func testCommandDraftCanonicalizesLegacyStatusesAndRejectsUmbrella() throws {
     let target = MobileCommandTarget(
       stationID: "station",
       taskID: "task-1",
@@ -152,6 +152,23 @@ extension MobileMirrorModelsCommandTests {
         payload: ["status": "backlog"]
       ).validate()
     )
+    for (legacyStatus, canonicalStatus) in [
+      "new": "todo",
+      "plan_review": "agentic_review",
+      "needs_you": "human_required",
+      "blocked": "failed",
+    ] {
+      let command = try MobileCommandDraft(
+        kind: .taskBoardDispatch,
+        confirmationText: "Dispatch task.",
+        target: target,
+        payload: ["status": legacyStatus]
+      ).makeCommand(
+        id: "command-\(legacyStatus)",
+        createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+      )
+      XCTAssertEqual(command.payload["status"], canonicalStatus)
+    }
     XCTAssertThrowsError(
       try MobileCommandDraft(
         kind: .taskBoardDispatch,

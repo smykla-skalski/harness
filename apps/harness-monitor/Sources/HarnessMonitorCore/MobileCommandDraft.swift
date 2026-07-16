@@ -1,5 +1,20 @@
 import Foundation
 
+private func canonicalTaskBoardDispatchStatus(_ status: String) -> String {
+  switch status {
+  case "new":
+    "todo"
+  case "plan_review":
+    "agentic_review"
+  case "needs_you":
+    "human_required"
+  case "blocked":
+    "failed"
+  default:
+    status
+  }
+}
+
 public enum MobileCommandDraftValidationError: Error, Equatable, CustomStringConvertible, Sendable {
   case missingStation
   case missingTarget(String)
@@ -199,7 +214,10 @@ public struct MobileCommandDraft: Equatable, Sendable {
       let key = trimmed(pair.key)
       let value = trimmed(pair.value)
       if !key.isEmpty, !value.isEmpty {
-        result[key] = value
+        result[key] =
+          kind == .taskBoardDispatch && key == "status"
+          ? canonicalTaskBoardDispatchStatus(value)
+          : value
       }
     }
   }
