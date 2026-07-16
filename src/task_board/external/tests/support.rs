@@ -139,6 +139,7 @@ pub(super) fn github_review_request_item(
     );
     item.status = status;
     item.project_id = Some("owner/repo".to_owned());
+    item.execution_repository = Some("owner/repo".to_owned());
     item.imported_from_provider = Some(ExternalRefProvider::GitHub);
     item.planning = PlanningState::default();
     item.external_refs = vec![github_review_request_ref(external_id)];

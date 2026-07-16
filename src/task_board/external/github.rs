@@ -13,6 +13,7 @@ use crate::github_api::{
 };
 use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 
+use super::targeting::github_repository_for_item;
 use super::{
     ExternalProvider, ExternalProviderCapabilities, ExternalSyncClient, ExternalSyncConfig,
     ExternalSyncField, ExternalTask, ExternalTaskRef, ExternalTaskUpdate, ExternalUpdateOutcome,
@@ -112,7 +113,7 @@ impl GitHubSyncClient {
 
     fn repository_for(&self, item: Option<&TaskBoardItem>) -> Result<GitHubRepository, CliError> {
         let candidate = item
-            .and_then(|item| item.project_id.as_deref())
+            .and_then(github_repository_for_item)
             .map(parse_github_repository)
             .transpose()?;
         candidate

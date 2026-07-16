@@ -12,6 +12,7 @@ use super::types::{ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardSta
 mod capabilities;
 mod github;
 mod sync;
+mod targeting;
 mod todoist;
 
 pub use capabilities::{

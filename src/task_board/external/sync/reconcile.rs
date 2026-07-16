@@ -1,4 +1,5 @@
 use crate::errors::CliError;
+use crate::task_board::external::targeting::execution_repository_for_task;
 use crate::task_board::external::{
     ExternalProvider, ExternalSyncConflictPolicy, ExternalTask, ExternalTaskRef,
 };
@@ -111,6 +112,11 @@ fn reconciliation_patch(item: &TaskBoardItem, task: &ExternalTask) -> TaskBoardI
             .clone()
             .map_or(OptionalFieldPatch::Clear, OptionalFieldPatch::Set);
     }
+    if item.execution_repository.is_none()
+        && let Some(repository) = execution_repository_for_task(task)
+    {
+        patch.execution_repository = OptionalFieldPatch::Set(repository);
+    }
     if let Some(refs) = reconciled_external_refs(item, task) {
         patch.external_refs = Some(refs);
     }
@@ -129,6 +135,7 @@ fn has_reconciliation_change(patch: &TaskBoardItemPatch) -> bool {
         || patch.body.is_some()
         || patch.status.is_some()
         || !matches!(patch.project_id, OptionalFieldPatch::Unchanged)
+        || !matches!(patch.execution_repository, OptionalFieldPatch::Unchanged)
         || patch.external_refs.is_some()
 }
 
