@@ -155,6 +155,57 @@ async fn into_completed_error_keeps_partial_batch_evidence() {
 }
 
 #[tokio::test]
+async fn terminal_local_error_keeps_captured_batch_evidence() {
+    let (_dir, db) = open_db().await;
+    let request = TaskBoardSyncRequest::default();
+    let terminal_error = CliErrorKind::workflow_io("local persistence failed").into();
+    let scope_error = CliErrorKind::workflow_io("local persistence failed").into();
+    let batch = ExternalSyncBatch {
+        operations: vec![operation(
+            true,
+            ExternalSyncAction::Pull,
+            "task-before-local-failure",
+        )],
+        scope_outcomes: vec![ExternalSyncScopeOutcome::failed(
+            ExternalProvider::Todoist,
+            "scope/primary".into(),
+            &scope_error,
+        )],
+        first_provider_failure: None,
+        terminal_error: Some(terminal_error),
+    };
+    let mut metrics = SyncExecutionMetrics::default();
+    metrics.capture(&batch);
+    let result = batch
+        .into_completed()
+        .map(|completed| sync_summary(completed.operations));
+
+    record_request_result(
+        &db,
+        &request,
+        TaskBoardSyncAuditTrigger::Requested,
+        &result,
+        &metrics,
+    )
+    .await
+    .expect("record terminal local failure audit");
+
+    let events = sync_events(&db).await;
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].outcome, "failure");
+    let payload = payload(&events[0]);
+    assert_eq!(payload["observed_operation_count"].as_u64(), Some(1));
+    assert_eq!(
+        payload["operation_evidence"][0]["board_item_id"].as_str(),
+        Some("task-before-local-failure")
+    );
+    assert_eq!(
+        payload["scope_outcomes"][0]["scope_id"].as_str(),
+        Some("scope/primary")
+    );
+}
+
+#[tokio::test]
 async fn orchestrator_records_scope_recovery_without_applied_operations() {
     let (_dir, db) = open_db().await;
     let request = TaskBoardSyncRequest::default();
@@ -411,6 +462,7 @@ fn batch(
         operations,
         scope_outcomes,
         first_provider_failure,
+        terminal_error: None,
     }
 }
 

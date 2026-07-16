@@ -18,6 +18,8 @@ use super::{
 mod batch;
 mod conflicts;
 mod delete;
+#[cfg(test)]
+mod evidence_tests;
 mod import;
 #[cfg(test)]
 mod lease_tests;

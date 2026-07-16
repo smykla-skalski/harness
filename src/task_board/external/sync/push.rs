@@ -118,18 +118,18 @@ async fn create_remote_item(
                 provider_project_id,
                 provider_revision,
             );
-            persist_push_conflicts(board, item, &remote, &changed_fields)
-                .await
-                .map_err(SyncClientError::Local)?;
             operations.push(push_operation(
                 client.provider(),
                 item,
                 reference,
                 false,
                 false,
-                changed_fields,
+                changed_fields.clone(),
                 Vec::new(),
             ));
+            persist_push_conflicts(board, item, &remote, &changed_fields)
+                .await
+                .map_err(SyncClientError::Local)?;
             return Err(SyncClientError::Local(error));
         }
     };
@@ -320,21 +320,31 @@ async fn persist_linked_update(
         )
         .await
     {
-        persist_push_conflicts(board, item, &remote, &supported)
-            .await
-            .map_err(SyncClientError::Local)?;
         operations.push(push_operation(
             client.provider(),
             item,
             updated_ref,
             false,
             false,
-            supported,
+            supported.clone(),
             unsupported,
         ));
+        persist_push_conflicts(board, item, &remote, &supported)
+            .await
+            .map_err(SyncClientError::Local)?;
         return Err(SyncClientError::Local(error));
     }
-    if unsupported.is_empty() {
+    let clears_conflicts = unsupported.is_empty();
+    operations.push(push_operation(
+        client.provider(),
+        item,
+        updated_ref.clone(),
+        false,
+        true,
+        supported,
+        unsupported,
+    ));
+    if clears_conflicts {
         let snapshot = board
             .item_snapshot(&item.id)
             .await
@@ -351,15 +361,6 @@ async fn persist_linked_update(
             .map_err(SyncClientError::Local)?;
     }
     republish_github_board_ready(client.provider());
-    operations.push(push_operation(
-        client.provider(),
-        item,
-        updated_ref,
-        false,
-        true,
-        supported,
-        unsupported,
-    ));
     Ok(())
 }
 
@@ -436,9 +437,7 @@ fn updated_remote_task(
                 .and_then(|state| state.project_id.clone())
                 .or_else(|| item.project_id.clone())
         },
-        updated_at: provider_revision
-            .map(ToOwned::to_owned)
-            .or_else(|| state.and_then(|state| state.updated_at.clone())),
+        updated_at: provider_revision.map(ToOwned::to_owned),
     }
 }
 

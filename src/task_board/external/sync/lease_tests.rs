@@ -22,11 +22,12 @@ async fn stale_lease_stops_before_remote_create() {
             String::new(),
             "2026-07-16T10:00:00Z".into(),
         ),
+        failure_completions: AtomicUsize::new(0),
     };
     let clients: Vec<Box<dyn ExternalSyncClient>> =
         vec![Box::new(CountingCreateClient(Arc::clone(&calls)))];
 
-    let error = sync_external_tasks_scoped(
+    let batch = sync_external_tasks_scoped(
         &store,
         ExternalSyncOptions {
             provider: Some(ExternalProvider::GitHub),
@@ -37,9 +38,28 @@ async fn stale_lease_stops_before_remote_create() {
         &clients,
     )
     .await
-    .expect_err("stale lease must stop the scope");
+    .expect("stale lease must retain scope evidence");
 
+    assert_eq!(store.failure_completions.load(Ordering::SeqCst), 1);
+    let evidence = batch.scope_outcomes[0]
+        .error
+        .as_deref()
+        .expect("stale lease failure evidence");
+    assert_eq!(
+        batch.scope_outcomes[0].error_code.as_deref(),
+        Some("WORKFLOW_CONCURRENT")
+    );
+    assert!(evidence.contains("provider scope lease was replaced"));
+    assert!(evidence.contains("stale provider scope cannot be finalized"));
+    let error = batch
+        .into_completed()
+        .expect_err("stale lease must stop the scope");
     assert_eq!(error.code(), "WORKFLOW_CONCURRENT");
+    assert!(
+        error
+            .details()
+            .is_some_and(|details| details.contains("stale provider scope cannot be finalized"))
+    );
     assert_eq!(calls.load(Ordering::SeqCst), 0);
 }
 
@@ -70,6 +90,7 @@ impl ExternalSyncClient for CountingCreateClient {
 
 struct StaleLeaseStore {
     item: TaskBoardItem,
+    failure_completions: AtomicUsize,
 }
 
 #[async_trait]
@@ -147,7 +168,11 @@ impl TaskBoardSyncStore for StaleLeaseStore {
         _attempt: &ExternalProviderScopeAttempt,
         _completed_at: &str,
     ) -> Result<ExternalProviderScopeState, CliError> {
-        unreachable!("stale lease is not a provider failure")
+        self.failure_completions.fetch_add(1, Ordering::SeqCst);
+        Err(
+            CliErrorKind::concurrent_modification("stale provider scope cannot be finalized")
+                .into(),
+        )
     }
 
     async fn replace_open_sync_conflicts(

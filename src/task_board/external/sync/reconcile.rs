@@ -67,7 +67,8 @@ pub(super) async fn reconcile_existing_item(
     let prefer_remote = matches!(
         options.conflict_policy,
         ExternalSyncConflictPolicy::PreferRemote
-    );
+    ) || matches!(options.direction, ExternalSyncDirection::Pull)
+        && matches!(options.conflict_policy, ExternalSyncConflictPolicy::Report);
     let patch = reconciliation_patch(item, &task, prefer_remote);
     if !has_reconciliation_change(&patch) {
         supersede_resolved_conflicts(board, options, provider, item, &task, &conflict_fields)
@@ -88,32 +89,46 @@ pub(super) async fn reconcile_existing_item(
         }));
         return Ok(());
     }
-    if let Err(error) = board.update_item(item, patch).await
-        && (error.code() != "WORKFLOW_CONCURRENT"
-            || latest_item_still_needs_reconciliation(board, item, &task, prefer_remote).await?)
-    {
-        return Err(error);
+    let applied = apply_reconciliation(board, item, &task, prefer_remote, patch).await?;
+    let records_applied_operation = applied
+        && !(matches!(
+            options.conflict_policy,
+            ExternalSyncConflictPolicy::PreferLocal
+        ) && !conflict_fields.is_empty()
+            && changed_fields.is_empty());
+    if records_applied_operation {
+        operations.push(operation(OperationDraft {
+            provider,
+            action: ExternalSyncAction::Pull,
+            board_item_id: Some(item.id.clone()),
+            reference: task.reference.clone(),
+            dry_run: false,
+            applied: true,
+            changed_fields,
+            unsupported_fields: Vec::new(),
+        }));
     }
     supersede_resolved_conflicts(board, options, provider, item, &task, &conflict_fields).await?;
-    if matches!(
-        options.conflict_policy,
-        ExternalSyncConflictPolicy::PreferLocal
-    ) && !conflict_fields.is_empty()
-        && changed_fields.is_empty()
-    {
-        return Ok(());
-    }
-    operations.push(operation(OperationDraft {
-        provider,
-        action: ExternalSyncAction::Pull,
-        board_item_id: Some(item.id.clone()),
-        reference: task.reference.clone(),
-        dry_run: false,
-        applied: true,
-        changed_fields,
-        unsupported_fields: Vec::new(),
-    }));
     Ok(())
+}
+
+async fn apply_reconciliation(
+    board: &dyn TaskBoardSyncStore,
+    item: &TaskBoardItem,
+    task: &ExternalTask,
+    prefer_remote: bool,
+    patch: TaskBoardItemPatch,
+) -> Result<bool, CliError> {
+    match board.update_item(item, patch).await {
+        Ok(_) => Ok(true),
+        Err(error) if error.code() != "WORKFLOW_CONCURRENT" => Err(error),
+        Err(error) => {
+            if latest_item_still_needs_reconciliation(board, item, task, prefer_remote).await? {
+                return Err(error);
+            }
+            Ok(false)
+        }
+    }
 }
 
 async fn supersede_resolved_conflicts(
