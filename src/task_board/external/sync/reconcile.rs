@@ -91,6 +91,7 @@ pub(super) async fn reconcile_existing_item(
         options.conflict_policy,
         ExternalSyncConflictPolicy::PreferLocal
     ) && !conflict_fields.is_empty()
+        && changed_fields.is_empty()
     {
         return Ok(());
     }

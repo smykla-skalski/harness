@@ -128,14 +128,14 @@ async fn prefer_local_supersedes_conflict_after_remote_and_local_state_converge(
         vec![remote_task(
             "remote-1",
             "Remote edit",
-            "Old body",
+            "Remote body",
             TaskBoardStatus::Backlog,
         )],
     );
     let updates = client.updates.clone();
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(client)];
 
-    sync_external_tasks(
+    let operations = sync_external_tasks(
         &db,
         both_options(ExternalSyncConflictPolicy::PreferLocal),
         &clients,
@@ -143,6 +143,15 @@ async fn prefer_local_supersedes_conflict_after_remote_and_local_state_converge(
     .await
     .expect("sync external tasks");
 
+    let item = db.task_board_item("task-prefer-local").await.expect("item");
+    assert_eq!(item.title, "Local edit");
+    assert_eq!(item.body, "Remote body");
+    let pull = operations
+        .iter()
+        .find(|operation| operation.action == ExternalSyncAction::Pull)
+        .expect("non-conflicting remote change is recorded");
+    assert!(pull.applied);
+    assert_eq!(pull.changed_fields, vec![ExternalSyncField::Body]);
     assert_eq!(
         *updates.lock().expect("updates"),
         vec![("remote-1".to_string(), vec![ExternalSyncField::Title])]
