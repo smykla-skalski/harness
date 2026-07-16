@@ -331,6 +331,47 @@ impl TaskBoardSyncStore for FailingPersistenceStore {
         Ok(2)
     }
 
+    async fn provider_scope_state(
+        &self,
+        _provider: ExternalProvider,
+        _scope_id: &str,
+    ) -> Result<ExternalProviderScopeState, CliError> {
+        Ok(ExternalProviderScopeState::default())
+    }
+
+    async fn begin_provider_scope_attempt(
+        &self,
+        provider: ExternalProvider,
+        scope_id: &str,
+        _now: &str,
+    ) -> Result<ExternalProviderScopeAttemptDecision, CliError> {
+        Ok(ExternalProviderScopeAttemptDecision::Started(
+            ExternalProviderScopeAttempt::new(
+                provider,
+                scope_id.to_owned(),
+                format!("test:{provider}:{scope_id}"),
+                true,
+            ),
+        ))
+    }
+
+    async fn complete_provider_scope_success(
+        &self,
+        _attempt: &ExternalProviderScopeAttempt,
+        _base_revision: Option<&str>,
+        _completed_at: &str,
+    ) -> Result<(), CliError> {
+        Ok(())
+    }
+
+    async fn complete_provider_scope_failure(
+        &self,
+        _attempt: &ExternalProviderScopeAttempt,
+        _completed_at: &str,
+    ) -> Result<ExternalProviderScopeState, CliError> {
+        Ok(ExternalProviderScopeState::default())
+    }
+
     async fn replace_open_sync_conflicts(
         &self,
         _item_id: &str,

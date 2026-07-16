@@ -4,6 +4,9 @@ use async_trait::async_trait;
 
 use super::*;
 use crate::errors::CliErrorKind;
+use crate::task_board::external::{
+    ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision, ExternalProviderScopeState,
+};
 use crate::task_board::{ExternalRefSyncState, TaskBoardSyncConflict};
 
 #[tokio::test]
@@ -109,6 +112,40 @@ impl TaskBoardSyncStore for FailingStore {
 
     async fn item_revision(&self, _item_id: &str) -> Result<i64, CliError> {
         Ok(2)
+    }
+
+    async fn provider_scope_state(
+        &self,
+        _provider: ExternalProvider,
+        _scope_id: &str,
+    ) -> Result<ExternalProviderScopeState, CliError> {
+        unreachable!("direct persistence test")
+    }
+
+    async fn begin_provider_scope_attempt(
+        &self,
+        _provider: ExternalProvider,
+        _scope_id: &str,
+        _now: &str,
+    ) -> Result<ExternalProviderScopeAttemptDecision, CliError> {
+        unreachable!("direct persistence test")
+    }
+
+    async fn complete_provider_scope_success(
+        &self,
+        _attempt: &ExternalProviderScopeAttempt,
+        _base_revision: Option<&str>,
+        _completed_at: &str,
+    ) -> Result<(), CliError> {
+        unreachable!("direct persistence test")
+    }
+
+    async fn complete_provider_scope_failure(
+        &self,
+        _attempt: &ExternalProviderScopeAttempt,
+        _completed_at: &str,
+    ) -> Result<ExternalProviderScopeState, CliError> {
+        unreachable!("direct persistence test")
     }
 
     async fn replace_open_sync_conflicts(
