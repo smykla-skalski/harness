@@ -21,9 +21,14 @@ use harness::setup::{
 };
 use sha2::{Digest, Sha256};
 
-// Re-export everything from the testkit so integration tests can use
-// `helpers::write_suite`, `helpers::make_bash_payload`, etc. unchanged.
+mod hook;
+mod run;
+
+// Keep lightweight fixtures in testkit and root-coupled fixtures local so
+// integration tests can continue importing everything through `helpers::*`.
 pub use harness_testkit::*;
+pub use hook::*;
+pub use run::*;
 
 /// Deterministically derive a valid UUID from a readable test label.
 pub fn test_session_uuid(label: &str) -> String {

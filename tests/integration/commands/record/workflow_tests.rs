@@ -12,11 +12,15 @@ fn cluster_up_rejects_finalized_run_reuse() {
     let tmp = tempfile::tempdir().unwrap();
     let run_dir = init_run(tmp.path(), "rec-cluster", "single-zone");
 
-    let mut state = harness_testkit::read_runner_state(&run_dir).unwrap();
+    let mut state = runner_workflow::read_runner_state(&run_dir)
+        .unwrap()
+        .unwrap();
     state.phase = RunnerPhase::Completed;
     runner_workflow::write_runner_state(&run_dir, &state).unwrap();
 
-    let reloaded = harness_testkit::read_runner_state(&run_dir).unwrap();
+    let reloaded = runner_workflow::read_runner_state(&run_dir)
+        .unwrap()
+        .unwrap();
     assert_eq!(reloaded.phase, RunnerPhase::Completed);
 }
 

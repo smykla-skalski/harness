@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use super::*;
 use crate::infra::blocks::{
-    ContainerRuntime, FakeComposeOrchestrator, FakeContainerRuntime, FakeProcessExecutor,
-    FakeProcessMethod, FakeResponse,
+    BollardContainerRuntime, ContainerRuntime, FakeComposeOrchestrator, FakeContainerRuntime,
+    FakeProcessExecutor, FakeProcessMethod, FakeResponse, StdProcessExecutor,
 };
 
 fn success_result(args: &[&str]) -> CommandResult {
@@ -353,6 +353,15 @@ fn bollard_compose_orchestrator_down_project_is_idempotent() {
 mod contracts {
     use super::*;
 
+    fn production_orchestrator() -> DockerComposeOrchestrator {
+        DockerComposeOrchestrator::new(Arc::new(StdProcessExecutor))
+    }
+
+    fn production_bollard_orchestrator() -> BollardComposeOrchestrator {
+        let docker = Arc::new(BollardContainerRuntime::new().expect("expected Docker engine"));
+        BollardComposeOrchestrator::new(docker)
+    }
+
     fn contract_up_then_down_succeeds(
         orchestrator: &dyn ComposeOrchestrator,
         compose_file: &Path,
@@ -389,5 +398,17 @@ mod contracts {
     #[test]
     fn fake_satisfies_down_project_is_idempotent() {
         contract_down_project_is_idempotent(&FakeComposeOrchestrator::new());
+    }
+
+    #[test]
+    #[ignore = "needs Docker daemon with compose"]
+    fn production_cli_satisfies_down_project_is_idempotent() {
+        contract_down_project_is_idempotent(&production_orchestrator());
+    }
+
+    #[test]
+    #[ignore = "needs Docker daemon"]
+    fn production_bollard_satisfies_down_project_is_idempotent() {
+        contract_down_project_is_idempotent(&production_bollard_orchestrator());
     }
 }

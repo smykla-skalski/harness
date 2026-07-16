@@ -1,12 +1,11 @@
 use std::fs;
 
-use harness_testkit::RunDirBuilder;
-
 use super::*;
 use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::Decision;
 use crate::hooks::protocol::payloads::HookEnvelopePayload;
 use crate::run::context::RunContext;
+use crate::run::test_support::build_test_run_dir;
 use crate::run::workflow::{PreflightState, PreflightStatus, RunnerPhase, RunnerWorkflowState};
 
 fn ctx_audit(skill: &str) -> HookContext {
@@ -51,7 +50,7 @@ fn allows_inactive_skill() {
 #[test]
 fn writes_audit_entry_for_suite_run_hook() {
     let tempdir = tempfile::tempdir().unwrap();
-    let run_dir = RunDirBuilder::new(tempdir.path(), "r01").build_run_dir();
+    let (run_dir, _) = build_test_run_dir(tempdir.path(), "r01");
     let mut run_context = RunContext::from_run_dir(&run_dir).unwrap();
     let mut status = run_context.status.take().unwrap();
     status.next_planned_group = Some("g01".to_string());

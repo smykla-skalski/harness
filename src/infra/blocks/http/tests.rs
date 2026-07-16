@@ -155,9 +155,9 @@ mod contracts {
         assert!(!response.body.is_empty(), "body should not be empty");
     }
 
-    fn contract_request_json_parses_body(client: &dyn HttpClient) {
+    fn contract_request_json_parses_body(client: &dyn HttpClient, url: &str) {
         let value = client
-            .request_json(HttpMethod::Get, "http://example.com/get", None, &[])
+            .request_json(HttpMethod::Get, url, None, &[])
             .expect("GET JSON should succeed");
         assert!(value.is_object(), "expected JSON object");
     }
@@ -176,13 +176,19 @@ mod contracts {
     #[test]
     fn fake_satisfies_request_json_parses_body() {
         let client = FakeHttpClient::single(200, r#"{"url":"http://example.com"}"#);
-        contract_request_json_parses_body(&client);
+        contract_request_json_parses_body(&client, "http://example.com/get");
     }
 
     #[test]
     #[ignore = "needs network access"]
     fn production_satisfies_request_returns_response() {
         contract_request_returns_response(&ReqwestHttpClient::new());
+    }
+
+    #[test]
+    #[ignore = "needs network access"]
+    fn production_satisfies_request_json_parses_body() {
+        contract_request_json_parses_body(&ReqwestHttpClient::new(), "http://httpbin.org/get");
     }
 
     #[test]

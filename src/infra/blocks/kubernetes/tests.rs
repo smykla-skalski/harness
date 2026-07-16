@@ -6,7 +6,9 @@ use temp_env::with_vars;
 
 use super::fake::FakeKubernetesResponse;
 use super::*;
-use crate::infra::blocks::{FakeProcessExecutor, FakeProcessMethod, FakeResponse};
+use crate::infra::blocks::{
+    FakeProcessExecutor, FakeProcessMethod, FakeResponse, StdProcessExecutor,
+};
 use crate::infra::exec::CommandResult;
 
 fn success_result(args: &[&str], stdout: &str) -> CommandResult {
@@ -274,6 +276,10 @@ fn kubernetes_backend_rejects_invalid_value() {
 mod contracts {
     use super::*;
 
+    fn production_operator() -> KubectlRuntime {
+        KubectlRuntime::new(Arc::new(StdProcessExecutor))
+    }
+
     fn contract_rollout_restart_empty_namespaces(
         runtime: &dyn KubernetesRuntime,
         kubeconfig: Option<&Path>,
@@ -300,5 +306,17 @@ mod contracts {
     fn fake_satisfies_list_pods_returns_list() {
         let fake = FakeKubernetesRuntime::new(vec![FakeKubernetesResponse::Pods(Ok(vec![]))]);
         contract_list_pods_returns_list(&fake, None);
+    }
+
+    #[test]
+    #[ignore = "needs kubectl and a reachable cluster"]
+    fn production_satisfies_list_pods_returns_list() {
+        contract_list_pods_returns_list(&production_operator(), None);
+    }
+
+    #[test]
+    #[ignore = "needs kubectl on PATH"]
+    fn production_satisfies_rollout_restart_empty_namespaces() {
+        contract_rollout_restart_empty_namespaces(&production_operator(), None);
     }
 }

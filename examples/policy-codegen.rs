@@ -1,10 +1,15 @@
+#![allow(
+    clippy::doc_markdown,
+    reason = "generator documentation intentionally uses many Rust and Swift identifiers"
+)]
+
 //! Rust -> Swift wire-type generator for the policy-canvas pilot.
 //!
 //! Reads the policy-graph Rust types and emits Codable Swift that round-trips
 //! the serde wire format. Built in-house: specta-swift 0.0.3 stack-overflows on
 //! internally-tagged enums and typeshare cannot express the adjacently-tagged
 //! enums later increments need. Run with:
-//! `mise run cargo:local -- run --example policy-codegen`.
+//! `mise run codegen`.
 //!
 //! Memory discipline: every emitter appends into one caller-owned `String`
 //! buffer via `write!` (no per-item temporaries), the case helpers pre-size
@@ -321,7 +326,7 @@ fn emit_memberwise_init(out: &mut String, spec: &SwiftStruct) {
 /// never feeds the decoder, which stays strict about fields serde requires.
 fn field_init_default(
     optional: bool,
-    decode_default: &Option<String>,
+    decode_default: Option<&str>,
     type_name: &str,
     rust_ident: Option<&str>,
     derives_default: bool,
@@ -331,7 +336,7 @@ fn field_init_default(
         return Some("nil".to_string());
     }
     if let Some(default) = decode_default {
-        return Some(default.clone());
+        return Some(default.to_string());
     }
     if !derives_default {
         return None;
@@ -819,12 +824,13 @@ fn rust_type_to_swift(ty: &Type) -> SwiftType {
         // Box<T> is transparent on the wire (serde serializes it exactly like
         // T), so unwrap to the inner type's mapping. Used for boxed enum
         // variants like ReviewTimelineEntry::SimpleActorEvent(Box<...>).
-        "Box" => first_generic_arg(&segment.arguments)
-            .map(rust_type_to_swift)
-            .unwrap_or_else(|| SwiftType {
+        "Box" => first_generic_arg(&segment.arguments).map_or_else(
+            || SwiftType {
                 name: "AnyCodable".to_string(),
                 optional: false,
-            }),
+            },
+            rust_type_to_swift,
+        ),
         scalar => SwiftType {
             name: map_scalar(scalar),
             optional: false,
@@ -1485,6 +1491,10 @@ fn swift_type_name(rust_name: &str, suffixed: &[&str]) -> String {
 
 /// Map a Rust scalar to its smallest faithful Swift type; pass named types
 /// (other generated wire types) through, suffixing wire/model-split names.
+#[allow(
+    clippy::match_same_arms,
+    reason = "separate arms document distinct Rust types with the same Swift wire shape"
+)]
 fn map_scalar(ident: &str) -> String {
     match ident {
         "u8" => "UInt8",
@@ -1536,7 +1546,7 @@ fn empty_collection_literal(swift_type: &str) -> &'static str {
     let is_dictionary = swift_type
         .strip_prefix('[')
         .and_then(|rest| rest.split_once(": "))
-        .map_or(false, |(key, _)| !key.contains('['));
+        .is_some_and(|(key, _)| !key.contains('['));
     if is_dictionary { "[:]" } else { "[]" }
 }
 
@@ -1849,10 +1859,10 @@ fn build_symbol_table(sources: &[&str]) -> SymbolTable {
                 Item::Const(item) => {
                     // Literal constants only (`const ROWS: u16 = 30;`); a const
                     // whose value is itself an expression is out of scope.
-                    if let Expr::Lit(literal) = item.expr.as_ref() {
-                        if let Some(swift) = lit_to_swift(&literal.lit) {
-                            const_literals.insert(item.ident.to_string(), swift);
-                        }
+                    if let Expr::Lit(literal) = item.expr.as_ref()
+                        && let Some(swift) = lit_to_swift(&literal.lit)
+                    {
+                        const_literals.insert(item.ident.to_string(), swift);
                     }
                 }
                 _ => {}
@@ -1989,16 +1999,16 @@ fn build_fields(
             // `#[serde(flatten)]` merges the referenced struct's fields into the
             // parent JSON object; Swift Codable has no flatten, so inline the
             // flattened struct's fields directly into the parent type.
-            if let Some(ident) = type_ident(&field.ty) {
-                if let Some(inner) = symbols.struct_fields.get(&ident) {
-                    out.extend(build_fields(
-                        &ident,
-                        inner,
-                        defaults,
-                        symbols,
-                        derives_default,
-                    ));
-                }
+            if let Some(ident) = type_ident(&field.ty)
+                && let Some(inner) = symbols.struct_fields.get(&ident)
+            {
+                out.extend(build_fields(
+                    &ident,
+                    inner,
+                    defaults,
+                    symbols,
+                    derives_default,
+                ));
             }
             continue;
         }
@@ -2040,7 +2050,7 @@ fn build_fields(
         };
         let init_default = field_init_default(
             optional,
-            &decode_default,
+            decode_default.as_deref(),
             &swift_type.name,
             rust_ident.as_deref(),
             derives_default,
@@ -2266,18 +2276,17 @@ fn emit_enum_item(
     symbols: &SymbolTable,
 ) {
     let container = serde_container(&item.attrs);
-    match container.tag {
-        Some(tag) => emit_tagged_enum(
+    if let Some(tag) = container.tag {
+        emit_tagged_enum(
             out,
             &build_tagged_enum(item, &tag, container.content.as_deref(), defaults, symbols),
-        ),
-        None => {
-            let spec = build_string_enum(item);
-            if OPEN_STRING_ENUMS.contains(&spec.name.as_str()) {
-                emit_open_enum(out, &spec);
-            } else {
-                emit_string_enum(out, &spec);
-            }
+        );
+    } else {
+        let spec = build_string_enum(item);
+        if OPEN_STRING_ENUMS.contains(&spec.name.as_str()) {
+            emit_open_enum(out, &spec);
+        } else {
+            emit_string_enum(out, &spec);
         }
     }
 }
@@ -2847,7 +2856,7 @@ const LOCAL_CLONE_PROGRESS_EMIT_ONLY: &[&str] =
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
 /// description woven into the generated header, and the checked-in output path
-/// (relative to the crate root).
+/// (relative to the repository root).
 struct GeneratedModule {
     output: &'static str,
     description: &'static str,
@@ -2858,6 +2867,10 @@ struct GeneratedModule {
 /// Every generated Swift wire-type module. Add an entry here to bring another
 /// daemon subsystem under generation; `codegen` writes each file and
 /// `codegen:check` fails when any drifts from its Rust sources.
+#[allow(
+    clippy::too_many_lines,
+    reason = "the declarative generated-module inventory is easiest to audit as one table"
+)]
 fn modules() -> Vec<GeneratedModule> {
     vec![
         GeneratedModule {
@@ -3268,9 +3281,16 @@ fn generate_policy_swift() -> String {
     generate_module(&modules()[0])
 }
 
+fn repository_root() -> &'static Path {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .expect("policy-codegen manifest must live under tools/policy-codegen")
+}
+
 fn main() {
     let check = std::env::args().any(|arg| arg == "--check");
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let root = repository_root();
     let mut drifted: Vec<&str> = Vec::new();
     for module in modules() {
         let generated = generate_module(&module);
@@ -3298,6 +3318,13 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn repository_root_resolves_workspace() {
+        let root = repository_root();
+        assert!(root.join("Cargo.toml").is_file());
+        assert!(root.join("apps/harness-monitor").is_dir());
+    }
 
     fn string_enum_case(name: &str, raw_value: &str) -> SwiftStringEnumCase {
         SwiftStringEnumCase {
@@ -3747,13 +3774,13 @@ pub struct Drop { pub other: String }
     fn omitted_wire_field_is_dropped_from_struct() {
         // DispatchPlan.lifecycle is in OMITTED_WIRE_FIELDS: the app does not read it,
         // so the wire type drops the field and the daemon's key is ignored on decode.
-        let source = r#"
+        let source = r"
             #[derive(Serialize, Deserialize)]
             pub struct DispatchPlan {
                 pub board_item_id: String,
                 pub lifecycle: DispatchLifecycle,
             }
-        "#;
+        ";
         let symbols = build_symbol_table(&[source]);
         let defaults = DefaultLiterals::new();
         let file = syn::parse_file(source).expect("source parses");

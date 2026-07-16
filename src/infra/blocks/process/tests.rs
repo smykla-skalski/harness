@@ -96,6 +96,13 @@ mod contracts {
         assert!(result.is_err(), "false should fail with exit code 1");
     }
 
+    fn contract_run_accepts_listed_exit_code(executor: &dyn ProcessExecutor) {
+        let result = executor
+            .run(&["false"], None, None, &[0, 1])
+            .expect("false with ok_exit_codes=[0,1] should succeed");
+        assert_eq!(result.returncode, 1);
+    }
+
     fn contract_run_streaming_returns_output(executor: &dyn ProcessExecutor) {
         let result = executor
             .run_streaming(&["echo", "stream"], None, None, &[0])
@@ -184,6 +191,12 @@ mod contracts {
     #[ignore = "needs real system binaries"]
     fn production_satisfies_run_rejects_bad_exit_code() {
         contract_run_rejects_bad_exit_code(&process_block::StdProcessExecutor);
+    }
+
+    #[test]
+    #[ignore = "needs real system binaries"]
+    fn production_satisfies_run_accepts_listed_exit_code() {
+        contract_run_accepts_listed_exit_code(&process_block::StdProcessExecutor);
     }
 
     #[test]

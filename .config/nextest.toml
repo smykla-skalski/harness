@@ -1,0 +1,16 @@
+nextest-version = "0.9.140"
+
+[profile.rust-timing]
+test-threads = 1
+retries = 0
+fail-fast = false
+status-level = "slow"
+final-status-level = "slow"
+success-output = "never"
+slow-timeout = "100ms"
+
+[profile.rust-timing.junit]
+path = "junit.xml"
+report-name = "harness-rust-timing"
+store-success-output = false
+store-failure-output = true
