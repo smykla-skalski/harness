@@ -106,10 +106,10 @@ pub(super) async fn record_request_result_with_correlation(
 ) -> Result<(), CliError> {
     let _audit_lane = acquire_audit_lane(db, trigger).await;
     let observation = AuditObservation::for_request(result.as_ref().err(), metrics);
-    let pending = correlation_id.map_or_else(
-        || plan_audit(db, trigger, observation),
-        |_| Some(PendingAudit::untracked()),
-    );
+    let force_correlated_evidence =
+        correlation_id.is_some() && correlated_audit_is_required(result, metrics);
+    let pending = plan_audit(db, trigger, observation)
+        .or_else(|| force_correlated_evidence.then(PendingAudit::untracked));
     let Some(pending) = pending else {
         return Ok(());
     };
@@ -123,6 +123,13 @@ pub(super) async fn record_request_result_with_correlation(
     persist_sync_audit_result(db, trigger, correlation_id, payload, classification, result).await?;
     pending.commit();
     Ok(())
+}
+
+fn correlated_audit_is_required(
+    result: &Result<TaskBoardSyncResponse, CliError>,
+    metrics: &SyncExecutionMetrics,
+) -> bool {
+    result.is_err() || metrics.has_applied_change() || metrics.failed_scope_count() > 0
 }
 
 pub(crate) async fn record_reviews_projection_result(
