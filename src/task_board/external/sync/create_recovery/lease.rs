@@ -3,9 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use async_trait::async_trait;
 
 use crate::errors::CliError;
-use crate::task_board::external::{
-    ExternalCreateLease, ExternalProviderScopeAttempt, TaskBoardSyncCoordinatorFenceDecision,
-};
+use crate::task_board::external::{ExternalCreateLease, ExternalProviderScopeAttempt};
 use crate::workspace::utc_now;
 
 use super::super::{SyncClientError, TaskBoardSyncStore};
@@ -52,11 +50,7 @@ impl<'a> ScopeCreateLease<'a> {
     }
 
     pub(super) async fn renew_before_provider_call(&self) -> Result<(), CliError> {
-        self.renew_scope().await?;
-        match self.board.check_coordinator_fence().await? {
-            TaskBoardSyncCoordinatorFenceDecision::Current => Ok(()),
-            TaskBoardSyncCoordinatorFenceDecision::Cancelled(error) => Err(error),
-        }
+        super::super::scope::renew_before_provider_call(self.board, Some(self.attempt)).await
     }
 }
 

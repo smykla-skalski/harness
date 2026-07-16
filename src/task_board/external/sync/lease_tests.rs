@@ -12,6 +12,7 @@ use crate::task_board::{
 };
 
 mod client;
+mod coordinator;
 mod marker;
 mod support;
 use client::DurableCreateClient;

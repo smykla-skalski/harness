@@ -109,6 +109,12 @@ impl AuditDescriptor {
                 outcome: "cancelled",
             };
         }
+        if event_type.ends_with(".partial") {
+            return Self {
+                severity: "warning",
+                outcome: "partial",
+            };
+        }
         if event_type.contains("defer") || event_type.contains("retry") {
             return Self {
                 severity: "info",
@@ -157,5 +163,13 @@ mod tests {
         assert_eq!(failure.severity, "error");
         assert_eq!(failure.outcome, "failure");
         assert_eq!(retry.outcome, "deferred");
+    }
+
+    #[test]
+    fn partial_run_has_warning_partial_audit_outcome() {
+        let partial = AuditDescriptor::from_event_type("task_board.automation.run.partial");
+
+        assert_eq!(partial.severity, "warning");
+        assert_eq!(partial.outcome, "partial");
     }
 }
