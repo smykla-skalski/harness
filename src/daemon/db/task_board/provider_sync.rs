@@ -2,9 +2,12 @@ use chrono::{DateTime, Duration};
 use serde::de::DeserializeOwned;
 use sqlx::{SqliteConnection, query, query_as};
 
+use crate::daemon::db::task_board::items::bump_change_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::task_board::external::ExternalProviderScopeState;
 use crate::task_board::{ExternalProvider, ExternalRefProvider, TaskBoardSyncConflict};
+
+use super::ORCHESTRATOR_CHANGE_SCOPE;
 
 const BACKOFF_BASE_SECONDS: u64 = 30;
 const BACKOFF_MULTIPLIER: u64 = 4;
@@ -46,7 +49,10 @@ impl AsyncDaemonDb {
         scope_id: &str,
         base_revision: Option<&str>,
     ) -> Result<(), CliError> {
-        query(
+        let mut transaction = self
+            .begin_immediate_transaction("task board provider scope success")
+            .await?;
+        let changed = query(
             "INSERT INTO task_board_provider_scope_state (
                 provider, scope_id, base_revision, health, failure_count, backoff_until, updated_at
              ) VALUES (?1, ?2, ?3, 'healthy', 0, NULL, ?4)
@@ -58,15 +64,30 @@ impl AsyncDaemonDb {
                 health = 'healthy',
                 failure_count = 0,
                 backoff_until = NULL,
-                updated_at = excluded.updated_at",
+                updated_at = excluded.updated_at
+             WHERE task_board_provider_scope_state.health IS NOT 'healthy'
+                OR task_board_provider_scope_state.failure_count IS NOT 0
+                OR task_board_provider_scope_state.backoff_until IS NOT NULL
+                OR (excluded.base_revision IS NOT NULL
+                    AND task_board_provider_scope_state.base_revision
+                        IS NOT excluded.base_revision)",
         )
         .bind(provider_label(provider))
         .bind(scope_id)
         .bind(base_revision)
         .bind(utc_now())
-        .execute(self.pool())
+        .execute(transaction.as_mut())
         .await
-        .map_err(|error| db_error(format!("record task-board provider success: {error}")))?;
+        .map_err(|error| db_error(format!("record task-board provider success: {error}")))?
+        .rows_affected()
+            > 0;
+        if changed {
+            bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+        }
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit task-board provider success: {error}")))?;
         Ok(())
     }
 
@@ -113,6 +134,7 @@ impl AsyncDaemonDb {
         .execute(transaction.as_mut())
         .await
         .map_err(|error| db_error(format!("record task-board provider failure: {error}")))?;
+        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
         transaction
             .commit()
             .await
@@ -134,7 +156,7 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board sync conflict replace")
             .await?;
-        supersede_removed_conflicts(
+        let mut changed = supersede_removed_conflicts(
             transaction.as_mut(),
             item_id,
             provider,
@@ -143,7 +165,10 @@ impl AsyncDaemonDb {
         )
         .await?;
         for conflict in conflicts {
-            upsert_open_conflict(transaction.as_mut(), conflict).await?;
+            changed |= upsert_open_conflict(transaction.as_mut(), conflict).await?;
+        }
+        if changed {
+            bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
         }
         transaction
             .commit()
@@ -175,7 +200,7 @@ async fn supersede_removed_conflicts(
     provider: ExternalProvider,
     external_ref: &str,
     conflicts: &[TaskBoardSyncConflict],
-) -> Result<(), CliError> {
+) -> Result<bool, CliError> {
     let fields = conflicts
         .iter()
         .map(|conflict| conflict.field.as_str())
@@ -190,9 +215,10 @@ async fn supersede_removed_conflicts(
     .fetch_all(&mut *connection)
     .await
     .map_err(|error| db_error(format!("read open task-board sync conflicts: {error}")))?;
+    let mut changed = false;
     for (conflict_id, field) in rows {
         if !fields.contains(&field.as_str()) {
-            query(
+            changed |= query(
                 "UPDATE task_board_sync_conflicts
                  SET state = 'superseded', resolved_at = ?2
                  WHERE conflict_id = ?1",
@@ -201,61 +227,97 @@ async fn supersede_removed_conflicts(
             .bind(utc_now())
             .execute(&mut *connection)
             .await
-            .map_err(|error| db_error(format!("supersede task-board sync conflict: {error}")))?;
+            .map_err(|error| db_error(format!("supersede task-board sync conflict: {error}")))?
+            .rows_affected()
+                > 0;
         }
     }
-    Ok(())
+    Ok(changed)
 }
 
 async fn upsert_open_conflict(
     connection: &mut SqliteConnection,
     conflict: &TaskBoardSyncConflict,
-) -> Result<(), CliError> {
+) -> Result<bool, CliError> {
+    let base_value_json = to_json(&conflict.base_value)?;
+    let local_value_json = to_json(&conflict.local_value)?;
+    let remote_value_json = to_json(&conflict.remote_value)?;
     let updated = query(
         "UPDATE task_board_sync_conflicts SET
-            conflict_id = ?1, base_value_json = ?6, local_value_json = ?7,
+            base_value_json = ?6, local_value_json = ?7,
             remote_value_json = ?8, item_revision = ?9, provider_revision = ?10
          WHERE item_id = ?2 AND provider = ?3 AND external_ref = ?4
-           AND field = ?5 AND state = 'open'",
+           AND field = ?5 AND state = 'open'
+           AND (base_value_json IS NOT ?6 OR local_value_json IS NOT ?7
+                OR remote_value_json IS NOT ?8 OR item_revision IS NOT ?9
+                OR provider_revision IS NOT ?10)",
     )
     .bind(&conflict.conflict_id)
     .bind(&conflict.item_id)
     .bind(ref_provider_label(conflict.provider))
     .bind(&conflict.external_ref)
     .bind(&conflict.field)
-    .bind(to_json(&conflict.base_value)?)
-    .bind(to_json(&conflict.local_value)?)
-    .bind(to_json(&conflict.remote_value)?)
+    .bind(&base_value_json)
+    .bind(&local_value_json)
+    .bind(&remote_value_json)
     .bind(conflict.item_revision)
     .bind(&conflict.provider_revision)
     .execute(&mut *connection)
     .await
     .map_err(|error| db_error(format!("update task-board sync conflict: {error}")))?;
     if updated.rows_affected() > 0 {
-        return Ok(());
+        return Ok(true);
     }
-    query(
+    let open_exists = query_as::<_, (i64,)>(
+        "SELECT EXISTS(
+            SELECT 1 FROM task_board_sync_conflicts
+            WHERE item_id = ?1 AND provider = ?2 AND external_ref = ?3
+              AND field = ?4 AND state = 'open'
+         )",
+    )
+    .bind(&conflict.item_id)
+    .bind(ref_provider_label(conflict.provider))
+    .bind(&conflict.external_ref)
+    .bind(&conflict.field)
+    .fetch_one(&mut *connection)
+    .await
+    .map_err(|error| db_error(format!("read task-board sync conflict identity: {error}")))?
+    .0 != 0;
+    if open_exists {
+        return Ok(false);
+    }
+    let changed = query(
         "INSERT INTO task_board_sync_conflicts (
             conflict_id, item_id, provider, external_ref, field,
             base_value_json, local_value_json, remote_value_json,
             item_revision, provider_revision, state, detected_at
-         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'open', ?11)",
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'open', ?11)
+         ON CONFLICT(conflict_id) DO UPDATE SET
+            base_value_json = excluded.base_value_json,
+            local_value_json = excluded.local_value_json,
+            remote_value_json = excluded.remote_value_json,
+            item_revision = excluded.item_revision,
+            provider_revision = excluded.provider_revision,
+            state = 'open', detected_at = excluded.detected_at,
+            resolved_at = NULL, resolved_by = NULL",
     )
     .bind(&conflict.conflict_id)
     .bind(&conflict.item_id)
     .bind(ref_provider_label(conflict.provider))
     .bind(&conflict.external_ref)
     .bind(&conflict.field)
-    .bind(to_json(&conflict.base_value)?)
-    .bind(to_json(&conflict.local_value)?)
-    .bind(to_json(&conflict.remote_value)?)
+    .bind(base_value_json)
+    .bind(local_value_json)
+    .bind(remote_value_json)
     .bind(conflict.item_revision)
     .bind(&conflict.provider_revision)
     .bind(utc_now())
     .execute(&mut *connection)
     .await
-    .map_err(|error| db_error(format!("insert task-board sync conflict: {error}")))?;
-    Ok(())
+    .map_err(|error| db_error(format!("insert task-board sync conflict: {error}")))?
+    .rows_affected()
+        > 0;
+    Ok(changed)
 }
 
 fn backoff_deadline(now: &str, failure_count: u32) -> Result<String, CliError> {
