@@ -11,16 +11,20 @@ use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 
 use super::targeting::github_repository_for_item;
 use super::{
-    ExternalCreateOutcome, ExternalProvider, ExternalProviderCapabilities, ExternalSyncClient,
-    ExternalSyncConfig, ExternalSyncField, ExternalTask, ExternalTaskRef, ExternalTaskUpdate,
-    ExternalUpdateOutcome, GITHUB_REPOSITORY_ENV, HARNESS_GITHUB_REPOSITORY_ENV, non_empty_body,
-    normalize_token,
+    ExternalCreateOutcome, ExternalCreateRecoveryClient, ExternalProvider,
+    ExternalProviderCapabilities, ExternalSyncClient, ExternalSyncConfig, ExternalSyncField,
+    ExternalTask, ExternalTaskRef, ExternalTaskUpdate, ExternalUpdateOutcome,
+    GITHUB_REPOSITORY_ENV, HARNESS_GITHUB_REPOSITORY_ENV, non_empty_body, normalize_token,
 };
 
+mod create_marker;
+mod create_recovery;
 mod errors;
 mod graphql;
 mod inbox;
 mod review_projection;
+#[cfg(test)]
+mod test_support;
 mod write;
 
 use errors::warn_github_message;
@@ -172,6 +176,14 @@ impl fmt::Debug for GitHubSyncClient {
 impl ExternalSyncClient for GitHubSyncClient {
     fn provider(&self) -> ExternalProvider {
         ExternalProvider::GitHub
+    }
+
+    #[allow(
+        private_interfaces,
+        reason = "provider-create recovery is intentionally crate-private"
+    )]
+    fn external_create_recovery(&self) -> Option<&dyn ExternalCreateRecoveryClient> {
+        Some(self)
     }
 
     fn scope_id(&self) -> String {
