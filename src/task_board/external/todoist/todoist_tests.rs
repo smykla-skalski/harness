@@ -245,6 +245,22 @@ fn todoist_request_ids_are_stable_for_safe_retries_and_change_with_intent() {
 }
 
 #[test]
+fn todoist_request_id_status_uses_stable_wire_values() {
+    assert_eq!(
+        todoist_request_id_status(TaskBoardStatus::InProgress),
+        "in_progress"
+    );
+    assert_eq!(
+        todoist_request_id_status(TaskBoardStatus::HumanRequired),
+        "human_required"
+    );
+    assert_eq!(
+        todoist_request_id_status(TaskBoardStatus::NeedsYou),
+        "needs_you"
+    );
+}
+
+#[test]
 fn todoist_project_filter_admits_only_matching_project_ids() {
     assert!(todoist_project_matches_filter(
         Some("proj-1"),

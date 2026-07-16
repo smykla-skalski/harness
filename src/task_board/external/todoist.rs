@@ -347,13 +347,33 @@ fn todoist_request_id(operation: &str, item: &TaskBoardItem, external_id: Option
         hasher.update(part.len().to_be_bytes());
         hasher.update(part.as_bytes());
     }
-    hasher.update(format!("{:?}", item.status));
+    hasher.update(todoist_request_id_status(item.status));
     let digest = hasher.finalize();
     let mut bytes = [0_u8; 16];
     bytes.copy_from_slice(&digest[..16]);
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
     Uuid::from_bytes(bytes).to_string()
+}
+
+fn todoist_request_id_status(status: TaskBoardStatus) -> &'static str {
+    match status {
+        TaskBoardStatus::Backlog => "backlog",
+        TaskBoardStatus::Todo => "todo",
+        TaskBoardStatus::Planning => "planning",
+        TaskBoardStatus::InProgress => "in_progress",
+        TaskBoardStatus::AgenticReview => "agentic_review",
+        TaskBoardStatus::Testing => "testing",
+        TaskBoardStatus::InReview => "in_review",
+        TaskBoardStatus::ToReview => "to_review",
+        TaskBoardStatus::HumanRequired => "human_required",
+        TaskBoardStatus::Failed => "failed",
+        TaskBoardStatus::Done => "done",
+        TaskBoardStatus::New => "new",
+        TaskBoardStatus::PlanReview => "plan_review",
+        TaskBoardStatus::NeedsYou => "needs_you",
+        TaskBoardStatus::Blocked => "blocked",
+    }
 }
 
 #[derive(Debug, Serialize)]

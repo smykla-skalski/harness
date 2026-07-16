@@ -98,7 +98,7 @@ impl ExternalProviderScopeState {
         })?;
         let now = DateTime::parse_from_rfc3339(now).map_err(|error| {
             CliErrorKind::workflow_parse(format!(
-                "task-board provider backoff comparison time '{now}' is invalid: {error}"
+                "task-board provider {kind} comparison time '{now}' is invalid: {error}"
             ))
         })?;
         Ok(until > now)
@@ -305,6 +305,25 @@ mod tests {
         assert_eq!(inbox_scope.scope_id(), "v1:github:read:12:acme/widgets");
         assert_ne!(repository_scope, inbox_scope);
         assert_ne!(repository_scope, todoist_scope);
+    }
+
+    #[test]
+    fn attempt_deadline_comparison_error_names_attempt_lease() {
+        let state = ExternalProviderScopeState {
+            health: ExternalProviderScopeHealth::Attempting,
+            backoff_until: Some("2026-07-16T10:15:00Z".into()),
+            ..ExternalProviderScopeState::default()
+        };
+
+        let error = state
+            .availability_at("not-a-timestamp")
+            .expect_err("invalid comparison timestamp");
+
+        assert!(
+            error
+                .message()
+                .contains("provider attempt lease comparison time")
+        );
     }
 
     struct ScopeClient {
