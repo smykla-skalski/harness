@@ -2,7 +2,9 @@ use async_trait::async_trait;
 
 use crate::daemon::db::{AsyncDaemonDb, db_error};
 use crate::errors::{CliError, CliErrorKind};
-use crate::task_board::external::ExternalProviderScopeState;
+use crate::task_board::external::{
+    ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision, ExternalProviderScopeState,
+};
 use crate::task_board::store::{TaskBoardItemPatch, apply_patch};
 use crate::task_board::{
     ExternalProvider, TaskBoardItem, TaskBoardStatus, TaskBoardSyncConflict, TaskBoardSyncStore,
@@ -63,22 +65,32 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
             .await
     }
 
-    async fn record_provider_scope_success(
+    async fn begin_provider_scope_attempt(
         &self,
         provider: ExternalProvider,
         scope_id: &str,
-        base_revision: Option<&str>,
-    ) -> Result<(), CliError> {
-        self.record_task_board_provider_scope_success(provider, scope_id, base_revision)
+        now: &str,
+    ) -> Result<ExternalProviderScopeAttemptDecision, CliError> {
+        self.begin_task_board_provider_scope_attempt(provider, scope_id, now)
             .await
     }
 
-    async fn record_provider_scope_failure(
+    async fn complete_provider_scope_success(
         &self,
-        provider: ExternalProvider,
-        scope_id: &str,
+        attempt: &ExternalProviderScopeAttempt,
+        base_revision: Option<&str>,
+        completed_at: &str,
+    ) -> Result<(), CliError> {
+        self.complete_task_board_provider_scope_success(attempt, base_revision, completed_at)
+            .await
+    }
+
+    async fn complete_provider_scope_failure(
+        &self,
+        attempt: &ExternalProviderScopeAttempt,
+        completed_at: &str,
     ) -> Result<ExternalProviderScopeState, CliError> {
-        self.record_task_board_provider_scope_failure(provider, scope_id)
+        self.complete_task_board_provider_scope_failure(attempt, completed_at)
             .await
     }
 

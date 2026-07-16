@@ -24,7 +24,11 @@ pub use github::{GitHubInboxSyncClient, GitHubSyncClient};
 pub(crate) use github::{
     imported_review_references_from_items, reconcile_review_item_from_snapshots,
 };
-pub(crate) use scopes::{ExternalProviderScopeState, ExternalSyncBatch, ExternalSyncScopeOutcome};
+pub(crate) use scopes::{
+    ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
+    ExternalProviderScopeAvailability, ExternalProviderScopeHealth, ExternalProviderScopeIdentity,
+    ExternalProviderScopeState, ExternalSyncBatch, ExternalSyncScopeOutcome,
+};
 pub use sync::{
     ExternalSyncAction, ExternalSyncDirection, ExternalSyncOperation, ExternalSyncOptions,
     configured_sync_clients,

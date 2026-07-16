@@ -3,6 +3,7 @@ use tempfile::tempdir;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::errors::{CliError, CliErrorKind};
+use crate::task_board::external::ExternalProviderScopeAttemptDecision;
 use crate::task_board::{
     ExternalProvider, ExternalRefProvider, ExternalRefSyncState, ExternalSyncAction,
     ExternalSyncClient, ExternalSyncConflictPolicy, ExternalSyncDirection, ExternalSyncOptions,
@@ -17,12 +18,14 @@ async fn provider_scope_failure_backoff_is_isolated_and_reset_by_success() {
         .await
         .expect("database");
 
+    let first_attempt = begin_attempt(&db, "acme/widgets", "2026-07-16T10:00:00Z").await;
     let first = db
-        .record_task_board_provider_scope_failure(ExternalProvider::GitHub, "acme/widgets")
+        .complete_task_board_provider_scope_failure(&first_attempt, "2026-07-16T10:00:00Z")
         .await
         .expect("first failure");
+    let second_attempt = begin_attempt(&db, "acme/widgets", "2026-07-16T10:00:31Z").await;
     let second = db
-        .record_task_board_provider_scope_failure(ExternalProvider::GitHub, "acme/widgets")
+        .complete_task_board_provider_scope_failure(&second_attempt, "2026-07-16T10:00:31Z")
         .await
         .expect("second failure");
     let other = db
@@ -35,14 +38,16 @@ async fn provider_scope_failure_backoff_is_isolated_and_reset_by_success() {
     assert!(second.backoff_until > first.backoff_until);
     assert_eq!(other.failure_count, 0);
 
-    db.record_task_board_provider_scope_success(
-        ExternalProvider::GitHub,
-        "acme/widgets",
+    let success_attempt = begin_attempt(&db, "acme/widgets", "2026-07-16T10:02:32Z").await;
+    db.complete_task_board_provider_scope_success(
+        &success_attempt,
         Some("provider-revision-2"),
+        "2026-07-16T10:02:32Z",
     )
     .await
     .expect("success");
-    db.record_task_board_provider_scope_success(ExternalProvider::GitHub, "acme/widgets", None)
+    let push_attempt = begin_attempt(&db, "acme/widgets", "2026-07-16T10:03:00Z").await;
+    db.complete_task_board_provider_scope_success(&push_attempt, None, "2026-07-16T10:03:00Z")
         .await
         .expect("push-only success");
     let reset = db
@@ -78,14 +83,17 @@ async fn failed_provider_scope_does_not_block_a_successful_scope() {
     assert_eq!(batch.failed_scope_count(), 1);
     assert_eq!(batch.operations.len(), 1);
     assert_eq!(
-        db.task_board_provider_scope_state(ExternalProvider::GitHub, "acme/broken")
-            .await
-            .expect("failed scope")
-            .failure_count,
+        db.task_board_provider_scope_state(
+            ExternalProvider::GitHub,
+            "v1:github:read:11:acme/broken",
+        )
+        .await
+        .expect("failed scope")
+        .failure_count,
         1
     );
     let successful = db
-        .task_board_provider_scope_state(ExternalProvider::GitHub, "acme/widgets")
+        .task_board_provider_scope_state(ExternalProvider::GitHub, "v1:github:read:12:acme/widgets")
         .await
         .expect("successful scope");
     assert_eq!(successful.failure_count, 0);
@@ -335,6 +343,21 @@ fn pull_options() -> ExternalSyncOptions {
         direction: ExternalSyncDirection::Pull,
         conflict_policy: ExternalSyncConflictPolicy::Report,
         dry_run: false,
+    }
+}
+
+async fn begin_attempt(
+    db: &AsyncDaemonDb,
+    scope_id: &str,
+    now: &str,
+) -> crate::task_board::external::ExternalProviderScopeAttempt {
+    match db
+        .begin_task_board_provider_scope_attempt(ExternalProvider::GitHub, scope_id, now)
+        .await
+        .expect("begin provider scope attempt")
+    {
+        ExternalProviderScopeAttemptDecision::Started(attempt) => attempt,
+        other => panic!("expected started attempt, got {other:?}"),
     }
 }
 

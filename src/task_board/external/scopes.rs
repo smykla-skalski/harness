@@ -2,23 +2,98 @@ use chrono::DateTime;
 
 use crate::errors::{CliError, CliErrorKind};
 
-use super::{ExternalProvider, ExternalSyncOperation};
+use super::{ExternalProvider, ExternalSyncClient, ExternalSyncOperation};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ExternalProviderScopeIdentity {
+    provider: ExternalProvider,
+    scope_id: String,
+}
+
+impl ExternalProviderScopeIdentity {
+    pub(crate) fn for_client(client: &dyn ExternalSyncClient) -> Self {
+        let provider = client.provider();
+        let resource_id = normalize_resource_id(provider, &client.scope_id());
+        let role = if client.allows_push() {
+            "write"
+        } else {
+            "read"
+        };
+        let scope_id = format!(
+            "v1:{}:{role}:{}:{resource_id}",
+            provider_label(provider),
+            resource_id.len()
+        );
+        Self { provider, scope_id }
+    }
+
+    pub(crate) const fn provider(&self) -> ExternalProvider {
+        self.provider
+    }
+
+    pub(crate) fn scope_id(&self) -> &str {
+        &self.scope_id
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) enum ExternalProviderScopeHealth {
+    #[default]
+    Healthy,
+    BackingOff,
+    Attempting,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ExternalProviderScopeAvailability {
+    Ready,
+    BackingOff,
+    Fenced,
+}
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct ExternalProviderScopeState {
     pub(crate) base_revision: Option<String>,
+    pub(crate) health: ExternalProviderScopeHealth,
     pub(crate) failure_count: u32,
     pub(crate) backoff_until: Option<String>,
 }
 
 impl ExternalProviderScopeState {
-    pub(crate) fn is_backing_off_at(&self, now: &str) -> Result<bool, CliError> {
-        let Some(until) = self.backoff_until.as_deref() else {
-            return Ok(false);
-        };
+    pub(crate) fn availability_at(
+        &self,
+        now: &str,
+    ) -> Result<ExternalProviderScopeAvailability, CliError> {
+        match self.health {
+            ExternalProviderScopeHealth::Healthy => Ok(ExternalProviderScopeAvailability::Ready),
+            ExternalProviderScopeHealth::BackingOff => {
+                self.deadline_is_active(now, "backoff").map(|active| {
+                    if active {
+                        ExternalProviderScopeAvailability::BackingOff
+                    } else {
+                        ExternalProviderScopeAvailability::Ready
+                    }
+                })
+            }
+            ExternalProviderScopeHealth::Attempting => {
+                self.deadline_is_active(now, "attempt lease").map(|active| {
+                    if active {
+                        ExternalProviderScopeAvailability::Fenced
+                    } else {
+                        ExternalProviderScopeAvailability::Ready
+                    }
+                })
+            }
+        }
+    }
+
+    fn deadline_is_active(&self, now: &str, kind: &str) -> Result<bool, CliError> {
+        let until = self.backoff_until.as_deref().ok_or_else(|| {
+            CliErrorKind::workflow_parse(format!("task-board provider {kind} deadline is missing"))
+        })?;
         let until = DateTime::parse_from_rfc3339(until).map_err(|error| {
             CliErrorKind::workflow_parse(format!(
-                "task-board provider backoff deadline '{until}' is invalid: {error}"
+                "task-board provider {kind} deadline '{until}' is invalid: {error}"
             ))
         })?;
         let now = DateTime::parse_from_rfc3339(now).map_err(|error| {
@@ -28,6 +103,53 @@ impl ExternalProviderScopeState {
         })?;
         Ok(until > now)
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ExternalProviderScopeAttempt {
+    provider: ExternalProvider,
+    scope_id: String,
+    fence_marker: String,
+    created_scope: bool,
+}
+
+impl ExternalProviderScopeAttempt {
+    pub(crate) fn new(
+        provider: ExternalProvider,
+        scope_id: String,
+        fence_marker: String,
+        created_scope: bool,
+    ) -> Self {
+        Self {
+            provider,
+            scope_id,
+            fence_marker,
+            created_scope,
+        }
+    }
+
+    pub(crate) const fn provider(&self) -> ExternalProvider {
+        self.provider
+    }
+
+    pub(crate) fn scope_id(&self) -> &str {
+        &self.scope_id
+    }
+
+    pub(crate) fn fence_marker(&self) -> &str {
+        &self.fence_marker
+    }
+
+    pub(crate) const fn created_scope(&self) -> bool {
+        self.created_scope
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ExternalProviderScopeAttemptDecision {
+    Started(ExternalProviderScopeAttempt),
+    BackingOff,
+    Fenced,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -129,5 +251,88 @@ impl ExternalSyncBatch {
             .iter()
             .filter(|outcome| outcome.kind == ExternalSyncScopeOutcomeKind::BackingOff)
             .count()
+    }
+}
+
+fn normalize_resource_id(provider: ExternalProvider, resource_id: &str) -> String {
+    let resource_id = resource_id.trim();
+    match provider {
+        ExternalProvider::GitHub => resource_id.to_ascii_lowercase(),
+        ExternalProvider::Todoist => resource_id.to_owned(),
+    }
+}
+
+const fn provider_label(provider: ExternalProvider) -> &'static str {
+    match provider {
+        ExternalProvider::GitHub => "github",
+        ExternalProvider::Todoist => "todoist",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use async_trait::async_trait;
+
+    use super::*;
+    use crate::task_board::{ExternalSyncClient, ExternalTask, ExternalTaskRef, TaskBoardItem};
+
+    #[test]
+    fn normalized_scope_identity_separates_provider_resource_and_client_role() {
+        let repository_sync = ScopeClient {
+            provider: ExternalProvider::GitHub,
+            scope_id: " Acme/Widgets ",
+            allows_push: true,
+        };
+        let inbox = ScopeClient {
+            provider: ExternalProvider::GitHub,
+            scope_id: "acme/widgets",
+            allows_push: false,
+        };
+        let todoist = ScopeClient {
+            provider: ExternalProvider::Todoist,
+            scope_id: "acme/widgets",
+            allows_push: true,
+        };
+
+        let repository_scope = ExternalProviderScopeIdentity::for_client(&repository_sync);
+        let inbox_scope = ExternalProviderScopeIdentity::for_client(&inbox);
+        let todoist_scope = ExternalProviderScopeIdentity::for_client(&todoist);
+
+        assert_eq!(
+            repository_scope.scope_id(),
+            "v1:github:write:12:acme/widgets"
+        );
+        assert_eq!(inbox_scope.scope_id(), "v1:github:read:12:acme/widgets");
+        assert_ne!(repository_scope, inbox_scope);
+        assert_ne!(repository_scope, todoist_scope);
+    }
+
+    struct ScopeClient {
+        provider: ExternalProvider,
+        scope_id: &'static str,
+        allows_push: bool,
+    }
+
+    #[async_trait]
+    impl ExternalSyncClient for ScopeClient {
+        fn provider(&self) -> ExternalProvider {
+            self.provider
+        }
+
+        fn scope_id(&self) -> String {
+            self.scope_id.into()
+        }
+
+        fn allows_push(&self) -> bool {
+            self.allows_push
+        }
+
+        async fn pull_tasks(&self) -> Result<Vec<ExternalTask>, CliError> {
+            Ok(Vec::new())
+        }
+
+        async fn push_task(&self, item: &TaskBoardItem) -> Result<ExternalTaskRef, CliError> {
+            Ok(ExternalTaskRef::new(self.provider, item.id.clone()))
+        }
     }
 }

@@ -1,8 +1,12 @@
 use async_trait::async_trait;
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::task_board::external::{
+    ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision, ExternalProviderScopeState,
+};
 use crate::task_board::store::{TaskBoardItemPatch, TaskBoardStore};
 use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
+use crate::task_board::{ExternalProvider, TaskBoardSyncConflict};
 
 use super::TaskBoardSyncStore;
 
@@ -57,6 +61,61 @@ impl TaskBoardSyncStore for TaskBoardStore {
         })
         .await
         .map_err(|error| sync_join_error("update item", error))?
+    }
+
+    async fn item_revision(&self, _item_id: &str) -> Result<i64, CliError> {
+        Ok(0)
+    }
+
+    async fn provider_scope_state(
+        &self,
+        _provider: ExternalProvider,
+        _scope_id: &str,
+    ) -> Result<ExternalProviderScopeState, CliError> {
+        Ok(ExternalProviderScopeState::default())
+    }
+
+    async fn begin_provider_scope_attempt(
+        &self,
+        provider: ExternalProvider,
+        scope_id: &str,
+        _now: &str,
+    ) -> Result<ExternalProviderScopeAttemptDecision, CliError> {
+        Ok(ExternalProviderScopeAttemptDecision::Started(
+            ExternalProviderScopeAttempt::new(
+                provider,
+                scope_id.to_owned(),
+                format!("test:{provider}:{scope_id}"),
+                true,
+            ),
+        ))
+    }
+
+    async fn complete_provider_scope_success(
+        &self,
+        _attempt: &ExternalProviderScopeAttempt,
+        _base_revision: Option<&str>,
+        _completed_at: &str,
+    ) -> Result<(), CliError> {
+        Ok(())
+    }
+
+    async fn complete_provider_scope_failure(
+        &self,
+        _attempt: &ExternalProviderScopeAttempt,
+        _completed_at: &str,
+    ) -> Result<ExternalProviderScopeState, CliError> {
+        Ok(ExternalProviderScopeState::default())
+    }
+
+    async fn replace_open_sync_conflicts(
+        &self,
+        _item_id: &str,
+        _provider: ExternalProvider,
+        _external_ref: &str,
+        _conflicts: &[TaskBoardSyncConflict],
+    ) -> Result<(), CliError> {
+        Ok(())
     }
 }
 

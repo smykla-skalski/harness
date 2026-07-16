@@ -253,7 +253,11 @@ mod tests {
 
     use super::*;
     use crate::errors::CliErrorKind;
-    use crate::task_board::external::ExternalSyncDirection;
+    use crate::task_board::TaskBoardSyncConflict;
+    use crate::task_board::external::{
+        ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
+        ExternalProviderScopeState, ExternalSyncDirection,
+    };
 
     #[tokio::test]
     async fn prefer_remote_concurrent_edit_never_claims_unapplied_remote_intent() {
@@ -313,6 +317,54 @@ mod tests {
             _patch: TaskBoardItemPatch,
         ) -> Result<TaskBoardItem, CliError> {
             Err(CliErrorKind::concurrent_modification("concurrent test edit").into())
+        }
+
+        async fn item_revision(&self, _item_id: &str) -> Result<i64, CliError> {
+            Ok(0)
+        }
+
+        async fn provider_scope_state(
+            &self,
+            _provider: ExternalProvider,
+            _scope_id: &str,
+        ) -> Result<ExternalProviderScopeState, CliError> {
+            unreachable!("reconciliation test does not inspect provider scope state")
+        }
+
+        async fn begin_provider_scope_attempt(
+            &self,
+            _provider: ExternalProvider,
+            _scope_id: &str,
+            _now: &str,
+        ) -> Result<ExternalProviderScopeAttemptDecision, CliError> {
+            unreachable!("reconciliation test does not begin provider attempts")
+        }
+
+        async fn complete_provider_scope_success(
+            &self,
+            _attempt: &ExternalProviderScopeAttempt,
+            _base_revision: Option<&str>,
+            _completed_at: &str,
+        ) -> Result<(), CliError> {
+            unreachable!("reconciliation test does not complete provider attempts")
+        }
+
+        async fn complete_provider_scope_failure(
+            &self,
+            _attempt: &ExternalProviderScopeAttempt,
+            _completed_at: &str,
+        ) -> Result<ExternalProviderScopeState, CliError> {
+            unreachable!("reconciliation test does not complete provider attempts")
+        }
+
+        async fn replace_open_sync_conflicts(
+            &self,
+            _item_id: &str,
+            _provider: ExternalProvider,
+            _external_ref: &str,
+            _conflicts: &[TaskBoardSyncConflict],
+        ) -> Result<(), CliError> {
+            Ok(())
         }
     }
 

@@ -1,6 +1,7 @@
 use tempfile::tempdir;
 
 use crate::daemon::db::AsyncDaemonDb;
+use crate::task_board::external::ExternalProviderScopeAttemptDecision;
 use crate::task_board::{
     ExternalProvider, ExternalRefProvider, TaskBoardConflictState, TaskBoardItem,
     TaskBoardSyncConflict,
@@ -19,17 +20,20 @@ async fn backoff_only_changes_publish_without_identical_recovery_churn() {
         .await
         .expect("initial revision");
 
-    db.record_task_board_provider_scope_failure(ExternalProvider::GitHub, "acme/widgets")
+    let failure_attempt = begin_attempt(&db, "2026-07-16T10:00:00Z").await;
+    db.complete_task_board_provider_scope_failure(&failure_attempt, "2026-07-16T10:00:00Z")
         .await
         .expect("record failure");
     let after_failure = assert_orchestrator_change(&db, before_failure).await;
 
-    db.record_task_board_provider_scope_success(ExternalProvider::GitHub, "acme/widgets", None)
+    let recovery_attempt = begin_attempt(&db, "2026-07-16T10:00:31Z").await;
+    db.complete_task_board_provider_scope_success(&recovery_attempt, None, "2026-07-16T10:00:31Z")
         .await
         .expect("record recovery");
     let after_recovery = assert_orchestrator_change(&db, after_failure).await;
 
-    db.record_task_board_provider_scope_success(ExternalProvider::GitHub, "acme/widgets", None)
+    let repeat_attempt = begin_attempt(&db, "2026-07-16T10:01:00Z").await;
+    db.complete_task_board_provider_scope_success(&repeat_attempt, None, "2026-07-16T10:01:00Z")
         .await
         .expect("repeat identical healthy state");
     assert_eq!(
@@ -123,6 +127,20 @@ async fn conflict_only_changes_publish_without_identical_write_churn() {
         db.current_change_sequence().await.expect("stable revision"),
         after_supersede
     );
+}
+
+async fn begin_attempt(
+    db: &AsyncDaemonDb,
+    now: &str,
+) -> crate::task_board::external::ExternalProviderScopeAttempt {
+    match db
+        .begin_task_board_provider_scope_attempt(ExternalProvider::GitHub, "acme/widgets", now)
+        .await
+        .expect("begin provider attempt")
+    {
+        ExternalProviderScopeAttemptDecision::Started(attempt) => attempt,
+        other => panic!("expected started attempt, got {other:?}"),
+    }
 }
 
 async fn assert_orchestrator_change(db: &AsyncDaemonDb, previous: i64) -> i64 {

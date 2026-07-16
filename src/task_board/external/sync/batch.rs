@@ -1,6 +1,8 @@
 use crate::errors::CliError;
 use crate::task_board::external::{
-    ExternalSyncBatch, ExternalSyncClient, ExternalSyncScopeOutcome,
+    ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
+    ExternalProviderScopeAvailability, ExternalProviderScopeIdentity, ExternalSyncBatch,
+    ExternalSyncClient, ExternalSyncScopeOutcome,
 };
 use crate::workspace::utc_now;
 
@@ -56,28 +58,48 @@ async fn sync_scope(
     client: &dyn ExternalSyncClient,
     batch: &mut BatchAccumulator,
 ) -> Result<(), CliError> {
-    let provider = client.provider();
-    let scope_id = client.scope_id();
-    let scope_state = board.provider_scope_state(provider, &scope_id).await?;
-    if scope_state.is_backing_off_at(&utc_now())? {
-        batch
-            .scope_outcomes
-            .push(ExternalSyncScopeOutcome::backing_off(provider, scope_id));
-        return Ok(());
-    }
+    let scope = ExternalProviderScopeIdentity::for_client(client);
+    let provider = scope.provider();
+    let scope_id = scope.scope_id().to_owned();
+    let attempt = match admit_scope(board, options, &scope).await? {
+        ScopeAdmission::Run(attempt) => attempt,
+        ScopeAdmission::BackingOff | ScopeAdmission::Fenced => {
+            batch
+                .scope_outcomes
+                .push(ExternalSyncScopeOutcome::backing_off(provider, scope_id));
+            return Ok(());
+        }
+    };
+    sync_admitted_scope(board, options, client, &scope, attempt.as_ref(), batch).await
+}
+
+async fn sync_admitted_scope(
+    board: &dyn TaskBoardSyncStore,
+    options: ExternalSyncOptions,
+    client: &dyn ExternalSyncClient,
+    scope: &ExternalProviderScopeIdentity,
+    attempt: Option<&ExternalProviderScopeAttempt>,
+    batch: &mut BatchAccumulator,
+) -> Result<(), CliError> {
+    let provider = scope.provider();
+    let scope_id = scope.scope_id().to_owned();
     match sync_client(board, options, client, &mut batch.operations).await {
         Ok(base_revision) => {
-            board
-                .record_provider_scope_success(provider, &scope_id, base_revision.as_deref())
-                .await?;
+            if let Some(attempt) = attempt {
+                board
+                    .complete_provider_scope_success(attempt, base_revision.as_deref(), &utc_now())
+                    .await?;
+            }
             batch
                 .scope_outcomes
                 .push(ExternalSyncScopeOutcome::success(provider, scope_id));
         }
         Err(SyncClientError::Provider(error)) => {
-            board
-                .record_provider_scope_failure(provider, &scope_id)
-                .await?;
+            if let Some(attempt) = attempt {
+                board
+                    .complete_provider_scope_failure(attempt, &utc_now())
+                    .await?;
+            }
             batch
                 .scope_outcomes
                 .push(ExternalSyncScopeOutcome::failed(provider, scope_id, &error));
@@ -88,6 +110,41 @@ async fn sync_scope(
         Err(SyncClientError::Local(error)) => return Err(error),
     }
     Ok(())
+}
+
+enum ScopeAdmission {
+    Run(Option<ExternalProviderScopeAttempt>),
+    BackingOff,
+    Fenced,
+}
+
+async fn admit_scope(
+    board: &dyn TaskBoardSyncStore,
+    options: ExternalSyncOptions,
+    scope: &ExternalProviderScopeIdentity,
+) -> Result<ScopeAdmission, CliError> {
+    let now = utc_now();
+    if options.dry_run {
+        return board
+            .provider_scope_state(scope.provider(), scope.scope_id())
+            .await?
+            .availability_at(&now)
+            .map(|availability| match availability {
+                ExternalProviderScopeAvailability::Ready => ScopeAdmission::Run(None),
+                ExternalProviderScopeAvailability::BackingOff => ScopeAdmission::BackingOff,
+                ExternalProviderScopeAvailability::Fenced => ScopeAdmission::Fenced,
+            });
+    }
+    board
+        .begin_provider_scope_attempt(scope.provider(), scope.scope_id(), &now)
+        .await
+        .map(|decision| match decision {
+            ExternalProviderScopeAttemptDecision::Started(attempt) => {
+                ScopeAdmission::Run(Some(attempt))
+            }
+            ExternalProviderScopeAttemptDecision::BackingOff => ScopeAdmission::BackingOff,
+            ExternalProviderScopeAttemptDecision::Fenced => ScopeAdmission::Fenced,
+        })
 }
 
 async fn sync_client(

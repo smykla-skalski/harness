@@ -1,7 +1,9 @@
 use async_trait::async_trait;
 
 use crate::errors::CliError;
-use crate::task_board::external::ExternalProviderScopeState;
+use crate::task_board::external::{
+    ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision, ExternalProviderScopeState,
+};
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::{ExternalProvider, TaskBoardItem, TaskBoardStatus, TaskBoardSyncConflict};
 
@@ -19,42 +21,39 @@ pub(crate) trait TaskBoardSyncStore: Send + Sync {
         patch: TaskBoardItemPatch,
     ) -> Result<TaskBoardItem, CliError>;
 
-    async fn item_revision(&self, _item_id: &str) -> Result<i64, CliError> {
-        Ok(0)
-    }
+    async fn item_revision(&self, item_id: &str) -> Result<i64, CliError>;
 
     async fn provider_scope_state(
         &self,
-        _provider: ExternalProvider,
-        _scope_id: &str,
-    ) -> Result<ExternalProviderScopeState, CliError> {
-        Ok(ExternalProviderScopeState::default())
-    }
+        provider: ExternalProvider,
+        scope_id: &str,
+    ) -> Result<ExternalProviderScopeState, CliError>;
 
-    async fn record_provider_scope_success(
+    async fn begin_provider_scope_attempt(
         &self,
-        _provider: ExternalProvider,
-        _scope_id: &str,
-        _base_revision: Option<&str>,
-    ) -> Result<(), CliError> {
-        Ok(())
-    }
+        provider: ExternalProvider,
+        scope_id: &str,
+        now: &str,
+    ) -> Result<ExternalProviderScopeAttemptDecision, CliError>;
 
-    async fn record_provider_scope_failure(
+    async fn complete_provider_scope_success(
         &self,
-        _provider: ExternalProvider,
-        _scope_id: &str,
-    ) -> Result<ExternalProviderScopeState, CliError> {
-        Ok(ExternalProviderScopeState::default())
-    }
+        attempt: &ExternalProviderScopeAttempt,
+        base_revision: Option<&str>,
+        completed_at: &str,
+    ) -> Result<(), CliError>;
+
+    async fn complete_provider_scope_failure(
+        &self,
+        attempt: &ExternalProviderScopeAttempt,
+        completed_at: &str,
+    ) -> Result<ExternalProviderScopeState, CliError>;
 
     async fn replace_open_sync_conflicts(
         &self,
-        _item_id: &str,
-        _provider: ExternalProvider,
-        _external_ref: &str,
-        _conflicts: &[TaskBoardSyncConflict],
-    ) -> Result<(), CliError> {
-        Ok(())
-    }
+        item_id: &str,
+        provider: ExternalProvider,
+        external_ref: &str,
+        conflicts: &[TaskBoardSyncConflict],
+    ) -> Result<(), CliError>;
 }
