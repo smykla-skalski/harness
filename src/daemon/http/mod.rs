@@ -372,7 +372,8 @@ where
     if *shutdown_rx.borrow() {
         return Ok(());
     }
-    super::systemd_notify::notify_ready()?;
+    harness_systemd_protocol::notify_ready()
+        .map_err(|error| CliError::from(CliErrorKind::workflow_io(error.to_string())))?;
 
     axum::serve(
         listener,

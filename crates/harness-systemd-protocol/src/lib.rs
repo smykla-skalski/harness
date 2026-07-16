@@ -1,18 +1,44 @@
-use crate::errors::CliError;
+//! Minimal systemd notification protocol support.
+
+#![deny(unsafe_code)]
+
+use std::io;
 
 #[cfg(target_os = "linux")]
 const READY_MESSAGE: &[u8] = b"READY=1\n";
 
-/// Notify systemd that daemon HTTP startup is complete.
+/// Failure while notifying systemd that the process is ready.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum NotifyError {
+    #[error("systemd abstract NOTIFY_SOCKET name cannot be empty")]
+    EmptyAbstractSocketName,
+    #[error("systemd NOTIFY_SOCKET must be an absolute path or abstract name: {socket}")]
+    RelativeSocket { socket: String },
+    #[error("parse systemd notification socket {socket}: {source}")]
+    InvalidAddress { socket: String, source: io::Error },
+    #[error("create systemd notification socket: {source}")]
+    CreateSocket { source: io::Error },
+    #[error("send systemd readiness notification to {socket}: {source}")]
+    Send { socket: String, source: io::Error },
+    #[error("send systemd readiness notification to {socket}: wrote {sent} of {expected} bytes")]
+    IncompleteSend {
+        socket: String,
+        sent: usize,
+        expected: usize,
+    },
+}
+
+/// Notify systemd that process startup is complete.
 ///
 /// Outside Linux, or when systemd did not configure `NOTIFY_SOCKET`, this is a
 /// no-op. Both filesystem-backed and Linux abstract-namespace notification
 /// sockets are supported.
 ///
 /// # Errors
-/// Returns [`CliError`] when a configured Linux notification socket is invalid
-/// or cannot receive the readiness datagram.
-pub(crate) fn notify_ready() -> Result<(), CliError> {
+/// Returns [`NotifyError`] when a configured Linux notification socket is
+/// invalid or cannot receive the readiness datagram.
+pub fn notify_ready() -> Result<(), NotifyError> {
     #[cfg(target_os = "linux")]
     {
         notify_ready_linux()
@@ -25,7 +51,7 @@ pub(crate) fn notify_ready() -> Result<(), CliError> {
 }
 
 #[cfg(target_os = "linux")]
-fn notify_ready_linux() -> Result<(), CliError> {
+fn notify_ready_linux() -> Result<(), NotifyError> {
     use std::env;
     use std::os::fd::AsRawFd as _;
     use std::os::unix::ffi::OsStrExt as _;
@@ -34,35 +60,27 @@ fn notify_ready_linux() -> Result<(), CliError> {
         AddressFamily, MsgFlags, SockFlag, SockProtocol, SockType, UnixAddr, sendto, socket,
     };
 
-    use crate::errors::CliErrorKind;
-
     let Some(notification_socket) = env::var_os("NOTIFY_SOCKET") else {
         return Ok(());
     };
+    let socket_label = notification_socket.to_string_lossy().into_owned();
     let socket_bytes = notification_socket.as_os_str().as_bytes();
     let address = if let Some(name) = socket_bytes.strip_prefix(b"@") {
         if name.is_empty() {
-            return Err(CliErrorKind::workflow_io(
-                "systemd abstract NOTIFY_SOCKET name cannot be empty".to_string(),
-            )
-            .into());
+            return Err(NotifyError::EmptyAbstractSocketName);
         }
         UnixAddr::new_abstract(name)
     } else {
         if !socket_bytes.starts_with(b"/") {
-            return Err(CliErrorKind::workflow_io(format!(
-                "systemd NOTIFY_SOCKET must be an absolute path or abstract name: {}",
-                notification_socket.to_string_lossy()
-            ))
-            .into());
+            return Err(NotifyError::RelativeSocket {
+                socket: socket_label,
+            });
         }
         UnixAddr::new(notification_socket.as_os_str())
     }
-    .map_err(|error| {
-        CliError::from(CliErrorKind::workflow_io(format!(
-            "parse systemd notification socket {}: {error}",
-            notification_socket.to_string_lossy()
-        )))
+    .map_err(|source| NotifyError::InvalidAddress {
+        socket: socket_label.clone(),
+        source: source.into(),
     })?;
     let datagram = socket(
         AddressFamily::Unix,
@@ -70,10 +88,8 @@ fn notify_ready_linux() -> Result<(), CliError> {
         SockFlag::SOCK_CLOEXEC,
         None::<SockProtocol>,
     )
-    .map_err(|error| {
-        CliError::from(CliErrorKind::workflow_io(format!(
-            "create systemd notification socket: {error}"
-        )))
+    .map_err(|source| NotifyError::CreateSocket {
+        source: source.into(),
     })?;
     let sent = sendto(
         datagram.as_raw_fd(),
@@ -81,19 +97,16 @@ fn notify_ready_linux() -> Result<(), CliError> {
         &address,
         MsgFlags::empty(),
     )
-    .map_err(|error| {
-        CliError::from(CliErrorKind::workflow_io(format!(
-            "send systemd readiness notification to {}: {error}",
-            notification_socket.to_string_lossy()
-        )))
+    .map_err(|source| NotifyError::Send {
+        socket: socket_label.clone(),
+        source: source.into(),
     })?;
     if sent != READY_MESSAGE.len() {
-        return Err(CliErrorKind::workflow_io(format!(
-            "send systemd readiness notification to {}: wrote {sent} of {} bytes",
-            notification_socket.to_string_lossy(),
-            READY_MESSAGE.len()
-        ))
-        .into());
+        return Err(NotifyError::IncompleteSend {
+            socket: socket_label,
+            sent,
+            expected: READY_MESSAGE.len(),
+        });
     }
     Ok(())
 }
@@ -108,13 +121,29 @@ mod tests {
     };
     use tempfile::tempdir_in;
 
-    use super::{READY_MESSAGE, notify_ready};
+    use super::{NotifyError, READY_MESSAGE, notify_ready};
 
     #[test]
     fn notify_ready_is_noop_when_socket_is_unset() {
         temp_env::with_var("NOTIFY_SOCKET", None::<&str>, || {
             notify_ready().expect("unset notification socket should be a no-op");
         });
+    }
+
+    #[test]
+    fn notify_ready_rejects_empty_abstract_socket_name() {
+        let error = temp_env::with_var("NOTIFY_SOCKET", Some("@"), notify_ready)
+            .expect_err("empty abstract socket name must fail");
+
+        assert!(matches!(error, NotifyError::EmptyAbstractSocketName));
+    }
+
+    #[test]
+    fn notify_ready_rejects_relative_socket_path() {
+        let error = temp_env::with_var("NOTIFY_SOCKET", Some("notify.sock"), notify_ready)
+            .expect_err("relative notification socket path must fail");
+
+        assert!(matches!(error, NotifyError::RelativeSocket { .. }));
     }
 
     #[test]
@@ -128,10 +157,10 @@ mod tests {
         });
 
         let mut message = [0_u8; 32];
-        let received = receiver
+        let message_len = receiver
             .recv(&mut message)
             .expect("receive readiness datagram");
-        assert_eq!(&message[..received], READY_MESSAGE);
+        assert_eq!(&message[..message_len], READY_MESSAGE);
     }
 
     #[test]
@@ -152,9 +181,9 @@ mod tests {
         });
 
         let mut message = [0_u8; 32];
-        let received = recv(receiver.as_raw_fd(), &mut message, MsgFlags::empty())
+        let message_len = recv(receiver.as_raw_fd(), &mut message, MsgFlags::empty())
             .expect("receive abstract readiness datagram");
-        assert_eq!(&message[..received], READY_MESSAGE);
+        assert_eq!(&message[..message_len], READY_MESSAGE);
     }
 
     #[test]
@@ -165,10 +194,6 @@ mod tests {
         let error = temp_env::with_var("NOTIFY_SOCKET", Some(missing.as_os_str()), notify_ready)
             .expect_err("missing configured socket must fail");
 
-        assert!(
-            error
-                .to_string()
-                .contains("send systemd readiness notification")
-        );
+        assert!(matches!(error, NotifyError::Send { .. }));
     }
 }

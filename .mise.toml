@@ -155,7 +155,7 @@ run = "./scripts/tests/test-release-install.sh"
 description = "Run unit tests"
 run = [
   "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime",
-  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-protocol -p harness-telemetry -p harness-testkit",
+  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-protocol -p harness-systemd-protocol -p harness-telemetry -p harness-testkit",
 ]
 
 [tasks."test:integration"]
@@ -275,6 +275,7 @@ run = [
   "./scripts/cargo-local.sh check --all-targets -p harness-command",
   "./scripts/cargo-local.sh check --all-targets -p harness-daemon-client",
   "./scripts/cargo-local.sh check --all-targets -p harness-protocol",
+  "./scripts/cargo-local.sh check --all-targets -p harness-systemd-protocol",
   "./scripts/cargo-local.sh check --all-targets -p harness-telemetry",
   "./scripts/cargo-local.sh check -p harness --bin harness",
   "./scripts/cargo-local.sh check -p harness-hook --bin harness-hook",
@@ -287,7 +288,7 @@ run = [
 hide = true
 run = [
   "./scripts/cargo-local.sh clippy -p harness --lib --bins",
-  "./scripts/cargo-local.sh clippy --all-targets -p harness-command -p harness-daemon-client -p harness-protocol -p harness-telemetry -p harness-daemon -p harness-bridge -p harness-mcp -p harness-hook -p policy-codegen",
+  "./scripts/cargo-local.sh clippy --all-targets -p harness-command -p harness-daemon-client -p harness-protocol -p harness-systemd-protocol -p harness-telemetry -p harness-daemon -p harness-bridge -p harness-mcp -p harness-hook -p policy-codegen",
 ]
 
 [tasks."aff:check"]

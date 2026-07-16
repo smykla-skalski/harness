@@ -9,6 +9,7 @@ members = [
   "crates/harness-hook",
   "crates/harness-mcp",
   "crates/harness-protocol",
+  "crates/harness-systemd-protocol",
   "crates/harness-telemetry",
   "testkit",
   "tools/policy-codegen",
@@ -39,6 +40,7 @@ include = [
 harness-command = { path = "crates/harness-command", version = "48.0.0" }
 harness-mcp = { path = "crates/harness-mcp", version = "48.0.0", optional = true }
 harness-protocol = { path = "crates/harness-protocol", version = "48.0.0" }
+harness-systemd-protocol = { path = "crates/harness-systemd-protocol", version = "48.0.0", optional = true }
 harness-telemetry = { path = "crates/harness-telemetry", version = "48.0.0" }
 arc-swap = "1.9.1"
 bollard = "0.21.0"
@@ -148,6 +150,7 @@ daemon-runtime = [
   "dep:hmac",
   "dep:hickory-resolver",
   "dep:http-body-util",
+  "dep:harness-systemd-protocol",
   "dep:instant-acme",
   "dep:rcgen",
   "dep:rusqlite",

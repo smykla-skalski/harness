@@ -3549,6 +3549,7 @@ dependencies = [
  "harness-command",
  "harness-mcp",
  "harness-protocol",
+ "harness-systemd-protocol",
  "harness-telemetry",
  "harness-testkit",
  "hex",
@@ -3677,6 +3678,7 @@ dependencies = [
  "gray_matter",
  "harness-hook",
  "harness-protocol",
+ "harness-systemd-protocol",
  "harness-telemetry",
  "hex",
  "hickory-resolver",
@@ -3805,6 +3807,16 @@ dependencies = [
  "serde",
  "serde_json",
  "tracing",
+]
+
+[[package]]
+name = "harness-systemd-protocol"
+version = "48.0.0"
+dependencies = [
+ "nix 0.31.3",
+ "temp-env",
+ "tempfile",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
