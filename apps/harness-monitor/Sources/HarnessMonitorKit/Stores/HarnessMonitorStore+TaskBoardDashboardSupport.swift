@@ -60,12 +60,16 @@ extension HarnessMonitorStore {
     fallbackStatus: TaskBoardOrchestratorStatus? = nil
   ) {
     let resolvedItems = snapshot.items.value ?? globalTaskBoardItems
-    let resolvedStatus =
+    let snapshotStatus =
       if let measuredStatus = snapshot.orchestratorStatus.measured {
         measuredStatus.value ?? fallbackStatus
       } else {
         fallbackStatus ?? globalTaskBoardOrchestratorStatus
       }
+    let resolvedStatus = reconcileTaskBoardOrchestratorStatus(
+      snapshotStatus,
+      snapshotConfirmationRevision: snapshot.stepModeConfirmationRevision
+    )
     let didChangeTaskBoardSnapshot =
       globalTaskBoardItems != resolvedItems
       || globalTaskBoardOrchestratorStatus != resolvedStatus

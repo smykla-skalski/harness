@@ -15,13 +15,13 @@ struct TaskBoardConnectionState: Sendable {
 
 extension HarnessMonitorStore {
   var taskBoardDatabaseInstanceID: String? {
-    get { taskBoardConnectionState.databaseInstanceID }
-    set { taskBoardConnectionState.databaseInstanceID = newValue }
+    get { taskBoardRuntimeState.connection.databaseInstanceID }
+    set { taskBoardRuntimeState.connection.databaseInstanceID = newValue }
   }
 
   var lastTaskBoardCredentialSync: TaskBoardCredentialSyncState? {
-    get { taskBoardConnectionState.credentialSync }
-    set { taskBoardConnectionState.credentialSync = newValue }
+    get { taskBoardRuntimeState.connection.credentialSync }
+    set { taskBoardRuntimeState.connection.credentialSync = newValue }
   }
 
   public func taskBoardGitSettingsSnapshot() async throws -> TaskBoardGitSettingsSnapshot {
@@ -155,10 +155,11 @@ extension HarnessMonitorStore {
       }
 
       if let status = globalTaskBoardOrchestratorStatus {
+        confirmTaskBoardOrchestratorSettings(orchestratorSettings)
         globalTaskBoardOrchestratorStatus = TaskBoardOrchestratorStatus(
           enabled: status.enabled,
           running: status.running,
-          stepMode: status.stepMode,
+          stepMode: orchestratorSettings.stepMode,
           heldDispatches: status.heldDispatches,
           currentTick: status.currentTick,
           lastRun: status.lastRun,

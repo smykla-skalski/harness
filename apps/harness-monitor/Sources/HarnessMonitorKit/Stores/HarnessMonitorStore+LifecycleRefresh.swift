@@ -23,6 +23,7 @@ extension HarnessMonitorStore {
     let sessions: MeasuredOperation<[SessionSummary]>
     let taskBoardItems: TaskBoardSnapshotLoad<[TaskBoardItem]>
     let taskBoardOrchestratorStatus: TaskBoardSnapshotLoad<TaskBoardOrchestratorStatus?>
+    let stepModeConfirmationRevision: UInt64
   }
 
   private enum RefreshSnapshotPiece: Sendable {
@@ -206,7 +207,12 @@ extension HarnessMonitorStore {
     isInitialConnect: Bool = false
   ) async throws {
     let adoptsLocalManifest = !usesRemoteDaemon
-    let refreshSnapshot = try await Self.loadRefreshSnapshot(using: client)
+    let stepModeConfirmationRevision =
+      taskBoardRuntimeState.stepModeMutation.confirmationRevision
+    let refreshSnapshot = try await Self.loadRefreshSnapshot(
+      using: client,
+      stepModeConfirmationRevision: stepModeConfirmationRevision
+    )
     await applyRefreshSnapshot(
       refreshSnapshot,
       using: client,
@@ -225,7 +231,12 @@ extension HarnessMonitorStore {
     preserveSelection: Bool
   ) async throws {
     let adoptsLocalManifest = !usesRemoteDaemon
-    let refreshSnapshot = try await Self.loadRefreshSnapshot(using: client)
+    let stepModeConfirmationRevision =
+      taskBoardRuntimeState.stepModeMutation.confirmationRevision
+    let refreshSnapshot = try await Self.loadRefreshSnapshot(
+      using: client,
+      stepModeConfirmationRevision: stepModeConfirmationRevision
+    )
     await applyRefreshSnapshot(
       refreshSnapshot,
       using: client,
@@ -240,7 +251,8 @@ extension HarnessMonitorStore {
   }
 
   nonisolated private static func loadRefreshSnapshot(
-    using client: any HarnessMonitorClientProtocol
+    using client: any HarnessMonitorClientProtocol,
+    stepModeConfirmationRevision: UInt64
   ) async throws -> RefreshSnapshot {
     try await withThrowingTaskGroup(
       of: RefreshSnapshotPiece.self,
@@ -326,7 +338,8 @@ extension HarnessMonitorStore {
         projects: projects,
         sessions: sessions,
         taskBoardItems: taskBoardItems,
-        taskBoardOrchestratorStatus: taskBoardOrchestratorStatus
+        taskBoardOrchestratorStatus: taskBoardOrchestratorStatus,
+        stepModeConfirmationRevision: stepModeConfirmationRevision
       )
     }
   }

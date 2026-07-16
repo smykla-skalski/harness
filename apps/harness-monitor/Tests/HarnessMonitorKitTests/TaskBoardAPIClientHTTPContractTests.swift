@@ -83,6 +83,7 @@ extension TaskBoardAPIClientTests {
     _ = try await client.taskBoardOrchestratorSettings()
     let updatedSettings = try await client.updateTaskBoardOrchestratorSettings(
       request: TaskBoardOrchestratorSettingsUpdateRequest(
+        stepMode: true,
         enabledWorkflows: [.defaultTask, .prFix],
         dryRunDefault: false,
         dispatchStatusFilter: .agenticReview,
@@ -269,6 +270,7 @@ extension TaskBoardAPIClientTests {
     #expect(records[7].body?["dry_run"] as? Bool == false)
     #expect(records[8].query == "status=failed")
     #expect(records[12].body?.isEmpty == true)
+    #expect(records[14].body?["step_mode"] as? Bool == true)
     #expect(records[14].body?["enabled_workflows"] as? [String] == ["default_task", "pr_fix"])
     #expect(records[14].body?["dry_run_default"] as? Bool == false)
     #expect(records[14].body?["dispatch_status_filter"] as? String == "agentic_review")

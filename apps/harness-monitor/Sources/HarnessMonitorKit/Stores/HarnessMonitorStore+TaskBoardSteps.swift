@@ -91,30 +91,6 @@ extension HarnessMonitorStore {
     return delivery
   }
 
-  @discardableResult
-  public func setTaskBoardStepMode(enabled: Bool) async -> Bool {
-    guard let client else {
-      return false
-    }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
-
-    do {
-      _ = try await client.updateTaskBoardOrchestratorSettings(
-        request: TaskBoardOrchestratorSettingsUpdateRequest(stepMode: enabled)
-      )
-      recordRequestSuccess()
-      await refreshTaskBoardDashboardSnapshot(using: client)
-      presentSuccessFeedback(
-        enabled ? "Enabled task-board step mode" : "Disabled task-board step mode"
-      )
-      return true
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      return false
-    }
-  }
-
   public func policyApprovalGrants() async -> [PolicyApprovalGrant]? {
     guard let client else {
       return nil

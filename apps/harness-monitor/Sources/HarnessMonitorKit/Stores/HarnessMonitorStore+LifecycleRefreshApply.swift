@@ -28,6 +28,7 @@ extension HarnessMonitorStore {
     let resolvedTaskBoardSnapshot = resolvedTaskBoardRefreshSnapshot(
       items: refreshSnapshot.taskBoardItems,
       orchestratorStatus: refreshSnapshot.taskBoardOrchestratorStatus,
+      stepModeConfirmationRevision: refreshSnapshot.stepModeConfirmationRevision,
       isInitialConnect: isInitialConnect
     )
     let didChangeTaskBoardSnapshot =
@@ -115,6 +116,7 @@ extension HarnessMonitorStore {
   func resolvedTaskBoardRefreshSnapshot(
     items: TaskBoardSnapshotLoad<[TaskBoardItem]>,
     orchestratorStatus: TaskBoardSnapshotLoad<TaskBoardOrchestratorStatus?>,
+    stepModeConfirmationRevision: UInt64,
     isInitialConnect: Bool
   ) -> ResolvedTaskBoardRefreshSnapshot {
     let currentItems = globalTaskBoardItems
@@ -163,9 +165,13 @@ extension HarnessMonitorStore {
         currentStatus
       }
 
+    let reconciledStatus = reconcileTaskBoardOrchestratorStatus(
+      resolvedStatus,
+      snapshotConfirmationRevision: stepModeConfirmationRevision
+    )
     return ResolvedTaskBoardRefreshSnapshot(
       items: resolvedItems,
-      orchestratorStatus: resolvedStatus,
+      orchestratorStatus: reconciledStatus,
       preservedItemIDs: preservedItemIDs,
       preservedStatus: shouldPreserveStatus
     )
@@ -217,7 +223,12 @@ extension HarnessMonitorStore {
         guard self.connectionState == .online || self.connectionState == .connecting else {
           return
         }
-        let snapshot = await Self.loadTaskBoardRefreshSnapshot(using: client)
+        let stepModeConfirmationRevision =
+          self.taskBoardRuntimeState.stepModeMutation.confirmationRevision
+        let snapshot = await Self.loadTaskBoardRefreshSnapshot(
+          using: client,
+          stepModeConfirmationRevision: stepModeConfirmationRevision
+        )
         let reachedDeadline = ContinuousClock.now >= deadline
         let tick = self.evaluateTaskBoardConfirmationTick(
           snapshot: snapshot,
@@ -300,7 +311,10 @@ extension HarnessMonitorStore {
       return
     }
     if measuredStatus.value != nil || reachedDeadline {
-      tick.resolvedStatus = measuredStatus.value
+      tick.resolvedStatus = reconcileTaskBoardOrchestratorStatus(
+        measuredStatus.value,
+        snapshotConfirmationRevision: snapshot.stepModeConfirmationRevision
+      )
       tick.shouldApply = true
     } else {
       tick.shouldKeepWaiting = true

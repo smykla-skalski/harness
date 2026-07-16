@@ -21,17 +21,25 @@ extension RecordingHarnessClient {
   func updateTaskBoardOrchestratorSettings(
     request: TaskBoardOrchestratorSettingsUpdateRequest
   ) async throws -> TaskBoardOrchestratorSettings {
-    calls.append(
-      .updateTaskBoardOrchestratorSettings(
-        policyVersion: request.policyVersion,
-        clearProjectDir: request.clearProjectDir,
-        clearDispatchStatusFilter: request.clearDispatchStatusFilter
+    lock.withLock {
+      callsStorage.append(
+        .updateTaskBoardOrchestratorSettings(
+          stepMode: request.stepMode,
+          policyVersion: request.policyVersion,
+          clearProjectDir: request.clearProjectDir,
+          clearDispatchStatusFilter: request.clearDispatchStatusFilter
+        )
       )
-    )
+    }
+    await orchestratorSettingsMutationGate.suspendIfConfigured()
     if let error = lock.withLock({ taskBoardOrchestratorSettingsError }) {
       throw error
     }
+    if let response = lock.withLock({ taskBoardOrchestratorSettingsResponse }) {
+      return response
+    }
     return TaskBoardOrchestratorSettings(
+      stepMode: request.stepMode ?? false,
       enabledWorkflows: request.enabledWorkflows ?? [.defaultTask],
       dryRunDefault: request.dryRunDefault ?? true,
       dispatchStatusFilter: request.dispatchStatusFilter,
@@ -150,11 +158,13 @@ extension RecordingHarnessClient {
 
   func sampleTaskBoardOrchestratorStatus(
     enabled: Bool = true,
-    running: Bool = false
+    running: Bool = false,
+    stepMode: Bool = false
   ) -> TaskBoardOrchestratorStatus {
     TaskBoardOrchestratorStatus(
       enabled: enabled,
       running: running,
+      stepMode: stepMode,
       currentTick: TaskBoardOrchestratorTickInfo(
         runId: "run-active",
         phase: .evaluation,
@@ -176,12 +186,16 @@ extension RecordingHarnessClient {
       workflowExecutionCounts: [
         TaskBoardWorkflowExecutionCount(status: .completed, count: 1)
       ],
-      settings: sampleTaskBoardOrchestratorSettings()
+      settings: sampleTaskBoardOrchestratorSettings(stepMode: stepMode)
     )
   }
 
-  func sampleTaskBoardOrchestratorSettings() -> TaskBoardOrchestratorSettings {
+  func sampleTaskBoardOrchestratorSettings(
+    stepMode: Bool = false,
+    policyVersion: String = "task-board-policy-v1"
+  ) -> TaskBoardOrchestratorSettings {
     TaskBoardOrchestratorSettings(
+      stepMode: stepMode,
       enabledWorkflows: [.defaultTask, .prFix],
       dryRunDefault: false,
       dispatchStatusFilter: .todo,
@@ -194,7 +208,7 @@ extension RecordingHarnessClient {
         enabledAutomations: TaskBoardGitHubAutomationToggles(enabled: [.syncTaskBoard, .autoMerge])
       ),
       githubInbox: TaskBoardGitHubInboxConfig(repositories: ["example/harness", "example/aff"]),
-      policyVersion: "task-board-policy-v1"
+      policyVersion: policyVersion
     )
   }
 

@@ -106,6 +106,7 @@ extension TaskBoardAPIClientTests {
     _ = try await transport.taskBoardOrchestratorSettings()
     _ = try await transport.updateTaskBoardOrchestratorSettings(
       request: TaskBoardOrchestratorSettingsUpdateRequest(
+        stepMode: true,
         enabledWorkflows: [.defaultTask, .prFix],
         dryRunDefault: false,
         dispatchStatusFilter: .agenticReview,
@@ -251,6 +252,7 @@ extension TaskBoardAPIClientTests {
     #expect(calls[11].params == nil)
     #expect(calls[12].params == .object([:]))
     #expect(calls[13].params == nil)
+    #expect(objectValue(calls[14].params, key: "step_mode") == .bool(true))
     #expect(
       objectValue(calls[14].params, key: "enabled_workflows")
         == .array([

@@ -195,6 +195,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     case approveTaskBoardPlan(id: String, approvedBy: String, approvedAt: String?)
     case revokeTaskBoardPlan(id: String, actor: String?)
     case updateTaskBoardOrchestratorSettings(
+      stepMode: Bool?,
       policyVersion: String?,
       clearProjectDir: Bool,
       clearDispatchStatusFilter: Bool
@@ -295,6 +296,9 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var taskBoardUpdateError: (any Error)?
   var taskBoardRuntimeConfigError: (any Error)?
   var taskBoardOrchestratorSettingsError: (any Error)?
+  var taskBoardOrchestratorSettingsResponse: TaskBoardOrchestratorSettings?
+  let orchestratorSettingsMutationGate =
+    RecordingTaskBoardOrchestratorSettingsMutationGate()
   var taskBoardGitHubTokensSyncError: (any Error)?
   var taskBoardTodoistTokenSyncError: (any Error)?
   var taskBoardGitIdentityDefaultsValue = TaskBoardGitIdentityDefaults()

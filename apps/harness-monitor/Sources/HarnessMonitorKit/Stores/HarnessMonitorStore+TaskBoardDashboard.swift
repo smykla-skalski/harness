@@ -10,6 +10,7 @@ extension HarnessMonitorStore {
   struct TaskBoardRefreshSnapshot: Sendable {
     let items: TaskBoardSnapshotLoad<[TaskBoardItem]>
     let orchestratorStatus: TaskBoardSnapshotLoad<TaskBoardOrchestratorStatus?>
+    let stepModeConfirmationRevision: UInt64
   }
 
   private static let taskBoardDashboardSyncRequest = TaskBoardSyncRequest(
@@ -56,6 +57,7 @@ extension HarnessMonitorStore {
 
   nonisolated static func loadTaskBoardRefreshSnapshot(
     using client: any HarnessMonitorClientProtocol,
+    stepModeConfirmationRevision: UInt64,
     includeItems: Bool = true,
     includeOrchestratorStatus: Bool = true
   ) async -> TaskBoardRefreshSnapshot {
@@ -73,7 +75,8 @@ extension HarnessMonitorStore {
       }
     return TaskBoardRefreshSnapshot(
       items: await items,
-      orchestratorStatus: await orchestratorStatus
+      orchestratorStatus: await orchestratorStatus,
+      stepModeConfirmationRevision: stepModeConfirmationRevision
     )
   }
 
