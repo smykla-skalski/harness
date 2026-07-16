@@ -13,8 +13,8 @@ use crate::daemon::protocol::{
     TaskBoardProjectsResponse, TaskBoardSyncRequest, TaskBoardSyncResponse,
     TaskBoardUpdateItemRequest,
 };
-use crate::errors::CliError;
-use crate::task_board::external::{ExternalSyncBatch, sync_external_tasks_scoped};
+use crate::errors::{CliError, CliErrorKind};
+use crate::task_board::external::sync_external_tasks_scoped;
 use crate::task_board::planning::PlanningTransition;
 use crate::task_board::{
     ExternalRef, ExternalSyncConfig, Machine, PlanningState, SpawnGateSwitches, TaskBoardItem,
@@ -34,6 +34,7 @@ mod sync_audit;
 
 pub(crate) use reviews_sync::reconcile_shared_review_items_db;
 use reviews_sync::shared_review_request_client;
+use sync_audit::SyncExecutionMetrics;
 pub(crate) use sync_audit::{
     ReviewsProjectionAuditSummary, record_reviews_projection_result,
     record_targeted_reviews_projection_result,
@@ -249,41 +250,8 @@ async fn sync_task_board_db_with_trigger(
 ) -> Result<TaskBoardSyncResponse, CliError> {
     let mut metrics = SyncExecutionMetrics::default();
     let result = sync_task_board_db_inner(db, request, &mut metrics).await;
-    sync_audit::record_request_result(db, request, trigger, &result, &metrics).await;
-    result
-}
-
-#[derive(Debug, Default)]
-struct SyncExecutionMetrics {
-    attempted_scope_count: usize,
-    result_scope_count: usize,
-    succeeded_scope_count: usize,
-    failed_scope_count: usize,
-    backing_off_scope_count: usize,
-    operation_count: usize,
-    applied_operation_count: usize,
-    conflict_count: usize,
-}
-
-impl SyncExecutionMetrics {
-    fn capture(&mut self, batch: &ExternalSyncBatch) {
-        self.attempted_scope_count = batch.attempted_scope_count();
-        self.result_scope_count = batch.result_scope_count();
-        self.succeeded_scope_count = batch.succeeded_scope_count();
-        self.failed_scope_count = batch.failed_scope_count();
-        self.backing_off_scope_count = batch.backing_off_scope_count();
-        self.operation_count = batch.operations.len();
-        self.applied_operation_count = batch
-            .operations
-            .iter()
-            .filter(|operation| operation.applied)
-            .count();
-        self.conflict_count = batch
-            .operations
-            .iter()
-            .filter(|operation| operation.action == crate::task_board::ExternalSyncAction::Conflict)
-            .count();
-    }
+    let audit = sync_audit::record_request_result(db, request, trigger, &result, &metrics).await;
+    combine_sync_and_audit_results(result, audit)
 }
 
 async fn sync_task_board_db_inner(
@@ -307,6 +275,35 @@ async fn sync_task_board_db_inner(
         super::task_board::build_sync_response_from_items(&items, &config, batch.operations);
     super::task_board::log_sync_completion(&summary);
     Ok(summary)
+}
+
+fn combine_sync_and_audit_results(
+    sync: Result<TaskBoardSyncResponse, CliError>,
+    audit: Result<(), CliError>,
+) -> Result<TaskBoardSyncResponse, CliError> {
+    match audit {
+        Ok(()) => sync,
+        Err(audit_error) => combine_audit_failure(sync, audit_error),
+    }
+}
+
+fn combine_audit_failure(
+    sync: Result<TaskBoardSyncResponse, CliError>,
+    audit_error: CliError,
+) -> Result<TaskBoardSyncResponse, CliError> {
+    let Err(sync_error) = sync else {
+        return Err(audit_error);
+    };
+    tracing::error!(
+        %sync_error,
+        %audit_error,
+        "task-board sync and audit persistence both failed"
+    );
+    Err(CliErrorKind::workflow_io(format!(
+        "task-board provider sync failed: {sync_error}; \
+task-board sync audit persistence failed: {audit_error}"
+    ))
+    .into())
 }
 
 pub(crate) async fn active_external_sync_config_db(
