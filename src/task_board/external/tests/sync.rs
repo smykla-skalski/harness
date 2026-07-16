@@ -1,3 +1,5 @@
+mod execution_repository_tests;
+
 use tempfile::tempdir;
 
 use super::support::{FakeSyncClient, external_task};
@@ -439,6 +441,7 @@ async fn sync_external_tasks_marks_imported_from_provider_on_new_github_items() 
         imported.imported_from_provider,
         Some(ExternalRefProvider::GitHub)
     );
+    assert_eq!(imported.execution_repository.as_deref(), Some("owner/repo"));
 }
 
 #[tokio::test]

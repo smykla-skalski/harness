@@ -67,13 +67,20 @@ pub(super) fn replace_synced_ref(
     current: &ExternalTaskRef,
     updated: &ExternalTaskRef,
     changed_fields: &[ExternalSyncField],
+    provider_revision: Option<&str>,
 ) -> Vec<ExternalRef> {
     let provider = current.provider.into();
     item.external_refs
         .iter()
         .map(|candidate| {
             if candidate.provider == provider && candidate.external_id == current.external_id {
-                synced_ref_from_update(candidate, updated.clone(), item, changed_fields)
+                synced_ref_from_update(
+                    candidate,
+                    updated.clone(),
+                    item,
+                    changed_fields,
+                    provider_revision,
+                )
             } else {
                 candidate.clone()
             }
@@ -84,9 +91,10 @@ pub(super) fn replace_synced_ref(
 pub(super) fn synced_ref_from_item(
     reference: ExternalTaskRef,
     item: &TaskBoardItem,
+    provider_revision: Option<&str>,
 ) -> ExternalRef {
     let mut reference = reference.into_core_ref();
-    reference.sync_state = Some(sync_state_from_created_item(item));
+    reference.sync_state = Some(sync_state_from_created_item(item, provider_revision));
     reference
 }
 
@@ -144,13 +152,16 @@ pub(super) fn changed_fields(patch: &TaskBoardItemPatch) -> Vec<ExternalSyncFiel
     fields
 }
 
-fn sync_state_from_created_item(item: &TaskBoardItem) -> ExternalRefSyncState {
+fn sync_state_from_created_item(
+    item: &TaskBoardItem,
+    provider_revision: Option<&str>,
+) -> ExternalRefSyncState {
     ExternalRefSyncState {
         title: Some(item.title.clone()),
         body: Some(item.body.clone()),
         status: Some(TaskBoardStatus::Backlog),
         project_id: item.project_id.clone(),
-        updated_at: None,
+        updated_at: provider_revision.map(ToOwned::to_owned),
         synced_at: Some(utc_now()),
     }
 }
@@ -160,6 +171,7 @@ fn synced_ref_from_update(
     updated: ExternalTaskRef,
     item: &TaskBoardItem,
     changed_fields: &[ExternalSyncField],
+    provider_revision: Option<&str>,
 ) -> ExternalRef {
     let mut reference = updated.into_core_ref();
     let mut state = current.sync_state.clone().unwrap_or_default();
@@ -176,7 +188,9 @@ fn synced_ref_from_update(
     if changed_fields.contains(&ExternalSyncField::Project) {
         state.project_id.clone_from(&item.project_id);
     }
-    state.updated_at = None;
+    if let Some(provider_revision) = provider_revision {
+        state.updated_at = Some(provider_revision.to_owned());
+    }
     state.synced_at = Some(utc_now());
     reference.sync_state = Some(state);
     reference
@@ -333,4 +347,47 @@ fn project_matches(item: &TaskBoardItem, candidate: &ExternalRef, project_id: &s
 fn github_legacy_external_id(external_id: &str) -> Option<&str> {
     let (_, legacy_id) = external_id.rsplit_once('#')?;
     (!legacy_id.trim().is_empty()).then_some(legacy_id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn status_only_update_preserves_known_provider_revision() {
+        let mut item = TaskBoardItem::new(
+            "task-1".into(),
+            "Title".into(),
+            "Body".into(),
+            "2026-07-16T10:00:00Z".into(),
+        );
+        item.status = TaskBoardStatus::Done;
+        let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1");
+        let mut core_reference = reference.clone().into_core_ref();
+        core_reference.sync_state = Some(ExternalRefSyncState {
+            title: Some("Title".into()),
+            body: Some("Body".into()),
+            status: Some(TaskBoardStatus::Backlog),
+            project_id: None,
+            updated_at: Some("provider-revision-1".into()),
+            synced_at: Some("2026-07-16T10:00:00Z".into()),
+        });
+        item.external_refs = vec![core_reference];
+
+        let refs = replace_synced_ref(
+            &item,
+            &reference,
+            &reference,
+            &[ExternalSyncField::Status],
+            None,
+        );
+
+        assert_eq!(
+            refs[0]
+                .sync_state
+                .as_ref()
+                .and_then(|state| state.updated_at.as_deref()),
+            Some("provider-revision-1")
+        );
+    }
 }

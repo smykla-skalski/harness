@@ -1,6 +1,6 @@
 use crate::errors::CliError;
 use crate::task_board::external::{
-    ExternalProvider, ExternalSyncField, ExternalTask, ExternalTaskRef,
+    ExternalProvider, ExternalSyncClient, ExternalSyncField, ExternalTask, ExternalTaskRef,
 };
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::types::{ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
@@ -8,27 +8,33 @@ use crate::workspace::utc_now;
 
 use super::super::github::reconciled_external_status;
 use super::merge::{external_ref_matches, matching_ref};
-use super::{ExternalSyncAction, ExternalSyncOperation, ExternalSyncOptions, TaskBoardSyncStore};
+use super::{
+    ExternalSyncAction, ExternalSyncOperation, ExternalSyncOptions, TaskBoardSyncStore,
+    client_owns_item,
+};
 
 pub(super) async fn reconcile_stale_github_review_requests(
     board: &dyn TaskBoardSyncStore,
     options: ExternalSyncOptions,
-    provider: ExternalProvider,
+    client: &dyn ExternalSyncClient,
     board_items: &[TaskBoardItem],
     tasks: &[ExternalTask],
-    authoritative_review_inbox: bool,
     operations: &mut Vec<ExternalSyncOperation>,
 ) -> Result<(), CliError> {
+    let provider = client.provider();
     if provider != ExternalProvider::GitHub
-        || !authoritative_review_inbox
+        || !client.authoritative_review_inbox()
         || !allows_stale_review_reconcile(options)
     {
         return Ok(());
     }
-
+    let scope_id = client.scope_id();
     let stale_items = board_items
         .iter()
         .filter_map(|item| {
+            if !client_owns_item(client, item, &scope_id) {
+                return None;
+            }
             let reference = provider_ref(item, provider)?;
             is_stale_github_review_request(item, &reference, tasks)
                 .then_some((item.clone(), reference))

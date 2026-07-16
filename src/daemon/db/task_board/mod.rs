@@ -10,7 +10,17 @@ mod items;
 mod mapper;
 mod policy_queues;
 mod policy_runs;
+mod provider_sync;
 mod rows;
+
+#[cfg(test)]
+mod provider_sync_backoff_tests;
+#[cfg(test)]
+mod provider_sync_fencing_tests;
+#[cfg(test)]
+mod provider_sync_publication_tests;
+#[cfg(test)]
+mod provider_sync_tests;
 
 pub(crate) use dispatch_intents::ClaimedTaskBoardDispatch;
 pub(crate) use dispatch_preparations::{

@@ -11,7 +11,9 @@ use super::types::{ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardSta
 
 mod capabilities;
 mod github;
+mod scopes;
 mod sync;
+mod targeting;
 mod todoist;
 
 pub use capabilities::{
@@ -22,12 +24,18 @@ pub use github::{GitHubInboxSyncClient, GitHubSyncClient};
 pub(crate) use github::{
     imported_review_references_from_items, reconcile_review_item_from_snapshots,
 };
+pub(crate) use scopes::{
+    ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
+    ExternalProviderScopeAvailability, ExternalProviderScopeHealth, ExternalProviderScopeIdentity,
+    ExternalProviderScopeState, ExternalSyncBatch, ExternalSyncScopeOutcome,
+};
 pub use sync::{
     ExternalSyncAction, ExternalSyncDirection, ExternalSyncOperation, ExternalSyncOptions,
     configured_sync_clients,
 };
 pub(crate) use sync::{
     TaskBoardSyncStore, configured_sync_clients_without_review_requests, sync_external_tasks,
+    sync_external_tasks_scoped,
 };
 pub use todoist::TodoistSyncClient;
 
@@ -325,6 +333,16 @@ fn normalize_string_list(values: &[String]) -> Vec<String> {
 pub trait ExternalSyncClient: Send + Sync {
     #[must_use]
     fn provider(&self) -> ExternalProvider;
+
+    #[must_use]
+    fn scope_id(&self) -> String {
+        self.provider().to_string()
+    }
+
+    #[must_use]
+    fn scope_for_item(&self, _item: &TaskBoardItem) -> String {
+        self.scope_id()
+    }
 
     #[must_use]
     fn capabilities(&self) -> ExternalProviderCapabilities {

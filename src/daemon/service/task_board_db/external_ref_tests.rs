@@ -1,5 +1,5 @@
 use super::*;
-use crate::task_board::{ExternalRefProvider, ExternalRefSyncState};
+use crate::task_board::{ExternalRefProvider, ExternalRefSyncState, TaskBoardStatus};
 
 #[test]
 fn external_ref_replacement_preserves_matching_daemon_sync_state() {

@@ -1,9 +1,8 @@
 use std::env;
 
-use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::daemon::db::{AsyncDaemonDb, db_error};
+use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
     TaskBoardAuditRequest, TaskBoardAuditResponse, TaskBoardCatalogRequest,
     TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardGetItemRequest,
@@ -15,13 +14,13 @@ use crate::daemon::protocol::{
     TaskBoardUpdateItemRequest,
 };
 use crate::errors::{CliError, CliErrorKind};
+use crate::task_board::external::sync_external_tasks_scoped;
 use crate::task_board::planning::PlanningTransition;
-use crate::task_board::store::{TaskBoardItemPatch, apply_patch};
 use crate::task_board::{
     ExternalRef, ExternalSyncConfig, Machine, PlanningState, SpawnGateSwitches, TaskBoardItem,
-    TaskBoardStatus, TaskBoardSyncStore, TaskBoardWorkflowState, approve_plan, begin_planning,
-    build_audit_summary_with_policy, build_machine_summaries, build_project_summaries,
-    configured_sync_clients_without_review_requests, revoke_plan, submit_plan, sync_external_tasks,
+    TaskBoardWorkflowState, approve_plan, begin_planning, build_audit_summary_with_policy,
+    build_machine_summaries, build_project_summaries,
+    configured_sync_clients_without_review_requests, revoke_plan, submit_plan,
 };
 use crate::workspace::utc_now;
 
@@ -29,56 +28,17 @@ use super::task_board::load_live_spawn_grants;
 
 #[cfg(test)]
 mod external_ref_tests;
+mod provider_sync_store;
 mod reviews_sync;
 mod sync_audit;
 
 pub(crate) use reviews_sync::reconcile_shared_review_items_db;
 use reviews_sync::shared_review_request_client;
+use sync_audit::SyncExecutionMetrics;
 pub(crate) use sync_audit::{
     ReviewsProjectionAuditSummary, record_reviews_projection_result,
     record_targeted_reviews_projection_result,
 };
-
-#[async_trait]
-impl TaskBoardSyncStore for AsyncDaemonDb {
-    async fn list_items(
-        &self,
-        status: Option<TaskBoardStatus>,
-    ) -> Result<Vec<TaskBoardItem>, CliError> {
-        self.list_task_board_items(status).await
-    }
-
-    async fn list_items_including_deleted(&self) -> Result<Vec<TaskBoardItem>, CliError> {
-        self.list_task_board_items_including_deleted().await
-    }
-
-    async fn create_item(&self, item: TaskBoardItem) -> Result<TaskBoardItem, CliError> {
-        self.create_task_board_item(item)
-            .await
-            .map(|mutation| mutation.item)
-    }
-
-    async fn update_item(
-        &self,
-        expected_item: &TaskBoardItem,
-        patch: TaskBoardItemPatch,
-    ) -> Result<TaskBoardItem, CliError> {
-        let item_id = expected_item.id.clone();
-        self.update_task_board_item(&item_id, |item| {
-            if item != expected_item {
-                return Err(CliErrorKind::concurrent_modification(format!(
-                    "task-board item '{item_id}' changed during external sync"
-                ))
-                .into());
-            }
-            apply_patch(item, patch);
-            Ok(true)
-        })
-        .await?
-        .map(|mutation| mutation.item)
-        .ok_or_else(|| db_error("Task Board sync update produced no mutation"))
-    }
-}
 
 pub(crate) async fn create_task_board_item_db(
     db: &AsyncDaemonDb,
@@ -288,14 +248,16 @@ async fn sync_task_board_db_with_trigger(
     request: &TaskBoardSyncRequest,
     trigger: sync_audit::TaskBoardSyncAuditTrigger,
 ) -> Result<TaskBoardSyncResponse, CliError> {
-    let result = sync_task_board_db_inner(db, request).await;
-    sync_audit::record_request_result(db, request, trigger, &result).await;
-    result
+    let mut metrics = SyncExecutionMetrics::default();
+    let result = sync_task_board_db_inner(db, request, &mut metrics).await;
+    let audit = sync_audit::record_request_result(db, request, trigger, &result, &metrics).await;
+    combine_sync_and_audit_results(result, audit)
 }
 
 async fn sync_task_board_db_inner(
     db: &AsyncDaemonDb,
     request: &TaskBoardSyncRequest,
+    metrics: &mut SyncExecutionMetrics,
 ) -> Result<TaskBoardSyncResponse, CliError> {
     let config = active_external_sync_config_db(db).await?;
     let mut clients = configured_sync_clients_without_review_requests(&config, request.provider)?;
@@ -304,12 +266,44 @@ async fn sync_task_board_db_inner(
     }
     super::task_board::log_sync_request(request, &config, clients.len());
     super::task_board::ensure_sync_request_can_run(request, &config, &clients)?;
-    let operations =
-        sync_external_tasks(db, super::task_board::sync_options(request), &clients).await?;
+    let batch =
+        sync_external_tasks_scoped(db, super::task_board::sync_options(request), &clients).await?;
+    metrics.capture(&batch);
+    let batch = batch.into_completed()?;
     let items = db.list_task_board_items(request.status).await?;
-    let summary = super::task_board::build_sync_response_from_items(&items, &config, operations);
+    let summary =
+        super::task_board::build_sync_response_from_items(&items, &config, batch.operations);
     super::task_board::log_sync_completion(&summary);
     Ok(summary)
+}
+
+fn combine_sync_and_audit_results(
+    sync: Result<TaskBoardSyncResponse, CliError>,
+    audit: Result<(), CliError>,
+) -> Result<TaskBoardSyncResponse, CliError> {
+    match audit {
+        Ok(()) => sync,
+        Err(audit_error) => combine_audit_failure(sync, audit_error),
+    }
+}
+
+fn combine_audit_failure(
+    sync: Result<TaskBoardSyncResponse, CliError>,
+    audit_error: CliError,
+) -> Result<TaskBoardSyncResponse, CliError> {
+    let Err(sync_error) = sync else {
+        return Err(audit_error);
+    };
+    tracing::error!(
+        %sync_error,
+        %audit_error,
+        "task-board sync and audit persistence both failed"
+    );
+    Err(CliErrorKind::workflow_io(format!(
+        "task-board provider sync failed: {sync_error}; \
+task-board sync audit persistence failed: {audit_error}"
+    ))
+    .into())
 }
 
 pub(crate) async fn active_external_sync_config_db(
@@ -482,6 +476,3 @@ fn non_empty(value: &str) -> Option<String> {
     let value = value.trim();
     (!value.is_empty()).then(|| value.to_owned())
 }
-
-#[cfg(test)]
-mod tests;

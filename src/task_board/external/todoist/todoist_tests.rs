@@ -11,6 +11,7 @@ use super::*;
 struct CapturedRequest {
     path: String,
     authorization: Option<String>,
+    request_id: Option<String>,
     body: String,
 }
 
@@ -141,6 +142,78 @@ async fn todoist_update_task_posts_changed_metadata_payload() {
     assert_eq!(body["project_id"], "project-2");
 }
 
+#[tokio::test]
+async fn todoist_status_write_preserves_metadata_provider_revision() {
+    let (endpoint, captured, handle) = spawn_sequence_mock(vec![
+        (
+            "200 OK",
+            r#"{"id":"remote-1","content":"Updated title","description":"Body","updated_at":"provider-revision-2"}"#,
+        ),
+        ("204 No Content", ""),
+    ]);
+    let client = TodoistSyncClient::new_with_api_base("token", endpoint).expect("client");
+    let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1");
+    let mut item = local_item("Updated title", "Body", None);
+    item.status = TaskBoardStatus::Done;
+
+    let outcome = client
+        .update_task(
+            &item,
+            &reference,
+            ExternalTaskUpdate::new(vec![ExternalSyncField::Title, ExternalSyncField::Status]),
+        )
+        .await
+        .expect("update metadata and status");
+
+    handle.join().expect("mock server");
+    let ExternalUpdateOutcome::Applied {
+        provider_revision, ..
+    } = outcome
+    else {
+        panic!("update must be applied");
+    };
+    assert_eq!(provider_revision.as_deref(), Some("provider-revision-2"));
+    let captured = captured.lock().expect("captured requests");
+    assert_eq!(captured.len(), 2);
+    assert_eq!(captured[0].path, "/tasks/remote-1");
+    assert_eq!(captured[1].path, "/tasks/remote-1/close");
+    assert!(captured.iter().all(|request| request.request_id.is_some()));
+    assert_ne!(captured[0].request_id, captured[1].request_id);
+}
+
+#[tokio::test]
+async fn todoist_precondition_failure_returns_current_remote_snapshot() {
+    let (endpoint, captured, handle) = spawn_json_mock_response(
+        r#"{"id":"remote-1","content":"Remote edit","description":"Remote body","project_id":"project-1","updated_at":"provider-revision-2"}"#,
+    );
+    let client = TodoistSyncClient::new_with_api_base("token", endpoint).expect("client");
+    let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1");
+    let item = local_item("Local edit", "Local body", Some("project-1"));
+
+    let outcome = client
+        .update_task(
+            &item,
+            &reference,
+            ExternalTaskUpdate::new(vec![ExternalSyncField::Title])
+                .with_precondition_updated_at(Some("provider-revision-1".into())),
+        )
+        .await
+        .expect("check precondition");
+
+    handle.join().expect("mock server");
+    let ExternalUpdateOutcome::PreconditionFailed { current } = outcome else {
+        panic!("stale precondition must fail");
+    };
+    assert_eq!(current.title, "Remote edit");
+    assert_eq!(current.body, "Remote body");
+    assert_eq!(current.project_id.as_deref(), Some("project-1"));
+    assert_eq!(current.updated_at.as_deref(), Some("provider-revision-2"));
+    assert_eq!(
+        captured.lock().expect("captured request").path,
+        "/tasks/remote-1"
+    );
+}
+
 #[test]
 fn todoist_update_classifies_metadata_and_status_changes() {
     let metadata = ExternalTaskUpdate::new(vec![ExternalSyncField::Title]);
@@ -150,6 +223,41 @@ fn todoist_update_classifies_metadata_and_status_changes() {
     assert!(!metadata.changes_status());
     assert!(!status.changes_metadata());
     assert!(status.changes_status());
+}
+
+#[test]
+fn todoist_request_ids_are_stable_for_safe_retries_and_change_with_intent() {
+    let item = local_item("Title", "Body", Some("project-1"));
+
+    assert_eq!(
+        todoist_request_id("create", &item, None),
+        todoist_request_id("create", &item, None)
+    );
+    assert_ne!(
+        todoist_request_id("create", &item, None),
+        todoist_request_id("update-metadata", &item, Some("remote-1"))
+    );
+    let edited = local_item("Edited title", "Body", Some("project-1"));
+    assert_ne!(
+        todoist_request_id("create", &item, None),
+        todoist_request_id("create", &edited, None)
+    );
+}
+
+#[test]
+fn todoist_request_id_status_uses_stable_wire_values() {
+    assert_eq!(
+        todoist_request_id_status(TaskBoardStatus::InProgress),
+        "in_progress"
+    );
+    assert_eq!(
+        todoist_request_id_status(TaskBoardStatus::HumanRequired),
+        "human_required"
+    );
+    assert_eq!(
+        todoist_request_id_status(TaskBoardStatus::NeedsYou),
+        "needs_you"
+    );
 }
 
 #[test]
@@ -259,6 +367,31 @@ fn spawn_json_mock(
     (endpoint, captured, handle)
 }
 
+fn spawn_sequence_mock(
+    responses: Vec<(&'static str, &'static str)>,
+) -> (
+    String,
+    Arc<Mutex<Vec<CapturedRequest>>>,
+    thread::JoinHandle<()>,
+) {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
+    let captured = Arc::new(Mutex::new(Vec::new()));
+    let captured_clone = Arc::clone(&captured);
+    let handle = thread::spawn(move || {
+        for (status, body) in responses {
+            let (mut stream, _) = listener.accept().expect("accept");
+            let request = read_http_request(&mut stream);
+            captured_clone
+                .lock()
+                .expect("captured requests")
+                .push(capture_request(&request));
+            write_http_response(&mut stream, status, body);
+        }
+    });
+    (endpoint, captured, handle)
+}
+
 fn capture_request(request: &str) -> CapturedRequest {
     let path = request
         .lines()
@@ -272,6 +405,12 @@ fn capture_request(request: &str) -> CapturedRequest {
                 .then(|| value.trim().to_string())
         })
     });
+    let request_id = request.lines().find_map(|line| {
+        line.split_once(':').and_then(|(name, value)| {
+            name.eq_ignore_ascii_case("x-request-id")
+                .then(|| value.trim().to_string())
+        })
+    });
     let body = request
         .split("\r\n\r\n")
         .nth(1)
@@ -280,6 +419,7 @@ fn capture_request(request: &str) -> CapturedRequest {
     CapturedRequest {
         path,
         authorization,
+        request_id,
         body,
     }
 }

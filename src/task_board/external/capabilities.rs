@@ -76,6 +76,11 @@ impl ExternalTaskUpdate {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExternalUpdateOutcome {
-    Applied(super::ExternalTaskRef),
-    PreconditionFailed,
+    Applied {
+        reference: super::ExternalTaskRef,
+        provider_revision: Option<String>,
+    },
+    PreconditionFailed {
+        current: super::ExternalTask,
+    },
 }
