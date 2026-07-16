@@ -2,15 +2,10 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 use async_trait::async_trait;
-use reqwest::Method;
-use serde::Deserialize;
 use serde_json::json;
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::github_api::{
-    GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
-    retry_stable_read,
-};
+use crate::github_api::{GitHubProtectedClient, retry_stable_read};
 use crate::task_board::normalize_repository_slug;
 use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 
@@ -25,8 +20,9 @@ mod errors;
 mod graphql;
 mod inbox;
 mod review_projection;
+mod write;
 
-use errors::{github_sync_error_with_context, warn_github_message};
+use errors::warn_github_message;
 pub use inbox::GitHubInboxSyncClient;
 pub(crate) use review_projection::{
     imported_review_references_from_items, reconcile_review_item_from_snapshots,
@@ -237,10 +233,18 @@ impl ExternalSyncClient for GitHubSyncClient {
         let repository = self.repository_for(Some(item))?;
         let issue_number = parse_issue_number(&reference.external_id)?;
         if let Some(precondition) = update.precondition_updated_at.as_deref() {
-            let current_updated_at =
+            // GitHub does not document conditional unsafe requests for issue PATCH.
+            // Independent uncached GraphQL and REST reads are the strongest
+            // available preflight and return the full snapshot on mismatch.
+            let observed_revision =
                 graphql::issue_updated_at(self.protected(), &repository, issue_number).await?;
-            if current_updated_at != precondition {
-                return Ok(ExternalUpdateOutcome::PreconditionFailed);
+            let current = self.fetch_issue(&repository, issue_number).await?;
+            if observed_revision != precondition
+                || current.updated_at.as_deref() != Some(precondition)
+            {
+                return Ok(ExternalUpdateOutcome::PreconditionFailed {
+                    current: current.into_external_task(&repository),
+                });
             }
         }
         let mut body = serde_json::Map::new();
@@ -280,63 +284,6 @@ impl ExternalSyncClient for GitHubSyncClient {
         self.patch_issue(&repository, issue_number, json!({ "state": "closed" }))
             .await?;
         Ok(())
-    }
-}
-
-impl GitHubSyncClient {
-    async fn create_issue(
-        &self,
-        repository: &GitHubRepository,
-        item: &TaskBoardItem,
-    ) -> Result<GitHubIssueResponse, CliError> {
-        let mut body = serde_json::Map::new();
-        body.insert("title".into(), json!(item.title));
-        if let Some(body_text) = non_empty_body(&item.body) {
-            body.insert("body".into(), json!(body_text));
-        }
-        let route = format!("/repos/{}/{}/issues", repository.owner, repository.repo);
-        self.client
-            .rest_json(
-                Method::POST,
-                route,
-                Some(serde_json::Value::Object(body)),
-                github_write_descriptor("task_board.github.issue_create"),
-            )
-            .await
-            .map(|response| response.body)
-            .map_err(|error| {
-                github_sync_error_with_context(
-                    format!("creating issue in {}", repository.slug()),
-                    &error,
-                )
-            })
-    }
-
-    async fn patch_issue(
-        &self,
-        repository: &GitHubRepository,
-        issue_number: u64,
-        body: serde_json::Value,
-    ) -> Result<GitHubIssueResponse, CliError> {
-        let route = format!(
-            "/repos/{}/{}/issues/{issue_number}",
-            repository.owner, repository.repo
-        );
-        self.client
-            .rest_json(
-                Method::PATCH,
-                route,
-                Some(body),
-                github_write_descriptor("task_board.github.issue_update"),
-            )
-            .await
-            .map(|response| response.body)
-            .map_err(|error| {
-                github_sync_error_with_context(
-                    format!("updating issue {issue_number} in {}", repository.slug()),
-                    &error,
-                )
-            })
     }
 }
 
@@ -402,22 +349,6 @@ fn github_issue_state(status: TaskBoardStatus) -> &'static str {
         TaskBoardStatus::Done => "closed",
         _ => "open",
     }
-}
-
-#[derive(Debug, Deserialize)]
-struct GitHubIssueResponse {
-    number: u64,
-    html_url: String,
-    #[serde(default)]
-    updated_at: Option<String>,
-}
-
-fn github_write_descriptor(operation: &str) -> GitHubRequestDescriptor {
-    GitHubRequestDescriptor::rest_core(
-        operation,
-        GitHubPriority::Mutation,
-        GitHubCachePolicy::no_store(),
-    )
 }
 
 fn github_inbox_issue_status(state: &str) -> TaskBoardStatus {

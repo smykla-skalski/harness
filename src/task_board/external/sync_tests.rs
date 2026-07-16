@@ -7,6 +7,7 @@ use super::*;
 use crate::task_board::store::TaskBoardStore;
 use crate::task_board::types::{ExternalRefSyncState, TaskBoardItem, TaskBoardStatus};
 
+mod conflict_correctness_tests;
 mod status_roundtrip_tests;
 
 #[tokio::test]
@@ -205,7 +206,12 @@ async fn linked_push_surfaces_conflict_when_precondition_fails() {
         vec![ExternalSyncField::Title],
         Vec::new(),
     )
-    .with_precondition_failure();
+    .with_precondition_failure(remote_task(
+        "remote-1",
+        "Concurrent remote edit",
+        "Old body",
+        TaskBoardStatus::Backlog,
+    ));
     let updates = client.updates.clone();
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(client)];
 
@@ -370,7 +376,7 @@ struct UpdateFakeSyncClient {
     capabilities: ExternalProviderCapabilities,
     tasks: Vec<ExternalTask>,
     updates: std::sync::Arc<Mutex<Vec<(String, Vec<ExternalSyncField>)>>>,
-    precondition_fails: bool,
+    precondition_failure: Option<ExternalTask>,
 }
 
 impl UpdateFakeSyncClient {
@@ -384,12 +390,12 @@ impl UpdateFakeSyncClient {
             capabilities: ExternalProviderCapabilities::with_update_fields(update_fields),
             tasks,
             updates: std::sync::Arc::new(Mutex::new(Vec::new())),
-            precondition_fails: false,
+            precondition_failure: None,
         }
     }
 
-    fn with_precondition_failure(mut self) -> Self {
-        self.precondition_fails = true;
+    fn with_precondition_failure(mut self, current: ExternalTask) -> Self {
+        self.precondition_failure = Some(current);
         self
     }
 }
@@ -418,8 +424,12 @@ impl ExternalSyncClient for UpdateFakeSyncClient {
         reference: &ExternalTaskRef,
         update: ExternalTaskUpdate,
     ) -> Result<ExternalUpdateOutcome, CliError> {
-        if self.precondition_fails && update.precondition_updated_at.is_some() {
-            return Ok(ExternalUpdateOutcome::PreconditionFailed);
+        if let Some(current) = &self.precondition_failure
+            && update.precondition_updated_at.is_some()
+        {
+            return Ok(ExternalUpdateOutcome::PreconditionFailed {
+                current: current.clone(),
+            });
         }
         self.updates
             .lock()

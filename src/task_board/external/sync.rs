@@ -1,9 +1,9 @@
+use std::slice;
+
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::CliError;
-use crate::github_api::republish_current_data_change;
-use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 use crate::workspace::utc_now;
 
@@ -22,6 +22,7 @@ mod import;
 mod legacy_store;
 mod lookup;
 mod merge;
+mod push;
 mod reconcile;
 mod scope;
 mod stale_reviews;
@@ -30,11 +31,8 @@ mod store;
 pub(crate) use batch::{sync_external_tasks, sync_external_tasks_scoped};
 use import::{external_item_id, imported_external_planning};
 use lookup::{OperationDraft, build_external_ref_index, item_for_ref, operation, provider_ref};
-use merge::{
-    has_reported_conflict, local_update_fields, matching_ref, pull_create_fields,
-    push_create_fields, replace_synced_ref, split_supported_fields, sync_state_from_task,
-    synced_ref_from_item,
-};
+use merge::{matching_ref, pull_create_fields, sync_state_from_task};
+use push::push_board_tasks;
 use reconcile::reconcile_existing_item;
 use scope::SyncClientError;
 use stale_reviews::reconcile_stale_github_review_requests;
@@ -153,7 +151,7 @@ fn add_todoist_clients(
     for project_id in config.todoist_import_project_ids() {
         let scoped_config = config
             .clone()
-            .with_todoist_import_project_ids_override(std::slice::from_ref(project_id));
+            .with_todoist_import_project_ids_override(slice::from_ref(project_id));
         clients.push(Box::new(TodoistSyncClient::from_config(&scoped_config)?));
     }
     Ok(())
@@ -184,7 +182,7 @@ fn add_github_clients(
     for repository in config.github_inbox_repositories() {
         let scoped_config = config
             .clone()
-            .with_github_inbox_repositories_override(std::slice::from_ref(repository));
+            .with_github_inbox_repositories_override(slice::from_ref(repository));
         let inbox = if include_review_requests {
             GitHubInboxSyncClient::from_config(&scoped_config)?
         } else {
@@ -292,6 +290,10 @@ fn new_pull_matches_status_filter(filter: Option<TaskBoardStatus>, task: &Extern
     })
 }
 
+fn client_owns_item(client: &dyn ExternalSyncClient, item: &TaskBoardItem, scope_id: &str) -> bool {
+    client.scope_for_item(item).eq_ignore_ascii_case(scope_id)
+}
+
 async fn find_item_for_task(
     board: &dyn TaskBoardSyncStore,
     task: &ExternalTask,
@@ -299,187 +301,6 @@ async fn find_item_for_task(
     let items = board.list_items(None).await?;
     let index = build_external_ref_index(&items);
     Ok(item_for_ref(&items, &index, &task.reference, task.project_id.as_deref()).cloned())
-}
-
-async fn push_board_tasks(
-    board: &dyn TaskBoardSyncStore,
-    options: ExternalSyncOptions,
-    client: &dyn ExternalSyncClient,
-    operations: &mut Vec<ExternalSyncOperation>,
-) -> Result<(), SyncClientError> {
-    let items = board
-        .list_items(options.status)
-        .await
-        .map_err(SyncClientError::Local)?;
-    let scope_id = client.scope_id();
-    for item in &items {
-        if !client_owns_item(client, item, &scope_id) {
-            continue;
-        }
-        if has_reported_conflict(operations, client.provider(), &item.id) {
-            continue;
-        }
-        if let Some(reference) = provider_ref(item, client.provider()) {
-            update_linked_remote(board, options, client, item, reference, operations).await?;
-        } else {
-            create_remote_item(board, options, client, item, operations).await?;
-        }
-    }
-    Ok(())
-}
-
-async fn create_remote_item(
-    board: &dyn TaskBoardSyncStore,
-    options: ExternalSyncOptions,
-    client: &dyn ExternalSyncClient,
-    item: &TaskBoardItem,
-    operations: &mut Vec<ExternalSyncOperation>,
-) -> Result<(), SyncClientError> {
-    if options.dry_run {
-        operations.push(operation(OperationDraft {
-            provider: client.provider(),
-            action: ExternalSyncAction::Push,
-            board_item_id: Some(item.id.clone()),
-            reference: ExternalTaskRef::new(client.provider(), ""),
-            dry_run: true,
-            applied: false,
-            changed_fields: push_create_fields(item),
-            unsupported_fields: Vec::new(),
-        }));
-        return Ok(());
-    }
-    let reference = client
-        .push_task(item)
-        .await
-        .map_err(SyncClientError::Provider)?;
-    let mut refs = item.external_refs.clone();
-    refs.push(synced_ref_from_item(reference.clone(), item, None));
-    let linked = board
-        .update_item(
-            item,
-            TaskBoardItemPatch {
-                external_refs: Some(refs),
-                ..TaskBoardItemPatch::default()
-            },
-        )
-        .await
-        .map_err(SyncClientError::Local)?;
-    republish_github_board_ready(client.provider());
-    operations.push(operation(OperationDraft {
-        provider: client.provider(),
-        action: ExternalSyncAction::Push,
-        board_item_id: Some(item.id.clone()),
-        reference: reference.clone(),
-        dry_run: false,
-        applied: true,
-        changed_fields: push_create_fields(item),
-        unsupported_fields: Vec::new(),
-    }));
-    if canonical_external_status(item.status) == TaskBoardStatus::Done {
-        update_linked_remote(board, options, client, &linked, reference, operations).await?;
-    }
-    Ok(())
-}
-
-fn client_owns_item(client: &dyn ExternalSyncClient, item: &TaskBoardItem, scope_id: &str) -> bool {
-    client.scope_for_item(item).eq_ignore_ascii_case(scope_id)
-}
-
-async fn update_linked_remote(
-    board: &dyn TaskBoardSyncStore,
-    options: ExternalSyncOptions,
-    client: &dyn ExternalSyncClient,
-    item: &TaskBoardItem,
-    reference: ExternalTaskRef,
-    operations: &mut Vec<ExternalSyncOperation>,
-) -> Result<(), SyncClientError> {
-    let capabilities = client.capabilities();
-    let changed = local_update_fields(item, &reference, &capabilities);
-    if changed.is_empty() {
-        return Ok(());
-    }
-    let (supported, unsupported) = split_supported_fields(&changed, &capabilities);
-    if options.dry_run || supported.is_empty() {
-        let can_apply = !supported.is_empty() && !options.dry_run;
-        operations.push(operation(OperationDraft {
-            provider: client.provider(),
-            action: ExternalSyncAction::Push,
-            board_item_id: Some(item.id.clone()),
-            reference: reference.clone(),
-            dry_run: options.dry_run,
-            applied: can_apply,
-            changed_fields: supported,
-            unsupported_fields: unsupported,
-        }));
-        return Ok(());
-    }
-    let precondition = remote_precondition(item, &reference);
-    let update =
-        ExternalTaskUpdate::new(supported.clone()).with_precondition_updated_at(precondition);
-    let outcome = client
-        .update_task(item, &reference, update)
-        .await
-        .map_err(SyncClientError::Provider)?;
-    let (updated_ref, provider_revision) = match outcome {
-        ExternalUpdateOutcome::Applied {
-            reference,
-            provider_revision,
-        } => (reference, provider_revision),
-        ExternalUpdateOutcome::PreconditionFailed => {
-            operations.push(operation(OperationDraft {
-                provider: client.provider(),
-                action: ExternalSyncAction::Conflict,
-                board_item_id: Some(item.id.clone()),
-                reference,
-                dry_run: options.dry_run,
-                applied: false,
-                changed_fields: supported,
-                unsupported_fields: Vec::new(),
-            }));
-            return Ok(());
-        }
-    };
-    let refs = replace_synced_ref(
-        item,
-        &reference,
-        &updated_ref,
-        &supported,
-        provider_revision.as_deref(),
-    );
-    operations.push(operation(OperationDraft {
-        provider: client.provider(),
-        action: ExternalSyncAction::Push,
-        board_item_id: Some(item.id.clone()),
-        reference: reference.clone(),
-        dry_run: false,
-        applied: true,
-        changed_fields: supported,
-        unsupported_fields: unsupported,
-    }));
-    board
-        .update_item(
-            item,
-            TaskBoardItemPatch {
-                external_refs: Some(refs),
-                ..TaskBoardItemPatch::default()
-            },
-        )
-        .await
-        .map_err(SyncClientError::Local)?;
-    republish_github_board_ready(client.provider());
-    Ok(())
-}
-
-fn republish_github_board_ready(provider: ExternalProvider) {
-    if provider == ExternalProvider::GitHub {
-        republish_current_data_change("task_board.github.local_sync_ready");
-    }
-}
-
-fn remote_precondition(item: &TaskBoardItem, reference: &ExternalTaskRef) -> Option<String> {
-    matching_ref(item, reference, item.project_id.as_deref())
-        .and_then(|reference| reference.sync_state.as_ref())
-        .and_then(|state| state.updated_at.clone())
 }
 
 fn create_item_from_external(task: &ExternalTask) -> TaskBoardItem {

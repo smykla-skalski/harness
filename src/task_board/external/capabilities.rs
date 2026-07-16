@@ -80,5 +80,7 @@ pub enum ExternalUpdateOutcome {
         reference: super::ExternalTaskRef,
         provider_revision: Option<String>,
     },
-    PreconditionFailed,
+    PreconditionFailed {
+        current: super::ExternalTask,
+    },
 }

@@ -1,6 +1,8 @@
 use sha2::{Digest, Sha256};
 
-use crate::task_board::{TaskBoardConflictState, TaskBoardItem, TaskBoardSyncConflict};
+use crate::task_board::{
+    ExternalRefSyncState, TaskBoardConflictState, TaskBoardItem, TaskBoardSyncConflict,
+};
 
 use super::merge::matching_ref;
 use super::{ExternalSyncField, ExternalTask};
@@ -53,10 +55,7 @@ const fn field_name(field: ExternalSyncField) -> &'static str {
     }
 }
 
-fn base_value(
-    state: Option<&crate::task_board::ExternalRefSyncState>,
-    field: ExternalSyncField,
-) -> serde_json::Value {
+fn base_value(state: Option<&ExternalRefSyncState>, field: ExternalSyncField) -> serde_json::Value {
     let Some(state) = state else {
         return serde_json::Value::Null;
     };

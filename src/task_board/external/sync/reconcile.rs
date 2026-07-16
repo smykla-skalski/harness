@@ -1,7 +1,7 @@
 use crate::errors::CliError;
 use crate::task_board::external::targeting::execution_repository_for_task;
 use crate::task_board::external::{
-    ExternalProvider, ExternalSyncConflictPolicy, ExternalTask, ExternalTaskRef,
+    ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncField, ExternalTask, ExternalTaskRef,
 };
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::types::{ExternalRef, ExternalRefSyncState, TaskBoardItem, TaskBoardStatus};
@@ -16,6 +16,10 @@ use super::{
     OperationDraft, TaskBoardSyncStore, operation,
 };
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "reconciliation keeps conflict policy, dry-run, and local CAS branches explicit"
+)]
 pub(super) async fn reconcile_existing_item(
     board: &dyn TaskBoardSyncStore,
     options: ExternalSyncOptions,
@@ -52,19 +56,14 @@ pub(super) async fn reconcile_existing_item(
         }));
         return Ok(());
     }
-    if matches!(
-        options.conflict_policy,
-        ExternalSyncConflictPolicy::PreferLocal
-    ) && !conflict_fields.is_empty()
-    {
-        return Ok(());
-    }
     let prefer_remote = matches!(
         options.conflict_policy,
         ExternalSyncConflictPolicy::PreferRemote
     );
     let patch = reconciliation_patch(item, &task, prefer_remote);
     if !has_reconciliation_change(&patch) {
+        supersede_resolved_conflicts(board, options, provider, item, &task, &conflict_fields)
+            .await?;
         return Ok(());
     }
     let changed_fields = changed_fields(&patch);
@@ -87,6 +86,14 @@ pub(super) async fn reconcile_existing_item(
     {
         return Err(error);
     }
+    supersede_resolved_conflicts(board, options, provider, item, &task, &conflict_fields).await?;
+    if matches!(
+        options.conflict_policy,
+        ExternalSyncConflictPolicy::PreferLocal
+    ) && !conflict_fields.is_empty()
+    {
+        return Ok(());
+    }
     operations.push(operation(OperationDraft {
         provider,
         action: ExternalSyncAction::Pull,
@@ -97,6 +104,27 @@ pub(super) async fn reconcile_existing_item(
         changed_fields,
         unsupported_fields: Vec::new(),
     }));
+    Ok(())
+}
+
+async fn supersede_resolved_conflicts(
+    board: &dyn TaskBoardSyncStore,
+    options: ExternalSyncOptions,
+    provider: ExternalProvider,
+    item: &TaskBoardItem,
+    task: &ExternalTask,
+    conflict_fields: &[ExternalSyncField],
+) -> Result<(), CliError> {
+    let resolved = match options.conflict_policy {
+        ExternalSyncConflictPolicy::Report => false,
+        ExternalSyncConflictPolicy::PreferRemote => true,
+        ExternalSyncConflictPolicy::PreferLocal => conflict_fields.is_empty(),
+    };
+    if resolved && !options.dry_run {
+        board
+            .replace_open_sync_conflicts(&item.id, provider, &task.reference.external_id, &[])
+            .await?;
+    }
     Ok(())
 }
 
