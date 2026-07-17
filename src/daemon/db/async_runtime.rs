@@ -100,9 +100,6 @@ impl AsyncDaemonDb {
     /// # Errors
     /// Returns [`CliError`] on SQL or serialization failures.
     pub(crate) async fn save_codex_run(&self, snapshot: &CodexRunSnapshot) -> Result<(), CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("async codex run save")
-            .await?;
         let pending_approvals_json = serde_json::to_string(&snapshot.pending_approvals)
             .map_err(|error| db_error(format!("serialize async codex approvals: {error}")))?;
         let resolved_approvals_json =
@@ -111,6 +108,9 @@ impl AsyncDaemonDb {
             })?;
         let events_json = serde_json::to_string(&snapshot.events)
             .map_err(|error| db_error(format!("serialize async codex events: {error}")))?;
+        let mut transaction = self
+            .begin_immediate_transaction("async codex run save")
+            .await?;
         query(UPSERT_CODEX_RUN_SQL)
             .bind(&snapshot.run_id)
             .bind(&snapshot.session_id)
