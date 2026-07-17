@@ -7,6 +7,10 @@ use super::status::{
 use super::test_support::{database, instant};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::policy_graph::{PolicyCanvasWorkspace, PolicyGraphMode};
+use crate::task_board::{
+    TaskBoardAutomationEffectiveState, TaskBoardAutomationWakePayload,
+    TaskBoardAutomationWakeRecoveryReason, TaskBoardAutomationWakeRequest,
+};
 
 #[tokio::test]
 async fn lean_policy_revision_matches_active_live_policy_semantics() {
@@ -128,6 +132,50 @@ async fn snapshot_ledger_read_succeeds_on_a_query_only_connection() {
         .expect("disable query-only mode");
 }
 
+#[tokio::test]
+async fn wake_acknowledgement_uses_the_pinned_read_snapshot() {
+    let db = ready_database().await;
+    let created_at = Utc::now();
+    let wake = db
+        .enqueue_task_board_automation_wake_event(&recovery_wake(), created_at)
+        .await
+        .expect("enqueue wake before snapshot");
+    let mut transaction = db.pool().begin().await.expect("begin deferred read");
+    let (policy_revision, observed_at) = begin_snapshot_observation(transaction.as_mut())
+        .await
+        .expect("pin snapshot observation");
+    let processed_at = wait_until_after(observed_at).await;
+    db.acknowledge_task_board_automation_wake_events(&[wake.sequence], processed_at)
+        .await
+        .expect("acknowledge wake after observation");
+
+    let pinned = snapshot_after_observation(&mut transaction, policy_revision, observed_at)
+        .await
+        .expect("build pinned wake snapshot");
+    assert_eq!(
+        pinned.effective_state,
+        TaskBoardAutomationEffectiveState::Scheduled
+    );
+    assert_eq!(
+        pinned.next_run_at.as_deref(),
+        Some(wake.created_at.as_str())
+    );
+    assert_eq!(pinned.last_reconciliation_at, None);
+    transaction.commit().await.expect("commit read transaction");
+
+    let current = snapshot(&db).await;
+    assert_eq!(
+        current.effective_state,
+        TaskBoardAutomationEffectiveState::Idle
+    );
+    assert_eq!(current.next_run_at, None);
+    assert_eq!(
+        current.last_reconciliation_at.as_deref(),
+        Some(timestamp(processed_at).as_str())
+    );
+    assert_eq!(current.heartbeat_at, timestamp(processed_at));
+}
+
 async fn ready_database() -> AsyncDaemonDb {
     let db = database().await;
     let settings =
@@ -185,6 +233,16 @@ async fn snapshot(db: &AsyncDaemonDb) -> crate::task_board::TaskBoardAutomationS
 
 fn timestamp(value: DateTime<Utc>) -> String {
     value.to_rfc3339()
+}
+
+fn recovery_wake() -> TaskBoardAutomationWakeRequest {
+    TaskBoardAutomationWakeRequest {
+        entity_id: None,
+        entity_revision: None,
+        payload: TaskBoardAutomationWakePayload::recovery(
+            TaskBoardAutomationWakeRecoveryReason::Startup,
+        ),
+    }
 }
 
 async fn wait_until_after(instant: DateTime<Utc>) -> DateTime<Utc> {

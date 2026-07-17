@@ -9,8 +9,9 @@ use crate::errors::CliError;
 use crate::feature_flags::task_board_automation_v2_enabled_from_env;
 use crate::task_board::{
     TaskBoardAutomationAdmissionState, TaskBoardAutomationDesiredMode,
-    TaskBoardOrchestratorSettings, TaskBoardOrchestratorState, TaskBoardWorkflowExecutionCount,
-    TaskBoardWorkflowStatus,
+    TaskBoardAutomationWakeEntityKind, TaskBoardAutomationWakePayload,
+    TaskBoardAutomationWakeRequest, TaskBoardOrchestratorSettings, TaskBoardOrchestratorState,
+    TaskBoardWorkflowExecutionCount, TaskBoardWorkflowStatus,
 };
 
 use super::task_board_db::task_board_host_local_db;
@@ -38,8 +39,24 @@ async fn start_task_board_orchestrator_with_durable(
 ) -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
     if durable_enabled {
         let settings = db.task_board_orchestrator_settings().await?;
-        db.start_task_board_automation(desired_mode_for_settings(&settings), Utc::now())
+        let desired_mode = desired_mode_for_settings(&settings);
+        let now = Utc::now();
+        if desired_mode == TaskBoardAutomationDesiredMode::Continuous {
+            db.start_task_board_automation_with_wake(
+                desired_mode,
+                &TaskBoardAutomationWakeRequest {
+                    entity_id: Some("automation-control".into()),
+                    entity_revision: None,
+                    payload: TaskBoardAutomationWakePayload::ledger_changed(
+                        TaskBoardAutomationWakeEntityKind::Control,
+                    ),
+                },
+                now,
+            )
             .await?;
+        } else {
+            db.start_task_board_automation(desired_mode, now).await?;
+        }
     }
     set_running_intent(db, true, true, durable_enabled).await
 }
@@ -76,29 +93,29 @@ pub(crate) async fn update_task_board_orchestrator_settings_db(
     apply_settings_update(&mut settings, request);
     settings.github_inbox = normalize_github_inbox(&settings.github_inbox)?;
     settings.todoist_inbox = normalize_todoist_inbox(&settings.todoist_inbox);
-    db.replace_task_board_orchestrator_settings(&settings)
-        .await?;
-    update_running_automation_mode(db, &settings, task_board_automation_v2_enabled_from_env())
-        .await?;
+    replace_orchestrator_settings_with_durable(
+        db,
+        &settings,
+        task_board_automation_v2_enabled_from_env(),
+    )
+    .await?;
     Ok(settings)
 }
 
-async fn update_running_automation_mode(
+async fn replace_orchestrator_settings_with_durable(
     db: &AsyncDaemonDb,
     settings: &TaskBoardOrchestratorSettings,
     durable_enabled: bool,
-) -> Result<(), CliError> {
+) -> Result<i64, CliError> {
     if !durable_enabled {
-        return Ok(());
+        return db.replace_task_board_orchestrator_settings(settings).await;
     }
-    let control = db.task_board_automation_control().await?;
-    if control.desired_mode != TaskBoardAutomationDesiredMode::Off
-        && control.admission_state == TaskBoardAutomationAdmissionState::Accepting
-    {
-        db.start_task_board_automation(desired_mode_for_settings(settings), Utc::now())
-            .await?;
-    }
-    Ok(())
+    db.replace_task_board_orchestrator_settings_for_automation(
+        settings,
+        desired_mode_for_settings(settings),
+        Utc::now(),
+    )
+    .await
 }
 
 const fn desired_mode_for_settings(
@@ -224,15 +241,100 @@ mod tests {
         assert!(!stopped.enabled);
         assert!(!stopped.running);
         assert!(stopped.automation.is_none());
-        update_running_automation_mode(&db, &TaskBoardOrchestratorSettings::default(), false)
-            .await
-            .expect("update legacy settings");
+        replace_orchestrator_settings_with_durable(
+            &db,
+            &TaskBoardOrchestratorSettings::default(),
+            false,
+        )
+        .await
+        .expect("update legacy settings");
         let durable_rows =
             query_scalar::<_, i64>("SELECT COUNT(*) FROM task_board_orchestrator_control")
                 .fetch_one(db.pool())
                 .await
                 .expect("count durable control rows");
         assert_eq!(durable_rows, 0);
+    }
+
+    #[tokio::test]
+    async fn durable_continuous_start_enqueues_a_control_wake() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
+            .await
+            .expect("open database");
+
+        start_task_board_orchestrator_with_durable(&db, true)
+            .await
+            .expect("start durable orchestrator");
+
+        let wakes = db
+            .pending_task_board_automation_wake_events(10)
+            .await
+            .expect("load control wake");
+        assert_eq!(wakes.len(), 1);
+        assert_eq!(wakes[0].entity_id.as_deref(), Some("automation-control"));
+        assert!(matches!(
+            wakes[0].payload,
+            TaskBoardAutomationWakePayload::LedgerChanged(ref payload)
+                if payload.entity_kind == TaskBoardAutomationWakeEntityKind::Control
+        ));
+    }
+
+    #[tokio::test]
+    async fn durable_step_start_does_not_enqueue_an_automatic_wake() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
+            .await
+            .expect("open database");
+        db.replace_task_board_orchestrator_settings(&TaskBoardOrchestratorSettings {
+            step_mode: true,
+            ..TaskBoardOrchestratorSettings::default()
+        })
+        .await
+        .expect("save step settings");
+
+        start_task_board_orchestrator_with_durable(&db, true)
+            .await
+            .expect("start step orchestrator");
+
+        assert!(
+            db.pending_task_board_automation_wake_events(10)
+                .await
+                .expect("load step wakes")
+                .is_empty()
+        );
+    }
+
+    #[tokio::test]
+    async fn running_continuous_settings_update_enqueues_its_revision() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
+            .await
+            .expect("open database");
+        db.start_task_board_automation(TaskBoardAutomationDesiredMode::Continuous, Utc::now())
+            .await
+            .expect("start durable automation");
+
+        let revision = replace_orchestrator_settings_with_durable(
+            &db,
+            &TaskBoardOrchestratorSettings::default(),
+            true,
+        )
+        .await
+        .expect("update running settings");
+
+        let wakes = db
+            .pending_task_board_automation_wake_events(10)
+            .await
+            .expect("load settings wake");
+        assert_eq!(wakes.len(), 1);
+        assert_eq!(wakes[0].entity_id.as_deref(), Some("automation-settings"));
+        assert_eq!(wakes[0].entity_revision, u64::try_from(revision).ok());
+        assert!(matches!(
+            wakes[0].payload,
+            TaskBoardAutomationWakePayload::LedgerChanged(ref payload)
+                if payload.entity_kind == TaskBoardAutomationWakeEntityKind::Settings
+        ));
     }
 
     #[tokio::test]

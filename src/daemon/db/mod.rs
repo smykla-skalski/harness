@@ -68,6 +68,7 @@ mod schema;
 mod schema_migrations;
 mod schema_repairs;
 mod schema_repairs_external_creates;
+mod schema_repairs_wake_events;
 mod schema_sql;
 mod schema_v10;
 mod schema_v11;

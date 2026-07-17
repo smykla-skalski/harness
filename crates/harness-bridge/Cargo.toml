@@ -1,6 +1,6 @@
 [package]
 name = "harness-bridge"
-version = "48.3.0"
+version = "48.4.0"
 edition = "2024"
 rust-version = "1.94"
 
@@ -21,9 +21,9 @@ clap = { version = "4.6.0", features = ["derive", "env"] }
 crossterm = "0.29.0"
 fs2 = "0.4.3"
 fs-err = "3.3.0"
-harness-hook = { path = "../harness-hook", version = "48.3.0" }
-harness-protocol = { path = "../harness-protocol", version = "48.3.0" }
-harness-telemetry = { path = "../harness-telemetry", version = "48.3.0" }
+harness-hook = { path = "../harness-hook", version = "48.4.0" }
+harness-protocol = { path = "../harness-protocol", version = "48.4.0" }
+harness-telemetry = { path = "../harness-telemetry", version = "48.4.0" }
 hex = "0.4.3"
 nix = { version = "0.31", features = ["signal"] }
 notify = "8.2.0"
