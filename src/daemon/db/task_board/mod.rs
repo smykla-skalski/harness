@@ -18,6 +18,7 @@ mod provider_external_creates;
 mod provider_sync;
 mod provider_sync_conflicts;
 mod rows;
+mod scheduler;
 
 #[cfg(test)]
 mod provider_external_create_finalize_tests;
@@ -52,6 +53,10 @@ pub(crate) use dispatch_preparations::{
 pub(crate) use imports::{TaskBoardImportMarker, TaskBoardImportResult};
 #[allow(unused_imports)]
 pub(crate) use items::{TaskBoardItemSnapshot, TaskBoardMutation};
+pub(crate) use scheduler::{
+    TaskBoardAutomationControlRecord, TaskBoardAutomationRunAdmission, TaskBoardAutomationRunFence,
+    TaskBoardAutomationRunLease, TaskBoardAutomationRunStage, TaskBoardRunAcquireRequest,
+};
 
 pub(crate) const ITEMS_CHANGE_SCOPE: &str = "task_board:items";
 pub(crate) const MACHINES_CHANGE_SCOPE: &str = "task_board:machines";

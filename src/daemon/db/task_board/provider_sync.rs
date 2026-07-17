@@ -141,6 +141,55 @@ impl AsyncDaemonDb {
         }
     }
 
+    pub(crate) async fn release_task_board_provider_scope_attempt(
+        &self,
+        attempt: &ExternalProviderScopeAttempt,
+        released_at: &str,
+    ) -> Result<(), CliError> {
+        parse_timestamp(released_at)?;
+        let mut transaction = self
+            .begin_immediate_transaction("task board provider scope release")
+            .await?;
+        let updated = if attempt.created_scope() {
+            query(
+                "DELETE FROM task_board_provider_scope_state
+                 WHERE provider = ?1 AND scope_id = ?2 AND health = ?3",
+            )
+            .bind(provider_label(attempt.provider()))
+            .bind(attempt.scope_id())
+            .bind(attempt.fence_marker())
+            .execute(transaction.as_mut())
+            .await
+            .map_err(|error| db_error(format!("release new task-board provider attempt: {error}")))?
+            .rows_affected()
+        } else {
+            query(
+                "UPDATE task_board_provider_scope_state SET
+                    health = 'healthy', backoff_until = NULL, updated_at = ?4
+                 WHERE provider = ?1 AND scope_id = ?2 AND health = ?3",
+            )
+            .bind(provider_label(attempt.provider()))
+            .bind(attempt.scope_id())
+            .bind(attempt.fence_marker())
+            .bind(released_at)
+            .execute(transaction.as_mut())
+            .await
+            .map_err(|error| db_error(format!("release task-board provider attempt: {error}")))?
+            .rows_affected()
+        };
+        if updated != 1 {
+            return Err(stale_attempt_error(attempt));
+        }
+        if !attempt.created_scope() {
+            bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+        }
+        transaction.commit().await.map_err(|error| {
+            db_error(format!(
+                "commit task-board provider attempt release: {error}"
+            ))
+        })
+    }
+
     pub(crate) async fn complete_task_board_provider_scope_success(
         &self,
         attempt: &ExternalProviderScopeAttempt,

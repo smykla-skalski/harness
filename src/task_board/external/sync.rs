@@ -50,7 +50,8 @@ use reconcile::reconcile_existing_item;
 use scope::SyncClientError;
 use stale_reviews::reconcile_stale_github_review_requests;
 pub(crate) use store::{
-    TaskBoardExternalCreateStore, TaskBoardSyncItemSnapshot, TaskBoardSyncStore,
+    TaskBoardExternalCreateStore, TaskBoardSyncCoordinatorFence,
+    TaskBoardSyncCoordinatorFenceDecision, TaskBoardSyncItemSnapshot, TaskBoardSyncStore,
 };
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]

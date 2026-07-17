@@ -256,6 +256,7 @@ mod signals_timeout;
 mod status;
 mod sync_support;
 mod task_board;
+mod task_board_automation_runtime;
 mod task_board_completion;
 mod task_board_db;
 mod task_board_evaluation;
@@ -264,7 +265,9 @@ mod task_board_github;
 mod task_board_host;
 #[cfg(test)]
 mod task_board_orchestrator;
+mod task_board_orchestrator_control;
 mod task_board_orchestrator_db;
+mod task_board_orchestrator_run_lease;
 mod task_board_orchestrator_settings;
 mod task_board_orchestrator_step_mode;
 mod task_board_runtime;
@@ -364,6 +367,9 @@ pub(crate) use task_board::{
     simulate_policy_pipeline, update_policy_scenario,
 };
 pub(crate) use task_board::{dispatch_task_board_async, pick_task_board_dispatch_async};
+pub(crate) use task_board_automation_runtime::{
+    TaskBoardAutomationRunSession, TaskBoardAutomationRunStart,
+};
 pub(crate) use task_board_db::{
     approve_task_board_plan_db, audit_task_board_db, begin_task_board_planning_db,
     create_task_board_item_db, delete_task_board_item_db, get_task_board_item_db,
@@ -385,11 +391,15 @@ pub use task_board_orchestrator::{
     task_board_orchestrator_settings, task_board_orchestrator_status,
     update_task_board_orchestrator_settings,
 };
-pub(crate) use task_board_orchestrator_db::{
-    run_task_board_orchestrator_once_db, start_task_board_orchestrator_db,
-    stop_task_board_orchestrator_db, task_board_orchestrator_settings_db,
-    task_board_orchestrator_status_db, update_task_board_orchestrator_settings_db,
+pub(crate) use task_board_orchestrator_control::{
+    start_task_board_orchestrator_db, stop_task_board_orchestrator_db,
+    task_board_orchestrator_settings_db, task_board_orchestrator_status_db,
+    update_task_board_orchestrator_settings_db,
 };
+pub(crate) use task_board_orchestrator_db::{
+    run_task_board_orchestrator_once_db, run_task_board_orchestrator_once_with_session_db,
+};
+pub(crate) use task_board_orchestrator_run_lease::TaskBoardOrchestratorRunGuard;
 pub(crate) use task_board_runtime::{
     acknowledge_task_board_git_runtime_secret_handoff,
     prepare_task_board_git_runtime_secret_handoff, sync_task_board_git_runtime_key_material,

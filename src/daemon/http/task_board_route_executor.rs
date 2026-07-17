@@ -15,12 +15,15 @@ use crate::daemon::task_board_managed_agents::{
     rendered_worker_prompt, start_worker_for_applied_task,
 };
 use crate::errors::{CliError, CliErrorKind};
+use crate::feature_flags::task_board_automation_v2_enabled_from_env;
 use crate::task_board::{
     DispatchAppliedTask, DispatchExecutionSummary, DispatchFailure, DispatchFailureKind,
+    TaskBoardAutomationRunTrigger,
 };
 
 use super::{DaemonHttpState, require_async_db};
 
+mod automation_run;
 mod item_ops;
 mod orchestrator_ops;
 mod policy_ops;
@@ -115,7 +118,26 @@ pub(crate) async fn run_once(
     state: &DaemonHttpState,
     request: TaskBoardOrchestratorRunOnceRequest,
 ) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
+    Box::pin(run_once_with_trigger(
+        state,
+        request,
+        TaskBoardAutomationRunTrigger::Manual,
+    ))
+    .await
+}
+
+pub(crate) async fn run_once_with_trigger(
+    state: &DaemonHttpState,
+    request: TaskBoardOrchestratorRunOnceRequest,
+    trigger: TaskBoardAutomationRunTrigger,
+) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
     let async_db = require_async_db(state, "task board orchestrator run once")?;
+    if task_board_automation_v2_enabled_from_env() {
+        return Box::pin(automation_run::run_once_durable(
+            state, async_db, request, trigger,
+        ))
+        .await;
+    }
     let result = service::run_task_board_orchestrator_once_db(async_db, &request).await;
     handle_run_once_result(state, result, async_db).await
 }

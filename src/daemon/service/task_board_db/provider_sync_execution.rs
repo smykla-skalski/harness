@@ -9,11 +9,14 @@ use crate::task_board::external::{
 };
 use crate::task_board::{ExternalSyncClient, configured_sync_clients_without_review_requests};
 
+use super::TaskBoardSyncRunContext;
+use super::provider_sync_context_store::ProviderSyncRunStore;
 use super::sync_audit::SyncExecutionMetrics;
 
 pub(super) async fn execute(
     db: &AsyncDaemonDb,
     request: &TaskBoardSyncRequest,
+    context: &TaskBoardSyncRunContext,
     metrics: &mut SyncExecutionMetrics,
 ) -> Result<TaskBoardSyncResponse, CliError> {
     let options = super::super::task_board::sync_options(request);
@@ -84,7 +87,9 @@ pub(super) async fn execute(
     if !has_recovery {
         super::super::task_board::ensure_sync_request_can_run(request, &config, &clients)?;
     }
-    let mut batch = sync_external_tasks_scoped_with_recovery(db, options, &clients, plan).await?;
+    let run_store = ProviderSyncRunStore::new(db, context.coordinator_fence());
+    let mut batch =
+        sync_external_tasks_scoped_with_recovery(&run_store, options, &clients, plan).await?;
     if !options.dry_run
         && let Err(error) = super::sync_audit::record_external_create_follow_ups(
             db,
@@ -142,9 +147,14 @@ mod tests {
         let (_dir, db, request) = config_failure_fixture().await;
         let mut metrics = SyncExecutionMetrics::default();
 
-        execute(&db, &request, &mut metrics)
-            .await
-            .expect_err("configuration load must fail");
+        execute(
+            &db,
+            &request,
+            &TaskBoardSyncRunContext::requested(),
+            &mut metrics,
+        )
+        .await
+        .expect_err("configuration load must fail");
 
         assert_eq!(metrics.operations().len(), 1);
         assert!(metrics.operations()[0].applied);
@@ -174,9 +184,14 @@ mod tests {
         assert_eq!(payload["applied_operation_count"].as_u64(), Some(0));
 
         let mut second_metrics = SyncExecutionMetrics::default();
-        execute(&db, &request, &mut second_metrics)
-            .await
-            .expect_err("configuration remains invalid");
+        execute(
+            &db,
+            &request,
+            &TaskBoardSyncRunContext::requested(),
+            &mut second_metrics,
+        )
+        .await
+        .expect_err("configuration remains invalid");
 
         assert!(second_metrics.operations().is_empty());
         assert_eq!(follow_up_events(&db).await.len(), 1);
@@ -197,16 +212,26 @@ mod tests {
             .expect("finalize before simulated crash");
         let mut first_metrics = SyncExecutionMetrics::default();
 
-        execute(&db, &request, &mut first_metrics)
-            .await
-            .expect_err("configuration remains invalid");
+        execute(
+            &db,
+            &request,
+            &TaskBoardSyncRunContext::requested(),
+            &mut first_metrics,
+        )
+        .await
+        .expect_err("configuration remains invalid");
 
         assert!(first_metrics.operations().is_empty());
         assert_eq!(follow_up_events(&db).await.len(), 1);
         let mut second_metrics = SyncExecutionMetrics::default();
-        execute(&db, &request, &mut second_metrics)
-            .await
-            .expect_err("configuration remains invalid");
+        execute(
+            &db,
+            &request,
+            &TaskBoardSyncRunContext::requested(),
+            &mut second_metrics,
+        )
+        .await
+        .expect_err("configuration remains invalid");
         assert!(second_metrics.operations().is_empty());
         assert_eq!(follow_up_events(&db).await.len(), 1);
     }
@@ -227,9 +252,14 @@ mod tests {
         request.dry_run = true;
         let mut metrics = SyncExecutionMetrics::default();
 
-        let error = execute(&db, &request, &mut metrics)
-            .await
-            .expect_err("pending follow-up must block preview");
+        let error = execute(
+            &db,
+            &request,
+            &TaskBoardSyncRunContext::requested(),
+            &mut metrics,
+        )
+        .await
+        .expect_err("pending follow-up must block preview");
 
         assert!(error.message().contains("blocks dry-run"));
         assert!(metrics.operations().is_empty());

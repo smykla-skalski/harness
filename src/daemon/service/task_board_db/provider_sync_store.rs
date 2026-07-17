@@ -151,6 +151,15 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
             .await
     }
 
+    async fn release_provider_scope_attempt(
+        &self,
+        attempt: &ExternalProviderScopeAttempt,
+        released_at: &str,
+    ) -> Result<(), CliError> {
+        self.release_task_board_provider_scope_attempt(attempt, released_at)
+            .await
+    }
+
     async fn complete_provider_scope_success(
         &self,
         attempt: &ExternalProviderScopeAttempt,

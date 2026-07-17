@@ -32,6 +32,9 @@ pub(crate) async fn dispatch_task_board_method(
     state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
 ) -> Option<WsResponse> {
+    if let Some(response) = orchestrator::dispatch_method(request, state).await {
+        return Some(response);
+    }
     match request.method.as_str() {
         ws_methods::TASK_BOARD_CREATE => Some(dispatch_task_board_create(request, state).await),
         ws_methods::TASK_BOARD_CAPABILITIES => {
@@ -78,41 +81,6 @@ pub(crate) async fn dispatch_task_board_method(
         ws_methods::TASK_BOARD_HOST_SET_PROJECT_TYPES => {
             Some(dispatch_task_board_host_set_project_types(request, state).await)
         }
-        ws_methods::TASK_BOARD_ORCHESTRATOR_STATUS => {
-            Some(orchestrator::dispatch_task_board_orchestrator_status(request, state).await)
-        }
-        ws_methods::TASK_BOARD_ORCHESTRATOR_START => {
-            Some(orchestrator::dispatch_task_board_orchestrator_start(request, state).await)
-        }
-        ws_methods::TASK_BOARD_ORCHESTRATOR_STOP => {
-            Some(orchestrator::dispatch_task_board_orchestrator_stop(request, state).await)
-        }
-        ws_methods::TASK_BOARD_ORCHESTRATOR_RUN_ONCE => {
-            Some(orchestrator::dispatch_task_board_orchestrator_run_once(request, state).await)
-        }
-        ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_GET => {
-            Some(orchestrator::dispatch_task_board_orchestrator_settings_get(request, state).await)
-        }
-        ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_UPDATE => Some(
-            orchestrator::dispatch_task_board_orchestrator_settings_update(request, state).await,
-        ),
-        ws_methods::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_GET => Some(
-            orchestrator::dispatch_task_board_orchestrator_runtime_config_get(request, state).await,
-        ),
-        ws_methods::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_UPDATE => Some(
-            orchestrator::dispatch_task_board_orchestrator_runtime_config_update(request, state)
-                .await,
-        ),
-        ws_methods::TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS_SYNC => Some(
-            orchestrator::dispatch_task_board_orchestrator_github_tokens_sync(request, state).await,
-        ),
-        ws_methods::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN_SYNC => Some(
-            orchestrator::dispatch_task_board_orchestrator_todoist_token_sync(request, state).await,
-        ),
-        ws_methods::TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN_SYNC => Some(
-            orchestrator::dispatch_task_board_orchestrator_openrouter_token_sync(request, state)
-                .await,
-        ),
         ws_methods::TASK_BOARD_GIT_IDENTITY_DEFAULTS => {
             Some(dispatch_task_board_git_identity_defaults(request).await)
         }

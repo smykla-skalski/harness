@@ -72,11 +72,18 @@ impl SyncAuditClassification {
 pub(super) async fn persist_sync_audit_result<T>(
     db: &AsyncDaemonDb,
     trigger: TaskBoardSyncAuditTrigger,
+    correlation_id: Option<&str>,
     payload_json: Value,
     classification: SyncAuditClassification,
     result: &Result<T, CliError>,
 ) -> Result<(), CliError> {
-    let event = sync_audit_event(trigger, payload_json, classification, result);
+    let event = sync_audit_event(
+        trigger,
+        correlation_id,
+        payload_json,
+        classification,
+        result,
+    );
     db.upsert_audit_event(&event).await?;
     broadcast_audit_event(&event);
     Ok(())
@@ -97,6 +104,7 @@ pub(in crate::daemon::service::task_board_db) async fn record_external_create_fo
 
 fn sync_audit_event<T>(
     trigger: TaskBoardSyncAuditTrigger,
+    correlation_id: Option<&str>,
     payload_json: Value,
     classification: SyncAuditClassification,
     result: &Result<T, CliError>,
@@ -118,7 +126,7 @@ fn sync_audit_event<T>(
         summary: presentation.summary,
         subject: None,
         actor: Some(trigger.actor().to_owned()),
-        correlation_id: None,
+        correlation_id: correlation_id.map(str::to_owned),
         action_key: Some("task_board.sync".to_owned()),
         payload_json: Some(payload_json),
         legacy_message: None,

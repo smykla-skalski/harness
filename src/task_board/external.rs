@@ -43,7 +43,8 @@ pub use sync::{
     configured_sync_clients,
 };
 pub(crate) use sync::{
-    TaskBoardExternalCreateStore, TaskBoardSyncItemSnapshot, TaskBoardSyncStore,
+    TaskBoardExternalCreateStore, TaskBoardSyncCoordinatorFence,
+    TaskBoardSyncCoordinatorFenceDecision, TaskBoardSyncItemSnapshot, TaskBoardSyncStore,
     assign_external_create_recovery, blocked_external_create_follow_ups,
     blocked_external_create_recovery, configured_sync_clients_without_review_requests,
     load_external_create_recovery_work, prepare_external_create_recovery, sync_external_tasks,

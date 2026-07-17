@@ -42,6 +42,16 @@ impl<'a> ScopeCreateLease<'a> {
             RecoveryCallError::Provider(error)
         }
     }
+
+    pub(super) async fn renew_scope(&self) -> Result<(), CliError> {
+        self.board
+            .renew_provider_scope_attempt(self.attempt, &utc_now())
+            .await
+    }
+
+    pub(super) async fn renew_before_provider_call(&self) -> Result<(), CliError> {
+        super::super::scope::renew_before_provider_call(self.board, Some(self.attempt)).await
+    }
 }
 
 impl RecoveryCallError {
@@ -56,10 +66,7 @@ impl RecoveryCallError {
 #[async_trait]
 impl ExternalCreateLease for ScopeCreateLease<'_> {
     async fn renew(&self) -> Result<(), CliError> {
-        let result = self
-            .board
-            .renew_provider_scope_attempt(self.attempt, &utc_now())
-            .await;
+        let result = self.renew_before_provider_call().await;
         if result.is_err() {
             self.local_failure.store(true, Ordering::SeqCst);
         }

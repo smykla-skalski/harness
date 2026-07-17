@@ -295,6 +295,12 @@ impl TaskBoardOrchestratorStatus {
     #[must_use]
     pub fn last_run_applied_count(&self) -> usize {
         self.last_run.as_ref().map_or(0, |run| {
+            let synced = run
+                .sync
+                .operations
+                .iter()
+                .filter(|operation| operation.applied)
+                .count();
             let dispatched = run
                 .dispatch
                 .as_ref()
@@ -303,7 +309,7 @@ impl TaskBoardOrchestratorStatus {
                 .evaluation
                 .as_ref()
                 .map_or(0, |evaluation| evaluation.updated);
-            dispatched + evaluated
+            synced + dispatched + evaluated
         })
     }
 }
