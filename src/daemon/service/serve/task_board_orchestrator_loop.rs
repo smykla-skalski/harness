@@ -430,6 +430,7 @@ mod tests {
             current_tick: None,
             last_run: None,
             workflow_execution_counts: Vec::new(),
+            automation: None,
             settings: Default::default(),
         }
     }

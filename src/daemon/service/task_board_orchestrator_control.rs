@@ -165,6 +165,7 @@ async fn status_from_state(
         current_tick: state.current_tick,
         last_run: state.last_run,
         workflow_execution_counts,
+        automation: None,
         settings,
     })
 }

@@ -162,6 +162,7 @@ fn emit_task_board_updated(sender: &Sender<StreamEvent>, changes: &WatchChanges)
     let payload = TaskBoardUpdatedPayload {
         revision,
         scopes: changes.task_board_scopes.iter().cloned().collect(),
+        automation: None,
     };
     let payload = match serde_json::to_value(payload) {
         Ok(payload) => payload,

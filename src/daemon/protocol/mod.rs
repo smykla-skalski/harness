@@ -9,6 +9,7 @@ mod reviews;
 mod session_requests;
 mod summaries;
 mod task_board;
+mod task_board_automation;
 mod task_board_spawn_gate;
 mod task_board_steps;
 #[cfg(test)]
@@ -30,6 +31,7 @@ pub use reviews::*;
 pub use session_requests::*;
 pub use summaries::*;
 pub use task_board::*;
+pub use task_board_automation::*;
 pub use task_board_spawn_gate::*;
 pub use task_board_steps::*;
 pub use voice::*;

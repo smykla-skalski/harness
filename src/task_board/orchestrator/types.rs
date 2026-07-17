@@ -153,6 +153,8 @@ pub struct TaskBoardOrchestratorStatus {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_run: Option<TaskBoardOrchestratorRunSummary>,
     pub workflow_execution_counts: Vec<TaskBoardWorkflowExecutionCount>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub automation: Option<super::super::TaskBoardAutomationSnapshot>,
     pub settings: TaskBoardOrchestratorSettings,
 }
 

@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 pub struct TaskBoardUpdatedPayload {
     pub revision: i64,
     pub scopes: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub automation: Option<crate::task_board::TaskBoardAutomationSnapshot>,
 }
 
 use crate::task_board::planning::PlanningTransition;
