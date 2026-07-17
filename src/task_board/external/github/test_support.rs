@@ -71,7 +71,10 @@ fn accept_before_deadline(listener: &TcpListener) -> TcpStream {
     let deadline = Instant::now() + Duration::from_secs(10);
     loop {
         match listener.accept() {
-            Ok((stream, _)) => return stream,
+            Ok((stream, _)) => {
+                prepare_accepted_stream(&stream);
+                return stream;
+            }
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                 assert!(Instant::now() < deadline, "timed out waiting for request");
                 thread::sleep(Duration::from_millis(5));
@@ -79,6 +82,10 @@ fn accept_before_deadline(listener: &TcpListener) -> TcpStream {
             Err(error) => panic!("accept request: {error}"),
         }
     }
+}
+
+fn prepare_accepted_stream(stream: &TcpStream) {
+    stream.set_nonblocking(false).expect("blocking stream");
 }
 
 fn read_http_request(stream: &mut TcpStream) -> String {
@@ -159,4 +166,29 @@ fn write_response(stream: &mut TcpStream, response: MockResponse) {
     );
     stream.write_all(raw.as_bytes()).expect("write response");
     stream.flush().expect("flush response");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accepted_stream_waits_for_delayed_request_bytes() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        listener.set_nonblocking(true).expect("nonblocking");
+        let address = listener.local_addr().expect("listener address");
+        let client = thread::spawn(move || {
+            let mut stream = TcpStream::connect(address).expect("connect");
+            thread::sleep(Duration::from_millis(50));
+            stream
+                .write_all(b"GET /delayed HTTP/1.1\r\nHost: localhost\r\n\r\n")
+                .expect("write delayed request");
+        });
+        let mut stream = accept_before_deadline(&listener);
+
+        let request = read_http_request(&mut stream);
+
+        client.join().expect("client");
+        assert!(request.starts_with("GET /delayed HTTP/1.1\r\n"));
+    }
 }

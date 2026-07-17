@@ -101,6 +101,7 @@ pub(crate) fn fake_running_xdg_daemon(
 }
 
 pub(crate) fn read_http_request(stream: &mut TcpStream) -> String {
+    stream.set_nonblocking(false).expect("blocking stream");
     stream
         .set_read_timeout(Some(std::time::Duration::from_secs(1)))
         .expect("read timeout");
