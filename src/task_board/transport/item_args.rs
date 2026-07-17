@@ -4,8 +4,8 @@ use clap::Args;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::types::{
-    ExternalRef, ExternalRefProvider, PlanningState, TaskBoardWorkflowState,
-    TaskBoardWorkflowStatus,
+    ExternalRef, ExternalRefProvider, MAX_TASK_BOARD_ESTIMATE, PlanningState,
+    TaskBoardWorkflowState, TaskBoardWorkflowStatus,
 };
 use crate::workspace::utc_now;
 
@@ -43,9 +43,9 @@ pub struct TaskBoardItemFieldArgs {
     pub session_id: Option<String>,
     #[arg(long)]
     pub work_item_id: Option<String>,
-    #[arg(long, value_parser = clap::value_parser!(u64).range(1..=i64::MAX as u64))]
+    #[arg(long, value_parser = clap::value_parser!(u64).range(1..=MAX_TASK_BOARD_ESTIMATE))]
     pub estimated_tokens: Option<u64>,
-    #[arg(long, value_parser = clap::value_parser!(u64).range(1..=i64::MAX as u64))]
+    #[arg(long, value_parser = clap::value_parser!(u64).range(1..=MAX_TASK_BOARD_ESTIMATE))]
     pub estimated_cost_microusd: Option<u64>,
 }
 
