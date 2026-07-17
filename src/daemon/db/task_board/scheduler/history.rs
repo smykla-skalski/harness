@@ -8,11 +8,14 @@ use crate::task_board::{
     TaskBoardAutomationRunState, TaskBoardAutomationRunTrigger, TaskBoardAutomationScope,
 };
 
-const RUN_SELECT_SQL: &str = "SELECT run_id, trigger, state, outcome, dry_run, scope_json,
-    started_at, heartbeat_at, completed_at, stage_summary_json, error_kind, error
+const RUN_INFO_SELECT_SQL: &str = "SELECT run_id, trigger, state, outcome, dry_run, scope_json,
+    started_at, heartbeat_at, completed_at,
+    '' AS stage_summary_json, NULL AS error_kind, NULL AS error
     FROM task_board_orchestrator_runs";
-const ACTIVE_RUN_SELECT_SQL: &str = "SELECT run_id, trigger, state, outcome, dry_run, scope_json,
-    started_at, heartbeat_at, completed_at, stage_summary_json, error_kind, error
+const ACTIVE_RUN_INFO_SELECT_SQL: &str =
+    "SELECT run_id, trigger, state, outcome, dry_run, scope_json,
+    started_at, heartbeat_at, completed_at,
+    '' AS stage_summary_json, NULL AS error_kind, NULL AS error
     FROM task_board_orchestrator_runs
     WHERE state IN ('running', 'cancelling') LIMIT 1";
 const RUN_DETAIL_SELECT_SQL: &str = "SELECT run_id, trigger, state, outcome, dry_run, scope_json,
@@ -47,7 +50,7 @@ impl AsyncDaemonDb {
     pub(crate) async fn active_task_board_automation_run(
         &self,
     ) -> Result<Option<TaskBoardAutomationRunInfo>, CliError> {
-        let row = query_as::<_, RunRecordRow>(ACTIVE_RUN_SELECT_SQL)
+        let row = query_as::<_, RunRecordRow>(ACTIVE_RUN_INFO_SELECT_SQL)
             .fetch_optional(self.pool())
             .await
             .map_err(|error| db_error(format!("load active task board automation run: {error}")))?;
@@ -130,7 +133,8 @@ pub(super) async fn load_snapshot_run_infos(
             )
          )
          SELECT run_id, trigger, state, outcome, dry_run, scope_json, started_at,
-                heartbeat_at, completed_at, stage_summary_json, error_kind, error
+                heartbeat_at, completed_at,
+                '' AS stage_summary_json, NULL AS error_kind, NULL AS error
          FROM task_board_orchestrator_runs
          WHERE run_id IN (SELECT run_id FROM candidates)",
     )
@@ -145,7 +149,7 @@ async fn load_history_rows(
     cursor: Option<&HistoryCursor>,
     limit: u32,
 ) -> Result<Vec<RunRecordRow>, CliError> {
-    let mut builder = QueryBuilder::<Sqlite>::new(RUN_SELECT_SQL);
+    let mut builder = QueryBuilder::<Sqlite>::new(RUN_INFO_SELECT_SQL);
     builder.push(" WHERE state = 'terminal' AND completed_at IS NOT NULL");
     if let Some(cursor) = cursor {
         builder.push(" AND (completed_at < ");

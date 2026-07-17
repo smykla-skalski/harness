@@ -86,6 +86,56 @@ async fn detail_reads_fenced_public_stages_canonically() {
 }
 
 #[tokio::test]
+async fn lightweight_reads_skip_detail_payloads() {
+    let db = database().await;
+    let completed_at = instant("2026-07-15T12:30:00Z");
+    seed_run(
+        &db,
+        "run-lightweight-history",
+        "terminal",
+        Some("completed"),
+        Some(completed_at),
+    )
+    .await;
+    seed_run(&db, "run-lightweight-active", "running", None, None).await;
+    query(
+        "UPDATE task_board_orchestrator_runs
+         SET stage_summary_json = X'80', error_kind = X'80', error = X'80'",
+    )
+    .execute(db.pool())
+    .await
+    .expect("seed non-text detail payloads");
+
+    assert_eq!(
+        run_ids(&history(&db, Some(1), None).await.runs),
+        ["run-lightweight-history"]
+    );
+    assert_eq!(
+        db.active_task_board_automation_run()
+            .await
+            .expect("load active run")
+            .expect("active run exists")
+            .run_id,
+        "run-lightweight-active"
+    );
+    let mut connection = db.pool().acquire().await.expect("acquire snapshot reader");
+    let snapshot_runs = super::history::load_snapshot_run_infos(&mut connection)
+        .await
+        .expect("load snapshot runs");
+    let mut snapshot_run_ids = run_ids(&snapshot_runs);
+    snapshot_run_ids.sort_unstable();
+    assert_eq!(
+        snapshot_run_ids,
+        ["run-lightweight-active", "run-lightweight-history"]
+    );
+    assert!(
+        db.task_board_automation_run_detail("run-lightweight-history")
+            .await
+            .is_err()
+    );
+}
+
+#[tokio::test]
 async fn detail_rejects_noncanonical_persisted_stages() {
     let db = database().await;
     seed_run(
