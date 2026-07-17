@@ -170,7 +170,6 @@ impl AsyncDaemonDb {
             .await?
             .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
         let prior_estimates = (item.estimated_tokens, item.estimated_cost_microusd);
-        let prior_workflow_status = item.workflow.status;
         if !mutate(&mut item)? {
             transaction
                 .commit()
@@ -185,8 +184,7 @@ impl AsyncDaemonDb {
             )));
         }
         if prior_estimates != (item.estimated_tokens, item.estimated_cost_microusd) {
-            ensure_estimates_are_editable_in_tx(&mut transaction, item_id, prior_workflow_status)
-                .await?;
+            ensure_estimates_are_editable_in_tx(&mut transaction, item_id).await?;
         }
         validate_item(&item)?;
         item.status = item.status.canonical_persisted_status();

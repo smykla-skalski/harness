@@ -5,13 +5,16 @@ use std::sync::{Arc, OnceLock};
 use tempfile::{TempDir, tempdir};
 use tokio::sync::broadcast;
 
+#[path = "admission_dispatch_estimate_freeze.rs"]
+mod estimate_freeze_tests;
+
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ReservedTaskBoardDispatch};
 use crate::daemon::protocol::{CodexRunStatus, StreamEvent};
 use crate::task_board::{
     AgentMode, DispatchPlan, SpawnGateSwitches, TaskBoardAdmissionDecision,
-    TaskBoardAutomationPolicy, TaskBoardItem, TaskBoardLaunchCapability, TaskBoardPolicyLimit,
-    TaskBoardPolicyScope, build_dispatch_plans_with_policy,
+    TaskBoardAutomationPolicy, TaskBoardItem, TaskBoardPolicyLimit, TaskBoardPolicyScope,
+    build_dispatch_plans_with_policy,
 };
 
 #[tokio::test]
@@ -84,86 +87,6 @@ async fn preparation_renewal_rejects_a_partial_admission_ledger() {
             .to_string()
             .contains("found 1 valid reserved ledger rows, expected 2")
     );
-}
-
-#[tokio::test]
-async fn admission_revalidates_then_commits_and_releases_concurrency() {
-    let db = test_db().await;
-    configure_policy(&db, admission_policy(1)).await;
-    let plan = create_plan(&db, "admission-start", AgentMode::Headless).await;
-    let intent = preparing_intent(
-        db.reserve_task_board_dispatch(&plan, "control-plane", Some("/tmp/project"), false)
-            .await
-            .expect("reserve dispatch"),
-    );
-
-    configure_policy(&db, admission_policy(2)).await;
-    let preparation = db
-        .claim_task_board_dispatch_preparation(&intent)
-        .await
-        .expect("claim preparation")
-        .expect("pending preparation");
-    assert_eq!(current_generation(&db, &intent).await, 2);
-    db.complete_task_board_dispatch_preparation(&preparation, "branch", "/tmp/worktree")
-        .await
-        .expect("complete preparation");
-    let claim = db
-        .claim_task_board_dispatch("admission-start")
-        .await
-        .expect("claim dispatch")
-        .expect("pending dispatch");
-    assert_eq!(current_generation(&db, &intent).await, 3);
-    let error = db
-        .update_task_board_item("admission-start", |item| {
-            item.estimated_tokens = Some(10);
-            Ok(true)
-        })
-        .await
-        .expect_err("worker claim must freeze estimate edits");
-    assert!(error.to_string().contains("frozen after worker start"));
-    assert_eq!(
-        db.task_board_item("admission-start")
-            .await
-            .expect("reload frozen item")
-            .estimated_tokens,
-        None
-    );
-    db.validate_task_board_dispatch_admission_start(
-        &intent,
-        &claim.claim_token,
-        Some(TaskBoardLaunchCapability::WorkspaceWrite),
-    )
-    .await
-    .expect("validate launch");
-    db.complete_task_board_dispatch(&intent, &claim.claim_token, "codex-admission-start")
-        .await
-        .expect("commit launch");
-    assert_eq!(ledger_state_count(&db, &intent, "committed").await, 2);
-    let error = db
-        .update_task_board_item("admission-start", |item| {
-            item.status = crate::task_board::TaskBoardStatus::Done;
-            Ok(true)
-        })
-        .await
-        .expect_err("active worker must prevent terminal item mutation");
-    assert!(error.to_string().contains("managed worker is active"));
-
-    assert!(
-        db.release_task_board_admission_for_managed_worker("codex-admission-start")
-            .await
-            .expect("release terminal worker")
-    );
-    assert_eq!(
-        ledger_kind_state(&db, &intent, "concurrency").await,
-        "released"
-    );
-    assert_eq!(ledger_kind_state(&db, &intent, "rate").await, "committed");
-    db.update_task_board_item("admission-start", |item| {
-        item.status = crate::task_board::TaskBoardStatus::Done;
-        Ok(true)
-    })
-    .await
-    .expect("terminal item update after worker release");
 }
 
 #[tokio::test]

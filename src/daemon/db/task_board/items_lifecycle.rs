@@ -8,23 +8,15 @@ use crate::task_board::{TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowStatus}
 pub(super) async fn ensure_estimates_are_editable_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     item_id: &str,
-    workflow_status: TaskBoardWorkflowStatus,
 ) -> Result<(), CliError> {
     let started = query_scalar::<_, bool>(
         "SELECT EXISTS(
              SELECT 1 FROM task_board_dispatch_intents
              WHERE item_id = ?1
-               AND (
-                   status = 'starting'
-                   OR (status = 'completed' AND ?2 = 1)
-               )
+               AND status IN ('starting', 'completed')
          )",
     )
     .bind(item_id)
-    .bind(i64::from(matches!(
-        workflow_status,
-        TaskBoardWorkflowStatus::Running
-    )))
     .fetch_one(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("check task board estimate freeze: {error}")))?;
