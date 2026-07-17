@@ -22,6 +22,8 @@ use crate::mcp::tool::ToolRegistry;
 
 use super::{register_all, socket_path};
 
+mod orchestrator_settings_tests;
+
 static DAEMON_TEST_MUTEX: OnceLock<AsyncMutex<()>> = OnceLock::new();
 
 fn daemon_test_mutex() -> &'static AsyncMutex<()> {
@@ -248,26 +250,6 @@ async fn dispatch_tool_proxies_to_running_daemon() {
 }
 
 #[tokio::test(flavor = "current_thread")]
-async fn orchestrator_settings_update_tool_proxies_to_running_daemon() {
-    let arguments = json!({
-        "dry_run_default": true,
-    });
-    let (result, captured) = call_task_board_tool(
-        ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_UPDATE,
-        arguments.clone(),
-        json!({ "saved": true }),
-    )
-    .await;
-
-    assert_eq!(text_result_json(&result), json!({ "saved": true }));
-    assert_eq!(
-        captured.request.method,
-        ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_UPDATE
-    );
-    assert_eq!(captured.request.params, arguments);
-}
-
-#[tokio::test(flavor = "current_thread")]
 async fn policy_save_draft_tool_proxies_to_running_daemon() {
     let arguments = json!({
         "document": {},
@@ -413,29 +395,6 @@ fn update_schema_uses_strict_additional_properties() {
         &schema,
         ws_methods::TASK_BOARD_UPDATE,
         TASK_BOARD_UPDATE_FIELDS,
-    );
-}
-
-#[test]
-fn orchestrator_settings_schema_advertises_strict_admission_policy() {
-    let schema = task_board_tool_schema(ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_UPDATE);
-    assert_schema_covers_fields(
-        &schema,
-        ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_UPDATE,
-        &["admission_policy"],
-    );
-    let policy = &schema["properties"]["admission_policy"];
-    assert_eq!(policy["type"], "object");
-    assert_eq!(policy["additionalProperties"], false);
-    assert_eq!(policy["properties"]["limits"]["type"], "array");
-    assert_eq!(
-        policy["properties"]["limits"]["items"]["additionalProperties"],
-        false
-    );
-    assert_eq!(policy["properties"]["windows"]["type"], "array");
-    assert_eq!(
-        policy["properties"]["windows"]["items"]["additionalProperties"],
-        false
     );
 }
 

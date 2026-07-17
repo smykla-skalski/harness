@@ -137,15 +137,46 @@ fn settings_update_schema() -> Value {
     json!({
         "type": "object",
         "properties": {
+            "step_mode": { "type": "boolean" },
+            "enabled_workflows": workflow_list_schema(),
             "dry_run_default": { "type": "boolean" },
             "dispatch_status_filter": { "type": "string" },
             "clear_dispatch_status_filter": { "type": "boolean" },
             "project_dir": { "type": "string" },
             "clear_project_dir": { "type": "boolean" },
+            "github_project": open_object_schema(),
+            "github_inbox": open_object_schema(),
+            "todoist_inbox": open_object_schema(),
+            "scheduling": open_object_schema(),
+            "retry": open_object_schema(),
+            "reviewers": open_object_schema(),
+            "repositories": object_list_schema(),
+            "execution_hosts": object_list_schema(),
             "admission_policy": admission_policy_schema(),
             "policy_version": { "type": "string" }
         },
         "additionalProperties": false
+    })
+}
+
+fn workflow_list_schema() -> Value {
+    json!({
+        "type": "array",
+        "items": {
+            "type": "string",
+            "enum": ["default_task", "pr_fix", "pr_review", "review"]
+        }
+    })
+}
+
+fn open_object_schema() -> Value {
+    json!({ "type": "object" })
+}
+
+fn object_list_schema() -> Value {
+    json!({
+        "type": "array",
+        "items": open_object_schema()
     })
 }
 
