@@ -15,6 +15,17 @@ use crate::task_board::{
     Machine, TaskBoardGitRuntimeConfig, TaskBoardOrchestratorSettings, TaskBoardOrchestratorState,
 };
 
+pub(super) struct TaskBoardOrchestratorSettingsMutation {
+    pub(super) row_revision: i64,
+    pub(super) change_revision: i64,
+}
+
+pub(crate) struct TaskBoardOrchestratorSettingsSnapshot {
+    pub(crate) settings: TaskBoardOrchestratorSettings,
+    pub(crate) row_revision: i64,
+    pub(crate) change_revision: i64,
+}
+
 impl AsyncDaemonDb {
     pub(crate) async fn task_board_machines(&self) -> Result<Vec<Machine>, CliError> {
         let rows = query_as::<_, MachineRow>(
@@ -128,13 +139,30 @@ impl AsyncDaemonDb {
     pub(crate) async fn task_board_orchestrator_settings(
         &self,
     ) -> Result<TaskBoardOrchestratorSettings, CliError> {
-        load_singleton_json(
-            self,
-            "SELECT settings_json FROM task_board_orchestrator_settings WHERE singleton = 1",
-            "task board orchestrator settings",
+        self.task_board_orchestrator_settings_snapshot()
+            .await
+            .map(|snapshot| snapshot.settings)
+    }
+
+    pub(crate) async fn task_board_orchestrator_settings_snapshot(
+        &self,
+    ) -> Result<TaskBoardOrchestratorSettingsSnapshot, CliError> {
+        let (settings_json, row_revision, change_revision) = query_as::<_, (String, i64, i64)>(
+            "SELECT settings.settings_json, settings.revision,
+                        COALESCE(changes.change_seq, 0)
+                 FROM task_board_orchestrator_settings AS settings
+                 LEFT JOIN change_tracking AS changes ON changes.scope = ?1
+                 WHERE settings.singleton = 1",
         )
+        .bind(ORCHESTRATOR_CHANGE_SCOPE)
+        .fetch_one(self.pool())
         .await
-        .map(Option::unwrap_or_default)
+        .map_err(|error| db_error(format!("load orchestrator settings: {error}")))?;
+        Ok(TaskBoardOrchestratorSettingsSnapshot {
+            settings: parse_json(&settings_json, "task board orchestrator settings")?,
+            row_revision,
+            change_revision,
+        })
     }
 
     pub(crate) async fn replace_task_board_orchestrator_settings(
@@ -149,7 +177,7 @@ impl AsyncDaemonDb {
             .commit()
             .await
             .map_err(|error| db_error(format!("commit orchestrator settings: {error}")))?;
-        Ok(revision)
+        Ok(revision.change_revision)
     }
 
     pub(crate) async fn task_board_orchestrator_state(
@@ -240,7 +268,7 @@ impl AsyncDaemonDb {
 pub(super) async fn replace_orchestrator_settings_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     settings: &TaskBoardOrchestratorSettings,
-) -> Result<i64, CliError> {
+) -> Result<TaskBoardOrchestratorSettingsMutation, CliError> {
     query(
         "INSERT INTO task_board_orchestrator_settings (
             singleton, settings_json, revision, updated_at
@@ -254,7 +282,18 @@ pub(super) async fn replace_orchestrator_settings_in_tx(
     .execute(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("save orchestrator settings: {error}")))?;
-    bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await
+    let row_revision = query_as::<_, (i64,)>(
+        "SELECT revision FROM task_board_orchestrator_settings WHERE singleton = 1",
+    )
+    .fetch_one(transaction.as_mut())
+    .await
+    .map(|row| row.0)
+    .map_err(|error| db_error(format!("read orchestrator settings revision: {error}")))?;
+    let change_revision = bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    Ok(TaskBoardOrchestratorSettingsMutation {
+        row_revision,
+        change_revision,
+    })
 }
 
 pub(super) async fn upsert_machine_in_tx(

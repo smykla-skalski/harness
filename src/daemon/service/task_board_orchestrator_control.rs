@@ -311,6 +311,9 @@ mod tests {
         let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
             .await
             .expect("open database");
+        db.replace_task_board_orchestrator_state(&TaskBoardOrchestratorState::default())
+            .await
+            .expect("advance unrelated change revision");
         db.start_task_board_automation(TaskBoardAutomationDesiredMode::Continuous, Utc::now())
             .await
             .expect("start durable automation");
@@ -330,6 +333,13 @@ mod tests {
         assert_eq!(wakes.len(), 1);
         assert_eq!(wakes[0].entity_id.as_deref(), Some("automation-settings"));
         assert_eq!(wakes[0].entity_revision, u64::try_from(revision).ok());
+        let change_revision = query_scalar::<_, i64>(
+            "SELECT change_seq FROM change_tracking WHERE scope = 'task_board:orchestrator'",
+        )
+        .fetch_one(db.pool())
+        .await
+        .expect("read orchestrator change revision");
+        assert!(change_revision > revision);
         assert!(matches!(
             wakes[0].payload,
             TaskBoardAutomationWakePayload::LedgerChanged(ref payload)

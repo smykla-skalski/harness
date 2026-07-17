@@ -171,10 +171,8 @@ impl AsyncDaemonDb {
         if changed == 1 {
             bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
             if desired_mode == TaskBoardAutomationDesiredMode::Continuous {
-                let revision = u64::try_from(revision).map_err(|error| {
-                    db_error(format!(
-                        "convert task board settings change revision: {error}"
-                    ))
+                let revision = u64::try_from(revision.row_revision).map_err(|error| {
+                    db_error(format!("convert task board settings row revision: {error}"))
                 })?;
                 super::wake::enqueue_in_tx(
                     &mut transaction,
@@ -195,7 +193,7 @@ impl AsyncDaemonDb {
                 "commit task board automation settings update: {error}"
             ))
         })?;
-        Ok(revision)
+        Ok(revision.row_revision)
     }
 
     pub(crate) async fn stop_task_board_automation(
