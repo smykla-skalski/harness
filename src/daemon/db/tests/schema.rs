@@ -139,6 +139,8 @@ fn all_tables_exist() {
         "task_checkpoints",
         "tasks",
         "task_board_dispatch_intents",
+        "task_board_dispatch_admission_decisions",
+        "task_board_dispatch_admission_ledger",
         "task_board_admission_leases",
         "task_board_execution_attempts",
         "task_board_execution_hosts",

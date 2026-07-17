@@ -14,6 +14,8 @@ pub(super) struct ItemRow {
     pub(super) agent_mode: String,
     pub(super) workflow_kind: String,
     pub(super) execution_repository: Option<String>,
+    pub(super) estimated_tokens: Option<i64>,
+    pub(super) estimated_cost_microusd: Option<i64>,
     pub(super) imported_from_provider: Option<String>,
     pub(super) planning_json: String,
     pub(super) workflow_json: String,

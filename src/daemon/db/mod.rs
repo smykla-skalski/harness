@@ -67,6 +67,7 @@ mod runtime;
 mod schema;
 mod schema_migrations;
 mod schema_repairs;
+mod schema_repairs_admission;
 mod schema_repairs_external_creates;
 mod schema_repairs_wake_events;
 mod schema_sql;
@@ -99,6 +100,7 @@ mod schema_v35;
 mod schema_v36;
 mod schema_v37;
 mod schema_v38;
+mod schema_v39;
 #[allow(dead_code)]
 mod task_board;
 #[allow(unused_imports)]
@@ -302,7 +304,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-pub(crate) const SCHEMA_VERSION: &str = "38";
+pub(crate) const SCHEMA_VERSION: &str = "39";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]

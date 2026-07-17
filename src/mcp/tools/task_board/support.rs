@@ -72,6 +72,25 @@ fn validate_params(params: Value, schema: &Value) -> Result<Value, ToolError> {
 }
 
 fn validate_value(path: &str, value: &Value, schema: &Value) -> Result<(), ToolError> {
+    if let Some(constraints) = schema.get("allOf").and_then(Value::as_array) {
+        for constraint in constraints {
+            validate_value(path, value, constraint)?;
+        }
+    }
+    if let Some(excluded) = schema.get("not")
+        && validate_value(path, value, excluded).is_ok()
+    {
+        return Err(ToolError::invalid(format!(
+            "{path} matches a disallowed field combination"
+        )));
+    }
+    if let Some(expected) = schema.get("const")
+        && expected != value
+    {
+        return Err(ToolError::invalid(format!(
+            "{path} must match the advertised constant"
+        )));
+    }
     if let Some(expected) = schema.get("type").and_then(Value::as_str)
         && !matches_schema_type(value, expected)
     {
@@ -155,7 +174,24 @@ fn validate_number(
             "{path} must be at least {minimum}"
         )));
     }
+    if let Some(maximum) = schema.get("maximum")
+        && number_exceeds_maximum(number, maximum)
+    {
+        return Err(ToolError::invalid(format!(
+            "{path} must be at most {maximum}"
+        )));
+    }
     Ok(())
+}
+
+fn number_exceeds_maximum(number: &serde_json::Number, maximum: &Value) -> bool {
+    if let (Some(number), Some(maximum)) = (number.as_u64(), maximum.as_u64()) {
+        return number > maximum;
+    }
+    number
+        .as_f64()
+        .zip(maximum.as_f64())
+        .is_some_and(|(number, maximum)| number > maximum)
 }
 
 fn matches_schema_type(value: &Value, expected: &str) -> bool {
@@ -382,6 +418,38 @@ mod validation_tests {
 
         assert!(validate_params(json!({ "tags": ["mcp", "cli"] }), &schema).is_ok());
         assert!(validate_params(json!({ "tags": ["mcp", 1] }), &schema).is_err());
+    }
+
+    #[test]
+    fn maximum_and_disallowed_field_combinations_are_enforced() {
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "value": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9_223_372_036_854_775_807_u64
+                },
+                "clear": { "type": "boolean" }
+            },
+            "allOf": [{
+                "not": {
+                    "properties": { "clear": { "const": true } },
+                    "required": ["value", "clear"]
+                }
+            }],
+            "additionalProperties": false
+        });
+
+        assert!(validate_params(json!({ "value": 1 }), &schema).is_ok());
+        assert!(
+            validate_params(json!({ "value": 9_223_372_036_854_775_807_u64 }), &schema).is_ok()
+        );
+        assert!(
+            validate_params(json!({ "value": 9_223_372_036_854_775_808_u64 }), &schema).is_err()
+        );
+        assert!(validate_params(json!({ "value": 1, "clear": false }), &schema).is_ok());
+        assert!(validate_params(json!({ "value": 1, "clear": true }), &schema).is_err());
     }
 
     #[test]

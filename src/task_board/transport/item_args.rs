@@ -43,6 +43,10 @@ pub struct TaskBoardItemFieldArgs {
     pub session_id: Option<String>,
     #[arg(long)]
     pub work_item_id: Option<String>,
+    #[arg(long, value_parser = clap::value_parser!(u64).range(1..=i64::MAX as u64))]
+    pub estimated_tokens: Option<u64>,
+    #[arg(long, value_parser = clap::value_parser!(u64).range(1..=i64::MAX as u64))]
+    pub estimated_cost_microusd: Option<u64>,
 }
 
 impl TaskBoardItemFieldArgs {

@@ -78,6 +78,12 @@ fn create_schema() -> Value {
             "body": { "type": "string" },
             "priority": { "type": "string" },
             "agent_mode": { "type": "string" },
+            "estimated_tokens": {
+                "type": "integer", "minimum": 1, "maximum": 9_223_372_036_854_775_807_u64
+            },
+            "estimated_cost_microusd": {
+                "type": "integer", "minimum": 1, "maximum": 9_223_372_036_854_775_807_u64
+            },
             "tags": string_array_schema(),
             "project_id": { "type": "string" },
             "target_project_types": string_array_schema(),
@@ -157,6 +163,14 @@ fn update_schema() -> Value {
             "status": { "type": "string" },
             "priority": { "type": "string" },
             "agent_mode": { "type": "string" },
+            "estimated_tokens": {
+                "type": "integer", "minimum": 1, "maximum": 9_223_372_036_854_775_807_u64
+            },
+            "estimated_cost_microusd": {
+                "type": "integer", "minimum": 1, "maximum": 9_223_372_036_854_775_807_u64
+            },
+            "clear_estimated_tokens": { "type": "boolean" },
+            "clear_estimated_cost_microusd": { "type": "boolean" },
             "tags": string_array_schema(),
             "project_id": { "type": "string" },
             "target_project_types": string_array_schema(),
@@ -172,6 +186,24 @@ fn update_schema() -> Value {
             "work_item_id": { "type": "string" }
         },
         "required": ["id"],
+        "allOf": [
+            {
+                "not": {
+                    "properties": { "clear_estimated_tokens": { "const": true } },
+                    "required": ["estimated_tokens", "clear_estimated_tokens"]
+                }
+            },
+            {
+                "not": {
+                    "properties": {
+                        "clear_estimated_cost_microusd": { "const": true }
+                    },
+                    "required": [
+                        "estimated_cost_microusd", "clear_estimated_cost_microusd"
+                    ]
+                }
+            }
+        ],
         "additionalProperties": false
     })
 }
@@ -199,4 +231,37 @@ fn plan_approve_schema() -> Value {
         "required": ["id", "approved_by"],
         "additionalProperties": false
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::{create_schema, update_schema};
+
+    #[test]
+    fn estimate_schemas_advertise_the_storage_bounds() {
+        for schema in [create_schema(), update_schema()] {
+            let properties = &schema["properties"];
+            for field in ["estimated_tokens", "estimated_cost_microusd"] {
+                assert_eq!(properties[field]["minimum"], json!(1));
+                assert_eq!(properties[field]["maximum"], json!(i64::MAX));
+            }
+        }
+    }
+
+    #[test]
+    fn update_schema_rejects_set_and_clear_combinations() {
+        let schema = update_schema();
+
+        assert_eq!(schema["allOf"].as_array().map(Vec::len), Some(2));
+        assert_eq!(
+            schema["allOf"][0]["not"]["required"],
+            json!(["estimated_tokens", "clear_estimated_tokens"])
+        );
+        assert_eq!(
+            schema["allOf"][1]["not"]["required"],
+            json!(["estimated_cost_microusd", "clear_estimated_cost_microusd"])
+        );
+    }
 }

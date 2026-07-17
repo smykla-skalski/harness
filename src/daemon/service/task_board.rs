@@ -339,6 +339,14 @@ fn patch_from_request(request: &TaskBoardUpdateItemRequest) -> TaskBoardItemPatc
             request.execution_repository.as_ref(),
             request.clear_identity.clear_execution_repository,
         ),
+        estimated_tokens: optional_copy_patch(
+            request.estimated_tokens,
+            request.clear_estimates.clear_estimated_tokens,
+        ),
+        estimated_cost_microusd: optional_copy_patch(
+            request.estimated_cost_microusd,
+            request.clear_estimates.clear_estimated_cost_microusd,
+        ),
         external_refs: request.external_refs.clone(),
         planning: request.planning.clone(),
         clear_planning: request.clear_state.clear_planning,
@@ -364,6 +372,15 @@ fn optional_string_patch(value: Option<&String>, clear: bool) -> OptionalFieldPa
     value
         .cloned()
         .map_or(OptionalFieldPatch::Unchanged, OptionalFieldPatch::Set)
+}
+
+#[cfg(test)]
+fn optional_copy_patch<T: Copy>(value: Option<T>, clear: bool) -> OptionalFieldPatch<T> {
+    if clear {
+        OptionalFieldPatch::Clear
+    } else {
+        value.map_or(OptionalFieldPatch::Unchanged, OptionalFieldPatch::Set)
+    }
 }
 
 #[cfg(test)]

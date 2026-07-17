@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use super::automation::TaskBoardWorkflowKind;
 
 pub const CURRENT_TASK_BOARD_ITEM_VERSION: u32 = 1;
+pub const MAX_TASK_BOARD_ESTIMATE: u64 = i64::MAX as u64;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TaskBoardItem {
@@ -28,6 +29,10 @@ pub struct TaskBoardItem {
     pub workflow_kind: TaskBoardWorkflowKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_repository: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub estimated_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub estimated_cost_microusd: Option<u64>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub external_refs: Vec<ExternalRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -64,6 +69,8 @@ impl TaskBoardItem {
             agent_mode: AgentMode::Headless,
             workflow_kind: TaskBoardWorkflowKind::DefaultTask,
             execution_repository: None,
+            estimated_tokens: None,
+            estimated_cost_microusd: None,
             external_refs: Vec::new(),
             imported_from_provider: None,
             planning: PlanningState::default(),

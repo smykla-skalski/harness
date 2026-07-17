@@ -28,6 +28,7 @@ pub(crate) use crate::task_board::external::{
     TaskBoardSyncCoordinatorFence, TaskBoardSyncCoordinatorFenceDecision,
 };
 
+mod estimate_validation;
 #[cfg(test)]
 mod external_ref_tests;
 mod provider_sync_context_store;
@@ -37,6 +38,7 @@ mod reviews_sync;
 mod sync_audit;
 mod sync_run_context;
 
+use estimate_validation::{validate_estimate, validate_update_estimates};
 pub(crate) use reviews_sync::reconcile_shared_review_items_db;
 use reviews_sync::shared_review_request_clients;
 use sync_audit::SyncExecutionMetrics;
@@ -50,6 +52,8 @@ pub(crate) async fn create_task_board_item_db(
     db: &AsyncDaemonDb,
     request: &TaskBoardCreateItemRequest,
 ) -> Result<TaskBoardItem, CliError> {
+    validate_estimate("estimated_tokens", request.estimated_tokens)?;
+    validate_estimate("estimated_cost_microusd", request.estimated_cost_microusd)?;
     let mut item = TaskBoardItem::new(
         request
             .id
@@ -64,6 +68,8 @@ pub(crate) async fn create_task_board_item_db(
     item.workflow_kind = request.workflow_kind;
     item.execution_repository
         .clone_from(&request.execution_repository);
+    item.estimated_tokens = request.estimated_tokens;
+    item.estimated_cost_microusd = request.estimated_cost_microusd;
     item.tags.clone_from(&request.tags);
     item.project_id.clone_from(&request.project_id);
     item.target_project_types
@@ -99,10 +105,11 @@ pub(crate) async fn update_task_board_item_db(
     id: &str,
     request: &TaskBoardUpdateItemRequest,
 ) -> Result<TaskBoardItem, CliError> {
+    validate_update_estimates(request)?;
     super::task_board_completion::validate_linked_task_completion(db, id, request.status).await?;
     let mutation = db
         .update_task_board_item(id, |item| {
-            apply_update_request(item, request);
+            apply_update_request(item, request)?;
             Ok(true)
         })
         .await?
@@ -340,7 +347,11 @@ async fn apply_planning_transition_db(
     })
 }
 
-fn apply_update_request(item: &mut TaskBoardItem, request: &TaskBoardUpdateItemRequest) {
+fn apply_update_request(
+    item: &mut TaskBoardItem,
+    request: &TaskBoardUpdateItemRequest,
+) -> Result<(), CliError> {
+    validate_update_estimates(request)?;
     assign_if_some(&mut item.title, request.title.as_ref());
     assign_if_some(&mut item.body, request.body.as_ref());
     assign_copy_if_some(&mut item.status, request.status);
@@ -365,6 +376,16 @@ fn apply_update_request(item: &mut TaskBoardItem, request: &TaskBoardUpdateItemR
         request.execution_repository.as_ref(),
         request.clear_identity.clear_execution_repository,
     );
+    apply_optional_copy(
+        &mut item.estimated_tokens,
+        request.estimated_tokens,
+        request.clear_estimates.clear_estimated_tokens,
+    );
+    apply_optional_copy(
+        &mut item.estimated_cost_microusd,
+        request.estimated_cost_microusd,
+        request.clear_estimates.clear_estimated_cost_microusd,
+    );
     apply_optional_string(
         &mut item.session_id,
         request.session_id.as_ref(),
@@ -376,6 +397,7 @@ fn apply_update_request(item: &mut TaskBoardItem, request: &TaskBoardUpdateItemR
         request.clear_identity.clear_work_item_id,
     );
     apply_update_state(item, request);
+    Ok(())
 }
 
 fn replacement_external_refs(
@@ -426,6 +448,14 @@ fn assign_if_some<T: Clone>(target: &mut T, value: Option<&T>) {
 fn assign_copy_if_some<T: Copy>(target: &mut T, value: Option<T>) {
     if let Some(value) = value {
         *target = value;
+    }
+}
+
+fn apply_optional_copy<T: Copy>(target: &mut Option<T>, value: Option<T>, clear: bool) {
+    if clear {
+        *target = None;
+    } else if let Some(value) = value {
+        *target = Some(value);
     }
 }
 

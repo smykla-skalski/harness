@@ -74,7 +74,7 @@ async fn connect_upgrades_applied_original_v34_migration() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        (1..=32).collect::<Vec<i64>>()
+        (1..=33).collect::<Vec<i64>>()
     );
     let requires_live = query_scalar::<_, bool>(
         "SELECT spawn_requires_live_policy FROM policy_workspace WHERE singleton = 1",
@@ -180,6 +180,10 @@ fn shipped_daemon_async_migration_checksums_remain_stable() {
         (
             "0032_daemon_v38_task_board_external_create_intents.sql",
             "C7D2FB56584DD8D1DE324D944A13B1B5F73F1DE76A78A36E12F9C2CB4485E6B437AA03C5214D8B1DF13743276318FB3E",
+        ),
+        (
+            "0033_daemon_v39_task_board_policy_admission.sql",
+            "AB6A259007355E6F6E1FCE4356345D0778F043AE3648F91005A0931E168646B6CBA088C765BD677B36875E655B71489F",
         ),
     ];
     let migrations_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/daemon/db/migrations");

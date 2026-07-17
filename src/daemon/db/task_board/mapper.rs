@@ -30,6 +30,11 @@ pub(super) fn item_from_rows(
             agent_mode: parse_label(&row.agent_mode, "task board agent mode")?,
             workflow_kind: parse_label(&row.workflow_kind, "task board workflow kind")?,
             execution_repository: row.execution_repository,
+            estimated_tokens: optional_u64(row.estimated_tokens, "task board estimated tokens")?,
+            estimated_cost_microusd: optional_u64(
+                row.estimated_cost_microusd,
+                "task board estimated cost",
+            )?,
             external_refs: external_refs
                 .into_iter()
                 .map(external_ref_from_row)
@@ -95,4 +100,12 @@ pub(super) fn label<T: Serialize>(value: T, context: &str) -> Result<String, Cli
 fn parse_label<T: DeserializeOwned>(value: &str, context: &str) -> Result<T, CliError> {
     serde_json::from_value(Value::String(value.to_owned()))
         .map_err(|error| db_error(format!("parse {context}: {error}")))
+}
+
+fn optional_u64(value: Option<i64>, context: &str) -> Result<Option<u64>, CliError> {
+    value
+        .map(|value| {
+            u64::try_from(value).map_err(|error| db_error(format!("parse {context}: {error}")))
+        })
+        .transpose()
 }

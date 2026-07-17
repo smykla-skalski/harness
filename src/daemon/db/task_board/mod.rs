@@ -21,6 +21,8 @@ mod rows;
 mod scheduler;
 
 #[cfg(test)]
+mod item_estimate_tests;
+#[cfg(test)]
 mod provider_external_create_finalize_tests;
 #[cfg(test)]
 mod provider_external_create_follow_up_tests;
