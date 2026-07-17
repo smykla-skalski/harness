@@ -54,12 +54,33 @@ async fn update_tool_proxies_every_public_field_to_running_daemon() {
         "repositories": [],
         "execution_hosts": [],
         "admission_policy": {
-            "limits": [{
-                "kind": "concurrency",
-                "scope": { "kind": "global" },
-                "limit": 1,
-                "reservation": 1,
-            }],
+            "limits": [
+                {
+                    "kind": "concurrency",
+                    "scope": { "kind": "global" },
+                    "limit": 1,
+                    "reservation": 1,
+                },
+                {
+                    "kind": "rate",
+                    "scope": { "kind": "workflow", "value": "default_task" },
+                    "limit": 10,
+                    "window_seconds": 60,
+                    "reservation": 1,
+                },
+                {
+                    "kind": "token_budget",
+                    "scope": { "kind": "repository", "value": "example/repo" },
+                    "limit": 1_000,
+                    "window_seconds": 3_600,
+                },
+                {
+                    "kind": "monetary_budget",
+                    "scope": { "kind": "global" },
+                    "limit_microusd": 10_000,
+                    "window_seconds": 3_600,
+                },
+            ],
             "windows": [{
                 "scope": { "kind": "repository", "value": "example/repo" },
                 "timezone": "UTC",
@@ -115,6 +136,12 @@ fn schema_advertises_every_field_and_strict_admission_policy() {
             "{field} must match the persisted integer bound"
         );
     }
+    assert_eq!(
+        policy["properties"]["limits"]["items"]["allOf"]
+            .as_array()
+            .map(Vec::len),
+        Some(4)
+    );
     let scope = &policy["properties"]["limits"]["items"]["properties"]["scope"];
     assert_eq!(scope["allOf"].as_array().map(Vec::len), Some(2));
 }
@@ -144,6 +171,35 @@ async fn schema_rejects_overflow_and_missing_non_global_scope_values() {
                 "scope": { "kind": "repository" },
                 "limit": 1,
                 "reservation": 1,
+            }],
+        }),
+        json!({
+            "limits": [{
+                "kind": "concurrency",
+                "scope": { "kind": "global" },
+                "limit": 1,
+            }],
+        }),
+        json!({
+            "limits": [{
+                "kind": "rate",
+                "scope": { "kind": "global" },
+                "limit": 1,
+                "reservation": 1,
+            }],
+        }),
+        json!({
+            "limits": [{
+                "kind": "token_budget",
+                "scope": { "kind": "global" },
+                "window_seconds": 60,
+            }],
+        }),
+        json!({
+            "limits": [{
+                "kind": "monetary_budget",
+                "scope": { "kind": "global" },
+                "window_seconds": 60,
             }],
         }),
     ];

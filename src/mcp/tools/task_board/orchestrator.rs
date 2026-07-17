@@ -220,6 +220,18 @@ fn admission_limit_schema() -> Value {
             }
         },
         "required": ["kind", "scope"],
+        "allOf": [
+            tagged_kind_requires_fields("concurrency", &["limit", "reservation"]),
+            tagged_kind_requires_fields(
+                "rate",
+                &["limit", "window_seconds", "reservation"]
+            ),
+            tagged_kind_requires_fields("token_budget", &["limit", "window_seconds"]),
+            tagged_kind_requires_fields(
+                "monetary_budget",
+                &["limit_microusd", "window_seconds"]
+            )
+        ],
         "additionalProperties": false
     })
 }
@@ -236,14 +248,14 @@ fn admission_scope_schema() -> Value {
         },
         "required": ["kind"],
         "allOf": [
-            scope_value_required_for("workflow"),
-            scope_value_required_for("repository")
+            tagged_kind_requires_fields("workflow", &["value"]),
+            tagged_kind_requires_fields("repository", &["value"])
         ],
         "additionalProperties": false
     })
 }
 
-fn scope_value_required_for(kind: &str) -> Value {
+fn tagged_kind_requires_fields(kind: &str, fields: &[&str]) -> Value {
     json!({
         "not": {
             "allOf": [
@@ -251,7 +263,7 @@ fn scope_value_required_for(kind: &str) -> Value {
                     "properties": { "kind": { "const": kind } },
                     "required": ["kind"]
                 },
-                { "not": { "required": ["value"] } }
+                { "not": { "required": fields } }
             ]
         }
     })
