@@ -7,6 +7,8 @@ use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::protocol::{SessionSummary, StreamEvent, TaskBoardUpdatedPayload};
 use crate::daemon::{service, snapshot, timeline};
 use crate::errors::{CliError, CliErrorKind};
+use crate::feature_flags::task_board_automation_v2_enabled_from_env;
+use crate::task_board::TaskBoardAutomationSnapshot;
 use crate::workspace::utc_now;
 
 use super::state::{RefreshScope, SessionDigest, WatchChanges, WatchSnapshot};
@@ -136,7 +138,7 @@ async fn emit_watch_changes_async(
     changes: WatchChanges,
     async_db: &Arc<AsyncDaemonDb>,
 ) {
-    emit_task_board_updated(sender, &changes);
+    emit_task_board_updated_async(sender, &changes, async_db.as_ref()).await;
     let session_ids: Vec<_> = changes.session_ids.into_iter().collect();
     if changes.sessions_updated {
         service::broadcast_sessions_updated_async(sender, Some(async_db.as_ref())).await;
@@ -151,17 +153,44 @@ async fn emit_watch_changes_async(
     }
 }
 
+async fn emit_task_board_updated_async(
+    sender: &Sender<StreamEvent>,
+    changes: &WatchChanges,
+    db: &AsyncDaemonDb,
+) {
+    if changes.task_board_revision.is_none() {
+        return;
+    }
+    let automation = if task_board_automation_v2_enabled_from_env() {
+        match service::task_board_automation_snapshot(db).await {
+            Ok(snapshot) => Some(snapshot),
+            Err(error) => {
+                tracing::warn!(%error, "failed to build task-board automation push snapshot");
+                None
+            }
+        }
+    } else {
+        None
+    };
+    emit_task_board_updated(sender, changes, automation);
+}
+
 #[expect(
     clippy::cognitive_complexity,
     reason = "tracing::warn! macro expands into a chain clippy reads as branchy"
 )]
-fn emit_task_board_updated(sender: &Sender<StreamEvent>, changes: &WatchChanges) {
+fn emit_task_board_updated(
+    sender: &Sender<StreamEvent>,
+    changes: &WatchChanges,
+    automation: Option<TaskBoardAutomationSnapshot>,
+) {
     let Some(revision) = changes.task_board_revision else {
         return;
     };
     let payload = TaskBoardUpdatedPayload {
         revision,
         scopes: changes.task_board_scopes.iter().cloned().collect(),
+        automation,
     };
     let payload = match serde_json::to_value(payload) {
         Ok(payload) => payload,
@@ -207,5 +236,68 @@ pub(super) fn emit_watch_changes_with<SessionsUpdated, SessionUpdatedCore, Sessi
 
     for session_id in changes.session_ids {
         broadcast_session_extensions(&session_id, None);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn task_board_push_carries_the_compact_automation_snapshot() {
+        let snapshot = automation_snapshot();
+        let (sender, mut receiver) = tokio::sync::broadcast::channel(1);
+        emit_task_board_updated(
+            &sender,
+            &WatchChanges {
+                task_board_revision: Some(12),
+                task_board_scopes: BTreeSet::from(["task_board:orchestrator".into()]),
+                ..WatchChanges::default()
+            },
+            Some(snapshot.clone()),
+        );
+
+        let event = receiver.try_recv().expect("task-board update event");
+        let payload: TaskBoardUpdatedPayload =
+            serde_json::from_value(event.payload).expect("task-board update payload");
+        assert_eq!(payload.revision, 12);
+        assert_eq!(payload.automation, Some(snapshot));
+    }
+
+    #[test]
+    fn task_board_push_is_silent_without_a_revision() {
+        let (sender, mut receiver) = tokio::sync::broadcast::channel(1);
+        emit_task_board_updated(
+            &sender,
+            &WatchChanges::default(),
+            Some(automation_snapshot()),
+        );
+
+        assert!(receiver.try_recv().is_err());
+    }
+
+    fn automation_snapshot() -> TaskBoardAutomationSnapshot {
+        serde_json::from_value(serde_json::json!({
+            "revision": 4,
+            "desired_mode": "continuous",
+            "admission_state": "accepting",
+            "effective_state": "idle",
+            "observed_at": "2026-07-17T00:00:00Z",
+            "heartbeat_at": "2026-07-17T00:00:00Z",
+            "settings_revision": 2,
+            "policy_revision": 3,
+            "queue": {
+                "ready": 0,
+                "awaiting_approval": 0,
+                "policy_blocked": 0,
+                "preparing": 0,
+                "retrying": 0,
+                "starting": 0,
+                "active": 0,
+                "draining": 0,
+                "cleanup_required": 0
+            }
+        }))
+        .expect("automation snapshot")
     }
 }

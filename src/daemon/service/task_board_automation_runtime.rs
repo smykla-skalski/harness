@@ -11,6 +11,7 @@ use crate::daemon::db::{
 use crate::errors::CliError;
 use crate::task_board::{
     TaskBoardAutomationRunOutcome, TaskBoardAutomationRunTrigger, TaskBoardAutomationScope,
+    TaskBoardAutomationSnapshot,
 };
 
 use super::TaskBoardOrchestratorRunGuard;
@@ -20,6 +21,12 @@ pub(crate) enum TaskBoardAutomationRunStart {
     Acquired(Box<TaskBoardAutomationRunSession>),
     Busy { run_id: String },
     Disabled,
+}
+
+pub(crate) async fn task_board_automation_snapshot(
+    db: &AsyncDaemonDb,
+) -> Result<TaskBoardAutomationSnapshot, CliError> {
+    db.task_board_automation_snapshot().await
 }
 
 pub(crate) struct TaskBoardAutomationRunSession {

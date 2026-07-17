@@ -113,6 +113,7 @@ impl TaskBoardOrchestrator {
             current_tick: None,
             last_run: None,
             workflow_execution_counts: Vec::new(),
+            automation: None,
             settings: TaskBoardOrchestratorSettings::default(),
         })
     }
@@ -328,6 +329,7 @@ impl TaskBoardOrchestrator {
             current_tick: state.current_tick,
             last_run: state.last_run,
             workflow_execution_counts: self.workflow_execution_counts()?,
+            automation: None,
             settings,
         })
     }

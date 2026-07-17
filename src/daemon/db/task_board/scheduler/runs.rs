@@ -1,3 +1,5 @@
+use std::slice;
+
 use chrono::{DateTime, Duration, Utc};
 use serde_json::json;
 use sqlx::{Sqlite, Transaction, query, query_as};
@@ -152,6 +154,7 @@ impl AsyncDaemonDb {
         let control = load_control_in_tx(&mut transaction).await?;
         let outcome = final_outcome(lease, &control, &row.state, outcome);
         finalize_run_row(&mut transaction, lease, outcome, error_kind, error, now).await?;
+        super::history::prune_terminal_run_history(&mut transaction, now).await?;
         bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
         let event = insert_automation_audit(
             &mut transaction,
@@ -171,7 +174,7 @@ impl AsyncDaemonDb {
                 "commit task board automation run finalization: {error}"
             ))
         })?;
-        broadcast_automation_audits(std::slice::from_ref(&event));
+        broadcast_automation_audits(slice::from_ref(&event));
         Ok(outcome)
     }
 }

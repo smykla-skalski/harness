@@ -200,6 +200,64 @@ fn remote_ws_authz_covers_handshake_and_per_message_scope() {
 }
 
 #[test]
+fn automation_observability_scope_matrix_protects_run_detail() {
+    let viewer = remote_client("viewer", RemoteRole::Viewer, &[RemoteAccessScope::Read]);
+    let operator = remote_client(
+        "operator",
+        RemoteRole::Operator,
+        &[RemoteAccessScope::Read, RemoteAccessScope::Write],
+    );
+
+    for (path, method) in [
+        (
+            http_paths::TASK_BOARD_ORCHESTRATOR_RUNS,
+            ws_methods::TASK_BOARD_ORCHESTRATOR_RUNS,
+        ),
+        (
+            http_paths::TASK_BOARD_ORCHESTRATOR_METRICS,
+            ws_methods::TASK_BOARD_ORCHESTRATOR_METRICS,
+        ),
+    ] {
+        assert_eq!(
+            authorize_remote_http_route(&viewer, http_route(path))
+                .expect("viewer HTTP read")
+                .required_scope,
+            RemoteAccessScope::Read
+        );
+        assert_eq!(
+            authorize_remote_ws_method(&viewer, method)
+                .expect("viewer websocket read")
+                .required_scope,
+            RemoteAccessScope::Read
+        );
+    }
+
+    let detail_route = http_route(http_paths::TASK_BOARD_ORCHESTRATOR_RUN_DETAIL);
+    assert_eq!(
+        authorize_remote_http_route(&viewer, detail_route)
+            .expect_err("viewer cannot read raw run detail"),
+        RemoteAuthError::InsufficientScope
+    );
+    assert_eq!(
+        authorize_remote_ws_method(&viewer, ws_methods::TASK_BOARD_ORCHESTRATOR_RUN_DETAIL)
+            .expect_err("viewer cannot read raw websocket run detail"),
+        RemoteAuthError::InsufficientScope
+    );
+    assert_eq!(
+        authorize_remote_http_route(&operator, detail_route)
+            .expect("operator HTTP detail")
+            .required_scope,
+        RemoteAccessScope::Write
+    );
+    assert_eq!(
+        authorize_remote_ws_method(&operator, ws_methods::TASK_BOARD_ORCHESTRATOR_RUN_DETAIL)
+            .expect("operator websocket detail")
+            .required_scope,
+        RemoteAccessScope::Write
+    );
+}
+
+#[test]
 fn remote_ws_handshake_scope_uses_http_route_contract() {
     let ws_route = http_route(http_paths::WS);
     let expected_scope = remote_http_scopes(ws_route)

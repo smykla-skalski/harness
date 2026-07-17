@@ -60,6 +60,7 @@ mod session_archive_tests;
 mod shutdown;
 mod support;
 mod task_board;
+mod task_board_automation_route_parity;
 mod task_board_catalog;
 mod task_board_crud;
 mod task_board_dispatch_pick;

@@ -4,18 +4,19 @@ use serde::{Deserialize, Serialize};
 pub struct TaskBoardUpdatedPayload {
     pub revision: i64,
     pub scopes: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub automation: Option<TaskBoardAutomationSnapshot>,
 }
 
-use crate::task_board::planning::PlanningTransition;
-use crate::task_board::types::TaskBoardWorkflowState;
 use crate::task_board::{
     AgentMode, DispatchExecutionSummary, ExternalProvider, ExternalRef, ExternalSyncConflictPolicy,
     ExternalSyncDirection, Machine, PlanningState, PolicyGraphMode, PolicyInput,
     PolicyPipelineAuditSummary, PolicyPipelineDocument, PolicyPipelineGoLiveDiff,
     PolicyPipelineReplayResult, PolicyPipelineSaveResponse, PolicyPipelineSimulationResult,
-    PolicyScenario, TaskBoardAuditSummary, TaskBoardEvaluationSummary,
+    PolicyScenario, TaskBoardAuditSummary, TaskBoardAutomationSnapshot, TaskBoardEvaluationSummary,
     TaskBoardGitIdentityDefaults, TaskBoardItem, TaskBoardMachineSummary, TaskBoardPriority,
     TaskBoardProjectSummary, TaskBoardStatus, TaskBoardSyncSummary, TaskBoardWorkflowKind,
+    planning::PlanningTransition, types::TaskBoardWorkflowState,
 };
 
 pub use crate::task_board::{

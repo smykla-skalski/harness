@@ -68,6 +68,9 @@ pub const TASK_BOARD_ORCHESTRATOR_STATUS: &str = "/v1/task-board/orchestrator/st
 pub const TASK_BOARD_ORCHESTRATOR_START: &str = "/v1/task-board/orchestrator/start";
 pub const TASK_BOARD_ORCHESTRATOR_STOP: &str = "/v1/task-board/orchestrator/stop";
 pub const TASK_BOARD_ORCHESTRATOR_RUN_ONCE: &str = "/v1/task-board/orchestrator/run-once";
+pub const TASK_BOARD_ORCHESTRATOR_RUNS: &str = "/v1/task-board/orchestrator/runs";
+pub const TASK_BOARD_ORCHESTRATOR_RUN_DETAIL: &str = "/v1/task-board/orchestrator/runs/{run_id}";
+pub const TASK_BOARD_ORCHESTRATOR_METRICS: &str = "/v1/task-board/orchestrator/metrics";
 pub const TASK_BOARD_ORCHESTRATOR_SETTINGS: &str = "/v1/task-board/orchestrator/settings";
 pub const TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG: &str =
     "/v1/task-board/orchestrator/runtime-config";

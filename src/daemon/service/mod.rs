@@ -368,7 +368,7 @@ pub(crate) use task_board::{
 };
 pub(crate) use task_board::{dispatch_task_board_async, pick_task_board_dispatch_async};
 pub(crate) use task_board_automation_runtime::{
-    TaskBoardAutomationRunSession, TaskBoardAutomationRunStart,
+    TaskBoardAutomationRunSession, TaskBoardAutomationRunStart, task_board_automation_snapshot,
 };
 pub(crate) use task_board_db::{
     approve_task_board_plan_db, audit_task_board_db, begin_task_board_planning_db,

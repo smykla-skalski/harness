@@ -8,6 +8,8 @@ use crate::daemon::protocol::{
     PolicyCanvasSetSpawnRequiresLivePolicyRequest, PolicyCanvasWorkspaceResponse,
     PolicyTransferBundle, PolicyTransferDumpRequest, PolicyTransferImportRequest,
     TASK_BOARD_STORAGE_DATABASE, TaskBoardAuditRequest, TaskBoardAuditResponse,
+    TaskBoardAutomationHistoryRequest, TaskBoardAutomationMetricsResponse,
+    TaskBoardAutomationRunDetailResponse, TaskBoardAutomationRunsResponse,
     TaskBoardCapabilitiesResponse, TaskBoardCatalogRequest, TaskBoardCreateItemRequest,
     TaskBoardDispatchDeliverRequest, TaskBoardDispatchDeliverResponse,
     TaskBoardDispatchPickRequest, TaskBoardDispatchPickResponse, TaskBoardDispatchRequest,
@@ -254,6 +256,34 @@ impl DaemonClient {
         self.post(http_paths::TASK_BOARD_ORCHESTRATOR_RUN_ONCE, request)
     }
 
+    pub fn task_board_automation_runs(
+        &self,
+        request: &TaskBoardAutomationHistoryRequest,
+    ) -> Result<TaskBoardAutomationRunsResponse, CliError> {
+        let limit = request.limit.map(|value| value.to_string());
+        let mut query = Vec::with_capacity(2);
+        if let Some(value) = limit.as_deref() {
+            query.push(("limit", value));
+        }
+        if let Some(value) = request.before.as_deref() {
+            query.push(("before", value));
+        }
+        self.get_with_query(http_paths::TASK_BOARD_ORCHESTRATOR_RUNS, &query)
+    }
+
+    pub fn task_board_automation_run_detail(
+        &self,
+        run_id: &str,
+    ) -> Result<TaskBoardAutomationRunDetailResponse, CliError> {
+        self.get(&automation_run_detail_path(run_id))
+    }
+
+    pub fn task_board_automation_metrics(
+        &self,
+    ) -> Result<TaskBoardAutomationMetricsResponse, CliError> {
+        self.get(http_paths::TASK_BOARD_ORCHESTRATOR_METRICS)
+    }
+
     pub fn task_board_orchestrator_settings(
         &self,
     ) -> Result<TaskBoardOrchestratorSettingsResponse, CliError> {
@@ -307,6 +337,16 @@ impl DaemonClient {
 
 fn item_path(item_id: &str) -> String {
     http_paths::TASK_BOARD_ITEM.replace("{item_id}", item_id)
+}
+
+fn automation_run_detail_path(run_id: &str) -> String {
+    let mut base = reqwest::Url::parse("http://localhost/").expect("static URL should parse");
+    base.path_segments_mut()
+        .expect("static URL should accept path segments")
+        .pop_if_empty()
+        .push(run_id);
+    let encoded_run_id = base.path().trim_start_matches('/');
+    http_paths::TASK_BOARD_ORCHESTRATOR_RUN_DETAIL.replace("{run_id}", encoded_run_id)
 }
 
 fn item_action_path(item_id: &str, action: &str) -> String {

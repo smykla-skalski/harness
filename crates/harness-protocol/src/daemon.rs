@@ -13,13 +13,22 @@ pub mod http_paths {
 #[path = "../../../src/daemon/protocol/api_contract/ws_methods.rs"]
 pub mod ws_methods;
 
+const NON_AGENT_FACING_TASK_BOARD_METHODS: &[&str] = &[
+    ws_methods::TASK_BOARD_ORCHESTRATOR_RUNS,
+    ws_methods::TASK_BOARD_ORCHESTRATOR_RUN_DETAIL,
+    ws_methods::TASK_BOARD_ORCHESTRATOR_METRICS,
+];
+
 /// Return websocket methods belonging to the task-board and policy surfaces.
 #[must_use]
 pub fn task_board_mcp_methods() -> Vec<&'static str> {
     ws_methods::ALL
         .iter()
         .copied()
-        .filter(|method| method.starts_with("task_board.") || method.starts_with("policy_"))
+        .filter(|method| {
+            (method.starts_with("task_board.") || method.starts_with("policy_"))
+                && !NON_AGENT_FACING_TASK_BOARD_METHODS.contains(method)
+        })
         .collect()
 }
 
@@ -95,5 +104,19 @@ mod tests {
                 "params": { "status": "todo" }
             })
         );
+    }
+
+    #[test]
+    fn observability_methods_are_wire_contracts_not_mcp_tools() {
+        let agent_methods = task_board_mcp_methods();
+
+        for method in [
+            ws_methods::TASK_BOARD_ORCHESTRATOR_RUNS,
+            ws_methods::TASK_BOARD_ORCHESTRATOR_RUN_DETAIL,
+            ws_methods::TASK_BOARD_ORCHESTRATOR_METRICS,
+        ] {
+            assert!(ws_methods::ALL.contains(&method));
+            assert!(!agent_methods.contains(&method));
+        }
     }
 }

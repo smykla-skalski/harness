@@ -1,11 +1,11 @@
-use axum::extract::State;
+use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
 
 use crate::daemon::protocol::{
-    TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
+    TaskBoardAutomationHistoryRequest, TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
     TaskBoardGitRuntimeKeyMaterialSyncRequest, TaskBoardGitRuntimeSecretHandoffAckRequest,
     TaskBoardGitSigningVerifyRequest, TaskBoardOpenRouterTokenSyncRequest,
     TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
@@ -39,6 +39,18 @@ pub(super) fn merge_orchestrator_routes(
         .route(
             http_paths::TASK_BOARD_ORCHESTRATOR_RUN_ONCE,
             post(post_task_board_orchestrator_run_once),
+        )
+        .route(
+            http_paths::TASK_BOARD_ORCHESTRATOR_RUNS,
+            get(get_task_board_automation_runs),
+        )
+        .route(
+            http_paths::TASK_BOARD_ORCHESTRATOR_RUN_DETAIL,
+            get(get_task_board_automation_run_detail),
+        )
+        .route(
+            http_paths::TASK_BOARD_ORCHESTRATOR_METRICS,
+            get(get_task_board_automation_metrics),
         )
         .route(
             http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
@@ -154,6 +166,59 @@ async fn post_task_board_orchestrator_run_once(
         &request_id,
         start,
         result,
+    )
+}
+
+async fn get_task_board_automation_runs(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Query(request): Query<TaskBoardAutomationHistoryRequest>,
+) -> Response {
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    timed_json(
+        "GET",
+        http_paths::TASK_BOARD_ORCHESTRATOR_RUNS,
+        &request_id,
+        start,
+        task_board_route_executor::automation_runs(&state, &request).await,
+    )
+}
+
+async fn get_task_board_automation_run_detail(
+    Path(run_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    timed_json(
+        "GET",
+        http_paths::TASK_BOARD_ORCHESTRATOR_RUN_DETAIL,
+        &request_id,
+        start,
+        task_board_route_executor::automation_run_detail(&state, &run_id).await,
+    )
+}
+
+async fn get_task_board_automation_metrics(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    timed_json(
+        "GET",
+        http_paths::TASK_BOARD_ORCHESTRATOR_METRICS,
+        &request_id,
+        start,
+        task_board_route_executor::automation_metrics(&state).await,
     )
 }
 

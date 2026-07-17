@@ -2,6 +2,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::task_board::{ExternalRefProvider, TaskBoardStatus};
 
+const LEGACY_TASK_BOARD_AUTOMATION_SNAPSHOT_SCHEMA_VERSION: u32 = 1;
+pub const TASK_BOARD_AUTOMATION_SNAPSHOT_SCHEMA_VERSION: u32 = 1;
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskBoardAutomationDesiredMode {
@@ -102,8 +105,69 @@ pub struct TaskBoardAutomationRunInfo {
     pub completed_at: Option<String>,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskBoardAutomationHistoryRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub before: Option<String>,
+}
+
+impl TaskBoardAutomationHistoryRequest {
+    #[must_use]
+    pub fn normalized_limit(&self) -> u32 {
+        self.limit.unwrap_or(100).clamp(1, 500)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskBoardAutomationHistoryResponse {
+    pub runs: Vec<TaskBoardAutomationRunInfo>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<String>,
+    pub has_older: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TaskBoardAutomationRunStage {
+    pub sequence: u64,
+    pub stage: String,
+    pub state: String,
+    pub recorded_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payload: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TaskBoardAutomationRunDetail {
+    pub run: TaskBoardAutomationRunInfo,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub stages: Vec<TaskBoardAutomationRunStage>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskBoardAutomationMetrics {
+    pub runs_total: u64,
+    pub runs_running: u64,
+    pub runs_completed: u64,
+    pub runs_noop: u64,
+    pub runs_partial: u64,
+    pub runs_failed: u64,
+    pub runs_cancelled: u64,
+    pub open_conflicts: u64,
+    pub captured_at: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskBoardAutomationSnapshot {
+    #[serde(default = "default_snapshot_schema_version")]
+    pub schema_version: u32,
     pub revision: u64,
     pub desired_mode: TaskBoardAutomationDesiredMode,
     pub admission_state: TaskBoardAutomationAdmissionState,
@@ -111,7 +175,11 @@ pub struct TaskBoardAutomationSnapshot {
     pub observed_at: String,
     pub heartbeat_at: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub heartbeat_age_seconds: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_run_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_retry_at: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_success_at: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -123,4 +191,90 @@ pub struct TaskBoardAutomationSnapshot {
     pub active_run: Option<TaskBoardAutomationRunInfo>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub blocked_reason: Option<String>,
+}
+
+const fn default_snapshot_schema_version() -> u32 {
+    LEGACY_TASK_BOARD_AUTOMATION_SNAPSHOT_SCHEMA_VERSION
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        TASK_BOARD_AUTOMATION_SNAPSHOT_SCHEMA_VERSION, TaskBoardAutomationHistoryRequest,
+        TaskBoardAutomationSnapshot,
+    };
+    use crate::task_board::{TaskBoardOrchestratorSettings, TaskBoardOrchestratorStatus};
+
+    #[test]
+    fn history_limit_is_bounded() {
+        assert_eq!(
+            TaskBoardAutomationHistoryRequest::default().normalized_limit(),
+            100
+        );
+        assert_eq!(
+            TaskBoardAutomationHistoryRequest {
+                limit: Some(0),
+                before: None,
+            }
+            .normalized_limit(),
+            1
+        );
+        assert_eq!(
+            TaskBoardAutomationHistoryRequest {
+                limit: Some(900),
+                before: None,
+            }
+            .normalized_limit(),
+            500
+        );
+    }
+
+    #[test]
+    fn compact_snapshot_schema_starts_at_one() {
+        assert_eq!(TASK_BOARD_AUTOMATION_SNAPSHOT_SCHEMA_VERSION, 1);
+        assert_eq!(super::default_snapshot_schema_version(), 1);
+    }
+
+    #[test]
+    fn legacy_snapshot_without_schema_version_stays_at_version_one() {
+        let snapshot: TaskBoardAutomationSnapshot = serde_json::from_value(serde_json::json!({
+            "revision": 4,
+            "desired_mode": "off",
+            "admission_state": "stopped",
+            "effective_state": "idle",
+            "observed_at": "2026-07-17T00:00:00Z",
+            "heartbeat_at": "2026-07-17T00:00:00Z",
+            "settings_revision": 2,
+            "policy_revision": 3,
+            "queue": {
+                "ready": 0,
+                "awaiting_approval": 0,
+                "policy_blocked": 0,
+                "preparing": 0,
+                "retrying": 0,
+                "starting": 0,
+                "active": 0,
+                "draining": 0,
+                "cleanup_required": 0
+            }
+        }))
+        .expect("decode legacy compact snapshot");
+
+        assert_eq!(snapshot.schema_version, 1);
+    }
+
+    #[test]
+    fn legacy_status_omits_and_defaults_the_automation_snapshot() {
+        let status: TaskBoardOrchestratorStatus = serde_json::from_value(serde_json::json!({
+            "enabled": false,
+            "running": false,
+            "workflow_execution_counts": [],
+            "settings": TaskBoardOrchestratorSettings::default()
+        }))
+        .expect("decode legacy status");
+        assert!(status.automation.is_none());
+
+        let encoded = serde_json::to_value(status).expect("encode feature-off status");
+        assert!(encoded.get("automation").is_none());
+    }
 }

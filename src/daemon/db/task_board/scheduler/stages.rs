@@ -1,5 +1,8 @@
+use std::slice;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sqlx::{query, query_as};
 
 use super::super::ORCHESTRATOR_CHANGE_SCOPE;
@@ -7,18 +10,7 @@ use super::super::items::bump_change_in_tx;
 use super::audit::{broadcast_automation_audits, insert_automation_audit, parse_scope};
 use super::runs::TaskBoardAutomationRunLease;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct TaskBoardAutomationRunStage {
-    pub(crate) sequence: u64,
-    pub(crate) stage: String,
-    pub(crate) state: String,
-    pub(crate) recorded_at: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) summary: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) payload: Option<serde_json::Value>,
-}
+use crate::task_board::TaskBoardAutomationRunStage;
 
 #[derive(Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -96,7 +88,7 @@ impl AsyncDaemonDb {
                 "commit task board automation run stage update '{run_id}': {error}"
             ))
         })?;
-        broadcast_automation_audits(std::slice::from_ref(&event));
+        broadcast_automation_audits(slice::from_ref(&event));
         u64::try_from(next_revision).map_err(|error| {
             db_error(format!(
                 "parse task board automation run revision '{run_id}': {error}"
@@ -160,14 +152,57 @@ fn updated_stage_summary(
     })
 }
 
-fn decode_stages(value: &str, run_id: &str) -> Result<Vec<TaskBoardAutomationRunStage>, CliError> {
+pub(super) fn decode_stages(
+    value: &str,
+    run_id: &str,
+) -> Result<Vec<TaskBoardAutomationRunStage>, CliError> {
     let mut summary = serde_json::from_str::<StoredStageSummary>(value).map_err(|error| {
         db_error(format!(
             "parse task board automation run stages '{run_id}': {error}"
         ))
     })?;
+    let shape = serde_json::from_str::<Value>(value).map_err(|error| {
+        db_error(format!(
+            "parse task board automation run stages '{run_id}': {error}"
+        ))
+    })?;
+    validate_stored_shape(&shape, run_id)?;
     canonicalize_stages(&mut summary.stages, run_id)?;
     Ok(summary.stages)
+}
+
+fn validate_stored_shape(value: &Value, run_id: &str) -> Result<(), CliError> {
+    let object = value.as_object().ok_or_else(|| invalid_shape(run_id))?;
+    if object.keys().any(|key| key != "stages") {
+        return Err(invalid_shape(run_id));
+    }
+    let Some(stages) = object.get("stages") else {
+        return Ok(());
+    };
+    let stages = stages.as_array().ok_or_else(|| invalid_shape(run_id))?;
+    for stage in stages {
+        let stage = stage.as_object().ok_or_else(|| invalid_shape(run_id))?;
+        let allowed = |key: &str| {
+            matches!(
+                key,
+                "sequence" | "stage" | "state" | "recorded_at" | "summary" | "payload"
+            )
+        };
+        if stage.keys().any(|key| !allowed(key))
+            || ["sequence", "stage", "state", "recorded_at"]
+                .iter()
+                .any(|key| !stage.contains_key(*key))
+        {
+            return Err(invalid_shape(run_id));
+        }
+    }
+    Ok(())
+}
+
+fn invalid_shape(run_id: &str) -> CliError {
+    db_error(format!(
+        "parse task board automation run stages '{run_id}': non-canonical stored shape"
+    ))
 }
 
 fn upsert_stage(
