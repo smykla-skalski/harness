@@ -13,10 +13,12 @@ async fn review_write_http_routes_fail_closed_without_enforced_policy() {
     let xdg_root = xdg_root.to_str().expect("utf8 xdg").to_owned();
     temp_env::async_with_vars(
         [
+            ("HARNESS_DAEMON_DATA_HOME", Some(xdg_root.as_str())),
             ("XDG_DATA_HOME", Some(xdg_root.as_str())),
             ("CLAUDE_SESSION_ID", Some("http-review-policy-writes")),
         ],
         async {
+            crate::daemon::state::ensure_daemon_dirs().expect("daemon dirs");
             let (base_url, server) = serve_http(test_http_state_with_db()).await;
             let client = reqwest::Client::new();
 
