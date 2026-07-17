@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use chrono::Utc;
+use sha2::{Digest, Sha256};
 use tokio::sync::watch as tokio_watch;
 use tokio::task::JoinHandle;
 use tokio::time::{MissedTickBehavior, interval};
@@ -58,7 +59,9 @@ async fn run_task_board_automation_loop(
             () = wait_for_shutdown(&mut shutdown_rx) => break,
             _ = ticker.tick() => {
                 if let Err(error) = run_loop_tick(&state, db.as_ref(), &mut loop_state).await {
-                    loop_state.record_failure(db.as_ref()).await;
+                    loop_state
+                        .record_failure(db.as_ref(), &state.daemon_epoch)
+                        .await;
                     tracing::warn!(%error, "task-board automation coordinator tick failed");
                 }
             }
@@ -88,14 +91,14 @@ impl AutomationLoopState {
             .is_some_and(|deadline| Instant::now() < deadline)
     }
 
-    async fn record_failure(&mut self, db: &AsyncDaemonDb) {
+    async fn record_failure(&mut self, db: &AsyncDaemonDb, stable_key: &str) {
         self.consecutive_failures = self.consecutive_failures.saturating_add(1);
         let retry = db.task_board_orchestrator_settings().await.map_or_else(
             |_| TaskBoardAutomationRetrySettings::default(),
             |value| value.retry,
         );
         self.retry_not_before =
-            Some(Instant::now() + retry_delay(&retry, self.consecutive_failures));
+            Some(Instant::now() + retry_delay(&retry, stable_key, self.consecutive_failures));
     }
 
     fn record_success(&mut self) {
@@ -105,15 +108,16 @@ impl AutomationLoopState {
     }
 }
 
-fn retry_delay(retry: &TaskBoardAutomationRetrySettings, failures: u32) -> Duration {
+fn retry_delay(
+    retry: &TaskBoardAutomationRetrySettings,
+    stable_key: &str,
+    failures: u32,
+) -> Duration {
     let cap = retry
         .max_delay_seconds
         .clamp(1, MAX_COORDINATOR_BACKOFF_SECONDS);
     let mut seconds = retry.base_delay_seconds.max(1).min(cap);
     let multiplier = u64::from(retry.multiplier.max(1));
-    if multiplier == 1 {
-        return Duration::from_secs(seconds);
-    }
     let steps = failures
         .saturating_sub(1)
         .min(retry.max_attempts.saturating_sub(1));
@@ -123,7 +127,32 @@ fn retry_delay(retry: &TaskBoardAutomationRetrySettings, failures: u32) -> Durat
         }
         seconds = seconds.saturating_mul(multiplier).min(cap);
     }
-    Duration::from_secs(seconds)
+    Duration::from_secs(
+        deterministic_jitter(
+            seconds,
+            stable_key,
+            failures,
+            retry.deterministic_jitter_percent,
+        )
+        .min(cap),
+    )
+}
+
+fn deterministic_jitter(base: u64, stable_key: &str, attempt: u32, percent: u8) -> u64 {
+    let percent = u64::from(percent.min(100));
+    if percent == 0 {
+        return base;
+    }
+    let digest = Sha256::digest(format!("{stable_key}:{attempt}").as_bytes());
+    let sample = u64::from_be_bytes(
+        digest[..8]
+            .try_into()
+            .expect("sha256 prefix is eight bytes"),
+    );
+    let offset =
+        i128::from(sample % (percent.saturating_mul(2).saturating_add(1))) - i128::from(percent);
+    let scaled = i128::from(base).saturating_mul(100_i128.saturating_add(offset)) / 100;
+    u64::try_from(scaled.max(1)).unwrap_or(u64::MAX)
 }
 
 async fn initialize_automation(db: &AsyncDaemonDb) -> Result<i64, CliError> {

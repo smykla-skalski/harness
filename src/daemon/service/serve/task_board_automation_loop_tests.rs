@@ -96,11 +96,11 @@ fn retry_delay_is_exponential_and_bounded() {
         deterministic_jitter_percent: 0,
     };
 
-    assert_eq!(retry_delay(&retry, 1), Duration::from_secs(2));
-    assert_eq!(retry_delay(&retry, 2), Duration::from_secs(6));
-    assert_eq!(retry_delay(&retry, 3), Duration::from_secs(18));
-    assert_eq!(retry_delay(&retry, 4), Duration::from_secs(20));
-    assert_eq!(retry_delay(&retry, 10), Duration::from_secs(20));
+    assert_eq!(retry_delay(&retry, "epoch", 1), Duration::from_secs(2));
+    assert_eq!(retry_delay(&retry, "epoch", 2), Duration::from_secs(6));
+    assert_eq!(retry_delay(&retry, "epoch", 3), Duration::from_secs(18));
+    assert_eq!(retry_delay(&retry, "epoch", 4), Duration::from_secs(20));
+    assert_eq!(retry_delay(&retry, "epoch", 10), Duration::from_secs(20));
 
     let unbounded = TaskBoardAutomationRetrySettings {
         max_attempts: u32::MAX,
@@ -110,9 +110,32 @@ fn retry_delay_is_exponential_and_bounded() {
         deterministic_jitter_percent: 0,
     };
     assert_eq!(
-        retry_delay(&unbounded, u32::MAX),
+        retry_delay(&unbounded, "epoch", u32::MAX),
         Duration::from_secs(MAX_COORDINATOR_BACKOFF_SECONDS)
     );
+
+    let jittered = TaskBoardAutomationRetrySettings {
+        max_attempts: 1,
+        base_delay_seconds: 100,
+        multiplier: 1,
+        max_delay_seconds: 200,
+        deterministic_jitter_percent: 20,
+    };
+    assert_eq!(
+        retry_delay(&jittered, "epoch-a", 1),
+        Duration::from_secs(86)
+    );
+    assert_ne!(
+        retry_delay(&jittered, "epoch-a", 1),
+        retry_delay(&jittered, "epoch-b", 1)
+    );
+
+    let capped = TaskBoardAutomationRetrySettings {
+        base_delay_seconds: 200,
+        deterministic_jitter_percent: 100,
+        ..jittered
+    };
+    assert_eq!(retry_delay(&capped, "epoch-a", 1), Duration::from_secs(200));
 }
 
 #[test]
