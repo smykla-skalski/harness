@@ -14,8 +14,14 @@ use crate::task_board::{
     TaskBoardOrchestratorSettings, TaskBoardOrchestratorState, TaskBoardStatus,
 };
 
+mod admission_compensation;
+mod admission_dispatch;
+mod admission_evidence;
+mod admission_lifecycle_tests;
 mod dispatch;
+mod dispatch_claims;
 mod imports;
+mod terminal_dispatch_lifecycle;
 
 #[tokio::test]
 async fn task_board_instance_identity_is_stable_per_database() {
@@ -203,6 +209,13 @@ async fn task_board_singletons_and_machine_registry_round_trip() {
     db.replace_task_board_orchestrator_settings(&settings)
         .await
         .expect("save settings");
+    let settings_snapshot = db
+        .task_board_orchestrator_settings_snapshot()
+        .await
+        .expect("load settings snapshot");
+    assert_eq!(settings_snapshot.settings, settings);
+    assert_eq!(settings_snapshot.row_revision, 2);
+    assert!(settings_snapshot.change_revision > 0);
     assert_eq!(
         db.task_board_orchestrator_settings()
             .await

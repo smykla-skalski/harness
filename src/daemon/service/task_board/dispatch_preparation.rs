@@ -37,6 +37,14 @@ pub(super) async fn reserve_and_prepare_task_board_dispatch(
         .map_err(|error| (DispatchFailureKind::LinkItem, error))?;
     let (intent_id, _) = match reserved {
         ReservedTaskBoardDispatch::Applied(applied) => return Ok(applied),
+        ReservedTaskBoardDispatch::Blocked(admission) => {
+            return Err((
+                DispatchFailureKind::LinkItem,
+                CliError::from(CliErrorKind::invalid_transition(
+                    admission.refusal_message(),
+                )),
+            ));
+        }
         ReservedTaskBoardDispatch::Preparing {
             intent_id,
             preparation,

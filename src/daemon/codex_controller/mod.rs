@@ -4,6 +4,7 @@ mod completion_evidence;
 mod effort;
 mod events;
 mod handle;
+mod handle_admission_recovery;
 mod handle_control;
 mod handle_orchestration;
 mod handle_orchestration_lifecycle;

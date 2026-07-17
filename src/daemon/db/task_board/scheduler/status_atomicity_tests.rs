@@ -182,9 +182,9 @@ async fn ready_database() -> AsyncDaemonDb {
         serde_json::to_string(&crate::task_board::TaskBoardOrchestratorSettings::default())
             .expect("serialize settings");
     query(
-        "INSERT INTO task_board_orchestrator_settings
-            (singleton, settings_json, revision, updated_at)
-         VALUES (1, ?1, 1, ?2)",
+        "UPDATE task_board_orchestrator_settings
+         SET settings_json = ?1, revision = 1, updated_at = ?2
+         WHERE singleton = 1",
     )
     .bind(settings)
     .bind(timestamp(Utc::now()))

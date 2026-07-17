@@ -81,6 +81,11 @@ impl TaskBoardOrchestrator {
         &self,
         update: &TaskBoardOrchestratorSettingsUpdateRequest,
     ) -> Result<TaskBoardOrchestratorSettings, CliError> {
+        update.validate_admission_policy().map_err(|error| {
+            crate::errors::CliErrorKind::workflow_parse(format!(
+                "invalid task-board admission policy: {error}"
+            ))
+        })?;
         let mut settings = self.settings()?;
         apply_settings_update(&mut settings, update);
         settings.github_inbox = normalize_github_inbox(&settings.github_inbox)?;

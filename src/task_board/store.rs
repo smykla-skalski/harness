@@ -1,7 +1,5 @@
 use std::path::{Path, PathBuf};
 
-use serde::{Deserialize, Serialize};
-
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io;
 #[cfg(test)]
@@ -10,10 +8,12 @@ use crate::workspace::harness_data_root;
 #[cfg(test)]
 use crate::workspace::utc_now;
 
+mod frontmatter;
 #[cfg(test)]
 mod loading;
 #[cfg(test)]
 mod parse_cache;
+use frontmatter::TaskBoardFrontmatter;
 #[cfg(test)]
 use parse_cache::BOARD_PARSE_CACHE;
 
@@ -21,8 +21,8 @@ use super::TaskBoardWorkflowKind;
 #[cfg(test)]
 use super::types::CURRENT_TASK_BOARD_ITEM_VERSION;
 use super::types::{
-    AgentMode, ExternalRef, ExternalRefProvider, PlanningState, TaskBoardItem, TaskBoardPriority,
-    TaskBoardStatus, TaskBoardWorkflowState,
+    AgentMode, ExternalRef, PlanningState, TaskBoardItem, TaskBoardPriority, TaskBoardStatus,
+    TaskBoardWorkflowState,
 };
 
 #[derive(Debug, Clone)]
@@ -43,6 +43,8 @@ pub struct TaskBoardItemPatch {
     pub agent_mode: Option<AgentMode>,
     pub workflow_kind: Option<TaskBoardWorkflowKind>,
     pub execution_repository: OptionalFieldPatch<String>,
+    pub estimated_tokens: OptionalFieldPatch<u64>,
+    pub estimated_cost_microusd: OptionalFieldPatch<u64>,
     pub external_refs: Option<Vec<ExternalRef>>,
     pub planning: Option<PlanningState>,
     pub clear_planning: bool,
@@ -62,101 +64,6 @@ pub enum OptionalFieldPatch<T> {
     Unchanged,
     Set(T),
     Clear,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct TaskBoardFrontmatter {
-    schema_version: u32,
-    id: String,
-    title: String,
-    status: TaskBoardStatus,
-    priority: TaskBoardPriority,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    tags: Vec<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    project_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    target_project_types: Vec<String>,
-    agent_mode: AgentMode,
-    #[serde(default)]
-    workflow_kind: TaskBoardWorkflowKind,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    execution_repository: Option<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    external_refs: Vec<ExternalRef>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    imported_from_provider: Option<ExternalRefProvider>,
-    #[serde(default)]
-    planning: PlanningState,
-    #[serde(default, skip_serializing_if = "TaskBoardWorkflowState::is_default")]
-    workflow: TaskBoardWorkflowState,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    session_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    work_item_id: Option<String>,
-    #[serde(default)]
-    usage: super::types::TaskUsage,
-    created_at: String,
-    updated_at: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    deleted_at: Option<String>,
-}
-
-impl From<&TaskBoardItem> for TaskBoardFrontmatter {
-    fn from(item: &TaskBoardItem) -> Self {
-        Self {
-            schema_version: item.schema_version,
-            id: item.id.clone(),
-            title: item.title.clone(),
-            status: item.status,
-            priority: item.priority,
-            tags: item.tags.clone(),
-            project_id: item.project_id.clone(),
-            target_project_types: item.target_project_types.clone(),
-            agent_mode: item.agent_mode,
-            workflow_kind: item.workflow_kind,
-            execution_repository: item.execution_repository.clone(),
-            external_refs: item.external_refs.clone(),
-            imported_from_provider: item.imported_from_provider,
-            planning: item.planning.clone(),
-            workflow: item.workflow.clone(),
-            session_id: item.session_id.clone(),
-            work_item_id: item.work_item_id.clone(),
-            usage: item.usage.clone(),
-            created_at: item.created_at.clone(),
-            updated_at: item.updated_at.clone(),
-            deleted_at: item.deleted_at.clone(),
-        }
-    }
-}
-
-impl TaskBoardFrontmatter {
-    fn into_item(self, body: String) -> TaskBoardItem {
-        TaskBoardItem {
-            schema_version: self.schema_version,
-            id: self.id,
-            title: self.title,
-            body,
-            status: self.status,
-            priority: self.priority,
-            tags: self.tags,
-            project_id: self.project_id,
-            target_project_types: self.target_project_types,
-            agent_mode: self.agent_mode,
-            workflow_kind: self.workflow_kind,
-            execution_repository: self.execution_repository,
-            external_refs: self.external_refs,
-            imported_from_provider: self.imported_from_provider,
-            planning: self.planning,
-            workflow: self.workflow,
-            session_id: self.session_id,
-            work_item_id: self.work_item_id,
-            usage: self.usage,
-            created_at: self.created_at,
-            updated_at: self.updated_at,
-            deleted_at: self.deleted_at,
-        }
-    }
 }
 
 #[must_use]
@@ -430,6 +337,11 @@ fn apply_planning_patch(target: &mut PlanningState, patch: Option<&PlanningState
 fn apply_link_patch(item: &mut TaskBoardItem, patch: TaskBoardItemPatch) {
     apply_optional_patch(&mut item.project_id, patch.project_id);
     apply_optional_patch(&mut item.execution_repository, patch.execution_repository);
+    apply_optional_patch(&mut item.estimated_tokens, patch.estimated_tokens);
+    apply_optional_patch(
+        &mut item.estimated_cost_microusd,
+        patch.estimated_cost_microusd,
+    );
     apply_optional_patch(&mut item.session_id, patch.session_id);
     apply_optional_patch(&mut item.work_item_id, patch.work_item_id);
 }

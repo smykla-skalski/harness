@@ -200,6 +200,7 @@ pub(super) async fn dispatch_task_board_orchestrator_settings_update(
             "has_github_project": body.github_project.is_some(),
             "has_github_inbox": body.github_inbox.is_some(),
             "has_todoist_inbox": body.todoist_inbox.is_some(),
+            "has_admission_policy": body.admission_policy.is_some(),
             "has_policy_version": body.policy_version.is_some(),
         }),
         &result,

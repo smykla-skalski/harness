@@ -3,13 +3,23 @@ use std::collections::BTreeMap;
 use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 use super::ITEMS_CHANGE_SCOPE;
+use super::admission_lifecycle::{
+    ensure_item_admission_can_terminate_in_tx, release_item_admission_in_tx,
+};
 use super::mapper::{item_from_rows, label, to_json};
 use super::rows::{ExternalRefRow, ItemRow};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::errors::CliErrorKind;
 use crate::infra::io;
-use crate::task_board::types::CURRENT_TASK_BOARD_ITEM_VERSION;
+use crate::task_board::types::{CURRENT_TASK_BOARD_ITEM_VERSION, MAX_TASK_BOARD_ESTIMATE};
 use crate::task_board::{TaskBoardItem, TaskBoardStatus};
+
+#[path = "items_lifecycle.rs"]
+mod lifecycle;
+use lifecycle::{
+    cancel_prestart_dispatch_for_terminal_item_in_tx, ensure_estimates_are_editable_in_tx,
+    task_board_item_is_terminal,
+};
 
 const SELECT_ITEM: &str = "SELECT * FROM task_board_items WHERE item_id = ?1";
 const SELECT_REFS: &str = "SELECT item_id, position, provider, external_id, url, sync_state_json
@@ -159,6 +169,7 @@ impl AsyncDaemonDb {
         let (mut item, revision) = load_item_in_tx(&mut transaction, item_id)
             .await?
             .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
+        let prior_estimates = (item.estimated_tokens, item.estimated_cost_microusd);
         if !mutate(&mut item)? {
             transaction
                 .commit()
@@ -172,9 +183,17 @@ impl AsyncDaemonDb {
                 item.id
             )));
         }
+        if prior_estimates != (item.estimated_tokens, item.estimated_cost_microusd) {
+            ensure_estimates_are_editable_in_tx(&mut transaction, item_id).await?;
+        }
         validate_item(&item)?;
         item.status = item.status.canonical_persisted_status();
         item.updated_at = utc_now();
+        if task_board_item_is_terminal(&item) {
+            ensure_item_admission_can_terminate_in_tx(&mut transaction, item_id).await?;
+            cancel_prestart_dispatch_for_terminal_item_in_tx(&mut transaction, item_id).await?;
+            release_item_admission_in_tx(&mut transaction, item_id).await?;
+        }
         replace_item_in_tx(&mut transaction, &item, revision + 1).await?;
         let change_revision = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
         transaction
@@ -231,10 +250,11 @@ pub(super) async fn insert_item_in_tx(
         "INSERT INTO task_board_items (
         item_id, schema_version, title, body, status, priority, tags_json, project_id,
         target_project_types_json, agent_mode, workflow_kind, execution_repository,
-        imported_from_provider, planning_json, workflow_json, session_id, work_item_id,
-        usage_json, created_at, updated_at, deleted_at, revision
+        estimated_tokens, estimated_cost_microusd, imported_from_provider, planning_json,
+        workflow_json, session_id, work_item_id, usage_json, created_at, updated_at,
+        deleted_at, revision
     ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
-        ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
+        ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
     )
     .bind(&item.id)
     .bind(i64::from(item.schema_version))
@@ -251,6 +271,14 @@ pub(super) async fn insert_item_in_tx(
     .bind(label(item.agent_mode, "task board agent mode")?)
     .bind(label(item.workflow_kind, "task board workflow kind")?)
     .bind(&item.execution_repository)
+    .bind(optional_u64_as_i64(
+        item.estimated_tokens,
+        "task board estimated tokens",
+    )?)
+    .bind(optional_u64_as_i64(
+        item.estimated_cost_microusd,
+        "task board estimated cost",
+    )?)
     .bind(
         item.imported_from_provider
             .map(|provider| label(provider, "task board imported provider"))
@@ -282,9 +310,10 @@ pub(super) async fn replace_item_in_tx(
         schema_version = ?2, title = ?3, body = ?4, status = ?5, priority = ?6,
         tags_json = ?7, project_id = ?8, target_project_types_json = ?9,
         agent_mode = ?10, workflow_kind = ?11, execution_repository = ?12,
-        imported_from_provider = ?13, planning_json = ?14, workflow_json = ?15,
-        session_id = ?16, work_item_id = ?17, usage_json = ?18, created_at = ?19,
-        updated_at = ?20, deleted_at = ?21, revision = ?22
+        estimated_tokens = ?13, estimated_cost_microusd = ?14,
+        imported_from_provider = ?15, planning_json = ?16, workflow_json = ?17,
+        session_id = ?18, work_item_id = ?19, usage_json = ?20, created_at = ?21,
+        updated_at = ?22, deleted_at = ?23, revision = ?24
         WHERE item_id = ?1",
     )
     .bind(&item.id)
@@ -302,6 +331,14 @@ pub(super) async fn replace_item_in_tx(
     .bind(label(item.agent_mode, "task board agent mode")?)
     .bind(label(item.workflow_kind, "task board workflow kind")?)
     .bind(&item.execution_repository)
+    .bind(optional_u64_as_i64(
+        item.estimated_tokens,
+        "task board estimated tokens",
+    )?)
+    .bind(optional_u64_as_i64(
+        item.estimated_cost_microusd,
+        "task board estimated cost",
+    )?)
     .bind(
         item.imported_from_provider
             .map(|provider| label(provider, "task board imported provider"))
@@ -393,7 +430,27 @@ fn validate_item(item: &TaskBoardItem) -> Result<(), CliError> {
         ))
         .into());
     }
+    if item
+        .estimated_tokens
+        .is_some_and(|value| !(1..=MAX_TASK_BOARD_ESTIMATE).contains(&value))
+    {
+        return Err(db_error("task-board estimated tokens are out of range"));
+    }
+    if item
+        .estimated_cost_microusd
+        .is_some_and(|value| !(1..=MAX_TASK_BOARD_ESTIMATE).contains(&value))
+    {
+        return Err(db_error("task-board estimated cost is out of range"));
+    }
     Ok(())
+}
+
+fn optional_u64_as_i64(value: Option<u64>, context: &str) -> Result<Option<i64>, CliError> {
+    value
+        .map(|value| {
+            i64::try_from(value).map_err(|error| db_error(format!("store {context}: {error}")))
+        })
+        .transpose()
 }
 
 fn sort_items(items: &mut [TaskBoardItem]) {

@@ -9,9 +9,9 @@ use crate::daemon::protocol::{
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::types::TaskBoardStatus;
 use crate::task_board::{
-    TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig, TaskBoardGitRuntimeProfile,
-    TaskBoardGitSigningConfig, TaskBoardGitSigningMode, TaskBoardOrchestratorStatus,
-    normalize_repository_slug,
+    TaskBoardAutomationPolicy, TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig,
+    TaskBoardGitRuntimeProfile, TaskBoardGitSigningConfig, TaskBoardGitSigningMode,
+    TaskBoardOrchestratorStatus, normalize_repository_slug, validate_task_board_policy,
 };
 
 use super::orchestrator_tokens::{
@@ -80,6 +80,9 @@ pub struct TaskBoardOrchestratorSettingsArgs {
     pub project_dir: Option<String>,
     #[arg(long)]
     pub clear_project_dir: bool,
+    /// Complete admission policy as a JSON object.
+    #[arg(long, value_name = "JSON", value_parser = parse_admission_policy)]
+    pub admission_policy: Option<TaskBoardAutomationPolicy>,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -220,6 +223,7 @@ impl TaskBoardOrchestratorSettingsArgs {
             || self.clear_dispatch_status_filter
             || self.project_dir.is_some()
             || self.clear_project_dir
+            || self.admission_policy.is_some()
     }
 
     fn update_request(&self) -> TaskBoardOrchestratorSettingsUpdateRequest {
@@ -230,9 +234,18 @@ impl TaskBoardOrchestratorSettingsArgs {
             clear_dispatch_status_filter: self.clear_dispatch_status_filter,
             project_dir: self.project_dir.clone(),
             clear_project_dir: self.clear_project_dir,
+            admission_policy: self.admission_policy.clone(),
             ..TaskBoardOrchestratorSettingsUpdateRequest::default()
         }
     }
+}
+
+fn parse_admission_policy(value: &str) -> Result<TaskBoardAutomationPolicy, String> {
+    let policy = serde_json::from_str(value)
+        .map_err(|error| format!("invalid task-board admission policy JSON: {error}"))?;
+    validate_task_board_policy(&policy)
+        .map_err(|error| format!("invalid task-board admission policy: {error}"))?;
+    Ok(policy)
 }
 
 impl Execute for TaskBoardOrchestratorRuntimeConfigArgs {

@@ -108,6 +108,9 @@ impl AsyncDaemonDb {
             })?;
         let events_json = serde_json::to_string(&snapshot.events)
             .map_err(|error| db_error(format!("serialize async codex events: {error}")))?;
+        let mut transaction = self
+            .begin_immediate_transaction("async codex run save")
+            .await?;
         query(UPSERT_CODEX_RUN_SQL)
             .bind(&snapshot.run_id)
             .bind(&snapshot.session_id)
@@ -132,10 +135,20 @@ impl AsyncDaemonDb {
             .bind(&snapshot.updated_at)
             .bind(&snapshot.model)
             .bind(&snapshot.effort)
-            .execute(self.pool())
+            .execute(transaction.as_mut())
             .await
             .map_err(|error| db_error(format!("save async codex run: {error}")))?;
-        Ok(())
+        if !snapshot.status.is_active() {
+            super::task_board::release_managed_worker_admission_in_tx(
+                &mut transaction,
+                &snapshot.run_id,
+            )
+            .await?;
+        }
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit async codex run: {error}")))
     }
 
     /// Load one Codex controller run snapshot from the canonical async DB.

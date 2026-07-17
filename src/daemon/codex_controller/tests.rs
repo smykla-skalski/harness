@@ -10,6 +10,7 @@ use super::{
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest, CodexRunStatus};
 use crate::session::types::{AgentStatus, SessionRole};
 
+mod admission_recovery;
 mod completion_evidence;
 mod registration_recovery;
 mod request_validation;

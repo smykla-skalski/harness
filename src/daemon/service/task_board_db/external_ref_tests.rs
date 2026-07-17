@@ -33,7 +33,7 @@ fn external_ref_replacement_preserves_matching_daemon_sync_state() {
         ..TaskBoardUpdateItemRequest::default()
     };
 
-    apply_update_request(&mut item, &request);
+    apply_update_request(&mut item, &request).expect("apply update");
 
     assert_eq!(item.external_refs.len(), 2);
     assert_eq!(item.external_refs[0].sync_state, None);
@@ -63,7 +63,7 @@ fn external_ref_replacement_rejects_stale_explicit_sync_state() {
         ..TaskBoardUpdateItemRequest::default()
     };
 
-    apply_update_request(&mut item, &request);
+    apply_update_request(&mut item, &request).expect("apply update");
 
     assert_eq!(item.external_refs[0].sync_state, Some(current));
 }
@@ -80,7 +80,7 @@ fn external_ref_replacement_rejects_sync_state_for_new_reference() {
         ..TaskBoardUpdateItemRequest::default()
     };
 
-    apply_update_request(&mut item, &request);
+    apply_update_request(&mut item, &request).expect("apply update");
 
     assert_eq!(item.external_refs[0].sync_state, None);
 }
@@ -98,6 +98,8 @@ async fn external_ref_creation_rejects_client_sync_state() {
         agent_mode: Default::default(),
         workflow_kind: Default::default(),
         execution_repository: None,
+        estimated_tokens: None,
+        estimated_cost_microusd: None,
         tags: Vec::new(),
         project_id: None,
         target_project_types: Vec::new(),
@@ -133,7 +135,7 @@ fn empty_external_ref_replacement_clears_every_reference() {
         ..TaskBoardUpdateItemRequest::default()
     };
 
-    apply_update_request(&mut item, &request);
+    apply_update_request(&mut item, &request).expect("apply update");
 
     assert!(item.external_refs.is_empty());
 }

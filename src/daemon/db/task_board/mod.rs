@@ -1,5 +1,10 @@
 //! Canonical `SQLite` persistence for Task Board domain state.
 
+mod admission;
+mod admission_lifecycle;
+mod admission_recovery;
+mod admission_reservations;
+pub(super) use admission_lifecycle::release_managed_worker_admission_in_tx;
 mod aggregates;
 mod dispatch_intents;
 mod dispatch_preparations;
@@ -20,6 +25,8 @@ mod provider_sync_conflicts;
 mod rows;
 mod scheduler;
 
+#[cfg(test)]
+mod item_estimate_tests;
 #[cfg(test)]
 mod provider_external_create_finalize_tests;
 #[cfg(test)]
@@ -45,7 +52,10 @@ mod provider_sync_renewal_tests;
 #[cfg(test)]
 mod provider_sync_tests;
 
-pub(crate) use dispatch_intents::ClaimedTaskBoardDispatch;
+pub(crate) use admission_recovery::{
+    TaskBoardAdmissionMissingRunRecovery, TaskBoardAdmissionWorkerRecovery,
+};
+pub(crate) use dispatch_intents::{ClaimedTaskBoardDispatch, TaskBoardDispatchClaimAction};
 pub(crate) use dispatch_preparations::{
     ClaimedTaskBoardDispatchPreparation, ReservedTaskBoardDispatch,
 };

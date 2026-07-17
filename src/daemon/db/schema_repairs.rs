@@ -30,8 +30,11 @@ const CURRENT_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] = &[
     ("policy_nodes", "layout_source"),
     ("policy_decisions", "evaluated_at"),
     ("task_board_dispatch_intents", "consumed_approval_grant_id"),
+    ("task_board_dispatch_intents", "compensation_pending"),
     ("task_board_items", "workflow_kind"),
     ("task_board_items", "execution_repository"),
+    ("task_board_items", "estimated_tokens"),
+    ("task_board_items", "estimated_cost_microusd"),
 ];
 
 const CURRENT_SCHEMA_CODEX_RUN_COLUMNS: &[(&str, &str)] = &[
@@ -94,6 +97,8 @@ pub(super) fn current_schema_shape_needs_repair(
         "task_board_admission_leases",
         "task_board_provider_scope_state",
         "task_board_external_create_intents",
+        "task_board_dispatch_admission_decisions",
+        "task_board_dispatch_admission_ledger",
         "task_board_sync_conflicts",
         "task_board_execution_hosts",
         "task_board_remote_assignments",
@@ -139,6 +144,9 @@ pub(super) fn current_schema_shape_needs_repair(
     if super::schema_repairs_wake_events::indexes_need_repair(conn)? {
         return Ok(true);
     }
+    if super::schema_repairs_admission::shape_needs_repair(conn)? {
+        return Ok(true);
+    }
     Ok(false)
 }
 
@@ -172,8 +180,10 @@ pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError>
     super::schema_v36::run(&db.conn)?;
     super::schema_v37::run(&db.conn)?;
     super::schema_v38::run(&db.conn)?;
+    super::schema_v39::run(&db.conn)?;
     super::schema_repairs_external_creates::require_complete_shape(&db.conn)?;
     super::schema_repairs_wake_events::require_complete_shape(&db.conn)?;
+    super::schema_repairs_admission::require_complete_shape(&db.conn)?;
     db.conn
         .execute(
             "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",

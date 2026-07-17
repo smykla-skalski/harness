@@ -183,16 +183,21 @@ async fn insert_singletons(
     snapshot: &LegacyTaskBoardSnapshot,
     runtime_config: &TaskBoardGitRuntimeConfig,
 ) -> Result<(), CliError> {
-    query(
-        "INSERT INTO task_board_orchestrator_settings (
-        singleton, settings_json, revision, updated_at
-    ) VALUES (1, ?1, 1, ?2)",
+    let settings_update = query(
+        "UPDATE task_board_orchestrator_settings
+         SET settings_json = ?1, revision = 1, updated_at = ?2
+         WHERE singleton = 1",
     )
     .bind(to_json(&snapshot.settings, "orchestrator settings")?)
     .bind(utc_now())
     .execute(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("import orchestrator settings: {error}")))?;
+    if settings_update.rows_affected() != 1 {
+        return Err(db_error(
+            "import orchestrator settings: seeded singleton is missing",
+        ));
+    }
     query(
         "INSERT INTO task_board_orchestrator_state (
         singleton, state_json, enabled, running, revision, updated_at

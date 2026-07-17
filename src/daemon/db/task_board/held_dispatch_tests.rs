@@ -81,6 +81,7 @@ async fn held_fixture() -> HeldFixture {
     let intent_id = match reserved {
         ReservedTaskBoardDispatch::Preparing { intent_id, .. } => intent_id,
         ReservedTaskBoardDispatch::Applied(_) => panic!("fresh item already applied"),
+        ReservedTaskBoardDispatch::Blocked(_) => panic!("default admission blocked reservation"),
     };
     let preparation = db
         .claim_task_board_dispatch_preparation(&intent_id)
@@ -172,7 +173,7 @@ async fn held_delivery_rechecks_kill_switch_then_advances_worker_state() {
     );
     let completed = fixture
         .db
-        .complete_task_board_dispatch(&claim.intent_id, &claim.claim_token)
+        .complete_task_board_dispatch(&claim.intent_id, &claim.claim_token, "codex-held-test")
         .await
         .expect("complete start");
     assert_eq!(completed.workflow.status, TaskBoardWorkflowStatus::Running);

@@ -22,6 +22,8 @@ use crate::mcp::tool::ToolRegistry;
 
 use super::{register_all, socket_path};
 
+mod orchestrator_settings_tests;
+
 static DAEMON_TEST_MUTEX: OnceLock<AsyncMutex<()>> = OnceLock::new();
 
 fn daemon_test_mutex() -> &'static AsyncMutex<()> {
@@ -244,26 +246,6 @@ async fn dispatch_tool_proxies_to_running_daemon() {
 
     assert_eq!(text_result_json(&result), json!({ "dispatched": 1 }));
     assert_eq!(captured.request.method, ws_methods::TASK_BOARD_DISPATCH);
-    assert_eq!(captured.request.params, arguments);
-}
-
-#[tokio::test(flavor = "current_thread")]
-async fn orchestrator_settings_update_tool_proxies_to_running_daemon() {
-    let arguments = json!({
-        "dry_run_default": true,
-    });
-    let (result, captured) = call_task_board_tool(
-        ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_UPDATE,
-        arguments.clone(),
-        json!({ "saved": true }),
-    )
-    .await;
-
-    assert_eq!(text_result_json(&result), json!({ "saved": true }));
-    assert_eq!(
-        captured.request.method,
-        ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_UPDATE
-    );
     assert_eq!(captured.request.params, arguments);
 }
 

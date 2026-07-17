@@ -154,6 +154,8 @@ pub struct TaskBoardUpdateArgs {
     #[command(flatten)]
     pub clear_links: TaskBoardUpdateClearLinkArgs,
     #[command(flatten)]
+    pub clear_estimates: TaskBoardUpdateClearEstimateArgs,
+    #[command(flatten)]
     pub clear_state: TaskBoardUpdateClearStateArgs,
 }
 
@@ -165,6 +167,14 @@ pub struct TaskBoardUpdateClearLinkArgs {
     pub clear_session: bool,
     #[arg(long)]
     pub clear_work_item: bool,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct TaskBoardUpdateClearEstimateArgs {
+    #[arg(long, conflicts_with = "estimated_tokens")]
+    pub clear_estimated_tokens: bool,
+    #[arg(long, conflicts_with = "estimated_cost_microusd")]
+    pub clear_estimated_cost_microusd: bool,
 }
 
 #[derive(Debug, Clone, Args)]

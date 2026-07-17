@@ -1,7 +1,4 @@
-use tokio::task::spawn_blocking;
-use tracing::warn;
-
-use crate::daemon::db::{AsyncDaemonDb, ClaimedTaskBoardDispatch};
+use crate::daemon::db::AsyncDaemonDb;
 #[cfg(test)]
 use crate::daemon::protocol::ManagedAgentSnapshot;
 use crate::daemon::protocol::{
@@ -11,15 +8,15 @@ use crate::daemon::protocol::{
     TaskBoardOrchestratorRunOnceResponse,
 };
 use crate::daemon::service;
-use crate::daemon::task_board_managed_agents::{
-    rendered_worker_prompt, start_worker_for_applied_task,
-};
+use crate::daemon::task_board_managed_agents::rendered_worker_prompt;
 use crate::errors::{CliError, CliErrorKind};
 use crate::feature_flags::task_board_automation_v2_enabled_from_env;
+#[cfg(test)]
+use crate::task_board::DispatchFailureKind;
 use crate::task_board::{
-    DispatchAppliedTask, DispatchExecutionSummary, DispatchFailure, DispatchFailureKind,
-    TaskBoardAutomationRunTrigger,
+    DispatchAppliedTask, DispatchExecutionSummary, DispatchFailure, TaskBoardAutomationRunTrigger,
 };
+use tokio::task::spawn_blocking;
 
 use super::{DaemonHttpState, require_async_db};
 
@@ -27,6 +24,7 @@ mod automation_run;
 mod item_ops;
 mod orchestrator_ops;
 mod policy_ops;
+mod worker_start;
 
 pub(crate) use item_ops::*;
 pub(crate) use orchestrator_ops::*;
@@ -70,29 +68,13 @@ pub(crate) async fn deliver(
     }
     let mut claim = db.claim_held_task_board_dispatch(&request.item_id).await?;
     let prompt = rendered_worker_prompt(&claim.applied, &claim.intent_id);
-    match start_worker_for_applied_task(state, &claim.applied, &claim.intent_id).await {
-        Ok(agent) => {
-            claim.applied.item = db
-                .complete_task_board_dispatch(&claim.intent_id, &claim.claim_token)
-                .await?;
-            Ok(TaskBoardDispatchDeliverResponse {
-                intent_id: claim.intent_id,
-                applied: claim.applied,
-                rendered_prompt: prompt,
-                started_agent: Some(agent),
-            })
-        }
-        Err(error) => {
-            db.fail_task_board_dispatch(
-                &claim.intent_id,
-                &claim.claim_token,
-                claim.consumed_approval_grant_id.as_deref(),
-                &error.to_string(),
-            )
-            .await?;
-            Err(error)
-        }
-    }
+    let agent = worker_start::start_and_complete_delivered_worker(state, db, &mut claim).await?;
+    Ok(TaskBoardDispatchDeliverResponse {
+        intent_id: claim.intent_id,
+        applied: claim.applied,
+        rendered_prompt: prompt,
+        started_agent: Some(agent),
+    })
 }
 
 pub(crate) async fn pick(
@@ -149,7 +131,8 @@ async fn handle_dispatch_result(
 ) -> Result<TaskBoardDispatchResponse, CliError> {
     let mut response = result?;
     if !response.applied.is_empty() {
-        let (applied, failures) = start_claimed_workers(state, &response.applied, async_db).await;
+        let (applied, failures) =
+            worker_start::start_claimed_workers(state, &response.applied, async_db).await;
         response.applied = applied;
         response.failures.extend(failures);
         broadcast_sessions_updated(state, Some(async_db)).await;
@@ -170,7 +153,7 @@ async fn handle_run_once_result(
             .and_then(|run| run.dispatch.as_ref())
             .map(|dispatch| dispatch.applied.clone())
             .unwrap_or_default();
-        let (kept, failures) = start_claimed_workers(state, &applied, async_db).await;
+        let (kept, failures) = worker_start::start_claimed_workers(state, &applied, async_db).await;
         if let Some(dispatch) = status
             .last_run
             .as_mut()
@@ -195,74 +178,6 @@ fn amend_dispatch_for_worker_outcomes(
 ) {
     dispatch.applied = kept;
     dispatch.failures.extend(failures);
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "worker startup must keep successful claims while routing each failure through durable rollback"
-)]
-async fn start_claimed_workers(
-    state: &DaemonHttpState,
-    applied: &[DispatchAppliedTask],
-    async_db: &AsyncDaemonDb,
-) -> (Vec<DispatchAppliedTask>, Vec<DispatchFailure>) {
-    let mut kept = Vec::new();
-    let mut failures = Vec::new();
-    for task in applied {
-        let mut claim = match async_db
-            .claim_task_board_dispatch(&task.board_item_id)
-            .await
-        {
-            Ok(Some(claim)) => claim,
-            Ok(None) => {
-                kept.push(task.clone());
-                continue;
-            }
-            Err(error) => {
-                warn!(board_item_id = %task.board_item_id, %error, "deferred task board worker claim to recovery loop");
-                kept.push(task.clone());
-                continue;
-            }
-        };
-        match start_worker_for_applied_task(state, &claim.applied, &claim.intent_id).await {
-            Ok(_) => {
-                match async_db
-                    .complete_task_board_dispatch(&claim.intent_id, &claim.claim_token)
-                    .await
-                {
-                    Ok(item) => claim.applied.item = item,
-                    Err(error) => {
-                        warn!(board_item_id = %task.board_item_id, %error, "task board worker started but intent completion failed");
-                    }
-                }
-                kept.push(claim.applied);
-            }
-            Err(error) => record_worker_failure(async_db, claim, error, &mut failures).await,
-        }
-    }
-    (kept, failures)
-}
-
-async fn record_worker_failure(
-    db: &AsyncDaemonDb,
-    claim: ClaimedTaskBoardDispatch,
-    error: CliError,
-    failures: &mut Vec<DispatchFailure>,
-) {
-    let rollback = db
-        .fail_task_board_dispatch(
-            &claim.intent_id,
-            &claim.claim_token,
-            claim.consumed_approval_grant_id.as_deref(),
-            &error.to_string(),
-        )
-        .await;
-    log_rollback_outcome(&claim.applied.board_item_id, rollback.err());
-    failures.push(DispatchFailure {
-        board_item_id: claim.applied.board_item_id,
-        kind: DispatchFailureKind::WorkerSpawnFailed,
-        message: error.to_string(),
-    });
 }
 
 /// Shared classifier for worker spawn outcomes. Runs `on_failure` for each
@@ -290,20 +205,6 @@ fn classify_worker_outcomes(
         }
     }
     (kept, failures)
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-)]
-fn log_rollback_outcome(board_item_id: &str, undo_error: Option<CliError>) {
-    if let Some(error) = undo_error {
-        warn!(
-            board_item_id,
-            error = %error,
-            "failed to roll back dispatched task-board item after worker spawn failure",
-        );
-    }
 }
 
 async fn broadcast_sessions_updated(state: &DaemonHttpState, async_db: Option<&AsyncDaemonDb>) {

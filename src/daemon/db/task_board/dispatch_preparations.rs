@@ -1,19 +1,28 @@
 use serde::{Deserialize, Serialize};
-use sqlx::{Sqlite, Transaction, query, query_as};
+use sqlx::{query, query_as};
 use uuid::Uuid;
 
 use super::ITEMS_CHANGE_SCOPE;
+use super::admission::{TaskBoardDispatchAdmissionSnapshot, evaluate_dispatch_admission_in_tx};
+use super::admission_lifecycle::{
+    TaskBoardAdmissionCheck, renew_dispatch_admission_in_tx, revalidate_dispatch_admission_in_tx,
+};
+use super::admission_reservations::persist_admission_snapshot_in_tx;
 use super::items::{bump_change_in_tx, load_item_in_tx, replace_item_in_tx};
 use crate::daemon::db::policy::consume_approval_grant_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::infra::io;
-use crate::session::types::TaskSeverity;
-use crate::task_board::{
-    DispatchAppliedTask, DispatchPlan, SessionIntent, TaskBoardItem, TaskBoardPriority,
-    TaskBoardStatus, TaskBoardWorkflowStatus,
-};
+use crate::task_board::{DispatchAppliedTask, DispatchPlan, SessionIntent};
 
 const PREPARATION_LEASE_SECONDS: i64 = 30;
+
+#[path = "dispatch_preparations_helpers.rs"]
+mod helpers;
+use helpers::{
+    active_reservation, apply_preparation_to_item, decode_preparation, ensure_preparation_claim,
+    fail_preparation_admission_in_tx, insert_preparation, release_expired_preparations,
+    validate_reservable_item,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct TaskBoardDispatchPreparation {
@@ -42,6 +51,7 @@ pub(crate) enum ReservedTaskBoardDispatch {
         preparation: TaskBoardDispatchPreparation,
     },
     Applied(DispatchAppliedTask),
+    Blocked(TaskBoardDispatchAdmissionSnapshot),
 }
 
 impl AsyncDaemonDb {
@@ -67,7 +77,7 @@ impl AsyncDaemonDb {
             })?;
             return Ok(reserved);
         }
-        let (item, _) = load_item_in_tx(&mut transaction, &plan.board_item_id)
+        let (item, item_revision) = load_item_in_tx(&mut transaction, &plan.board_item_id)
             .await?
             .ok_or_else(|| {
                 db_error(format!(
@@ -76,6 +86,22 @@ impl AsyncDaemonDb {
                 ))
             })?;
         validate_reservable_item(&item, plan)?;
+        let mut admission =
+            evaluate_dispatch_admission_in_tx(&mut transaction, &item, item_revision, None).await?;
+        if admission.as_ref().is_some_and(|value| !value.is_allowed()) {
+            let mut admission = admission.take().expect("checked task board admission");
+            persist_admission_snapshot_in_tx(
+                &mut transaction,
+                &plan.board_item_id,
+                None,
+                &mut admission,
+            )
+            .await?;
+            transaction.commit().await.map_err(|error| {
+                db_error(format!("commit refused task board admission: {error}"))
+            })?;
+            return Ok(ReservedTaskBoardDispatch::Blocked(admission));
+        }
         let intent_id = format!("dispatch-intent-{}", Uuid::new_v4().simple());
         let workflow_execution_id = format!("workflow-{}", Uuid::new_v4().simple());
         let session_id = match &plan.session {
@@ -93,6 +119,15 @@ impl AsyncDaemonDb {
             hold_worker,
         };
         insert_preparation(&mut transaction, &intent_id, &preparation).await?;
+        if let Some(mut admission) = admission {
+            persist_admission_snapshot_in_tx(
+                &mut transaction,
+                &plan.board_item_id,
+                Some(&intent_id),
+                &mut admission,
+            )
+            .await?;
+        }
         transaction.commit().await.map_err(|error| {
             db_error(format!("commit task board dispatch reservation: {error}"))
         })?;
@@ -127,6 +162,34 @@ impl AsyncDaemonDb {
             })?;
             return Ok(None);
         };
+        let preparation = decode_preparation(&payload)?;
+        let (item, item_revision) = load_item_in_tx(&mut transaction, &preparation.board_item_id)
+            .await?
+            .ok_or_else(|| {
+                db_error(format!(
+                    "task-board item '{}' not found",
+                    preparation.board_item_id
+                ))
+            })?;
+        validate_reservable_item(&item, &preparation.plan)?;
+        if let TaskBoardAdmissionCheck::Blocked(admission) =
+            revalidate_dispatch_admission_in_tx(&mut transaction, intent_id, &item, item_revision)
+                .await?
+        {
+            fail_preparation_admission_in_tx(
+                &mut transaction,
+                intent_id,
+                &admission.refusal_message(),
+            )
+            .await?;
+            transaction.commit().await.map_err(|error| {
+                db_error(format!("commit refused task board preparation: {error}"))
+            })?;
+            return Err(crate::errors::CliErrorKind::invalid_transition(
+                admission.refusal_message(),
+            )
+            .into());
+        }
         let claim_token = format!("dispatch-prepare-{}", Uuid::new_v4().simple());
         query(
             "UPDATE task_board_dispatch_intents
@@ -147,7 +210,7 @@ impl AsyncDaemonDb {
         Ok(Some(ClaimedTaskBoardDispatchPreparation {
             intent_id: intent_id.to_string(),
             claim_token,
-            preparation: decode_preparation(&payload)?,
+            preparation,
         }))
     }
 
@@ -177,6 +240,9 @@ impl AsyncDaemonDb {
         &self,
         claim: &ClaimedTaskBoardDispatchPreparation,
     ) -> Result<(), CliError> {
+        let mut transaction = self
+            .begin_immediate_transaction("task board dispatch preparation renewal")
+            .await?;
         let changed = query(
             "UPDATE task_board_dispatch_intents
              SET claimed_at = ?3, updated_at = ?3
@@ -185,18 +251,21 @@ impl AsyncDaemonDb {
         .bind(&claim.intent_id)
         .bind(&claim.claim_token)
         .bind(utc_now())
-        .execute(self.pool())
+        .execute(transaction.as_mut())
         .await
         .map_err(|error| db_error(format!("renew task board preparation: {error}")))?
         .rows_affected();
-        if changed == 1 {
-            Ok(())
-        } else {
-            Err(db_error(format!(
+        if changed != 1 {
+            return Err(db_error(format!(
                 "task board preparation '{}' lost its claim",
                 claim.intent_id
-            )))
+            )));
         }
+        renew_dispatch_admission_in_tx(&mut transaction, &claim.intent_id).await?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit task board preparation renewal: {error}")))
     }
 
     /// Atomically link a prepared session task and expose it for worker startup.
@@ -224,33 +293,7 @@ impl AsyncDaemonDb {
                 ))
             })?;
         validate_reservable_item(&item, &preparation.plan)?;
-        item.workflow.execution_id = Some(preparation.workflow_execution_id.clone());
-        item.workflow.branch = Some(branch.to_string());
-        item.workflow.worktree = Some(worktree.to_string());
-        item.workflow.status = TaskBoardWorkflowStatus::Running;
-        item.workflow.current_step_id = Some(
-            if preparation.hold_worker {
-                "awaiting_delivery"
-            } else {
-                "dispatch"
-            }
-            .to_string(),
-        );
-        item.workflow.attempts = item.workflow.attempts.saturating_add(1);
-        // Record the real recorded-decision id from evaluation so the workflow
-        // trace correlates with the decision feed. Fall back to a minted trace
-        // id only when the built-in fallback gate decided (no recorded id).
-        item.workflow.push_policy_trace_id(
-            preparation
-                .plan
-                .policy_decision_id
-                .clone()
-                .unwrap_or_else(|| format!("policy-trace-{}", Uuid::new_v4().simple())),
-        );
-        item.status = TaskBoardStatus::InProgress;
-        item.session_id = Some(preparation.session_id.clone());
-        item.work_item_id = Some(preparation.work_item_id.clone());
-        item.updated_at = utc_now();
+        apply_preparation_to_item(&mut item, preparation, branch, worktree);
         replace_item_in_tx(&mut transaction, &item, revision + 1).await?;
         // Immediate dispatch consumes its one-shot grant with publication.
         // Step-mode dispatch deliberately keeps the grant live while held;
@@ -335,143 +378,4 @@ impl AsyncDaemonDb {
             )))
         }
     }
-}
-
-async fn active_reservation(
-    transaction: &mut Transaction<'_, Sqlite>,
-    item_id: &str,
-) -> Result<Option<ReservedTaskBoardDispatch>, CliError> {
-    let row = query_as::<_, (String, String, String)>(
-        "SELECT intent_id, status, payload_json FROM task_board_dispatch_intents
-         WHERE item_id = ?1
-           AND status IN ('preparing', 'preparing_claimed', 'held', 'pending', 'starting')
-         ORDER BY created_at DESC LIMIT 1",
-    )
-    .bind(item_id)
-    .fetch_optional(transaction.as_mut())
-    .await
-    .map_err(|error| db_error(format!("load active task board reservation: {error}")))?;
-    row.map(|(intent_id, status, payload)| {
-        if matches!(status.as_str(), "preparing" | "preparing_claimed") {
-            Ok(ReservedTaskBoardDispatch::Preparing {
-                intent_id,
-                preparation: decode_preparation(&payload)?,
-            })
-        } else {
-            serde_json::from_str(&payload)
-                .map(ReservedTaskBoardDispatch::Applied)
-                .map_err(|error| db_error(format!("decode active task board dispatch: {error}")))
-        }
-    })
-    .transpose()
-}
-
-async fn insert_preparation(
-    transaction: &mut Transaction<'_, Sqlite>,
-    intent_id: &str,
-    preparation: &TaskBoardDispatchPreparation,
-) -> Result<(), CliError> {
-    let payload = serde_json::to_string(preparation)
-        .map_err(|error| db_error(format!("serialize task board preparation: {error}")))?;
-    let now = utc_now();
-    query(
-        "INSERT INTO task_board_dispatch_intents (
-            intent_id, item_id, session_id, work_item_id, workflow_execution_id, payload_json,
-            status, attempts, available_at, created_at, updated_at
-         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'preparing', 0, ?7, ?7, ?7)",
-    )
-    .bind(intent_id)
-    .bind(&preparation.board_item_id)
-    .bind(&preparation.session_id)
-    .bind(&preparation.work_item_id)
-    .bind(&preparation.workflow_execution_id)
-    .bind(payload)
-    .bind(now)
-    .execute(transaction.as_mut())
-    .await
-    .map_err(|error| db_error(format!("insert task board preparation: {error}")))?;
-    Ok(())
-}
-
-async fn release_expired_preparations(
-    transaction: &mut Transaction<'_, Sqlite>,
-) -> Result<(), CliError> {
-    query(
-        "UPDATE task_board_dispatch_intents
-         SET status = 'preparing', claim_token = NULL, claimed_at = NULL, updated_at = ?1
-         WHERE status = 'preparing_claimed'
-           AND datetime(claimed_at) <= datetime('now', ?2)",
-    )
-    .bind(utc_now())
-    .bind(format!("-{PREPARATION_LEASE_SECONDS} seconds"))
-    .execute(transaction.as_mut())
-    .await
-    .map_err(|error| db_error(format!("release expired task board preparations: {error}")))?;
-    Ok(())
-}
-
-async fn ensure_preparation_claim(
-    transaction: &mut Transaction<'_, Sqlite>,
-    claim: &ClaimedTaskBoardDispatchPreparation,
-) -> Result<(), CliError> {
-    let exists = query_as::<_, (i64,)>(
-        "SELECT COUNT(*) FROM task_board_dispatch_intents
-         WHERE intent_id = ?1 AND claim_token = ?2 AND status = 'preparing_claimed'",
-    )
-    .bind(&claim.intent_id)
-    .bind(&claim.claim_token)
-    .fetch_one(transaction.as_mut())
-    .await
-    .map_err(|error| db_error(format!("verify task board preparation claim: {error}")))?
-    .0;
-    if exists == 1 {
-        Ok(())
-    } else {
-        Err(db_error(format!(
-            "task board preparation '{}' is not claimed",
-            claim.intent_id
-        )))
-    }
-}
-
-fn validate_reservable_item(item: &TaskBoardItem, plan: &DispatchPlan) -> Result<(), CliError> {
-    let body = item.body.trim();
-    let body = (!body.is_empty()).then_some(body);
-    let session_matches = match &plan.session {
-        SessionIntent::Existing { session_id } => item.session_id.as_deref() == Some(session_id),
-        SessionIntent::Create { .. } => item.session_id.is_none(),
-    };
-    let matches_plan = item.id == plan.board_item_id
-        && item.title == plan.task.title
-        && body == plan.task.context.as_deref()
-        && dispatch_severity(item.priority) == plan.task.severity
-        && item.planning.summary == plan.task.suggested_fix
-        && item.tags == plan.task.tags
-        && item.external_refs == plan.task.external_refs
-        && item.status == TaskBoardStatus::Todo
-        && session_matches
-        && item.work_item_id.is_none()
-        && !item.is_deleted();
-    if matches_plan {
-        Ok(())
-    } else {
-        Err(db_error(format!(
-            "task-board item '{}' changed before dispatch reservation",
-            plan.board_item_id
-        )))
-    }
-}
-
-const fn dispatch_severity(priority: TaskBoardPriority) -> TaskSeverity {
-    match priority {
-        TaskBoardPriority::Low => TaskSeverity::Low,
-        TaskBoardPriority::Medium => TaskSeverity::Medium,
-        TaskBoardPriority::High => TaskSeverity::High,
-        TaskBoardPriority::Critical => TaskSeverity::Critical,
-    }
-}
-
-fn decode_preparation(payload: &str) -> Result<TaskBoardDispatchPreparation, CliError> {
-    serde_json::from_str(payload)
-        .map_err(|error| db_error(format!("decode task board preparation: {error}")))
 }

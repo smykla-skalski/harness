@@ -1,7 +1,8 @@
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::protocol::{
     TaskBoardAuditRequest, TaskBoardCreateItemRequest, TaskBoardListItemsRequest,
-    TaskBoardUpdateIdentityClears, TaskBoardUpdateItemRequest, TaskBoardUpdateStateClears,
+    TaskBoardUpdateEstimateClears, TaskBoardUpdateIdentityClears, TaskBoardUpdateItemRequest,
+    TaskBoardUpdateStateClears,
 };
 use crate::errors::CliError;
 use crate::task_board::TaskBoardWorkflowKind;
@@ -21,6 +22,8 @@ impl Execute for TaskBoardCreateArgs {
             agent_mode: self.agent_mode,
             workflow_kind: TaskBoardWorkflowKind::default(),
             execution_repository: None,
+            estimated_tokens: self.fields.estimated_tokens,
+            estimated_cost_microusd: self.fields.estimated_cost_microusd,
             tags: self.tag.clone(),
             project_id: self.project_id.clone(),
             target_project_types: self.target_project_type.clone(),
@@ -93,6 +96,12 @@ impl TaskBoardUpdateArgs {
             agent_mode: self.agent_mode,
             workflow_kind: None,
             execution_repository: None,
+            estimated_tokens: self.fields.estimated_tokens,
+            estimated_cost_microusd: self.fields.estimated_cost_microusd,
+            clear_estimates: TaskBoardUpdateEstimateClears {
+                clear_estimated_tokens: self.clear_estimates.clear_estimated_tokens,
+                clear_estimated_cost_microusd: self.clear_estimates.clear_estimated_cost_microusd,
+            },
             tags: (!self.tag.is_empty()).then(|| self.tag.clone()),
             project_id: self.project_id.clone(),
             target_project_types: (!self.target_project_type.is_empty())

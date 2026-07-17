@@ -292,7 +292,7 @@ struct AsyncSessionMutationRow {
     project_id: String,
 }
 
-async fn sync_session_in_transaction(
+pub(in crate::daemon::db) async fn sync_session_in_transaction(
     transaction: &mut Transaction<'_, Sqlite>,
     project_id: &str,
     state: &SessionState,

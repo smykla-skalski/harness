@@ -32,6 +32,7 @@ mod schema;
 mod schema_backfill;
 mod schema_migrations;
 mod schema_shape_repairs;
+mod schema_shape_repairs_admission;
 mod schema_shape_repairs_wake_events;
 mod signals;
 mod sync;

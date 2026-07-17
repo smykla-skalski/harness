@@ -4,8 +4,8 @@ use tempfile::tempdir;
 use super::*;
 use crate::task_board::{
     DispatchAppliedTask, ExternalProvider, ExternalSyncAction, ExternalSyncOperation,
-    TaskBoardEvaluationRecord, TaskBoardEvaluationSummary, TaskBoardItem, TaskBoardStatus,
-    TaskBoardWorkflowStatus, build_dispatch_plan,
+    TaskBoardAutomationPolicy, TaskBoardEvaluationRecord, TaskBoardEvaluationSummary,
+    TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowStatus, build_dispatch_plan,
 };
 
 #[test]
@@ -239,6 +239,10 @@ fn partial_settings_json_populates_defaults() {
     assert_eq!(settings.enabled_workflows, defaults.enabled_workflows);
     assert_eq!(settings.dry_run_default, defaults.dry_run_default);
     assert_eq!(settings.policy_version, defaults.policy_version);
+    assert_eq!(
+        settings.admission_policy,
+        TaskBoardAutomationPolicy::default()
+    );
 }
 
 #[test]

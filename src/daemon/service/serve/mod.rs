@@ -104,6 +104,9 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         async_db.clone(),
         config.sandboxed,
     );
+    codex_controller
+        .reconcile_task_board_admission_workers_after_restart()
+        .await?;
     let agent_tui_manager = AgentTuiManagerHandle::new_with_async_db(
         sender.clone(),
         db.clone(),

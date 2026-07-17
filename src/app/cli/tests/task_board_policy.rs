@@ -123,6 +123,36 @@ fn parse_orchestrator_step_mode() {
 }
 
 #[test]
+fn parse_orchestrator_admission_policy() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "task-board",
+        "orchestrator",
+        "settings",
+        "--admission-policy",
+        "{}",
+        "--json",
+    ])
+    .expect("parse orchestrator admission policy");
+    match task_board_command(cli.command) {
+        TaskBoardCommand::Orchestrator {
+            command: TaskBoardOrchestratorCommand::Settings(args),
+        } => assert_eq!(args.admission_policy, Some(Default::default())),
+        _ => panic!("expected TaskBoard Orchestrator Settings"),
+    }
+
+    let invalid = Cli::try_parse_from([
+        "harness",
+        "task-board",
+        "orchestrator",
+        "settings",
+        "--admission-policy",
+        r#"{"limits":[{"kind":"concurrency","scope":{"kind":"global"},"limit":0,"reservation":1}]}"#,
+    ]);
+    assert!(invalid.is_err(), "invalid policy must fail CLI parsing");
+}
+
+#[test]
 fn parse_policy_grants() {
     let grants = Cli::try_parse_from(["harness", "task-board", "policy", "grants", "--json"])
         .expect("parse policy grants");

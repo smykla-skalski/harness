@@ -1,8 +1,12 @@
-use sqlx::{SqliteConnection, query, query_as};
+use sqlx::{Sqlite, SqliteConnection, Transaction, query, query_as};
 use uuid::Uuid;
 
 use super::ITEMS_CHANGE_SCOPE;
-use super::dispatch_intents::{ClaimedTaskBoardDispatch, decode_applied};
+use super::admission_lifecycle::{TaskBoardAdmissionCheck, revalidate_dispatch_admission_in_tx};
+use super::dispatch_intents::{
+    ClaimedTaskBoardDispatch, TaskBoardDispatchClaimAction, decode_applied,
+    ensure_dispatch_item_startable,
+};
 use super::items::{bump_change_in_tx, load_item_in_tx, replace_item_in_tx};
 use crate::daemon::db::policy::{
     consume_approval_grant_in_tx_at, live_approval_grant_in_tx_at, load_workspace_in_tx,
@@ -11,8 +15,9 @@ use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error, utc_now
 use crate::infra::io;
 use crate::task_board::policy_graph::PolicyCanvasWorkspace;
 use crate::task_board::{
-    DispatchAppliedTask, PolicyAction, SpawnGateSwitches, TaskBoardHeldDispatchItem,
-    TaskBoardHeldDispatchSummary, consumed_grant_id, dispatch_policy_from_graph,
+    DispatchAppliedTask, PolicyAction, PolicyDecision, SpawnGateSwitches,
+    TaskBoardHeldDispatchItem, TaskBoardHeldDispatchSummary, TaskBoardItem, consumed_grant_id,
+    dispatch_policy_from_graph,
 };
 
 #[derive(Debug)]
@@ -87,52 +92,39 @@ impl AsyncDaemonDb {
             .await?
             .ok_or_else(|| db_error(format!("task-board item '{board_item_id}' not found")))?;
         ensure_held_linkage(&applied, &item)?;
-        let now = utc_now();
-        let workspace = load_workspace_in_tx(&mut transaction).await?;
-        let switches = spawn_gate_switches(workspace.as_ref());
-        let live_policy = workspace
-            .as_ref()
-            .and_then(|workspace| workspace.active_live_canvas())
-            .map(|(canvas, graph)| (canvas.id.as_str(), graph));
-        let grant = match live_policy {
-            Some((_, graph)) => {
-                live_approval_grant_in_tx_at(
-                    transaction.as_mut(),
-                    board_item_id,
-                    PolicyAction::SpawnAgent,
-                    graph.revision,
-                    &now,
-                )
-                .await?
-            }
-            None => None,
-        };
-        let (decision, decision_id) = dispatch_policy_from_graph(
+        ensure_dispatch_item_startable(
             &item,
-            live_policy,
-            Some(now.clone()),
-            switches,
-            grant.as_ref(),
-        );
-        if !decision.is_allow() {
+            &applied.session_id,
+            &applied.work_item_id,
+            applied.item.workflow.execution_id.as_deref(),
+        )?;
+        if let TaskBoardAdmissionCheck::Blocked(admission) =
+            revalidate_dispatch_admission_in_tx(&mut transaction, &intent_id, &item, revision)
+                .await?
+        {
             transaction.commit().await.map_err(|error| {
-                db_error(format!("commit denied held task board delivery: {error}"))
+                db_error(format!("commit refused held task board admission: {error}"))
             })?;
-            return Err(CliErrorKind::invalid_transition(format!(
-                "current spawn policy refused held delivery: {decision:?}"
-            ))
-            .into());
+            return Err(CliErrorKind::invalid_transition(admission.refusal_message()).into());
         }
-        let consumed_approval_grant_id = consumed_grant_id(grant.as_ref(), &decision);
-        if let Some(grant_id) = consumed_approval_grant_id.as_deref() {
-            let consumed =
-                consume_approval_grant_in_tx_at(transaction.as_mut(), grant_id, &now).await?;
-            if !consumed {
-                return Err(db_error(format!(
-                    "approval grant expired or was consumed during delivery (grant '{grant_id}')"
-                )));
+        let now = utc_now();
+        let authorization =
+            authorize_held_delivery(&mut transaction, board_item_id, &item, &now).await?;
+        let (decision_id, consumed_approval_grant_id) = match authorization {
+            HeldDeliveryAuthorization::Allowed {
+                decision_id,
+                consumed_approval_grant_id,
+            } => (decision_id, consumed_approval_grant_id),
+            HeldDeliveryAuthorization::Refused(decision) => {
+                transaction.commit().await.map_err(|error| {
+                    db_error(format!("commit denied held task board delivery: {error}"))
+                })?;
+                return Err(CliErrorKind::invalid_transition(format!(
+                    "current spawn policy refused held delivery: {decision:?}"
+                ))
+                .into());
             }
-        }
+        };
         item.workflow.current_step_id = Some("dispatch".to_string());
         item.workflow.last_error = None;
         if let Some(decision_id) = decision_id {
@@ -169,8 +161,67 @@ impl AsyncDaemonDb {
             claim_token,
             applied,
             consumed_approval_grant_id,
+            action: TaskBoardDispatchClaimAction::Start,
         })
     }
+}
+
+enum HeldDeliveryAuthorization {
+    Allowed {
+        decision_id: Option<String>,
+        consumed_approval_grant_id: Option<String>,
+    },
+    Refused(PolicyDecision),
+}
+
+async fn authorize_held_delivery(
+    transaction: &mut Transaction<'_, Sqlite>,
+    board_item_id: &str,
+    item: &TaskBoardItem,
+    now: &str,
+) -> Result<HeldDeliveryAuthorization, CliError> {
+    let workspace = load_workspace_in_tx(transaction).await?;
+    let switches = spawn_gate_switches(workspace.as_ref());
+    let live_policy = workspace
+        .as_ref()
+        .and_then(|workspace| workspace.active_live_canvas())
+        .map(|(canvas, graph)| (canvas.id.as_str(), graph));
+    let grant = match live_policy {
+        Some((_, graph)) => {
+            live_approval_grant_in_tx_at(
+                transaction.as_mut(),
+                board_item_id,
+                PolicyAction::SpawnAgent,
+                graph.revision,
+                now,
+            )
+            .await?
+        }
+        None => None,
+    };
+    let (decision, decision_id) = dispatch_policy_from_graph(
+        item,
+        live_policy,
+        Some(now.to_string()),
+        switches,
+        grant.as_ref(),
+    );
+    if !decision.is_allow() {
+        return Ok(HeldDeliveryAuthorization::Refused(decision));
+    }
+    let consumed_approval_grant_id = consumed_grant_id(grant.as_ref(), &decision);
+    if let Some(grant_id) = consumed_approval_grant_id.as_deref() {
+        let consumed = consume_approval_grant_in_tx_at(transaction.as_mut(), grant_id, now).await?;
+        if !consumed {
+            return Err(db_error(format!(
+                "approval grant expired or was consumed during delivery (grant '{grant_id}')"
+            )));
+        }
+    }
+    Ok(HeldDeliveryAuthorization::Allowed {
+        decision_id,
+        consumed_approval_grant_id,
+    })
 }
 
 async fn load_held_delivery(

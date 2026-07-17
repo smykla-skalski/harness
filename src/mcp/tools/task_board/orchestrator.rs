@@ -137,14 +137,162 @@ fn settings_update_schema() -> Value {
     json!({
         "type": "object",
         "properties": {
+            "step_mode": { "type": "boolean" },
+            "enabled_workflows": workflow_list_schema(),
             "dry_run_default": { "type": "boolean" },
             "dispatch_status_filter": { "type": "string" },
             "clear_dispatch_status_filter": { "type": "boolean" },
             "project_dir": { "type": "string" },
             "clear_project_dir": { "type": "boolean" },
+            "github_project": open_object_schema(),
+            "github_inbox": open_object_schema(),
+            "todoist_inbox": open_object_schema(),
+            "scheduling": open_object_schema(),
+            "retry": open_object_schema(),
+            "reviewers": open_object_schema(),
+            "repositories": object_list_schema(),
+            "execution_hosts": object_list_schema(),
+            "admission_policy": admission_policy_schema(),
             "policy_version": { "type": "string" }
         },
-        "additionalProperties": true
+        "additionalProperties": false
+    })
+}
+
+fn workflow_list_schema() -> Value {
+    json!({
+        "type": "array",
+        "items": {
+            "type": "string",
+            "enum": ["default_task", "pr_fix", "pr_review", "review"]
+        }
+    })
+}
+
+fn open_object_schema() -> Value {
+    json!({ "type": "object" })
+}
+
+fn object_list_schema() -> Value {
+    json!({
+        "type": "array",
+        "items": open_object_schema()
+    })
+}
+
+fn admission_policy_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "limits": {
+                "type": "array",
+                "items": admission_limit_schema()
+            },
+            "windows": {
+                "type": "array",
+                "items": admission_window_schema()
+            }
+        },
+        "additionalProperties": false
+    })
+}
+
+fn admission_limit_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "kind": {
+                "type": "string",
+                "enum": ["concurrency", "rate", "token_budget", "monetary_budget"]
+            },
+            "scope": admission_scope_schema(),
+            "limit": {
+                "type": "integer", "minimum": 1, "maximum": 9_223_372_036_854_775_807_u64
+            },
+            "limit_microusd": {
+                "type": "integer", "minimum": 1, "maximum": 9_223_372_036_854_775_807_u64
+            },
+            "window_seconds": {
+                "type": "integer", "minimum": 1, "maximum": 9_223_372_036_854_775_807_u64
+            },
+            "reservation": {
+                "type": "integer", "minimum": 1, "maximum": 9_223_372_036_854_775_807_u64
+            }
+        },
+        "required": ["kind", "scope"],
+        "allOf": [
+            tagged_kind_requires_fields("concurrency", &["limit", "reservation"]),
+            tagged_kind_requires_fields(
+                "rate",
+                &["limit", "window_seconds", "reservation"]
+            ),
+            tagged_kind_requires_fields("token_budget", &["limit", "window_seconds"]),
+            tagged_kind_requires_fields(
+                "monetary_budget",
+                &["limit_microusd", "window_seconds"]
+            )
+        ],
+        "additionalProperties": false
+    })
+}
+
+fn admission_scope_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "kind": {
+                "type": "string",
+                "enum": ["global", "workflow", "repository"]
+            },
+            "value": { "type": "string" }
+        },
+        "required": ["kind"],
+        "allOf": [
+            tagged_kind_requires_fields("workflow", &["value"]),
+            tagged_kind_requires_fields("repository", &["value"])
+        ],
+        "additionalProperties": false
+    })
+}
+
+fn tagged_kind_requires_fields(kind: &str, fields: &[&str]) -> Value {
+    json!({
+        "not": {
+            "allOf": [
+                {
+                    "properties": { "kind": { "const": kind } },
+                    "required": ["kind"]
+                },
+                { "not": { "required": fields } }
+            ]
+        }
+    })
+}
+
+fn admission_window_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "scope": admission_scope_schema(),
+            "timezone": { "type": "string" },
+            "weekdays": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                    "enum": [
+                        "monday", "tuesday", "wednesday", "thursday", "friday",
+                        "saturday", "sunday"
+                    ]
+                }
+            },
+            "start_time": { "type": "string" },
+            "end_time": { "type": "string" },
+            "outside_action": { "type": "string", "enum": ["defer", "deny"] }
+        },
+        "required": [
+            "scope", "timezone", "weekdays", "start_time", "end_time", "outside_action"
+        ],
+        "additionalProperties": false
     })
 }
 
