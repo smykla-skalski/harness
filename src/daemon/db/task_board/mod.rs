@@ -24,6 +24,9 @@ mod provider_sync;
 mod provider_sync_conflicts;
 mod rows;
 mod scheduler;
+mod workflow_execution_attempts;
+mod workflow_execution_rows;
+mod workflow_executions;
 
 #[cfg(test)]
 mod item_estimate_tests;
