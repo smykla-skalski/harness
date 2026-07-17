@@ -308,29 +308,9 @@ default_jobs() {
   local cpu_count base_jobs
   cpu_count="$(detect_cpu_count)"
 
-  # Agent sessions need a lower cap so parallel workers do not drown the host.
-  if [[ -n "$session_id" ]]; then
-    if (( cpu_count <= 4 )); then
-      base_jobs=1
-    elif (( cpu_count <= 8 )); then
-      base_jobs=2
-    elif (( cpu_count <= 12 )); then
-      base_jobs=3
-    else
-      base_jobs=4
-    fi
-  else
-    # Keep the machine responsive by default instead of saturating all cores.
-    if (( cpu_count <= 4 )); then
-      base_jobs=2
-    elif (( cpu_count <= 8 )); then
-      base_jobs=3
-    elif (( cpu_count <= 12 )); then
-      base_jobs=4
-    else
-      base_jobs=6
-    fi
-  fi
+  # A single build group receives the full logical CPU budget. Concurrent
+  # groups divide that shared budget below.
+  base_jobs=$cpu_count
 
   if (( active_build_count > 1 )); then
     base_jobs=$(((base_jobs + active_build_count - 1) / active_build_count))
