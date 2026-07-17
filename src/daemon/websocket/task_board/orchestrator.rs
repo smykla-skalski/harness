@@ -3,6 +3,7 @@ use std::pin::Pin;
 
 use crate::daemon::http::{DaemonHttpState, task_board_route_executor};
 use crate::daemon::protocol::{
+    TaskBoardAutomationHistoryRequest, TaskBoardAutomationRunDetailRequest,
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
     TaskBoardOpenRouterTokenSyncRequest, TaskBoardOrchestratorRunOnceRequest,
     TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardTodoistTokenSyncRequest, WsRequest,
@@ -10,7 +11,7 @@ use crate::daemon::protocol::{
 };
 
 use super::super::mutations::dispatch_query_result;
-use super::{invalid_params, parse_control_plane_params, parse_params};
+use super::{invalid_params, parse_control_plane_params, parse_params, parse_params_or_default};
 
 pub(super) async fn dispatch_method(
     request: &WsRequest,
@@ -30,6 +31,15 @@ pub(super) async fn dispatch_method(
             let future: Pin<Box<dyn Future<Output = WsResponse> + Send + '_>> =
                 Box::pin(dispatch_task_board_orchestrator_run_once(request, state));
             Some(future.await)
+        }
+        ws_methods::TASK_BOARD_ORCHESTRATOR_RUNS => {
+            Some(dispatch_task_board_automation_runs(request, state).await)
+        }
+        ws_methods::TASK_BOARD_ORCHESTRATOR_RUN_DETAIL => {
+            Some(dispatch_task_board_automation_run_detail(request, state).await)
+        }
+        ws_methods::TASK_BOARD_ORCHESTRATOR_METRICS => {
+            Some(dispatch_task_board_automation_metrics(request, state).await)
         }
         ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_GET => {
             Some(dispatch_task_board_orchestrator_settings_get(request, state).await)
@@ -119,6 +129,42 @@ pub(super) async fn dispatch_task_board_orchestrator_run_once(
     )
     .await;
     dispatch_query_result(&request.id, result)
+}
+
+pub(super) async fn dispatch_task_board_automation_runs(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Ok(body) = parse_params_or_default::<TaskBoardAutomationHistoryRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::automation_runs(state, &body).await,
+    )
+}
+
+pub(super) async fn dispatch_task_board_automation_run_detail(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardAutomationRunDetailRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::automation_run_detail(state, &body.run_id).await,
+    )
+}
+
+pub(super) async fn dispatch_task_board_automation_metrics(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::automation_metrics(state).await,
+    )
 }
 
 pub(super) async fn dispatch_task_board_orchestrator_settings_get(

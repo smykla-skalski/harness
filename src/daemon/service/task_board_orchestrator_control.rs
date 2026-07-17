@@ -148,15 +148,17 @@ async fn status_from_state(
             (count > 0).then_some(TaskBoardWorkflowExecutionCount { status, count })
         })
         .collect();
-    let (enabled, running) = if durable_enabled {
-        let control = db.task_board_automation_control().await?;
-        (
-            control.desired_mode != TaskBoardAutomationDesiredMode::Off,
-            control.admission_state == TaskBoardAutomationAdmissionState::Accepting,
-        )
+    let automation = if durable_enabled {
+        Some(super::task_board_automation_snapshot(db).await?)
     } else {
-        (state.enabled, state.running)
+        None
     };
+    let enabled = automation.as_ref().map_or(state.enabled, |snapshot| {
+        snapshot.desired_mode != TaskBoardAutomationDesiredMode::Off
+    });
+    let running = automation.as_ref().map_or(state.running, |snapshot| {
+        snapshot.admission_state == TaskBoardAutomationAdmissionState::Accepting
+    });
     Ok(TaskBoardOrchestratorStatusResponse {
         enabled,
         running,
@@ -165,7 +167,7 @@ async fn status_from_state(
         current_tick: state.current_tick,
         last_run: state.last_run,
         workflow_execution_counts,
-        automation: None,
+        automation,
         settings,
     })
 }
@@ -187,7 +189,9 @@ mod tests {
 
     use super::*;
     use crate::daemon::db::{TaskBoardAutomationRunAdmission, TaskBoardRunAcquireRequest};
-    use crate::task_board::{TaskBoardAutomationRunTrigger, TaskBoardAutomationScope};
+    use crate::task_board::{
+        TaskBoardAutomationEffectiveState, TaskBoardAutomationRunTrigger, TaskBoardAutomationScope,
+    };
 
     #[test]
     fn step_mode_selects_step_admission() {
@@ -213,11 +217,13 @@ mod tests {
 
         assert!(status.enabled);
         assert!(status.running);
+        assert!(status.automation.is_none());
         let stopped = stop_task_board_orchestrator_with_durable(&db, false)
             .await
             .expect("stop legacy orchestrator");
         assert!(!stopped.enabled);
         assert!(!stopped.running);
+        assert!(stopped.automation.is_none());
         update_running_automation_mode(&db, &TaskBoardOrchestratorSettings::default(), false)
             .await
             .expect("update legacy settings");
@@ -284,6 +290,10 @@ mod tests {
         db.stop_task_board_automation(Utc::now())
             .await
             .expect("start draining");
+        let control_before_status = db
+            .task_board_automation_control()
+            .await
+            .expect("load draining control");
 
         let status = status_from_state(
             &db,
@@ -297,5 +307,21 @@ mod tests {
 
         assert!(!status.enabled);
         assert!(!status.running);
+        let snapshot = status.automation.expect("durable automation snapshot");
+        assert_eq!(
+            snapshot.admission_state,
+            TaskBoardAutomationAdmissionState::Draining
+        );
+        assert_eq!(
+            snapshot.effective_state,
+            TaskBoardAutomationEffectiveState::Stopping
+        );
+        assert_eq!(
+            db.task_board_automation_control()
+                .await
+                .expect("reload draining control"),
+            control_before_status,
+            "status reads must not finish or otherwise mutate the drain"
+        );
     }
 }

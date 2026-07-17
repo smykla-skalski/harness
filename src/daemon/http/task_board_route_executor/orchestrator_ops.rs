@@ -1,4 +1,6 @@
 use crate::daemon::protocol::{
+    TaskBoardAutomationHistoryRequest, TaskBoardAutomationMetricsResponse,
+    TaskBoardAutomationRunDetailResponse, TaskBoardAutomationRunsResponse,
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitHubTokensSyncResponse,
     TaskBoardGitIdentityDefaultsResponse, TaskBoardGitRuntimeConfig,
     TaskBoardGitRuntimeConfigResponse, TaskBoardGitRuntimeKeyMaterialSyncRequest,
@@ -11,7 +13,7 @@ use crate::daemon::protocol::{
     TaskBoardTodoistTokenSyncResponse,
 };
 use crate::daemon::service;
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 
 use super::super::{DaemonHttpState, require_async_db};
 use super::run_blocking;
@@ -44,6 +46,33 @@ pub(crate) async fn stop_orchestrator(
         "task board orchestrator stop",
     )?)
     .await
+}
+
+pub(crate) async fn automation_runs(
+    state: &DaemonHttpState,
+    request: &TaskBoardAutomationHistoryRequest,
+) -> Result<TaskBoardAutomationRunsResponse, CliError> {
+    require_async_db(state, "task board automation run history")?
+        .task_board_automation_history(request)
+        .await
+}
+
+pub(crate) async fn automation_run_detail(
+    state: &DaemonHttpState,
+    run_id: &str,
+) -> Result<TaskBoardAutomationRunDetailResponse, CliError> {
+    require_async_db(state, "task board automation run detail")?
+        .task_board_automation_run_detail(run_id)
+        .await?
+        .ok_or_else(|| CliErrorKind::path_not_found(format!("automation run '{run_id}'")).into())
+}
+
+pub(crate) async fn automation_metrics(
+    state: &DaemonHttpState,
+) -> Result<TaskBoardAutomationMetricsResponse, CliError> {
+    require_async_db(state, "task board automation metrics")?
+        .task_board_automation_metrics()
+        .await
 }
 
 pub(crate) async fn orchestrator_settings(

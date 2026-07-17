@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::task_board::{ExternalRefProvider, TaskBoardStatus};
 
+const LEGACY_TASK_BOARD_AUTOMATION_SNAPSHOT_SCHEMA_VERSION: u32 = 1;
 pub const TASK_BOARD_AUTOMATION_SNAPSHOT_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -193,12 +194,16 @@ pub struct TaskBoardAutomationSnapshot {
 }
 
 const fn default_snapshot_schema_version() -> u32 {
-    TASK_BOARD_AUTOMATION_SNAPSHOT_SCHEMA_VERSION
+    LEGACY_TASK_BOARD_AUTOMATION_SNAPSHOT_SCHEMA_VERSION
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{TASK_BOARD_AUTOMATION_SNAPSHOT_SCHEMA_VERSION, TaskBoardAutomationHistoryRequest};
+    use super::{
+        TASK_BOARD_AUTOMATION_SNAPSHOT_SCHEMA_VERSION, TaskBoardAutomationHistoryRequest,
+        TaskBoardAutomationSnapshot,
+    };
+    use crate::task_board::{TaskBoardOrchestratorSettings, TaskBoardOrchestratorStatus};
 
     #[test]
     fn history_limit_is_bounded() {
@@ -228,5 +233,48 @@ mod tests {
     fn compact_snapshot_schema_starts_at_one() {
         assert_eq!(TASK_BOARD_AUTOMATION_SNAPSHOT_SCHEMA_VERSION, 1);
         assert_eq!(super::default_snapshot_schema_version(), 1);
+    }
+
+    #[test]
+    fn legacy_snapshot_without_schema_version_stays_at_version_one() {
+        let snapshot: TaskBoardAutomationSnapshot = serde_json::from_value(serde_json::json!({
+            "revision": 4,
+            "desired_mode": "off",
+            "admission_state": "stopped",
+            "effective_state": "idle",
+            "observed_at": "2026-07-17T00:00:00Z",
+            "heartbeat_at": "2026-07-17T00:00:00Z",
+            "settings_revision": 2,
+            "policy_revision": 3,
+            "queue": {
+                "ready": 0,
+                "awaiting_approval": 0,
+                "policy_blocked": 0,
+                "preparing": 0,
+                "retrying": 0,
+                "starting": 0,
+                "active": 0,
+                "draining": 0,
+                "cleanup_required": 0
+            }
+        }))
+        .expect("decode legacy compact snapshot");
+
+        assert_eq!(snapshot.schema_version, 1);
+    }
+
+    #[test]
+    fn legacy_status_omits_and_defaults_the_automation_snapshot() {
+        let status: TaskBoardOrchestratorStatus = serde_json::from_value(serde_json::json!({
+            "enabled": false,
+            "running": false,
+            "workflow_execution_counts": [],
+            "settings": TaskBoardOrchestratorSettings::default()
+        }))
+        .expect("decode legacy status");
+        assert!(status.automation.is_none());
+
+        let encoded = serde_json::to_value(status).expect("encode feature-off status");
+        assert!(encoded.get("automation").is_none());
     }
 }

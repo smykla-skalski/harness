@@ -184,16 +184,16 @@ fn automation_runs_encode_history_query() {
 }
 
 #[test]
-fn automation_run_detail_expands_path_and_preserves_not_found() {
+fn automation_run_detail_expands_path_and_preserves_missing_detail_error() {
     let (endpoint, request_line, handle) =
-        spawn_mock("404 Not Found", r#"{"error":"not found"}"#.into());
+        spawn_mock("400 Bad Request", r#"{"error":"not found"}"#.into());
 
     let error = client_with(endpoint)
         .task_board_automation_run_detail("run/42 ?#%")
         .expect_err("missing automation run");
     handle.join().expect("server");
 
-    assert!(error.to_string().contains("HTTP 404"));
+    assert!(error.to_string().contains("HTTP 400"));
     assert_eq!(
         *request_line.lock().expect("request line"),
         "GET /v1/task-board/orchestrator/runs/run%2F42%20%3F%23%25 HTTP/1.1"

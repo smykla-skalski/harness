@@ -1939,8 +1939,8 @@ const OMITTED_WIRE_FIELDS: &[(&str, &str)] = &[
     ("ExternalSyncOperation", "changed_fields"),
     ("ExternalSyncOperation", "unsupported_fields"),
     // task-board automation: the current Monitor hand models do not surface the daemon's v36
-    // workflow identity or automation settings yet. Keep their wire adapters on the existing app
-    // shape; JSONDecoder safely ignores these additional response keys.
+    // workflow identity, automation settings, or compact status snapshot yet. Keep their wire
+    // adapters on the existing app shape; JSONDecoder safely ignores these response keys.
     ("TaskBoardItem", "workflow_kind"),
     ("TaskBoardItem", "execution_repository"),
     ("TaskBoardOrchestratorSettings", "scheduling"),
@@ -1948,6 +1948,7 @@ const OMITTED_WIRE_FIELDS: &[(&str, &str)] = &[
     ("TaskBoardOrchestratorSettings", "reviewers"),
     ("TaskBoardOrchestratorSettings", "repositories"),
     ("TaskBoardOrchestratorSettings", "execution_hosts"),
+    ("TaskBoardOrchestratorStatus", "automation"),
 ];
 
 /// Whether `(struct_name, field_name)` is in `OMITTED_WIRE_FIELDS`.
@@ -3799,6 +3800,38 @@ pub struct Drop { pub other: String }
             .map(|field| field.property.as_str())
             .collect();
         assert_eq!(properties, vec!["boardItemId"], "lifecycle is dropped");
+    }
+
+    #[test]
+    fn automation_snapshot_is_deferred_from_monitor_status_wire() {
+        let source = r"
+            #[derive(Serialize, Deserialize)]
+            pub struct TaskBoardOrchestratorStatus {
+                pub enabled: bool,
+                pub automation: TaskBoardAutomationSnapshot,
+            }
+        ";
+        let symbols = build_symbol_table(&[source]);
+        let defaults = DefaultLiterals::new();
+        let file = syn::parse_file(source).expect("source parses");
+        let item = file
+            .items
+            .iter()
+            .find_map(|item| match item {
+                Item::Struct(item) if item.ident == "TaskBoardOrchestratorStatus" => {
+                    Some(item.clone())
+                }
+                _ => None,
+            })
+            .expect("TaskBoardOrchestratorStatus struct present");
+        let spec = build_struct(&item, &defaults, &symbols).expect("struct builds");
+        let properties: Vec<_> = spec
+            .fields
+            .iter()
+            .map(|field| field.property.as_str())
+            .collect();
+
+        assert_eq!(properties, vec!["enabled"], "automation is deferred");
     }
 
     #[test]

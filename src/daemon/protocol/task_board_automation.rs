@@ -27,5 +27,7 @@ mod tests {
         .expect("decode legacy task-board push payload");
 
         assert!(payload.automation.is_none());
+        let encoded = serde_json::to_value(payload).expect("encode feature-off push payload");
+        assert!(encoded.get("automation").is_none());
     }
 }
