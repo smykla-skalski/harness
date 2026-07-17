@@ -142,6 +142,19 @@ fn whole_policy_validation_rejects_invalid_unmatched_rules() {
         Err(TaskBoardPolicyCompilationError::InvalidLimit { .. })
     ));
 
+    let unpersistable_limit = TaskBoardAutomationPolicy {
+        limits: vec![TaskBoardPolicyLimit::Concurrency {
+            scope: TaskBoardPolicyScope::Global,
+            limit: u64::MAX,
+            reservation: 1,
+        }],
+        windows: Vec::new(),
+    };
+    assert!(matches!(
+        validate_task_board_policy(&unpersistable_limit),
+        Err(TaskBoardPolicyCompilationError::InvalidLimit { .. })
+    ));
+
     let invalid_window = TaskBoardAutomationPolicy {
         limits: Vec::new(),
         windows: vec![window(

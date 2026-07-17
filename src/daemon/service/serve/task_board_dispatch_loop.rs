@@ -5,10 +5,13 @@ use tokio::task::JoinHandle;
 use tokio::time::{MissedTickBehavior, interval};
 use tracing::warn;
 
-use crate::daemon::db::{AsyncDaemonDb, ClaimedTaskBoardDispatch};
+use crate::daemon::db::{AsyncDaemonDb, ClaimedTaskBoardDispatch, TaskBoardDispatchClaimAction};
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::service::task_board::prepare_claimed_task_board_dispatch;
-use crate::daemon::task_board_managed_agents::start_worker_for_applied_task;
+use crate::daemon::task_board_managed_agents::{
+    begin_worker_compensation, maintain_task_board_dispatch_claim, managed_worker_id,
+    resume_worker_compensation, start_worker_for_applied_task,
+};
 
 const RECOVERY_INTERVAL: Duration = Duration::from_secs(1);
 const MAX_RECOVERIES_PER_TICK: usize = 16;
@@ -85,28 +88,169 @@ async fn finish_claim(
     db: &AsyncDaemonDb,
     claim: ClaimedTaskBoardDispatch,
 ) {
-    let result = start_worker_for_applied_task(state, &claim.applied, &claim.intent_id).await;
+    let _heartbeat =
+        maintain_task_board_dispatch_claim(db.clone(), &claim.intent_id, &claim.claim_token);
+    if let Some(reason) = compensation_reason(&claim.action) {
+        finish_compensating_claim(state, db, &claim, reason).await;
+        return;
+    }
+    let result =
+        start_worker_for_applied_task(state, &claim.applied, &claim.intent_id, &claim.claim_token)
+            .await;
     match result {
         Ok(_) => {
             if let Err(error) = db
-                .complete_task_board_dispatch(&claim.intent_id, &claim.claim_token)
+                .renew_task_board_dispatch_claim(&claim.intent_id, &claim.claim_token)
                 .await
             {
-                warn!(board_item_id = %claim.applied.board_item_id, %error, "task board dispatch recovery completion failed");
+                compensate_failed_completion(state, db, &claim, &error).await;
+                return;
             }
-        }
-        Err(error) => {
-            if let Err(rollback_error) = db
-                .fail_task_board_dispatch(
+            if let Err(error) = db
+                .complete_task_board_dispatch(
                     &claim.intent_id,
                     &claim.claim_token,
-                    claim.consumed_approval_grant_id.as_deref(),
-                    &error.to_string(),
+                    &managed_worker_id(&claim.applied, &claim.intent_id),
                 )
                 .await
             {
-                warn!(board_item_id = %claim.applied.board_item_id, %rollback_error, "task board dispatch recovery rollback failed");
+                compensate_failed_completion(state, db, &claim, &error).await;
             }
         }
+        Err(start_error) => {
+            let may_rollback = start_error.may_rollback();
+            let error = start_error.into_cli_error();
+            if may_rollback {
+                if let Err(rollback_error) = db
+                    .fail_task_board_dispatch(
+                        &claim.intent_id,
+                        &claim.claim_token,
+                        claim.consumed_approval_grant_id.as_deref(),
+                        &error.to_string(),
+                    )
+                    .await
+                {
+                    warn!(board_item_id = %claim.applied.board_item_id, %rollback_error, "task board dispatch recovery rollback failed");
+                }
+            } else {
+                warn!(
+                    board_item_id = %claim.applied.board_item_id,
+                    %error,
+                    "task board worker start outcome is uncertain; leaving the claim fenced for recovery"
+                );
+            }
+        }
+    }
+}
+
+fn compensation_reason(action: &TaskBoardDispatchClaimAction) -> Option<&str> {
+    match action {
+        TaskBoardDispatchClaimAction::Start | TaskBoardDispatchClaimAction::Recover => None,
+        TaskBoardDispatchClaimAction::Compensate { reason } => Some(reason.as_str()),
+    }
+}
+
+async fn compensate_failed_completion(
+    state: &DaemonHttpState,
+    db: &AsyncDaemonDb,
+    claim: &ClaimedTaskBoardDispatch,
+    completion_error: &crate::errors::CliError,
+) {
+    if let Err(stop_error) = begin_worker_compensation(
+        state,
+        db,
+        &claim.applied,
+        &claim.intent_id,
+        &claim.claim_token,
+        &completion_error.to_string(),
+    )
+    .await
+    {
+        warn!(
+            board_item_id = %claim.applied.board_item_id,
+            %completion_error,
+            %stop_error,
+            "task board dispatch recovery completion and compensation failed; leaving claim fenced"
+        );
+        return;
+    }
+    if let Err(rollback_error) = db
+        .finalize_task_board_dispatch_compensation(
+            &claim.intent_id,
+            &claim.claim_token,
+            claim.consumed_approval_grant_id.as_deref(),
+            &managed_worker_id(&claim.applied, &claim.intent_id),
+            &completion_error.to_string(),
+        )
+        .await
+    {
+        warn!(
+            board_item_id = %claim.applied.board_item_id,
+            %completion_error,
+            %rollback_error,
+            "task board dispatch recovery stopped its worker but rollback failed"
+        );
+    }
+}
+
+async fn finish_compensating_claim(
+    state: &DaemonHttpState,
+    db: &AsyncDaemonDb,
+    claim: &ClaimedTaskBoardDispatch,
+    reason: &str,
+) {
+    if let Err(error) = resume_worker_compensation(
+        state,
+        db,
+        &claim.applied,
+        &claim.intent_id,
+        &claim.claim_token,
+    )
+    .await
+    {
+        warn!(
+            board_item_id = %claim.applied.board_item_id,
+            %error,
+            "task board worker compensation retry failed; leaving durable compensation pending"
+        );
+        return;
+    }
+    if let Err(error) = db
+        .finalize_task_board_dispatch_compensation(
+            &claim.intent_id,
+            &claim.claim_token,
+            claim.consumed_approval_grant_id.as_deref(),
+            &managed_worker_id(&claim.applied, &claim.intent_id),
+            reason,
+        )
+        .await
+    {
+        warn!(
+            board_item_id = %claim.applied.board_item_id,
+            %error,
+            "task board worker compensation rollback failed; leaving durable compensation pending"
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TaskBoardDispatchClaimAction, compensation_reason};
+
+    #[test]
+    fn recovered_compensation_routes_around_worker_start() {
+        let action = TaskBoardDispatchClaimAction::Compensate {
+            reason: "worker stop required".to_string(),
+        };
+
+        assert_eq!(compensation_reason(&action), Some("worker stop required"));
+        assert_eq!(
+            compensation_reason(&TaskBoardDispatchClaimAction::Start),
+            None
+        );
+        assert_eq!(
+            compensation_reason(&TaskBoardDispatchClaimAction::Recover),
+            None
+        );
     }
 }

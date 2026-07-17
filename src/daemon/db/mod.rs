@@ -106,9 +106,10 @@ mod task_board;
 #[allow(unused_imports)]
 pub(crate) use task_board::{
     ClaimedTaskBoardDispatch, ClaimedTaskBoardDispatchPreparation, ReservedTaskBoardDispatch,
+    TaskBoardAdmissionMissingRunRecovery, TaskBoardAdmissionWorkerRecovery,
     TaskBoardAutomationControlRecord, TaskBoardAutomationRunAdmission, TaskBoardAutomationRunFence,
-    TaskBoardAutomationRunLease, TaskBoardAutomationRunStage, TaskBoardImportMarker,
-    TaskBoardItemSnapshot, TaskBoardRunAcquireRequest,
+    TaskBoardAutomationRunLease, TaskBoardAutomationRunStage, TaskBoardDispatchClaimAction,
+    TaskBoardImportMarker, TaskBoardItemSnapshot, TaskBoardRunAcquireRequest,
 };
 mod session_data;
 mod signals;

@@ -410,6 +410,7 @@ async fn stale_consumed_grant_prevents_dispatch_preparation_completion() {
     let intent_id = match reserved {
         ReservedTaskBoardDispatch::Preparing { intent_id, .. } => intent_id,
         ReservedTaskBoardDispatch::Applied(_) => panic!("new reservation was already applied"),
+        ReservedTaskBoardDispatch::Blocked(_) => panic!("default admission blocked reservation"),
     };
     let claim = db
         .claim_task_board_dispatch_preparation(&intent_id)

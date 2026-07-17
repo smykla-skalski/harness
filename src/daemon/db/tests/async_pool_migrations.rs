@@ -183,7 +183,7 @@ fn shipped_daemon_async_migration_checksums_remain_stable() {
         ),
         (
             "0033_daemon_v39_task_board_policy_admission.sql",
-            "AB6A259007355E6F6E1FCE4356345D0778F043AE3648F91005A0931E168646B6CBA088C765BD677B36875E655B71489F",
+            "91742D2F0BCDF2830FB7720DFE53675C83DAD8B9575B653E0A558A31C6C3C11A60A687CE621E20B069040ACDD351294D",
         ),
     ];
     let migrations_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/daemon/db/migrations");

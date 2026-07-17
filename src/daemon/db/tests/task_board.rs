@@ -14,8 +14,14 @@ use crate::task_board::{
     TaskBoardOrchestratorSettings, TaskBoardOrchestratorState, TaskBoardStatus,
 };
 
+mod admission_compensation;
+mod admission_dispatch;
+mod admission_evidence;
+mod admission_lifecycle_tests;
 mod dispatch;
+mod dispatch_claims;
 mod imports;
+mod terminal_dispatch_lifecycle;
 
 #[tokio::test]
 async fn task_board_instance_identity_is_stable_per_database() {

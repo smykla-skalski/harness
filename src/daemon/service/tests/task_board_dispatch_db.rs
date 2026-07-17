@@ -53,6 +53,9 @@ fn prepared_dispatch_resumes_without_duplicate_session_or_task() {
                     preparation,
                 } => (intent_id, preparation),
                 ReservedTaskBoardDispatch::Applied(_) => panic!("new dispatch already applied"),
+                ReservedTaskBoardDispatch::Blocked(_) => {
+                    panic!("default admission blocked dispatch")
+                }
             };
             let first_claim = db
                 .claim_task_board_dispatch_preparation(&intent_id)

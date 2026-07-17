@@ -8,6 +8,9 @@ use crate::task_board::{
     collect_admission_requirements, evaluate_admission_requirements, normalize_repository_slug,
 };
 
+mod validation;
+use validation::validate_limit;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", rename_all = "snake_case")]
 pub enum TaskBoardPolicyScope {
@@ -385,36 +388,6 @@ fn policy_rule_for_limit(
             reservation,
         },
     })
-}
-
-fn validate_limit(
-    limit: &TaskBoardPolicyLimit,
-    scope: &ResolvedScope,
-) -> Result<(), TaskBoardPolicyCompilationError> {
-    let valid = match limit {
-        TaskBoardPolicyLimit::Concurrency {
-            limit, reservation, ..
-        } => *limit > 0 && *reservation > 0,
-        TaskBoardPolicyLimit::Rate {
-            limit,
-            window_seconds,
-            reservation,
-            ..
-        } => *limit > 0 && *window_seconds > 0 && *reservation > 0,
-        TaskBoardPolicyLimit::TokenBudget {
-            limit,
-            window_seconds,
-            ..
-        } => *limit > 0 && *window_seconds > 0,
-        TaskBoardPolicyLimit::MonetaryBudget {
-            limit_microusd,
-            window_seconds,
-            ..
-        } => *limit_microusd > 0 && *window_seconds > 0,
-    };
-    valid
-        .then_some(())
-        .ok_or_else(|| TaskBoardPolicyCompilationError::InvalidLimit { scope: scope.key() })
 }
 
 fn compile_limit(

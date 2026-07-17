@@ -67,10 +67,13 @@ async fn task_board_dispatch_intents_survive_until_worker_outcome() {
         .expect("reclaim dispatch")
         .expect("expired dispatch");
     assert_ne!(reclaimed.claim_token, claim.claim_token);
-    db.complete_task_board_dispatch(&reclaimed.intent_id, &reclaimed.claim_token)
-        .await
-        .expect("complete dispatch");
-
+    db.complete_task_board_dispatch(
+        &reclaimed.intent_id,
+        &reclaimed.claim_token,
+        "codex-reclaimed-test",
+    )
+    .await
+    .expect("complete dispatch");
     let failed = db
         .task_board_item("task-dispatch-failed")
         .await
@@ -154,6 +157,7 @@ async fn task_board_dispatch_reservation_precedes_links_and_is_reclaimable() {
             preparation,
         } => (intent_id, preparation),
         ReservedTaskBoardDispatch::Applied(_) => panic!("new reservation was already applied"),
+        ReservedTaskBoardDispatch::Blocked(_) => panic!("default admission blocked reservation"),
     };
     assert_eq!(preparation.board_item_id, "task-dispatch-reserved");
     let still_todo = db
@@ -264,7 +268,6 @@ async fn existing_session_without_work_item_is_reservable() {
     let reserved = db
         .reserve_task_board_dispatch(&plan, "control-plane", None, false)
         .await;
-
     assert!(
         reserved.is_ok(),
         "existing session without work item should reserve: {reserved:?}"
@@ -467,6 +470,7 @@ async fn approved_grant_is_consumed_at_reservation() {
     let intent_id = match reserved {
         ReservedTaskBoardDispatch::Preparing { intent_id, .. } => intent_id,
         ReservedTaskBoardDispatch::Applied(_) => panic!("new reservation was already applied"),
+        ReservedTaskBoardDispatch::Blocked(_) => panic!("default admission blocked reservation"),
     };
     let claim = db
         .claim_task_board_dispatch_preparation(&intent_id)

@@ -269,12 +269,12 @@ async fn run_remote_serve_lifecycle_async(
         RemoteInitialAcmeControl::ShutdownAfterIssuance => return Ok(0),
     }
     let plan = build_remote_serve_execution_plan_from_config(args, db, remote_config)?;
-    service::serve_remote_https(
+    Box::pin(service::serve_remote_https(
         plan.service_config,
         plan.acme_plan,
         shutdown_tx,
         shutdown_rx,
-    )
+    ))
     .await?;
     Ok(0)
 }

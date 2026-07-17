@@ -75,12 +75,11 @@ mod tests {
              ) VALUES (
                  'legacy-item', 0, 'github', '42', '{\"status\":\"umbrella\"}'
              );
-             INSERT INTO task_board_orchestrator_settings (
-                 singleton, settings_json, revision, updated_at
-             ) VALUES (
-                 1, '{\"dispatch_status_filter\":\"umbrella\"}', 1,
-                 '2026-07-16T00:00:00Z'
-             );
+             UPDATE task_board_orchestrator_settings
+                SET settings_json = '{\"dispatch_status_filter\":\"umbrella\"}',
+                    revision = 1,
+                    updated_at = '2026-07-16T00:00:00Z'
+              WHERE singleton = 1;
              INSERT INTO task_board_orchestrator_state (
                  singleton, state_json, enabled, running, revision, updated_at
              ) VALUES (

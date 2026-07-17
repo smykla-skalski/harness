@@ -3,6 +3,9 @@ use std::collections::BTreeMap;
 use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 use super::ITEMS_CHANGE_SCOPE;
+use super::admission_lifecycle::{
+    ensure_item_admission_can_terminate_in_tx, release_item_admission_in_tx,
+};
 use super::mapper::{item_from_rows, label, to_json};
 use super::rows::{ExternalRefRow, ItemRow};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
@@ -10,6 +13,13 @@ use crate::errors::CliErrorKind;
 use crate::infra::io;
 use crate::task_board::types::{CURRENT_TASK_BOARD_ITEM_VERSION, MAX_TASK_BOARD_ESTIMATE};
 use crate::task_board::{TaskBoardItem, TaskBoardStatus};
+
+#[path = "items_lifecycle.rs"]
+mod lifecycle;
+use lifecycle::{
+    cancel_prestart_dispatch_for_terminal_item_in_tx, ensure_estimates_are_editable_in_tx,
+    task_board_item_is_terminal,
+};
 
 const SELECT_ITEM: &str = "SELECT * FROM task_board_items WHERE item_id = ?1";
 const SELECT_REFS: &str = "SELECT item_id, position, provider, external_id, url, sync_state_json
@@ -159,6 +169,8 @@ impl AsyncDaemonDb {
         let (mut item, revision) = load_item_in_tx(&mut transaction, item_id)
             .await?
             .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
+        let prior_estimates = (item.estimated_tokens, item.estimated_cost_microusd);
+        let prior_workflow_status = item.workflow.status;
         if !mutate(&mut item)? {
             transaction
                 .commit()
@@ -172,9 +184,18 @@ impl AsyncDaemonDb {
                 item.id
             )));
         }
+        if prior_estimates != (item.estimated_tokens, item.estimated_cost_microusd) {
+            ensure_estimates_are_editable_in_tx(&mut transaction, item_id, prior_workflow_status)
+                .await?;
+        }
         validate_item(&item)?;
         item.status = item.status.canonical_persisted_status();
         item.updated_at = utc_now();
+        if task_board_item_is_terminal(&item) {
+            ensure_item_admission_can_terminate_in_tx(&mut transaction, item_id).await?;
+            cancel_prestart_dispatch_for_terminal_item_in_tx(&mut transaction, item_id).await?;
+            release_item_admission_in_tx(&mut transaction, item_id).await?;
+        }
         replace_item_in_tx(&mut transaction, &item, revision + 1).await?;
         let change_revision = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
         transaction

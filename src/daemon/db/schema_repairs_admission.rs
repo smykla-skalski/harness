@@ -24,6 +24,19 @@ estimated_cost_microusd INTEGER
             AND estimated_cost_microusd BETWEEN 1 AND 9223372036854775807
         )
     )";
+const COMPENSATION_PENDING_DEFINITION: &str = "
+compensation_pending INTEGER NOT NULL DEFAULT 0
+    CHECK (
+        compensation_pending IN (0, 1)
+        AND (
+            compensation_pending = 0
+            OR (
+                status IN ('pending', 'starting')
+                AND last_error IS NOT NULL
+                AND length(last_error) > 0
+            )
+        )
+    )";
 
 struct ObjectShape {
     object_type: &'static str,
@@ -84,6 +97,11 @@ const OBJECT_SHAPES: &[ObjectShape] = &[
 pub(super) fn shape_needs_repair(conn: &Connection) -> Result<bool, CliError> {
     if item_column_needs_repair(conn, "estimated_tokens", ESTIMATED_TOKENS_DEFINITION)?
         || item_column_needs_repair(conn, "estimated_cost_microusd", ESTIMATED_COST_DEFINITION)?
+        || dispatch_column_needs_repair(
+            conn,
+            "compensation_pending",
+            COMPENSATION_PENDING_DEFINITION,
+        )?
     {
         return Ok(true);
     }
@@ -96,7 +114,7 @@ pub(super) fn shape_needs_repair(conn: &Connection) -> Result<bool, CliError> {
             return Err(incompatible_shape(shape.name));
         }
     }
-    Ok(false)
+    Ok(!settings_singleton_exists(conn)?)
 }
 
 pub(super) fn repair_and_stamp(conn: &Connection) -> Result<(), CliError> {
@@ -112,6 +130,11 @@ pub(super) fn repair_and_stamp(conn: &Connection) -> Result<(), CliError> {
         "estimated_cost_microusd",
         ESTIMATED_COST_DEFINITION,
     )?;
+    ensure_dispatch_column(
+        &transaction,
+        "compensation_pending",
+        COMPENSATION_PENDING_DEFINITION,
+    )?;
     transaction
         .execute_batch(migration_objects_sql()?)
         .map_err(|error| db_error(format!("create task-board admission schema: {error}")))?;
@@ -124,6 +147,11 @@ pub(super) fn repair_and_stamp(conn: &Connection) -> Result<(), CliError> {
 pub(super) fn require_complete_shape(conn: &Connection) -> Result<(), CliError> {
     require_item_column(conn, "estimated_tokens", ESTIMATED_TOKENS_DEFINITION)?;
     require_item_column(conn, "estimated_cost_microusd", ESTIMATED_COST_DEFINITION)?;
+    require_dispatch_column(
+        conn,
+        "compensation_pending",
+        COMPENSATION_PENDING_DEFINITION,
+    )?;
     for shape in OBJECT_SHAPES {
         let actual = object_sql(conn, shape)?
             .ok_or_else(|| db_error(format!("missing task-board admission {}", shape.name)))?;
@@ -131,17 +159,46 @@ pub(super) fn require_complete_shape(conn: &Connection) -> Result<(), CliError> 
             return Err(incompatible_shape(shape.name));
         }
     }
+    if !settings_singleton_exists(conn)? {
+        return Err(db_error(
+            "missing task-board orchestrator settings singleton",
+        ));
+    }
     Ok(())
 }
 
+fn settings_singleton_exists(conn: &Connection) -> Result<bool, CliError> {
+    conn.query_row(
+        "SELECT EXISTS(
+             SELECT 1 FROM task_board_orchestrator_settings WHERE singleton = 1
+         )",
+        [],
+        |row| row.get(0),
+    )
+    .map_err(|error| db_error(format!("read task-board orchestrator settings: {error}")))
+}
+
 fn ensure_item_column(conn: &Connection, name: &str, definition: &str) -> Result<(), CliError> {
-    if stored_item_column(conn, name)?.is_none() {
-        conn.execute_batch(&format!(
-            "ALTER TABLE task_board_items ADD COLUMN {definition};"
-        ))
-        .map_err(|error| db_error(format!("add task-board {name} column: {error}")))?;
-    }
+    ensure_column(conn, "task_board_items", name, definition)?;
     require_item_column(conn, name, definition)
+}
+
+fn ensure_dispatch_column(conn: &Connection, name: &str, definition: &str) -> Result<(), CliError> {
+    ensure_column(conn, "task_board_dispatch_intents", name, definition)?;
+    require_dispatch_column(conn, name, definition)
+}
+
+fn ensure_column(
+    conn: &Connection,
+    table: &str,
+    name: &str,
+    definition: &str,
+) -> Result<(), CliError> {
+    if stored_column(conn, table, name)?.is_none() {
+        conn.execute_batch(&format!("ALTER TABLE {table} ADD COLUMN {definition};"))
+            .map_err(|error| db_error(format!("add task-board {name} column: {error}")))?;
+    }
+    Ok(())
 }
 
 fn item_column_needs_repair(
@@ -149,16 +206,28 @@ fn item_column_needs_repair(
     name: &str,
     definition: &str,
 ) -> Result<bool, CliError> {
-    if stored_item_column(conn, name)?.is_none() {
+    if stored_column(conn, "task_board_items", name)?.is_none() {
         return Ok(true);
     }
     require_item_column(conn, name, definition)?;
     Ok(false)
 }
 
+fn dispatch_column_needs_repair(
+    conn: &Connection,
+    name: &str,
+    definition: &str,
+) -> Result<bool, CliError> {
+    if stored_column(conn, "task_board_dispatch_intents", name)?.is_none() {
+        return Ok(true);
+    }
+    require_dispatch_column(conn, name, definition)?;
+    Ok(false)
+}
+
 fn require_item_column(conn: &Connection, name: &str, definition: &str) -> Result<(), CliError> {
     let Some((declared_type, not_null, default_value, primary_key, hidden)) =
-        stored_item_column(conn, name)?
+        stored_column(conn, "task_board_items", name)?
     else {
         return Err(db_error(format!("missing task-board {name} column")));
     };
@@ -183,12 +252,51 @@ fn require_item_column(conn: &Connection, name: &str, definition: &str) -> Resul
     )))
 }
 
-fn stored_item_column(conn: &Connection, name: &str) -> Result<Option<StoredColumn>, CliError> {
+fn require_dispatch_column(
+    conn: &Connection,
+    name: &str,
+    definition: &str,
+) -> Result<(), CliError> {
+    let Some((declared_type, not_null, default_value, primary_key, hidden)) =
+        stored_column(conn, "task_board_dispatch_intents", name)?
+    else {
+        return Err(db_error(format!("missing task-board {name} column")));
+    };
+    let table_sql: String = conn
+        .query_row(
+            "SELECT sql FROM sqlite_master
+             WHERE type = 'table' AND name = 'task_board_dispatch_intents'",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|error| {
+            db_error(format!(
+                "read task_board_dispatch_intents definition: {error}"
+            ))
+        })?;
+    let metadata_matches = declared_type == "INTEGER"
+        && not_null
+        && default_value.as_deref() == Some("0")
+        && primary_key == 0
+        && hidden == 0;
+    if metadata_matches && normalize_sql(&table_sql).contains(&normalize_sql(definition)) {
+        return Ok(());
+    }
+    Err(db_error(format!(
+        "incompatible task-board {name} column; refusing destructive repair"
+    )))
+}
+
+fn stored_column(
+    conn: &Connection,
+    table: &str,
+    name: &str,
+) -> Result<Option<StoredColumn>, CliError> {
     conn.query_row(
         "SELECT type, \"notnull\", dflt_value, pk, hidden
-         FROM pragma_table_xinfo('task_board_items')
-         WHERE name = ?1",
-        [name],
+         FROM pragma_table_xinfo(?1)
+         WHERE name = ?2",
+        rusqlite::params![table, name],
         |row| {
             Ok((
                 row.get(0)?,

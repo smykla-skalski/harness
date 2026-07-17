@@ -30,6 +30,7 @@ const CURRENT_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] = &[
     ("policy_nodes", "layout_source"),
     ("policy_decisions", "evaluated_at"),
     ("task_board_dispatch_intents", "consumed_approval_grant_id"),
+    ("task_board_dispatch_intents", "compensation_pending"),
     ("task_board_items", "workflow_kind"),
     ("task_board_items", "execution_repository"),
     ("task_board_items", "estimated_tokens"),

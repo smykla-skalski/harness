@@ -18,6 +18,20 @@ ALTER TABLE task_board_items
             )
         );
 
+ALTER TABLE task_board_dispatch_intents
+    ADD COLUMN compensation_pending INTEGER NOT NULL DEFAULT 0
+        CHECK (
+            compensation_pending IN (0, 1)
+            AND (
+                compensation_pending = 0
+                OR (
+                    status IN ('pending', 'starting')
+                    AND last_error IS NOT NULL
+                    AND length(last_error) > 0
+                )
+            )
+        );
+
 CREATE UNIQUE INDEX IF NOT EXISTS task_board_dispatch_intents_admission_identity
     ON task_board_dispatch_intents(intent_id, item_id);
 
@@ -79,7 +93,7 @@ CREATE TABLE IF NOT EXISTS task_board_dispatch_admission_decisions (
         OR (decision IN ('deferred', 'rejected') AND intent_id IS NULL)
     ),
     CHECK (
-        (decision = 'deferred' AND next_available_at IS NOT NULL)
+        decision = 'deferred'
         OR (decision != 'deferred' AND next_available_at IS NULL)
     ),
     CHECK (
@@ -91,6 +105,7 @@ CREATE TABLE IF NOT EXISTS task_board_dispatch_admission_decisions (
         )
     ),
     UNIQUE(intent_id, generation),
+    UNIQUE(item_id, generation),
     UNIQUE(decision_id, intent_id, generation, item_id, decision),
     FOREIGN KEY (intent_id, item_id)
         REFERENCES task_board_dispatch_intents(intent_id, item_id)
@@ -171,13 +186,13 @@ CREATE TABLE IF NOT EXISTS task_board_dispatch_admission_ledger (
     CHECK (
         (
             kind = 'concurrency'
-            AND amount = 1
+            AND amount > 0
             AND window_started_at IS NULL
             AND window_ends_at IS NULL
         )
         OR (
             kind = 'rate'
-            AND amount = 1
+            AND amount > 0
             AND window_started_at IS NOT NULL
             AND window_ends_at > window_started_at
         )
@@ -199,6 +214,7 @@ CREATE TABLE IF NOT EXISTS task_board_dispatch_admission_ledger (
             state = 'reserved'
             AND managed_worker_id IS NULL
             AND expires_at IS NOT NULL
+            AND expires_at > reserved_at
             AND committed_at IS NULL
             AND released_at IS NULL
         )
@@ -207,6 +223,7 @@ CREATE TABLE IF NOT EXISTS task_board_dispatch_admission_ledger (
             AND managed_worker_id IS NOT NULL
             AND expires_at IS NULL
             AND committed_at IS NOT NULL
+            AND committed_at >= reserved_at
             AND released_at IS NULL
         )
         OR (
@@ -217,11 +234,13 @@ CREATE TABLE IF NOT EXISTS task_board_dispatch_admission_ledger (
                 (
                     committed_at IS NULL
                     AND managed_worker_id IS NULL
+                    AND released_at >= reserved_at
                 )
                 OR (
                     kind = 'concurrency'
                     AND committed_at IS NOT NULL
                     AND managed_worker_id IS NOT NULL
+                    AND committed_at >= reserved_at
                     AND released_at >= committed_at
                 )
             )
