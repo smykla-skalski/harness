@@ -1,3 +1,4 @@
+use std::future::Future;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -64,31 +65,16 @@ impl PressElementTool {
             Err(error) => Err(ToolError::internal(error.to_string())),
         }
     }
-}
 
-#[async_trait]
-impl Tool for PressElementTool {
-    fn name(&self) -> &'static str {
-        "press_element"
-    }
-
-    fn description(&self) -> &'static str {
-        "Invoke an element's semantic accessibility activation without moving \
-         the mouse or requiring the app to be frontmost."
-    }
-
-    fn input_schema(&self) -> Value {
-        json!({
-            "type": "object",
-            "properties": {
-                "identifier": {"type": "string"},
-            },
-            "required": ["identifier"],
-            "additionalProperties": false,
-        })
-    }
-
-    async fn call(&self, params: Value) -> Result<ToolResult, ToolError> {
+    pub(crate) async fn call_with_accessibility_action<F, Fut>(
+        &self,
+        params: Value,
+        fallback_action: F,
+    ) -> Result<ToolResult, ToolError>
+    where
+        F: FnOnce(String, Option<i64>, AccessibilityAction) -> Fut,
+        Fut: Future<Output = Result<(), AccessibilityActionError>>,
+    {
         let parsed: Params = decode_params(params)?;
         if parsed.identifier.is_empty() {
             return Err(ToolError::invalid("identifier cannot be empty"));
@@ -132,8 +118,8 @@ impl Tool for PressElementTool {
             }
         }
 
-        match perform_accessibility_action(
-            &parsed.identifier,
+        match fallback_action(
+            parsed.identifier.clone(),
             element.element.window_id,
             AccessibilityAction::Press,
         )
@@ -156,6 +142,36 @@ impl Tool for PressElementTool {
             ))),
             Err(error) => Err(ToolError::internal(error.to_string())),
         }
+    }
+}
+
+#[async_trait]
+impl Tool for PressElementTool {
+    fn name(&self) -> &'static str {
+        "press_element"
+    }
+
+    fn description(&self) -> &'static str {
+        "Invoke an element's semantic accessibility activation without moving \
+         the mouse or requiring the app to be frontmost."
+    }
+
+    fn input_schema(&self) -> Value {
+        json!({
+            "type": "object",
+            "properties": {
+                "identifier": {"type": "string"},
+            },
+            "required": ["identifier"],
+            "additionalProperties": false,
+        })
+    }
+
+    async fn call(&self, params: Value) -> Result<ToolResult, ToolError> {
+        self.call_with_accessibility_action(params, |identifier, window_id, action| async move {
+            perform_accessibility_action(&identifier, window_id, action).await
+        })
+        .await
     }
 }
 

@@ -16,7 +16,10 @@ use super::{
     ClickElementTool, DragDropTool, GetElementTool, ListElementsTool, ListWindowsTool,
     PressElementTool, ScrollTool, register_all,
 };
-use crate::mcp::automation::{AccessibilityQueryError, INPUT_OVERRIDE_ENV};
+use crate::mcp::automation::{
+    AccessibilityAction, AccessibilityActionError, AccessibilityQueryError,
+    perform_accessibility_action_with_program,
+};
 use crate::mcp::protocol::ContentBlock;
 use crate::mcp::registry::RegistryClient;
 use crate::mcp::registry::{
@@ -197,48 +200,6 @@ fn write_helper_script(path: &Path, body: &str) {
     let mut permissions = fs::metadata(path).expect("helper metadata").permissions();
     permissions.set_mode(0o755);
     fs::set_permissions(path, permissions).expect("set helper executable");
-}
-
-fn write_fake_harness_input(path: &Path) {
-    let script = r#"#!/bin/sh
-case "$1" in
-  --help|check)
-    exit 0
-    ;;
-  get-element)
-    identifier="$2"
-    case "$identifier" in
-      "task.source")
-        x=10
-        y=20
-        width=50
-        height=40
-        ;;
-      "agent.destination")
-        x=210
-        y=120
-        width=60
-        height=60
-        ;;
-      *)
-        x=10
-        y=20
-        width=30
-        height=40
-        ;;
-    esac
-    printf '{"element":{"identifier":"%s","label":"%s","value":null,"hint":null,"kind":"button","frame":{"x":%s,"y":%s,"width":%s,"height":%s},"windowID":7,"enabled":true,"selected":false,"focused":true}}\n' \
-      "$identifier" "$identifier" "$x" "$y" "$width" "$height"
-    ;;
-  scroll|drag|perform-action)
-    exit 0
-    ;;
-  *)
-    exit 64
-    ;;
-esac
-"#;
-    write_helper_script(path, script);
 }
 
 fn write_press_action_helper(path: &Path, log_path: &Path) {

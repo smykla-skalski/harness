@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::env;
 use std::fs::Metadata;
 use std::fs::read_dir;
+use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -38,12 +39,23 @@ impl Backend {
 /// Order: `$HARNESS_MONITOR_INPUT_BIN` > bundled helper under the registry
 /// package > `cliclick` on PATH > None.
 pub async fn detect_backend() -> Backend {
+    let mut probe = |path: PathBuf| async move { viable_helper_candidate(&path).await };
+    detect_backend_with_probe(&mut probe).await
+}
+
+pub(crate) async fn detect_backend_with_probe<P, F>(probe: &mut P) -> Backend
+where
+    P: FnMut(PathBuf) -> F,
+    F: Future<Output = Option<(SystemTime, PathBuf)>>,
+{
     if let Some(path) = env_override()
-        && viable_helper_candidate(&path).await.is_some()
+        && probe(path.clone()).await.is_some()
     {
         return Backend::HarnessInput(path);
     }
-    if let Some(candidate) = default_helper_candidate().await {
+    if let Some(candidate) =
+        default_helper_candidate_from_roots_with_probe(&helper_search_roots(), probe).await
+    {
         return Backend::HarnessInput(candidate);
     }
     if on_path("cliclick").await {
@@ -60,29 +72,21 @@ fn env_override() -> Option<PathBuf> {
     Some(PathBuf::from(value))
 }
 
-pub(crate) async fn default_helper_candidate() -> Option<PathBuf> {
-    default_helper_candidate_from_roots(&helper_search_roots()).await
-}
-
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "exercised by automation tests to lock helper ranking"
-    )
-)]
-pub(crate) async fn default_helper_candidate_in(repo_root: &Path) -> Option<PathBuf> {
-    best_helper_candidate(helper_candidates_from(repo_root)).await
-}
-
-pub(crate) async fn default_helper_candidate_from_roots(roots: &[PathBuf]) -> Option<PathBuf> {
+pub(crate) async fn default_helper_candidate_from_roots_with_probe<P, F>(
+    roots: &[PathBuf],
+    probe: &mut P,
+) -> Option<PathBuf>
+where
+    P: FnMut(PathBuf) -> F,
+    F: Future<Output = Option<(SystemTime, PathBuf)>>,
+{
     let mut seen = HashSet::new();
     let candidates: Vec<PathBuf> = roots
         .iter()
         .flat_map(|root| helper_candidates_from(root))
         .filter(|candidate| seen.insert(candidate.clone()))
         .collect();
-    best_helper_candidate(candidates).await
+    best_helper_candidate_with_probe(candidates, probe).await
 }
 
 fn helper_candidates_from(repo_root: &Path) -> Vec<PathBuf> {
@@ -130,13 +134,15 @@ fn prefers_candidate(candidate: &Path, incumbent: &Path) -> bool {
             .any(|component| component.as_os_str() == "debug")
 }
 
-async fn best_helper_candidate<I>(candidates: I) -> Option<PathBuf>
+async fn best_helper_candidate_with_probe<I, P, F>(candidates: I, probe: &mut P) -> Option<PathBuf>
 where
     I: IntoIterator<Item = PathBuf>,
+    P: FnMut(PathBuf) -> F,
+    F: Future<Output = Option<(SystemTime, PathBuf)>>,
 {
     let mut best: Option<(SystemTime, PathBuf)> = None;
     for candidate in candidates {
-        let Some((modified, candidate)) = viable_helper_candidate(&candidate).await else {
+        let Some((modified, candidate)) = probe(candidate).await else {
             continue;
         };
         if best.as_ref().is_none_or(|(best_modified, best_path)| {
@@ -150,11 +156,23 @@ where
 }
 
 async fn viable_helper_candidate(path: &Path) -> Option<(SystemTime, PathBuf)> {
+    let mut launch_check = |path: PathBuf| async move { helper_launches(&path).await };
+    viable_helper_candidate_with_launch_check(path, &mut launch_check).await
+}
+
+pub(crate) async fn viable_helper_candidate_with_launch_check<L, F>(
+    path: &Path,
+    launch_check: &mut L,
+) -> Option<(SystemTime, PathBuf)>
+where
+    L: FnMut(PathBuf) -> F,
+    F: Future<Output = bool>,
+{
     let metadata = fs::metadata(path).await.ok()?;
     if !metadata.is_file() || !is_executable(&metadata) {
         return None;
     }
-    if !helper_launches(path).await {
+    if !launch_check(path.to_path_buf()).await {
         return None;
     }
     Some((

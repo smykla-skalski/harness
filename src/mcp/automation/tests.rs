@@ -1,17 +1,21 @@
+use std::collections::HashSet;
 use std::ffi::OsString;
 use std::fs;
+use std::future::{Ready, ready};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use std::os::unix::fs::PermissionsExt;
+use tokio::sync::Barrier;
 
 use crate::mcp::automation::AccessibilityAction;
 use crate::mcp::registry::ElementKind;
 
 use super::accessibility::{get_element_args, list_elements_args, perform_action_args};
 use super::backend::{
-    Backend, INPUT_OVERRIDE_ENV, default_helper_candidate_from_roots, default_helper_candidate_in,
-    detect_backend, helper_search_roots_from,
+    Backend, INPUT_OVERRIDE_ENV, default_helper_candidate_from_roots_with_probe,
+    detect_backend_with_probe, helper_search_roots_from, viable_helper_candidate_with_launch_check,
 };
 use super::input::{MouseButton, click_args, move_mouse_args, type_text_args};
 use super::screenshot::{ScreenshotOptions, ScreenshotTarget, screenshot_args};
@@ -49,6 +53,20 @@ fn valid_helper_script() -> &'static str {
 
 fn failing_helper_script() -> &'static str {
     "#!/bin/sh\nexit 1\n"
+}
+
+fn probe_fixture_candidate(
+    viable: &HashSet<PathBuf>,
+    path: PathBuf,
+) -> Ready<Option<(SystemTime, PathBuf)>> {
+    let candidate = viable.contains(&path).then(|| {
+        let modified = fs::metadata(&path)
+            .expect("candidate metadata")
+            .modified()
+            .expect("candidate timestamp");
+        (modified, path)
+    });
+    ready(candidate)
 }
 
 #[test]
@@ -265,12 +283,53 @@ async fn detect_backend_honours_env_override_when_file_exists() {
     let expected_path = temp.path().join("harness-monitor-input");
     write_helper_script(&expected_path, valid_helper_script());
     let path_value = expected_path.to_string_lossy().into_owned();
-    let backend = temp_env::async_with_vars(
-        [(INPUT_OVERRIDE_ENV, Some(path_value.as_str()))],
-        async move { detect_backend().await },
-    )
-    .await;
+    let expected_for_probe = expected_path.clone();
+    let backend =
+        temp_env::async_with_vars([(INPUT_OVERRIDE_ENV, Some(path_value.as_str()))], async {
+            let mut probe = move |path: PathBuf| {
+                ready((path == expected_for_probe).then_some((SystemTime::UNIX_EPOCH, path)))
+            };
+            detect_backend_with_probe(&mut probe).await
+        })
+        .await;
     assert_eq!(backend, Backend::HarnessInput(expected_path));
+}
+
+#[tokio::test]
+async fn helper_candidate_requires_executable_metadata_and_a_successful_launch() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let missing = temp.path().join("missing-helper");
+    let mut successful_launch = |_| ready(true);
+    assert!(
+        viable_helper_candidate_with_launch_check(&missing, &mut successful_launch)
+            .await
+            .is_none()
+    );
+
+    let helper = temp.path().join("harness-monitor-input");
+    write_helper_script(&helper, valid_helper_script());
+    let mut failed_launch = |_| ready(false);
+    assert!(
+        viable_helper_candidate_with_launch_check(&helper, &mut failed_launch)
+            .await
+            .is_none()
+    );
+
+    let mut successful_launch = |_| ready(true);
+    let viable = viable_helper_candidate_with_launch_check(&helper, &mut successful_launch).await;
+    assert_eq!(viable.map(|(_, path)| path), Some(helper.clone()));
+
+    let mut permissions = fs::metadata(&helper)
+        .expect("helper metadata")
+        .permissions();
+    permissions.set_mode(0o644);
+    fs::set_permissions(&helper, permissions).expect("remove executable bit");
+    let mut successful_launch = |_| ready(true);
+    assert!(
+        viable_helper_candidate_with_launch_check(&helper, &mut successful_launch)
+            .await
+            .is_none()
+    );
 }
 
 #[tokio::test]
@@ -286,7 +345,11 @@ async fn default_helper_candidate_prefers_newest_platform_build() {
     set_helper_modified(&release, 1);
     set_helper_modified(&debug, 2);
 
-    let candidate = default_helper_candidate_in(temp.path()).await;
+    let viable = HashSet::from([release.clone(), debug.clone()]);
+    let mut probe = |path| probe_fixture_candidate(&viable, path);
+    let candidate =
+        default_helper_candidate_from_roots_with_probe(&[temp.path().to_path_buf()], &mut probe)
+            .await;
     assert_eq!(candidate, Some(debug));
 }
 
@@ -303,7 +366,11 @@ async fn default_helper_candidate_skips_newer_non_viable_platform_build() {
     set_helper_modified(&release, 1);
     set_helper_modified(&debug, 2);
 
-    let candidate = default_helper_candidate_in(temp.path()).await;
+    let viable = HashSet::from([release.clone()]);
+    let mut probe = |path| probe_fixture_candidate(&viable, path);
+    let candidate =
+        default_helper_candidate_from_roots_with_probe(&[temp.path().to_path_buf()], &mut probe)
+            .await;
     assert_eq!(candidate, Some(release));
 }
 
@@ -322,12 +389,57 @@ async fn default_helper_candidate_prefers_newest_viable_candidate_across_search_
     set_helper_modified(&older, 1);
     set_helper_modified(&newer, 2);
 
-    let candidate = default_helper_candidate_from_roots(&[
-        first_root.path().to_path_buf(),
-        second_root.path().to_path_buf(),
-    ])
+    let viable = HashSet::from([older.clone(), newer.clone()]);
+    let mut probe = |path| probe_fixture_candidate(&viable, path);
+    let candidate = default_helper_candidate_from_roots_with_probe(
+        &[
+            first_root.path().to_path_buf(),
+            second_root.path().to_path_buf(),
+        ],
+        &mut probe,
+    )
     .await;
     assert_eq!(candidate, Some(newer));
+}
+
+#[tokio::test]
+async fn concurrent_helper_discovery_keeps_injected_probe_results_isolated() {
+    let first_root = tempfile::tempdir().expect("first root");
+    let second_root = tempfile::tempdir().expect("second root");
+    let first = first_root
+        .path()
+        .join("mcp-servers/harness-monitor-registry/.build/arm64-apple-macosx/release/harness-monitor-input");
+    let second = second_root
+        .path()
+        .join("mcp-servers/harness-monitor-registry/.build/arm64-apple-macosx/release/harness-monitor-input");
+    write_helper_script(&first, valid_helper_script());
+    write_helper_script(&second, valid_helper_script());
+    let barrier = Arc::new(Barrier::new(2));
+
+    let discover = |root: PathBuf, expected: PathBuf, barrier: Arc<Barrier>| async move {
+        let viable = HashSet::from([expected]);
+        let mut probe = move |path| {
+            let candidate = probe_fixture_candidate(&viable, path);
+            let barrier = Arc::clone(&barrier);
+            async move {
+                barrier.wait().await;
+                candidate.await
+            }
+        };
+        default_helper_candidate_from_roots_with_probe(&[root], &mut probe).await
+    };
+
+    let (first_result, second_result) = tokio::join!(
+        discover(
+            first_root.path().to_path_buf(),
+            first.clone(),
+            Arc::clone(&barrier),
+        ),
+        discover(second_root.path().to_path_buf(), second.clone(), barrier,),
+    );
+
+    assert_eq!(first_result, Some(first));
+    assert_eq!(second_result, Some(second));
 }
 
 #[test]
