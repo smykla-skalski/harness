@@ -223,6 +223,8 @@ pub(super) fn setup_version_script_fixture_with_pbxproj(
         "crates/harness-hook/Cargo.toml",
         "crates/harness-mcp/Cargo.toml",
         "crates/harness-protocol/Cargo.toml",
+        "crates/harness-systemd/Cargo.toml",
+        "crates/harness-systemd-protocol/Cargo.toml",
         "crates/harness-telemetry/Cargo.toml",
         "testkit/Cargo.toml",
         "src/observe/output.rs",
