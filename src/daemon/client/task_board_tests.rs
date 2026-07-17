@@ -6,7 +6,7 @@ use super::DaemonClient;
 use super::test_support::{read_http_request, write_http_response};
 use crate::daemon::protocol::{
     PolicyTransferBundle, PolicyTransferDumpRequest, PolicyTransferImportRequest,
-    TaskBoardListItemsRequest, TaskBoardUpdateItemRequest,
+    TaskBoardAutomationHistoryRequest, TaskBoardListItemsRequest, TaskBoardUpdateItemRequest,
 };
 use crate::task_board::{TaskBoardItem, TaskBoardStatus};
 
@@ -160,6 +160,63 @@ fn task_board_update_uses_put_item_route() {
     assert_eq!(
         *request_line.lock().expect("request line"),
         "PUT /v1/task-board/items/task-1 HTTP/1.1"
+    );
+}
+
+#[test]
+fn automation_runs_encode_history_query() {
+    let (endpoint, request_line, handle) =
+        spawn_mock("200 OK", r#"{"runs":[],"has_older":false}"#.into());
+
+    let response = client_with(endpoint)
+        .task_board_automation_runs(&TaskBoardAutomationHistoryRequest {
+            limit: Some(25),
+            before: Some("2026-07-17T08:30:00Z/run 7".into()),
+        })
+        .expect("automation runs");
+    handle.join().expect("server");
+
+    assert!(response.runs.is_empty());
+    assert_eq!(
+        *request_line.lock().expect("request line"),
+        "GET /v1/task-board/orchestrator/runs?limit=25&before=2026-07-17T08%3A30%3A00Z%2Frun+7 HTTP/1.1"
+    );
+}
+
+#[test]
+fn automation_run_detail_expands_path_and_preserves_not_found() {
+    let (endpoint, request_line, handle) =
+        spawn_mock("404 Not Found", r#"{"error":"not found"}"#.into());
+
+    let error = client_with(endpoint)
+        .task_board_automation_run_detail("run/42 ?#%")
+        .expect_err("missing automation run");
+    handle.join().expect("server");
+
+    assert!(error.to_string().contains("HTTP 404"));
+    assert_eq!(
+        *request_line.lock().expect("request line"),
+        "GET /v1/task-board/orchestrator/runs/run%2F42%20%3F%23%25 HTTP/1.1"
+    );
+}
+
+#[test]
+fn automation_metrics_use_metrics_route() {
+    let (endpoint, request_line, handle) = spawn_mock(
+        "200 OK",
+        r#"{"runs_total":3,"runs_running":1,"runs_completed":1,"runs_noop":0,"runs_partial":0,"runs_failed":1,"runs_cancelled":0,"open_conflicts":2,"captured_at":"2026-07-17T08:30:00Z"}"#.into(),
+    );
+
+    let response = client_with(endpoint)
+        .task_board_automation_metrics()
+        .expect("automation metrics");
+    handle.join().expect("server");
+
+    assert_eq!(response.runs_total, 3);
+    assert_eq!(response.open_conflicts, 2);
+    assert_eq!(
+        *request_line.lock().expect("request line"),
+        "GET /v1/task-board/orchestrator/metrics HTTP/1.1"
     );
 }
 

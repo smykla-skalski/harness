@@ -2,9 +2,9 @@ use super::*;
 
 #[test]
 fn task_board_routes_have_complete_ws_parity() {
-    let task_board_routes = super::routes_task_board::ROUTES;
-    let actual: Vec<_> = task_board_routes
+    let actual: Vec<_> = super::routes_task_board::ROUTES
         .iter()
+        .chain(super::routes_task_board_orchestrator::ROUTES)
         .map(|route| {
             let ws_method = route
                 .parity
@@ -399,11 +399,34 @@ fn task_board_routes_have_complete_ws_parity() {
                 ws_methods::POLICY_PIPELINE_REPLAY,
                 true,
             ),
+            (
+                HttpRouteMethod::Get,
+                http_paths::TASK_BOARD_ORCHESTRATOR_RUNS,
+                ws_methods::TASK_BOARD_ORCHESTRATOR_RUNS,
+                false,
+            ),
+            (
+                HttpRouteMethod::Get,
+                http_paths::TASK_BOARD_ORCHESTRATOR_RUN_DETAIL,
+                ws_methods::TASK_BOARD_ORCHESTRATOR_RUN_DETAIL,
+                false,
+            ),
+            (
+                HttpRouteMethod::Get,
+                http_paths::TASK_BOARD_ORCHESTRATOR_METRICS,
+                ws_methods::TASK_BOARD_ORCHESTRATOR_METRICS,
+                false,
+            ),
         ]
     );
-    let expected_mcp_methods: Vec<_> = actual
+    let expected_mcp_methods: Vec<_> = super::routes_task_board::ROUTES
         .iter()
-        .map(|(_, _, ws_method, _)| *ws_method)
+        .map(|route| {
+            route
+                .parity
+                .ws_method()
+                .expect("task-board route should map to websocket")
+        })
         .collect();
     assert_eq!(task_board_mcp_methods(), expected_mcp_methods);
 }

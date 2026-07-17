@@ -57,6 +57,7 @@ mod routes_remote;
 mod routes_reviews;
 mod routes_sessions_infra;
 mod routes_task_board;
+mod routes_task_board_orchestrator;
 mod routes_tasks_agents_voice;
 #[cfg(test)]
 mod tests;
