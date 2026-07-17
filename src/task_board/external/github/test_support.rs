@@ -68,10 +68,19 @@ pub(super) fn spawn_sequence_mock(
 }
 
 fn accept_before_deadline(listener: &TcpListener) -> TcpStream {
+    accept_before_deadline_with_stream_setup(listener, |_| {})
+}
+
+fn accept_before_deadline_with_stream_setup<F>(listener: &TcpListener, stream_setup: F) -> TcpStream
+where
+    F: FnOnce(&TcpStream),
+{
     let deadline = Instant::now() + Duration::from_secs(10);
+    let mut stream_setup = Some(stream_setup);
     loop {
         match listener.accept() {
             Ok((stream, _)) => {
+                stream_setup.take().expect("stream setup")(&stream);
                 prepare_accepted_stream(&stream);
                 return stream;
             }
@@ -177,18 +186,36 @@ mod tests {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
         listener.set_nonblocking(true).expect("nonblocking");
         let address = listener.local_addr().expect("listener address");
+        let (write_request, wait_to_write) = std::sync::mpsc::channel();
         let client = thread::spawn(move || {
             let mut stream = TcpStream::connect(address).expect("connect");
-            thread::sleep(Duration::from_millis(50));
+            if wait_to_write.recv().is_err() {
+                return;
+            }
             stream
                 .write_all(b"GET /delayed HTTP/1.1\r\nHost: localhost\r\n\r\n")
                 .expect("write delayed request");
         });
-        let mut stream = accept_before_deadline(&listener);
+        let mut stream = accept_before_deadline_with_stream_setup(&listener, |stream| {
+            stream
+                .set_nonblocking(true)
+                .expect("simulate inherited nonblocking mode");
+        });
+        #[cfg(all(unix, feature = "bridge-runtime"))]
+        assert!(!stream_is_nonblocking(&stream));
+        write_request.send(()).expect("release request writer");
 
         let request = read_http_request(&mut stream);
 
         client.join().expect("client");
         assert!(request.starts_with("GET /delayed HTTP/1.1\r\n"));
+    }
+
+    #[cfg(all(unix, feature = "bridge-runtime"))]
+    fn stream_is_nonblocking(stream: &TcpStream) -> bool {
+        use nix::fcntl::{FcntlArg, OFlag, fcntl};
+
+        let flags = fcntl(stream, FcntlArg::F_GETFL).expect("read stream flags");
+        OFlag::from_bits_truncate(flags).contains(OFlag::O_NONBLOCK)
     }
 }
