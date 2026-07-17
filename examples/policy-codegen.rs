@@ -1948,6 +1948,7 @@ const OMITTED_WIRE_FIELDS: &[(&str, &str)] = &[
     ("TaskBoardOrchestratorSettings", "reviewers"),
     ("TaskBoardOrchestratorSettings", "repositories"),
     ("TaskBoardOrchestratorSettings", "execution_hosts"),
+    ("TaskBoardOrchestratorSettings", "admission_policy"),
     ("TaskBoardOrchestratorStatus", "automation"),
 ];
 
@@ -3832,6 +3833,38 @@ pub struct Drop { pub other: String }
             .collect();
 
         assert_eq!(properties, vec!["enabled"], "automation is deferred");
+    }
+
+    #[test]
+    fn admission_policy_is_deferred_from_monitor_settings_wire() {
+        let source = r"
+            #[derive(Serialize, Deserialize)]
+            pub struct TaskBoardOrchestratorSettings {
+                pub dry_run_default: bool,
+                pub admission_policy: TaskBoardAutomationPolicy,
+            }
+        ";
+        let symbols = build_symbol_table(&[source]);
+        let defaults = DefaultLiterals::new();
+        let file = syn::parse_file(source).expect("source parses");
+        let item = file
+            .items
+            .iter()
+            .find_map(|item| match item {
+                Item::Struct(item) if item.ident == "TaskBoardOrchestratorSettings" => {
+                    Some(item.clone())
+                }
+                _ => None,
+            })
+            .expect("TaskBoardOrchestratorSettings present");
+        let spec = build_struct(&item, &defaults, &symbols).expect("struct builds");
+        let properties: Vec<_> = spec
+            .fields
+            .iter()
+            .map(|field| field.property.as_str())
+            .collect();
+
+        assert_eq!(properties, vec!["dryRunDefault"]);
     }
 
     #[test]

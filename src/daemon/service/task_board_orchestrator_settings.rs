@@ -71,6 +71,9 @@ fn apply_automation_fields(
     if let Some(execution_hosts) = &update.execution_hosts {
         settings.execution_hosts.clone_from(execution_hosts);
     }
+    if let Some(admission_policy) = &update.admission_policy {
+        settings.admission_policy.clone_from(admission_policy);
+    }
 }
 
 pub(super) fn normalize_github_inbox(

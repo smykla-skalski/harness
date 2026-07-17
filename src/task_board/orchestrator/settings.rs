@@ -159,6 +159,9 @@ pub(super) fn apply_settings_update(
     if let Some(execution_hosts) = &update.execution_hosts {
         settings.execution_hosts.clone_from(execution_hosts);
     }
+    if let Some(admission_policy) = &update.admission_policy {
+        settings.admission_policy.clone_from(admission_policy);
+    }
     if let Some(policy_version) = &update.policy_version {
         settings.policy_version.clone_from(policy_version);
     }

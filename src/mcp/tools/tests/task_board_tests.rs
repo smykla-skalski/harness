@@ -417,6 +417,29 @@ fn update_schema_uses_strict_additional_properties() {
 }
 
 #[test]
+fn orchestrator_settings_schema_advertises_strict_admission_policy() {
+    let schema = task_board_tool_schema(ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_UPDATE);
+    assert_schema_covers_fields(
+        &schema,
+        ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_UPDATE,
+        &["admission_policy"],
+    );
+    let policy = &schema["properties"]["admission_policy"];
+    assert_eq!(policy["type"], "object");
+    assert_eq!(policy["additionalProperties"], false);
+    assert_eq!(policy["properties"]["limits"]["type"], "array");
+    assert_eq!(
+        policy["properties"]["limits"]["items"]["additionalProperties"],
+        false
+    );
+    assert_eq!(policy["properties"]["windows"]["type"], "array");
+    assert_eq!(
+        policy["properties"]["windows"]["items"]["additionalProperties"],
+        false
+    );
+}
+
+#[test]
 fn policy_schemas_advertise_protocol_fields() {
     for tool_name in [
         ws_methods::POLICY_PIPELINE_GET,

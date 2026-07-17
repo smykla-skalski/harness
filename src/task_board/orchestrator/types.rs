@@ -6,8 +6,10 @@ use super::super::policy::POLICY_VERSION;
 use super::super::summary::{TaskBoardAuditSummary, TaskBoardSyncSummary};
 use super::super::types::{TaskBoardStatus, TaskBoardWorkflowStatus};
 use super::super::{
-    TaskBoardAutomationRetrySettings, TaskBoardAutomationSchedulingSettings,
-    TaskBoardExecutionHostConfig, TaskBoardRepositoryAutomationConfig, TaskBoardReviewerSettings,
+    TaskBoardAutomationPolicy, TaskBoardAutomationRetrySettings,
+    TaskBoardAutomationSchedulingSettings, TaskBoardExecutionHostConfig,
+    TaskBoardPolicyCompilationError, TaskBoardRepositoryAutomationConfig,
+    TaskBoardReviewerSettings, validate_task_board_policy,
 };
 
 pub use crate::task_board::github::GitHubProjectConfig as TaskBoardGitHubProjectConfig;
@@ -56,6 +58,8 @@ pub struct TaskBoardOrchestratorSettings {
     pub repositories: Vec<TaskBoardRepositoryAutomationConfig>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub execution_hosts: Vec<TaskBoardExecutionHostConfig>,
+    #[serde(default)]
+    pub admission_policy: TaskBoardAutomationPolicy,
     #[serde(default = "default_policy_version")]
     pub policy_version: String,
 }
@@ -92,6 +96,8 @@ pub struct TaskBoardOrchestratorSettingsUpdateRequest {
     pub repositories: Option<Vec<TaskBoardRepositoryAutomationConfig>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_hosts: Option<Vec<TaskBoardExecutionHostConfig>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub admission_policy: Option<TaskBoardAutomationPolicy>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub policy_version: Option<String>,
 }
@@ -255,8 +261,21 @@ impl Default for TaskBoardOrchestratorSettings {
             reviewers: TaskBoardReviewerSettings::default(),
             repositories: Vec::new(),
             execution_hosts: Vec::new(),
+            admission_policy: TaskBoardAutomationPolicy::default(),
             policy_version: default_policy_version(),
         }
+    }
+}
+
+impl TaskBoardOrchestratorSettingsUpdateRequest {
+    /// Validate the complete replacement admission policy, when supplied.
+    ///
+    /// # Errors
+    /// Returns the first deterministic whole-policy validation error.
+    pub fn validate_admission_policy(&self) -> Result<(), TaskBoardPolicyCompilationError> {
+        self.admission_policy
+            .as_ref()
+            .map_or(Ok(()), validate_task_board_policy)
     }
 }
 

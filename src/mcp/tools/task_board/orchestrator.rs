@@ -142,9 +142,88 @@ fn settings_update_schema() -> Value {
             "clear_dispatch_status_filter": { "type": "boolean" },
             "project_dir": { "type": "string" },
             "clear_project_dir": { "type": "boolean" },
+            "admission_policy": admission_policy_schema(),
             "policy_version": { "type": "string" }
         },
-        "additionalProperties": true
+        "additionalProperties": false
+    })
+}
+
+fn admission_policy_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "limits": {
+                "type": "array",
+                "items": admission_limit_schema()
+            },
+            "windows": {
+                "type": "array",
+                "items": admission_window_schema()
+            }
+        },
+        "additionalProperties": false
+    })
+}
+
+fn admission_limit_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "kind": {
+                "type": "string",
+                "enum": ["concurrency", "rate", "token_budget", "monetary_budget"]
+            },
+            "scope": admission_scope_schema(),
+            "limit": { "type": "integer", "minimum": 1 },
+            "limit_microusd": { "type": "integer", "minimum": 1 },
+            "window_seconds": { "type": "integer", "minimum": 1 },
+            "reservation": { "type": "integer", "minimum": 1 }
+        },
+        "required": ["kind", "scope"],
+        "additionalProperties": false
+    })
+}
+
+fn admission_scope_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "kind": {
+                "type": "string",
+                "enum": ["global", "workflow", "repository"]
+            },
+            "value": { "type": "string" }
+        },
+        "required": ["kind"],
+        "additionalProperties": false
+    })
+}
+
+fn admission_window_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "scope": admission_scope_schema(),
+            "timezone": { "type": "string" },
+            "weekdays": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                    "enum": [
+                        "monday", "tuesday", "wednesday", "thursday", "friday",
+                        "saturday", "sunday"
+                    ]
+                }
+            },
+            "start_time": { "type": "string" },
+            "end_time": { "type": "string" },
+            "outside_action": { "type": "string", "enum": ["defer", "deny"] }
+        },
+        "required": [
+            "scope", "timezone", "weekdays", "start_time", "end_time", "outside_action"
+        ],
+        "additionalProperties": false
     })
 }
 

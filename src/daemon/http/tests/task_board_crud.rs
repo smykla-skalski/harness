@@ -107,6 +107,14 @@ async fn run_flow() {
             .as_bool(),
         Some(true)
     );
+    let admission_policy = json!({
+        "limits": [{
+            "kind": "concurrency",
+            "scope": { "kind": "global" },
+            "limit": 2,
+            "reservation": 1
+        }]
+    });
     let settings = put_json(
         &client,
         &base_url,
@@ -114,12 +122,37 @@ async fn run_flow() {
         json!({
             "dry_run_default": false,
             "dispatch_status_filter": "todo",
-            "step_mode": true
+            "step_mode": true,
+            "admission_policy": admission_policy
         }),
     )
     .await;
     assert_eq!(settings["dry_run_default"].as_bool(), Some(false));
     assert_eq!(settings["step_mode"].as_bool(), Some(true));
+    assert_eq!(settings["admission_policy"], admission_policy);
+    let (invalid_status, invalid_error) = put_json_with_status(
+        &client,
+        &base_url,
+        http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
+        json!({
+            "dry_run_default": true,
+            "admission_policy": {
+                "limits": [{
+                    "kind": "concurrency",
+                    "scope": { "kind": "global" },
+                    "limit": 0,
+                    "reservation": 1
+                }]
+            }
+        }),
+    )
+    .await;
+    assert_eq!(invalid_status, StatusCode::BAD_REQUEST);
+    assert!(
+        invalid_error["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("invalid task-board admission policy"))
+    );
     let loaded_settings = get_json(
         &client,
         &base_url,
@@ -128,6 +161,7 @@ async fn run_flow() {
     .await;
     assert_eq!(loaded_settings["dry_run_default"].as_bool(), Some(false));
     assert_eq!(loaded_settings["step_mode"].as_bool(), Some(true));
+    assert_eq!(loaded_settings["admission_policy"], admission_policy);
     let status = get_json(
         &client,
         &base_url,
@@ -270,6 +304,15 @@ async fn post_json_with_status(
 
 async fn put_json(client: &reqwest::Client, base_url: &str, path: &str, body: Value) -> Value {
     json_request(client.put(format!("{base_url}{path}")).json(&body), path).await
+}
+
+async fn put_json_with_status(
+    client: &reqwest::Client,
+    base_url: &str,
+    path: &str,
+    body: Value,
+) -> (StatusCode, Value) {
+    json_request_with_status(client.put(format!("{base_url}{path}")).json(&body)).await
 }
 
 async fn get_json(client: &reqwest::Client, base_url: &str, path: &str) -> Value {

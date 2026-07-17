@@ -89,6 +89,9 @@ pub(crate) async fn update_orchestrator_settings(
     state: &DaemonHttpState,
     request: &TaskBoardOrchestratorSettingsUpdateRequest,
 ) -> Result<TaskBoardOrchestratorSettingsResponse, CliError> {
+    request.validate_admission_policy().map_err(|error| {
+        CliErrorKind::workflow_parse(format!("invalid task-board admission policy: {error}"))
+    })?;
     service::update_task_board_orchestrator_settings_db(
         require_async_db(state, "task board orchestrator settings update")?,
         request,
