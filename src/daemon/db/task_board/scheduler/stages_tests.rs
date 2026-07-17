@@ -7,10 +7,10 @@ use tokio::sync::Barrier;
 use super::test_support::{
     acquire_request, automation_audit_count, database, fail_automation_audit_inserts, instant,
 };
-use crate::daemon::db::{
-    TaskBoardAutomationRunAdmission, TaskBoardAutomationRunLease, TaskBoardAutomationRunStage,
+use crate::daemon::db::{TaskBoardAutomationRunAdmission, TaskBoardAutomationRunLease};
+use crate::task_board::{
+    TaskBoardAutomationRunOutcome, TaskBoardAutomationRunStage, TaskBoardAutomationRunTrigger,
 };
-use crate::task_board::{TaskBoardAutomationRunOutcome, TaskBoardAutomationRunTrigger};
 
 #[derive(Deserialize)]
 struct StoredStageSummary {
