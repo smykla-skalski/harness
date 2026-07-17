@@ -9,8 +9,6 @@ use tokio::time::{Duration, timeout};
 
 use crate::mcp::registry::{ElementKind, GetElementResult, ListElementsResult};
 
-#[cfg(test)]
-use super::backend::INPUT_OVERRIDE_ENV;
 use super::backend::{Backend, detect_backend};
 
 // Keep helper fallback queries bounded so a wedged AX tree degrades to a fast
@@ -112,9 +110,18 @@ pub async fn perform_action(
     action: AccessibilityAction,
 ) -> Result<(), AccessibilityActionError> {
     let program = helper_program_for_action().await?;
-    match run_action_request(&program, identifier, window_id, action).await {
+    perform_action_with_program(&program, identifier, window_id, action).await
+}
+
+pub(crate) async fn perform_action_with_program(
+    program: &Path,
+    identifier: &str,
+    window_id: Option<i64>,
+    action: AccessibilityAction,
+) -> Result<(), AccessibilityActionError> {
+    match run_action_request(program, identifier, window_id, action).await {
         Err(AccessibilityActionError::NotFound) if window_id.is_some() => {
-            run_action_request(&program, identifier, None, action).await
+            run_action_request(program, identifier, None, action).await
         }
         result => result,
     }
@@ -365,14 +372,9 @@ esac
             log_path = log_path.to_string_lossy()
         );
         write_helper_script(&helper, &script);
-        let helper_path = helper.to_string_lossy().into_owned();
-
-        temp_env::async_with_vars([(INPUT_OVERRIDE_ENV, Some(helper_path.as_str()))], async {
-            perform_action("button.send", Some(7), AccessibilityAction::Press)
-                .await
-                .expect("unscoped retry succeeds");
-        })
-        .await;
+        perform_action_with_program(&helper, "button.send", Some(7), AccessibilityAction::Press)
+            .await
+            .expect("unscoped retry succeeds");
 
         assert_eq!(
             fs::read_to_string(log_path).expect("read retry log"),

@@ -1,5 +1,13 @@
 use super::*;
 
+async fn unexpected_accessibility_fallback(
+    _identifier: String,
+    _window_id: Option<i64>,
+    _action: AccessibilityAction,
+) -> Result<(), AccessibilityActionError> {
+    panic!("registry path unexpectedly used the accessibility fallback");
+}
+
 #[tokio::test]
 async fn list_windows_tool_returns_json_text_result() {
     let dir = TempDir::new().unwrap();
@@ -124,16 +132,19 @@ async fn press_element_invokes_helper_semantic_action() {
     let helper = dir.path().join("harness-monitor-input");
     let log_path = dir.path().join("press-action.log");
     write_press_action_helper(&helper, &log_path);
-    let helper_path = helper.to_string_lossy().into_owned();
     let client = Arc::new(RegistryClient::with_socket_path(path));
     let tool = PressElementTool::new(client);
 
-    let result = temp_env::async_with_vars(
-        [(INPUT_OVERRIDE_ENV, Some(helper_path.as_str()))],
-        async move { tool.call(json!({"identifier": "button.send"})).await },
-    )
-    .await
-    .expect("semantic action succeeds");
+    let result = tool
+        .call_with_accessibility_action(
+            json!({"identifier": "button.send"}),
+            move |identifier, window_id, action| async move {
+                perform_accessibility_action_with_program(&helper, &identifier, window_id, action)
+                    .await
+            },
+        )
+        .await
+        .expect("semantic action succeeds");
     let request_line = server.await.unwrap();
 
     assert!(!result.is_error);
@@ -157,16 +168,19 @@ async fn press_element_surfaces_missing_semantic_action_as_tool_error_result() {
         4,
         "error: no supported accessibility action for identifier: button.send",
     );
-    let helper_path = helper.to_string_lossy().into_owned();
     let client = Arc::new(RegistryClient::with_socket_path(path));
     let tool = PressElementTool::new(client);
 
-    let result = temp_env::async_with_vars(
-        [(INPUT_OVERRIDE_ENV, Some(helper_path.as_str()))],
-        async move { tool.call(json!({"identifier": "button.send"})).await },
-    )
-    .await
-    .expect("tool-level error result");
+    let result = tool
+        .call_with_accessibility_action(
+            json!({"identifier": "button.send"}),
+            move |identifier, window_id, action| async move {
+                perform_accessibility_action_with_program(&helper, &identifier, window_id, action)
+                    .await
+            },
+        )
+        .await
+        .expect("tool-level error result");
     let request_line = server.await.unwrap();
 
     assert!(request_line.contains("\"op\":\"getElement\""));
@@ -195,25 +209,16 @@ async fn press_element_uses_registry_semantic_action_when_advertised() {
             .to_string(),
         ],
     );
-    let helper = dir.path().join("harness-monitor-input");
-    let helper_log = dir.path().join("helper.log");
-    write_helper_script(
-        &helper,
-        &format!(
-            "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"{}\"\nexit 0\n",
-            helper_log.to_string_lossy()
-        ),
-    );
-    let helper_path = helper.to_string_lossy().into_owned();
     let client = Arc::new(RegistryClient::with_socket_path(path));
     let tool = PressElementTool::new(client);
 
-    let result = temp_env::async_with_vars(
-        [(INPUT_OVERRIDE_ENV, Some(helper_path.as_str()))],
-        async move { tool.call(json!({"identifier": "button.send"})).await },
-    )
-    .await
-    .expect("registry semantic action succeeds");
+    let result = tool
+        .call_with_accessibility_action(
+            json!({"identifier": "button.send"}),
+            unexpected_accessibility_fallback,
+        )
+        .await
+        .expect("registry semantic action succeeds");
     let request_lines = server.await.unwrap();
 
     assert!(!result.is_error);
@@ -221,11 +226,6 @@ async fn press_element_uses_registry_semantic_action_when_advertised() {
     assert!(request_lines[0].contains("\"op\":\"getElement\""));
     assert!(request_lines[1].contains("\"op\":\"performAction\""));
     assert!(request_lines[1].contains("\"action\":\"press\""));
-    assert!(
-        !helper_log.exists(),
-        "registry-first path should not consult helper: {}",
-        fs::read_to_string(&helper_log).unwrap_or_default()
-    );
 }
 
 #[tokio::test]
@@ -250,16 +250,19 @@ async fn press_element_falls_back_to_helper_when_registry_press_transport_is_uns
     let helper = dir.path().join("harness-monitor-input");
     let log_path = dir.path().join("press-action.log");
     write_press_action_helper(&helper, &log_path);
-    let helper_path = helper.to_string_lossy().into_owned();
     let client = Arc::new(RegistryClient::with_socket_path(path));
     let tool = PressElementTool::new(client);
 
-    let result = temp_env::async_with_vars(
-        [(INPUT_OVERRIDE_ENV, Some(helper_path.as_str()))],
-        async move { tool.call(json!({"identifier": "button.send"})).await },
-    )
-    .await
-    .expect("helper fallback succeeds");
+    let result = tool
+        .call_with_accessibility_action(
+            json!({"identifier": "button.send"}),
+            move |identifier, window_id, action| async move {
+                perform_accessibility_action_with_program(&helper, &identifier, window_id, action)
+                    .await
+            },
+        )
+        .await
+        .expect("helper fallback succeeds");
     let request_lines = server.await.unwrap();
 
     assert!(!result.is_error);
@@ -291,25 +294,16 @@ async fn press_element_surfaces_registry_action_unavailable_without_helper_fallb
             .to_string(),
         ],
     );
-    let helper = dir.path().join("harness-monitor-input");
-    let helper_log = dir.path().join("helper.log");
-    write_helper_script(
-        &helper,
-        &format!(
-            "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"{}\"\nexit 0\n",
-            helper_log.to_string_lossy()
-        ),
-    );
-    let helper_path = helper.to_string_lossy().into_owned();
     let client = Arc::new(RegistryClient::with_socket_path(path));
     let tool = PressElementTool::new(client);
 
-    let result = temp_env::async_with_vars(
-        [(INPUT_OVERRIDE_ENV, Some(helper_path.as_str()))],
-        async move { tool.call(json!({"identifier": "button.send"})).await },
-    )
-    .await
-    .expect("tool-level error result");
+    let result = tool
+        .call_with_accessibility_action(
+            json!({"identifier": "button.send"}),
+            unexpected_accessibility_fallback,
+        )
+        .await
+        .expect("tool-level error result");
     let request_lines = server.await.unwrap();
 
     assert!(result.is_error);
@@ -320,11 +314,6 @@ async fn press_element_surfaces_registry_action_unavailable_without_helper_fallb
         vec![ContentBlock::text(
             "identifier 'button.send' resolves to a live element without a supported semantic press action"
         )]
-    );
-    assert!(
-        !helper_log.exists(),
-        "action-unavailable should not drop to helper: {}",
-        fs::read_to_string(&helper_log).unwrap_or_default()
     );
 }
 

@@ -4,7 +4,6 @@ use serde_json::{Value, json};
 use tempfile::TempDir;
 
 use crate::daemon::protocol::{task_board_mcp_methods, ws_methods};
-use crate::mcp::automation::INPUT_OVERRIDE_ENV;
 use crate::mcp::registry::RegistryClient;
 use crate::mcp::tool::{Tool, ToolRegistry};
 
@@ -39,25 +38,32 @@ async fn scroll_tool_rejects_disabled_targets() {
 async fn scroll_tool_uses_helper_fallback_when_registry_reports_not_found() {
     let dir = TempDir::new().unwrap();
     let path = socket_path(&dir);
-    let helper = dir.path().join("fake-harness-monitor-input");
-    write_fake_harness_input(&helper);
-    let helper_value = helper.to_string_lossy().into_owned();
     let server = spawn_single_response(&path, not_found_response(1));
     let client = Arc::new(RegistryClient::with_socket_path(path));
+    let resolve_client = Arc::clone(&client);
     let tool = ScrollTool::new(client);
 
-    let result = temp_env::async_with_vars(
-        [(INPUT_OVERRIDE_ENV, Some(helper_value.as_str()))],
-        async move {
-            tool.call(json!({
+    let result = tool
+        .call_with_dependencies(
+            json!({
                 "identifier": "harness.session.cockpit.scroll",
                 "deltaY": 180,
-            }))
-            .await
-        },
-    )
-    .await
-    .expect("helper fallback should let scroll succeed");
+            }),
+            move |identifier| {
+                let client = Arc::clone(&resolve_client);
+                async move {
+                    resolve_get_element_with(&client, &identifier, |identifier| async move {
+                        Ok(GetElementResult {
+                            element: fallback_element(&identifier, 7, ElementKind::Button),
+                        })
+                    })
+                    .await
+                }
+            },
+            |_x, _y, _delta_x, _delta_y| async { Ok(()) },
+        )
+        .await
+        .expect("helper fallback should let scroll succeed");
 
     let request_line = server.await.unwrap();
     assert!(request_line.contains("\"identifier\":\"harness.session.cockpit.scroll\""));
@@ -126,25 +132,32 @@ async fn drag_drop_tool_rejects_disabled_destination() {
 async fn drag_drop_tool_uses_helper_fallback_when_registry_reports_not_found() {
     let dir = TempDir::new().unwrap();
     let path = socket_path(&dir);
-    let helper = dir.path().join("fake-harness-monitor-input");
-    write_fake_harness_input(&helper);
-    let helper_value = helper.to_string_lossy().into_owned();
     let server = spawn_response_sequence(&path, vec![not_found_response(1), not_found_response(2)]);
     let client = Arc::new(RegistryClient::with_socket_path(path));
+    let resolve_client = Arc::clone(&client);
     let tool = DragDropTool::new(client);
 
-    let result = temp_env::async_with_vars(
-        [(INPUT_OVERRIDE_ENV, Some(helper_value.as_str()))],
-        async move {
-            tool.call(json!({
+    let result = tool
+        .call_with_dependencies(
+            json!({
                 "sourceIdentifier": "task.source",
                 "destinationIdentifier": "agent.destination",
-            }))
-            .await
-        },
-    )
-    .await
-    .expect("helper fallback should let drag succeed");
+            }),
+            move |identifier| {
+                let client = Arc::clone(&resolve_client);
+                async move {
+                    resolve_get_element_with(&client, &identifier, |identifier| async move {
+                        Ok(GetElementResult {
+                            element: fallback_element(&identifier, 7, ElementKind::Button),
+                        })
+                    })
+                    .await
+                }
+            },
+            |_start_x, _start_y, _end_x, _end_y, _duration_ms| async { Ok(()) },
+        )
+        .await
+        .expect("helper fallback should let drag succeed");
 
     let requests = server.await.unwrap();
     assert_eq!(requests.len(), 2);

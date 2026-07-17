@@ -1,10 +1,11 @@
+use std::future::Future;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use crate::mcp::automation::drag_drop;
+use crate::mcp::automation::{AutomationError, drag_drop};
 use crate::mcp::protocol::ToolResult;
 use crate::mcp::registry::{GetElementResult, Rect, RegistryClient};
 use crate::mcp::tool::{Tool, ToolError};
@@ -40,6 +41,62 @@ impl DragDropTool {
     async fn fetch_element(&self, identifier: &str) -> Result<GetElementResult, ToolError> {
         resolve_get_element(&self.client, identifier).await
     }
+
+    pub(crate) async fn call_with_dependencies<R, RFut, D, DFut>(
+        &self,
+        params: Value,
+        mut resolve_element: R,
+        perform_drag_drop: D,
+    ) -> Result<ToolResult, ToolError>
+    where
+        R: FnMut(String) -> RFut,
+        RFut: Future<Output = Result<GetElementResult, ToolError>>,
+        D: FnOnce(f64, f64, f64, f64, u64) -> DFut,
+        DFut: Future<Output = Result<(), AutomationError>>,
+    {
+        let parsed: Params = decode_params(params)?;
+        if parsed.source_identifier.is_empty() {
+            return Err(ToolError::invalid("sourceIdentifier cannot be empty"));
+        }
+        if parsed.destination_identifier.is_empty() {
+            return Err(ToolError::invalid("destinationIdentifier cannot be empty"));
+        }
+        if parsed.duration_ms > MAX_DURATION_MS {
+            return Err(ToolError::invalid(format!(
+                "durationMs must be <= {MAX_DURATION_MS}"
+            )));
+        }
+
+        let source = resolve_element(parsed.source_identifier.clone()).await?;
+        let destination = resolve_element(parsed.destination_identifier.clone()).await?;
+        if !source.element.enabled {
+            return Err(ToolError::invalid(format!(
+                "sourceIdentifier '{}' resolves to a disabled target",
+                parsed.source_identifier
+            )));
+        }
+        if !destination.element.enabled {
+            return Err(ToolError::invalid(format!(
+                "destinationIdentifier '{}' resolves to a disabled target",
+                parsed.destination_identifier
+            )));
+        }
+        let (start_x, start_y) = center(&source.element.frame);
+        let (end_x, end_y) = center(&destination.element.frame);
+        perform_drag_drop(start_x, start_y, end_x, end_y, parsed.duration_ms)
+            .await
+            .map_err(|error| ToolError::internal(error.to_string()))?;
+        let payload = json!({
+            "dragged": {
+                "sourceIdentifier": parsed.source_identifier,
+                "destinationIdentifier": parsed.destination_identifier,
+                "start": {"x": start_x, "y": start_y},
+                "end": {"x": end_x, "y": end_y},
+                "durationMs": parsed.duration_ms,
+            }
+        });
+        Ok(ToolResult::text(payload.to_string()))
+    }
 }
 
 #[async_trait]
@@ -67,48 +124,14 @@ impl Tool for DragDropTool {
     }
 
     async fn call(&self, params: Value) -> Result<ToolResult, ToolError> {
-        let parsed: Params = decode_params(params)?;
-        if parsed.source_identifier.is_empty() {
-            return Err(ToolError::invalid("sourceIdentifier cannot be empty"));
-        }
-        if parsed.destination_identifier.is_empty() {
-            return Err(ToolError::invalid("destinationIdentifier cannot be empty"));
-        }
-        if parsed.duration_ms > MAX_DURATION_MS {
-            return Err(ToolError::invalid(format!(
-                "durationMs must be <= {MAX_DURATION_MS}"
-            )));
-        }
-
-        let source = self.fetch_element(&parsed.source_identifier).await?;
-        let destination = self.fetch_element(&parsed.destination_identifier).await?;
-        if !source.element.enabled {
-            return Err(ToolError::invalid(format!(
-                "sourceIdentifier '{}' resolves to a disabled target",
-                parsed.source_identifier
-            )));
-        }
-        if !destination.element.enabled {
-            return Err(ToolError::invalid(format!(
-                "destinationIdentifier '{}' resolves to a disabled target",
-                parsed.destination_identifier
-            )));
-        }
-        let (start_x, start_y) = center(&source.element.frame);
-        let (end_x, end_y) = center(&destination.element.frame);
-        drag_drop(start_x, start_y, end_x, end_y, parsed.duration_ms)
-            .await
-            .map_err(|error| ToolError::internal(error.to_string()))?;
-        let payload = json!({
-            "dragged": {
-                "sourceIdentifier": parsed.source_identifier,
-                "destinationIdentifier": parsed.destination_identifier,
-                "start": {"x": start_x, "y": start_y},
-                "end": {"x": end_x, "y": end_y},
-                "durationMs": parsed.duration_ms,
-            }
-        });
-        Ok(ToolResult::text(payload.to_string()))
+        self.call_with_dependencies(
+            params,
+            |identifier| async move { self.fetch_element(&identifier).await },
+            |start_x, start_y, end_x, end_y, duration_ms| async move {
+                drag_drop(start_x, start_y, end_x, end_y, duration_ms).await
+            },
+        )
+        .await
     }
 }
 

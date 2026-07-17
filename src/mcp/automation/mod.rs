@@ -14,6 +14,8 @@ mod screenshot;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+pub(crate) use accessibility::perform_action_with_program as perform_accessibility_action_with_program;
 pub use accessibility::{
     AccessibilityAction, AccessibilityActionError, AccessibilityQueryError,
     get_element as get_accessibility_element, get_element_args as accessibility_get_element_args,
