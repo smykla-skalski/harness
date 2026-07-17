@@ -12,6 +12,7 @@ mod open_db;
 mod policy_bootstrap;
 mod remote;
 mod shutdown_signals;
+mod task_board_automation_loop;
 mod task_board_dispatch_loop;
 mod task_board_migration;
 mod task_board_orchestrator_loop;

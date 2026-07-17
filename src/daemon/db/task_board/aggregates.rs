@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 
 use serde::de::DeserializeOwned;
 
-use sqlx::{query, query_as};
+use sqlx::{Sqlite, Transaction, query, query_as};
 
 use super::mapper::{machine_from_row, parse_json, to_json};
 use super::rows::MachineRow;
@@ -144,20 +144,7 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board orchestrator settings")
             .await?;
-        query(
-            "INSERT INTO task_board_orchestrator_settings (
-            singleton, settings_json, revision, updated_at
-        ) VALUES (1, ?1, 1, ?2)
-        ON CONFLICT(singleton) DO UPDATE SET settings_json = excluded.settings_json,
-            revision = task_board_orchestrator_settings.revision + 1,
-            updated_at = excluded.updated_at",
-        )
-        .bind(to_json(settings, "task board orchestrator settings")?)
-        .bind(utc_now())
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("save orchestrator settings: {error}")))?;
-        let revision = bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+        let revision = replace_orchestrator_settings_in_tx(&mut transaction, settings).await?;
         transaction
             .commit()
             .await
@@ -248,6 +235,26 @@ impl AsyncDaemonDb {
             .map_err(|error| db_error(format!("commit task board runtime config: {error}")))?;
         Ok(revision)
     }
+}
+
+pub(super) async fn replace_orchestrator_settings_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    settings: &TaskBoardOrchestratorSettings,
+) -> Result<i64, CliError> {
+    query(
+        "INSERT INTO task_board_orchestrator_settings (
+            singleton, settings_json, revision, updated_at
+         ) VALUES (1, ?1, 1, ?2)
+         ON CONFLICT(singleton) DO UPDATE SET settings_json = excluded.settings_json,
+             revision = task_board_orchestrator_settings.revision + 1,
+             updated_at = excluded.updated_at",
+    )
+    .bind(to_json(settings, "task board orchestrator settings")?)
+    .bind(utc_now())
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("save orchestrator settings: {error}")))?;
+    bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await
 }
 
 pub(super) async fn upsert_machine_in_tx(

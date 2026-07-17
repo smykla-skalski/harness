@@ -1,6 +1,8 @@
 use chrono::{DateTime, Duration, Utc};
 use sqlx::{Sqlite, SqliteConnection, Transaction, query_as};
 
+mod wake;
+
 use super::super::ORCHESTRATOR_CHANGE_SCOPE;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
@@ -23,13 +25,7 @@ struct SnapshotLedger {
     runs: Vec<TaskBoardAutomationRunInfo>,
     provider_backoff: Option<ProviderBackoff>,
     open_conflict: bool,
-}
-
-struct SnapshotActivity {
-    revision: u64,
-    runs: Vec<TaskBoardAutomationRunInfo>,
-    provider_backoff: Option<ProviderBackoff>,
-    open_conflict: bool,
+    wake: wake::WakeObservation,
 }
 
 #[derive(sqlx::FromRow)]
@@ -117,27 +113,16 @@ async fn load_snapshot_ledger(
 ) -> Result<SnapshotLedger, CliError> {
     let (settings_revision, offline_after) = load_settings(connection).await?;
     let control = load_control(connection).await?;
-    let activity = load_snapshot_activity(connection).await?;
     Ok(SnapshotLedger {
-        revision: activity.revision,
+        revision: load_revision(connection).await?,
         settings_revision,
         policy_revision,
         offline_after,
         control,
-        runs: activity.runs,
-        provider_backoff: activity.provider_backoff,
-        open_conflict: activity.open_conflict,
-    })
-}
-
-async fn load_snapshot_activity(
-    connection: &mut SqliteConnection,
-) -> Result<SnapshotActivity, CliError> {
-    Ok(SnapshotActivity {
-        revision: load_revision(connection).await?,
         runs: super::history::load_snapshot_run_infos(connection).await?,
         provider_backoff: load_provider_backoff(connection).await?,
         open_conflict: load_open_conflict(connection).await?,
+        wake: wake::load(connection).await?,
     })
 }
 
@@ -325,13 +310,15 @@ fn build_snapshot(
         observed_at: observed_at.to_rfc3339(),
         heartbeat_at: facts.heartbeat_at.value,
         heartbeat_age_seconds: Some(u64::try_from(heartbeat_age.num_seconds()).unwrap_or(u64::MAX)),
-        next_run_at: ledger
-            .provider_backoff
-            .as_ref()
-            .map(|backoff| backoff.earliest.value.clone()),
+        next_run_at: ledger.wake.next_run_at(
+            ledger
+                .provider_backoff
+                .as_ref()
+                .map(|backoff| &backoff.earliest),
+        ),
         next_retry_at: None,
         last_success_at: facts.last_success.map(|value| value.value),
-        last_reconciliation_at: None,
+        last_reconciliation_at: ledger.wake.last_reconciliation_at(),
         settings_revision: ledger.settings_revision,
         policy_revision: ledger.policy_revision,
         queue: TaskBoardAutomationQueueSummary::default(),
@@ -351,6 +338,7 @@ struct RunFacts {
 fn run_facts(ledger: &SnapshotLedger) -> Result<RunFacts, CliError> {
     let mut active = Vec::new();
     let mut heartbeat_at = ledger.control.updated_at.clone();
+    ledger.wake.promote_heartbeat(&mut heartbeat_at);
     let mut last_success = None::<StoredInstant>;
     let mut latest_terminal = None::<(StoredInstant, String, TaskBoardAutomationRunOutcome)>;
     for run in &ledger.runs {
@@ -445,6 +433,9 @@ fn derive_effective_state(
                 "provider_backoff",
             );
         }
+        return (TaskBoardAutomationEffectiveState::Scheduled, None);
+    }
+    if ledger.wake.is_pending() {
         return (TaskBoardAutomationEffectiveState::Scheduled, None);
     }
     (TaskBoardAutomationEffectiveState::Idle, None)
