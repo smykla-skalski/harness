@@ -10,6 +10,7 @@ use crate::task_board::{
 };
 
 pub const TASK_BOARD_WORKFLOW_EXECUTION_SCHEMA_VERSION: u32 = 1;
+pub const TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -101,6 +102,18 @@ pub enum TaskBoardAttemptResultArtifact {
     Review(TaskBoardReviewerOutcome),
     Evaluation(TaskBoardEvaluationResult),
     Lifecycle(TaskBoardLifecycleOutcome),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TaskBoardLocalAttemptResult {
+    pub schema_version: u32,
+    pub execution_id: String,
+    pub action_key: String,
+    pub attempt: u32,
+    pub idempotency_key: String,
+    pub exact_head_revision: String,
+    pub artifact: TaskBoardAttemptResultArtifact,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

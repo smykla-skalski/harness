@@ -256,6 +256,7 @@ mod tests {
             work_item_id: format!("work-{id}"),
             lifecycle,
             item,
+            read_only_workflow: None,
         }
     }
 

@@ -12,7 +12,9 @@ use super::items::{bump_change_in_tx, load_item_in_tx, replace_item_in_tx};
 use crate::daemon::db::policy::consume_approval_grant_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::infra::io;
-use crate::task_board::{DispatchAppliedTask, DispatchPlan, SessionIntent};
+use crate::task_board::{
+    DispatchAppliedTask, DispatchPlan, SessionIntent, TaskBoardReadOnlyWorkflowLaunch,
+};
 
 const PREPARATION_LEASE_SECONDS: i64 = 30;
 
@@ -268,16 +270,27 @@ impl AsyncDaemonDb {
             .map_err(|error| db_error(format!("commit task board preparation renewal: {error}")))
     }
 
-    /// Atomically link a prepared session task and expose it for worker startup.
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "dispatch completion must keep item linking and intent publication atomic"
-    )]
     pub(crate) async fn complete_task_board_dispatch_preparation(
         &self,
         claim: &ClaimedTaskBoardDispatchPreparation,
         branch: &str,
         worktree: &str,
+    ) -> Result<DispatchAppliedTask, CliError> {
+        self.complete_task_board_dispatch_preparation_with_workflow(claim, branch, worktree, None)
+            .await
+    }
+
+    /// Atomically link a prepared session task and expose it for worker startup.
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "dispatch completion must keep item linking and intent publication atomic"
+    )]
+    pub(crate) async fn complete_task_board_dispatch_preparation_with_workflow(
+        &self,
+        claim: &ClaimedTaskBoardDispatchPreparation,
+        branch: &str,
+        worktree: &str,
+        read_only_workflow: Option<TaskBoardReadOnlyWorkflowLaunch>,
     ) -> Result<DispatchAppliedTask, CliError> {
         let mut transaction = self
             .begin_immediate_transaction("task board dispatch preparation completion")
@@ -314,6 +327,7 @@ impl AsyncDaemonDb {
             work_item_id: preparation.work_item_id.clone(),
             lifecycle: preparation.plan.applied_lifecycle(),
             item,
+            read_only_workflow,
         };
         let payload = serde_json::to_string(&applied).map_err(|error| {
             db_error(format!("serialize prepared task board dispatch: {error}"))

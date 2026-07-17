@@ -98,6 +98,13 @@ pub(crate) async fn evaluate_task_board_async(
     let items = selected_items_async(async_db, request).await?;
     let mut summary = TaskBoardEvaluationSummary::default();
     for item in &items {
+        if matches!(
+            item.workflow_kind,
+            crate::task_board::TaskBoardWorkflowKind::Review
+                | crate::task_board::TaskBoardWorkflowKind::PrReview
+        ) {
+            continue;
+        }
         let Some((session_id, work_item_id)) = linked_task(item) else {
             summary.push(skipped_unlinked_record(item));
             continue;

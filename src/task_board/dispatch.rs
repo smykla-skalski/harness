@@ -17,6 +17,7 @@ use super::policy::{PolicyApprovalGrant, PolicyDecision};
 #[cfg(test)]
 use super::store::TaskBoardStore;
 use super::types::{AgentMode, ExternalRef, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
+use super::{TaskBoardPullRequestIdentity, TaskBoardResolvedReviewer, TaskBoardWorkflowKind};
 
 #[path = "dispatch_lifecycle.rs"]
 mod lifecycle;
@@ -70,6 +71,23 @@ pub struct DispatchAppliedTask {
     pub work_item_id: String,
     pub lifecycle: DispatchLifecycle,
     pub item: TaskBoardItem,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub read_only_workflow: Option<TaskBoardReadOnlyWorkflowLaunch>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskBoardReadOnlyWorkflowLaunch {
+    pub workflow_kind: TaskBoardWorkflowKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_repository: Option<String>,
+    pub configuration_revision: u64,
+    pub policy_version: String,
+    pub resolved_reviewers: TaskBoardResolvedReviewer,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_revision: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pull_request: Option<TaskBoardPullRequestIdentity>,
+    pub exact_head_revision: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -259,7 +259,7 @@ async fn validate_current_create_revisions(
     Ok(())
 }
 
-async fn insert_execution_in_tx(
+pub(super) async fn insert_execution_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     record: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<(), CliError> {

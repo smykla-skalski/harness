@@ -9,12 +9,13 @@ use tokio::sync::broadcast;
 mod estimate_freeze_tests;
 
 use crate::daemon::codex_controller::CodexControllerHandle;
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ReservedTaskBoardDispatch};
+use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ReservedTaskBoardDispatch, workflow_owner};
 use crate::daemon::protocol::{CodexRunStatus, StreamEvent};
 use crate::task_board::{
     AgentMode, DispatchPlan, SpawnGateSwitches, TaskBoardAdmissionDecision,
     TaskBoardAutomationPolicy, TaskBoardItem, TaskBoardPolicyLimit, TaskBoardPolicyScope,
-    build_dispatch_plans_with_policy,
+    TaskBoardReadOnlyWorkflowLaunch, TaskBoardWorkflowKind, build_dispatch_plans_with_policy,
+    resolve_task_board_reviewers,
 };
 
 #[tokio::test]
@@ -211,6 +212,119 @@ async fn terminal_run_before_dispatch_commit_releases_only_concurrency() {
         "released"
     );
     assert_eq!(ledger_kind_state(&db, &intent, "rate").await, "committed");
+}
+
+#[tokio::test]
+async fn read_only_dispatch_atomically_starts_workflow_under_stable_admission_owner() {
+    let db = test_db().await;
+    configure_policy(&db, admission_policy(1)).await;
+    let mut item = TaskBoardItem::new(
+        "admission-read-only".into(),
+        "Review exact head".into(),
+        "Review without workspace writes".into(),
+        "2026-07-17T10:00:00Z".into(),
+    );
+    item.agent_mode = AgentMode::Evaluate;
+    item.workflow_kind = TaskBoardWorkflowKind::Review;
+    db.create_task_board_item(item).await.expect("create item");
+    let settings = db
+        .task_board_orchestrator_settings_snapshot()
+        .await
+        .expect("settings snapshot");
+    let launch = TaskBoardReadOnlyWorkflowLaunch {
+        workflow_kind: TaskBoardWorkflowKind::Review,
+        execution_repository: None,
+        configuration_revision: u64::try_from(settings.row_revision).expect("settings revision"),
+        policy_version: settings.settings.policy_version.clone(),
+        resolved_reviewers: resolve_task_board_reviewers(
+            &settings.settings.reviewers,
+            TaskBoardWorkflowKind::Review,
+            None,
+        )
+        .expect("resolved reviewers"),
+        provider_revision: None,
+        pull_request: None,
+        exact_head_revision: "head-frozen".into(),
+    };
+    let plan = create_plan_for_existing(&db, "admission-read-only").await;
+    let intent = preparing_intent(
+        db.reserve_task_board_dispatch(&plan, "control-plane", Some("/tmp/project"), false)
+            .await
+            .expect("reserve dispatch"),
+    );
+    let preparation = db
+        .claim_task_board_dispatch_preparation(&intent)
+        .await
+        .expect("claim preparation")
+        .expect("pending preparation");
+    let applied = db
+        .complete_task_board_dispatch_preparation_with_workflow(
+            &preparation,
+            "branch",
+            "/tmp/worktree",
+            Some(launch),
+        )
+        .await
+        .expect("complete preparation");
+    let execution_id = applied
+        .item
+        .workflow
+        .execution_id
+        .clone()
+        .expect("execution id");
+    let claim = db
+        .claim_task_board_dispatch("admission-read-only")
+        .await
+        .expect("claim dispatch")
+        .expect("pending dispatch");
+    let owner = workflow_owner(&execution_id);
+
+    db.complete_task_board_dispatch(&intent, &claim.claim_token, &owner)
+        .await
+        .expect("commit read-only dispatch");
+
+    let execution = db
+        .task_board_workflow_execution(&execution_id)
+        .await
+        .expect("load execution")
+        .expect("durable execution");
+    let item = db
+        .task_board_item_snapshot("admission-read-only")
+        .await
+        .expect("load item snapshot");
+    assert_eq!(execution.snapshot.item_revision, item.item_revision);
+    assert_eq!(
+        execution.transition.phase,
+        Some(crate::task_board::TaskBoardExecutionPhase::Review)
+    );
+    assert_eq!(
+        execution.transition.execution_state,
+        crate::task_board::TaskBoardExecutionState::Running
+    );
+    assert_eq!(execution.attempts.len(), 1);
+    assert_eq!(
+        execution.attempts[0].action_key,
+        "review:default-code-reviewer"
+    );
+    assert_eq!(
+        execution.attempts[0].idempotency_key,
+        format!("codex-{intent}")
+    );
+    assert_eq!(
+        execution.ownership.resources.get("admission_owner"),
+        Some(&owner)
+    );
+    let persisted_owner_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM task_board_dispatch_admission_ledger
+         WHERE intent_id = ?1 AND kind = 'concurrency' AND state = 'committed'
+           AND managed_worker_id = ?2",
+    )
+    .bind(&intent)
+    .bind(&owner)
+    .fetch_one(db.pool())
+    .await
+    .expect("load admission owner");
+    assert_eq!(persisted_owner_count, 1);
 }
 
 #[tokio::test]

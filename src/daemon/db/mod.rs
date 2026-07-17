@@ -103,6 +103,7 @@ mod schema_v38;
 mod schema_v39;
 #[allow(dead_code)]
 mod task_board;
+pub(crate) use task_board::workflow_owner;
 #[allow(unused_imports)]
 pub(crate) use task_board::{
     ClaimedTaskBoardDispatch, ClaimedTaskBoardDispatchPreparation, ReservedTaskBoardDispatch,

@@ -147,7 +147,7 @@ pub(super) async fn load_execution_attempts_in_tx(
         .collect()
 }
 
-async fn insert_attempt_in_tx(
+pub(super) async fn insert_attempt_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     record: &TaskBoardExecutionAttemptRecord,
 ) -> Result<(), CliError> {

@@ -4,7 +4,8 @@ use crate::daemon::db::{AsyncDaemonDb, ClaimedTaskBoardDispatch, TaskBoardDispat
 use crate::daemon::protocol::ManagedAgentSnapshot;
 use crate::daemon::task_board_managed_agents::{
     TaskBoardWorkerStartError, begin_worker_compensation, maintain_task_board_dispatch_claim,
-    managed_worker_id, resume_worker_compensation, start_worker_for_applied_task,
+    managed_admission_owner_id, managed_worker_id, resume_worker_compensation,
+    start_worker_for_applied_task,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::{DispatchAppliedTask, DispatchFailure, DispatchFailureKind};
@@ -164,7 +165,7 @@ async fn complete_started_worker(
         .complete_task_board_dispatch(
             &claim.intent_id,
             &claim.claim_token,
-            &managed_worker_id(&claim.applied, &claim.intent_id),
+            &managed_admission_owner_id(&claim.applied, &claim.intent_id),
         )
         .await?;
     Ok(())

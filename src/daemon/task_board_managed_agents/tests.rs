@@ -6,13 +6,17 @@ use crate::daemon::agent_tui::AgentTuiStatus;
 use crate::daemon::protocol::{CodexRunStatus, ManagedAgentSnapshot};
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::SessionRole;
-use crate::task_board::AgentMode;
+use crate::task_board::{
+    AgentMode, TaskBoardAttemptResultArtifact, TaskBoardLocalAttemptResult,
+    TaskBoardReadOnlyWorkflowLaunch, TaskBoardResolvedReviewer, TaskBoardReviewerProfile,
+    TaskBoardWorkflowKind,
+};
 
 use super::test_support::{applied_task, codex_snapshot, terminal_snapshot, test_http_state};
 use super::{
     begin_worker_compensation, codex_worker_id, codex_worker_request, exact_worker_not_found,
-    managed_worker_id, recover_same_session_worker, resolve_start_failure,
-    start_worker_for_applied_task, stop_worker_in_lane, terminal_worker_id,
+    managed_admission_owner_id, managed_worker_id, recover_same_applied_worker,
+    resolve_start_failure, start_worker_for_applied_task, stop_worker_in_lane, terminal_worker_id,
     terminal_worker_request,
 };
 
@@ -66,6 +70,58 @@ fn planning_and_evaluate_workers_are_report_only() {
 }
 
 #[test]
+fn read_only_review_request_freezes_identity_and_has_no_session_task() {
+    let mut applied = applied_task(AgentMode::Evaluate);
+    applied.item.workflow_kind = TaskBoardWorkflowKind::Review;
+    applied.read_only_workflow = Some(review_launch());
+
+    let request = codex_worker_request(&applied, "codex-review-attempt");
+
+    assert_eq!(request.mode, crate::daemon::protocol::CodexRunMode::Report);
+    assert_eq!(request.task_id, None);
+    assert_eq!(request.persona.as_deref(), Some("code-reviewer"));
+    assert_eq!(request.model.as_deref(), Some("gpt-5"));
+    assert_eq!(request.effort.as_deref(), Some("high"));
+    assert_eq!(request.workflow_execution_id.as_deref(), Some("workflow-1"));
+    assert!(request.prompt.contains("Exact head: head-frozen"));
+    assert!(request.prompt.contains("Do not modify files"));
+    let (_, encoded) = request
+        .prompt
+        .split_once("shape (use verdict pass, changes_required, or human_required):\n")
+        .expect("result envelope marker");
+    let envelope: TaskBoardLocalAttemptResult =
+        serde_json::from_str(encoded).expect("strict result envelope");
+    assert_eq!(envelope.execution_id, "workflow-1");
+    assert_eq!(envelope.action_key, "review:default-code-reviewer");
+    assert_eq!(envelope.attempt, 1);
+    assert_eq!(envelope.idempotency_key, "codex-review-attempt");
+    assert_eq!(envelope.exact_head_revision, "head-frozen");
+    assert!(matches!(
+        envelope.artifact,
+        TaskBoardAttemptResultArtifact::Review(_)
+    ));
+    assert!(
+        request
+            .capabilities
+            .contains(&"task-board:workflow:read-only".to_string())
+    );
+    assert_eq!(
+        managed_admission_owner_id(&applied, "dispatch-intent-1"),
+        "workflow-workflow-1"
+    );
+}
+
+#[test]
+fn ordinary_dispatch_keeps_worker_scoped_admission() {
+    let applied = applied_task(AgentMode::Headless);
+
+    assert_eq!(
+        managed_admission_owner_id(&applied, "dispatch-intent-1"),
+        managed_worker_id(&applied, "dispatch-intent-1")
+    );
+}
+
+#[test]
 fn interactive_worker_request_uses_terminal_runtime() {
     let applied = applied_task(AgentMode::Interactive);
 
@@ -78,6 +134,27 @@ fn interactive_worker_request_uses_terminal_runtime() {
     assert_eq!(request.fallback_role, Some(SessionRole::Worker));
     assert_eq!(request.rows, 24);
     assert_eq!(request.cols, 80);
+}
+
+fn review_launch() -> TaskBoardReadOnlyWorkflowLaunch {
+    let mut profile = TaskBoardReviewerProfile::default();
+    profile.model = Some("gpt-5".into());
+    profile.effort = Some("high".into());
+    TaskBoardReadOnlyWorkflowLaunch {
+        workflow_kind: TaskBoardWorkflowKind::Review,
+        execution_repository: None,
+        configuration_revision: 1,
+        policy_version: "policy-v1".into(),
+        resolved_reviewers: TaskBoardResolvedReviewer {
+            reviewer_count: 1,
+            required_approvals: 1,
+            max_revision_cycles: 1,
+            profiles: vec![profile],
+        },
+        provider_revision: None,
+        pull_request: None,
+        exact_head_revision: "head-frozen".into(),
+    }
 }
 
 #[test]
@@ -105,7 +182,8 @@ fn terminal_and_failed_same_session_workers_are_recovered() {
 
     for snapshot in snapshots {
         let expected_id = snapshot.agent_id().to_string();
-        let recovered = resolve_start_failure(start_failure(), Ok(Some(snapshot)), "session-1")
+        let applied = applied_task(AgentMode::Headless);
+        let recovered = resolve_start_failure(start_failure(), Ok(Some(snapshot)), &applied)
             .expect("same-session durable worker evidence");
         assert_eq!(recovered.agent_id(), expected_id);
     }
@@ -116,10 +194,38 @@ fn deterministic_worker_from_another_session_fails_closed() {
     let snapshot =
         ManagedAgentSnapshot::Codex(codex_snapshot(CodexRunStatus::Running, "different-session"));
 
-    let error = recover_same_session_worker(snapshot, "session-1")
+    let applied = applied_task(AgentMode::Headless);
+    let error = recover_same_applied_worker(snapshot, &applied)
         .expect_err("cross-session deterministic identity must conflict");
 
     assert_eq!(error.code(), "KSRCLI092");
+}
+
+#[test]
+fn read_only_recovery_rejects_a_conflicting_durable_run() {
+    let mut applied = applied_task(AgentMode::Evaluate);
+    applied.item.workflow_kind = TaskBoardWorkflowKind::Review;
+    applied.read_only_workflow = Some(review_launch());
+    let run_id = "codex-review-attempt";
+    let request = codex_worker_request(&applied, run_id);
+    let mut run = codex_snapshot(CodexRunStatus::Running, &applied.session_id);
+    run.run_id = run_id.into();
+    run.board_item_id = request.board_item_id;
+    run.workflow_execution_id = request.workflow_execution_id;
+    run.task_id = request.task_id;
+    run.mode = request.mode;
+    run.prompt = request.prompt;
+    run.model = request.model;
+    run.effort = request.effort;
+    let matching = ManagedAgentSnapshot::Codex(run.clone());
+
+    recover_same_applied_worker(matching, &applied).expect("matching durable run");
+
+    run.workflow_execution_id = Some("workflow-other".into());
+    let error = recover_same_applied_worker(ManagedAgentSnapshot::Codex(run), &applied)
+        .expect_err("conflicting run must fail");
+    assert_eq!(error.code(), "KSRCLI092");
+    assert!(error.message().contains("frozen read-only workflow"));
 }
 
 #[test]
@@ -145,7 +251,8 @@ fn only_exact_deterministic_lookup_miss_allows_start() {
 #[test]
 fn uncertain_probe_errors_are_not_rollback_safe() {
     let probe_error = CliErrorKind::workflow_io("managed worker lookup failed").into();
-    let error = resolve_start_failure(start_failure(), Err(probe_error), "session-1")
+    let applied = applied_task(AgentMode::Headless);
+    let error = resolve_start_failure(start_failure(), Err(probe_error), &applied)
         .expect_err("uncertain second probe must retain recovery ownership");
 
     assert!(!error.may_rollback());
@@ -154,7 +261,8 @@ fn uncertain_probe_errors_are_not_rollback_safe() {
 
 #[test]
 fn exact_post_start_miss_is_rollback_safe() {
-    let error = resolve_start_failure(start_failure(), Ok(None), "session-1")
+    let applied = applied_task(AgentMode::Headless);
+    let error = resolve_start_failure(start_failure(), Ok(None), &applied)
         .expect_err("exact second miss preserves the start failure");
 
     assert!(error.may_rollback());

@@ -6,6 +6,7 @@ use super::admission_lifecycle::{
     TaskBoardAdmissionCheck, commit_dispatch_admission_in_tx, revalidate_dispatch_admission_in_tx,
 };
 use super::items::{bump_change_in_tx, load_item_in_tx, replace_item_in_tx};
+use super::workflow_dispatch::insert_started_read_only_workflow_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error, utc_now};
 use crate::infra::io;
 use crate::task_board::dispatch::DispatchLifecycle;
@@ -85,6 +86,7 @@ impl AsyncDaemonDb {
             work_item_id: work_item_id.to_string(),
             lifecycle: lifecycle.clone(),
             item,
+            read_only_workflow: None,
         };
         insert_intent(&mut transaction, &applied).await?;
         bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
@@ -252,6 +254,18 @@ impl AsyncDaemonDb {
         item.workflow.last_error = None;
         item.updated_at = utc_now();
         replace_item_in_tx(&mut transaction, &item, revision + 1).await?;
+        if let Some(launch) =
+            claimed_intent_read_only_launch(&mut transaction, intent_id, claim_token).await?
+        {
+            insert_started_read_only_workflow_in_tx(
+                &mut transaction,
+                &item,
+                revision + 1,
+                intent_id,
+                &launch,
+            )
+            .await?;
+        }
         bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
         let now = utc_now();
         let changed = query(
@@ -279,6 +293,24 @@ impl AsyncDaemonDb {
             .map_err(|error| db_error(format!("commit task board dispatch completion: {error}")))?;
         Ok(item)
     }
+}
+
+async fn claimed_intent_read_only_launch(
+    transaction: &mut Transaction<'_, Sqlite>,
+    intent_id: &str,
+    claim_token: &str,
+) -> Result<Option<crate::task_board::TaskBoardReadOnlyWorkflowLaunch>, CliError> {
+    let payload = query_as::<_, (String,)>(
+        "SELECT payload_json FROM task_board_dispatch_intents
+         WHERE intent_id = ?1 AND claim_token = ?2 AND status = 'starting'",
+    )
+    .bind(intent_id)
+    .bind(claim_token)
+    .fetch_one(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("load claimed read-only workflow launch: {error}")))?
+    .0;
+    decode_applied(&payload).map(|applied| applied.read_only_workflow)
 }
 
 async fn validate_pending_dispatch(

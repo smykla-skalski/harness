@@ -9,8 +9,8 @@ use crate::daemon::db::{AsyncDaemonDb, ClaimedTaskBoardDispatch, TaskBoardDispat
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::service::task_board::prepare_claimed_task_board_dispatch;
 use crate::daemon::task_board_managed_agents::{
-    begin_worker_compensation, maintain_task_board_dispatch_claim, managed_worker_id,
-    resume_worker_compensation, start_worker_for_applied_task,
+    begin_worker_compensation, maintain_task_board_dispatch_claim, managed_admission_owner_id,
+    managed_worker_id, resume_worker_compensation, start_worker_for_applied_task,
 };
 
 const RECOVERY_INTERVAL: Duration = Duration::from_secs(1);
@@ -110,7 +110,7 @@ async fn finish_claim(
                 .complete_task_board_dispatch(
                     &claim.intent_id,
                     &claim.claim_token,
-                    &managed_worker_id(&claim.applied, &claim.intent_id),
+                    &managed_admission_owner_id(&claim.applied, &claim.intent_id),
                 )
                 .await
             {

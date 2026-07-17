@@ -91,6 +91,7 @@ fn run_once_persists_summary_and_counts_workflow_statuses() {
                     work_item_id: "work-1".to_string(),
                     lifecycle: build_dispatch_plan(&applied_item).applied_lifecycle(),
                     item: applied_item,
+                    read_only_workflow: None,
                 }],
                 failures: Vec::new(),
             })
