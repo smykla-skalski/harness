@@ -273,6 +273,16 @@ mod task_board_orchestrator_step_mode;
 mod task_board_runtime;
 #[cfg(test)]
 mod task_board_sync_tests;
+mod task_board_workflow_execution;
+#[cfg(test)]
+mod task_board_workflow_execution_tests;
+#[cfg(test)]
+mod task_board_workflow_repository_tests;
+mod task_board_workflow_review;
+#[cfg(test)]
+mod task_board_workflow_review_tests;
+#[cfg(test)]
+mod task_board_workflow_test_support;
 mod wake_route;
 
 pub use crate::reviews::fetch_review_avatar;

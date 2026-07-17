@@ -15,8 +15,17 @@ use crate::task_board::{
 const SELECT_EXECUTION: &str = "SELECT * FROM task_board_workflow_executions
     WHERE execution_id = ?1";
 const SELECT_ACTIVE_EXECUTIONS: &str = "SELECT * FROM task_board_workflow_executions
-    WHERE item_id = ?1 AND completed_at IS NULL
+    WHERE item_id = ?1
+      AND state IN ('pending', 'preparing', 'starting', 'running', 'retry_wait',
+                    'awaiting_approval', 'draining')
     ORDER BY created_at DESC, execution_id DESC LIMIT 2";
+const SELECT_READY_EXECUTIONS: &str = "SELECT * FROM task_board_workflow_executions
+    WHERE workflow_kind IN ('review', 'pr_review')
+      AND completed_at IS NULL
+      AND (state IN ('pending', 'preparing', 'starting', 'running')
+           OR (state = 'retry_wait' AND available_at <= ?1))
+    ORDER BY COALESCE(available_at, created_at), updated_at, execution_id
+    LIMIT ?2";
 
 impl AsyncDaemonDb {
     pub(crate) async fn create_or_load_task_board_workflow_execution(
@@ -87,6 +96,39 @@ impl AsyncDaemonDb {
             .await
             .map_err(|error| db_error(format!("commit active workflow execution load: {error}")))?;
         Ok(execution)
+    }
+
+    pub(crate) async fn ready_task_board_workflow_executions(
+        &self,
+        now: &str,
+        limit: usize,
+    ) -> Result<Vec<TaskBoardWorkflowExecutionRecord>, CliError> {
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+        let limit = i64::try_from(limit.min(100))
+            .map_err(|_| db_error("workflow execution ready limit is out of range"))?;
+        let mut transaction =
+            self.pool().begin().await.map_err(|error| {
+                db_error(format!("begin ready workflow execution load: {error}"))
+            })?;
+        let rows = query_as::<_, WorkflowExecutionRow>(SELECT_READY_EXECUTIONS)
+            .bind(now)
+            .bind(limit)
+            .fetch_all(transaction.as_mut())
+            .await
+            .map_err(|error| db_error(format!("load ready workflow executions: {error}")))?;
+        let mut executions = Vec::with_capacity(rows.len());
+        for row in rows {
+            let execution_id = row.execution_id.clone();
+            let attempts = load_execution_attempts_in_tx(&mut transaction, &execution_id).await?;
+            executions.push(row.into_record(attempts)?);
+        }
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit ready workflow execution load: {error}")))?;
+        Ok(executions)
     }
 
     pub(crate) async fn compare_and_set_task_board_workflow_execution(
