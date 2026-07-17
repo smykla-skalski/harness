@@ -208,7 +208,8 @@ async fn cached_reviews_query_creates_only_matching_task_board_reviews_idempoten
     assert_eq!(items.len(), 1);
     assert_eq!(items[0].title, "Review acme/api#17");
     assert_eq!(items[0].status, TaskBoardStatus::Backlog);
-    assert_eq!(items[0].project_id.as_deref(), Some("acme/api"));
+    assert!(items[0].project_id.is_none());
+    assert_eq!(items[0].execution_repository.as_deref(), Some("acme/api"));
     assert_eq!(
         items[0].external_refs[0].external_id, "acme/api#17",
         "repeated projection must reuse the deterministic imported item"

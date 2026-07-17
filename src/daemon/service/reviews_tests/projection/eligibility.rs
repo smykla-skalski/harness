@@ -92,7 +92,12 @@ fn cache_requested_review(
 fn status_for_repository(items: &[TaskBoardItem], repository: &str) -> TaskBoardStatus {
     items
         .iter()
-        .find(|item| item.project_id.as_deref() == Some(repository))
+        .find(|item| {
+            item.execution_repository
+                .as_deref()
+                .or(item.project_id.as_deref())
+                == Some(repository)
+        })
         .unwrap_or_else(|| panic!("missing task for {repository}"))
         .status
 }
