@@ -53,7 +53,22 @@ async fn update_tool_proxies_every_public_field_to_running_daemon() {
         },
         "repositories": [],
         "execution_hosts": [],
-        "admission_policy": { "limits": [], "windows": [] },
+        "admission_policy": {
+            "limits": [{
+                "kind": "concurrency",
+                "scope": { "kind": "global" },
+                "limit": 1,
+                "reservation": 1,
+            }],
+            "windows": [{
+                "scope": { "kind": "repository", "value": "example/repo" },
+                "timezone": "UTC",
+                "weekdays": ["monday"],
+                "start_time": "09:00",
+                "end_time": "17:00",
+                "outside_action": "defer",
+            }],
+        },
         "policy_version": "1",
     });
     let (result, captured) = call_task_board_tool(
@@ -92,4 +107,59 @@ fn schema_advertises_every_field_and_strict_admission_policy() {
         policy["properties"]["windows"]["items"]["additionalProperties"],
         false
     );
+    let limit = &policy["properties"]["limits"]["items"]["properties"];
+    for field in ["limit", "limit_microusd", "window_seconds", "reservation"] {
+        assert_eq!(
+            limit[field]["maximum"],
+            json!(9_223_372_036_854_775_807_u64),
+            "{field} must match the persisted integer bound"
+        );
+    }
+    let scope = &policy["properties"]["limits"]["items"]["properties"]["scope"];
+    assert_eq!(scope["allOf"].as_array().map(Vec::len), Some(2));
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn schema_rejects_overflow_and_missing_non_global_scope_values() {
+    let invalid_policies = [
+        json!({
+            "limits": [{
+                "kind": "concurrency",
+                "scope": { "kind": "global" },
+                "limit": 9_223_372_036_854_775_808_u64,
+                "reservation": 1,
+            }],
+        }),
+        json!({
+            "limits": [{
+                "kind": "concurrency",
+                "scope": { "kind": "workflow" },
+                "limit": 1,
+                "reservation": 1,
+            }],
+        }),
+        json!({
+            "limits": [{
+                "kind": "concurrency",
+                "scope": { "kind": "repository" },
+                "limit": 1,
+                "reservation": 1,
+            }],
+        }),
+    ];
+
+    for admission_policy in invalid_policies {
+        let registry = task_board_registry();
+        let tool = registry
+            .get(ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_UPDATE)
+            .expect("settings update tool registered");
+        let error = tool
+            .call(json!({ "admission_policy": admission_policy }))
+            .await
+            .expect_err("invalid admission policy must fail before daemon I/O");
+        assert!(
+            matches!(error, crate::mcp::tool::ToolError::InvalidParams(_)),
+            "unexpected validation error: {error:?}"
+        );
+    }
 }

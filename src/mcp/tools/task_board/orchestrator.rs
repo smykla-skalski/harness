@@ -206,10 +206,18 @@ fn admission_limit_schema() -> Value {
                 "enum": ["concurrency", "rate", "token_budget", "monetary_budget"]
             },
             "scope": admission_scope_schema(),
-            "limit": { "type": "integer", "minimum": 1 },
-            "limit_microusd": { "type": "integer", "minimum": 1 },
-            "window_seconds": { "type": "integer", "minimum": 1 },
-            "reservation": { "type": "integer", "minimum": 1 }
+            "limit": {
+                "type": "integer", "minimum": 1, "maximum": 9_223_372_036_854_775_807_u64
+            },
+            "limit_microusd": {
+                "type": "integer", "minimum": 1, "maximum": 9_223_372_036_854_775_807_u64
+            },
+            "window_seconds": {
+                "type": "integer", "minimum": 1, "maximum": 9_223_372_036_854_775_807_u64
+            },
+            "reservation": {
+                "type": "integer", "minimum": 1, "maximum": 9_223_372_036_854_775_807_u64
+            }
         },
         "required": ["kind", "scope"],
         "additionalProperties": false
@@ -227,7 +235,25 @@ fn admission_scope_schema() -> Value {
             "value": { "type": "string" }
         },
         "required": ["kind"],
+        "allOf": [
+            scope_value_required_for("workflow"),
+            scope_value_required_for("repository")
+        ],
         "additionalProperties": false
+    })
+}
+
+fn scope_value_required_for(kind: &str) -> Value {
+    json!({
+        "not": {
+            "allOf": [
+                {
+                    "properties": { "kind": { "const": kind } },
+                    "required": ["kind"]
+                },
+                { "not": { "required": ["value"] } }
+            ]
+        }
     })
 }
 
