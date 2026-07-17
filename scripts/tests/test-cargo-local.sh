@@ -208,6 +208,47 @@ scenario_usable_tmpdir_is_preserved() {
   fi
 }
 
+scenario_default_build_jobs_use_all_logical_cpus() {
+  local fake_bin="$SANDBOX/cpu-bin"
+  local agent_output local_output
+  mkdir -p "$fake_bin"
+  cat >"$fake_bin/getconf" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "_NPROCESSORS_ONLN" ]]; then
+  printf '24\n'
+  exit 0
+fi
+exit 1
+EOF
+  chmod +x "$fake_bin/getconf"
+
+  agent_output="$(
+    PATH="$fake_bin:$PATH" \
+      CARGO_BUILD_JOBS='' \
+      HARNESS_CARGO_JOBS='' \
+      print_tmpdir_env "cargo-local-all-cpus-agent-$$"
+  )"
+  local_output="$(
+    unset CODEX_SESSION_ID CODEX_THREAD_ID CLAUDE_SESSION_ID CLAUDE_CODE_SESSION_ID
+    unset GEMINI_SESSION_ID COPILOT_SESSION_ID OPENCODE_SESSION_ID
+    PATH="$fake_bin:$PATH" \
+      CARGO_BUILD_JOBS='' \
+      HARNESS_CARGO_JOBS='' \
+      HARNESS_CARGO_SKIP_LEASE=1 \
+      HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+      SCCACHE_BIN="$SANDBOX/missing-sccache" \
+      RUSTC_WRAPPER='' \
+      "$ROOT/scripts/cargo-local.sh" --print-env
+  )"
+
+  if assert_line "CARGO_BUILD_JOBS=24" "$agent_output" \
+    && assert_line "CARGO_BUILD_JOBS=24" "$local_output"; then
+    pass "default build jobs use all detected logical CPUs"
+  else
+    fail "default build jobs were capped: agent=$agent_output local=$local_output"
+  fi
+}
+
 scenario_single_thread_nextest_override_is_rejected() {
   local output single_thread status
   single_thread="$((2 - 1))"
@@ -338,6 +379,7 @@ scenario_missing_tmpdir_uses_short_external_fallback
 scenario_concurrent_tmpdir_creation_is_idempotent
 scenario_unusable_tmpdir_uses_short_external_fallback
 scenario_usable_tmpdir_is_preserved
+scenario_default_build_jobs_use_all_logical_cpus
 scenario_single_thread_nextest_override_is_rejected
 scenario_noncanonical_nextest_override_is_rejected
 scenario_supported_sccache_is_resolved_once
