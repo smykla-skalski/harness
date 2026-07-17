@@ -6,6 +6,7 @@ mod launch_capability;
 mod policy_compiler;
 mod policy_compiler_windows;
 mod remote;
+mod reviewer_resolution;
 mod settings;
 mod status;
 mod wake;
@@ -16,6 +17,7 @@ pub use interfaces::*;
 pub use launch_capability::*;
 pub use policy_compiler::*;
 pub use remote::*;
+pub use reviewer_resolution::*;
 pub use settings::*;
 pub use status::*;
 pub use workflow::*;
@@ -28,3 +30,5 @@ mod admission_tests;
 mod launch_capability_tests;
 #[cfg(test)]
 mod policy_compiler_tests;
+#[cfg(test)]
+mod reviewer_resolution_tests;
