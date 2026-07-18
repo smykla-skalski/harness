@@ -4,13 +4,15 @@ use std::ops::Deref;
 use chrono::{Duration, Timelike, Utc};
 use tempfile::{TempDir, tempdir};
 
+use crate::daemon::db::task_board::write_workflow_fixture::{
+    approved_write_item, complete_write_preparation,
+};
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ReservedTaskBoardDispatch};
 use crate::task_board::{
-    AgentMode, DispatchPlan, SpawnGateSwitches, TaskBoardAdmissionRequirement,
-    TaskBoardAutomationPolicy, TaskBoardItem, TaskBoardLaunchCapability,
-    TaskBoardOutsideWindowAction, TaskBoardPolicyLimit, TaskBoardPolicyScope,
-    TaskBoardPolicyWeekday, TaskBoardPolicyWindow, build_dispatch_plans_with_policy,
-    canonical_admission_requirement_key,
+    DispatchPlan, SpawnGateSwitches, TaskBoardAdmissionRequirement, TaskBoardAutomationPolicy,
+    TaskBoardItem, TaskBoardLaunchCapability, TaskBoardOutsideWindowAction, TaskBoardPolicyLimit,
+    TaskBoardPolicyScope, TaskBoardPolicyWeekday, TaskBoardPolicyWindow,
+    build_dispatch_plans_with_policy, canonical_admission_requirement_key,
 };
 
 #[tokio::test]
@@ -41,7 +43,7 @@ async fn configured_policy_rejects_missing_decision_and_ledger_evidence() {
         .await
         .expect("claim commit preparation")
         .expect("pending commit preparation");
-    db.complete_task_board_dispatch_preparation(&preparation, "branch", "/tmp/worktree")
+    complete_write_preparation(&db, &preparation, "branch", "/tmp/worktree")
         .await
         .expect("complete commit preparation");
     let dispatch = db
@@ -79,7 +81,7 @@ async fn empty_policy_preserves_evidenceless_renewal_and_commit() {
     db.renew_task_board_dispatch_preparation(&preparation)
         .await
         .expect("renew empty-policy preparation");
-    db.complete_task_board_dispatch_preparation(&preparation, "branch", "/tmp/worktree")
+    complete_write_preparation(&db, &preparation, "branch", "/tmp/worktree")
         .await
         .expect("complete empty-policy preparation");
     let dispatch = db
@@ -129,7 +131,7 @@ async fn claim_heartbeat_and_commit_keep_the_frozen_start_authorization() {
         .await
         .expect("claim authorized preparation")
         .expect("pending authorized preparation");
-    db.complete_task_board_dispatch_preparation(&preparation, "branch", "/tmp/worktree")
+    complete_write_preparation(&db, &preparation, "branch", "/tmp/worktree")
         .await
         .expect("complete authorized preparation");
     let dispatch = db
@@ -182,7 +184,7 @@ async fn worker_claim_renewal_rejects_orphaned_admission_ledger() {
         .await
         .expect("claim orphan preparation")
         .expect("pending orphan preparation");
-    db.complete_task_board_dispatch_preparation(&preparation, "branch", "/tmp/worktree")
+    complete_write_preparation(&db, &preparation, "branch", "/tmp/worktree")
         .await
         .expect("complete orphan preparation");
     let dispatch = db
@@ -278,13 +280,12 @@ async fn configure_policy(db: &AsyncDaemonDb, policy: TaskBoardAutomationPolicy)
 }
 
 async fn reserve(db: &AsyncDaemonDb, item_id: &str, estimates: Option<(u64, u64)>) -> String {
-    let mut item = TaskBoardItem::new(
+    let mut item = approved_write_item(TaskBoardItem::new(
         item_id.to_string(),
         "Admission lifecycle".to_string(),
         "Body".to_string(),
         "2026-07-17T10:00:00Z".to_string(),
-    );
-    item.agent_mode = AgentMode::Headless;
+    ));
     if let Some((tokens, cost)) = estimates {
         item.estimated_tokens = Some(tokens);
         item.estimated_cost_microusd = Some(cost);

@@ -10,6 +10,10 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
 };
 
+#[path = "lifecycle/verification_retry.rs"]
+mod verification_retry;
+use verification_retry::schedule_publish_verification_retry;
+
 use super::super::task_board_read_only_runtime::{
     TaskBoardPublishVerification, TaskBoardReadOnlyRuntime,
 };
@@ -181,12 +185,29 @@ where
             verified.mutated = published.mutated;
             complete_lifecycle(db, execution, attempt, verified, now).await
         }
-        Ok(TaskBoardPublishVerification::Absent) => {
-            mark_publish_unknown(
+        Ok(TaskBoardPublishVerification::Absent) if is_write(execution.snapshot.workflow_kind) => {
+            schedule_publish_verification_retry(
                 db,
                 execution,
                 attempt,
                 "successful approval response was absent during authoritative verification",
+                Some(&published),
+                now,
+            )
+            .await
+        }
+        Ok(TaskBoardPublishVerification::Absent) => {
+            mark_publish_unknown(db, execution, attempt, "approval is absent", now).await
+        }
+        Err(error)
+            if is_write(execution.snapshot.workflow_kind) && error.code() == "WORKFLOW_IO" =>
+        {
+            schedule_publish_verification_retry(
+                db,
+                execution,
+                attempt,
+                &error.to_string(),
+                Some(&published),
                 now,
             )
             .await
@@ -324,12 +345,35 @@ async fn settle_ambiguous_publish<R>(
 where
     R: TaskBoardReadOnlyRuntime,
 {
-    match verify_publish(runtime, execution, None).await {
+    let known_external_url = attempt
+        .artifact
+        .as_ref()
+        .and_then(|artifact| match artifact {
+            TaskBoardAttemptResultArtifact::Lifecycle(outcome) => outcome.external_url.as_deref(),
+            _ => None,
+        });
+    match verify_publish(runtime, execution, known_external_url).await {
         Ok(TaskBoardPublishVerification::Applied(outcome)) => {
             complete_lifecycle(db, execution, attempt, outcome, now).await
         }
+        Ok(TaskBoardPublishVerification::Absent) if is_write(execution.snapshot.workflow_kind) => {
+            schedule_publish_verification_retry(db, execution, attempt, detail, None, now).await
+        }
         Ok(TaskBoardPublishVerification::Absent) => {
             mark_publish_unknown(db, execution, attempt, detail, now).await
+        }
+        Err(error)
+            if is_write(execution.snapshot.workflow_kind) && error.code() == "WORKFLOW_IO" =>
+        {
+            schedule_publish_verification_retry(
+                db,
+                execution,
+                attempt,
+                &error.to_string(),
+                None,
+                now,
+            )
+            .await
         }
         Err(error) => mark_publish_unknown(db, execution, attempt, &error.to_string(), now).await,
     }

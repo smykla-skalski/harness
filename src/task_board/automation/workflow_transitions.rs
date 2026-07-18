@@ -32,6 +32,15 @@ const REVIEW_PHASES: [TaskBoardExecutionPhase; 4] = [
 pub struct TaskBoardPullRequestIdentity {
     pub repository: String,
     pub number: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head: Option<TaskBoardPullRequestHeadIdentity>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskBoardPullRequestHeadIdentity {
+    pub repository: String,
+    pub branch: String,
+    pub revision: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -54,6 +63,12 @@ pub enum TaskBoardWorkflowTransitionError {
     InvalidPullRequestRepository { repository: String },
     #[error("pull request number must be greater than zero")]
     InvalidPullRequestNumber,
+    #[error("pull request head repository '{repository}' is invalid, expected owner/repo")]
+    InvalidPullRequestHeadRepository { repository: String },
+    #[error("pull request head branch must not be empty")]
+    MissingPullRequestHeadBranch,
+    #[error("pull request head revision must not be empty")]
+    MissingPullRequestHeadRevision,
     #[error("workflow phase requires an exact head revision")]
     MissingHeadRevision,
     #[error("pull request identity changed during the workflow")]
@@ -327,7 +342,36 @@ fn normalize_pull_request(
     Ok(Some(TaskBoardPullRequestIdentity {
         repository,
         number: identity.number,
+        head: identity
+            .head
+            .as_ref()
+            .map(normalize_pull_request_head)
+            .transpose()?,
     }))
+}
+
+fn normalize_pull_request_head(
+    head: &TaskBoardPullRequestHeadIdentity,
+) -> Result<TaskBoardPullRequestHeadIdentity, TaskBoardWorkflowTransitionError> {
+    let repository = normalize_repository_slug(Some(&head.repository)).ok_or_else(|| {
+        TaskBoardWorkflowTransitionError::InvalidPullRequestHeadRepository {
+            repository: head.repository.clone(),
+        }
+    })?;
+    let branch = non_empty_head_value(&head.branch)
+        .ok_or(TaskBoardWorkflowTransitionError::MissingPullRequestHeadBranch)?;
+    let revision = non_empty_head_value(&head.revision)
+        .ok_or(TaskBoardWorkflowTransitionError::MissingPullRequestHeadRevision)?;
+    Ok(TaskBoardPullRequestHeadIdentity {
+        repository,
+        branch,
+        revision,
+    })
+}
+
+fn non_empty_head_value(value: &str) -> Option<String> {
+    let value = value.trim();
+    (!value.is_empty()).then(|| value.to_owned())
 }
 
 fn normalize_head(

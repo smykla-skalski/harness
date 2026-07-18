@@ -89,6 +89,9 @@ async fn ensure_frozen_head<R>(
 where
     R: TaskBoardReadOnlyRuntime,
 {
+    if !ensure_implementation_ancestry(db, runtime, execution, attempt, now).await? {
+        return Ok(false);
+    }
     let fresh = match runtime.resolve_exact_head(execution).await {
         Ok(head) => head,
         Err(error) => {
@@ -117,6 +120,52 @@ where
         return Ok(false);
     }
     Ok(true)
+}
+
+async fn ensure_implementation_ancestry<R>(
+    db: &AsyncDaemonDb,
+    runtime: &R,
+    execution: &TaskBoardWorkflowExecutionRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
+    now: &str,
+) -> Result<bool, CliError>
+where
+    R: TaskBoardReadOnlyRuntime,
+{
+    let Some(TaskBoardAttemptResultArtifact::Implementation(result)) = attempt.artifact.as_ref()
+    else {
+        return Ok(true);
+    };
+    let descends = match runtime
+        .implementation_result_descends_from_base(execution, result)
+        .await
+    {
+        Ok(descends) => descends,
+        Err(error) => {
+            super::attempt_recovery::schedule_resolution_retry(
+                db,
+                execution,
+                &attempt.action_key,
+                &error.to_string(),
+                now,
+            )
+            .await?;
+            return Ok(false);
+        }
+    };
+    if descends {
+        return Ok(true);
+    }
+    require_human(
+        db,
+        &execution.execution_id,
+        "implementation_ancestry_invalid",
+        "implementation result does not descend from its reported base",
+        TaskBoardTerminalOutcomeKind::HumanRequired,
+        now,
+    )
+    .await?;
+    Ok(false)
 }
 
 fn expected_attempt_head<'a>(
@@ -184,19 +233,35 @@ async fn advance_publication(
     now: &str,
 ) -> Result<(), CliError> {
     let observed = external_url.map(parse_pull_request_url).transpose()?;
-    let pull_request = observed
-        .as_ref()
-        .or(execution.transition.pull_request.as_ref());
+    let pull_request = publication_identity(execution, observed.as_ref())?;
     super::super::task_board_workflow_execution::advance_workflow_execution(
         db,
         &TaskBoardWorkflowExecutionCas::from(execution),
         revisions,
-        pull_request,
+        pull_request.as_ref(),
         execution.transition.exact_head_revision.as_deref(),
         now,
     )
     .await?;
     Ok(())
+}
+
+fn publication_identity(
+    execution: &TaskBoardWorkflowExecutionRecord,
+    observed: Option<&TaskBoardPullRequestIdentity>,
+) -> Result<Option<TaskBoardPullRequestIdentity>, CliError> {
+    match (execution.transition.pull_request.as_ref(), observed) {
+        (Some(frozen), Some(actual))
+            if frozen.repository != actual.repository || frozen.number != actual.number =>
+        {
+            Err(invalid_transition(
+                "workflow publication changed its frozen pull request",
+            ))
+        }
+        (Some(frozen), _) => Ok(Some(frozen.clone())),
+        (None, Some(actual)) => Ok(Some(actual.clone())),
+        (None, None) => Ok(None),
+    }
 }
 
 fn parse_pull_request_url(url: &str) -> Result<TaskBoardPullRequestIdentity, CliError> {
@@ -213,7 +278,11 @@ fn parse_pull_request_url(url: &str) -> Result<TaskBoardPullRequestIdentity, Cli
         .ok()
         .filter(|number| *number > 0)
         .ok_or_else(|| invalid_transition("workflow publication pull request is invalid"))?;
-    Ok(TaskBoardPullRequestIdentity { repository, number })
+    Ok(TaskBoardPullRequestIdentity {
+        repository,
+        number,
+        head: None,
+    })
 }
 
 async fn ingest_evaluation(

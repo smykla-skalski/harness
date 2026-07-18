@@ -2,6 +2,7 @@ use super::{
     admission_policy, configure_policy, create_plan, current_generation, ledger_kind_state,
     ledger_state_count, preparing_intent, test_db,
 };
+use crate::daemon::db::complete_write_preparation;
 use crate::task_board::{
     AgentMode, TaskBoardLaunchCapability, TaskBoardStatus, TaskBoardWorkflowStatus,
 };
@@ -24,7 +25,7 @@ async fn admission_revalidates_then_commits_and_releases_concurrency() {
         .expect("claim preparation")
         .expect("pending preparation");
     assert_eq!(current_generation(&db, &intent).await, 2);
-    db.complete_task_board_dispatch_preparation(&preparation, "branch", "/tmp/worktree")
+    complete_write_preparation(&db, &preparation, "branch", "/tmp/worktree")
         .await
         .expect("complete preparation");
     let claim = db
@@ -40,7 +41,11 @@ async fn admission_revalidates_then_commits_and_releases_concurrency() {
         })
         .await
         .expect_err("worker claim must freeze estimate edits");
-    assert!(error.to_string().contains("frozen after worker start"));
+    assert!(
+        error
+            .to_string()
+            .contains("cannot change while its workflow side effect is claimed")
+    );
     assert_eq!(
         db.task_board_item("admission-start")
             .await
@@ -102,7 +107,7 @@ async fn estimates_remain_frozen_after_started_worker_becomes_terminal() {
         .await
         .expect("claim preparation")
         .expect("pending preparation");
-    db.complete_task_board_dispatch_preparation(&preparation, "branch", "/tmp/worktree")
+    complete_write_preparation(&db, &preparation, "branch", "/tmp/worktree")
         .await
         .expect("complete preparation");
     let claim = db

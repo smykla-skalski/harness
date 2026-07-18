@@ -1,21 +1,20 @@
-use std::path::{Path, PathBuf};
-
 use async_trait::async_trait;
-use tokio::task::spawn_blocking;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::http::{DaemonHttpState, run_codex_agent_blocking};
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest, CodexRunSnapshot};
 use crate::errors::{CliError, CliErrorKind};
-use crate::git::GitRepository;
 use crate::reviews::{
     ReviewActionKind, ReviewActionOutcome, ReviewItem, ReviewPullRequestState,
     ReviewsActionResponse, ReviewsApproveRequest, ReviewsApproveRequestSource,
 };
 use crate::task_board::{
-    TaskBoardLifecycleOutcome, TaskBoardPullRequestIdentity, TaskBoardWorkflowExecutionRecord,
-    TaskBoardWorkflowKind, validate_task_board_read_only_run_context,
+    TaskBoardImplementationResult, TaskBoardLifecycleOutcome, TaskBoardPullRequestIdentity,
+    TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
 };
+
+#[path = "task_board_read_only_runtime/git_evidence.rs"]
+mod git_evidence;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum TaskBoardPublishVerification {
@@ -61,6 +60,12 @@ pub(crate) trait TaskBoardReadOnlyRuntime: Send + Sync {
         &self,
         execution: &TaskBoardWorkflowExecutionRecord,
     ) -> Result<String, CliError>;
+
+    async fn implementation_result_descends_from_base(
+        &self,
+        execution: &TaskBoardWorkflowExecutionRecord,
+        result: &TaskBoardImplementationResult,
+    ) -> Result<bool, CliError>;
 
     async fn publish_pr_review(
         &self,
@@ -180,7 +185,9 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
         match execution.snapshot.workflow_kind {
             TaskBoardWorkflowKind::DefaultTask
             | TaskBoardWorkflowKind::PrFix
-            | TaskBoardWorkflowKind::Review => resolve_local_workflow_head(execution).await,
+            | TaskBoardWorkflowKind::Review => {
+                git_evidence::resolve_local_workflow_head(execution).await
+            }
             TaskBoardWorkflowKind::PrReview => {
                 let review = resolve_pr_review(execution).await?;
                 required_head(&review.head_sha)
@@ -189,6 +196,14 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
                 "workflow runtime requires a known execution",
             )),
         }
+    }
+
+    async fn implementation_result_descends_from_base(
+        &self,
+        execution: &TaskBoardWorkflowExecutionRecord,
+        result: &TaskBoardImplementationResult,
+    ) -> Result<bool, CliError> {
+        git_evidence::implementation_result_descends_from_base(execution, result).await
     }
 
     async fn publish_pr_review(
@@ -266,27 +281,6 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
     }
 }
 
-async fn resolve_local_workflow_head(
-    execution: &TaskBoardWorkflowExecutionRecord,
-) -> Result<String, CliError> {
-    if execution.transition.workflow_kind != execution.snapshot.workflow_kind {
-        return Err(invalid_transition(
-            "local workflow execution identities do not agree",
-        ));
-    }
-    let context = execution
-        .snapshot
-        .read_only_run_context
-        .as_ref()
-        .ok_or_else(|| invalid_transition("Review workflow has no immutable run context"))?;
-    validate_task_board_read_only_run_context(context)
-        .map_err(|error| invalid_transition(error.to_string()))?;
-    let worktree = PathBuf::from(&context.worktree);
-    spawn_blocking(move || local_head(&worktree))
-        .await
-        .map_err(|error| invalid_transition(format!("join local head resolver: {error}")))?
-}
-
 async fn resolve_pr_review(
     execution: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<ReviewItem, CliError> {
@@ -318,18 +312,6 @@ fn pr_review_identity(
         .as_ref()
         .ok_or_else(|| invalid_transition("PrReview execution has no frozen pull request"))?;
     Ok(frozen.clone())
-}
-
-fn local_head(worktree: &Path) -> Result<String, CliError> {
-    let repository = GitRepository::discover(worktree)
-        .map_err(|error| invalid_transition(format!("discover review repository: {error}")))?;
-    let repository = repository
-        .open_gix()
-        .map_err(|error| invalid_transition(format!("open review repository: {error}")))?;
-    repository
-        .head_commit()
-        .map(|commit| commit.id.to_hex().to_string())
-        .map_err(|error| invalid_transition(format!("resolve review HEAD: {error}")))
 }
 
 fn lifecycle_outcome(
@@ -415,7 +397,7 @@ mod tests {
         let temp = tempdir().expect("tempdir");
         harness_testkit::init_git_repo_with_seed(temp.path());
 
-        let head = local_head(temp.path()).expect("resolve local head");
+        let head = git_evidence::local_head(temp.path()).expect("resolve local head");
 
         assert_eq!(head.len(), 40);
         assert!(head.bytes().all(|byte| byte.is_ascii_hexdigit()));

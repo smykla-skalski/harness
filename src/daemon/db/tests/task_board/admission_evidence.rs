@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 
+use crate::daemon::db::task_board::write_workflow_fixture::{
+    approved_write_item, complete_write_preparation,
+};
 use crate::daemon::db::{AsyncDaemonDb, ReservedTaskBoardDispatch};
 use crate::task_board::{
-    AgentMode, SpawnGateSwitches, TaskBoardAutomationPolicy, TaskBoardItem,
-    TaskBoardLaunchCapability, TaskBoardPolicyLimit, TaskBoardPolicyScope, TaskBoardStatus,
-    build_dispatch_plans_with_policy,
+    SpawnGateSwitches, TaskBoardAutomationPolicy, TaskBoardItem, TaskBoardLaunchCapability,
+    TaskBoardPolicyLimit, TaskBoardPolicyScope, TaskBoardStatus, build_dispatch_plans_with_policy,
 };
 
 use super::admission_dispatch::{configure_policy, preparing_intent, test_db};
@@ -82,7 +84,7 @@ async fn refused_pending_intent_releases_capacity_in_the_same_transaction() {
         .claim_task_board_dispatch("refused-pending")
         .await
         .expect_err("no-longer-startable dispatch must be refused");
-    assert!(error.to_string().contains("no longer startable"));
+    assert!(error.to_string().contains("changed before worker claim"));
     assert_eq!(intent_status(&db, &intent).await, "failed");
     assert_eq!(active_ledger_rows(&db, &intent).await, 0);
 
@@ -199,13 +201,12 @@ async fn create_plan(
     item_id: &str,
     estimates: Option<(u64, u64)>,
 ) -> crate::task_board::DispatchPlan {
-    let mut item = TaskBoardItem::new(
+    let mut item = approved_write_item(TaskBoardItem::new(
         item_id.to_string(),
         "Admission evidence".to_string(),
         "Body".to_string(),
         "2026-07-17T10:00:00Z".to_string(),
-    );
-    item.agent_mode = AgentMode::Headless;
+    ));
     if let Some((tokens, cost)) = estimates {
         item.estimated_tokens = Some(tokens);
         item.estimated_cost_microusd = Some(cost);
@@ -228,7 +229,7 @@ async fn prepare_dispatch(db: &AsyncDaemonDb, intent_id: &str) {
         .await
         .expect("claim preparation")
         .expect("pending preparation");
-    db.complete_task_board_dispatch_preparation(&preparation, "branch", "/tmp/worktree")
+    complete_write_preparation(db, &preparation, "branch", "/tmp/worktree")
         .await
         .expect("complete preparation");
 }

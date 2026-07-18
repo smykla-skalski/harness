@@ -4,6 +4,7 @@ fn pull_request(number: u64) -> TaskBoardPullRequestIdentity {
     TaskBoardPullRequestIdentity {
         repository: "example/compass".into(),
         number,
+        head: None,
     }
 }
 
@@ -78,6 +79,37 @@ fn write_workflows_freeze_pr_identity_and_advance_through_approval() {
 }
 
 #[test]
+fn pr_fix_freezes_fork_repository_branch_and_source_revision() {
+    let identity = TaskBoardPullRequestIdentity {
+        repository: "example/compass".into(),
+        number: 41,
+        head: Some(TaskBoardPullRequestHeadIdentity {
+            repository: "contributor/compass".into(),
+            branch: "feature/fix".into(),
+            revision: "source-head".into(),
+        }),
+    };
+    let state = start_task_board_workflow(
+        TaskBoardWorkflowKind::PrFix,
+        Some(&identity),
+        Some("source-head"),
+    )
+    .expect("start fork-backed PrFix");
+    assert_eq!(state.pull_request.as_ref(), Some(&identity));
+
+    let mut malformed = identity;
+    malformed.head.as_mut().expect("head").branch = " ".into();
+    assert_eq!(
+        start_task_board_workflow(
+            TaskBoardWorkflowKind::PrFix,
+            Some(&malformed),
+            Some("source-head"),
+        ),
+        Err(TaskBoardWorkflowTransitionError::MissingPullRequestHeadBranch)
+    );
+}
+
+#[test]
 fn write_revision_cycle_retains_the_reviewed_head_as_next_base() {
     let mut state = start_task_board_workflow(TaskBoardWorkflowKind::DefaultTask, None, None)
         .expect("start default task");
@@ -87,8 +119,14 @@ fn write_revision_cycle_retains_the_reviewed_head_as_next_base() {
 
     let restarted = restart_task_board_workflow_revision(&state).expect("restart implementation");
 
-    assert_eq!(restarted.phase, Some(TaskBoardExecutionPhase::Implementation));
-    assert_eq!(restarted.exact_head_revision.as_deref(), Some("head-reviewed"));
+    assert_eq!(
+        restarted.phase,
+        Some(TaskBoardExecutionPhase::Implementation)
+    );
+    assert_eq!(
+        restarted.exact_head_revision.as_deref(),
+        Some("head-reviewed")
+    );
 }
 
 #[test]

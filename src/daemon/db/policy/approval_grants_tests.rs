@@ -4,6 +4,9 @@ use tempfile::{TempDir, tempdir};
 
 use super::*;
 use crate::daemon::db::ReservedTaskBoardDispatch;
+use crate::daemon::db::task_board::write_workflow_fixture::{
+    approved_write_item, complete_write_preparation,
+};
 use crate::task_board::{
     PolicyAction, PolicyApprovalState, PolicyReasonCode, TaskBoardItem, TaskBoardStatus,
     build_dispatch_plans_with_policy,
@@ -377,12 +380,12 @@ async fn consume_in_tx_matches_the_pooled_consume() {
 async fn stale_consumed_grant_prevents_dispatch_preparation_completion() {
     let (_dir, db) = connect().await;
     let item_id = "board-item-1";
-    db.create_task_board_item(TaskBoardItem::new(
+    db.create_task_board_item(approved_write_item(TaskBoardItem::new(
         item_id.to_owned(),
         "Stale grant dispatch".to_owned(),
         "Body".to_owned(),
         "2026-07-14T10:00:00Z".to_owned(),
-    ))
+    )))
     .await
     .expect("create item");
     let grant = db
@@ -419,8 +422,7 @@ async fn stale_consumed_grant_prevents_dispatch_preparation_completion() {
         .expect("pending preparation");
     assert!(consume(&db, &grant.id).await, "race consumes grant first");
 
-    let error = db
-        .complete_task_board_dispatch_preparation(&claim, "harness/stale", "/tmp/stale")
+    let error = complete_write_preparation(&db, &claim, "harness/stale", "/tmp/stale")
         .await
         .expect_err("stale grant must reject completion");
     assert!(

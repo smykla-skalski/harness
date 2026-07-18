@@ -22,6 +22,10 @@ use super::{
     TaskBoardReadOnlyRunContext, TaskBoardResolvedReviewer, TaskBoardWorkflowKind,
 };
 
+#[path = "dispatch_readiness.rs"]
+mod readiness;
+use readiness::{blocked, readiness};
+
 #[path = "dispatch_lifecycle.rs"]
 mod lifecycle;
 pub use lifecycle::{
@@ -412,31 +416,6 @@ pub(crate) fn machine_mismatch_plan_with_policy(
     plan
 }
 
-fn readiness(item: &TaskBoardItem, policy: &PolicyDecision) -> DispatchReadiness {
-    if item.is_deleted() {
-        return blocked(DispatchBlockReason::Deleted);
-    }
-    if let Some(work_item_id) = item.work_item_id.as_deref() {
-        return blocked(DispatchBlockReason::AlreadyLinked {
-            work_item_id: work_item_id.to_string(),
-        });
-    }
-    if let PlanApprovalGate::Blocked { reason } = approval_gate(item) {
-        return blocked(DispatchBlockReason::PlanApproval { reason });
-    }
-    if item.status != TaskBoardStatus::Todo {
-        return blocked(DispatchBlockReason::Status {
-            status: item.status,
-        });
-    }
-    if !policy.is_allow() {
-        return blocked(DispatchBlockReason::Policy {
-            decision: policy.clone(),
-        });
-    }
-    DispatchReadiness::Ready
-}
-
 #[path = "dispatch_spawn_policy.rs"]
 mod spawn_policy;
 pub use spawn_policy::SpawnGateSwitches;
@@ -495,10 +474,6 @@ const fn severity(priority: TaskBoardPriority) -> TaskSeverity {
     }
 }
 
-fn blocked(reason: DispatchBlockReason) -> DispatchReadiness {
-    DispatchReadiness::Blocked { reason }
-}
-
 fn non_empty(value: &str) -> Option<String> {
     let trimmed = value.trim();
     (!trimmed.is_empty()).then(|| trimmed.to_string())
@@ -507,3 +482,6 @@ fn non_empty(value: &str) -> Option<String> {
 #[cfg(test)]
 #[path = "dispatch_tests.rs"]
 mod tests;
+#[cfg(test)]
+#[path = "dispatch_write_workflow_tests.rs"]
+mod write_workflow_tests;

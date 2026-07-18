@@ -59,7 +59,9 @@ fn rest_pull_request_handle_maps_response_entries() {
         "draft": true,
         "merged": false,
         "head": {
-            "sha": "deadbeef"
+            "sha": "deadbeef",
+            "ref": "feature/fix",
+            "repo": { "full_name": "contributor/fork" }
         },
         "requested_reviewers": [
             { "login": "reviewer" }
@@ -80,6 +82,8 @@ fn rest_pull_request_handle_maps_response_entries() {
             draft: true,
             merged: false,
             head_sha: "deadbeef".into(),
+            head_repository: Some("contributor/fork".into()),
+            head_branch: Some("feature/fix".into()),
             requested_reviewers: vec!["reviewer".into()],
             requested_team_reviewers: vec!["core".into()],
         }

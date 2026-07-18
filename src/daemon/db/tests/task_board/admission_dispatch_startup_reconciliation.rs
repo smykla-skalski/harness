@@ -6,7 +6,7 @@ use super::{
     admission_policy, configure_policy, create_plan, ledger_kind_state, preparing_intent, test_db,
 };
 use crate::daemon::codex_controller::CodexControllerHandle;
-use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::{AsyncDaemonDb, complete_write_preparation};
 use crate::daemon::protocol::{CodexRunStatus, StreamEvent};
 use crate::task_board::AgentMode;
 
@@ -25,7 +25,7 @@ async fn startup_reconciliation_releases_orphaned_codex_concurrency() {
         .await
         .expect("claim preparation")
         .expect("pending preparation");
-    db.complete_task_board_dispatch_preparation(&preparation, "branch", "/tmp/worktree")
+    complete_write_preparation(&db, &preparation, "branch", "/tmp/worktree")
         .await
         .expect("complete preparation");
     let claim = db

@@ -26,6 +26,8 @@ pub struct GitHubPullRequestHandle {
     pub draft: bool,
     pub merged: bool,
     pub head_sha: String,
+    pub head_repository: Option<String>,
+    pub head_branch: Option<String>,
     pub requested_reviewers: Vec<String>,
     pub requested_team_reviewers: Vec<String>,
 }
@@ -118,6 +120,16 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
         pull_request_number: u64,
     ) -> Result<GitHubPullRequestHandle, CliError> {
         super::client_graphql::pull_request_handle(&self.client, config, pull_request_number)
+            .await?
+            .ok_or_else(|| pull_request_not_found(config, pull_request_number))
+    }
+
+    async fn get_pull_request_fresh(
+        &self,
+        config: &GitHubProjectConfig,
+        pull_request_number: u64,
+    ) -> Result<GitHubPullRequestHandle, CliError> {
+        super::client_graphql::pull_request_handle_fresh(&self.client, config, pull_request_number)
             .await?
             .ok_or_else(|| pull_request_not_found(config, pull_request_number))
     }
@@ -269,26 +281,6 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
     }
 }
 
-fn build_pull_request_handle(
-    number: u64,
-    html_url: String,
-    draft: bool,
-    merged: bool,
-    head_sha: String,
-    requested_reviewers: Vec<String>,
-    requested_team_reviewers: Vec<String>,
-) -> GitHubPullRequestHandle {
-    GitHubPullRequestHandle {
-        number,
-        html_url: Some(html_url),
-        draft,
-        merged,
-        head_sha,
-        requested_reviewers,
-        requested_team_reviewers,
-    }
-}
-
 fn pull_request_not_found(config: &GitHubProjectConfig, pull_request_number: u64) -> CliError {
     CliErrorKind::workflow_io(format!(
         "task-board github pull request not found: {}/{}#{}",
@@ -313,6 +305,14 @@ struct RestPullRequestResponse {
 #[derive(Debug, Deserialize)]
 struct RestPullRequestBranch {
     sha: String,
+    #[serde(rename = "ref")]
+    branch: Option<String>,
+    repo: Option<RestPullRequestRepository>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RestPullRequestRepository {
+    full_name: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -332,23 +332,26 @@ struct GitHubMergeResponse {
 }
 
 fn rest_pull_request_handle(pull_request: RestPullRequestResponse) -> GitHubPullRequestHandle {
-    build_pull_request_handle(
-        pull_request.number,
-        pull_request.html_url,
-        pull_request.draft.unwrap_or(false),
-        pull_request.merged.unwrap_or(false),
-        pull_request.head.sha,
-        pull_request
+    let RestPullRequestBranch { sha, branch, repo } = pull_request.head;
+    GitHubPullRequestHandle {
+        number: pull_request.number,
+        html_url: Some(pull_request.html_url),
+        draft: pull_request.draft.unwrap_or(false),
+        merged: pull_request.merged.unwrap_or(false),
+        head_sha: sha,
+        head_repository: repo.map(|repository| repository.full_name),
+        head_branch: branch,
+        requested_reviewers: pull_request
             .requested_reviewers
             .into_iter()
             .map(|reviewer| reviewer.login)
             .collect(),
-        pull_request
+        requested_team_reviewers: pull_request
             .requested_teams
             .into_iter()
             .map(|team| team.slug)
             .collect(),
-    )
+    }
 }
 
 fn github_merge_method(method: GitHubMergeMethod) -> &'static str {

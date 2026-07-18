@@ -1,9 +1,12 @@
 use std::collections::HashMap;
 
 use crate::daemon::db::NewApprovalGrant;
+use crate::daemon::db::task_board::write_workflow_fixture::{
+    approved_write_item, complete_write_preparation,
+};
 use crate::daemon::protocol::CodexRunStatus;
 use crate::task_board::{
-    AgentMode, PolicyAction, PolicyReasonCode, SpawnGateSwitches, TaskBoardItem,
+    PolicyAction, PolicyReasonCode, SpawnGateSwitches, TaskBoardItem,
     build_dispatch_plans_with_policy,
 };
 
@@ -15,13 +18,12 @@ use super::admission_dispatch::{
 async fn missing_worker_compensation_commits_usage_and_releases_concurrency() {
     let db = test_db().await;
     configure_policy(&db, admission_policy(1)).await;
-    let mut item = TaskBoardItem::new(
+    let item = approved_write_item(TaskBoardItem::new(
         "admission-compensated-start".to_string(),
         "Compensated admission".to_string(),
         "Body".to_string(),
         "2026-07-17T10:00:00Z".to_string(),
-    );
-    item.agent_mode = AgentMode::Headless;
+    ));
     db.create_task_board_item(item).await.expect("create item");
     let item = db
         .task_board_item("admission-compensated-start")
@@ -45,7 +47,7 @@ async fn missing_worker_compensation_commits_usage_and_releases_concurrency() {
         .await
         .expect("claim preparation")
         .expect("pending preparation");
-    db.complete_task_board_dispatch_preparation(&preparation, "branch", "/tmp/worktree")
+    complete_write_preparation(&db, &preparation, "branch", "/tmp/worktree")
         .await
         .expect("complete preparation");
     let claim = db
@@ -133,13 +135,12 @@ async fn begin_compensation_with_grant(
     db: &crate::daemon::db::AsyncDaemonDb,
     item_id: &str,
 ) -> CompensationFixture {
-    let mut item = TaskBoardItem::new(
+    let item = approved_write_item(TaskBoardItem::new(
         item_id.to_string(),
         "Terminal compensation".to_string(),
         "Body".to_string(),
         "2026-07-17T10:00:00Z".to_string(),
-    );
-    item.agent_mode = AgentMode::Headless;
+    ));
     db.create_task_board_item(item).await.expect("create item");
     let grant = approved_grant(&db, item_id).await;
     let mut plan = build_dispatch_plans_with_policy(
@@ -161,7 +162,7 @@ async fn begin_compensation_with_grant(
         .await
         .expect("claim preparation")
         .expect("pending preparation");
-    db.complete_task_board_dispatch_preparation(&preparation, "branch", "/tmp/worktree")
+    complete_write_preparation(db, &preparation, "branch", "/tmp/worktree")
         .await
         .expect("complete preparation");
     let claim = db

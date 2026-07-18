@@ -133,6 +133,7 @@ pub(super) async fn seed_ready_board_item(
         "2026-05-14T00:00:00Z".to_string(),
     );
     item.status = TaskBoardStatus::Todo;
+    item.workflow_kind = crate::task_board::TaskBoardWorkflowKind::Unknown;
     let item = submit_plan(&item, "Use task dispatch.").apply_to(&item);
     let item = approve_plan(&item, "lead", "2026-05-14T01:00:00Z").apply_to(&item);
     state

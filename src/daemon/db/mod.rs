@@ -106,6 +106,10 @@ mod schema_v40;
 #[allow(dead_code)]
 mod task_board;
 pub(crate) use task_board::workflow_owner;
+#[cfg(test)]
+pub(crate) use task_board::write_workflow_fixture::{
+    approved_write_item, complete_write_preparation,
+};
 #[allow(unused_imports)]
 pub(crate) use task_board::{
     ClaimedTaskBoardDispatch, ClaimedTaskBoardDispatchPreparation, ReservedTaskBoardDispatch,

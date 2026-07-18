@@ -63,6 +63,8 @@ mod provider_sync_publication_tests;
 mod provider_sync_renewal_tests;
 #[cfg(test)]
 mod provider_sync_tests;
+#[cfg(test)]
+pub(crate) mod write_workflow_fixture;
 
 pub(crate) use admission_recovery::{
     TaskBoardAdmissionMissingRunRecovery, TaskBoardAdmissionWorkerRecovery,

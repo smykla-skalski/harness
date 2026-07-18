@@ -48,7 +48,16 @@ pub(super) async fn prepare_write_workflow_launch(
     )
     .map_err(|error| invalid_transition(error.to_string()))?;
     super::read_only_workflow_launch::ensure_supported_runtimes(&resolved_reviewers)?;
-    let (pull_request, base_head_revision) = resolve_write_identity(&item, worktree).await?;
+    let requested_pull_request = requested_pull_request(&item)?;
+    let pull_request = super::super::task_board_github::validate_write_workflow_launch_publication(
+        db,
+        &settings.settings,
+        execution_repository.as_deref(),
+        requested_pull_request.as_ref(),
+    )
+    .await?;
+    let (pull_request, base_head_revision) =
+        resolve_write_identity(&item, worktree, pull_request).await?;
     let (approved_by, approved_at) = approved_plan(&item)?;
     let snapshot = workflow_snapshot(
         &item,
@@ -121,6 +130,14 @@ pub(crate) async fn validate_write_workflow_launch(
     )
     .map_err(|error| invalid_transition(error.to_string()))?;
     super::read_only_workflow_launch::ensure_supported_runtimes(&reviewers)?;
+    let requested_pull_request = requested_pull_request(&item)?;
+    let pull_request = super::super::task_board_github::validate_write_workflow_launch_publication(
+        db,
+        &settings.settings,
+        execution_repository.as_deref(),
+        requested_pull_request.as_ref(),
+    )
+    .await?;
     let started_item_revision = launch
         .prepared_item_revision
         .checked_add(1)
@@ -150,7 +167,7 @@ pub(crate) async fn validate_write_workflow_launch(
     let approval = bind_plan_approval(&result, &snapshot, execution_id, &approved_by, &approved_at)
         .map_err(|error| invalid_transition(error.to_string()))?;
     let (pull_request, base_head_revision) =
-        resolve_write_identity(&item, worktree(&item)?).await?;
+        resolve_write_identity(&item, worktree(&item)?, pull_request).await?;
     let stable = item.workflow_kind == launch.workflow_kind
         && item.agent_mode == AgentMode::Headless
         && snapshot.execution_repository == launch.execution_repository
@@ -182,20 +199,36 @@ pub(crate) async fn validate_write_workflow_launch(
 async fn resolve_write_identity(
     item: &TaskBoardItem,
     worktree: &str,
+    pull_request: Option<TaskBoardPullRequestIdentity>,
 ) -> Result<(Option<TaskBoardPullRequestIdentity>, String), CliError> {
     let local_head = super::read_only_workflow_launch::resolve_worktree_head(worktree).await?;
     if item.workflow_kind != TaskBoardWorkflowKind::PrFix {
         return Ok((None, local_head));
     }
-    let identity = resolve_task_board_pull_request_identity(item)
-        .map_err(|error| invalid_transition(error.to_string()))?;
-    let remote_head = super::read_only_workflow_launch::resolve_pr_review_head(&identity).await?;
+    let identity = pull_request
+        .ok_or_else(|| invalid_transition("PrFix launch has no frozen pull request head"))?;
+    let remote_head = identity
+        .head
+        .as_ref()
+        .map(|head| head.revision.as_str())
+        .ok_or_else(|| invalid_transition("PrFix launch has no frozen pull request head"))?;
     if remote_head != local_head {
         return Err(invalid_transition(
             "PrFix worktree HEAD does not match its pull request head",
         ));
     }
     Ok((Some(identity), local_head))
+}
+
+fn requested_pull_request(
+    item: &TaskBoardItem,
+) -> Result<Option<TaskBoardPullRequestIdentity>, CliError> {
+    (item.workflow_kind == TaskBoardWorkflowKind::PrFix)
+        .then(|| {
+            resolve_task_board_pull_request_identity(item)
+                .map_err(|error| invalid_transition(error.to_string()))
+        })
+        .transpose()
 }
 
 fn workflow_snapshot(
@@ -255,3 +288,7 @@ const fn is_write_workflow(kind: TaskBoardWorkflowKind) -> bool {
 fn invalid_transition(detail: impl Into<String>) -> CliError {
     CliErrorKind::invalid_transition(detail.into()).into()
 }
+
+#[cfg(test)]
+#[path = "write_workflow_launch_tests.rs"]
+mod tests;

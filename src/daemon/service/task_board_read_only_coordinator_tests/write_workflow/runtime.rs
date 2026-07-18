@@ -80,9 +80,14 @@ pub(super) struct FakeWriteRuntime {
     plans: Mutex<VecDeque<PlannedRun>>,
     runs: Mutex<BTreeMap<String, CodexRunSnapshot>>,
     head: Mutex<String>,
+    valid_implementation_ancestry: AtomicBool,
     starts: AtomicUsize,
     publishes: AtomicUsize,
     published: AtomicBool,
+    ambiguous_publish_errors: Mutex<VecDeque<String>>,
+    verification_errors: Mutex<VecDeque<String>>,
+    verification_urls: Mutex<Vec<Option<String>>>,
+    verifications: AtomicUsize,
 }
 
 impl FakeWriteRuntime {
@@ -91,9 +96,14 @@ impl FakeWriteRuntime {
             plans: Mutex::new(plans.into_iter().collect()),
             runs: Mutex::new(BTreeMap::new()),
             head: Mutex::new(BASE_HEAD.into()),
+            valid_implementation_ancestry: AtomicBool::new(true),
             starts: AtomicUsize::new(0),
             publishes: AtomicUsize::new(0),
             published: AtomicBool::new(false),
+            ambiguous_publish_errors: Mutex::new(VecDeque::new()),
+            verification_errors: Mutex::new(VecDeque::new()),
+            verification_urls: Mutex::new(Vec::new()),
+            verifications: AtomicUsize::new(0),
         }
     }
 
@@ -103,6 +113,36 @@ impl FakeWriteRuntime {
 
     pub(super) fn publish_count(&self) -> usize {
         self.publishes.load(Ordering::SeqCst)
+    }
+
+    pub(super) fn reject_implementation_ancestry(&self) {
+        self.valid_implementation_ancestry
+            .store(false, Ordering::SeqCst);
+    }
+
+    pub(super) fn fail_next_verification(&self, detail: &str) {
+        self.verification_errors
+            .lock()
+            .expect("verification errors lock")
+            .push_back(detail.into());
+    }
+
+    pub(super) fn fail_next_publish_after_mutation(&self, detail: &str) {
+        self.ambiguous_publish_errors
+            .lock()
+            .expect("ambiguous publish errors lock")
+            .push_back(detail.into());
+    }
+
+    pub(super) fn verification_count(&self) -> usize {
+        self.verifications.load(Ordering::SeqCst)
+    }
+
+    pub(super) fn verification_urls(&self) -> Vec<Option<String>> {
+        self.verification_urls
+            .lock()
+            .expect("verification URLs lock")
+            .clone()
     }
 
     fn load_run(&self, run_id: &str) -> Option<CodexRunSnapshot> {
@@ -220,6 +260,14 @@ impl TaskBoardReadOnlyRuntime for FakeWriteRuntime {
         Ok(self.head.lock().expect("head lock").clone())
     }
 
+    async fn implementation_result_descends_from_base(
+        &self,
+        _execution: &TaskBoardWorkflowExecutionRecord,
+        _result: &TaskBoardImplementationResult,
+    ) -> Result<bool, CliError> {
+        Ok(self.valid_implementation_ancestry.load(Ordering::SeqCst))
+    }
+
     async fn publish_pr_review(
         &self,
         _execution: &TaskBoardWorkflowExecutionRecord,
@@ -240,14 +288,35 @@ impl TaskBoardReadOnlyRuntime for FakeWriteRuntime {
     ) -> Result<TaskBoardLifecycleOutcome, CliError> {
         self.publishes.fetch_add(1, Ordering::SeqCst);
         self.published.store(true, Ordering::SeqCst);
+        if let Some(detail) = self
+            .ambiguous_publish_errors
+            .lock()
+            .expect("ambiguous publish errors lock")
+            .pop_front()
+        {
+            return Err(CliErrorKind::workflow_io(detail).into());
+        }
         Ok(publication(execution, true))
     }
 
     async fn verify_write_workflow_publication(
         &self,
         execution: &TaskBoardWorkflowExecutionRecord,
-        _known_external_url: Option<&str>,
+        known_external_url: Option<&str>,
     ) -> Result<TaskBoardPublishVerification, CliError> {
+        self.verifications.fetch_add(1, Ordering::SeqCst);
+        self.verification_urls
+            .lock()
+            .expect("verification URLs lock")
+            .push(known_external_url.map(str::to_owned));
+        if let Some(detail) = self
+            .verification_errors
+            .lock()
+            .expect("verification errors lock")
+            .pop_front()
+        {
+            return Err(CliErrorKind::workflow_io(detail).into());
+        }
         if self.published.load(Ordering::SeqCst) {
             Ok(TaskBoardPublishVerification::Applied(publication(
                 execution, false,

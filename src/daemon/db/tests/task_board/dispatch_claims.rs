@@ -2,6 +2,9 @@ use std::collections::HashMap;
 
 use tempfile::{TempDir, tempdir};
 
+use crate::daemon::db::task_board::write_workflow_fixture::{
+    approved_write_item, complete_write_preparation,
+};
 use crate::daemon::db::{AsyncDaemonDb, ClaimedTaskBoardDispatch, TaskBoardDispatchClaimAction};
 use crate::daemon::task_board_managed_agents::managed_worker_id;
 use crate::task_board::{TaskBoardItem, TaskBoardStatus, build_dispatch_plans_with_policy};
@@ -58,7 +61,7 @@ async fn stale_worker_claim_cannot_mutate_reclaimed_claim() {
 }
 
 #[tokio::test]
-async fn reclaimed_worker_restores_expired_frozen_admission_before_commit() {
+async fn reclaimed_worker_restores_admission_but_honors_write_revision_fence() {
     let db = test_db().await;
     configure_policy(&db, admission_policy(2)).await;
     let first_intent = prepare_admitted_dispatch(&db, "reclaimed-worker-first").await;
@@ -70,12 +73,6 @@ async fn reclaimed_worker_restores_expired_frozen_admission_before_commit() {
     assert!(matches!(first.action, TaskBoardDispatchClaimAction::Start));
     let _second_intent = prepare_admitted_dispatch(&db, "reclaimed-worker-second").await;
     configure_policy(&db, admission_policy(1)).await;
-    db.update_task_board_item("reclaimed-worker-first", |item| {
-        item.title = "Edited after uncertain start".to_owned();
-        Ok(true)
-    })
-    .await
-    .expect("edit non-frozen item metadata");
     age_claim_and_release_admission(&db, &first.intent_id).await;
 
     let reclaimed = db
@@ -93,16 +90,22 @@ async fn reclaimed_worker_restores_expired_frozen_admission_before_commit() {
     db.renew_task_board_dispatch_claim(&reclaimed.intent_id, &reclaimed.claim_token)
         .await
         .expect("restore the deterministic worker's frozen admission");
-    db.complete_task_board_dispatch(&reclaimed.intent_id, &reclaimed.claim_token, &worker_id)
+    let error = db
+        .complete_task_board_dispatch(&reclaimed.intent_id, &reclaimed.claim_token, &worker_id)
         .await
-        .expect("commit deterministic worker evidence under frozen admission");
+        .expect_err("settings drift must invalidate the frozen write launch");
+    assert!(
+        error
+            .to_string()
+            .contains("configuration revision changed before worker start")
+    );
     assert_eq!(
         ledger_kind_state(&db, &reclaimed.intent_id, "concurrency").await,
-        "committed"
+        "reserved"
     );
     assert_eq!(
         ledger_kind_state(&db, &reclaimed.intent_id, "rate").await,
-        "committed"
+        "reserved"
     );
 }
 
@@ -263,12 +266,12 @@ async fn claimed_dispatch(item_id: &str) -> (TempDir, AsyncDaemonDb, ClaimedTask
 }
 
 async fn prepare_admitted_dispatch(db: &AsyncDaemonDb, item_id: &str) -> String {
-    db.create_task_board_item(TaskBoardItem::new(
+    db.create_task_board_item(approved_write_item(TaskBoardItem::new(
         item_id.to_owned(),
         "Admitted worker claim".to_owned(),
         "Body".to_owned(),
         "2026-07-17T10:00:00Z".to_owned(),
-    ))
+    )))
     .await
     .expect("create admitted item");
     let item = db
@@ -293,7 +296,7 @@ async fn prepare_admitted_dispatch(db: &AsyncDaemonDb, item_id: &str) -> String 
         .await
         .expect("claim admitted preparation")
         .expect("pending admitted preparation");
-    db.complete_task_board_dispatch_preparation(&preparation, "branch", "/tmp/worktree")
+    complete_write_preparation(db, &preparation, "branch", "/tmp/worktree")
         .await
         .expect("complete admitted preparation");
     intent

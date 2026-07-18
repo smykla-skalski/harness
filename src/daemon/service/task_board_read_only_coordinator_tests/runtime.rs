@@ -9,9 +9,9 @@ use crate::daemon::protocol::{CodexRunRequest, CodexRunSnapshot, CodexRunStatus}
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::{
     TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardAttemptResultArtifact,
-    TaskBoardEvaluationResult, TaskBoardLifecycleOutcome, TaskBoardLocalAttemptResult,
-    TaskBoardPhaseVerdict, TaskBoardReviewResult, TaskBoardReviewerOutcome,
-    TaskBoardWorkflowExecutionRecord,
+    TaskBoardEvaluationResult, TaskBoardImplementationResult, TaskBoardLifecycleOutcome,
+    TaskBoardLocalAttemptResult, TaskBoardPhaseVerdict, TaskBoardReviewResult,
+    TaskBoardReviewerOutcome, TaskBoardWorkflowExecutionRecord,
 };
 
 use super::super::task_board_read_only_runtime::{
@@ -292,6 +292,14 @@ impl TaskBoardReadOnlyRuntime for FakeReadOnlyRuntime {
             HeadBehavior::Exact(head) => Ok(head.clone()),
             HeadBehavior::Error(detail) => Err(CliErrorKind::workflow_io(detail.clone()).into()),
         }
+    }
+
+    async fn implementation_result_descends_from_base(
+        &self,
+        _execution: &TaskBoardWorkflowExecutionRecord,
+        _result: &TaskBoardImplementationResult,
+    ) -> Result<bool, CliError> {
+        Ok(true)
     }
 
     async fn publish_pr_review(

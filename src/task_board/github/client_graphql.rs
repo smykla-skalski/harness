@@ -10,6 +10,9 @@ use crate::github_api::{
 use super::client::{GitHubCreatePullRequest, GitHubPullRequestHandle};
 use super::config::GitHubProjectConfig;
 
+mod fresh;
+pub(super) use fresh::pull_request_handle_fresh;
+
 const GRAPHQL_PAGE_LIMIT: u32 = 5;
 
 pub(super) async fn pull_request_handle(
@@ -230,6 +233,8 @@ fragment PullRequestHandleFields on PullRequest {
   isDraft
   merged
   headRefOid
+  headRefName
+  headRepository { nameWithOwner }
   reviewRequests(first: 100) {
     pageInfo { hasNextPage endCursor }
     nodes {
@@ -260,6 +265,8 @@ fragment PullRequestHandleFields on PullRequest {
   isDraft
   merged
   headRefOid
+  headRefName
+  headRepository { nameWithOwner }
   reviewRequests(first: 100) {
     pageInfo { hasNextPage endCursor }
     nodes {
@@ -409,6 +416,10 @@ struct GraphqlPullRequestHandle {
     merged: bool,
     #[serde(rename = "headRefOid")]
     head_ref_oid: String,
+    #[serde(rename = "headRefName")]
+    head_ref_name: Option<String>,
+    #[serde(rename = "headRepository")]
+    head_repository: Option<GraphqlHeadRepository>,
     #[serde(rename = "reviewRequests")]
     review_requests: GitHubGraphqlConnection<GraphqlReviewRequest>,
 }
@@ -421,12 +432,20 @@ impl GraphqlPullRequestHandle {
             draft: self.is_draft,
             merged: self.merged,
             head_sha: self.head_ref_oid,
+            head_repository: self.head_repository.map(|repo| repo.name_with_owner),
+            head_branch: self.head_ref_name,
             requested_reviewers: Vec::new(),
             requested_team_reviewers: Vec::new(),
         };
         handle.extend_review_requests(self.review_requests.nodes);
         handle
     }
+}
+
+#[derive(Debug, Deserialize)]
+struct GraphqlHeadRepository {
+    #[serde(rename = "nameWithOwner")]
+    name_with_owner: String,
 }
 
 #[derive(Debug, Deserialize)]

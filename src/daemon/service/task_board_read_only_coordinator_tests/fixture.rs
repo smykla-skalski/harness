@@ -275,6 +275,7 @@ fn pull_request(workflow_kind: TaskBoardWorkflowKind) -> Option<TaskBoardPullReq
     (workflow_kind == TaskBoardWorkflowKind::PrReview).then(|| TaskBoardPullRequestIdentity {
         repository: "example/compass".into(),
         number: 17,
+        head: None,
     })
 }
 

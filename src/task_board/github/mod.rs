@@ -82,6 +82,16 @@ pub trait GitHubAutomationClient: Send + Sync {
         )))
     }
 
+    /// Load current pull-request metadata without consulting a read cache.
+    ///
+    /// # Errors
+    /// Returns provider or transport errors surfaced by the implementation.
+    async fn get_pull_request_fresh(
+        &self,
+        config: &GitHubProjectConfig,
+        pull_request_number: u64,
+    ) -> Result<GitHubPullRequestHandle, CliError>;
+
     /// Find an existing open pull request for a branch or create one when absent.
     ///
     /// # Errors

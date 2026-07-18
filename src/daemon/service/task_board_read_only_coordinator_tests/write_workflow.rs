@@ -19,6 +19,7 @@ mod runtime;
 const BASE_HEAD: &str = "head-base";
 const FIRST_HEAD: &str = "head-first";
 const SECOND_HEAD: &str = "head-second";
+const RETRY_AT: &str = "2026-07-17T10:05:00Z";
 
 #[tokio::test]
 async fn write_workflow_runs_revision_cycle_publish_cleanup_and_projection() {
@@ -76,6 +77,96 @@ async fn write_workflow_runs_revision_cycle_publish_cleanup_and_projection() {
         item.workflow.pr_url.as_deref(),
         Some("https://github.com/example/compass/pull/42")
     );
+}
+
+#[tokio::test]
+async fn transient_publication_verification_recovers_on_bounded_retry() {
+    let fixture = seed_write_execution("write-publication-verification-retry").await;
+    let runtime = FakeWriteRuntime::new([
+        PlannedRun::implementation(1, 1, BASE_HEAD, FIRST_HEAD),
+        PlannedRun::review(1, FIRST_HEAD, TaskBoardPhaseVerdict::Pass),
+        PlannedRun::evaluation(1, FIRST_HEAD),
+    ]);
+    runtime.fail_next_verification("GitHub head is not visible yet");
+
+    for _ in 0..24 {
+        tick(&fixture, &runtime).await;
+        if runtime.verification_count() == 1 {
+            break;
+        }
+    }
+    let waiting = load_execution(&fixture).await;
+    assert_eq!(runtime.publish_count(), 1);
+    assert_eq!(runtime.verification_count(), 1);
+    assert_eq!(
+        waiting.transition.execution_state,
+        TaskBoardExecutionState::Running
+    );
+
+    for _ in 0..12 {
+        tick_at(&fixture, &runtime, RETRY_AT).await;
+        if load_execution(&fixture).await.transition.phase
+            == Some(TaskBoardExecutionPhase::Terminal)
+        {
+            break;
+        }
+    }
+    let completed = load_execution(&fixture).await;
+    assert_eq!(runtime.verification_count(), 2);
+    assert_eq!(
+        runtime.verification_urls(),
+        vec![
+            Some("https://github.com/example/compass/pull/42".into()),
+            Some("https://github.com/example/compass/pull/42".into()),
+        ]
+    );
+    assert_eq!(
+        completed.transition.phase,
+        Some(TaskBoardExecutionPhase::Terminal)
+    );
+}
+
+#[tokio::test]
+async fn ambiguous_write_publication_is_verified_without_a_second_mutation() {
+    let fixture = seed_write_execution("write-publication-ambiguous").await;
+    let runtime = FakeWriteRuntime::new([
+        PlannedRun::implementation(1, 1, BASE_HEAD, FIRST_HEAD),
+        PlannedRun::review(1, FIRST_HEAD, TaskBoardPhaseVerdict::Pass),
+        PlannedRun::evaluation(1, FIRST_HEAD),
+    ]);
+    runtime.fail_next_publish_after_mutation("connection closed after push");
+
+    drive_to_terminal(&fixture, &runtime).await;
+
+    assert_eq!(runtime.publish_count(), 1);
+    assert_eq!(runtime.verification_count(), 1);
+    assert_eq!(
+        load_execution(&fixture).await.transition.phase,
+        Some(TaskBoardExecutionPhase::Terminal)
+    );
+}
+
+#[tokio::test]
+async fn implementation_result_with_unrelated_base_is_rejected_before_review() {
+    let fixture = seed_write_execution("write-unrelated-implementation").await;
+    let runtime = FakeWriteRuntime::new([PlannedRun::implementation(1, 1, BASE_HEAD, FIRST_HEAD)]);
+    runtime.reject_implementation_ancestry();
+
+    for _ in 0..4 {
+        tick(&fixture, &runtime).await;
+    }
+
+    let execution = load_execution(&fixture).await;
+    assert_eq!(
+        execution.transition.execution_state,
+        TaskBoardExecutionState::HumanRequired
+    );
+    assert_eq!(
+        execution.blocked_reason.as_deref(),
+        Some("implementation_ancestry_invalid")
+    );
+    assert_eq!(runtime.start_count(), 1);
+    assert_eq!(runtime.publish_count(), 0);
 }
 
 #[tokio::test]
@@ -312,8 +403,12 @@ async fn drive_to_terminal(fixture: &Fixture, runtime: &FakeWriteRuntime) {
 }
 
 async fn tick(fixture: &Fixture, runtime: &FakeWriteRuntime) {
+    tick_at(fixture, runtime, NOW).await;
+}
+
+async fn tick_at(fixture: &Fixture, runtime: &FakeWriteRuntime, now: &str) {
     let report =
-        reconcile_task_board_read_only_workflows_with_runtime(&fixture.test.db, runtime, NOW, 8)
+        reconcile_task_board_read_only_workflows_with_runtime(&fixture.test.db, runtime, now, 8)
             .await
             .expect("reconcile write workflow");
     if !report.failures.is_empty() {
