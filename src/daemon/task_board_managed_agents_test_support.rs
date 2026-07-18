@@ -126,6 +126,7 @@ pub(super) fn applied_task(mode: AgentMode) -> DispatchAppliedTask {
         ),
         item,
         read_only_workflow: None,
+        write_workflow: None,
     }
 }
 

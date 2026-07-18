@@ -3,8 +3,9 @@ use crate::daemon::protocol::{CodexRunMode, CodexRunRequest};
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole};
 use crate::task_board::{
     AgentMode, DispatchAppliedTask, TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION,
-    TaskBoardAttemptResultArtifact, TaskBoardItem, TaskBoardLocalAttemptResult,
-    TaskBoardReviewerOutcome, WorkerPromptContext, render_worker_prompt,
+    TaskBoardAttemptResultArtifact, TaskBoardImplementationResult, TaskBoardItem,
+    TaskBoardLocalAttemptResult, TaskBoardReviewerOutcome, WorkerPromptContext,
+    render_worker_prompt,
 };
 
 const DEFAULT_INTERACTIVE_RUNTIME: &str = "codex";
@@ -15,6 +16,9 @@ pub(super) fn codex_worker_request(
 ) -> CodexRunRequest {
     if let Some(launch) = applied.read_only_workflow.as_ref() {
         return read_only_review_request(applied, launch, managed_run_id);
+    }
+    if let Some(launch) = applied.write_workflow.as_ref() {
+        return write_implementation_request(applied, launch, managed_run_id);
     }
     let mode = match applied.item.agent_mode {
         AgentMode::Planning | AgentMode::Evaluate => CodexRunMode::Report,
@@ -37,6 +41,81 @@ pub(super) fn codex_worker_request(
         effort: None,
         allow_custom_model: false,
     }
+}
+
+fn write_implementation_request(
+    applied: &DispatchAppliedTask,
+    launch: &crate::task_board::TaskBoardWriteWorkflowLaunch,
+    managed_run_id: &str,
+) -> CodexRunRequest {
+    CodexRunRequest {
+        actor: Some(CONTROL_PLANE_ACTOR_ID.to_string()),
+        prompt: write_implementation_prompt(applied, launch, managed_run_id),
+        mode: CodexRunMode::WorkspaceWrite,
+        role: SessionRole::Leader,
+        fallback_role: Some(SessionRole::Worker),
+        capabilities: write_capabilities(&applied.item, managed_run_id),
+        name: Some(format!("Task Board Implementation: {}", applied.item.title)),
+        persona: None,
+        resume_thread_id: None,
+        task_id: Some(applied.work_item_id.clone()),
+        board_item_id: Some(applied.board_item_id.clone()),
+        workflow_execution_id: applied.item.workflow.execution_id.clone(),
+        model: None,
+        effort: None,
+        allow_custom_model: false,
+    }
+}
+
+fn write_implementation_prompt(
+    applied: &DispatchAppliedTask,
+    launch: &crate::task_board::TaskBoardWriteWorkflowLaunch,
+    managed_run_id: &str,
+) -> String {
+    let execution_id = applied
+        .item
+        .workflow
+        .execution_id
+        .as_deref()
+        .expect("write prompt requires workflow execution id");
+    let response = TaskBoardLocalAttemptResult {
+        schema_version: TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION,
+        execution_id: execution_id.to_string(),
+        action_key: "implementation:1".into(),
+        attempt: 1,
+        idempotency_key: managed_run_id.to_string(),
+        exact_head_revision: "REPLACE_WITH_CURRENT_HEAD".into(),
+        artifact: TaskBoardAttemptResultArtifact::Implementation(TaskBoardImplementationResult {
+            revision_cycle: 1,
+            base_head_revision: launch.base_head_revision.clone(),
+            head_revision: "REPLACE_WITH_CURRENT_HEAD".into(),
+            summary: "concise implementation summary".into(),
+            evidence: vec!["focused validation and owning gate results".into()],
+        }),
+    };
+    let criteria = launch
+        .planning_result
+        .acceptance_criteria
+        .iter()
+        .map(|criterion| format!("- {criterion}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    format!(
+        "Implement the exact approved plan for Task Board item '{}'.\n\nTitle: {}\nWorktree: {}\nBase head: {}\n\nApproved plan:\n{}\n\nAcceptance criteria:\n{}\n\nWork only in the assigned worktree. Preserve unrelated changes, run focused validation through repository workflows, and create local commits as required by the repository; do not push, publish, or merge. Before responding, replace every REPLACE_WITH_CURRENT_HEAD token below with the exact resulting Git HEAD. Your final message must contain only one JSON value matching this exact identity and shape:\n{}",
+        applied.board_item_id,
+        applied.item.title,
+        applied
+            .item
+            .workflow
+            .worktree
+            .as_deref()
+            .unwrap_or_default(),
+        launch.base_head_revision,
+        launch.planning_result.plan_markdown,
+        criteria,
+        serde_json::to_string_pretty(&response)
+            .expect("serialize implementation response template"),
+    )
 }
 
 fn read_only_review_request(
@@ -165,6 +244,13 @@ fn read_only_capabilities(item_id: &str, tags: &[String], managed_run_id: &str) 
     ];
     capabilities.extend(tags.iter().map(|tag| format!("task-board:tag:{tag}")));
     capabilities.push("task-board:workflow:read-only".into());
+    capabilities.push(format!("task-board:attempt:{managed_run_id}"));
+    capabilities
+}
+
+fn write_capabilities(item: &TaskBoardItem, managed_run_id: &str) -> Vec<String> {
+    let mut capabilities = worker_capabilities(item);
+    capabilities.push("task-board:workflow:write".into());
     capabilities.push(format!("task-board:attempt:{managed_run_id}"));
     capabilities
 }

@@ -16,7 +16,7 @@ use crate::task_board::{TaskBoardItem, TaskBoardStatus};
 
 #[path = "items_lifecycle.rs"]
 mod lifecycle;
-pub(super) use lifecycle::ensure_read_only_item_mutation_allowed_in_tx;
+pub(super) use lifecycle::ensure_workflow_item_mutation_allowed_in_tx;
 use lifecycle::{
     cancel_prestart_dispatch_for_terminal_item_in_tx, ensure_estimates_are_editable_in_tx,
     task_board_item_is_terminal,
@@ -178,7 +178,7 @@ impl AsyncDaemonDb {
                 .map_err(|error| db_error(format!("commit task board item no-op: {error}")))?;
             return Ok(None);
         }
-        ensure_read_only_item_mutation_allowed_in_tx(&mut transaction, item_id).await?;
+        ensure_workflow_item_mutation_allowed_in_tx(&mut transaction, item_id).await?;
         if item.id != item_id {
             return Err(db_error(format!(
                 "task-board mutation cannot change item id '{item_id}' to '{}'",

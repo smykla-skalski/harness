@@ -8,6 +8,8 @@ pub(super) use admission_lifecycle::release_managed_worker_admission_in_tx;
 mod aggregates;
 mod dispatch_intents;
 mod dispatch_preparations;
+mod dispatch_workflow_launch;
+mod dispatch_workflow_start;
 mod held_dispatch;
 mod import_lifecycle;
 mod imports;

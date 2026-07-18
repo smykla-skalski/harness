@@ -486,6 +486,7 @@ pub(super) async fn seed_dispatched_initial_report(label: &str) -> Fixture {
             "branch",
             "/tmp/read-only-worktree",
             Some(launch),
+            None,
         )
         .await
         .expect("complete dispatched report preparation");

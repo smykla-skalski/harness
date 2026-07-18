@@ -27,12 +27,7 @@ pub(super) async fn prepare_read_only_workflow_launch(
         is_read_only_workflow(item.workflow_kind),
         source_item_revision,
     ) {
-        (false, None) => return Ok(None),
-        (false, Some(_)) => {
-            return Err(invalid_transition(
-                "read-only workflow kind changed after dispatch reservation",
-            ));
-        }
+        (false, _) => return Ok(None),
         (true, None) => {
             return Err(invalid_transition(
                 "read-only workflow preparation has no frozen item revision",
@@ -137,10 +132,7 @@ pub(crate) async fn validate_read_only_workflow_launch(
             .worktree
             .as_deref()
             .ok_or_else(|| invalid_transition("Review workflow has no local worktree"))?;
-        let worktree = PathBuf::from(worktree);
-        spawn_blocking(move || local_head(&worktree))
-            .await
-            .map_err(|error| invalid_transition(format!("join local head resolver: {error}")))??
+        resolve_worktree_head(worktree).await?
     };
     if fresh_head != launch.exact_head_revision {
         return Err(invalid_transition(
@@ -175,11 +167,15 @@ async fn resolve_exact_head(
         let head = resolve_pr_review_head(&identity).await?;
         return Ok((Some(identity), head));
     }
-    let worktree = PathBuf::from(worktree);
-    let head = spawn_blocking(move || local_head(&worktree))
-        .await
-        .map_err(|error| invalid_transition(format!("join local head resolver: {error}")))??;
+    let head = resolve_worktree_head(worktree).await?;
     Ok((None, head))
+}
+
+pub(super) async fn resolve_worktree_head(worktree: &str) -> Result<String, CliError> {
+    let worktree = PathBuf::from(worktree);
+    spawn_blocking(move || local_head(&worktree))
+        .await
+        .map_err(|error| invalid_transition(format!("join local head resolver: {error}")))?
 }
 
 fn local_head(worktree: &Path) -> Result<String, CliError> {
@@ -194,7 +190,7 @@ fn local_head(worktree: &Path) -> Result<String, CliError> {
         .map_err(|error| invalid_transition(format!("resolve review HEAD: {error}")))
 }
 
-fn ensure_supported_runtimes(
+pub(super) fn ensure_supported_runtimes(
     reviewers: &crate::task_board::TaskBoardResolvedReviewer,
 ) -> Result<(), CliError> {
     if reviewers

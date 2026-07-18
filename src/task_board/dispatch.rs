@@ -18,8 +18,8 @@ use super::policy::{PolicyApprovalGrant, PolicyDecision};
 use super::store::TaskBoardStore;
 use super::types::{AgentMode, ExternalRef, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
 use super::{
-    TaskBoardPullRequestIdentity, TaskBoardReadOnlyRunContext, TaskBoardResolvedReviewer,
-    TaskBoardWorkflowKind,
+    TaskBoardPlanApprovalBinding, TaskBoardPlanningResult, TaskBoardPullRequestIdentity,
+    TaskBoardReadOnlyRunContext, TaskBoardResolvedReviewer, TaskBoardWorkflowKind,
 };
 
 #[path = "dispatch_lifecycle.rs"]
@@ -76,6 +76,8 @@ pub struct DispatchAppliedTask {
     pub item: TaskBoardItem,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub read_only_workflow: Option<TaskBoardReadOnlyWorkflowLaunch>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub write_workflow: Option<Box<TaskBoardWriteWorkflowLaunch>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -95,6 +97,25 @@ pub struct TaskBoardReadOnlyWorkflowLaunch {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pull_request: Option<TaskBoardPullRequestIdentity>,
     pub exact_head_revision: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskBoardWriteWorkflowLaunch {
+    pub workflow_kind: TaskBoardWorkflowKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_repository: Option<String>,
+    pub configuration_revision: u64,
+    pub policy_version: String,
+    pub resolved_reviewers: TaskBoardResolvedReviewer,
+    pub source_item_revision: i64,
+    pub prepared_item_revision: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_revision: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pull_request: Option<TaskBoardPullRequestIdentity>,
+    pub base_head_revision: String,
+    pub planning_result: TaskBoardPlanningResult,
+    pub plan_approval: TaskBoardPlanApprovalBinding,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

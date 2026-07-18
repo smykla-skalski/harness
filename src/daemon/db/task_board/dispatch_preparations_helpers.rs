@@ -87,10 +87,11 @@ pub(super) async fn active_reservation(
         if matches!(status.as_str(), "preparing" | "preparing_claimed") {
             Ok(ReservedTaskBoardDispatch::Preparing {
                 intent_id,
-                preparation: decode_preparation(&payload)?,
+                preparation: Box::new(decode_preparation(&payload)?),
             })
         } else {
             serde_json::from_str(&payload)
+                .map(Box::new)
                 .map(ReservedTaskBoardDispatch::Applied)
                 .map_err(|error| db_error(format!("decode active task board dispatch: {error}")))
         }

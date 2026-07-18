@@ -9,15 +9,15 @@ use crate::daemon::http::{
 };
 use crate::daemon::protocol::ManagedAgentSnapshot;
 use crate::errors::{CliError, CliErrorKind};
-use crate::task_board::{
-    AgentMode, DispatchAppliedTask, TaskBoardLaunchCapability,
-    validate_task_board_read_only_run_context,
-};
+use crate::task_board::{AgentMode, DispatchAppliedTask, TaskBoardLaunchCapability};
 
 const DISPATCH_CLAIM_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
 
 mod requests;
 use requests::{codex_worker_request, terminal_worker_request, worker_prompt};
+
+mod workflow_launch;
+use workflow_launch::{validate_recovered_workflow_worker, validate_workflow_launch};
 
 mod claim_settlement;
 pub(crate) use claim_settlement::settle_claimed_task_board_worker;
@@ -142,11 +142,7 @@ async fn start_worker_for_applied_task_in_lane(
     // an already-prepared intent cannot start while the kill switch is engaged.
     // Transport-agnostic because it runs before stdio/bridge selection.
     ensure_spawn_kill_switch_clear(state, &applied.board_item_id).await?;
-    crate::daemon::service::validate_read_only_workflow_launch(
-        require_async_db(state, "read-only workflow start validation")?,
-        applied,
-    )
-    .await?;
+    let workflow_revision_fence = validate_workflow_launch(state, applied).await?;
     #[cfg(test)]
     start_authorization_test_support::pause_before_final_authorization().await;
     // Keep the transaction-backed admission and item-revision fence immediately before the
@@ -157,10 +153,7 @@ async fn start_worker_for_applied_task_in_lane(
             dispatch_intent_id,
             claim_token,
             launch_capability(applied.item.agent_mode),
-            applied
-                .read_only_workflow
-                .as_ref()
-                .map(|launch| (launch.prepared_item_revision, launch.configuration_revision)),
+            workflow_revision_fence,
         )
         .await?;
     start_or_recover_worker(state, applied, dispatch_intent_id, worker_id).await
@@ -334,38 +327,8 @@ fn recover_same_applied_worker(
         ))
         .into());
     }
-    let Some(launch) = applied.read_only_workflow.as_ref() else {
-        return Ok(snapshot);
-    };
-    if validate_task_board_read_only_run_context(&launch.run_context).is_err()
-        || launch.run_context.session_id != applied.session_id
-    {
-        return Err(read_only_recovery_conflict(snapshot.agent_id()));
-    }
-    let ManagedAgentSnapshot::Codex(run) = &snapshot else {
-        return Err(read_only_recovery_conflict(snapshot.agent_id()));
-    };
-    let expected_request = codex_worker_request(applied, &run.run_id);
-    let worktree_matches = run.project_dir == launch.run_context.worktree;
-    let matches = run.board_item_id.as_deref() == Some(applied.board_item_id.as_str())
-        && run.workflow_execution_id == applied.item.workflow.execution_id
-        && run.task_id.is_none()
-        && run.mode == expected_request.mode
-        && run.prompt == expected_request.prompt
-        && run.model == expected_request.model
-        && run.effort == expected_request.effort;
-    if matches && worktree_matches {
-        Ok(snapshot)
-    } else {
-        Err(read_only_recovery_conflict(&run.run_id))
-    }
-}
-
-fn read_only_recovery_conflict(worker_id: &str) -> CliError {
-    CliErrorKind::session_agent_conflict(format!(
-        "managed worker '{worker_id}' contradicts its frozen read-only workflow request"
-    ))
-    .into()
+    validate_recovered_workflow_worker(&snapshot, applied)?;
+    Ok(snapshot)
 }
 
 async fn start_worker_by_mode(
@@ -476,14 +439,12 @@ pub(crate) fn managed_admission_owner_id(
     applied: &DispatchAppliedTask,
     dispatch_intent_id: &str,
 ) -> String {
-    applied
-        .read_only_workflow
-        .as_ref()
-        .and(applied.item.workflow.execution_id.as_deref())
-        .map_or_else(
-            || managed_worker_id(applied, dispatch_intent_id),
-            crate::daemon::db::workflow_owner,
-        )
+    let workflow = applied.read_only_workflow.is_some() || applied.write_workflow.is_some();
+    if workflow && let Some(execution_id) = applied.item.workflow.execution_id.as_deref() {
+        crate::daemon::db::workflow_owner(execution_id)
+    } else {
+        managed_worker_id(applied, dispatch_intent_id)
+    }
 }
 
 pub(crate) fn rendered_worker_prompt(

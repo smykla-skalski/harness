@@ -13,13 +13,16 @@ mod estimate_freeze_tests;
 mod read_only_revision_tests;
 #[path = "admission_dispatch_startup_reconciliation.rs"]
 mod startup_reconciliation_tests;
+#[path = "admission_dispatch_write_workflow.rs"]
+mod write_workflow_tests;
 
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ReservedTaskBoardDispatch, workflow_owner};
 use crate::daemon::protocol::CodexRunStatus;
 use crate::task_board::{
     AgentMode, DispatchPlan, SpawnGateSwitches, TaskBoardAdmissionDecision,
     TaskBoardAutomationPolicy, TaskBoardItem, TaskBoardPolicyLimit, TaskBoardPolicyScope,
-    TaskBoardReadOnlyWorkflowLaunch, TaskBoardWorkflowKind, build_dispatch_plans_with_policy,
+    TaskBoardReadOnlyWorkflowLaunch, TaskBoardWorkflowKind, TaskBoardWriteWorkflowLaunch,
+    bind_plan_approval, build_dispatch_plans_with_policy, build_planning_result,
     resolve_task_board_reviewers,
 };
 

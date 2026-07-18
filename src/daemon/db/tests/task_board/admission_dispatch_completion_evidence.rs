@@ -38,6 +38,7 @@ async fn read_only_dispatch_atomically_starts_workflow_with_exact_completion_evi
             "branch",
             "/tmp/worktree",
             Some(launch),
+            None,
         )
         .await
         .expect("complete preparation");

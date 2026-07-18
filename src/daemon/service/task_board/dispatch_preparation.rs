@@ -18,7 +18,7 @@ use crate::session::storage as session_storage;
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionState};
 use crate::task_board::{
     DispatchAppliedTask, DispatchFailureKind, DispatchPlan, SessionIntent,
-    TaskBoardReadOnlyWorkflowLaunch,
+    TaskBoardReadOnlyWorkflowLaunch, TaskBoardWriteWorkflowLaunch,
 };
 use crate::workspace::adopter::SessionAdopter;
 use crate::workspace::layout::SessionLayout;
@@ -40,7 +40,7 @@ pub(super) async fn reserve_and_prepare_task_board_dispatch(
         .await
         .map_err(|error| (DispatchFailureKind::LinkItem, error))?;
     let (intent_id, _) = match reserved {
-        ReservedTaskBoardDispatch::Applied(applied) => return Ok(applied),
+        ReservedTaskBoardDispatch::Applied(applied) => return Ok(*applied),
         ReservedTaskBoardDispatch::Blocked(admission) => {
             return Err((
                 DispatchFailureKind::LinkItem,
@@ -98,6 +98,7 @@ pub(crate) async fn prepare_claimed_task_board_dispatch(
         &checkout.branch,
         &checkout.worktree,
         checkout.read_only_workflow,
+        checkout.write_workflow,
     )
     .await
     .map_err(|error| (DispatchFailureKind::LinkItem, error))
@@ -107,6 +108,7 @@ struct DispatchCheckout {
     branch: String,
     worktree: String,
     read_only_workflow: Option<TaskBoardReadOnlyWorkflowLaunch>,
+    write_workflow: Option<Box<TaskBoardWriteWorkflowLaunch>>,
 }
 
 async fn prepare_dispatch_side_effects(
@@ -143,10 +145,21 @@ async fn prepare_dispatch_side_effects(
     .boxed()
     .await
     .map_err(|error| (DispatchFailureKind::LinkItem, error))?;
+    let write_workflow = super::write_workflow_launch::prepare_write_workflow_launch(
+        db,
+        &claim.preparation.board_item_id,
+        &claim.preparation.workflow_execution_id,
+        &worktree,
+        claim.preparation.source_item_revision,
+    )
+    .boxed()
+    .await
+    .map_err(|error| (DispatchFailureKind::LinkItem, error))?;
     Ok(DispatchCheckout {
         branch: resolved.state.branch_ref,
         worktree,
         read_only_workflow,
+        write_workflow,
     })
 }
 

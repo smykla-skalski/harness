@@ -40,6 +40,7 @@ async fn read_only_completion_rechecks_configuration_before_mutation_and_can_com
             "branch",
             "/tmp/worktree",
             Some(launch),
+            None,
         )
         .await
         .expect("publish read-only launch");
@@ -114,7 +115,10 @@ async fn read_only_completion_rechecks_configuration_before_mutation_and_can_com
     )
     .await
     .expect("finalize compensation after worker stop");
-    assert_eq!(ledger_kind_state(&db, &intent, "concurrency").await, "released");
+    assert_eq!(
+        ledger_kind_state(&db, &intent, "concurrency").await,
+        "released"
+    );
     assert_eq!(ledger_kind_state(&db, &intent, "rate").await, "committed");
     assert_eq!(intent_status(&db, &intent).await, "failed");
 }

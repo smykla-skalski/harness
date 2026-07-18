@@ -3,11 +3,13 @@ use uuid::Uuid;
 
 use super::ITEMS_CHANGE_SCOPE;
 use super::admission_lifecycle::{
-    TaskBoardAdmissionCheck, commit_dispatch_admission_in_tx, revalidate_dispatch_admission_in_tx,
-    validate_worker_start_fence_in_tx,
+    commit_dispatch_admission_in_tx, validate_worker_start_fence_in_tx,
+};
+use super::dispatch_workflow_start::{
+    insert_started_workflow_in_tx, load_claimed_applied, validate_pending_dispatch,
+    workflow_start_fence,
 };
 use super::items::{bump_change_in_tx, load_item_in_tx, replace_item_in_tx};
-use super::workflow_dispatch::insert_started_read_only_workflow_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error, utc_now};
 use crate::infra::io;
 use crate::task_board::dispatch::DispatchLifecycle;
@@ -16,8 +18,7 @@ use crate::task_board::{DispatchAppliedTask, TaskBoardStatus, TaskBoardWorkflowS
 const CLAIM_LEASE_SECONDS: i64 = 30;
 
 #[path = "dispatch_intents_helpers.rs"]
-mod helpers;
-use helpers::refuse_pending_admission_in_tx;
+pub(super) mod helpers;
 
 #[derive(Debug)]
 pub(crate) enum TaskBoardDispatchClaimAction {
@@ -88,6 +89,7 @@ impl AsyncDaemonDb {
             lifecycle: lifecycle.clone(),
             item,
             read_only_workflow: None,
+            write_workflow: None,
         };
         insert_intent(&mut transaction, &applied).await?;
         bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
@@ -238,8 +240,7 @@ impl AsyncDaemonDb {
             .await?;
         let (item_id, session_id, work_item_id, execution_id) =
             claimed_intent_identity(&mut transaction, intent_id, claim_token).await?;
-        let read_only_launch =
-            claimed_intent_read_only_launch(&mut transaction, intent_id, claim_token).await?;
+        let applied = load_claimed_applied(&mut transaction, intent_id, claim_token).await?;
         let (mut item, revision) = load_item_in_tx(&mut transaction, &item_id)
             .await?
             .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
@@ -251,10 +252,12 @@ impl AsyncDaemonDb {
                 "task board dispatch intent '{intent_id}' no longer matches its item linkage"
             )));
         }
-        if let Some(launch) = read_only_launch.as_ref() {
+        if let Some((prepared_item_revision, configuration_revision)) =
+            workflow_start_fence(&applied)?
+        {
             validate_worker_start_fence_in_tx(
                 &mut transaction,
-                Some((launch.prepared_item_revision, launch.configuration_revision)),
+                Some((prepared_item_revision, configuration_revision)),
                 revision,
             )
             .await?;
@@ -265,16 +268,8 @@ impl AsyncDaemonDb {
         item.workflow.last_error = None;
         item.updated_at = utc_now();
         replace_item_in_tx(&mut transaction, &item, revision + 1).await?;
-        if let Some(launch) = read_only_launch.as_ref() {
-            insert_started_read_only_workflow_in_tx(
-                &mut transaction,
-                &item,
-                revision + 1,
-                intent_id,
-                launch,
-            )
+        insert_started_workflow_in_tx(&mut transaction, &item, revision + 1, intent_id, &applied)
             .await?;
-        }
         bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
         let now = utc_now();
         let changed = query(
@@ -302,87 +297,6 @@ impl AsyncDaemonDb {
             .map_err(|error| db_error(format!("commit task board dispatch completion: {error}")))?;
         Ok(item)
     }
-}
-
-async fn claimed_intent_read_only_launch(
-    transaction: &mut Transaction<'_, Sqlite>,
-    intent_id: &str,
-    claim_token: &str,
-) -> Result<Option<crate::task_board::TaskBoardReadOnlyWorkflowLaunch>, CliError> {
-    let payload = query_as::<_, (String,)>(
-        "SELECT payload_json FROM task_board_dispatch_intents
-         WHERE intent_id = ?1 AND claim_token = ?2 AND status = 'starting'",
-    )
-    .bind(intent_id)
-    .bind(claim_token)
-    .fetch_one(transaction.as_mut())
-    .await
-    .map_err(|error| db_error(format!("load claimed read-only workflow launch: {error}")))?
-    .0;
-    decode_applied(&payload).map(|applied| applied.read_only_workflow)
-}
-
-async fn validate_pending_dispatch(
-    transaction: &mut Transaction<'_, Sqlite>,
-    board_item_id: &str,
-    intent_id: &str,
-    applied: &DispatchAppliedTask,
-    consumed_approval_grant_id: Option<&str>,
-) -> Result<(), CliError> {
-    let (item, item_revision) = load_item_in_tx(transaction, board_item_id)
-        .await?
-        .ok_or_else(|| db_error(format!("task-board item '{board_item_id}' not found")))?;
-    if let Some(launch) = applied.read_only_workflow.as_ref() {
-        crate::task_board::validate_task_board_read_only_item_revisions(
-            launch.source_item_revision,
-            launch.prepared_item_revision,
-        )
-        .map_err(|error| db_error(error.to_string()))?;
-        if item_revision != launch.prepared_item_revision {
-            let error = CliError::from(CliErrorKind::invalid_transition(
-                "read-only workflow item revision changed before worker claim",
-            ));
-            refuse_pending_admission_in_tx(
-                transaction,
-                intent_id,
-                applied,
-                consumed_approval_grant_id,
-                &error.to_string(),
-            )
-            .await?;
-            return Err(error);
-        }
-    }
-    if let Err(error) = ensure_dispatch_item_startable(
-        &item,
-        &applied.session_id,
-        &applied.work_item_id,
-        applied.item.workflow.execution_id.as_deref(),
-    ) {
-        refuse_pending_admission_in_tx(
-            transaction,
-            intent_id,
-            applied,
-            consumed_approval_grant_id,
-            &error.to_string(),
-        )
-        .await?;
-        return Err(error);
-    }
-    if let TaskBoardAdmissionCheck::Blocked(admission) =
-        revalidate_dispatch_admission_in_tx(transaction, intent_id, &item, item_revision).await?
-    {
-        refuse_pending_admission_in_tx(
-            transaction,
-            intent_id,
-            applied,
-            consumed_approval_grant_id,
-            &admission.refusal_message(),
-        )
-        .await?;
-        return Err(CliErrorKind::invalid_transition(admission.refusal_message()).into());
-    }
-    Ok(())
 }
 
 pub(super) fn ensure_dispatch_item_startable(

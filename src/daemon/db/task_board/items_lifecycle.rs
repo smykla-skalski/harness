@@ -29,7 +29,7 @@ pub(super) async fn ensure_estimates_are_editable_in_tx(
     Ok(())
 }
 
-pub(crate) async fn ensure_read_only_item_mutation_allowed_in_tx(
+pub(crate) async fn ensure_workflow_item_mutation_allowed_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     item_id: &str,
 ) -> Result<(), CliError> {
@@ -37,7 +37,8 @@ pub(crate) async fn ensure_read_only_item_mutation_allowed_in_tx(
         "SELECT EXISTS(
              SELECT 1 FROM task_board_dispatch_intents
              WHERE item_id = ?1 AND status = 'starting'
-               AND json_type(payload_json, '$.read_only_workflow') = 'object'
+               AND (json_type(payload_json, '$.read_only_workflow') = 'object'
+                    OR json_type(payload_json, '$.write_workflow') = 'object')
              UNION ALL
              SELECT 1 FROM task_board_workflow_executions AS execution
              JOIN task_board_execution_attempts AS attempt
@@ -49,10 +50,10 @@ pub(crate) async fn ensure_read_only_item_mutation_allowed_in_tx(
     .bind(item_id)
     .fetch_one(transaction.as_mut())
     .await
-    .map_err(|error| db_error(format!("check read-only worker start claim: {error}")))?;
+    .map_err(|error| db_error(format!("check workflow side-effect claim: {error}")))?;
     if side_effect_claimed {
         return Err(CliErrorKind::invalid_transition(format!(
-            "task-board item '{item_id}' cannot change while its read-only side effect is claimed"
+            "task-board item '{item_id}' cannot change while its workflow side effect is claimed"
         ))
         .into());
     }

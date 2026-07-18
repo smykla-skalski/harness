@@ -26,8 +26,8 @@ pub use automation::*;
 pub use dispatch::{
     DispatchAppliedTask, DispatchBlockReason, DispatchExecutionSummary, DispatchFailure,
     DispatchFailureKind, DispatchPlan, DispatchReadiness, EvaluatorIntent, FollowUpPhase,
-    ReviewerIntent, SessionIntent, TaskBoardReadOnlyWorkflowLaunch, TaskCreationIntent,
-    WorkerIntent,
+    ReviewerIntent, SessionIntent, TaskBoardReadOnlyWorkflowLaunch, TaskBoardWriteWorkflowLaunch,
+    TaskCreationIntent, WorkerIntent,
 };
 #[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use dispatch::{
