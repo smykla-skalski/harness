@@ -110,11 +110,26 @@ pub struct TaskBoardReviewResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TaskBoardImplementationResult {
+    pub revision_cycle: u32,
+    pub base_head_revision: String,
+    pub head_revision: String,
+    pub summary: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub evidence: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskBoardEvaluationResult {
     pub verdict: TaskBoardPhaseVerdict,
     pub summary: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub evidence: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head_revision: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revision_cycle: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

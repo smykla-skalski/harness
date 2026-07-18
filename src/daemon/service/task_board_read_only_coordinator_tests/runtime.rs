@@ -62,6 +62,8 @@ impl PlannedReport {
                 verdict: TaskBoardPhaseVerdict::Pass,
                 summary: "durable review evidence passed evaluation".into(),
                 evidence: vec!["review was bound to the frozen head".into()],
+                head_revision: None,
+                revision_cycle: None,
             }),
             status: CodexRunStatus::Completed,
         }

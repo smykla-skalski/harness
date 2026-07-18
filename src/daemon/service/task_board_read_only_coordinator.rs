@@ -72,10 +72,26 @@ where
     let mut seen = BTreeSet::new();
     let recoverable = db.recoverable_task_board_workflow_executions(limit).await?;
     for execution in recoverable {
-        reconcile_candidate(db, runtime, execution, now, &mut seen, &mut report).await;
+        Box::pin(reconcile_candidate(
+            db,
+            runtime,
+            execution,
+            now,
+            &mut seen,
+            &mut report,
+        ))
+        .await;
     }
     for execution in db.ready_task_board_workflow_executions(now, limit).await? {
-        reconcile_candidate(db, runtime, execution, now, &mut seen, &mut report).await;
+        Box::pin(reconcile_candidate(
+            db,
+            runtime,
+            execution,
+            now,
+            &mut seen,
+            &mut report,
+        ))
+        .await;
     }
     Ok(report)
 }

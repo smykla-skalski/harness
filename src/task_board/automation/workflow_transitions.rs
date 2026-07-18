@@ -11,6 +11,16 @@ const PR_REVIEW_PHASES: [TaskBoardExecutionPhase; 4] = [
     TaskBoardExecutionPhase::Cleanup,
     TaskBoardExecutionPhase::Terminal,
 ];
+const WRITE_PHASES: [TaskBoardExecutionPhase; 8] = [
+    TaskBoardExecutionPhase::Planning,
+    TaskBoardExecutionPhase::AwaitingApproval,
+    TaskBoardExecutionPhase::Implementation,
+    TaskBoardExecutionPhase::Review,
+    TaskBoardExecutionPhase::Evaluate,
+    TaskBoardExecutionPhase::Publish,
+    TaskBoardExecutionPhase::Cleanup,
+    TaskBoardExecutionPhase::Terminal,
+];
 const REVIEW_PHASES: [TaskBoardExecutionPhase; 4] = [
     TaskBoardExecutionPhase::Review,
     TaskBoardExecutionPhase::Evaluate,
@@ -54,6 +64,8 @@ pub enum TaskBoardWorkflowTransitionError {
     NoAdmittedPhase,
     #[error("workflow is already terminal")]
     AlreadyTerminal,
+    #[error("workflow does not support an implementation revision cycle")]
+    RevisionCycleUnsupported,
     #[error("phase '{phase:?}' does not belong to workflow '{workflow_kind:?}'")]
     InvalidPhase {
         workflow_kind: TaskBoardWorkflowKind,
@@ -66,11 +78,10 @@ pub const fn task_board_workflow_phases(
     workflow_kind: TaskBoardWorkflowKind,
 ) -> &'static [TaskBoardExecutionPhase] {
     match workflow_kind {
+        TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix => &WRITE_PHASES,
         TaskBoardWorkflowKind::PrReview => &PR_REVIEW_PHASES,
         TaskBoardWorkflowKind::Review => &REVIEW_PHASES,
-        TaskBoardWorkflowKind::Unknown
-        | TaskBoardWorkflowKind::DefaultTask
-        | TaskBoardWorkflowKind::PrFix => &[],
+        TaskBoardWorkflowKind::Unknown => &[],
     }
 }
 
@@ -84,13 +95,10 @@ pub fn validate_task_board_workflow_transition_state(
     state: &TaskBoardWorkflowTransitionState,
 ) -> Result<(), TaskBoardWorkflowTransitionError> {
     let Some(phase) = state.phase else {
-        return if matches!(
-            state.workflow_kind,
-            TaskBoardWorkflowKind::PrReview | TaskBoardWorkflowKind::Review
-        ) {
-            Err(TaskBoardWorkflowTransitionError::NoAdmittedPhase)
-        } else {
+        return if state.workflow_kind == TaskBoardWorkflowKind::Unknown {
             Ok(())
+        } else {
+            Err(TaskBoardWorkflowTransitionError::NoAdmittedPhase)
         };
     };
     if !task_board_workflow_phases(state.workflow_kind).contains(&phase) {
@@ -123,12 +131,18 @@ pub fn start_task_board_workflow(
     };
     let pull_request = normalize_pull_request(pull_request)?;
     let exact_head_revision = normalize_head(exact_head_revision)?;
-    if workflow_kind == TaskBoardWorkflowKind::PrReview && pull_request.is_none() {
+    if matches!(
+        workflow_kind,
+        TaskBoardWorkflowKind::PrFix | TaskBoardWorkflowKind::PrReview
+    ) && pull_request.is_none()
+    {
         return Err(TaskBoardWorkflowTransitionError::MissingPullRequestIdentity);
     }
     if matches!(
         workflow_kind,
-        TaskBoardWorkflowKind::PrReview | TaskBoardWorkflowKind::Review
+        TaskBoardWorkflowKind::PrFix
+            | TaskBoardWorkflowKind::PrReview
+            | TaskBoardWorkflowKind::Review
     ) && exact_head_revision.is_none()
     {
         return Err(TaskBoardWorkflowTransitionError::MissingHeadRevision);
@@ -139,6 +153,38 @@ pub fn start_task_board_workflow(
         execution_state: state_for_phase(phase),
         pull_request,
         exact_head_revision,
+    })
+}
+
+/// Restart a write workflow at implementation after review or evaluation requested changes.
+///
+/// # Errors
+///
+/// Returns an error unless the workflow is a supported write kind in Review or Evaluate.
+pub fn restart_task_board_workflow_revision(
+    state: &TaskBoardWorkflowTransitionState,
+) -> Result<TaskBoardWorkflowTransitionState, TaskBoardWorkflowTransitionError> {
+    if !matches!(
+        state.workflow_kind,
+        TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
+    ) || !matches!(
+        state.phase,
+        Some(TaskBoardExecutionPhase::Review | TaskBoardExecutionPhase::Evaluate)
+    ) {
+        return Err(TaskBoardWorkflowTransitionError::RevisionCycleUnsupported);
+    }
+    validate_state_invariants(
+        state,
+        state
+            .phase
+            .ok_or(TaskBoardWorkflowTransitionError::RevisionCycleUnsupported)?,
+    )?;
+    Ok(TaskBoardWorkflowTransitionState {
+        workflow_kind: state.workflow_kind,
+        phase: Some(TaskBoardExecutionPhase::Implementation),
+        execution_state: TaskBoardExecutionState::Pending,
+        pull_request: state.pull_request.clone(),
+        exact_head_revision: state.exact_head_revision.clone(),
     })
 }
 
@@ -197,7 +243,10 @@ fn transitioned_pull_request(
     let observed = normalize_pull_request(observed)?;
     if let (Some(expected), Some(actual)) = (&expected, &observed)
         && expected != actual
-        && state.workflow_kind == TaskBoardWorkflowKind::PrReview
+        && matches!(
+            state.workflow_kind,
+            TaskBoardWorkflowKind::PrFix | TaskBoardWorkflowKind::PrReview
+        )
     {
         return Err(TaskBoardWorkflowTransitionError::PullRequestIdentityChanged);
     }
@@ -227,11 +276,18 @@ fn validate_state_invariants(
     phase: TaskBoardExecutionPhase,
 ) -> Result<(), TaskBoardWorkflowTransitionError> {
     let pull_request = normalize_pull_request(state.pull_request.as_ref())?;
-    if state.workflow_kind == TaskBoardWorkflowKind::PrReview && pull_request.is_none() {
+    if matches!(
+        state.workflow_kind,
+        TaskBoardWorkflowKind::PrFix | TaskBoardWorkflowKind::PrReview
+    ) && pull_request.is_none()
+    {
         return Err(TaskBoardWorkflowTransitionError::MissingPullRequestIdentity);
     }
     let head = normalize_head(state.exact_head_revision.as_deref())?;
-    if exact_head_is_frozen(state.workflow_kind, phase) && head.is_none() {
+    if (state.workflow_kind == TaskBoardWorkflowKind::PrFix
+        || exact_head_is_frozen(state.workflow_kind, phase))
+        && head.is_none()
+    {
         return Err(TaskBoardWorkflowTransitionError::MissingHeadRevision);
     }
     Ok(())
@@ -241,10 +297,16 @@ const fn exact_head_is_frozen(
     workflow_kind: TaskBoardWorkflowKind,
     phase: TaskBoardExecutionPhase,
 ) -> bool {
-    let _ = phase;
     matches!(
         workflow_kind,
         TaskBoardWorkflowKind::PrReview | TaskBoardWorkflowKind::Review
+    ) || matches!(
+        phase,
+        TaskBoardExecutionPhase::Review
+            | TaskBoardExecutionPhase::Evaluate
+            | TaskBoardExecutionPhase::Publish
+            | TaskBoardExecutionPhase::Cleanup
+            | TaskBoardExecutionPhase::Terminal
     )
 }
 

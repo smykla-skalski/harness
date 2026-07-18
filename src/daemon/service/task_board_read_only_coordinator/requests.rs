@@ -140,6 +140,8 @@ fn evaluation_prompt(
             verdict: TaskBoardPhaseVerdict::Pass,
             summary: "concise evaluation conclusion".into(),
             evidence: vec!["exact-head review evidence supporting the verdict".into()],
+            head_revision: None,
+            revision_cycle: None,
         }),
     };
     let evidence = serde_json::to_string_pretty(&execution.artifacts.review_cycles)

@@ -16,6 +16,7 @@ mod wake;
 mod workflow;
 mod workflow_execution;
 mod workflow_execution_validation;
+mod workflow_execution_write_validation;
 mod workflow_transitions;
 
 pub use admission::*;
@@ -50,3 +51,5 @@ mod policy_compiler_tests;
 mod reviewer_resolution_tests;
 #[cfg(test)]
 mod workflow_transition_tests;
+#[cfg(test)]
+mod workflow_write_validation_tests;

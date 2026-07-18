@@ -62,6 +62,14 @@ where
             validate_lifecycle_artifact(execution, attempt, result.terminal)?;
             advance(db, execution, revisions, now).await?;
         }
+        Some(
+            TaskBoardAttemptResultArtifact::Planning(_)
+            | TaskBoardAttemptResultArtifact::Implementation(_),
+        ) => {
+            return Err(invalid_transition(
+                "read-only workflow received a write result artifact",
+            ));
+        }
         None => {
             return Err(invalid_transition(
                 "completed attempt has no result artifact",

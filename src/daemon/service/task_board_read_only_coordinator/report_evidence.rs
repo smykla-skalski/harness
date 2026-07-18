@@ -123,6 +123,8 @@ fn artifact_matches(
                     == Some(outcome.result.head_revision.as_str())
         }
         TaskBoardAttemptResultArtifact::Evaluation(_) => attempt.action_key == "evaluate",
-        TaskBoardAttemptResultArtifact::Lifecycle(_) => false,
+        TaskBoardAttemptResultArtifact::Lifecycle(_)
+        | TaskBoardAttemptResultArtifact::Planning(_)
+        | TaskBoardAttemptResultArtifact::Implementation(_) => false,
     }
 }

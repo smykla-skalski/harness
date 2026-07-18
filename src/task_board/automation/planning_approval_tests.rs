@@ -13,6 +13,7 @@ pub(super) fn snapshot() -> TaskBoardWorkflowSnapshot {
             max_revision_cycles: 3,
             profiles: vec![TaskBoardReviewerProfile::default()],
         },
+        read_only_run_context: None,
         provider_revision: Some("remote-3".into()),
     }
 }
