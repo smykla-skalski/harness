@@ -58,7 +58,7 @@ impl ExternalSyncClient for FenceClient {
         self.calls.updates.fetch_add(1, Ordering::SeqCst);
         Ok(ExternalUpdateOutcome::Applied {
             reference: reference.clone(),
-            provider_revision: Some("provider-revision-2".into()),
+            provider_revision: ExternalRevisionUpdate::Set("provider-revision-2".into()),
         })
     }
 

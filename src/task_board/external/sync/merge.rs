@@ -6,9 +6,9 @@ use crate::workspace::utc_now;
 
 use crate::task_board::external::targeting::provider_project_maps_to_board;
 use crate::task_board::external::{
-    ExternalProvider, ExternalProviderCapabilities, ExternalSyncAction, ExternalSyncField,
-    ExternalSyncOperation, ExternalTask, ExternalTaskRef, canonical_external_status,
-    local_external_status,
+    ExternalProvider, ExternalProviderCapabilities, ExternalRevisionUpdate, ExternalSyncAction,
+    ExternalSyncField, ExternalSyncOperation, ExternalTask, ExternalTaskRef,
+    canonical_external_status, local_external_status,
 };
 
 pub(super) fn has_reported_conflict(
@@ -68,7 +68,7 @@ pub(super) fn replace_synced_ref(
     current: &ExternalTaskRef,
     updated: &ExternalTaskRef,
     changed_fields: &[ExternalSyncField],
-    provider_revision: Option<&str>,
+    provider_revision: &ExternalRevisionUpdate,
 ) -> Vec<ExternalRef> {
     let provider = current.provider.into();
     item.external_refs
@@ -164,7 +164,7 @@ fn synced_ref_from_update(
     updated: ExternalTaskRef,
     item: &TaskBoardItem,
     changed_fields: &[ExternalSyncField],
-    provider_revision: Option<&str>,
+    provider_revision: &ExternalRevisionUpdate,
 ) -> ExternalRef {
     let mut reference = updated.into_core_ref();
     let mut state = current.sync_state.clone().unwrap_or_default();
@@ -181,9 +181,7 @@ fn synced_ref_from_update(
     if changed_fields.contains(&ExternalSyncField::Project) {
         state.project_id.clone_from(&item.project_id);
     }
-    if let Some(provider_revision) = provider_revision {
-        state.updated_at = Some(provider_revision.to_owned());
-    }
+    state.updated_at = provider_revision.resolve(state.updated_at.as_deref());
     state.synced_at = Some(utc_now());
     reference.sync_state = Some(state);
     reference
@@ -354,7 +352,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn status_only_update_preserves_known_provider_revision() {
+    fn revision_update_distinguishes_preserve_set_and_clear() {
         let mut item = TaskBoardItem::new(
             "task-1".into(),
             "Title".into(),
@@ -374,20 +372,49 @@ mod tests {
         });
         item.external_refs = vec![core_reference];
 
-        let refs = replace_synced_ref(
+        let preserved = replace_synced_ref(
             &item,
             &reference,
             &reference,
-            &[ExternalSyncField::Status],
-            None,
+            &[],
+            &ExternalRevisionUpdate::Preserve,
         );
-
         assert_eq!(
-            refs[0]
+            preserved[0]
                 .sync_state
                 .as_ref()
                 .and_then(|state| state.updated_at.as_deref()),
             Some("provider-revision-1")
+        );
+
+        let set = replace_synced_ref(
+            &item,
+            &reference,
+            &reference,
+            &[ExternalSyncField::Status],
+            &ExternalRevisionUpdate::Set("provider-revision-2".into()),
+        );
+        assert_eq!(
+            set[0]
+                .sync_state
+                .as_ref()
+                .and_then(|state| state.updated_at.as_deref()),
+            Some("provider-revision-2")
+        );
+
+        let cleared = replace_synced_ref(
+            &item,
+            &reference,
+            &reference,
+            &[ExternalSyncField::Status],
+            &ExternalRevisionUpdate::Clear,
+        );
+        assert_eq!(
+            cleared[0]
+                .sync_state
+                .as_ref()
+                .and_then(|state| state.updated_at.as_deref()),
+            None
         );
     }
 }

@@ -438,7 +438,7 @@ impl ExternalSyncClient for UpdateFakeSyncClient {
             .push((reference.external_id.clone(), update.changed_fields));
         Ok(ExternalUpdateOutcome::Applied {
             reference: reference.clone(),
-            provider_revision: Some("provider-revision-2".into()),
+            provider_revision: ExternalRevisionUpdate::Set("provider-revision-2".into()),
         })
     }
 }

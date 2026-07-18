@@ -100,7 +100,7 @@ fn assert_status_update_reference(outcome: ExternalUpdateOutcome) {
         reference.url.as_deref(),
         Some("https://app.todoist.com/app/task/remote-1")
     );
-    assert_eq!(provider_revision, None);
+    assert_eq!(provider_revision, ExternalRevisionUpdate::Clear);
 }
 
 #[tokio::test]
@@ -168,7 +168,7 @@ async fn todoist_update_task_posts_changed_metadata_payload() {
         reference.url.as_deref(),
         Some("https://app.todoist.com/app/task/remote-1")
     );
-    assert_eq!(provider_revision, None);
+    assert_eq!(provider_revision, ExternalRevisionUpdate::Clear);
     handle.join().expect("mock server");
     let captured = captured.lock().expect("captured request");
     assert_eq!(captured.path, "/tasks/remote-1");

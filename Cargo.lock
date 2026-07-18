@@ -117,7 +117,7 @@ dependencies = [
 
 [[package]]
 name = "aff"
-version = "48.5.0"
+version = "49.0.0"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -3535,7 +3535,7 @@ dependencies = [
 
 [[package]]
 name = "harness"
-version = "48.5.0"
+version = "49.0.0"
 dependencies = [
  "agent-client-protocol",
  "arc-swap",
@@ -3625,7 +3625,7 @@ dependencies = [
 
 [[package]]
 name = "harness-bridge"
-version = "48.5.0"
+version = "49.0.0"
 dependencies = [
  "agent-client-protocol",
  "async-trait",
@@ -3662,7 +3662,7 @@ dependencies = [
 
 [[package]]
 name = "harness-command"
-version = "48.5.0"
+version = "49.0.0"
 dependencies = [
  "tempfile",
  "uzers",
@@ -3670,7 +3670,7 @@ dependencies = [
 
 [[package]]
 name = "harness-daemon"
-version = "48.5.0"
+version = "49.0.0"
 dependencies = [
  "agent-client-protocol",
  "arc-swap",
@@ -3745,7 +3745,7 @@ dependencies = [
 
 [[package]]
 name = "harness-daemon-client"
-version = "48.5.0"
+version = "49.0.0"
 dependencies = [
  "fs2",
  "reqwest",
@@ -3761,7 +3761,7 @@ dependencies = [
 
 [[package]]
 name = "harness-hook"
-version = "48.5.0"
+version = "49.0.0"
 dependencies = [
  "chrono",
  "clap",
@@ -3793,7 +3793,7 @@ dependencies = [
 
 [[package]]
 name = "harness-mcp"
-version = "48.5.0"
+version = "49.0.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -3816,7 +3816,7 @@ dependencies = [
 
 [[package]]
 name = "harness-protocol"
-version = "48.5.0"
+version = "49.0.0"
 dependencies = [
  "clap",
  "serde",
@@ -3826,7 +3826,7 @@ dependencies = [
 
 [[package]]
 name = "harness-systemd"
-version = "48.5.0"
+version = "49.0.0"
 dependencies = [
  "assert_cmd",
  "chrono",
@@ -3852,7 +3852,7 @@ dependencies = [
 
 [[package]]
 name = "harness-systemd-protocol"
-version = "48.5.0"
+version = "49.0.0"
 dependencies = [
  "nix 0.31.3",
  "temp-env",
@@ -3862,7 +3862,7 @@ dependencies = [
 
 [[package]]
 name = "harness-telemetry"
-version = "48.5.0"
+version = "49.0.0"
 dependencies = [
  "axum",
  "chrono",
@@ -3888,7 +3888,7 @@ dependencies = [
 
 [[package]]
 name = "harness-testkit"
-version = "48.5.0"
+version = "49.0.0"
 dependencies = [
  "temp-env",
  "tempfile",

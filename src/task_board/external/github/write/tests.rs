@@ -115,7 +115,10 @@ async fn matching_github_precondition_reads_fresh_then_patches() {
     else {
         panic!("matching precondition must apply");
     };
-    assert_eq!(provider_revision.as_deref(), Some("provider-revision-2"));
+    assert_eq!(
+        provider_revision,
+        ExternalRevisionUpdate::Set("provider-revision-2".into())
+    );
     let captured = captured.lock().expect("captured requests");
     assert_eq!(captured.len(), 3);
     assert_eq!(captured[0].method, "POST");
@@ -126,6 +129,77 @@ async fn matching_github_precondition_reads_fresh_then_patches() {
         serde_json::from_str::<serde_json::Value>(&captured[2].body).expect("request body")["title"],
         "Local edit"
     );
+}
+
+#[tokio::test]
+async fn canonical_repository_mismatch_rejects_update_before_remote_mutation() {
+    let client = sync_client("http://127.0.0.1:0");
+    let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "other/widgets#17");
+
+    let error = client
+        .update_task(
+            &local_item(),
+            &reference,
+            ExternalTaskUpdate::new(vec![ExternalSyncField::Title]),
+        )
+        .await
+        .expect_err("repository mismatch must fail closed");
+
+    assert_repository_mismatch(&error);
+}
+
+#[tokio::test]
+async fn canonical_repository_mismatch_rejects_delete_before_remote_mutation() {
+    let client = sync_client("http://127.0.0.1:0");
+    let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "other/widgets#17");
+
+    let error = client
+        .delete_task(&local_item(), &reference)
+        .await
+        .expect_err("repository mismatch must fail closed");
+
+    assert_repository_mismatch(&error);
+}
+
+#[tokio::test]
+async fn matching_canonical_and_legacy_issue_references_remain_compatible() {
+    let _guard = acquire_global_budget_test_lock().await;
+    let (endpoint, captured, handle) = spawn_sequence_mock(vec![
+        issue_response("Local edit", "Remote body", "open", "revision-2"),
+        issue_response("Local edit", "Remote body", "open", "revision-3"),
+        issue_response("Local edit", "Remote body", "closed", "revision-4"),
+    ]);
+    let client = sync_client(&endpoint);
+    let item = local_item();
+
+    for external_id in ["AcMe/WIDGETS#17", "#17"] {
+        client
+            .update_task(
+                &item,
+                &ExternalTaskRef::new(ExternalProvider::GitHub, external_id),
+                ExternalTaskUpdate::new(vec![ExternalSyncField::Title]),
+            )
+            .await
+            .expect("compatible issue reference");
+    }
+    client
+        .delete_task(&item, &ExternalTaskRef::new(ExternalProvider::GitHub, "17"))
+        .await
+        .expect("legacy bare issue reference");
+
+    handle.join().expect("mock server");
+    let captured = captured.lock().expect("captured requests");
+    assert_eq!(captured.len(), 3);
+    assert!(captured.iter().all(|request| {
+        request.method == "PATCH" && request.path == "/repos/acme/widgets/issues/17"
+    }));
+}
+
+fn assert_repository_mismatch(error: &CliError) {
+    assert_eq!(error.code(), "WORKFLOW_PARSE");
+    let message = error.to_string();
+    assert!(message.contains("other/widgets"), "{message}");
+    assert!(message.contains("acme/widgets"), "{message}");
 }
 
 fn sync_client(endpoint: &str) -> GitHubSyncClient {
