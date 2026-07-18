@@ -25,12 +25,18 @@ pub fn task_board_attempt_retry_decision(
         return TaskBoardAttemptRetryDecision::HumanRequired;
     }
     let delay_seconds = retry_delay_seconds(settings, stable_key, failed_attempt);
-    let delay = Duration::seconds(i64::try_from(delay_seconds).unwrap_or(i64::MAX));
+    let Some(available_at) = i64::try_from(delay_seconds)
+        .ok()
+        .and_then(Duration::try_seconds)
+        .and_then(|delay| now.checked_add_signed(delay))
+    else {
+        return TaskBoardAttemptRetryDecision::HumanRequired;
+    };
     TaskBoardAttemptRetryDecision::Retry(TaskBoardRetrySchedule {
         action_key: action_key.to_string(),
         next_attempt: failed_attempt.saturating_add(1),
         failure_class,
-        available_at: (now + delay).to_rfc3339(),
+        available_at: available_at.to_rfc3339(),
     })
 }
 
@@ -131,6 +137,45 @@ mod tests {
                 TaskBoardAttemptRetryDecision::HumanRequired
             );
         }
+    }
+
+    #[test]
+    fn retry_timestamp_overflow_requires_human() {
+        assert_eq!(
+            task_board_attempt_retry_decision(
+                &TaskBoardAutomationRetrySettings::default(),
+                "execution:reviewer",
+                "review:reviewer",
+                1,
+                TaskBoardFailureClass::Transient,
+                DateTime::<Utc>::MAX_UTC,
+            ),
+            TaskBoardAttemptRetryDecision::HumanRequired
+        );
+    }
+
+    #[test]
+    fn retry_duration_overflow_requires_human() {
+        let settings = TaskBoardAutomationRetrySettings {
+            max_attempts: 2,
+            base_delay_seconds: u64::MAX,
+            multiplier: 1,
+            max_delay_seconds: u64::MAX,
+            deterministic_jitter_percent: 0,
+        };
+        let now = Utc.with_ymd_and_hms(2026, 7, 17, 10, 0, 0).unwrap();
+
+        assert_eq!(
+            task_board_attempt_retry_decision(
+                &settings,
+                "execution:reviewer",
+                "review:reviewer",
+                1,
+                TaskBoardFailureClass::Transient,
+                now,
+            ),
+            TaskBoardAttemptRetryDecision::HumanRequired
+        );
     }
 
     fn retry_at(decision: TaskBoardAttemptRetryDecision) -> String {
