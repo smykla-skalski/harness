@@ -11,6 +11,8 @@ use crate::task_board::external::{
 use crate::task_board::store::apply_patch;
 use crate::task_board::{ExternalRefSyncState, TaskBoardSyncConflict};
 
+mod revision_lifecycle_tests;
+
 #[tokio::test]
 async fn linked_push_is_not_applied_when_required_local_persistence_fails() {
     let item = linked_item();
@@ -35,7 +37,7 @@ async fn linked_push_is_not_applied_when_required_local_persistence_fails() {
         reference.clone(),
         AppliedRemoteUpdate {
             reference,
-            provider_revision: Some("provider-revision-2".into()),
+            provider_revision: ExternalRevisionUpdate::Set("provider-revision-2".into()),
         },
         vec![ExternalSyncField::Title],
         Vec::new(),
@@ -68,7 +70,7 @@ async fn remote_update_evidence_survives_conflict_persistence_failure() {
         reference.clone(),
         AppliedRemoteUpdate {
             reference,
-            provider_revision: Some("provider-revision-2".into()),
+            provider_revision: ExternalRevisionUpdate::Set("provider-revision-2".into()),
         },
         vec![ExternalSyncField::Title],
         Vec::new(),
@@ -96,7 +98,7 @@ async fn applied_remote_update_evidence_survives_cleanup_failure() {
         reference.clone(),
         AppliedRemoteUpdate {
             reference,
-            provider_revision: Some("provider-revision-2".into()),
+            provider_revision: ExternalRevisionUpdate::Set("provider-revision-2".into()),
         },
         vec![ExternalSyncField::Title],
         Vec::new(),
@@ -124,7 +126,7 @@ async fn missing_provider_revision_stays_unknown_in_conflict_evidence() {
         reference.clone(),
         AppliedRemoteUpdate {
             reference,
-            provider_revision: None,
+            provider_revision: ExternalRevisionUpdate::Clear,
         },
         vec![ExternalSyncField::Title],
         Vec::new(),
@@ -139,7 +141,7 @@ async fn missing_provider_revision_stays_unknown_in_conflict_evidence() {
 }
 
 #[tokio::test]
-async fn successful_local_sync_retains_known_revision_when_provider_omits_one() {
+async fn successful_local_sync_preserves_known_revision_when_requested() {
     let item = linked_item();
     let store = failing_store(&item, true, None);
     let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1");
@@ -152,9 +154,9 @@ async fn successful_local_sync_retains_known_revision_when_provider_omits_one() 
         reference.clone(),
         AppliedRemoteUpdate {
             reference,
-            provider_revision: None,
+            provider_revision: ExternalRevisionUpdate::Preserve,
         },
-        vec![ExternalSyncField::Title],
+        Vec::new(),
         Vec::new(),
         &mut operations,
     )

@@ -8,9 +8,9 @@ use crate::errors::{CliError, CliErrorKind};
 use super::super::types::{ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 use super::{
     ExternalCreateOutcome, ExternalCreateRecoveryClient, ExternalProvider,
-    ExternalProviderCapabilities, ExternalSyncClient, ExternalSyncConfig, ExternalSyncField,
-    ExternalTask, ExternalTaskRef, ExternalTaskUpdate, ExternalUpdateOutcome, non_empty_body,
-    normalize_token,
+    ExternalProviderCapabilities, ExternalRevisionUpdate, ExternalSyncClient, ExternalSyncConfig,
+    ExternalSyncField, ExternalTask, ExternalTaskRef, ExternalTaskUpdate, ExternalUpdateOutcome,
+    non_empty_body, normalize_token,
 };
 
 #[cfg(test)]
@@ -199,10 +199,15 @@ impl ExternalSyncClient for TodoistSyncClient {
         let changes_metadata = update.changes_metadata();
         let changes_status = update.changes_status();
         let has_task_mutation = changes_metadata || project_destination.is_some();
+        let has_provider_mutation = has_task_mutation || changes_status;
         let status_action = changes_status.then(|| TodoistStatusAction::for_status(item.status));
         let closes_task = status_action == Some(TodoistStatusAction::Close);
         let mut updated_reference = todoist_task_reference(&reference.external_id);
-        let mut provider_revision = None;
+        let mut provider_revision = if has_provider_mutation {
+            ExternalRevisionUpdate::Clear
+        } else {
+            ExternalRevisionUpdate::Preserve
+        };
         if let Some(action) = status_action
             .filter(|action| *action == TodoistStatusAction::Reopen && has_task_mutation)
         {
@@ -222,13 +227,13 @@ impl ExternalSyncClient for TodoistSyncClient {
         }
         if let Some(task) = latest_task {
             updated_reference = task.reference();
-            provider_revision = task.updated_at;
+            provider_revision = ExternalRevisionUpdate::from_new_revision(task.updated_at);
         }
         if has_task_mutation && closes_task {
             // Todoist close returns no task and archived tasks are not available
             // through the active-task read endpoint. Never report a pre-close
             // mutation revision as though it followed the close mutation.
-            provider_revision = None;
+            provider_revision = ExternalRevisionUpdate::Clear;
         }
         Ok(ExternalUpdateOutcome::Applied {
             reference: updated_reference,

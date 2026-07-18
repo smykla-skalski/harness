@@ -40,7 +40,10 @@ async fn todoist_project_only_update_uses_move_endpoint_and_response() {
     else {
         panic!("move must be applied");
     };
-    assert_eq!(provider_revision.as_deref(), Some("revision-move"));
+    assert_eq!(
+        provider_revision,
+        ExternalRevisionUpdate::Set("revision-move".into())
+    );
     assert_eq!(
         reference.url.as_deref(),
         Some("https://app.todoist.com/app/task/remote-1")
@@ -92,7 +95,10 @@ async fn todoist_combined_metadata_then_move_returns_move_truth() {
     else {
         panic!("combined update must be applied");
     };
-    assert_eq!(provider_revision.as_deref(), Some("revision-move"));
+    assert_eq!(
+        provider_revision,
+        ExternalRevisionUpdate::Set("revision-move".into())
+    );
     assert_eq!(
         reference.url.as_deref(),
         Some("https://app.todoist.com/app/task/remote-1")
@@ -149,7 +155,10 @@ async fn todoist_reopen_then_metadata_then_move_preserves_final_truth() {
     else {
         panic!("combined update must be applied");
     };
-    assert_eq!(provider_revision.as_deref(), Some("revision-move"));
+    assert_eq!(
+        provider_revision,
+        ExternalRevisionUpdate::Set("revision-move".into())
+    );
     assert_eq!(
         reference.url.as_deref(),
         Some("https://app.todoist.com/app/task/remote-1")

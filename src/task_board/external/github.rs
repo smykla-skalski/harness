@@ -12,8 +12,8 @@ use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 use super::targeting::github_repository_for_item;
 use super::{
     ExternalCreateOutcome, ExternalCreateRecoveryClient, ExternalProvider,
-    ExternalProviderCapabilities, ExternalSyncClient, ExternalSyncConfig, ExternalSyncField,
-    ExternalTask, ExternalTaskRef, ExternalTaskUpdate, ExternalUpdateOutcome,
+    ExternalProviderCapabilities, ExternalRevisionUpdate, ExternalSyncClient, ExternalSyncConfig,
+    ExternalSyncField, ExternalTask, ExternalTaskRef, ExternalTaskUpdate, ExternalUpdateOutcome,
     GITHUB_REPOSITORY_ENV, HARNESS_GITHUB_REPOSITORY_ENV, non_empty_body, normalize_token,
 };
 
@@ -247,7 +247,7 @@ impl ExternalSyncClient for GitHubSyncClient {
         update: ExternalTaskUpdate,
     ) -> Result<ExternalUpdateOutcome, CliError> {
         let repository = self.repository_for(Some(item))?;
-        let issue_number = parse_issue_number(&reference.external_id)?;
+        let issue_number = parse_issue_number(&reference.external_id, &repository)?;
         if let Some(precondition) = update.precondition_updated_at.as_deref() {
             // GitHub does not document conditional unsafe requests for issue PATCH.
             // Independent uncached GraphQL and REST reads are the strongest
@@ -282,7 +282,7 @@ impl ExternalSyncClient for GitHubSyncClient {
                 github_external_id(&repository, issue.number),
             )
             .with_url(issue.html_url),
-            provider_revision: issue.updated_at,
+            provider_revision: ExternalRevisionUpdate::from_new_revision(issue.updated_at),
         })
     }
 
@@ -296,7 +296,7 @@ impl ExternalSyncClient for GitHubSyncClient {
         reference: &ExternalTaskRef,
     ) -> Result<(), CliError> {
         let repository = self.repository_for(Some(item))?;
-        let issue_number = parse_issue_number(&reference.external_id)?;
+        let issue_number = parse_issue_number(&reference.external_id, &repository)?;
         self.patch_issue(&repository, issue_number, json!({ "state": "closed" }))
             .await?;
         Ok(())
@@ -354,17 +354,43 @@ fn missing_github_repository_error() -> CliError {
     .into()
 }
 
-fn parse_issue_number(value: &str) -> Result<u64, CliError> {
-    value
-        .rsplit_once('#')
-        .map_or(value, |(_, issue_number)| issue_number)
-        .parse::<u64>()
-        .map_err(|error| {
-            CliError::new(CliErrorKind::workflow_parse(format!(
-                "task-board github issue number must be numeric, got '{value}'"
-            )))
-            .with_source(error)
-        })
+fn parse_issue_number(value: &str, selected: &GitHubRepository) -> Result<u64, CliError> {
+    let (repository, issue_number) =
+        value
+            .rsplit_once('#')
+            .map_or((None, value), |(repository, issue_number)| {
+                (
+                    (!repository.trim().is_empty()).then_some(repository),
+                    issue_number,
+                )
+            });
+    if let Some(repository) = repository {
+        validate_issue_repository(repository, selected)?;
+    }
+    issue_number.parse::<u64>().map_err(|error| {
+        CliError::new(CliErrorKind::workflow_parse(format!(
+            "task-board github issue number must be numeric, got '{value}'"
+        )))
+        .with_source(error)
+    })
+}
+
+fn validate_issue_repository(value: &str, selected: &GitHubRepository) -> Result<(), CliError> {
+    let embedded = normalize_repository_slug(Some(value)).ok_or_else(|| {
+        CliErrorKind::workflow_parse(format!(
+            "task-board github external_id repository must use owner/repo, got '{value}'"
+        ))
+    })?;
+    let selected_slug = normalize_repository_slug(Some(&selected.slug()))
+        .expect("parsed GitHub repository must have a normalized slug");
+    if embedded != selected_slug {
+        return Err(CliErrorKind::workflow_parse(format!(
+            "task-board github external_id repository '{value}' does not match selected repository '{}'; align item repository ownership or external_id before retrying",
+            selected.slug()
+        ))
+        .into());
+    }
+    Ok(())
 }
 
 fn github_issue_search_status(state: &str) -> TaskBoardStatus {

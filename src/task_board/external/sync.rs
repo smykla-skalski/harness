@@ -10,9 +10,10 @@ use crate::workspace::utc_now;
 
 use super::targeting::{board_project_id_for_task, execution_repository_for_task};
 use super::{
-    ExternalProvider, ExternalSyncClient, ExternalSyncConfig, ExternalSyncConflictPolicy,
-    ExternalSyncField, ExternalTask, ExternalTaskRef, ExternalTaskUpdate, ExternalUpdateOutcome,
-    GitHubInboxSyncClient, GitHubSyncClient, TodoistSyncClient, canonical_external_status,
+    ExternalProvider, ExternalRevisionUpdate, ExternalSyncClient, ExternalSyncConfig,
+    ExternalSyncConflictPolicy, ExternalSyncField, ExternalTask, ExternalTaskRef,
+    ExternalTaskUpdate, ExternalUpdateOutcome, GitHubInboxSyncClient, GitHubSyncClient,
+    TodoistSyncClient, canonical_external_status,
 };
 
 mod batch;

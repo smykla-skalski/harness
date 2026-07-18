@@ -1,6 +1,6 @@
 [package]
 name = "harness-hook"
-version = "48.5.0"
+version = "48.5.1"
 edition = "2024"
 rust-version = "1.94"
 
@@ -14,9 +14,9 @@ test = false
 
 [dependencies]
 clap = { version = "4.6.0", features = ["derive", "env"] }
-harness-daemon-client = { path = "../harness-daemon-client", version = "48.5.0" }
-harness-protocol = { path = "../harness-protocol", version = "48.5.0" }
-harness-telemetry = { path = "../harness-telemetry", version = "48.5.0" }
+harness-daemon-client = { path = "../harness-daemon-client", version = "48.5.1" }
+harness-protocol = { path = "../harness-protocol", version = "48.5.1" }
+harness-telemetry = { path = "../harness-telemetry", version = "48.5.1" }
 chrono = { version = "0.4.44", features = ["serde"] }
 fs-err = "3.3.0"
 fs2 = "0.4.3"

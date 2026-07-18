@@ -11,10 +11,11 @@ use crate::task_board::external::{
     ExternalProviderScopeIdentity,
 };
 use crate::task_board::{
-    ExternalProvider, ExternalProviderCapabilities, ExternalRefSyncState, ExternalSyncAction,
-    ExternalSyncClient, ExternalSyncConflictPolicy, ExternalSyncDirection, ExternalSyncField,
-    ExternalSyncOptions, ExternalTask, ExternalTaskRef, ExternalTaskUpdate, ExternalUpdateOutcome,
-    TaskBoardExternalCreateIntentState, TaskBoardItem, TaskBoardStatus, sync_external_tasks,
+    ExternalProvider, ExternalProviderCapabilities, ExternalRefSyncState, ExternalRevisionUpdate,
+    ExternalSyncAction, ExternalSyncClient, ExternalSyncConflictPolicy, ExternalSyncDirection,
+    ExternalSyncField, ExternalSyncOptions, ExternalTask, ExternalTaskRef, ExternalTaskUpdate,
+    ExternalUpdateOutcome, TaskBoardExternalCreateIntentState, TaskBoardItem, TaskBoardStatus,
+    sync_external_tasks,
 };
 
 #[tokio::test]
@@ -322,7 +323,9 @@ impl ExternalSyncClient for CreateDoneClient {
         }
         Ok(ExternalUpdateOutcome::Applied {
             reference: reference.clone(),
-            provider_revision: self.update_revision.clone(),
+            provider_revision: ExternalRevisionUpdate::from_new_revision(
+                self.update_revision.clone(),
+            ),
         })
     }
 }

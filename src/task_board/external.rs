@@ -18,8 +18,8 @@ mod targeting;
 mod todoist;
 
 pub use capabilities::{
-    ExternalProviderCapabilities, ExternalSyncConflictPolicy, ExternalSyncField,
-    ExternalTaskUpdate, ExternalUpdateOutcome,
+    ExternalProviderCapabilities, ExternalRevisionUpdate, ExternalSyncConflictPolicy,
+    ExternalSyncField, ExternalTaskUpdate, ExternalUpdateOutcome,
 };
 pub(crate) use create_recovery::ExternalCreateRecoveryClient;
 #[allow(
@@ -438,7 +438,9 @@ pub trait ExternalSyncClient: Send + Sync {
     /// Implementations that honour `update.precondition_updated_at` may return
     /// `ExternalUpdateOutcome::PreconditionFailed` when the remote task changed
     /// since the precondition timestamp. The sync layer surfaces that as a
-    /// conflict and skips the write.
+    /// conflict and skips the write. Applied updates must set or clear provider
+    /// revision state after a mutation, preserving it only when no revision-changing
+    /// write occurred.
     ///
     /// # Errors
     /// Returns provider or transport errors surfaced by the implementation.

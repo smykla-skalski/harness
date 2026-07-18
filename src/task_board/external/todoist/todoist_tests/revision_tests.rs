@@ -1,6 +1,27 @@
 use super::*;
 
 #[tokio::test]
+async fn todoist_empty_update_intentionally_preserves_provider_revision() {
+    let client =
+        TodoistSyncClient::new_with_api_base("token", "http://127.0.0.1:0").expect("client");
+    let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1");
+    let item = local_item("Title", "Body", None);
+
+    let outcome = client
+        .update_task(&item, &reference, ExternalTaskUpdate::new(Vec::new()))
+        .await
+        .expect("empty update");
+
+    let ExternalUpdateOutcome::Applied {
+        provider_revision, ..
+    } = outcome
+    else {
+        panic!("empty update must be applied");
+    };
+    assert_eq!(provider_revision, ExternalRevisionUpdate::Preserve);
+}
+
+#[tokio::test]
 async fn todoist_combined_close_does_not_report_pre_close_revision() {
     let (endpoint, captured, handle) = spawn_sequence_mock(vec![
         (
@@ -30,7 +51,7 @@ async fn todoist_combined_close_does_not_report_pre_close_revision() {
     else {
         panic!("update must be applied");
     };
-    assert_eq!(provider_revision, None);
+    assert_eq!(provider_revision, ExternalRevisionUpdate::Clear);
     let captured = captured.lock().expect("captured requests");
     assert_eq!(captured.len(), 2);
     assert_eq!(captured[0].path, "/tasks/remote-1");
@@ -63,7 +84,10 @@ async fn todoist_combined_reopen_returns_final_metadata_revision() {
     else {
         panic!("update must be applied");
     };
-    assert_eq!(provider_revision.as_deref(), Some("provider-revision-3"));
+    assert_eq!(
+        provider_revision,
+        ExternalRevisionUpdate::Set("provider-revision-3".into())
+    );
     let captured = captured.lock().expect("captured requests");
     assert_eq!(captured.len(), 2);
     assert_eq!(captured[0].path, "/tasks/remote-1/reopen");
@@ -103,7 +127,7 @@ async fn todoist_metadata_write_without_revision_does_not_reuse_precondition() {
     else {
         panic!("update must be applied");
     };
-    assert_eq!(provider_revision, None);
+    assert_eq!(provider_revision, ExternalRevisionUpdate::Clear);
     let captured = captured.lock().expect("captured requests");
     assert_eq!(captured.len(), 2);
     assert_eq!(captured[0].path, "/tasks/remote-1");

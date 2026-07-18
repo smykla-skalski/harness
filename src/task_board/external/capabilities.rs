@@ -75,10 +75,37 @@ impl ExternalTaskUpdate {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExternalRevisionUpdate {
+    /// Leave the stored provider revision unchanged because no revision-changing write occurred.
+    Preserve,
+    /// Replace the stored provider revision with the provider's post-write revision.
+    Set(String),
+    /// Remove the stored provider revision because a write succeeded without a usable revision.
+    Clear,
+}
+
+impl ExternalRevisionUpdate {
+    /// Convert a post-write provider revision, clearing stale state when the provider omitted it.
+    #[must_use]
+    pub fn from_new_revision(revision: Option<String>) -> Self {
+        revision.map_or(Self::Clear, Self::Set)
+    }
+
+    #[must_use]
+    pub(crate) fn resolve(&self, current: Option<&str>) -> Option<String> {
+        match self {
+            Self::Preserve => current.map(ToOwned::to_owned),
+            Self::Set(revision) => Some(revision.clone()),
+            Self::Clear => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExternalUpdateOutcome {
     Applied {
         reference: super::ExternalTaskRef,
-        provider_revision: Option<String>,
+        provider_revision: ExternalRevisionUpdate,
     },
     PreconditionFailed {
         current: super::ExternalTask,

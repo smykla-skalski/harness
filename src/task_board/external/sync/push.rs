@@ -12,10 +12,10 @@ use super::merge::{
     replace_synced_ref, split_supported_fields,
 };
 use super::{
-    ExternalProvider, ExternalSyncAction, ExternalSyncClient, ExternalSyncField,
-    ExternalSyncOperation, ExternalSyncOptions, ExternalTask, ExternalTaskRef, ExternalTaskUpdate,
-    ExternalUpdateOutcome, SyncClientError, TaskBoardExternalCreateIntent, TaskBoardSyncStore,
-    canonical_external_status,
+    ExternalProvider, ExternalRevisionUpdate, ExternalSyncAction, ExternalSyncClient,
+    ExternalSyncField, ExternalSyncOperation, ExternalSyncOptions, ExternalTask, ExternalTaskRef,
+    ExternalTaskUpdate, ExternalUpdateOutcome, SyncClientError, TaskBoardExternalCreateIntent,
+    TaskBoardSyncStore, canonical_external_status,
 };
 
 pub(super) async fn push_board_tasks(
@@ -177,7 +177,7 @@ async fn update_linked_remote(
 
 struct AppliedRemoteUpdate {
     reference: ExternalTaskRef,
-    provider_revision: Option<String>,
+    provider_revision: ExternalRevisionUpdate,
 }
 
 async fn execute_provider_update(
@@ -245,14 +245,14 @@ async fn persist_linked_update(
         &reference,
         &updated_ref,
         &supported,
-        provider_revision.as_deref(),
+        &provider_revision,
     );
     let remote = updated_remote_task(
         item,
         &reference,
         updated_ref.clone(),
         &supported,
-        provider_revision.as_deref(),
+        &provider_revision,
     );
     if let Err(error) = board
         .update_item(
@@ -329,7 +329,7 @@ fn updated_remote_task(
     current_ref: &ExternalTaskRef,
     updated_ref: ExternalTaskRef,
     changed_fields: &[ExternalSyncField],
-    provider_revision: Option<&str>,
+    provider_revision: &ExternalRevisionUpdate,
 ) -> ExternalTask {
     let state = matching_ref(item, current_ref, item.project_id.as_deref())
         .and_then(|reference| reference.sync_state.as_ref());
@@ -362,7 +362,7 @@ fn updated_remote_task(
                 .and_then(|state| state.project_id.clone())
                 .or_else(|| item.project_id.clone())
         },
-        updated_at: provider_revision.map(ToOwned::to_owned),
+        updated_at: provider_revision.resolve(state.and_then(|state| state.updated_at.as_deref())),
     }
 }
 
