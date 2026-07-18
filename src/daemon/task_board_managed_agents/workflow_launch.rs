@@ -1,5 +1,6 @@
 use crate::daemon::http::{DaemonHttpState, require_async_db};
 use crate::daemon::protocol::ManagedAgentSnapshot;
+use crate::daemon::service::{validate_read_only_workflow_launch, validate_write_workflow_launch};
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::{DispatchAppliedTask, validate_task_board_read_only_run_context};
 
@@ -9,12 +10,12 @@ pub(super) async fn validate_workflow_launch(
     state: &DaemonHttpState,
     applied: &DispatchAppliedTask,
 ) -> Result<Option<(i64, u64)>, CliError> {
-    crate::daemon::service::validate_read_only_workflow_launch(
+    validate_read_only_workflow_launch(
         require_async_db(state, "read-only workflow start validation")?,
         applied,
     )
     .await?;
-    crate::daemon::service::validate_write_workflow_launch(
+    validate_write_workflow_launch(
         require_async_db(state, "write workflow start validation")?,
         applied,
     )
@@ -36,15 +37,17 @@ pub(super) fn validate_recovered_workflow_worker(
             }
             (launch.run_context.worktree.as_str(), None)
         }
-        (None, Some(_)) => (
-            applied
-                .item
-                .workflow
-                .worktree
-                .as_deref()
-                .ok_or_else(|| workflow_recovery_conflict(snapshot.agent_id()))?,
-            Some(applied.work_item_id.as_str()),
-        ),
+        (None, Some(launch)) => {
+            if validate_task_board_read_only_run_context(&launch.run_context).is_err()
+                || launch.run_context.session_id != applied.session_id
+            {
+                return Err(workflow_recovery_conflict(snapshot.agent_id()));
+            }
+            (
+                launch.run_context.worktree.as_str(),
+                Some(applied.work_item_id.as_str()),
+            )
+        }
         (None, None) => return Ok(()),
     };
     let ManagedAgentSnapshot::Codex(run) = snapshot else {

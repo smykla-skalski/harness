@@ -4,12 +4,12 @@ use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
     TaskBoardExecutionState, TaskBoardItem, TaskBoardTerminalOutcome, TaskBoardTerminalOutcomeKind,
     TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionCasOutcome,
-    TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowRevisionGuard,
+    TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind, TaskBoardWorkflowRevisionGuard,
 };
 use sha2::{Digest, Sha256};
 
 use super::super::task_board_read_only_runtime::TaskBoardReadOnlyRuntime;
-use super::{attempt_recovery, ingestion, lifecycle, reports, requests};
+use super::{attempt_recovery, ingestion, lifecycle, reports, requests, revision_validation};
 
 pub(super) async fn reconcile_execution<R>(
     db: &AsyncDaemonDb,
@@ -35,6 +35,22 @@ where
         .await?;
         return Ok(());
     }
+    if matches!(
+        execution.snapshot.workflow_kind,
+        TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
+    ) && let Err(error) = requests::write_task_id(&execution)
+    {
+        require_human(
+            db,
+            &execution.execution_id,
+            "write_task_id_missing",
+            &error.to_string(),
+            TaskBoardTerminalOutcomeKind::HumanRequired,
+            now,
+        )
+        .await?;
+        return Ok(());
+    }
     if execution.transition.execution_state == TaskBoardExecutionState::RetryWait {
         super::super::task_board_workflow_execution::resume_workflow_retry(
             db,
@@ -48,7 +64,11 @@ where
     if let Some(attempt) = active_attempt.as_ref().filter(|attempt| {
         matches!(
             execution.transition.phase,
-            Some(TaskBoardExecutionPhase::Review | TaskBoardExecutionPhase::Evaluate)
+            Some(
+                TaskBoardExecutionPhase::Implementation
+                    | TaskBoardExecutionPhase::Review
+                    | TaskBoardExecutionPhase::Evaluate
+            )
         ) && matches!(
             attempt.state,
             TaskBoardAttemptState::Starting | TaskBoardAttemptState::Running
@@ -64,24 +84,9 @@ where
         lifecycle::reconcile_lifecycle_attempt(db, runtime, &execution, attempt, now).await?;
         return Ok(());
     }
-    let snapshot = db.task_board_item_snapshot(&execution.item_id).await?;
-    if !item_identity_matches(&execution, &snapshot.item) {
-        require_human(
-            db,
-            &execution.execution_id,
-            "item_identity_changed",
-            "Task Board item was deleted or detached from its read-only workflow",
-            TaskBoardTerminalOutcomeKind::HumanRequired,
-            now,
-        )
-        .await?;
+    let Some(revisions) = current_revisions_or_invalidate(db, &execution, now).await? else {
         return Ok(());
-    }
-    let revisions = current_revisions(db, snapshot.item_revision, &execution).await?;
-    if revisions != TaskBoardWorkflowRevisionGuard::from(&execution.snapshot) {
-        invalidate_revisions(db, &execution, &revisions, now).await?;
-        return Ok(());
-    }
+    };
     if let Some(attempt) = active_attempt.as_ref() {
         return reconcile_active_attempt(db, runtime, &execution, attempt, now).await;
     }
@@ -102,6 +107,34 @@ where
     schedule_next_attempt(db, &execution, now).await
 }
 
+async fn current_revisions_or_invalidate(
+    db: &AsyncDaemonDb,
+    execution: &TaskBoardWorkflowExecutionRecord,
+    now: &str,
+) -> Result<Option<TaskBoardWorkflowRevisionGuard>, CliError> {
+    let snapshot = db.task_board_item_snapshot(&execution.item_id).await?;
+    if !item_identity_matches(execution, &snapshot.item) {
+        require_human(
+            db,
+            &execution.execution_id,
+            "item_identity_changed",
+            "Task Board item was deleted or detached from its workflow",
+            TaskBoardTerminalOutcomeKind::HumanRequired,
+            now,
+        )
+        .await?;
+        return Ok(None);
+    }
+    let (revisions, policy_version) =
+        revision_validation::current_revisions(db, snapshot.item_revision, execution).await?;
+    if revision_validation::revisions_match(execution, &revisions, &policy_version) {
+        return Ok(Some(revisions));
+    }
+    revision_validation::invalidate_revisions(db, execution, &revisions, &policy_version, now)
+        .await?;
+    Ok(None)
+}
+
 async fn reconcile_active_attempt<R>(
     db: &AsyncDaemonDb,
     runtime: &R,
@@ -113,11 +146,13 @@ where
     R: TaskBoardReadOnlyRuntime,
 {
     match execution.transition.phase {
-        Some(TaskBoardExecutionPhase::Review | TaskBoardExecutionPhase::Evaluate) => {
-            reports::reconcile_report_attempt(db, runtime, execution, attempt, true, now)
-                .await
-                .map(|_| ())
-        }
+        Some(
+            TaskBoardExecutionPhase::Implementation
+            | TaskBoardExecutionPhase::Review
+            | TaskBoardExecutionPhase::Evaluate,
+        ) => reports::reconcile_report_attempt(db, runtime, execution, attempt, true, now)
+            .await
+            .map(|_| ()),
         Some(TaskBoardExecutionPhase::Publish | TaskBoardExecutionPhase::Cleanup) => {
             lifecycle::reconcile_lifecycle_attempt(db, runtime, execution, attempt, now).await
         }
@@ -173,11 +208,16 @@ async fn schedule_next_attempt(
 
 fn next_action_key(execution: &TaskBoardWorkflowExecutionRecord) -> Result<String, CliError> {
     match execution.transition.phase {
+        Some(TaskBoardExecutionPhase::Implementation) => Ok(format!(
+            "implementation:{}",
+            execution.artifacts.current_revision_cycle
+        )),
         Some(TaskBoardExecutionPhase::Review) => {
             let completed = execution
                 .artifacts
                 .review_cycles
-                .last()
+                .iter()
+                .find(|cycle| cycle.revision_cycle == execution.artifacts.current_revision_cycle)
                 .map(|cycle| cycle.outcomes.as_slice())
                 .unwrap_or_default();
             execution
@@ -192,11 +232,23 @@ fn next_action_key(execution: &TaskBoardWorkflowExecutionRecord) -> Result<Strin
                 .map(|profile| format!("review:{}", profile.id))
                 .ok_or_else(|| invalid_transition("review phase has no remaining reviewer action"))
         }
-        Some(TaskBoardExecutionPhase::Evaluate) => Ok("evaluate".into()),
+        Some(TaskBoardExecutionPhase::Evaluate) => {
+            if matches!(
+                execution.snapshot.workflow_kind,
+                TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
+            ) {
+                Ok(format!(
+                    "evaluate:{}",
+                    execution.artifacts.current_revision_cycle
+                ))
+            } else {
+                Ok("evaluate".into())
+            }
+        }
         Some(TaskBoardExecutionPhase::Publish) => Ok("publish".into()),
         Some(TaskBoardExecutionPhase::Cleanup) => Ok("cleanup".into()),
         phase => Err(invalid_transition(format!(
-            "read-only execution has no schedulable action in phase {phase:?}"
+            "workflow execution has no schedulable action in phase {phase:?}"
         ))),
     }
 }
@@ -222,18 +274,6 @@ fn one_active_attempt(
     }
 }
 
-async fn current_revisions(
-    db: &AsyncDaemonDb,
-    item_revision: i64,
-    execution: &TaskBoardWorkflowExecutionRecord,
-) -> Result<TaskBoardWorkflowRevisionGuard, CliError> {
-    Ok(TaskBoardWorkflowRevisionGuard {
-        item_revision,
-        configuration_revision: db.task_board_configuration_revision().await?,
-        provider_revision: execution.snapshot.provider_revision.clone(),
-    })
-}
-
 pub(super) async fn settlement_is_current(
     db: &AsyncDaemonDb,
     execution_id: &str,
@@ -251,37 +291,21 @@ pub(super) async fn settlement_is_current(
             db,
             execution_id,
             "item_identity_changed_after_attempt",
-            "Task Board item changed identity while a read-only attempt was settling",
+            "Task Board item changed identity while a workflow attempt was settling",
             TaskBoardTerminalOutcomeKind::HumanRequired,
             now,
         )
         .await?;
         return Ok(false);
     }
-    let revisions = current_revisions(db, snapshot.item_revision, &current).await?;
-    if revisions != TaskBoardWorkflowRevisionGuard::from(&current.snapshot) {
-        invalidate_revisions(db, &current, &revisions, now).await?;
+    let (revisions, policy_version) =
+        revision_validation::current_revisions(db, snapshot.item_revision, &current).await?;
+    if !revision_validation::revisions_match(&current, &revisions, &policy_version) {
+        revision_validation::invalidate_revisions(db, &current, &revisions, &policy_version, now)
+            .await?;
         return Ok(false);
     }
     Ok(true)
-}
-
-async fn invalidate_revisions(
-    db: &AsyncDaemonDb,
-    execution: &TaskBoardWorkflowExecutionRecord,
-    revisions: &TaskBoardWorkflowRevisionGuard,
-    now: &str,
-) -> Result<(), CliError> {
-    super::super::task_board_workflow_execution::advance_workflow_execution(
-        db,
-        &TaskBoardWorkflowExecutionCas::from(execution),
-        revisions,
-        execution.transition.pull_request.as_ref(),
-        execution.transition.exact_head_revision.as_deref(),
-        now,
-    )
-    .await?;
-    Ok(())
 }
 
 pub(super) async fn set_execution_state(

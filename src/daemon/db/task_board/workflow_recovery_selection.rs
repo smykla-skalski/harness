@@ -9,22 +9,22 @@ use crate::task_board::TaskBoardWorkflowExecutionRecord;
 
 const RECOVERY_QUEUE: &str = "read_only_recoverable";
 const ELIGIBLE_COUNT: &str = "SELECT COUNT(*) FROM task_board_workflow_executions
-    WHERE workflow_kind IN ('review', 'pr_review')
+    WHERE workflow_kind IN ('default_task', 'pr_fix', 'review', 'pr_review')
       AND completed_at IS NULL
       AND state IN ('preparing', 'starting', 'running')";
 const SELECT_CANONICAL: &str = "SELECT * FROM task_board_workflow_executions
-    WHERE workflow_kind IN ('review', 'pr_review')
+    WHERE workflow_kind IN ('default_task', 'pr_fix', 'review', 'pr_review')
       AND completed_at IS NULL
       AND state IN ('preparing', 'starting', 'running')
     ORDER BY updated_at, execution_id LIMIT ?1";
 const SELECT_AFTER_CURSOR: &str = "SELECT * FROM task_board_workflow_executions
-    WHERE workflow_kind IN ('review', 'pr_review')
+    WHERE workflow_kind IN ('default_task', 'pr_fix', 'review', 'pr_review')
       AND completed_at IS NULL
       AND state IN ('preparing', 'starting', 'running')
       AND (updated_at > ?1 OR (updated_at = ?1 AND execution_id > ?2))
     ORDER BY updated_at, execution_id LIMIT ?3";
 const SELECT_THROUGH_CURSOR: &str = "SELECT * FROM task_board_workflow_executions
-    WHERE workflow_kind IN ('review', 'pr_review')
+    WHERE workflow_kind IN ('default_task', 'pr_fix', 'review', 'pr_review')
       AND completed_at IS NULL
       AND state IN ('preparing', 'starting', 'running')
       AND (updated_at < ?1 OR (updated_at = ?1 AND execution_id <= ?2))

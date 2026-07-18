@@ -16,7 +16,8 @@ mod ingestion;
 mod lifecycle;
 mod report_evidence;
 mod reports;
-mod requests;
+pub(crate) mod requests;
+mod revision_validation;
 
 const MAX_RECONCILIATIONS_PER_CLASS_PER_TICK: usize = 16;
 

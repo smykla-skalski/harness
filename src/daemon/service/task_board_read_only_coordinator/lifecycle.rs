@@ -7,7 +7,7 @@ use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptCasOutcome,
     TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase, TaskBoardExecutionState,
     TaskBoardFailureClass, TaskBoardLifecycleOutcome, TaskBoardTerminalOutcomeKind,
-    TaskBoardWorkflowExecutionRecord,
+    TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
 };
 
 use super::super::task_board_read_only_runtime::{
@@ -45,7 +45,7 @@ where
         .transition
         .exact_head_revision
         .as_deref()
-        .ok_or_else(|| invalid_transition("PrReview workflow has no frozen exact head"))?;
+        .ok_or_else(|| invalid_transition("workflow has no frozen exact head"))?;
     if fresh == frozen {
         return Ok(true);
     }
@@ -53,7 +53,7 @@ where
         db,
         &execution.execution_id,
         "exact_head_changed_before_publish",
-        "PrReview exact head changed before publish was claimed",
+        "workflow exact head changed before publish was claimed",
         TaskBoardTerminalOutcomeKind::HumanRequired,
         now,
     )
@@ -136,7 +136,7 @@ where
         else {
             return Ok(());
         };
-        return match runtime.publish_pr_review(execution).await {
+        return match publish(runtime, execution).await {
             Ok(outcome) => {
                 verify_successful_publish(db, runtime, execution, &claimed, outcome, now).await
             }
@@ -176,7 +176,7 @@ async fn verify_successful_publish<R>(
 where
     R: TaskBoardReadOnlyRuntime,
 {
-    match runtime.verify_pr_review_approval(execution).await {
+    match verify_publish(runtime, execution, published.external_url.as_deref()).await {
         Ok(TaskBoardPublishVerification::Applied(mut verified)) => {
             verified.mutated = published.mutated;
             complete_lifecycle(db, execution, attempt, verified, now).await
@@ -324,7 +324,7 @@ async fn settle_ambiguous_publish<R>(
 where
     R: TaskBoardReadOnlyRuntime,
 {
-    match runtime.verify_pr_review_approval(execution).await {
+    match verify_publish(runtime, execution, None).await {
         Ok(TaskBoardPublishVerification::Applied(outcome)) => {
             complete_lifecycle(db, execution, attempt, outcome, now).await
         }
@@ -356,13 +356,7 @@ async fn complete_lifecycle(
         .transition
         .phase
         .ok_or_else(|| invalid_transition("lifecycle completion has no durable phase"))?;
-    settle_execution_running_in_phase(
-        db,
-        &execution.execution_id,
-        phase,
-        now,
-    )
-    .await
+    settle_execution_running_in_phase(db, &execution.execution_id, phase, now).await
 }
 
 async fn mark_publish_unknown(
@@ -386,9 +380,47 @@ async fn mark_publish_unknown(
         db,
         &execution.execution_id,
         "publish_outcome_unknown",
-        "PrReview approval outcome could not be verified authoritatively",
+        "workflow publication outcome could not be verified authoritatively",
         TaskBoardTerminalOutcomeKind::Unknown,
         now,
     )
     .await
+}
+
+async fn publish<R>(
+    runtime: &R,
+    execution: &TaskBoardWorkflowExecutionRecord,
+) -> Result<TaskBoardLifecycleOutcome, CliError>
+where
+    R: TaskBoardReadOnlyRuntime,
+{
+    if is_write(execution.snapshot.workflow_kind) {
+        runtime.publish_write_workflow(execution).await
+    } else {
+        runtime.publish_pr_review(execution).await
+    }
+}
+
+async fn verify_publish<R>(
+    runtime: &R,
+    execution: &TaskBoardWorkflowExecutionRecord,
+    known_external_url: Option<&str>,
+) -> Result<TaskBoardPublishVerification, CliError>
+where
+    R: TaskBoardReadOnlyRuntime,
+{
+    if is_write(execution.snapshot.workflow_kind) {
+        runtime
+            .verify_write_workflow_publication(execution, known_external_url)
+            .await
+    } else {
+        runtime.verify_pr_review_approval(execution).await
+    }
+}
+
+const fn is_write(kind: TaskBoardWorkflowKind) -> bool {
+    matches!(
+        kind,
+        TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
+    )
 }

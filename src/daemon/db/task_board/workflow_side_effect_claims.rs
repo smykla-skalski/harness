@@ -1,10 +1,10 @@
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error};
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptRecord,
-    TaskBoardExecutionPhase, TaskBoardExecutionState, TaskBoardWorkflowCasMismatch,
-    TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
-    validate_task_board_attempt_update, validate_task_board_execution_update,
-    validate_task_board_workflow_execution,
+    TaskBoardExecutionPhase, TaskBoardExecutionState, TaskBoardOrchestratorSettings,
+    TaskBoardWorkflowCasMismatch, TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
+    TaskBoardWorkflowKind, validate_task_board_attempt_update,
+    validate_task_board_execution_update, validate_task_board_workflow_execution,
 };
 
 use super::ORCHESTRATOR_CHANGE_SCOPE;
@@ -141,7 +141,8 @@ fn claim_disposition(
         || !matches!(
             parent.transition.phase,
             Some(
-                TaskBoardExecutionPhase::Review
+                TaskBoardExecutionPhase::Implementation
+                    | TaskBoardExecutionPhase::Review
                     | TaskBoardExecutionPhase::Evaluate
                     | TaskBoardExecutionPhase::Publish
             )
@@ -158,17 +159,36 @@ async fn ensure_live_revisions(
     transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
     parent: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<(), CliError> {
+    if matches!(
+        parent.snapshot.workflow_kind,
+        TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
+    ) {
+        let settings_json = sqlx::query_scalar::<_, String>(
+            "SELECT settings_json FROM task_board_orchestrator_settings WHERE singleton = 1",
+        )
+        .fetch_one(transaction.as_mut())
+        .await
+        .map_err(|error| db_error(format!("load workflow policy version: {error}")))?;
+        let settings = serde_json::from_str::<TaskBoardOrchestratorSettings>(&settings_json)
+            .map_err(|error| db_error(format!("decode workflow policy version: {error}")))?;
+        if settings.policy_version != parent.snapshot.policy_version {
+            return Err(CliErrorKind::concurrent_modification(
+                "workflow policy version changed before side-effect claim",
+            )
+            .into());
+        }
+    }
     let Some(mismatch) = live_execution_revision_mismatch_in_tx(transaction, parent).await? else {
         return Ok(());
     };
     let reason = match mismatch {
         TaskBoardWorkflowCasMismatch::ItemRevision => {
-            "read-only workflow item revision changed before side-effect claim"
+            "workflow item revision changed before side-effect claim"
         }
         TaskBoardWorkflowCasMismatch::ConfigurationRevision => {
-            "read-only workflow configuration revision changed before side-effect claim"
+            "workflow configuration revision changed before side-effect claim"
         }
-        _ => "read-only workflow revision changed before side-effect claim",
+        _ => "workflow revision changed before side-effect claim",
     };
     Err(CliErrorKind::concurrent_modification(reason).into())
 }

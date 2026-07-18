@@ -302,7 +302,7 @@ async fn seed_attempt(
     .expect("seed workflow attempt");
 }
 
-async fn insert_committed_admission(
+pub(super) async fn insert_committed_admission(
     db: &AsyncDaemonDb,
     item_id: &str,
     execution_id: &str,

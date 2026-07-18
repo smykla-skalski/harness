@@ -184,7 +184,10 @@ pub(super) async fn insert_started_write_workflow_in_tx(
         ownership: TaskBoardExecutionOwnership {
             host_id: None,
             fencing_epoch: 0,
-            resources: BTreeMap::from([("admission_owner".into(), workflow_owner(execution_id))]),
+            resources: BTreeMap::from([
+                ("admission_owner".into(), workflow_owner(execution_id)),
+                ("task_id".into(), launch.task_id.clone()),
+            ]),
         },
         available_at: None,
         blocked_reason: None,
@@ -208,6 +211,8 @@ fn validate_write_launch(
     execution_id: &str,
     launch: &TaskBoardWriteWorkflowLaunch,
 ) -> Result<TaskBoardWorkflowSnapshot, CliError> {
+    validate_task_board_read_only_run_context(&launch.run_context)
+        .map_err(|error| db_error(error.to_string()))?;
     validate_task_board_read_only_item_revisions(
         launch.source_item_revision,
         launch.prepared_item_revision,
@@ -241,6 +246,12 @@ fn validate_write_launch(
         || execution_repository != launch.execution_repository
         || pull_request != launch.pull_request
         || item_revision != started_revision
+        || item.session_id.as_deref() != Some(launch.run_context.session_id.as_str())
+        || item.title != launch.run_context.title
+        || item.body != launch.run_context.body
+        || item.tags != launch.run_context.tags
+        || item.workflow.worktree.as_deref() != Some(launch.run_context.worktree.as_str())
+        || item.work_item_id.as_deref() != Some(launch.task_id.as_str())
         || launch.plan_approval.execution_id != execution_id
         || launch.base_head_revision.trim().is_empty()
     {
@@ -255,7 +266,7 @@ fn validate_write_launch(
         configuration_revision: launch.configuration_revision,
         policy_version: launch.policy_version.clone(),
         reviewer: launch.resolved_reviewers.clone(),
-        read_only_run_context: None,
+        read_only_run_context: Some(launch.run_context.clone()),
         provider_revision: launch.provider_revision.clone(),
     };
     let planning_result = build_planning_result(

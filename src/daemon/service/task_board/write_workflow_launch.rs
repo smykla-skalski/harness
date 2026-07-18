@@ -1,15 +1,19 @@
 use crate::daemon::db::AsyncDaemonDb;
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::{
-    AgentMode, DispatchAppliedTask, PlanApprovalGate, TaskBoardItem, TaskBoardPullRequestIdentity,
+    AgentMode, DispatchAppliedTask, PlanApprovalGate, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
+    TaskBoardItem, TaskBoardPullRequestIdentity, TaskBoardReadOnlyRunContext,
     TaskBoardWorkflowKind, TaskBoardWorkflowSnapshot, TaskBoardWriteWorkflowLaunch, approval_gate,
     bind_plan_approval, build_planning_result, resolve_task_board_pull_request_identity,
     resolve_task_board_reviewers, task_board_read_only_execution_repository,
+    validate_task_board_read_only_run_context,
 };
 
 pub(super) async fn prepare_write_workflow_launch(
     db: &AsyncDaemonDb,
     item_id: &str,
+    session_id: &str,
+    task_id: &str,
     execution_id: &str,
     worktree: &str,
     source_item_revision: Option<i64>,
@@ -72,6 +76,15 @@ pub(super) async fn prepare_write_workflow_launch(
         resolved_reviewers: snapshot.reviewer,
         source_item_revision,
         prepared_item_revision: source_item_revision,
+        task_id: task_id.to_string(),
+        run_context: TaskBoardReadOnlyRunContext {
+            schema_version: TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
+            session_id: session_id.to_string(),
+            title: item.title.clone(),
+            body: item.body.clone(),
+            tags: item.tags.clone(),
+            worktree: worktree.to_string(),
+        },
         provider_revision: None,
         pull_request,
         base_head_revision,
@@ -87,6 +100,8 @@ pub(crate) async fn validate_write_workflow_launch(
     let Some(launch) = applied.write_workflow.as_ref() else {
         return Ok(());
     };
+    validate_task_board_read_only_run_context(&launch.run_context)
+        .map_err(|error| invalid_transition(error.to_string()))?;
     if applied.read_only_workflow.is_some() {
         return Err(invalid_transition(
             "dispatch carries conflicting workflow launches",
@@ -143,6 +158,13 @@ pub(crate) async fn validate_write_workflow_launch(
         && snapshot.policy_version == launch.policy_version
         && snapshot.reviewer == launch.resolved_reviewers
         && item_snapshot.item_revision == launch.prepared_item_revision
+        && launch.task_id == applied.work_item_id
+        && launch.run_context.session_id == applied.session_id
+        && launch.run_context.title == item.title
+        && launch.run_context.body == item.body
+        && launch.run_context.tags == item.tags
+        && item.session_id.as_deref() == Some(launch.run_context.session_id.as_str())
+        && item.workflow.worktree.as_deref() == Some(launch.run_context.worktree.as_str())
         && result == launch.planning_result
         && approval == launch.plan_approval
         && pull_request == launch.pull_request

@@ -4,12 +4,16 @@ use crate::task_board::{
     TaskBoardAttemptResultArtifact, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
     TaskBoardExecutionState, TaskBoardImplementationResult, TaskBoardWorkflowExecutionRecord,
     TaskBoardWorkflowKind, validate_plan_approval, validate_planning_result,
+    validate_task_board_read_only_run_context,
 };
 
 use super::TaskBoardWorkflowExecutionValidationError;
 
 pub(super) fn is_write_workflow(kind: TaskBoardWorkflowKind) -> bool {
-    matches!(kind, TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix)
+    matches!(
+        kind,
+        TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
+    )
 }
 
 pub(super) fn validate_write_frozen_contract(
@@ -18,12 +22,18 @@ pub(super) fn validate_write_frozen_contract(
     if !is_write_workflow(record.snapshot.workflow_kind) {
         return validate_read_only_has_no_write_evidence(record);
     }
-    if record.snapshot.read_only_run_context.is_some() {
-        return invalid(
-            "snapshot.read_only_run_context",
-            "write workflow carries read-only launch context",
-        );
-    }
+    let context = record
+        .snapshot
+        .read_only_run_context
+        .as_ref()
+        .ok_or_else(|| {
+            field_error(
+                "snapshot.read_only_run_context",
+                "write workflow has no immutable local run context",
+            )
+        })?;
+    validate_task_board_read_only_run_context(context)
+        .map_err(|error| field_error("snapshot.read_only_run_context", error))?;
     validate_phase_evidence(record)
 }
 
@@ -81,9 +91,10 @@ fn validate_phase_evidence(
             .map_err(|error| field_error("artifacts.planning_result", error))?;
     }
     if let Some(binding) = artifacts.plan_approval.as_ref() {
-        let result = artifacts.planning_result.as_ref().ok_or_else(|| {
-            field_error("artifacts.plan_approval", "has no planning result")
-        })?;
+        let result = artifacts
+            .planning_result
+            .as_ref()
+            .ok_or_else(|| field_error("artifacts.plan_approval", "has no planning result"))?;
         if !validate_plan_approval(binding, result, &record.snapshot, &record.execution_id).valid {
             return invalid("artifacts.plan_approval", "does not match frozen plan");
         }
@@ -160,7 +171,10 @@ fn validate_implementation_result(
     attempt: &TaskBoardExecutionAttemptRecord,
     result: &TaskBoardImplementationResult,
 ) -> Result<(), TaskBoardWorkflowExecutionValidationError> {
-    required(&result.base_head_revision, "attempt.artifact.implementation")?;
+    required(
+        &result.base_head_revision,
+        "attempt.artifact.implementation",
+    )?;
     required(&result.head_revision, "attempt.artifact.implementation")?;
     required(&result.summary, "attempt.artifact.implementation")?;
     if result.revision_cycle == 0

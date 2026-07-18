@@ -1,24 +1,25 @@
 #[cfg(test)]
 use std::collections::BTreeMap;
+use std::fmt::Display;
 
 use chrono::{DateTime, SecondsFormat, Utc};
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::{
-    TaskBoardAttemptState, TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptCasOutcome,
-    TaskBoardExecutionAttemptCreateOutcome, TaskBoardExecutionAttemptRecord,
-    TaskBoardExecutionDiagnostic, TaskBoardExecutionPhase, TaskBoardExecutionState,
-    TaskBoardPullRequestIdentity, TaskBoardRetrySchedule, TaskBoardTerminalOutcome,
-    TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionCas,
-    TaskBoardWorkflowExecutionCasOutcome, TaskBoardWorkflowExecutionRecord,
+    TaskBoardAttemptResultArtifact, TaskBoardAttemptState, TaskBoardExecutionAttemptCas,
+    TaskBoardExecutionAttemptCasOutcome, TaskBoardExecutionAttemptCreateOutcome,
+    TaskBoardExecutionAttemptRecord, TaskBoardExecutionDiagnostic, TaskBoardExecutionPhase,
+    TaskBoardExecutionState, TaskBoardPhaseVerdict, TaskBoardPullRequestIdentity,
+    TaskBoardRetrySchedule, TaskBoardReviewRoundDecision, TaskBoardTerminalOutcome,
+    TaskBoardTerminalOutcomeKind, TaskBoardWorkflowCasMismatch, TaskBoardWorkflowExecutionCas,
+    TaskBoardWorkflowExecutionCasOutcome, TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
     TaskBoardWorkflowRevisionGuard, advance_task_board_workflow,
 };
 #[cfg(test)]
 use crate::task_board::{
     TaskBoardExecutionOwnership, TaskBoardWorkflowExecutionArtifacts,
-    TaskBoardWorkflowExecutionCreateOutcome, TaskBoardWorkflowKind, TaskBoardWorkflowSnapshot,
-    start_task_board_workflow,
+    TaskBoardWorkflowExecutionCreateOutcome, TaskBoardWorkflowSnapshot, start_task_board_workflow,
 };
 
 #[cfg(test)]
@@ -249,19 +250,29 @@ fn validate_attempt_phase(
         .phase
         .ok_or_else(|| invalid_transition("workflow execution has no active phase"))?;
     let valid_action = match phase {
+        TaskBoardExecutionPhase::Implementation => {
+            attempt.action_key
+                == format!(
+                    "implementation:{}",
+                    execution.artifacts.current_revision_cycle
+                )
+        }
         TaskBoardExecutionPhase::Review => attempt.action_key.starts_with("review:"),
-        TaskBoardExecutionPhase::Evaluate => attempt.action_key == "evaluate",
+        TaskBoardExecutionPhase::Evaluate => {
+            attempt.action_key == "evaluate"
+                || attempt.action_key
+                    == format!("evaluate:{}", execution.artifacts.current_revision_cycle)
+        }
         TaskBoardExecutionPhase::Publish => attempt.action_key == "publish",
         TaskBoardExecutionPhase::Cleanup => attempt.action_key == "cleanup",
         TaskBoardExecutionPhase::Planning
         | TaskBoardExecutionPhase::AwaitingApproval
-        | TaskBoardExecutionPhase::Implementation
         | TaskBoardExecutionPhase::Terminal => false,
     };
     if !valid_action {
         return Err(invalid_transition(format!(
-            "workflow attempt action '{}' does not belong to phase {phase:?}",
-            attempt.action_key
+            "workflow attempt action '{}' does not belong to phase {phase:?} at revision cycle {}",
+            attempt.action_key, execution.artifacts.current_revision_cycle
         )));
     }
     if attempt.state != TaskBoardAttemptState::Completed {
@@ -269,17 +280,21 @@ fn validate_attempt_phase(
     }
     let valid_artifact = match (phase, attempt.artifact.as_ref()) {
         (
-            TaskBoardExecutionPhase::Review,
-            Some(crate::task_board::TaskBoardAttemptResultArtifact::Review(outcome)),
-        ) => attempt.action_key == format!("review:{}", outcome.profile_id),
-        (
+            TaskBoardExecutionPhase::Implementation,
+            Some(TaskBoardAttemptResultArtifact::Implementation(_)),
+        )
+        | (
             TaskBoardExecutionPhase::Evaluate,
-            Some(crate::task_board::TaskBoardAttemptResultArtifact::Evaluation(_)),
+            Some(TaskBoardAttemptResultArtifact::Evaluation(_)),
         )
         | (
             TaskBoardExecutionPhase::Publish | TaskBoardExecutionPhase::Cleanup,
-            Some(crate::task_board::TaskBoardAttemptResultArtifact::Lifecycle(_)),
+            Some(TaskBoardAttemptResultArtifact::Lifecycle(_)),
         ) => true,
+        (
+            TaskBoardExecutionPhase::Review,
+            Some(TaskBoardAttemptResultArtifact::Review(outcome)),
+        ) => attempt.action_key == format!("review:{}", outcome.profile_id),
         _ => false,
     };
     if valid_artifact {
@@ -310,7 +325,7 @@ pub(super) async fn stale_outcome(
         .await?;
     let Some(current) = current else {
         return Ok(TaskBoardWorkflowExecutionCasOutcome::Stale {
-            mismatch: crate::task_board::TaskBoardWorkflowCasMismatch::ExecutionId,
+            mismatch: TaskBoardWorkflowCasMismatch::ExecutionId,
             current: None,
         });
     };
@@ -342,12 +357,30 @@ fn phase_evidence_allows_advance(
     match record.transition.phase {
         Some(TaskBoardExecutionPhase::Review) => {
             let approved = record.artifacts.review_cycles.last().is_some_and(|cycle| {
-                cycle.decision == Some(crate::task_board::TaskBoardReviewRoundDecision::Approved)
+                cycle.decision == Some(TaskBoardReviewRoundDecision::Approved)
             });
             evidence_or_wait(record, approved, "review_evidence_pending", updated_at)
         }
+        Some(TaskBoardExecutionPhase::Implementation) => {
+            let action = format!("implementation:{}", record.artifacts.current_revision_cycle);
+            let present = completed_attempt(record, &action, ArtifactKind::Implementation);
+            evidence_or_wait(
+                record,
+                present,
+                "implementation_evidence_pending",
+                updated_at,
+            )
+        }
         Some(TaskBoardExecutionPhase::Evaluate) => {
-            let present = completed_attempt(record, "evaluate", ArtifactKind::Evaluation);
+            let action = if matches!(
+                record.snapshot.workflow_kind,
+                TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
+            ) {
+                format!("evaluate:{}", record.artifacts.current_revision_cycle)
+            } else {
+                "evaluate".into()
+            };
+            let present = completed_attempt(record, &action, ArtifactKind::Evaluation);
             evidence_or_wait(record, present, "evaluation_evidence_pending", updated_at)
         }
         Some(TaskBoardExecutionPhase::Publish) => {
@@ -359,11 +392,7 @@ fn phase_evidence_allows_advance(
             evidence_or_wait(record, present, "cleanup_evidence_pending", updated_at)
         }
         Some(TaskBoardExecutionPhase::Terminal) | None => true,
-        Some(
-            TaskBoardExecutionPhase::Planning
-            | TaskBoardExecutionPhase::AwaitingApproval
-            | TaskBoardExecutionPhase::Implementation,
-        ) => {
+        Some(TaskBoardExecutionPhase::Planning | TaskBoardExecutionPhase::AwaitingApproval) => {
             require_human(record, "write_phase_not_supported", updated_at);
             false
         }
@@ -393,6 +422,7 @@ fn invalidate_for_revision_change(
 
 #[derive(Clone, Copy)]
 enum ArtifactKind {
+    Implementation,
     Evaluation,
     Lifecycle,
     TerminalLifecycle,
@@ -411,12 +441,13 @@ fn completed_attempt(
 }
 
 fn artifact_matches(attempt: &TaskBoardExecutionAttemptRecord, kind: ArtifactKind) -> bool {
-    use crate::task_board::TaskBoardAttemptResultArtifact::{Evaluation, Lifecycle};
+    use TaskBoardAttemptResultArtifact::{Evaluation, Implementation, Lifecycle};
     match (attempt.artifact.as_ref(), kind) {
+        (Some(Implementation(_)), ArtifactKind::Implementation)
+        | (Some(Lifecycle(_)), ArtifactKind::Lifecycle) => true,
         (Some(Evaluation(result)), ArtifactKind::Evaluation) => {
-            result.verdict == crate::task_board::TaskBoardPhaseVerdict::Pass
+            result.verdict == TaskBoardPhaseVerdict::Pass
         }
-        (Some(Lifecycle(_)), ArtifactKind::Lifecycle) => true,
         (Some(Lifecycle(result)), ArtifactKind::TerminalLifecycle) => result.terminal,
         _ => false,
     }
@@ -465,7 +496,7 @@ fn required(value: &str, field: &str) -> Result<String, CliError> {
     }
 }
 
-fn workflow_error(error: impl std::fmt::Display) -> CliError {
+fn workflow_error(error: impl Display) -> CliError {
     invalid_transition(error.to_string())
 }
 

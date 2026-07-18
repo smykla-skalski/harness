@@ -24,6 +24,9 @@ use super::{
     terminal_worker_request,
 };
 
+#[path = "write_request_recovery_tests.rs"]
+mod write_request_recovery_tests;
+
 #[test]
 fn codex_worker_request_carries_task_board_identity() {
     let applied = applied_task(AgentMode::Headless);
@@ -250,6 +253,15 @@ fn write_launch() -> TaskBoardWriteWorkflowLaunch {
         resolved_reviewers: reviewer,
         source_item_revision: 1,
         prepared_item_revision: 2,
+        task_id: "task-1".into(),
+        run_context: TaskBoardReadOnlyRunContext {
+            schema_version: TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
+            session_id: "session-1".into(),
+            title: "Board item".into(),
+            body: "Investigate the issue".into(),
+            tags: vec!["backend".into()],
+            worktree: "/tmp/task-worktree".into(),
+        },
         provider_revision: None,
         pull_request: None,
         base_head_revision: "head-base".into(),

@@ -37,6 +37,26 @@ pub(crate) trait TaskBoardReadOnlyRuntime: Send + Sync {
         run_id: &str,
     ) -> Result<CodexRunSnapshot, CliError>;
 
+    async fn load_codex_workspace_run(
+        &self,
+        _run_id: &str,
+    ) -> Result<Option<CodexRunSnapshot>, CliError> {
+        Err(invalid_transition(
+            "write workflow runtime does not support durable Codex run loading",
+        ))
+    }
+
+    async fn start_codex_workspace_run(
+        &self,
+        _session_id: &str,
+        _request: &CodexRunRequest,
+        _run_id: &str,
+    ) -> Result<CodexRunSnapshot, CliError> {
+        Err(invalid_transition(
+            "write workflow runtime does not support WorkspaceWrite starts",
+        ))
+    }
+
     async fn resolve_exact_head(
         &self,
         execution: &TaskBoardWorkflowExecutionRecord,
@@ -51,6 +71,25 @@ pub(crate) trait TaskBoardReadOnlyRuntime: Send + Sync {
         &self,
         execution: &TaskBoardWorkflowExecutionRecord,
     ) -> Result<TaskBoardPublishVerification, CliError>;
+
+    async fn publish_write_workflow(
+        &self,
+        _execution: &TaskBoardWorkflowExecutionRecord,
+    ) -> Result<TaskBoardLifecycleOutcome, CliError> {
+        Err(invalid_transition(
+            "runtime does not support write workflow publication",
+        ))
+    }
+
+    async fn verify_write_workflow_publication(
+        &self,
+        _execution: &TaskBoardWorkflowExecutionRecord,
+        _known_external_url: Option<&str>,
+    ) -> Result<TaskBoardPublishVerification, CliError> {
+        Err(invalid_transition(
+            "runtime does not support write workflow publication verification",
+        ))
+    }
 }
 
 pub(crate) struct ProductionTaskBoardReadOnlyRuntime<'a> {
@@ -105,18 +144,49 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
         .await
     }
 
+    async fn load_codex_workspace_run(
+        &self,
+        run_id: &str,
+    ) -> Result<Option<CodexRunSnapshot>, CliError> {
+        self.load_codex_report_run(run_id).await
+    }
+
+    async fn start_codex_workspace_run(
+        &self,
+        session_id: &str,
+        request: &CodexRunRequest,
+        run_id: &str,
+    ) -> Result<CodexRunSnapshot, CliError> {
+        if request.mode != CodexRunMode::WorkspaceWrite {
+            return Err(invalid_transition(
+                "write workflow runtime only starts Codex WorkspaceWrite runs",
+            ));
+        }
+        let session_id = session_id.to_owned();
+        let request = request.clone();
+        let run_id = run_id.to_owned();
+        run_codex_agent_blocking(
+            self.state,
+            "task-board write workspace start",
+            move |handle| handle.start_run_with_id(&session_id, &request, run_id),
+        )
+        .await
+    }
+
     async fn resolve_exact_head(
         &self,
         execution: &TaskBoardWorkflowExecutionRecord,
     ) -> Result<String, CliError> {
         match execution.snapshot.workflow_kind {
-            TaskBoardWorkflowKind::Review => resolve_local_review_head(execution).await,
+            TaskBoardWorkflowKind::DefaultTask
+            | TaskBoardWorkflowKind::PrFix
+            | TaskBoardWorkflowKind::Review => resolve_local_workflow_head(execution).await,
             TaskBoardWorkflowKind::PrReview => {
                 let review = resolve_pr_review(execution).await?;
                 required_head(&review.head_sha)
             }
-            _ => Err(invalid_transition(
-                "read-only runtime requires a Review or PrReview execution",
+            TaskBoardWorkflowKind::Unknown => Err(invalid_transition(
+                "workflow runtime requires a known execution",
             )),
         }
     }
@@ -173,16 +243,35 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
             Ok(TaskBoardPublishVerification::Absent)
         }
     }
+
+    async fn publish_write_workflow(
+        &self,
+        execution: &TaskBoardWorkflowExecutionRecord,
+    ) -> Result<TaskBoardLifecycleOutcome, CliError> {
+        super::task_board_github::publish_task_board_write_execution(self.db, execution).await
+    }
+
+    async fn verify_write_workflow_publication(
+        &self,
+        execution: &TaskBoardWorkflowExecutionRecord,
+        known_external_url: Option<&str>,
+    ) -> Result<TaskBoardPublishVerification, CliError> {
+        super::task_board_github::verify_task_board_write_execution_publication(
+            self.db,
+            execution,
+            known_external_url,
+        )
+        .await
+        .map(TaskBoardPublishVerification::Applied)
+    }
 }
 
-async fn resolve_local_review_head(
+async fn resolve_local_workflow_head(
     execution: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<String, CliError> {
-    if execution.transition.workflow_kind != TaskBoardWorkflowKind::Review
-        || execution.transition.pull_request.is_some()
-    {
+    if execution.transition.workflow_kind != execution.snapshot.workflow_kind {
         return Err(invalid_transition(
-            "Review execution and Task Board item identities do not agree",
+            "local workflow execution identities do not agree",
         ));
     }
     let context = execution

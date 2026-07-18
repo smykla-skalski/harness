@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
 
 use super::*;
-use crate::task_board::AgentMode;
+use crate::task_board::{
+    AgentMode, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardReadOnlyRunContext,
+};
 
 const NOW: &str = "2026-07-18T10:00:00Z";
 
@@ -87,7 +89,9 @@ fn write_evaluation_requires_exact_head_and_revision_cycle() {
     let mut record = write_execution();
     record.transition.phase = Some(TaskBoardExecutionPhase::Evaluate);
     record.transition.exact_head_revision = Some("head-result".into());
-    record.attempts.push(evaluation_attempt(Some("head-result"), Some(1)));
+    record
+        .attempts
+        .push(evaluation_attempt(Some("head-result"), Some(1)));
     validate_task_board_workflow_execution(&record).expect("bound evaluation");
 
     let mut missing = record.clone();
@@ -126,7 +130,14 @@ fn write_execution() -> TaskBoardWorkflowExecutionRecord {
         configuration_revision: 11,
         policy_version: "policy-v1".into(),
         reviewer: reviewer.clone(),
-        read_only_run_context: None,
+        read_only_run_context: Some(TaskBoardReadOnlyRunContext {
+            schema_version: TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
+            session_id: "session-write".into(),
+            title: "Write workflow".into(),
+            body: "Implement safely".into(),
+            tags: Vec::new(),
+            worktree: "/tmp/write-worktree".into(),
+        }),
         provider_revision: Some("provider-v3".into()),
     };
     let planning_result = build_planning_result(
@@ -136,14 +147,9 @@ fn write_execution() -> TaskBoardWorkflowExecutionRecord {
         "execution-write",
     )
     .expect("build plan");
-    let plan_approval = bind_plan_approval(
-        &planning_result,
-        &snapshot,
-        "execution-write",
-        "lead",
-        NOW,
-    )
-    .expect("bind approval");
+    let plan_approval =
+        bind_plan_approval(&planning_result, &snapshot, "execution-write", "lead", NOW)
+            .expect("bind approval");
     TaskBoardWorkflowExecutionRecord {
         execution_id: "execution-write".into(),
         item_id: "item-write".into(),

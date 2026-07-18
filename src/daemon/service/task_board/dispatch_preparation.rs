@@ -148,6 +148,8 @@ async fn prepare_dispatch_side_effects(
     let write_workflow = super::write_workflow_launch::prepare_write_workflow_launch(
         db,
         &claim.preparation.board_item_id,
+        &claim.preparation.session_id,
+        &claim.preparation.work_item_id,
         &claim.preparation.workflow_execution_id,
         &worktree,
         claim.preparation.source_item_revision,

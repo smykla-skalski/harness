@@ -109,6 +109,10 @@ pub struct TaskBoardWriteWorkflowLaunch {
     pub resolved_reviewers: TaskBoardResolvedReviewer,
     pub source_item_revision: i64,
     pub prepared_item_revision: i64,
+    #[serde(default)]
+    pub task_id: String,
+    #[serde(default)]
+    pub run_context: TaskBoardReadOnlyRunContext,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider_revision: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

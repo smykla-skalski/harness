@@ -269,13 +269,20 @@ pub(super) fn validate_attempt_phase(
         .phase
         .ok_or_else(|| db_error("workflow execution has no active phase"))?;
     let valid_action = match phase {
+        TaskBoardExecutionPhase::Implementation => {
+            attempt.action_key
+                == format!("implementation:{}", parent.artifacts.current_revision_cycle)
+        }
         TaskBoardExecutionPhase::Review => attempt.action_key.starts_with("review:"),
-        TaskBoardExecutionPhase::Evaluate => attempt.action_key == "evaluate",
+        TaskBoardExecutionPhase::Evaluate => {
+            attempt.action_key == "evaluate"
+                || attempt.action_key
+                    == format!("evaluate:{}", parent.artifacts.current_revision_cycle)
+        }
         TaskBoardExecutionPhase::Publish => attempt.action_key == "publish",
         TaskBoardExecutionPhase::Cleanup => attempt.action_key == "cleanup",
         TaskBoardExecutionPhase::Planning
         | TaskBoardExecutionPhase::AwaitingApproval
-        | TaskBoardExecutionPhase::Implementation
         | TaskBoardExecutionPhase::Terminal => false,
     };
     if !valid_action {
@@ -296,6 +303,7 @@ fn ensure_external_side_effect_uses_atomic_claim(
         parent.transition.phase,
         Some(
             TaskBoardExecutionPhase::Review
+                | TaskBoardExecutionPhase::Implementation
                 | TaskBoardExecutionPhase::Evaluate
                 | TaskBoardExecutionPhase::Publish
         )
@@ -321,10 +329,10 @@ fn validate_completed_artifact(
     }
     let valid = match (phase, attempt.artifact.as_ref()) {
         (
-            TaskBoardExecutionPhase::Review,
-            Some(TaskBoardAttemptResultArtifact::Review(outcome)),
-        ) => attempt.action_key == format!("review:{}", outcome.profile_id),
-        (
+            TaskBoardExecutionPhase::Implementation,
+            Some(TaskBoardAttemptResultArtifact::Implementation(_)),
+        )
+        | (
             TaskBoardExecutionPhase::Evaluate,
             Some(TaskBoardAttemptResultArtifact::Evaluation(_)),
         )
@@ -332,6 +340,10 @@ fn validate_completed_artifact(
             TaskBoardExecutionPhase::Publish | TaskBoardExecutionPhase::Cleanup,
             Some(TaskBoardAttemptResultArtifact::Lifecycle(_)),
         ) => true,
+        (
+            TaskBoardExecutionPhase::Review,
+            Some(TaskBoardAttemptResultArtifact::Review(outcome)),
+        ) => attempt.action_key == format!("review:{}", outcome.profile_id),
         _ => false,
     };
     if valid {
