@@ -34,7 +34,7 @@ query ReviewPullRequestByReference($owner: String!, $name: String!, $number: Int
       baseRefName
       author { login avatarUrl }
       authorAssociation
-      viewerLatestReview { state }
+      viewerLatestReview { state commit { oid } }
       viewerLatestReviewRequest { id }
       repository {
         id
@@ -114,10 +114,44 @@ struct PullRequestByReferenceRepository {
     pull_request: Option<SearchNode>,
 }
 
+#[derive(Clone, Copy)]
+enum ReferenceFreshness {
+    Cached,
+    Authoritative,
+}
+
+impl ReferenceFreshness {
+    fn cache_policy(self) -> GitHubCachePolicy {
+        match self {
+            Self::Cached => {
+                GitHubCachePolicy::read_through(Duration::from_mins(5), Duration::from_hours(1))
+            }
+            Self::Authoritative => GitHubCachePolicy::no_store(),
+        }
+    }
+}
+
 impl ReviewsGitHubClient {
     pub(crate) async fn fetch_by_references(
         &self,
         request: &ReviewsPullRequestResolveRequest,
+    ) -> Result<ReviewsFetchByIds, CliError> {
+        self.fetch_by_references_with_freshness(request, ReferenceFreshness::Cached)
+            .await
+    }
+
+    pub(crate) async fn fetch_by_references_authoritative(
+        &self,
+        request: &ReviewsPullRequestResolveRequest,
+    ) -> Result<ReviewsFetchByIds, CliError> {
+        self.fetch_by_references_with_freshness(request, ReferenceFreshness::Authoritative)
+            .await
+    }
+
+    async fn fetch_by_references_with_freshness(
+        &self,
+        request: &ReviewsPullRequestResolveRequest,
+        freshness: ReferenceFreshness,
     ) -> Result<ReviewsFetchByIds, CliError> {
         let mut items: Vec<ReviewItem> = Vec::with_capacity(request.references.len());
         let mut continuations: Vec<NodeContinuation> = Vec::new();
@@ -131,7 +165,7 @@ impl ReviewsGitHubClient {
                 continue;
             };
             let response = self
-                .fetch_one_reference(owner, name, reference.number)
+                .fetch_one_reference(owner, name, reference.number, freshness.cache_policy())
                 .await?;
             let key = reference.key();
             ingest_nodes_chunk(
@@ -172,16 +206,14 @@ impl ReviewsGitHubClient {
         owner: &str,
         name: &str,
         number: u64,
+        cache_policy: GitHubCachePolicy,
     ) -> Result<PullRequestByReferenceResponse, CliError> {
         self.client
             .graphql(
                 GitHubRequestDescriptor::graphql(
                     "reviews.pull_request_by_reference",
                     GitHubPriority::FreshRead,
-                    GitHubCachePolicy::read_through(
-                        Duration::from_mins(5),
-                        Duration::from_hours(1),
-                    ),
+                    cache_policy,
                 ),
                 json!({
                     "query": PULL_REQUEST_BY_REFERENCE_QUERY,
@@ -194,5 +226,19 @@ impl ReviewsGitHubClient {
             )
             .await
             .map(|response| response.body)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn authoritative_reference_reads_bypass_every_cache() {
+        let policy = ReferenceFreshness::Authoritative.cache_policy();
+
+        assert!(policy.force_refresh);
+        assert!(!policy.is_enabled());
+        assert!(!policy.disk);
     }
 }

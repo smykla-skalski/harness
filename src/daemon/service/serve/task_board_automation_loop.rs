@@ -235,11 +235,11 @@ async fn run_loop_tick(
         .await?;
     if !wakes.is_empty() {
         process_wake_batch(db, &wakes, |trigger| async move {
-            task_board_route_executor::run_once_with_trigger(
+            Box::pin(task_board_route_executor::run_once_with_trigger(
                 state,
                 TaskBoardOrchestratorRunOnceRequest::default(),
                 trigger,
-            )
+            ))
             .await
             .map(|_| ())
         })
@@ -280,11 +280,11 @@ async fn run_interval_fallback(
     if loop_state.last_reconciliation.elapsed() < reconcile_after {
         return Ok(());
     }
-    task_board_route_executor::run_once_with_trigger(
+    Box::pin(task_board_route_executor::run_once_with_trigger(
         state,
         TaskBoardOrchestratorRunOnceRequest::default(),
         TaskBoardAutomationRunTrigger::Scheduled,
-    )
+    ))
     .await?;
     loop_state.record_success();
     Ok(())

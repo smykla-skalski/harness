@@ -3,21 +3,24 @@ use std::time::Duration;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
-use crate::daemon::agent_tui::AgentTuiStartRequest;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::http::{
     DaemonHttpState, require_async_db, run_codex_agent_blocking, run_terminal_agent_blocking,
 };
-use crate::daemon::protocol::{CodexRunMode, CodexRunRequest, ManagedAgentSnapshot};
+use crate::daemon::protocol::ManagedAgentSnapshot;
 use crate::errors::{CliError, CliErrorKind};
-use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole};
 use crate::task_board::{
-    AgentMode, DispatchAppliedTask, TaskBoardItem, TaskBoardLaunchCapability, WorkerPromptContext,
-    render_worker_prompt,
+    AgentMode, DispatchAppliedTask, TaskBoardLaunchCapability,
+    validate_task_board_read_only_run_context,
 };
 
-const DEFAULT_INTERACTIVE_RUNTIME: &str = "codex";
 const DISPATCH_CLAIM_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
+
+mod requests;
+use requests::{codex_worker_request, terminal_worker_request, worker_prompt};
+
+mod claim_settlement;
+pub(crate) use claim_settlement::settle_claimed_task_board_worker;
 
 pub(crate) struct TaskBoardDispatchClaimHeartbeat {
     task: JoinHandle<()>,
@@ -94,7 +97,8 @@ pub(crate) fn maintain_task_board_dispatch_claim(
     TaskBoardDispatchClaimHeartbeat { task }
 }
 
-pub(crate) async fn start_worker_for_applied_task(
+#[cfg(test)]
+async fn start_worker_for_applied_task(
     state: &DaemonHttpState,
     applied: &DispatchAppliedTask,
     dispatch_intent_id: &str,
@@ -106,14 +110,31 @@ pub(crate) async fn start_worker_for_applied_task(
         .managed_agent_mutation_locks
         .lock(&session_id, &worker_id)
         .await;
+    start_worker_for_applied_task_in_lane(
+        state,
+        applied,
+        dispatch_intent_id,
+        claim_token,
+        &worker_id,
+    )
+    .await
+}
+
+async fn start_worker_for_applied_task_in_lane(
+    state: &DaemonHttpState,
+    applied: &DispatchAppliedTask,
+    dispatch_intent_id: &str,
+    claim_token: &str,
+    worker_id: &str,
+) -> Result<ManagedAgentSnapshot, TaskBoardWorkerStartError> {
     // Keep this deterministic probe ahead of every mutable preflight. A claim
     // reclaimed after an uncertain start may already own this exact worker;
     // current item or admission drift cannot safely reject it first.
-    let existing = probe_existing_worker(state, applied, &worker_id)
+    let existing = probe_existing_worker(state, applied, worker_id)
         .await
         .map_err(TaskBoardWorkerStartError::uncertain)?;
     if let Some(snapshot) = existing {
-        return recover_same_session_worker(snapshot, &session_id)
+        return recover_same_applied_worker(snapshot, applied)
             .map_err(TaskBoardWorkerStartError::uncertain);
     }
     // Fail-closed recheck at the shared worker-start seam: this guards the
@@ -121,14 +142,28 @@ pub(crate) async fn start_worker_for_applied_task(
     // an already-prepared intent cannot start while the kill switch is engaged.
     // Transport-agnostic because it runs before stdio/bridge selection.
     ensure_spawn_kill_switch_clear(state, &applied.board_item_id).await?;
+    crate::daemon::service::validate_read_only_workflow_launch(
+        require_async_db(state, "read-only workflow start validation")?,
+        applied,
+    )
+    .await?;
+    #[cfg(test)]
+    start_authorization_test_support::pause_before_final_authorization().await;
+    // Keep the transaction-backed admission and item-revision fence immediately before the
+    // external start. A post-commit mutation still follows the existing uncertain-start and
+    // compensation model, but an edit completed before this boundary cannot launch stale work.
     require_async_db(state, "task-board worker admission check")?
         .validate_task_board_dispatch_admission_start(
             dispatch_intent_id,
             claim_token,
             launch_capability(applied.item.agent_mode),
+            applied
+                .read_only_workflow
+                .as_ref()
+                .map(|launch| (launch.prepared_item_revision, launch.configuration_revision)),
         )
         .await?;
-    start_or_recover_worker(state, applied, dispatch_intent_id, &worker_id, &session_id).await
+    start_or_recover_worker(state, applied, dispatch_intent_id, worker_id).await
 }
 
 async fn start_or_recover_worker(
@@ -136,23 +171,22 @@ async fn start_or_recover_worker(
     applied: &DispatchAppliedTask,
     dispatch_intent_id: &str,
     worker_id: &str,
-    session_id: &str,
 ) -> Result<ManagedAgentSnapshot, TaskBoardWorkerStartError> {
     let start_error = match start_worker_by_mode(state, applied, dispatch_intent_id).await {
         Ok(snapshot) => return Ok(snapshot),
         Err(error) => error,
     };
     let probe = probe_existing_worker(state, applied, worker_id).await;
-    resolve_start_failure(start_error, probe, session_id)
+    resolve_start_failure(start_error, probe, applied)
 }
 
 fn resolve_start_failure(
     start_error: CliError,
     probe: Result<Option<ManagedAgentSnapshot>, CliError>,
-    session_id: &str,
+    applied: &DispatchAppliedTask,
 ) -> Result<ManagedAgentSnapshot, TaskBoardWorkerStartError> {
     match probe {
-        Ok(Some(snapshot)) => recover_same_session_worker(snapshot, session_id)
+        Ok(Some(snapshot)) => recover_same_applied_worker(snapshot, applied)
             .map_err(TaskBoardWorkerStartError::uncertain),
         Ok(None) => Err(TaskBoardWorkerStartError::from(start_error)),
         Err(probe_error) => Err(TaskBoardWorkerStartError::uncertain_after_start(
@@ -162,7 +196,8 @@ fn resolve_start_failure(
     }
 }
 
-pub(crate) async fn begin_worker_compensation(
+#[cfg(test)]
+async fn begin_worker_compensation(
     state: &DaemonHttpState,
     db: &AsyncDaemonDb,
     applied: &DispatchAppliedTask,
@@ -286,19 +321,51 @@ fn exact_worker_not_found(error: &CliError, mode: AgentMode, worker_id: &str) ->
     error.message() == expected
 }
 
-fn recover_same_session_worker(
+fn recover_same_applied_worker(
     snapshot: ManagedAgentSnapshot,
-    expected_session_id: &str,
+    applied: &DispatchAppliedTask,
 ) -> Result<ManagedAgentSnapshot, CliError> {
-    if snapshot.session_id() == expected_session_id {
-        return Ok(snapshot);
+    if snapshot.session_id() != applied.session_id {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "managed worker '{}' belongs to session '{}', not reclaimed session '{}'",
+            snapshot.agent_id(),
+            snapshot.session_id(),
+            applied.session_id,
+        ))
+        .into());
     }
-    Err(CliErrorKind::session_agent_conflict(format!(
-        "managed worker '{}' belongs to session '{}', not reclaimed session '{expected_session_id}'",
-        snapshot.agent_id(),
-        snapshot.session_id(),
+    let Some(launch) = applied.read_only_workflow.as_ref() else {
+        return Ok(snapshot);
+    };
+    if validate_task_board_read_only_run_context(&launch.run_context).is_err()
+        || launch.run_context.session_id != applied.session_id
+    {
+        return Err(read_only_recovery_conflict(snapshot.agent_id()));
+    }
+    let ManagedAgentSnapshot::Codex(run) = &snapshot else {
+        return Err(read_only_recovery_conflict(snapshot.agent_id()));
+    };
+    let expected_request = codex_worker_request(applied, &run.run_id);
+    let worktree_matches = run.project_dir == launch.run_context.worktree;
+    let matches = run.board_item_id.as_deref() == Some(applied.board_item_id.as_str())
+        && run.workflow_execution_id == applied.item.workflow.execution_id
+        && run.task_id.is_none()
+        && run.mode == expected_request.mode
+        && run.prompt == expected_request.prompt
+        && run.model == expected_request.model
+        && run.effort == expected_request.effort;
+    if matches && worktree_matches {
+        Ok(snapshot)
+    } else {
+        Err(read_only_recovery_conflict(&run.run_id))
+    }
+}
+
+fn read_only_recovery_conflict(worker_id: &str) -> CliError {
+    CliErrorKind::session_agent_conflict(format!(
+        "managed worker '{worker_id}' contradicts its frozen read-only workflow request"
     ))
-    .into())
+    .into()
 }
 
 async fn start_worker_by_mode(
@@ -379,33 +446,6 @@ async fn start_interactive_worker(
     .await
 }
 
-fn codex_worker_request(applied: &DispatchAppliedTask, managed_run_id: &str) -> CodexRunRequest {
-    let mode = match applied.item.agent_mode {
-        AgentMode::Planning | AgentMode::Evaluate => CodexRunMode::Report,
-        AgentMode::Headless | AgentMode::Interactive => CodexRunMode::WorkspaceWrite,
-    };
-    CodexRunRequest {
-        actor: Some(CONTROL_PLANE_ACTOR_ID.to_string()),
-        prompt: worker_prompt(applied, managed_run_id),
-        mode,
-        // A newly-created task-board session has no leader yet. Requesting the
-        // leader role activates that session so lifecycle checkpoints work;
-        // existing sessions with a leader resolve to the worker fallback.
-        role: SessionRole::Leader,
-        fallback_role: Some(SessionRole::Worker),
-        capabilities: worker_capabilities(&applied.item),
-        name: Some(worker_name(&applied.item)),
-        persona: None,
-        resume_thread_id: None,
-        task_id: Some(applied.work_item_id.clone()),
-        board_item_id: Some(applied.board_item_id.clone()),
-        workflow_execution_id: applied.item.workflow.execution_id.clone(),
-        model: None,
-        effort: None,
-        allow_custom_model: false,
-    }
-}
-
 const fn launch_capability(mode: AgentMode) -> Option<TaskBoardLaunchCapability> {
     match mode {
         AgentMode::Planning | AgentMode::Evaluate => {
@@ -414,35 +454,6 @@ const fn launch_capability(mode: AgentMode) -> Option<TaskBoardLaunchCapability>
         AgentMode::Headless => Some(TaskBoardLaunchCapability::WorkspaceWrite),
         AgentMode::Interactive => None,
     }
-}
-
-fn terminal_worker_request(
-    applied: &DispatchAppliedTask,
-    managed_run_id: &str,
-) -> AgentTuiStartRequest {
-    AgentTuiStartRequest {
-        runtime: DEFAULT_INTERACTIVE_RUNTIME.to_string(),
-        role: SessionRole::Leader,
-        fallback_role: Some(SessionRole::Worker),
-        capabilities: worker_capabilities(&applied.item),
-        name: Some(worker_name(&applied.item)),
-        prompt: Some(worker_prompt(applied, managed_run_id)),
-        project_dir: None,
-        argv: Vec::new(),
-        rows: 24,
-        cols: 80,
-        persona: None,
-        task_id: Some(applied.work_item_id.clone()),
-        board_item_id: Some(applied.board_item_id.clone()),
-        workflow_execution_id: applied.item.workflow.execution_id.clone(),
-        model: None,
-        effort: None,
-        allow_custom_model: false,
-    }
-}
-
-fn worker_name(item: &TaskBoardItem) -> String {
-    format!("Task Board: {}", item.title)
 }
 
 fn codex_worker_id(dispatch_intent_id: &str) -> String {
@@ -461,27 +472,18 @@ pub(crate) fn managed_worker_id(applied: &DispatchAppliedTask, dispatch_intent_i
     }
 }
 
-fn worker_capabilities(item: &TaskBoardItem) -> Vec<String> {
-    let mut capabilities = vec![
-        "task-board".to_string(),
-        format!("task-board:item:{}", item.id),
-    ];
-    capabilities.extend(item.tags.iter().map(|tag| format!("task-board:tag:{tag}")));
-    capabilities
-}
-
-fn worker_prompt(applied: &DispatchAppliedTask, managed_run_id: &str) -> String {
-    render_worker_prompt(
-        &applied.item,
-        &WorkerPromptContext {
-            board_item_id: &applied.board_item_id,
-            work_item_id: &applied.work_item_id,
-            worktree: applied.item.workflow.worktree.as_deref(),
-            session_id: Some(&applied.session_id),
-            managed_run_id: Some(managed_run_id),
-            status: applied.item.status,
-        },
-    )
+pub(crate) fn managed_admission_owner_id(
+    applied: &DispatchAppliedTask,
+    dispatch_intent_id: &str,
+) -> String {
+    applied
+        .read_only_workflow
+        .as_ref()
+        .and(applied.item.workflow.execution_id.as_deref())
+        .map_or_else(
+            || managed_worker_id(applied, dispatch_intent_id),
+            crate::daemon::db::workflow_owner,
+        )
 }
 
 pub(crate) fn rendered_worker_prompt(
@@ -497,5 +499,13 @@ pub(crate) fn rendered_worker_prompt(
 mod test_support;
 
 #[cfg(test)]
+#[path = "task_board_managed_agents/start_authorization_test_support.rs"]
+mod start_authorization_test_support;
+
+#[cfg(test)]
 #[path = "task_board_managed_agents/tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "task_board_managed_agents/read_only_start_revision_tests.rs"]
+mod read_only_start_revision_tests;

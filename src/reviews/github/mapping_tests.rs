@@ -5,7 +5,8 @@ use crate::reviews::{
     ReviewMergeableState, ReviewPullRequestState, ReviewReviewEventState, ReviewReviewStatus,
 };
 
-use super::apply_policy_review_metadata;
+use super::{apply_policy_review_metadata, viewer_approval_matches_head};
+use crate::reviews::github::types::{ViewerLatestReviewNode, ViewerReviewCommitNode};
 
 fn review(author: &str, state: ReviewReviewEventState) -> PullRequestReview {
     PullRequestReview {
@@ -118,4 +119,41 @@ fn policy_metadata_handles_zero_and_unsatisfied_required_approvals() {
         items[1].approval_requirement_satisfied_after_viewer_approval,
         Some(false)
     );
+}
+
+#[test]
+fn viewer_approval_is_active_only_for_the_current_head() {
+    let review = ViewerLatestReviewNode {
+        state: Some("APPROVED".into()),
+        commit: Some(ViewerReviewCommitNode {
+            oid: "head-approved".into(),
+        }),
+    };
+
+    assert!(viewer_approval_matches_head(
+        Some(&review),
+        Some("head-approved")
+    ));
+    assert!(!viewer_approval_matches_head(
+        Some(&review),
+        Some("head-new")
+    ));
+
+    let review_without_commit = ViewerLatestReviewNode {
+        state: Some("APPROVED".into()),
+        commit: None,
+    };
+    assert!(!viewer_approval_matches_head(
+        Some(&review_without_commit),
+        None
+    ));
+
+    let review_with_blank_commit = ViewerLatestReviewNode {
+        state: Some("APPROVED".into()),
+        commit: Some(ViewerReviewCommitNode { oid: String::new() }),
+    };
+    assert!(!viewer_approval_matches_head(
+        Some(&review_with_blank_commit),
+        Some("")
+    ));
 }

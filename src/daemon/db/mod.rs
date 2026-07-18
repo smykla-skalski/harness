@@ -69,6 +69,7 @@ mod schema_migrations;
 mod schema_repairs;
 mod schema_repairs_admission;
 mod schema_repairs_external_creates;
+mod schema_repairs_reconciliation_cursors;
 mod schema_repairs_wake_events;
 mod schema_sql;
 mod schema_v10;
@@ -101,8 +102,10 @@ mod schema_v36;
 mod schema_v37;
 mod schema_v38;
 mod schema_v39;
+mod schema_v40;
 #[allow(dead_code)]
 mod task_board;
+pub(crate) use task_board::workflow_owner;
 #[allow(unused_imports)]
 pub(crate) use task_board::{
     ClaimedTaskBoardDispatch, ClaimedTaskBoardDispatchPreparation, ReservedTaskBoardDispatch,
@@ -305,7 +308,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-pub(crate) const SCHEMA_VERSION: &str = "39";
+pub(crate) const SCHEMA_VERSION: &str = "40";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]

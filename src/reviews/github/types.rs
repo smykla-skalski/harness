@@ -227,6 +227,13 @@ pub(super) struct ViewerLatestReviewRequestNode {
 #[derive(Debug, Deserialize)]
 pub(super) struct ViewerLatestReviewNode {
     pub(super) state: Option<String>,
+    #[serde(default)]
+    pub(super) commit: Option<ViewerReviewCommitNode>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct ViewerReviewCommitNode {
+    pub(super) oid: String,
 }
 
 #[derive(Debug, Deserialize)]

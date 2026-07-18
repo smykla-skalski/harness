@@ -193,6 +193,7 @@ fn apply_dispatch_plan(
         work_item_id,
         lifecycle: plan.applied_lifecycle(),
         item,
+        read_only_workflow: None,
     })
 }
 

@@ -256,6 +256,7 @@ mod signals_timeout;
 mod status;
 mod sync_support;
 mod task_board;
+pub(crate) use task_board::validate_read_only_workflow_launch;
 mod task_board_automation_runtime;
 mod task_board_completion;
 mod task_board_db;
@@ -270,9 +271,23 @@ mod task_board_orchestrator_db;
 mod task_board_orchestrator_run_lease;
 mod task_board_orchestrator_settings;
 mod task_board_orchestrator_step_mode;
+mod task_board_read_only_coordinator;
+#[cfg(test)]
+mod task_board_read_only_coordinator_tests;
+mod task_board_read_only_runtime;
 mod task_board_runtime;
 #[cfg(test)]
 mod task_board_sync_tests;
+mod task_board_workflow_execution;
+#[cfg(test)]
+mod task_board_workflow_execution_tests;
+#[cfg(test)]
+mod task_board_workflow_repository_tests;
+mod task_board_workflow_review;
+#[cfg(test)]
+mod task_board_workflow_review_tests;
+#[cfg(test)]
+mod task_board_workflow_test_support;
 mod wake_route;
 
 pub use crate::reviews::fetch_review_avatar;

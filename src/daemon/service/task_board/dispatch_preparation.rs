@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use futures_util::FutureExt;
 use tokio::task::{JoinError, spawn_blocking};
 use tokio::time::sleep;
 
@@ -15,7 +16,10 @@ use crate::daemon::service::{
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::storage as session_storage;
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionState};
-use crate::task_board::{DispatchAppliedTask, DispatchFailureKind, DispatchPlan, SessionIntent};
+use crate::task_board::{
+    DispatchAppliedTask, DispatchFailureKind, DispatchPlan, SessionIntent,
+    TaskBoardReadOnlyWorkflowLaunch,
+};
 use crate::workspace::adopter::SessionAdopter;
 use crate::workspace::layout::SessionLayout;
 use crate::workspace::worktree::WorktreeController;
@@ -89,14 +93,20 @@ pub(crate) async fn prepare_claimed_task_board_dispatch(
         }
     };
     let checkout = prepared?;
-    db.complete_task_board_dispatch_preparation(claim, &checkout.branch, &checkout.worktree)
-        .await
-        .map_err(|error| (DispatchFailureKind::LinkItem, error))
+    db.complete_task_board_dispatch_preparation_with_workflow(
+        claim,
+        &checkout.branch,
+        &checkout.worktree,
+        checkout.read_only_workflow,
+    )
+    .await
+    .map_err(|error| (DispatchFailureKind::LinkItem, error))
 }
 
 struct DispatchCheckout {
     branch: String,
     worktree: String,
+    read_only_workflow: Option<TaskBoardReadOnlyWorkflowLaunch>,
 }
 
 async fn prepare_dispatch_side_effects(
@@ -122,9 +132,21 @@ async fn prepare_dispatch_side_effects(
                 ))),
             )
         })?;
+    let worktree = resolved.state.worktree_path.to_string_lossy().into_owned();
+    let read_only_workflow = super::read_only_workflow_launch::prepare_read_only_workflow_launch(
+        db,
+        &claim.preparation.board_item_id,
+        &claim.preparation.session_id,
+        &worktree,
+        claim.preparation.source_item_revision,
+    )
+    .boxed()
+    .await
+    .map_err(|error| (DispatchFailureKind::LinkItem, error))?;
     Ok(DispatchCheckout {
         branch: resolved.state.branch_ref,
-        worktree: resolved.state.worktree_path.to_string_lossy().into_owned(),
+        worktree,
+        read_only_workflow,
     })
 }
 

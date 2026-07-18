@@ -103,6 +103,7 @@ pub(super) fn current_schema_shape_needs_repair(
         "task_board_execution_hosts",
         "task_board_remote_assignments",
         "task_board_orchestrator_wake_events",
+        "task_board_reconciliation_cursors",
     ] {
         if !table_exists(conn, table)? {
             return Ok(true);
@@ -147,6 +148,9 @@ pub(super) fn current_schema_shape_needs_repair(
     if super::schema_repairs_admission::shape_needs_repair(conn)? {
         return Ok(true);
     }
+    if super::schema_repairs_reconciliation_cursors::shape_needs_repair(conn)? {
+        return Ok(true);
+    }
     Ok(false)
 }
 
@@ -181,9 +185,11 @@ pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError>
     super::schema_v37::run(&db.conn)?;
     super::schema_v38::run(&db.conn)?;
     super::schema_v39::run(&db.conn)?;
+    super::schema_v40::run(&db.conn)?;
     super::schema_repairs_external_creates::require_complete_shape(&db.conn)?;
     super::schema_repairs_wake_events::require_complete_shape(&db.conn)?;
     super::schema_repairs_admission::require_complete_shape(&db.conn)?;
+    super::schema_repairs_reconciliation_cursors::require_complete_shape(&db.conn)?;
     db.conn
         .execute(
             "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",

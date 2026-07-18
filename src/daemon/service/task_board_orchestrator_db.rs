@@ -158,7 +158,14 @@ async fn execute_run(
 
     begin_stage(session, 5, "publish").await?;
     let publish = async {
-        let items = items_for_input(db, &prepared.input).await?;
+        let mut items = items_for_input(db, &prepared.input).await?;
+        items.retain(|item| {
+            !matches!(
+                item.workflow_kind,
+                crate::task_board::TaskBoardWorkflowKind::Review
+                    | crate::task_board::TaskBoardWorkflowKind::PrReview
+            )
+        });
         run_task_board_github_automation_async(settings, &prepared.input, &items, db).await
     }
     .await;

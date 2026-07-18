@@ -153,7 +153,8 @@ async fn handle_run_once_result(
             .and_then(|run| run.dispatch.as_ref())
             .map(|dispatch| dispatch.applied.clone())
             .unwrap_or_default();
-        let (kept, failures) = worker_start::start_claimed_workers(state, &applied, async_db).await;
+        let (kept, failures) =
+            Box::pin(worker_start::start_claimed_workers(state, &applied, async_db)).await;
         if let Some(dispatch) = status
             .last_run
             .as_mut()
@@ -256,6 +257,7 @@ mod tests {
             work_item_id: format!("work-{id}"),
             lifecycle,
             item,
+            read_only_workflow: None,
         }
     }
 

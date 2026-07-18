@@ -6,6 +6,7 @@ mod validation;
 pub(super) use self::compensation::{
     commit_compensating_dispatch_admission_in_tx, finalize_compensating_dispatch_admission_in_tx,
 };
+pub(super) use self::validation::validate_worker_start_fence_in_tx;
 use self::validation::{
     CurrentAllowedAdmission, admission_policy_is_configured_in_tx, current_allowed_admission,
     current_settings_revision, decode_requirements, intent_item_in_tx,
@@ -347,6 +348,7 @@ impl AsyncDaemonDb {
         intent_id: &str,
         claim_token: &str,
         actual_capability: Option<TaskBoardLaunchCapability>,
+        expected_read_only_fence: Option<(i64, u64)>,
     ) -> Result<(), CliError> {
         let mut transaction = self
             .begin_immediate_transaction("task board admission start validation")
@@ -361,6 +363,12 @@ impl AsyncDaemonDb {
                 "task board admission item revision changed while loading",
             ));
         }
+        validate_worker_start_fence_in_tx(
+            &mut transaction,
+            expected_read_only_fence,
+            loaded_revision,
+        )
+        .await?;
         super::dispatch_intents::ensure_dispatch_item_startable(
             &item,
             &session_id,

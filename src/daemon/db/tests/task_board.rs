@@ -22,6 +22,10 @@ mod dispatch;
 mod dispatch_claims;
 mod imports;
 mod terminal_dispatch_lifecycle;
+mod workflow_executions;
+mod workflow_phase_settlement;
+mod workflow_recovery_queue;
+mod workflow_side_effect_claims;
 
 #[tokio::test]
 async fn task_board_instance_identity_is_stable_per_database() {

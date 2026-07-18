@@ -11,7 +11,7 @@ use crate::task_board::github::GitHubProjectConfig;
 
 use super::types::{
     CommitConnection, LabelNode, PageInfo, RepositoryLabelConnection, RepositoryLabelNode,
-    ReviewNode, SearchNode, StatusContextNode,
+    ReviewNode, SearchNode, StatusContextNode, ViewerLatestReviewNode,
 };
 use super::{
     GRAPHQL_PAGE_SIZE, PullRequestReview, ReviewActionKind, ReviewActionOutcome,
@@ -208,9 +208,10 @@ fn build_review_item(
         .default_branch_ref
         .as_ref()
         .map(|branch| branch.name.clone());
-    let viewer_has_active_approval = node.viewer_latest_review.as_ref().is_some_and(|review| {
-        map_review_event_state(review.state.as_deref()) == ReviewReviewEventState::Approved
-    });
+    let viewer_has_active_approval = viewer_approval_matches_head(
+        node.viewer_latest_review.as_ref(),
+        node.head_ref_oid.as_deref(),
+    );
     let viewer_is_requested_reviewer = node.viewer_latest_review_request.is_some();
     let backport_detection =
         backport_detector.and_then(|detector| detector.detect(&ctx.repository_name, &node.title));
@@ -264,6 +265,22 @@ fn build_review_item(
         auto_merge_enabled: Some(node.auto_merge_request.is_some()),
         approval_requirement_satisfied_after_viewer_approval: None,
     }
+}
+
+fn viewer_approval_matches_head(
+    review: Option<&ViewerLatestReviewNode>,
+    head: Option<&str>,
+) -> bool {
+    let Some(head) = head.filter(|head| !head.trim().is_empty()) else {
+        return false;
+    };
+
+    review.is_some_and(|review| {
+        map_review_event_state(review.state.as_deref()) == ReviewReviewEventState::Approved
+            && review.commit.as_ref().is_some_and(|commit| {
+                !commit.oid.trim().is_empty() && commit.oid == head
+            })
+    })
 }
 
 pub(super) fn apply_policy_review_metadata(items: &mut [ReviewItem]) {

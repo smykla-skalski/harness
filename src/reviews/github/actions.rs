@@ -23,6 +23,9 @@ use super::{
     ReviewsRequestReviewRequest, ReviewsRerunChecksRequest, timeline,
 };
 
+const DIRECT_APPROVAL_OPERATION: &str = "reviews.approve";
+const POLICY_APPROVAL_OPERATION: &str = "reviews.auto_approve";
+
 impl ReviewsGitHubClient {
     /// Resolve the authenticated GitHub viewer through the shared GitHub data
     /// source. Used to mark "(you)" on the current viewer's reviewer pill and
@@ -38,14 +41,14 @@ impl ReviewsGitHubClient {
     ) -> Result<Vec<ReviewActionResult>, CliError> {
         let mut results = Vec::with_capacity(request.targets.len());
         for target in &request.targets {
-            let result = approve_target(&self.client, target, "reviews.approve").await;
+            let result = approve_target(&self.client, target, DIRECT_APPROVAL_OPERATION).await;
             results.push(action_result(target, ReviewActionKind::Approve, result));
         }
         Ok(results)
     }
 
     pub(crate) async fn policy_approve(&self, target: &ReviewTarget) -> Result<(), CliError> {
-        approve_target(&self.client, target, "reviews.auto_approve").await
+        approve_target(&self.client, target, POLICY_APPROVAL_OPERATION).await
     }
 
     pub(crate) async fn comment(
@@ -317,18 +320,32 @@ async fn approve_target(
     target: &ReviewTarget,
     operation: &str,
 ) -> Result<(), CliError> {
-    client
-        .graphql_envelope(
-            mutation_descriptor(operation),
-            json!({
-                "query": APPROVE_MUTATION,
-                "variables": {
-                    "id": target.pull_request_id,
-                },
-            }),
-        )
-        .await
-        .map(|_| ())
+    let (descriptor, body) = approval_request(target, operation)?;
+    client.graphql_envelope(descriptor, body).await.map(|_| ())
+}
+
+fn approval_request(
+    target: &ReviewTarget,
+    operation: &str,
+) -> Result<(GitHubRequestDescriptor, serde_json::Value), CliError> {
+    if target.head_sha.trim().is_empty() {
+        return Err(CliErrorKind::workflow_parse(format!(
+            "cannot approve {}/pull/{} without an exact head commit",
+            target.repository, target.number
+        ))
+        .into());
+    }
+
+    Ok((
+        mutation_descriptor(operation),
+        json!({
+            "query": APPROVE_MUTATION,
+            "variables": {
+                "id": target.pull_request_id,
+                "commitOID": target.head_sha,
+            },
+        }),
+    ))
 }
 
 async fn merge_target(
@@ -351,5 +368,81 @@ async fn merge_target(
             target.repository
         ))
         .into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::reviews::{
+        ReviewCheckStatus, ReviewMergeableState, ReviewPullRequestState, ReviewReviewStatus,
+        ReviewTargetFlags,
+    };
+
+    #[test]
+    fn approval_mutation_requires_commit_oid() {
+        assert!(APPROVE_MUTATION.contains("$commitOID: GitObjectID!"));
+        assert!(APPROVE_MUTATION.contains("commitOID: $commitOID"));
+    }
+
+    #[test]
+    fn every_approval_path_binds_the_target_head_sha() {
+        let target = review_target();
+
+        for operation in [DIRECT_APPROVAL_OPERATION, POLICY_APPROVAL_OPERATION] {
+            let (descriptor, body) =
+                approval_request(&target, operation).expect("valid approval target");
+
+            assert_eq!(descriptor.operation, operation);
+            assert_eq!(
+                body.pointer("/variables/commitOID")
+                    .and_then(serde_json::Value::as_str),
+                Some(target.head_sha.as_str())
+            );
+            assert_eq!(
+                body.pointer("/variables/id")
+                    .and_then(serde_json::Value::as_str),
+                Some(target.pull_request_id.as_str())
+            );
+        }
+    }
+
+    #[test]
+    fn every_approval_path_rejects_a_blank_target_head_sha() {
+        for head_sha in ["", " \t"] {
+            let mut target = review_target();
+            target.head_sha = head_sha.to_owned();
+
+            for operation in [DIRECT_APPROVAL_OPERATION, POLICY_APPROVAL_OPERATION] {
+                let error = approval_request(&target, operation)
+                    .expect_err("approval must require an exact target head");
+
+                assert_eq!(error.code(), "WORKFLOW_PARSE");
+                assert!(error.to_string().contains("exact head commit"));
+            }
+        }
+    }
+
+    fn review_target() -> ReviewTarget {
+        ReviewTarget {
+            pull_request_id: "PR_kwDOexample".to_owned(),
+            repository_id: "R_kwDOexample".to_owned(),
+            repository: "example/widgets".to_owned(),
+            number: 42,
+            url: "https://github.com/example/widgets/pull/42".to_owned(),
+            state: ReviewPullRequestState::Open,
+            head_sha: "0123456789abcdef".to_owned(),
+            mergeable: ReviewMergeableState::Mergeable,
+            review_status: ReviewReviewStatus::ReviewRequired,
+            check_status: ReviewCheckStatus::Success,
+            flags: ReviewTargetFlags::default(),
+            viewer_can_merge_as_admin: false,
+            required_failed_check_names: Vec::new(),
+            check_suite_ids: Vec::new(),
+            has_conflict_markers: None,
+            viewer_has_active_approval: None,
+            auto_merge_enabled: None,
+            approval_requirement_satisfied_after_viewer_approval: None,
+        }
     }
 }

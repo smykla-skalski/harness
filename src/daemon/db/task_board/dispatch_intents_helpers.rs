@@ -120,6 +120,78 @@ impl AsyncDaemonDb {
             .await
     }
 
+    pub(crate) async fn task_board_dispatch_completion_matches(
+        &self,
+        intent_id: &str,
+        execution_id: &str,
+        managed_worker_id: &str,
+        admission_owner_id: &str,
+        side_effect_worker_id: &str,
+        require_workflow_evidence: bool,
+    ) -> Result<bool, CliError> {
+        let intent_matches = query_scalar::<_, bool>(
+            "SELECT EXISTS(
+                 SELECT 1 FROM task_board_dispatch_intents AS intent
+                 WHERE intent.intent_id = ?1 AND intent.workflow_execution_id = ?2
+                   AND intent.status = 'completed'
+                   AND COALESCE((
+                       SELECT json_array_length(decision.requirements_json)
+                       FROM task_board_dispatch_admission_decisions AS decision
+                       WHERE decision.intent_id = intent.intent_id
+                         AND decision.is_current = 1 AND decision.decision = 'allowed'
+                   ), 0) = (
+                       SELECT COUNT(*) FROM task_board_dispatch_admission_ledger AS ledger
+                       WHERE ledger.intent_id = intent.intent_id
+                         AND ledger.committed_at IS NOT NULL
+                         AND ledger.managed_worker_id = ?3
+                   )
+                   AND NOT EXISTS(
+                       SELECT 1 FROM task_board_dispatch_admission_ledger AS ledger
+                       WHERE ledger.intent_id = intent.intent_id
+                         AND ledger.committed_at IS NOT NULL
+                         AND (ledger.managed_worker_id IS NULL
+                              OR ledger.managed_worker_id != ?3)
+                   )
+             )",
+        )
+        .bind(intent_id)
+        .bind(execution_id)
+        .bind(managed_worker_id)
+        .fetch_one(self.pool())
+        .await
+        .map_err(|error| {
+            db_error(format!(
+                "check exact task board dispatch completion: {error}"
+            ))
+        })?;
+        if !intent_matches || !require_workflow_evidence {
+            return Ok(intent_matches);
+        }
+        query_scalar::<_, bool>(
+            "SELECT EXISTS(
+                 SELECT 1 FROM task_board_workflow_executions AS execution
+                 WHERE execution.execution_id = ?1
+                   AND json_extract(execution.resource_ownership_json,
+                                    '$.resources.admission_owner') = ?2
+                   AND EXISTS(
+                       SELECT 1 FROM task_board_execution_attempts AS attempt
+                       WHERE attempt.execution_id = execution.execution_id
+                         AND attempt.idempotency_key = ?3
+                   )
+             )",
+        )
+        .bind(execution_id)
+        .bind(admission_owner_id)
+        .bind(side_effect_worker_id)
+        .fetch_one(self.pool())
+        .await
+        .map_err(|error| {
+            db_error(format!(
+                "check exact task board workflow completion evidence: {error}"
+            ))
+        })
+    }
+
     pub(crate) async fn task_board_dispatch_is_held(
         &self,
         applied: &DispatchAppliedTask,
@@ -216,14 +288,13 @@ impl AsyncDaemonDb {
         &self,
         intent_id: &str,
         claim_token: &str,
-        consumed_approval_grant_id: Option<&str>,
         managed_worker_id: &str,
         reason: &str,
     ) -> Result<(), CliError> {
         self.finish_failed_task_board_dispatch(
             intent_id,
             claim_token,
-            consumed_approval_grant_id,
+            None,
             Some(managed_worker_id),
             reason,
             true,

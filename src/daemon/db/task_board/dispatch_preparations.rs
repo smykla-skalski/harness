@@ -12,7 +12,11 @@ use super::items::{bump_change_in_tx, load_item_in_tx, replace_item_in_tx};
 use crate::daemon::db::policy::consume_approval_grant_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::infra::io;
-use crate::task_board::{DispatchAppliedTask, DispatchPlan, SessionIntent};
+use crate::task_board::{
+    DispatchAppliedTask, DispatchPlan, SessionIntent, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
+    TaskBoardItem, TaskBoardReadOnlyRunContext, TaskBoardReadOnlyWorkflowLaunch,
+    TaskBoardWorkflowKind,
+};
 
 const PREPARATION_LEASE_SECONDS: i64 = 30;
 
@@ -33,6 +37,8 @@ pub(crate) struct TaskBoardDispatchPreparation {
     pub(crate) actor: String,
     pub(crate) project_dir: Option<String>,
     pub(crate) plan: DispatchPlan,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) source_item_revision: Option<i64>,
     #[serde(default)]
     pub(crate) hold_worker: bool,
 }
@@ -52,6 +58,28 @@ pub(crate) enum ReservedTaskBoardDispatch {
     },
     Applied(DispatchAppliedTask),
     Blocked(TaskBoardDispatchAdmissionSnapshot),
+}
+
+fn preparation_revision_error(
+    preparation: &TaskBoardDispatchPreparation,
+    item: &TaskBoardItem,
+    item_revision: i64,
+) -> Option<&'static str> {
+    if preparation
+        .source_item_revision
+        .is_some_and(|expected| expected != item_revision)
+    {
+        Some("read-only workflow item revision changed before preparation claim")
+    } else if preparation.source_item_revision.is_none()
+        && matches!(
+            item.workflow_kind,
+            TaskBoardWorkflowKind::Review | TaskBoardWorkflowKind::PrReview
+        )
+    {
+        Some("legacy read-only preparation has no frozen item revision")
+    } else {
+        None
+    }
 }
 
 impl AsyncDaemonDb {
@@ -116,6 +144,11 @@ impl AsyncDaemonDb {
             actor: actor.to_string(),
             project_dir: project_dir.map(ToString::to_string),
             plan: plan.clone(),
+            source_item_revision: matches!(
+                item.workflow_kind,
+                TaskBoardWorkflowKind::Review | TaskBoardWorkflowKind::PrReview
+            )
+            .then_some(item_revision),
             hold_worker,
         };
         insert_preparation(&mut transaction, &intent_id, &preparation).await?;
@@ -171,6 +204,13 @@ impl AsyncDaemonDb {
                     preparation.board_item_id
                 ))
             })?;
+        if let Some(reason) = preparation_revision_error(&preparation, &item, item_revision) {
+            fail_preparation_admission_in_tx(&mut transaction, intent_id, reason).await?;
+            transaction.commit().await.map_err(|error| {
+                db_error(format!("commit stale task board preparation: {error}"))
+            })?;
+            return Err(crate::errors::CliErrorKind::invalid_transition(reason).into());
+        }
         validate_reservable_item(&item, &preparation.plan)?;
         if let TaskBoardAdmissionCheck::Blocked(admission) =
             revalidate_dispatch_admission_in_tx(&mut transaction, intent_id, &item, item_revision)
@@ -268,16 +308,27 @@ impl AsyncDaemonDb {
             .map_err(|error| db_error(format!("commit task board preparation renewal: {error}")))
     }
 
-    /// Atomically link a prepared session task and expose it for worker startup.
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "dispatch completion must keep item linking and intent publication atomic"
-    )]
     pub(crate) async fn complete_task_board_dispatch_preparation(
         &self,
         claim: &ClaimedTaskBoardDispatchPreparation,
         branch: &str,
         worktree: &str,
+    ) -> Result<DispatchAppliedTask, CliError> {
+        self.complete_task_board_dispatch_preparation_with_workflow(claim, branch, worktree, None)
+            .await
+    }
+
+    /// Atomically link a prepared session task and expose it for worker startup.
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "dispatch completion must keep item linking and intent publication atomic"
+    )]
+    pub(crate) async fn complete_task_board_dispatch_preparation_with_workflow(
+        &self,
+        claim: &ClaimedTaskBoardDispatchPreparation,
+        branch: &str,
+        worktree: &str,
+        mut read_only_workflow: Option<TaskBoardReadOnlyWorkflowLaunch>,
     ) -> Result<DispatchAppliedTask, CliError> {
         let mut transaction = self
             .begin_immediate_transaction("task board dispatch preparation completion")
@@ -293,8 +344,21 @@ impl AsyncDaemonDb {
                 ))
             })?;
         validate_reservable_item(&item, &preparation.plan)?;
+        read_only_workflow = prepare_read_only_launch_for_publication(
+            preparation,
+            &item,
+            revision,
+            worktree,
+            read_only_workflow,
+        )?;
         apply_preparation_to_item(&mut item, preparation, branch, worktree);
-        replace_item_in_tx(&mut transaction, &item, revision + 1).await?;
+        let prepared_item_revision = revision
+            .checked_add(1)
+            .ok_or_else(|| db_error("task-board item revision is out of range"))?;
+        replace_item_in_tx(&mut transaction, &item, prepared_item_revision).await?;
+        if let Some(launch) = read_only_workflow.as_mut() {
+            launch.prepared_item_revision = prepared_item_revision;
+        }
         // Immediate dispatch consumes its one-shot grant with publication.
         // Step-mode dispatch deliberately keeps the grant live while held;
         // delivery re-evaluates current policy and consumes atomically there.
@@ -314,6 +378,7 @@ impl AsyncDaemonDb {
             work_item_id: preparation.work_item_id.clone(),
             lifecycle: preparation.plan.applied_lifecycle(),
             item,
+            read_only_workflow,
         };
         let payload = serde_json::to_string(&applied).map_err(|error| {
             db_error(format!("serialize prepared task board dispatch: {error}"))
@@ -378,4 +443,63 @@ impl AsyncDaemonDb {
             )))
         }
     }
+}
+
+fn prepare_read_only_launch_for_publication(
+    preparation: &TaskBoardDispatchPreparation,
+    item: &TaskBoardItem,
+    revision: i64,
+    worktree: &str,
+    mut launch: Option<TaskBoardReadOnlyWorkflowLaunch>,
+) -> Result<Option<TaskBoardReadOnlyWorkflowLaunch>, CliError> {
+    match (preparation.source_item_revision, launch.as_mut()) {
+        (Some(source), Some(launch)) => {
+            crate::task_board::validate_task_board_read_only_item_revisions(
+                launch.source_item_revision,
+                launch.prepared_item_revision,
+            )
+            .map_err(|error| db_error(error.to_string()))?;
+            if revision != source
+                || launch.source_item_revision != source
+                || launch.prepared_item_revision != source
+            {
+                return Err(db_error(
+                    "read-only workflow item revision changed before preparation publication",
+                ));
+            }
+            if launch.workflow_kind != item.workflow_kind
+                || !matches!(
+                    item.workflow_kind,
+                    TaskBoardWorkflowKind::Review | TaskBoardWorkflowKind::PrReview
+                )
+                || item.agent_mode != crate::task_board::AgentMode::Evaluate
+            {
+                return Err(db_error(
+                    "read-only workflow identity changed before preparation publication",
+                ));
+            }
+            launch.run_context = TaskBoardReadOnlyRunContext {
+                schema_version: TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
+                session_id: preparation.session_id.clone(),
+                title: item.title.clone(),
+                body: item.body.clone(),
+                tags: item.tags.clone(),
+                worktree: worktree.to_string(),
+            };
+            crate::task_board::validate_task_board_read_only_run_context(&launch.run_context)
+                .map_err(|error| db_error(format!("validate read-only run context: {error}")))?;
+        }
+        (Some(_), None) => {
+            return Err(db_error(
+                "read-only dispatch preparation omitted its launch",
+            ));
+        }
+        (None, Some(_)) => {
+            return Err(db_error(
+                "non-read-only dispatch supplied a read-only launch",
+            ));
+        }
+        (None, None) => {}
+    }
+    Ok(launch)
 }

@@ -52,6 +52,7 @@ async fn admission_revalidates_then_commits_and_releases_concurrency() {
         &intent,
         &claim.claim_token,
         Some(TaskBoardLaunchCapability::WorkspaceWrite),
+        None,
     )
     .await
     .expect("validate launch");
@@ -113,6 +114,7 @@ async fn estimates_remain_frozen_after_started_worker_becomes_terminal() {
         &intent,
         &claim.claim_token,
         Some(TaskBoardLaunchCapability::WorkspaceWrite),
+        None,
     )
     .await
     .expect("validate launch");

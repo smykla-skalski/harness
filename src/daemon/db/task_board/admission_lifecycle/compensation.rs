@@ -1,4 +1,4 @@
-use sqlx::{Sqlite, Transaction, query, query_scalar};
+use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 use super::super::{ITEMS_CHANGE_SCOPE, items::bump_change_in_tx};
 use super::validation::{CurrentAllowedAdmission, current_allowed_admission, decode_requirements};
@@ -50,18 +50,22 @@ pub(in crate::daemon::db::task_board) async fn finalize_compensating_dispatch_ad
         return Ok(());
     };
     let requirements = decode_requirements(&recorded.requirements_json)?;
-    ensure_compensating_admission_is_complete(
+    let expected_concurrency = requirements
+        .iter()
+        .filter(|requirement| requirement.kind == TaskBoardAdmissionRequirementKind::Concurrency)
+        .count();
+    let released_concurrency = ensure_compensating_admission_is_complete(
         transaction,
         intent_id,
         managed_worker_id,
         &recorded,
         requirements.len(),
+        expected_concurrency,
     )
     .await?;
-    let expected_concurrency = requirements
-        .iter()
-        .filter(|requirement| requirement.kind == TaskBoardAdmissionRequirementKind::Concurrency)
-        .count();
+    let remaining_concurrency = expected_concurrency
+        .checked_sub(released_concurrency)
+        .ok_or_else(|| db_error("task board compensation released excess concurrency rows"))?;
     let changed = query(
         "UPDATE task_board_dispatch_admission_ledger
          SET state = 'released', released_at = ?5
@@ -81,7 +85,7 @@ pub(in crate::daemon::db::task_board) async fn finalize_compensating_dispatch_ad
         ))
     })?
     .rows_affected();
-    ensure_row_count(changed, expected_concurrency, "finalize released")?;
+    ensure_row_count(changed, remaining_concurrency, "finalize released")?;
     if changed > 0 {
         bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
     }
@@ -94,11 +98,16 @@ async fn ensure_compensating_admission_is_complete(
     managed_worker_id: &str,
     recorded: &CurrentAllowedAdmission,
     expected_rows: usize,
-) -> Result<(), CliError> {
-    let rows = query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM task_board_dispatch_admission_ledger
+    expected_concurrency: usize,
+) -> Result<usize, CliError> {
+    let (committed_rows, released_concurrency) = query_as::<_, (i64, i64)>(
+        "SELECT
+             COALESCE(SUM(CASE WHEN state = 'committed' THEN 1 ELSE 0 END), 0),
+             COALESCE(SUM(CASE
+                 WHEN kind = 'concurrency' AND state = 'released' THEN 1 ELSE 0 END), 0)
+         FROM task_board_dispatch_admission_ledger
          WHERE decision_id = ?1 AND intent_id = ?2 AND generation = ?3
-           AND managed_worker_id = ?4 AND state = 'committed'",
+           AND managed_worker_id = ?4",
     )
     .bind(&recorded.decision_id)
     .bind(intent_id)
@@ -108,14 +117,19 @@ async fn ensure_compensating_admission_is_complete(
     .await
     .map_err(|error| db_error(format!("load compensating task board admission: {error}")))?;
     let active_rows = active_admission_row_count(transaction, intent_id).await?;
-    if usize::try_from(rows).ok() != Some(expected_rows)
-        || usize::try_from(active_rows).ok() != Some(expected_rows)
+    let accepted_rows = committed_rows.saturating_add(released_concurrency);
+    if usize::try_from(accepted_rows).ok() != Some(expected_rows)
+        || active_rows != committed_rows
+        || usize::try_from(released_concurrency)
+            .ok()
+            .is_none_or(|released| released > expected_concurrency)
     {
         return Err(db_error(format!(
-            "task board compensation found {rows} exact committed ledger rows and {active_rows} active rows, expected {expected_rows}"
+            "task board compensation found {committed_rows} exact committed rows, {released_concurrency} exact released concurrency rows, and {active_rows} active rows, expected {expected_rows} total rows and at most {expected_concurrency} released concurrency rows"
         )));
     }
-    Ok(())
+    usize::try_from(released_concurrency)
+        .map_err(|_| db_error("task board compensation released concurrency count is invalid"))
 }
 
 async fn ensure_no_active_admission_rows(

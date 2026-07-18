@@ -1,7 +1,7 @@
 use chrono::{DateTime, Duration, Utc};
 use sqlx::{Sqlite, Transaction, query_as, query_scalar};
 
-use crate::daemon::db::{CliError, db_error, utc_now};
+use crate::daemon::db::{CliError, CliErrorKind, db_error, utc_now};
 use crate::task_board::{
     TaskBoardAdmissionRequirement, TaskBoardAdmissionRequirementKind, TaskBoardItem,
     TaskBoardOrchestratorSettings, canonical_admission_requirement_key,
@@ -65,6 +65,48 @@ pub(super) async fn current_settings_revision(
             "load task board admission settings revision: {error}"
         ))
     })
+}
+
+pub(in crate::daemon::db::task_board) async fn validate_worker_start_fence_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    expected_read_only_fence: Option<(i64, u64)>,
+    loaded_item_revision: i64,
+) -> Result<(), CliError> {
+    let (settings_revision, spawn_kill_switch) = query_as::<_, (i64, bool)>(
+        "SELECT settings.revision,
+                COALESCE((SELECT spawn_kill_switch FROM policy_workspace
+                          WHERE singleton = 1), 0)
+         FROM task_board_orchestrator_settings AS settings
+         WHERE settings.singleton = 1",
+    )
+    .fetch_one(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("load final task board start fence: {error}")))?;
+    if spawn_kill_switch {
+        return Err(CliErrorKind::invalid_transition(
+            "spawn kill switch engaged; worker start refused".to_string(),
+        )
+        .into());
+    }
+    let Some((expected_item_revision, expected_configuration_revision)) = expected_read_only_fence
+    else {
+        return Ok(());
+    };
+    if expected_item_revision != loaded_item_revision {
+        return Err(CliErrorKind::invalid_transition(
+            "read-only workflow item revision changed before worker start".to_string(),
+        )
+        .into());
+    }
+    let current_configuration_revision = u64::try_from(settings_revision)
+        .map_err(|_| db_error("task board settings revision is out of range"))?;
+    if expected_configuration_revision != current_configuration_revision {
+        return Err(CliErrorKind::invalid_transition(
+            "read-only workflow configuration revision changed before worker start".to_string(),
+        )
+        .into());
+    }
+    Ok(())
 }
 
 pub(super) async fn current_allowed_admission(

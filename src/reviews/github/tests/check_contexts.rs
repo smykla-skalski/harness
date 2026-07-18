@@ -92,7 +92,10 @@ fn graphql_payload_preserves_check_urls_into_daemon_json() {
                         "login": "renovate[bot]",
                         "avatarUrl": "https://avatars.githubusercontent.com/in/2740?v=4"
                     },
-                    "viewerLatestReview": { "state": "APPROVED" },
+                    "viewerLatestReview": {
+                        "state": "APPROVED",
+                        "commit": { "oid": "abc123" }
+                    },
                     "repository": {
                         "id": "R_1",
                         "nameWithOwner": "acme/api",

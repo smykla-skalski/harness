@@ -17,7 +17,7 @@ use crate::task_board::policy_graph::PolicyCanvasWorkspace;
 use crate::task_board::{
     DispatchAppliedTask, PolicyAction, PolicyDecision, SpawnGateSwitches,
     TaskBoardHeldDispatchItem, TaskBoardHeldDispatchSummary, TaskBoardItem, consumed_grant_id,
-    dispatch_policy_from_graph,
+    dispatch_policy_from_graph, validate_task_board_read_only_item_revisions,
 };
 
 #[derive(Debug)]
@@ -92,6 +92,7 @@ impl AsyncDaemonDb {
             .await?
             .ok_or_else(|| db_error(format!("task-board item '{board_item_id}' not found")))?;
         ensure_held_linkage(&applied, &item)?;
+        validate_held_read_only_claim_revision(&applied, revision)?;
         ensure_dispatch_item_startable(
             &item,
             &applied.session_id,
@@ -131,8 +132,14 @@ impl AsyncDaemonDb {
             item.workflow.push_policy_trace_id(decision_id);
         }
         item.updated_at.clone_from(&now);
-        replace_item_in_tx(&mut transaction, &item, revision + 1).await?;
+        let delivered_item_revision = revision
+            .checked_add(1)
+            .ok_or_else(|| db_error("task-board item revision is out of range"))?;
+        replace_item_in_tx(&mut transaction, &item, delivered_item_revision).await?;
         applied.item = item;
+        if let Some(launch) = applied.read_only_workflow.as_mut() {
+            launch.prepared_item_revision = delivered_item_revision;
+        }
         let payload = serde_json::to_string(&applied)
             .map_err(|error| db_error(format!("serialize held task board delivery: {error}")))?;
         let claim_token = format!("dispatch-claim-{}", Uuid::new_v4().simple());
@@ -164,6 +171,26 @@ impl AsyncDaemonDb {
             action: TaskBoardDispatchClaimAction::Start,
         })
     }
+}
+
+fn validate_held_read_only_claim_revision(
+    applied: &DispatchAppliedTask,
+    item_revision: i64,
+) -> Result<(), CliError> {
+    let Some(launch) = applied.read_only_workflow.as_ref() else {
+        return Ok(());
+    };
+    validate_task_board_read_only_item_revisions(
+        launch.source_item_revision,
+        launch.prepared_item_revision,
+    )
+    .map_err(|error| db_error(error.to_string()))?;
+    if item_revision != launch.prepared_item_revision {
+        return Err(db_error(
+            "read-only workflow item revision changed before held worker claim",
+        ));
+    }
+    Ok(())
 }
 
 enum HeldDeliveryAuthorization {

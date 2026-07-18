@@ -24,6 +24,16 @@ mod provider_sync;
 mod provider_sync_conflicts;
 mod rows;
 mod scheduler;
+mod workflow_dispatch;
+mod workflow_execution_attempts;
+mod workflow_execution_candidates;
+mod workflow_execution_revisions;
+mod workflow_execution_rows;
+mod workflow_executions;
+mod workflow_recovery_selection;
+mod workflow_side_effect_claims;
+mod workflow_terminal;
+pub(crate) use workflow_dispatch::workflow_owner;
 
 #[cfg(test)]
 mod item_estimate_tests;

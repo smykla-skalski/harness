@@ -10,8 +10,8 @@ use crate::reviews::{
     ReviewsActionPreviewResponse, ReviewsActionResponse, ReviewsAutoRequest,
     ReviewsCacheClearResponse, ReviewsCapabilitiesResponse, ReviewsGitHubClient,
     ReviewsPolicyPreviewRequest, ReviewsPolicyRunStartRequest, ReviewsPolicyTrigger,
-    ReviewsQueryRequest, ReviewsQueryResponse, ReviewsRepositoryCatalogRequest,
-    ReviewsRepositoryCatalogResponse,
+    ReviewsPullRequestReference, ReviewsPullRequestResolveRequest, ReviewsQueryRequest,
+    ReviewsQueryResponse, ReviewsRepositoryCatalogRequest, ReviewsRepositoryCatalogResponse,
 };
 use crate::workspace::utc_now;
 
@@ -69,6 +69,30 @@ use preview::{preview_action_target, preview_action_warnings};
 pub use refresh::refresh_reviews;
 pub use resolve::resolve_review_pull_requests;
 use token::{github_token, missing_token_error, token_bound_requests};
+
+pub(crate) async fn resolve_exact_pull_request(
+    repository: &str,
+    number: u64,
+) -> Result<ReviewItem, CliError> {
+    let reference = ReviewsPullRequestReference {
+        repository: repository.to_string(),
+        number,
+    };
+    let resolved = resolve::fetch_pull_requests_by_reference_authoritative(
+        &ReviewsPullRequestResolveRequest {
+            references: vec![reference],
+            backport_detection_enabled: false,
+            backport_patterns: Vec::new(),
+        },
+    )
+    .await?;
+    resolved.items.into_iter().next().ok_or_else(|| {
+        CliErrorKind::workflow_io(format!(
+            "pull request '{repository}#{number}' was not found during exact-head resolution"
+        ))
+        .into()
+    })
+}
 
 /// Query dependency update pull requests through configured GitHub tokens.
 ///
