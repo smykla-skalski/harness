@@ -116,7 +116,15 @@ fn claim_disposition(
         .into());
     }
     if attempt_identity_matches(expected_attempt, current)
-        && current.state == TaskBoardAttemptState::Running
+        && matches!(
+            current.state,
+            TaskBoardAttemptState::Running
+                | TaskBoardAttemptState::RetryWait
+                | TaskBoardAttemptState::Completed
+                | TaskBoardAttemptState::Failed
+                | TaskBoardAttemptState::Cancelled
+                | TaskBoardAttemptState::Unknown
+        )
     {
         return Ok(SideEffectClaimDisposition::AlreadyClaimed);
     }

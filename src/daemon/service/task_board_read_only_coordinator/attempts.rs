@@ -290,9 +290,38 @@ pub(super) async fn set_execution_state(
     state: TaskBoardExecutionState,
     now: &str,
 ) -> Result<(), CliError> {
+    set_execution_state_guarded(db, execution_id, state, None, now).await
+}
+
+pub(super) async fn settle_execution_running_in_phase(
+    db: &AsyncDaemonDb,
+    execution_id: &str,
+    expected_phase: TaskBoardExecutionPhase,
+    now: &str,
+) -> Result<(), CliError> {
+    set_execution_state_guarded(
+        db,
+        execution_id,
+        TaskBoardExecutionState::Running,
+        Some(expected_phase),
+        now,
+    )
+    .await
+}
+
+async fn set_execution_state_guarded(
+    db: &AsyncDaemonDb,
+    execution_id: &str,
+    state: TaskBoardExecutionState,
+    expected_phase: Option<TaskBoardExecutionPhase>,
+    now: &str,
+) -> Result<(), CliError> {
     let Some(current) = db.task_board_workflow_execution(execution_id).await? else {
         return Err(invalid_transition("workflow execution disappeared"));
     };
+    if expected_phase.is_some() && current.transition.phase != expected_phase {
+        return Ok(());
+    }
     if is_stopped(&current) {
         return Err(CliErrorKind::concurrent_modification(
             "workflow execution stopped before its active state claim",
@@ -301,6 +330,12 @@ pub(super) async fn set_execution_state(
     }
     if current.transition.execution_state == state {
         return Ok(());
+    }
+    if !active_state_claim_allowed(current.transition.execution_state) {
+        return Err(CliErrorKind::concurrent_modification(
+            "workflow execution state changed before its active state claim",
+        )
+        .into());
     }
     let mut updated = current.clone();
     updated.transition.execution_state = state;
@@ -316,6 +351,14 @@ pub(super) async fn set_execution_state(
     match outcome {
         TaskBoardWorkflowExecutionCasOutcome::Updated(_)
         | TaskBoardWorkflowExecutionCasOutcome::Unchanged(_) => Ok(()),
+        TaskBoardWorkflowExecutionCasOutcome::Stale {
+            current: Some(latest),
+            ..
+        } if latest.transition.execution_state == state
+            || (expected_phase.is_some() && latest.transition.phase != expected_phase) =>
+        {
+            Ok(())
+        }
         TaskBoardWorkflowExecutionCasOutcome::Stale { .. } => {
             Err(CliErrorKind::concurrent_modification(
                 "workflow execution changed before its active state claim",
@@ -323,6 +366,16 @@ pub(super) async fn set_execution_state(
             .into())
         }
     }
+}
+
+const fn active_state_claim_allowed(current: TaskBoardExecutionState) -> bool {
+    matches!(
+        current,
+        TaskBoardExecutionState::Pending
+            | TaskBoardExecutionState::Preparing
+            | TaskBoardExecutionState::Starting
+            | TaskBoardExecutionState::Running
+    )
 }
 
 pub(super) async fn require_human(

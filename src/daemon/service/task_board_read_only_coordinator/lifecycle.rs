@@ -13,7 +13,9 @@ use crate::task_board::{
 use super::super::task_board_read_only_runtime::{
     TaskBoardPublishVerification, TaskBoardReadOnlyRuntime,
 };
-use super::attempts::{invalid_transition, require_human, set_execution_state};
+use super::attempts::{
+    invalid_transition, require_human, set_execution_state, settle_execution_running_in_phase,
+};
 use super::reports::transition_attempt;
 
 pub(super) async fn preflight_publish<R>(
@@ -253,6 +255,9 @@ async fn claim_lifecycle_attempt(
                 current.action_key == attempt.action_key && current.attempt == attempt.attempt
             })
             .ok_or_else(|| invalid_transition("publish attempt disappeared before claim"))?;
+        if current.state != TaskBoardAttemptState::Starting {
+            return Ok(None);
+        }
         claimed = current.clone();
         claimed.state = TaskBoardAttemptState::Running;
         claimed.updated_at = now.to_string();
@@ -347,10 +352,14 @@ async fn complete_lifecycle(
         Some(TaskBoardAttemptResultArtifact::Lifecycle(outcome)),
     )
     .await?;
-    set_execution_state(
+    let phase = execution
+        .transition
+        .phase
+        .ok_or_else(|| invalid_transition("lifecycle completion has no durable phase"))?;
+    settle_execution_running_in_phase(
         db,
         &execution.execution_id,
-        TaskBoardExecutionState::Running,
+        phase,
         now,
     )
     .await

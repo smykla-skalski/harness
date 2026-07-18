@@ -115,6 +115,16 @@ where
     attempts::reconcile_execution(db, runtime, execution, now).await
 }
 
+#[cfg(test)]
+pub(super) async fn settle_execution_running_in_phase_for_test(
+    db: &AsyncDaemonDb,
+    execution_id: &str,
+    expected_phase: crate::task_board::TaskBoardExecutionPhase,
+    now: &str,
+) -> Result<(), CliError> {
+    attempts::settle_execution_running_in_phase(db, execution_id, expected_phase, now).await
+}
+
 async fn project_terminal_executions(
     db: &AsyncDaemonDb,
     limit: usize,

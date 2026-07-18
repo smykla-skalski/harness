@@ -41,8 +41,10 @@ async fn concurrent_reconcilers_claim_one_publish_side_effect() {
         runtime.release_publish();
     };
     let (first, second, ()) = tokio::join!(first, second, observe);
-    assert!(first.expect("first reconcile").failures.is_empty());
-    assert!(second.expect("second reconcile").failures.is_empty());
+    let first = first.expect("first reconcile");
+    let second = second.expect("second reconcile");
+    assert!(first.failures.is_empty(), "{:?}", first.failures);
+    assert!(second.failures.is_empty(), "{:?}", second.failures);
 
     let execution = load_execution(&fixture).await;
     assert_eq!(
