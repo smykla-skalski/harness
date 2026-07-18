@@ -138,4 +138,22 @@ fn viewer_approval_is_active_only_for_the_current_head() {
         Some(&review),
         Some("head-new")
     ));
+
+    let review_without_commit = ViewerLatestReviewNode {
+        state: Some("APPROVED".into()),
+        commit: None,
+    };
+    assert!(!viewer_approval_matches_head(
+        Some(&review_without_commit),
+        None
+    ));
+
+    let review_with_blank_commit = ViewerLatestReviewNode {
+        state: Some("APPROVED".into()),
+        commit: Some(ViewerReviewCommitNode { oid: String::new() }),
+    };
+    assert!(!viewer_approval_matches_head(
+        Some(&review_with_blank_commit),
+        Some("")
+    ));
 }

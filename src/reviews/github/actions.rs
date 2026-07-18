@@ -320,15 +320,23 @@ async fn approve_target(
     target: &ReviewTarget,
     operation: &str,
 ) -> Result<(), CliError> {
-    let (descriptor, body) = approval_request(target, operation);
+    let (descriptor, body) = approval_request(target, operation)?;
     client.graphql_envelope(descriptor, body).await.map(|_| ())
 }
 
 fn approval_request(
     target: &ReviewTarget,
     operation: &str,
-) -> (GitHubRequestDescriptor, serde_json::Value) {
-    (
+) -> Result<(GitHubRequestDescriptor, serde_json::Value), CliError> {
+    if target.head_sha.trim().is_empty() {
+        return Err(CliErrorKind::workflow_parse(format!(
+            "cannot approve {}/pull/{} without an exact head commit",
+            target.repository, target.number
+        ))
+        .into());
+    }
+
+    Ok((
         mutation_descriptor(operation),
         json!({
             "query": APPROVE_MUTATION,
@@ -337,7 +345,7 @@ fn approval_request(
                 "commitOID": target.head_sha,
             },
         }),
-    )
+    ))
 }
 
 async fn merge_target(
@@ -382,7 +390,8 @@ mod tests {
         let target = review_target();
 
         for operation in [DIRECT_APPROVAL_OPERATION, POLICY_APPROVAL_OPERATION] {
-            let (descriptor, body) = approval_request(&target, operation);
+            let (descriptor, body) =
+                approval_request(&target, operation).expect("valid approval target");
 
             assert_eq!(descriptor.operation, operation);
             assert_eq!(
@@ -395,6 +404,22 @@ mod tests {
                     .and_then(serde_json::Value::as_str),
                 Some(target.pull_request_id.as_str())
             );
+        }
+    }
+
+    #[test]
+    fn every_approval_path_rejects_a_blank_target_head_sha() {
+        for head_sha in ["", " \t"] {
+            let mut target = review_target();
+            target.head_sha = head_sha.to_owned();
+
+            for operation in [DIRECT_APPROVAL_OPERATION, POLICY_APPROVAL_OPERATION] {
+                let error = approval_request(&target, operation)
+                    .expect_err("approval must require an exact target head");
+
+                assert_eq!(error.code(), "WORKFLOW_PARSE");
+                assert!(error.to_string().contains("exact head commit"));
+            }
         }
     }
 
