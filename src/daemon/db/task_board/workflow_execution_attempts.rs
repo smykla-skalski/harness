@@ -6,9 +6,10 @@ use super::workflow_execution_rows::{ExecutionAttemptRow, attempt_artifact_json,
 use super::workflow_executions::load_execution_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
-    TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptCasOutcome,
-    TaskBoardExecutionAttemptCreateOutcome, TaskBoardExecutionAttemptRecord,
-    TaskBoardExecutionState, TaskBoardWorkflowExecutionRecord, validate_task_board_attempt_update,
+    TaskBoardAttemptResultArtifact, TaskBoardAttemptState, TaskBoardExecutionAttemptCas,
+    TaskBoardExecutionAttemptCasOutcome, TaskBoardExecutionAttemptCreateOutcome,
+    TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase, TaskBoardExecutionState,
+    TaskBoardWorkflowExecutionRecord, validate_task_board_attempt_update,
     validate_task_board_execution_attempt, validate_task_board_workflow_execution,
 };
 
@@ -28,19 +29,6 @@ impl AsyncDaemonDb {
         let parent = load_execution_in_tx(&mut transaction, &proposed.execution_id)
             .await?
             .ok_or_else(|| db_error("execution attempt parent does not exist"))?;
-        if parent.transition.phase.is_none()
-            || matches!(
-                parent.transition.execution_state,
-                TaskBoardExecutionState::HumanRequired
-                    | TaskBoardExecutionState::Completed
-                    | TaskBoardExecutionState::Failed
-                    | TaskBoardExecutionState::Cancelled
-            )
-        {
-            return Err(db_error(
-                "workflow execution is not admitted for a new attempt",
-            ));
-        }
         let by_identity = parent.attempts.iter().find(|attempt| {
             attempt.action_key == proposed.action_key && attempt.attempt == proposed.attempt
         });
@@ -49,10 +37,10 @@ impl AsyncDaemonDb {
             .iter()
             .find(|attempt| attempt.idempotency_key == proposed.idempotency_key);
         if let (Some(by_identity), Some(by_key)) = (by_identity, by_key) {
-            let same_record = by_identity.action_key == by_key.action_key
+            let same_record = by_identity == proposed
+                && by_identity.action_key == by_key.action_key
                 && by_identity.attempt == by_key.attempt
-                && by_identity.idempotency_key == by_key.idempotency_key
-                && by_identity.started_at == proposed.started_at;
+                && by_identity.idempotency_key == by_key.idempotency_key;
             if same_record {
                 transaction.commit().await.map_err(|error| {
                     db_error(format!("commit execution attempt create no-op: {error}"))
@@ -68,6 +56,20 @@ impl AsyncDaemonDb {
                 "execution attempt identity or idempotency key conflicts with durable state",
             ));
         }
+        if parent.transition.phase.is_none()
+            || matches!(
+                parent.transition.execution_state,
+                TaskBoardExecutionState::HumanRequired
+                    | TaskBoardExecutionState::Completed
+                    | TaskBoardExecutionState::Failed
+                    | TaskBoardExecutionState::Cancelled
+            )
+        {
+            return Err(db_error(
+                "workflow execution is not admitted for a new attempt",
+            ));
+        }
+        validate_attempt_phase(&parent, proposed)?;
         validate_attempt_in_execution(&parent, proposed, None)?;
         insert_attempt_in_tx(&mut transaction, proposed).await?;
         bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
@@ -107,6 +109,12 @@ impl AsyncDaemonDb {
             })?;
             return Ok(TaskBoardExecutionAttemptCasOutcome::Stale(None));
         };
+        if attempt_identity_matches(expected, &current) && current == *updated {
+            transaction.commit().await.map_err(|error| {
+                db_error(format!("commit unchanged execution attempt CAS: {error}"))
+            })?;
+            return Ok(TaskBoardExecutionAttemptCasOutcome::Unchanged(current));
+        }
         if !attempt_cas_matches(expected, &current) {
             transaction.commit().await.map_err(|error| {
                 db_error(format!("commit stale execution attempt CAS: {error}"))
@@ -115,13 +123,9 @@ impl AsyncDaemonDb {
         }
         validate_task_board_attempt_update(&current, updated)
             .map_err(|error| db_error(format!("validate execution attempt CAS: {error}")))?;
+        validate_attempt_phase(&parent, updated)?;
         validate_attempt_in_execution(&parent, updated, Some(index))?;
-        if current == *updated {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit unchanged execution attempt CAS: {error}"))
-            })?;
-            return Ok(TaskBoardExecutionAttemptCasOutcome::Unchanged(current));
-        }
+        ensure_external_side_effect_uses_atomic_claim(&parent, &current, updated)?;
         update_attempt_in_tx(&mut transaction, expected, updated).await?;
         bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
         transaction.commit().await.map_err(|error| {
@@ -180,7 +184,7 @@ pub(super) async fn insert_attempt_in_tx(
     .map_err(|error| db_error(format!("insert execution attempt: {error}")))
 }
 
-async fn update_attempt_in_tx(
+pub(super) async fn update_attempt_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     expected: &TaskBoardExecutionAttemptCas,
     record: &TaskBoardExecutionAttemptRecord,
@@ -219,7 +223,14 @@ async fn update_attempt_in_tx(
     }
 }
 
-fn attempt_cas_matches(
+pub(super) fn attempt_cas_matches(
+    expected: &TaskBoardExecutionAttemptCas,
+    current: &TaskBoardExecutionAttemptRecord,
+) -> bool {
+    attempt_identity_matches(expected, current) && expected.state == current.state
+}
+
+pub(super) fn attempt_identity_matches(
     expected: &TaskBoardExecutionAttemptCas,
     current: &TaskBoardExecutionAttemptRecord,
 ) -> bool {
@@ -227,7 +238,6 @@ fn attempt_cas_matches(
         && expected.action_key == current.action_key
         && expected.attempt == current.attempt
         && expected.idempotency_key == current.idempotency_key
-        && expected.state == current.state
 }
 
 fn validate_attempt_in_execution(
@@ -243,4 +253,92 @@ fn validate_attempt_in_execution(
     }
     validate_task_board_workflow_execution(&candidate)
         .map_err(|error| db_error(format!("validate attempt in durable execution: {error}")))
+}
+
+pub(super) fn validate_attempt_phase(
+    parent: &TaskBoardWorkflowExecutionRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
+) -> Result<(), CliError> {
+    if attempt.execution_id != parent.execution_id {
+        return Err(db_error(
+            "workflow attempt does not belong to its execution",
+        ));
+    }
+    let phase = parent
+        .transition
+        .phase
+        .ok_or_else(|| db_error("workflow execution has no active phase"))?;
+    let valid_action = match phase {
+        TaskBoardExecutionPhase::Review => attempt.action_key.starts_with("review:"),
+        TaskBoardExecutionPhase::Evaluate => attempt.action_key == "evaluate",
+        TaskBoardExecutionPhase::Publish => attempt.action_key == "publish",
+        TaskBoardExecutionPhase::Cleanup => attempt.action_key == "cleanup",
+        TaskBoardExecutionPhase::Planning
+        | TaskBoardExecutionPhase::AwaitingApproval
+        | TaskBoardExecutionPhase::Implementation
+        | TaskBoardExecutionPhase::Terminal => false,
+    };
+    if !valid_action {
+        return Err(db_error(format!(
+            "workflow attempt action '{}' does not belong to phase {phase:?}",
+            attempt.action_key
+        )));
+    }
+    validate_completed_artifact(phase, attempt)
+}
+
+fn ensure_external_side_effect_uses_atomic_claim(
+    parent: &TaskBoardWorkflowExecutionRecord,
+    current: &TaskBoardExecutionAttemptRecord,
+    updated: &TaskBoardExecutionAttemptRecord,
+) -> Result<(), CliError> {
+    let external_claim = matches!(
+        parent.transition.phase,
+        Some(
+            TaskBoardExecutionPhase::Review
+                | TaskBoardExecutionPhase::Evaluate
+                | TaskBoardExecutionPhase::Publish
+        )
+    ) && (parent.transition.phase != Some(TaskBoardExecutionPhase::Publish)
+        || current.action_key == "publish")
+        && current.state == TaskBoardAttemptState::Starting
+        && updated.state == TaskBoardAttemptState::Running;
+    if external_claim {
+        Err(db_error(
+            "workflow external side-effect requires an atomic parent and attempt claim",
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_completed_artifact(
+    phase: TaskBoardExecutionPhase,
+    attempt: &TaskBoardExecutionAttemptRecord,
+) -> Result<(), CliError> {
+    if attempt.state != TaskBoardAttemptState::Completed {
+        return Ok(());
+    }
+    let valid = match (phase, attempt.artifact.as_ref()) {
+        (
+            TaskBoardExecutionPhase::Review,
+            Some(TaskBoardAttemptResultArtifact::Review(outcome)),
+        ) => attempt.action_key == format!("review:{}", outcome.profile_id),
+        (
+            TaskBoardExecutionPhase::Evaluate,
+            Some(TaskBoardAttemptResultArtifact::Evaluation(_)),
+        )
+        | (
+            TaskBoardExecutionPhase::Publish | TaskBoardExecutionPhase::Cleanup,
+            Some(TaskBoardAttemptResultArtifact::Lifecycle(_)),
+        ) => true,
+        _ => false,
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(db_error(
+            "workflow attempt result artifact contradicts its frozen phase",
+        ))
+    }
 }

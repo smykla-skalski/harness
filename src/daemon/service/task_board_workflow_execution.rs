@@ -1,3 +1,4 @@
+#[cfg(test)]
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, SecondsFormat, Utc};
@@ -7,15 +8,20 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptCasOutcome,
     TaskBoardExecutionAttemptCreateOutcome, TaskBoardExecutionAttemptRecord,
-    TaskBoardExecutionDiagnostic, TaskBoardExecutionOwnership, TaskBoardExecutionPhase,
-    TaskBoardExecutionState, TaskBoardPullRequestIdentity, TaskBoardRetrySchedule,
-    TaskBoardTerminalOutcome, TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionArtifacts,
-    TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionCasOutcome,
-    TaskBoardWorkflowExecutionCreateOutcome, TaskBoardWorkflowExecutionRecord,
-    TaskBoardWorkflowKind, TaskBoardWorkflowRevisionGuard, TaskBoardWorkflowSnapshot,
-    advance_task_board_workflow, start_task_board_workflow,
+    TaskBoardExecutionDiagnostic, TaskBoardExecutionPhase, TaskBoardExecutionState,
+    TaskBoardPullRequestIdentity, TaskBoardRetrySchedule, TaskBoardTerminalOutcome,
+    TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionCas,
+    TaskBoardWorkflowExecutionCasOutcome, TaskBoardWorkflowExecutionRecord,
+    TaskBoardWorkflowRevisionGuard, advance_task_board_workflow,
+};
+#[cfg(test)]
+use crate::task_board::{
+    TaskBoardExecutionOwnership, TaskBoardWorkflowExecutionArtifacts,
+    TaskBoardWorkflowExecutionCreateOutcome, TaskBoardWorkflowKind, TaskBoardWorkflowSnapshot,
+    start_task_board_workflow,
 };
 
+#[cfg(test)]
 pub(crate) struct TaskBoardWorkflowExecutionCreateRequest {
     pub execution_id: String,
     pub item_id: String,
@@ -25,6 +31,7 @@ pub(crate) struct TaskBoardWorkflowExecutionCreateRequest {
     pub created_at: String,
 }
 
+#[cfg(test)]
 pub(crate) async fn create_or_load_workflow_execution(
     db: &AsyncDaemonDb,
     request: &TaskBoardWorkflowExecutionCreateRequest,
@@ -202,9 +209,30 @@ pub(crate) async fn record_workflow_execution_attempt(
         .task_board_workflow_execution(&expected.execution_id)
         .await?
         .ok_or_else(|| invalid_transition("workflow execution does not exist"))?;
+    if execution
+        .attempts
+        .iter()
+        .any(|current| attempt_replay_matches(expected, current, updated))
+    {
+        return db
+            .compare_and_set_task_board_execution_attempt(expected, updated)
+            .await;
+    }
     validate_attempt_phase(&execution, updated)?;
     db.compare_and_set_task_board_execution_attempt(expected, updated)
         .await
+}
+
+fn attempt_replay_matches(
+    expected: &TaskBoardExecutionAttemptCas,
+    current: &TaskBoardExecutionAttemptRecord,
+    updated: &TaskBoardExecutionAttemptRecord,
+) -> bool {
+    current == updated
+        && expected.execution_id == current.execution_id
+        && expected.action_key == current.action_key
+        && expected.attempt == current.attempt
+        && expected.idempotency_key == current.idempotency_key
 }
 
 fn validate_attempt_phase(
@@ -294,10 +322,7 @@ fn cas_matches(
     expected: &TaskBoardWorkflowExecutionCas,
     record: &TaskBoardWorkflowExecutionRecord,
 ) -> bool {
-    expected.execution_id == record.execution_id
-        && expected.phase == record.transition.phase
-        && expected.state == record.transition.execution_state
-        && expected.revisions == TaskBoardWorkflowRevisionGuard::from(&record.snapshot)
+    *expected == TaskBoardWorkflowExecutionCas::from(record)
 }
 
 fn is_stopped(record: &TaskBoardWorkflowExecutionRecord) -> bool {
@@ -430,6 +455,7 @@ fn parse_time(value: &str) -> Result<DateTime<Utc>, CliError> {
         .map_err(|error| invalid_transition(format!("invalid workflow timestamp: {error}")))
 }
 
+#[cfg(test)]
 fn required(value: &str, field: &str) -> Result<String, CliError> {
     let value = value.trim();
     if value.is_empty() {

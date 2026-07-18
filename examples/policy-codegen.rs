@@ -1908,6 +1908,7 @@ const OMITTED_WIRE_FIELDS: &[(&str, &str)] = &[
     ("DispatchExecutionSummary", "failures"),
     ("DispatchPlan", "lifecycle"),
     ("DispatchAppliedTask", "lifecycle"),
+    ("DispatchAppliedTask", "read_only_workflow"),
     // acp process incident: the daemon-only remediation booleans the Swift hand never models.
     ("AcpProcessIncidentPayload", "restart_applied"),
     ("AcpProcessIncidentPayload", "backoff_applied"),

@@ -53,7 +53,6 @@ async fn compensation_survives_reservation_horizon_and_retry_with_exact_usage() 
     db.finalize_task_board_dispatch_compensation(
         &retry.intent_id,
         &retry.claim_token,
-        retry.consumed_approval_grant_id.as_deref(),
         &worker_id,
         "worker start outcome requires compensation",
     )
@@ -125,6 +124,7 @@ async fn claim_to_start_policy_drift_commits_the_blocked_evidence() {
             &first,
             &first_claim.claim_token,
             Some(TaskBoardLaunchCapability::WorkspaceWrite),
+            None,
         )
         .await
         .expect_err("new policy must block the first worker start");

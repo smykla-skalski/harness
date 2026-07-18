@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::task_board::{ExternalRefProvider, TaskBoardReviewerProfile};
 
+pub const TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION: u32 = 1;
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskBoardWorkflowKind {
@@ -123,6 +125,18 @@ pub struct TaskBoardResolvedReviewer {
     pub profiles: Vec<TaskBoardReviewerProfile>,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TaskBoardReadOnlyRunContext {
+    pub schema_version: u32,
+    pub session_id: String,
+    pub title: String,
+    pub body: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+    pub worktree: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskBoardWorkflowSnapshot {
     pub workflow_kind: TaskBoardWorkflowKind,
@@ -132,6 +146,8 @@ pub struct TaskBoardWorkflowSnapshot {
     pub configuration_revision: u64,
     pub policy_version: String,
     pub reviewer: TaskBoardResolvedReviewer,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub read_only_run_context: Option<TaskBoardReadOnlyRunContext>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider_revision: Option<String>,
 }

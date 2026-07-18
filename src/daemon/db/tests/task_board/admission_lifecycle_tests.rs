@@ -141,6 +141,7 @@ async fn claim_heartbeat_and_commit_keep_the_frozen_start_authorization() {
         &intent,
         &dispatch.claim_token,
         Some(TaskBoardLaunchCapability::WorkspaceWrite),
+        None,
     )
     .await
     .expect("authorize worker start");

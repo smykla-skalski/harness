@@ -21,7 +21,7 @@ query SearchReviews($query: String!, $after: String) {
         baseRefName
         author { login avatarUrl }
         authorAssociation
-        viewerLatestReview { state }
+        viewerLatestReview { state commit { oid } }
         viewerLatestReviewRequest { id }
         repository {
           id
@@ -125,7 +125,7 @@ query ReviewNodes($ids: [ID!]!) {
       baseRefName
       author { login avatarUrl }
       authorAssociation
-      viewerLatestReview { state }
+      viewerLatestReview { state commit { oid } }
       viewerLatestReviewRequest { id }
       repository {
         id
@@ -287,8 +287,8 @@ query PullRequestBody($id: ID!) {
 ";
 
 pub(super) const APPROVE_MUTATION: &str = r"
-mutation ApproveReview($id: ID!) {
-  addPullRequestReview(input: { pullRequestId: $id, event: APPROVE }) {
+mutation ApproveReview($id: ID!, $commitOID: GitObjectID!) {
+  addPullRequestReview(input: { pullRequestId: $id, commitOID: $commitOID, event: APPROVE }) {
     pullRequestReview { state }
   }
 }

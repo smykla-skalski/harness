@@ -4,6 +4,7 @@ use uuid::Uuid;
 use super::ITEMS_CHANGE_SCOPE;
 use super::admission_lifecycle::{
     TaskBoardAdmissionCheck, commit_dispatch_admission_in_tx, revalidate_dispatch_admission_in_tx,
+    validate_worker_start_fence_in_tx,
 };
 use super::items::{bump_change_in_tx, load_item_in_tx, replace_item_in_tx};
 use super::workflow_dispatch::insert_started_read_only_workflow_in_tx;
@@ -237,6 +238,8 @@ impl AsyncDaemonDb {
             .await?;
         let (item_id, session_id, work_item_id, execution_id) =
             claimed_intent_identity(&mut transaction, intent_id, claim_token).await?;
+        let read_only_launch =
+            claimed_intent_read_only_launch(&mut transaction, intent_id, claim_token).await?;
         let (mut item, revision) = load_item_in_tx(&mut transaction, &item_id)
             .await?
             .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
@@ -248,21 +251,27 @@ impl AsyncDaemonDb {
                 "task board dispatch intent '{intent_id}' no longer matches its item linkage"
             )));
         }
+        if let Some(launch) = read_only_launch.as_ref() {
+            validate_worker_start_fence_in_tx(
+                &mut transaction,
+                Some((launch.prepared_item_revision, launch.configuration_revision)),
+                revision,
+            )
+            .await?;
+        }
         ensure_dispatch_item_startable(&item, &session_id, &work_item_id, Some(&execution_id))?;
         item.workflow.status = TaskBoardWorkflowStatus::Running;
         item.workflow.current_step_id = Some("worker_running".to_string());
         item.workflow.last_error = None;
         item.updated_at = utc_now();
         replace_item_in_tx(&mut transaction, &item, revision + 1).await?;
-        if let Some(launch) =
-            claimed_intent_read_only_launch(&mut transaction, intent_id, claim_token).await?
-        {
+        if let Some(launch) = read_only_launch.as_ref() {
             insert_started_read_only_workflow_in_tx(
                 &mut transaction,
                 &item,
                 revision + 1,
                 intent_id,
-                &launch,
+                launch,
             )
             .await?;
         }
@@ -323,6 +332,27 @@ async fn validate_pending_dispatch(
     let (item, item_revision) = load_item_in_tx(transaction, board_item_id)
         .await?
         .ok_or_else(|| db_error(format!("task-board item '{board_item_id}' not found")))?;
+    if let Some(launch) = applied.read_only_workflow.as_ref() {
+        crate::task_board::validate_task_board_read_only_item_revisions(
+            launch.source_item_revision,
+            launch.prepared_item_revision,
+        )
+        .map_err(|error| db_error(error.to_string()))?;
+        if item_revision != launch.prepared_item_revision {
+            let error = CliError::from(CliErrorKind::invalid_transition(
+                "read-only workflow item revision changed before worker claim",
+            ));
+            refuse_pending_admission_in_tx(
+                transaction,
+                intent_id,
+                applied,
+                consumed_approval_grant_id,
+                &error.to_string(),
+            )
+            .await?;
+            return Err(error);
+        }
+    }
     if let Err(error) = ensure_dispatch_item_startable(
         &item,
         &applied.session_id,

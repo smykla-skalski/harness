@@ -129,6 +129,43 @@ pub(super) fn applied_task(mode: AgentMode) -> DispatchAppliedTask {
     }
 }
 
+pub(super) async fn seed_session(db: &crate::daemon::db::AsyncDaemonDb, session_id: &str) {
+    let now = "2026-07-17T10:00:00Z";
+    let state_json = serde_json::json!({
+        "schema_version": crate::session::types::CURRENT_VERSION,
+        "session_id": session_id,
+        "context": "managed-agent recovery",
+        "status": "active",
+        "created_at": now,
+        "updated_at": now,
+    })
+    .to_string();
+    sqlx::query(
+        "INSERT INTO projects (
+             project_id, name, checkout_id, checkout_name, context_root,
+             is_worktree, discovered_at, updated_at
+         ) VALUES ('project-1', 'harness', 'checkout-1', 'main',
+                   '/tmp/harness-managed-agent-test', 0, ?1, ?1)",
+    )
+    .bind(now)
+    .execute(db.pool())
+    .await
+    .expect("seed managed-agent project");
+    sqlx::query(
+        "INSERT INTO sessions (
+             session_id, project_id, schema_version, context, status,
+             created_at, updated_at, state_json
+         ) VALUES (?1, 'project-1', 3, 'managed-agent recovery', 'active',
+                   ?2, ?2, ?3)",
+    )
+    .bind(session_id)
+    .bind(now)
+    .bind(state_json)
+    .execute(db.pool())
+    .await
+    .expect("seed managed-agent session");
+}
+
 pub(super) fn terminal_snapshot(status: AgentTuiStatus, session_id: &str) -> AgentTuiSnapshot {
     AgentTuiSnapshot {
         tui_id: "agent-tui-dispatch-intent-existing".into(),

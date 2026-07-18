@@ -4,7 +4,9 @@ use crate::daemon::db::ReservedTaskBoardDispatch;
 use crate::daemon::protocol::SessionStartRequest;
 use std::collections::HashMap;
 
-use crate::task_board::{TaskBoardItem, build_dispatch_plans_with_policy};
+use crate::task_board::{
+    AgentMode, TaskBoardItem, TaskBoardWorkflowKind, build_dispatch_plans_with_policy,
+};
 
 #[test]
 fn prepared_dispatch_resumes_without_duplicate_session_or_task() {
@@ -147,6 +149,93 @@ fn prepared_dispatch_resumes_without_duplicate_session_or_task() {
                 linked.workflow.worktree.as_deref(),
                 resolved.state.worktree_path.to_str()
             );
+        });
+    });
+}
+
+#[test]
+fn read_only_dispatch_rejects_aba_after_claim_before_late_head_resolution() {
+    with_temp_project(|project| {
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(async {
+            let db = crate::daemon::db::AsyncDaemonDb::connect(
+                &project
+                    .parent()
+                    .expect("project parent")
+                    .join("read-only.sqlite"),
+            )
+            .await
+            .expect("open async daemon db");
+            let mut item = TaskBoardItem::new(
+                "dispatch-read-only-aba".into(),
+                "Review exact head".into(),
+                "Review without workspace writes".into(),
+                "2026-07-18T10:00:00Z".into(),
+            );
+            item.agent_mode = AgentMode::Evaluate;
+            item.workflow_kind = TaskBoardWorkflowKind::Review;
+            db.create_task_board_item(item.clone())
+                .await
+                .expect("create read-only item");
+            let plan = build_dispatch_plans_with_policy(
+                &[item],
+                None,
+                None,
+                crate::task_board::SpawnGateSwitches::default(),
+                &HashMap::new(),
+            )
+            .remove(0);
+            let reserved = db
+                .reserve_task_board_dispatch(
+                    &plan,
+                    crate::session::types::CONTROL_PLANE_ACTOR_ID,
+                    Some(project.to_string_lossy().as_ref()),
+                    false,
+                )
+                .await
+                .expect("reserve read-only dispatch");
+            let intent_id = match reserved {
+                ReservedTaskBoardDispatch::Preparing {
+                    intent_id,
+                    preparation,
+                } => {
+                    assert!(preparation.source_item_revision.is_some());
+                    intent_id
+                }
+                other => panic!("unexpected reservation: {other:?}"),
+            };
+            let claim = db
+                .claim_task_board_dispatch_preparation(&intent_id)
+                .await
+                .expect("claim read-only preparation")
+                .expect("pending read-only preparation");
+            for title in ["Transient edit", "Review exact head"] {
+                db.update_task_board_item(&plan.board_item_id, |item| {
+                    item.title = title.into();
+                    Ok(true)
+                })
+                .await
+                .expect("mutate item during preparation")
+                .expect("item mutation");
+            }
+
+            let (_, error) = task_board::prepare_claimed_task_board_dispatch(&db, &claim)
+                .await
+                .expect_err("late production capture must reject revision ABA");
+
+            assert!(
+                error
+                    .to_string()
+                    .contains("changed after dispatch reservation")
+            );
+            let status: String = sqlx::query_scalar(
+                "SELECT status FROM task_board_dispatch_intents WHERE intent_id = ?1",
+            )
+            .bind(&intent_id)
+            .fetch_one(db.pool())
+            .await
+            .expect("load intent status");
+            assert_eq!(status, "preparing_claimed");
         });
     });
 }

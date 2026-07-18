@@ -182,8 +182,8 @@ fn review_queries_request_author_association_and_viewer_scoped_review_fields() {
         "search query must request authorAssociation for row halo semantics"
     );
     assert!(
-        SEARCH_QUERY.contains("viewerLatestReview { state }"),
-        "search query must request the viewer-specific latest review"
+        SEARCH_QUERY.contains("viewerLatestReview { state commit { oid } }"),
+        "search query must bind the viewer-specific latest review to its commit"
     );
     assert!(
         SEARCH_QUERY.contains("viewerLatestReviewRequest"),
@@ -198,8 +198,8 @@ fn review_queries_request_author_association_and_viewer_scoped_review_fields() {
         "nodes query must request authorAssociation for refresh parity"
     );
     assert!(
-        NODES_BY_IDS_QUERY.contains("viewerLatestReview { state }"),
-        "nodes query must request the viewer-specific latest review for refresh parity"
+        NODES_BY_IDS_QUERY.contains("viewerLatestReview { state commit { oid } }"),
+        "nodes query must bind the viewer-specific latest review to its commit"
     );
     assert!(
         NODES_BY_IDS_QUERY.contains("viewerLatestReviewRequest"),
@@ -210,8 +210,8 @@ fn review_queries_request_author_association_and_viewer_scoped_review_fields() {
         "nodes query must avoid fetching every requested reviewer"
     );
     assert!(
-        PULL_REQUEST_BY_REFERENCE_QUERY.contains("viewerLatestReview { state }"),
-        "reference query must request the viewer-specific latest review"
+        PULL_REQUEST_BY_REFERENCE_QUERY.contains("viewerLatestReview { state commit { oid } }"),
+        "reference query must bind the viewer-specific latest review to its commit"
     );
     assert!(
         PULL_REQUEST_BY_REFERENCE_QUERY.contains("viewerLatestReviewRequest"),

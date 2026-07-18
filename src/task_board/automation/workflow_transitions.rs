@@ -84,13 +84,13 @@ pub fn validate_task_board_workflow_transition_state(
     state: &TaskBoardWorkflowTransitionState,
 ) -> Result<(), TaskBoardWorkflowTransitionError> {
     let Some(phase) = state.phase else {
-        return if !matches!(
+        return if matches!(
             state.workflow_kind,
             TaskBoardWorkflowKind::PrReview | TaskBoardWorkflowKind::Review
         ) {
-            Ok(())
-        } else {
             Err(TaskBoardWorkflowTransitionError::NoAdmittedPhase)
+        } else {
+            Ok(())
         };
     };
     if !task_board_workflow_phases(state.workflow_kind).contains(&phase) {

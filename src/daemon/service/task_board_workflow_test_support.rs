@@ -2,7 +2,8 @@ use tempfile::TempDir;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
-    AgentMode, TaskBoardItem, TaskBoardOrchestratorSettings, TaskBoardPullRequestIdentity,
+    AgentMode, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardItem,
+    TaskBoardOrchestratorSettings, TaskBoardPullRequestIdentity, TaskBoardReadOnlyRunContext,
     TaskBoardResolvedReviewer, TaskBoardReviewerProfile, TaskBoardWorkflowExecutionCasOutcome,
     TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind, TaskBoardWorkflowSnapshot,
 };
@@ -94,6 +95,14 @@ pub(super) async fn seed_snapshot(
             .expect("configuration revision"),
         policy_version: "policy-v1".into(),
         reviewer: reviewers,
+        read_only_run_context: Some(TaskBoardReadOnlyRunContext {
+            schema_version: TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
+            session_id: format!("session-{item_id}"),
+            title: "Lantern workflow".into(),
+            body: "Durable workflow fixture".into(),
+            tags: Vec::new(),
+            worktree: "/tmp/read-only-worktree".into(),
+        }),
         provider_revision: Some("provider-amber".into()),
     }
 }

@@ -7,12 +7,14 @@ use crate::daemon::protocol::{CodexRunStatus, ManagedAgentSnapshot};
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::SessionRole;
 use crate::task_board::{
-    AgentMode, TaskBoardAttemptResultArtifact, TaskBoardLocalAttemptResult,
-    TaskBoardReadOnlyWorkflowLaunch, TaskBoardResolvedReviewer, TaskBoardReviewerProfile,
-    TaskBoardWorkflowKind,
+    AgentMode, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardAttemptResultArtifact,
+    TaskBoardLocalAttemptResult, TaskBoardReadOnlyRunContext, TaskBoardReadOnlyWorkflowLaunch,
+    TaskBoardResolvedReviewer, TaskBoardReviewerProfile, TaskBoardWorkflowKind,
 };
 
-use super::test_support::{applied_task, codex_snapshot, terminal_snapshot, test_http_state};
+use super::test_support::{
+    applied_task, codex_snapshot, seed_session, terminal_snapshot, test_http_state,
+};
 use super::{
     begin_worker_compensation, codex_worker_id, codex_worker_request, exact_worker_not_found,
     managed_admission_owner_id, managed_worker_id, recover_same_applied_worker,
@@ -151,6 +153,16 @@ fn review_launch() -> TaskBoardReadOnlyWorkflowLaunch {
             max_revision_cycles: 1,
             profiles: vec![profile],
         },
+        source_item_revision: 1,
+        prepared_item_revision: 2,
+        run_context: TaskBoardReadOnlyRunContext {
+            schema_version: TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
+            session_id: "session-1".into(),
+            title: "Board item".into(),
+            body: "Investigate the issue".into(),
+            tags: vec!["backend".into()],
+            worktree: "/tmp/task-worktree".into(),
+        },
         provider_revision: None,
         pull_request: None,
         exact_head_revision: "head-frozen".into(),
@@ -217,9 +229,22 @@ fn read_only_recovery_rejects_a_conflicting_durable_run() {
     run.prompt = request.prompt;
     run.model = request.model;
     run.effort = request.effort;
+    run.project_dir = applied
+        .read_only_workflow
+        .as_ref()
+        .expect("read-only launch")
+        .run_context
+        .worktree
+        .clone();
     let matching = ManagedAgentSnapshot::Codex(run.clone());
 
     recover_same_applied_worker(matching, &applied).expect("matching durable run");
+
+    let mut wrong_worktree = run.clone();
+    wrong_worktree.project_dir = "/tmp/other-worktree".into();
+    let error = recover_same_applied_worker(ManagedAgentSnapshot::Codex(wrong_worktree), &applied)
+        .expect_err("conflicting worktree must fail");
+    assert_eq!(error.code(), "KSRCLI092");
 
     run.workflow_execution_id = Some("workflow-other".into());
     let error = recover_same_applied_worker(ManagedAgentSnapshot::Codex(run), &applied)
@@ -323,43 +348,6 @@ async fn deterministic_worker_evidence_precedes_claim_preflight() {
         .expect("existing worker must be recovered before claim validation");
 
     assert_eq!(recovered.agent_id(), worker_id);
-}
-
-async fn seed_session(db: &crate::daemon::db::AsyncDaemonDb, session_id: &str) {
-    let now = "2026-07-17T10:00:00Z";
-    let state_json = serde_json::json!({
-        "schema_version": crate::session::types::CURRENT_VERSION,
-        "session_id": session_id,
-        "context": "managed-agent recovery",
-        "status": "active",
-        "created_at": now,
-        "updated_at": now,
-    })
-    .to_string();
-    sqlx::query(
-        "INSERT INTO projects (
-             project_id, name, checkout_id, checkout_name, context_root,
-             is_worktree, discovered_at, updated_at
-         ) VALUES ('project-1', 'harness', 'checkout-1', 'main',
-                   '/tmp/harness-managed-agent-test', 0, ?1, ?1)",
-    )
-    .bind(now)
-    .execute(db.pool())
-    .await
-    .expect("seed managed-agent project");
-    sqlx::query(
-        "INSERT INTO sessions (
-             session_id, project_id, schema_version, context, status,
-             created_at, updated_at, state_json
-         ) VALUES (?1, 'project-1', 3, 'managed-agent recovery', 'active',
-                   ?2, ?2, ?3)",
-    )
-    .bind(session_id)
-    .bind(now)
-    .bind(state_json)
-    .execute(db.pool())
-    .await
-    .expect("seed managed-agent session");
 }
 
 #[tokio::test]

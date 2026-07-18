@@ -9,12 +9,18 @@ use crate::daemon::http::{
 };
 use crate::daemon::protocol::ManagedAgentSnapshot;
 use crate::errors::{CliError, CliErrorKind};
-use crate::task_board::{AgentMode, DispatchAppliedTask, TaskBoardLaunchCapability};
+use crate::task_board::{
+    AgentMode, DispatchAppliedTask, TaskBoardLaunchCapability,
+    validate_task_board_read_only_run_context,
+};
 
 const DISPATCH_CLAIM_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
 
 mod requests;
 use requests::{codex_worker_request, terminal_worker_request, worker_prompt};
+
+mod claim_settlement;
+pub(crate) use claim_settlement::settle_claimed_task_board_worker;
 
 pub(crate) struct TaskBoardDispatchClaimHeartbeat {
     task: JoinHandle<()>,
@@ -91,7 +97,8 @@ pub(crate) fn maintain_task_board_dispatch_claim(
     TaskBoardDispatchClaimHeartbeat { task }
 }
 
-pub(crate) async fn start_worker_for_applied_task(
+#[cfg(test)]
+async fn start_worker_for_applied_task(
     state: &DaemonHttpState,
     applied: &DispatchAppliedTask,
     dispatch_intent_id: &str,
@@ -103,10 +110,27 @@ pub(crate) async fn start_worker_for_applied_task(
         .managed_agent_mutation_locks
         .lock(&session_id, &worker_id)
         .await;
+    start_worker_for_applied_task_in_lane(
+        state,
+        applied,
+        dispatch_intent_id,
+        claim_token,
+        &worker_id,
+    )
+    .await
+}
+
+async fn start_worker_for_applied_task_in_lane(
+    state: &DaemonHttpState,
+    applied: &DispatchAppliedTask,
+    dispatch_intent_id: &str,
+    claim_token: &str,
+    worker_id: &str,
+) -> Result<ManagedAgentSnapshot, TaskBoardWorkerStartError> {
     // Keep this deterministic probe ahead of every mutable preflight. A claim
     // reclaimed after an uncertain start may already own this exact worker;
     // current item or admission drift cannot safely reject it first.
-    let existing = probe_existing_worker(state, applied, &worker_id)
+    let existing = probe_existing_worker(state, applied, worker_id)
         .await
         .map_err(TaskBoardWorkerStartError::uncertain)?;
     if let Some(snapshot) = existing {
@@ -118,19 +142,28 @@ pub(crate) async fn start_worker_for_applied_task(
     // an already-prepared intent cannot start while the kill switch is engaged.
     // Transport-agnostic because it runs before stdio/bridge selection.
     ensure_spawn_kill_switch_clear(state, &applied.board_item_id).await?;
-    require_async_db(state, "task-board worker admission check")?
-        .validate_task_board_dispatch_admission_start(
-            dispatch_intent_id,
-            claim_token,
-            launch_capability(applied.item.agent_mode),
-        )
-        .await?;
     crate::daemon::service::validate_read_only_workflow_launch(
         require_async_db(state, "read-only workflow start validation")?,
         applied,
     )
     .await?;
-    start_or_recover_worker(state, applied, dispatch_intent_id, &worker_id).await
+    #[cfg(test)]
+    start_authorization_test_support::pause_before_final_authorization().await;
+    // Keep the transaction-backed admission and item-revision fence immediately before the
+    // external start. A post-commit mutation still follows the existing uncertain-start and
+    // compensation model, but an edit completed before this boundary cannot launch stale work.
+    require_async_db(state, "task-board worker admission check")?
+        .validate_task_board_dispatch_admission_start(
+            dispatch_intent_id,
+            claim_token,
+            launch_capability(applied.item.agent_mode),
+            applied
+                .read_only_workflow
+                .as_ref()
+                .map(|launch| (launch.prepared_item_revision, launch.configuration_revision)),
+        )
+        .await?;
+    start_or_recover_worker(state, applied, dispatch_intent_id, worker_id).await
 }
 
 async fn start_or_recover_worker(
@@ -163,7 +196,8 @@ fn resolve_start_failure(
     }
 }
 
-pub(crate) async fn begin_worker_compensation(
+#[cfg(test)]
+async fn begin_worker_compensation(
     state: &DaemonHttpState,
     db: &AsyncDaemonDb,
     applied: &DispatchAppliedTask,
@@ -300,13 +334,19 @@ fn recover_same_applied_worker(
         ))
         .into());
     }
-    if applied.read_only_workflow.is_none() {
+    let Some(launch) = applied.read_only_workflow.as_ref() else {
         return Ok(snapshot);
+    };
+    if validate_task_board_read_only_run_context(&launch.run_context).is_err()
+        || launch.run_context.session_id != applied.session_id
+    {
+        return Err(read_only_recovery_conflict(snapshot.agent_id()));
     }
     let ManagedAgentSnapshot::Codex(run) = &snapshot else {
         return Err(read_only_recovery_conflict(snapshot.agent_id()));
     };
     let expected_request = codex_worker_request(applied, &run.run_id);
+    let worktree_matches = run.project_dir == launch.run_context.worktree;
     let matches = run.board_item_id.as_deref() == Some(applied.board_item_id.as_str())
         && run.workflow_execution_id == applied.item.workflow.execution_id
         && run.task_id.is_none()
@@ -314,7 +354,7 @@ fn recover_same_applied_worker(
         && run.prompt == expected_request.prompt
         && run.model == expected_request.model
         && run.effort == expected_request.effort;
-    if matches {
+    if matches && worktree_matches {
         Ok(snapshot)
     } else {
         Err(read_only_recovery_conflict(&run.run_id))
@@ -439,7 +479,7 @@ pub(crate) fn managed_admission_owner_id(
     applied
         .read_only_workflow
         .as_ref()
-        .and_then(|_| applied.item.workflow.execution_id.as_deref())
+        .and(applied.item.workflow.execution_id.as_deref())
         .map_or_else(
             || managed_worker_id(applied, dispatch_intent_id),
             crate::daemon::db::workflow_owner,
@@ -459,5 +499,13 @@ pub(crate) fn rendered_worker_prompt(
 mod test_support;
 
 #[cfg(test)]
+#[path = "task_board_managed_agents/start_authorization_test_support.rs"]
+mod start_authorization_test_support;
+
+#[cfg(test)]
 #[path = "task_board_managed_agents/tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "task_board_managed_agents/read_only_start_revision_tests.rs"]
+mod read_only_start_revision_tests;

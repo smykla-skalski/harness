@@ -1,6 +1,7 @@
 use sqlx::{Sqlite, Transaction, query, query_as};
 use uuid::Uuid;
 
+use super::super::admission_lifecycle::release_dispatch_admission_in_tx;
 use super::{
     ClaimedTaskBoardDispatchPreparation, PREPARATION_LEASE_SECONDS, ReservedTaskBoardDispatch,
     TaskBoardDispatchPreparation,
@@ -64,6 +65,7 @@ pub(super) async fn fail_preparation_admission_in_tx(
     .execute(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("refuse task board preparation admission: {error}")))?;
+    release_dispatch_admission_in_tx(transaction, intent_id).await?;
     Ok(())
 }
 

@@ -55,8 +55,12 @@ fn read_only_review_request(
         mode: CodexRunMode::Report,
         role: SessionRole::Leader,
         fallback_role: Some(SessionRole::Worker),
-        capabilities: read_only_capabilities(&applied.item, managed_run_id),
-        name: Some(format!("Task Board Review: {}", applied.item.title)),
+        capabilities: read_only_capabilities(
+            &applied.board_item_id,
+            &launch.run_context.tags,
+            managed_run_id,
+        ),
+        name: Some(format!("Task Board Review: {}", launch.run_context.title)),
         persona: Some(profile.persona.clone()),
         resume_thread_id: None,
         task_id: None,
@@ -107,11 +111,11 @@ fn read_only_review_prompt(
     format!(
         "Run a strictly read-only review for Task Board item '{}'.\n\nTitle: {}\nContext: {}\nExact head: {}{}\nWorktree: {}\n\nDo not modify files, commits, branches, task state, pull requests, or external systems. Verify that every inspected change belongs to the exact frozen head above; return human_required when that revision cannot be inspected. Your final message must contain only one JSON value matching this exact identity and shape (use verdict pass, changes_required, or human_required):\n{}",
         applied.board_item_id,
-        applied.item.title,
-        applied.item.body,
+        launch.run_context.title,
+        launch.run_context.body,
         launch.exact_head_revision,
         pull_request,
-        applied.item.workflow.worktree.as_deref().unwrap_or(""),
+        launch.run_context.worktree,
         serde_json::to_string_pretty(&response).expect("serialize review response template"),
     )
 }
@@ -154,8 +158,12 @@ fn worker_capabilities(item: &TaskBoardItem) -> Vec<String> {
     capabilities
 }
 
-fn read_only_capabilities(item: &TaskBoardItem, managed_run_id: &str) -> Vec<String> {
-    let mut capabilities = worker_capabilities(item);
+fn read_only_capabilities(item_id: &str, tags: &[String], managed_run_id: &str) -> Vec<String> {
+    let mut capabilities = vec![
+        "task-board".to_string(),
+        format!("task-board:item:{item_id}"),
+    ];
+    capabilities.extend(tags.iter().map(|tag| format!("task-board:tag:{tag}")));
     capabilities.push("task-board:workflow:read-only".into());
     capabilities.push(format!("task-board:attempt:{managed_run_id}"));
     capabilities

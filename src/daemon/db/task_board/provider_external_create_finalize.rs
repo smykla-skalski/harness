@@ -1,6 +1,9 @@
 use sqlx::{Sqlite, SqliteConnection, Transaction, query_as};
 
-use super::items::{bump_change_in_tx, load_item_in_tx, replace_item_in_tx};
+use super::items::{
+    bump_change_in_tx, ensure_read_only_item_mutation_allowed_in_tx, load_item_in_tx,
+    replace_item_in_tx,
+};
 use super::provider_external_create_evidence::{
     normalized_evidence_target, validate_create_evidence,
 };
@@ -116,6 +119,7 @@ async fn finalize_new_link(
     provider_target: Option<&str>,
     provider_baseline: &ExternalRef,
 ) -> Result<TaskBoardExternalCreateFinalizeResult, CliError> {
+    ensure_read_only_item_mutation_allowed_in_tx(&mut transaction, &stored.item_id).await?;
     apply_provider_identity(&mut item, &stored, provider_target)?;
     item.external_refs.push(provider_baseline.clone());
     if item.updated_at.as_str() < attached_at {
@@ -163,6 +167,7 @@ async fn finalize_existing_link(
 ) -> Result<TaskBoardExternalCreateFinalizeResult, CliError> {
     let identity_changed = apply_provider_identity(&mut item, &stored, provider_target)?;
     let attached_item_revision = if identity_changed {
+        ensure_read_only_item_mutation_allowed_in_tx(&mut transaction, &stored.item_id).await?;
         if item.updated_at.as_str() < attached_at {
             attached_at.clone_into(&mut item.updated_at);
         }

@@ -177,7 +177,6 @@ async fn crash_reclaims_compensation_without_restarting_or_completing_worker() {
     db.finalize_task_board_dispatch_compensation(
         &first.intent_id,
         &first.claim_token,
-        first.consumed_approval_grant_id.as_deref(),
         "codex-compensation-reclaim",
         "worker started but dispatch completion failed",
     )
@@ -186,7 +185,6 @@ async fn crash_reclaims_compensation_without_restarting_or_completing_worker() {
     db.finalize_task_board_dispatch_compensation(
         &reclaimed.intent_id,
         &reclaimed.claim_token,
-        reclaimed.consumed_approval_grant_id.as_deref(),
         "codex-compensation-reclaim",
         "worker started but dispatch completion failed",
     )

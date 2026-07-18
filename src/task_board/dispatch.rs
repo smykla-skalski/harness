@@ -17,7 +17,10 @@ use super::policy::{PolicyApprovalGrant, PolicyDecision};
 #[cfg(test)]
 use super::store::TaskBoardStore;
 use super::types::{AgentMode, ExternalRef, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
-use super::{TaskBoardPullRequestIdentity, TaskBoardResolvedReviewer, TaskBoardWorkflowKind};
+use super::{
+    TaskBoardPullRequestIdentity, TaskBoardReadOnlyRunContext, TaskBoardResolvedReviewer,
+    TaskBoardWorkflowKind,
+};
 
 #[path = "dispatch_lifecycle.rs"]
 mod lifecycle;
@@ -83,6 +86,10 @@ pub struct TaskBoardReadOnlyWorkflowLaunch {
     pub configuration_revision: u64,
     pub policy_version: String,
     pub resolved_reviewers: TaskBoardResolvedReviewer,
+    pub source_item_revision: i64,
+    pub prepared_item_revision: i64,
+    #[serde(default)]
+    pub run_context: TaskBoardReadOnlyRunContext,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider_revision: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

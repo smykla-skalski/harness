@@ -30,7 +30,7 @@ pub(super) async fn run_once_durable(
     )
     .await?;
     let session = admitted_session(start)?;
-    let result = execute_durable_run(state, db, &request, &session).await;
+    let result = Box::pin(execute_durable_run(state, db, &request, &session)).await;
     finish_durable_run(db, session, result).await
 }
 

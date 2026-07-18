@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardEvaluationResult, TaskBoardExecutionPhase,
@@ -11,6 +12,7 @@ use crate::task_board::{
 
 pub const TASK_BOARD_WORKFLOW_EXECUTION_SCHEMA_VERSION: u32 = 1;
 pub const TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION: u32 = 1;
+pub const TASK_BOARD_SIDE_EFFECT_CLAIM_GRACE_SECONDS: i64 = 300;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -187,6 +189,7 @@ pub struct TaskBoardWorkflowExecutionCas {
     pub phase: Option<TaskBoardExecutionPhase>,
     pub state: TaskBoardExecutionState,
     pub revisions: TaskBoardWorkflowRevisionGuard,
+    pub record_sha256: String,
 }
 
 impl From<&TaskBoardWorkflowExecutionRecord> for TaskBoardWorkflowExecutionCas {
@@ -196,6 +199,7 @@ impl From<&TaskBoardWorkflowExecutionRecord> for TaskBoardWorkflowExecutionCas {
             phase: record.transition.phase,
             state: record.transition.execution_state,
             revisions: TaskBoardWorkflowRevisionGuard::from(&record.snapshot),
+            record_sha256: workflow_execution_sha256(record),
         }
     }
 }
@@ -209,6 +213,13 @@ pub enum TaskBoardWorkflowCasMismatch {
     ItemRevision,
     ConfigurationRevision,
     ProviderRevision,
+    Record,
+}
+
+fn workflow_execution_sha256(record: &TaskBoardWorkflowExecutionRecord) -> String {
+    let canonical =
+        serde_json::to_vec(record).expect("workflow execution record serialization is infallible");
+    hex::encode(Sha256::digest(canonical))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

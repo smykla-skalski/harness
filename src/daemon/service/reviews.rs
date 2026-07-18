@@ -78,11 +78,13 @@ pub(crate) async fn resolve_exact_pull_request(
         repository: repository.to_string(),
         number,
     };
-    let resolved = resolve::fetch_pull_requests_by_reference(&ReviewsPullRequestResolveRequest {
-        references: vec![reference],
-        backport_detection_enabled: false,
-        backport_patterns: Vec::new(),
-    })
+    let resolved = resolve::fetch_pull_requests_by_reference_authoritative(
+        &ReviewsPullRequestResolveRequest {
+            references: vec![reference],
+            backport_detection_enabled: false,
+            backport_patterns: Vec::new(),
+        },
+    )
     .await?;
     resolved.items.into_iter().next().ok_or_else(|| {
         CliErrorKind::workflow_io(format!(

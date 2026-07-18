@@ -73,16 +73,9 @@ impl WorkflowExecutionRow {
             parse_strict_json(&self.diagnostics_json, "workflow execution artifacts")?;
         let ownership: TaskBoardExecutionOwnership =
             parse_strict_json(&self.resource_ownership_json, "workflow ownership")?;
-        validate_row_copies(
-            &self,
-            workflow_kind,
-            phase,
-            state,
-            &snapshot,
-            &resolved_reviewers,
-            &stored,
-            &ownership,
-        )?;
+        validate_transition_copies(workflow_kind, phase, state, &stored)?;
+        validate_snapshot_copies(&self, workflow_kind, &snapshot, &resolved_reviewers)?;
+        validate_ownership_copies(&self, &ownership)?;
         let record = TaskBoardWorkflowExecutionRecord {
             execution_id: self.execution_id,
             item_id: self.item_id,
@@ -213,31 +206,48 @@ where
     Ok(parsed)
 }
 
-#[allow(clippy::too_many_arguments)]
-fn validate_row_copies(
-    row: &WorkflowExecutionRow,
+fn validate_transition_copies(
     workflow_kind: TaskBoardWorkflowKind,
     phase: Option<TaskBoardExecutionPhase>,
     state: TaskBoardExecutionState,
+    stored: &StoredExecutionState,
+) -> Result<(), CliError> {
+    ensure_row_copies_match(
+        workflow_kind == stored.transition.workflow_kind
+            && phase == stored.transition.phase
+            && state == stored.transition.execution_state,
+    )
+}
+
+fn validate_snapshot_copies(
+    row: &WorkflowExecutionRow,
+    workflow_kind: TaskBoardWorkflowKind,
     snapshot: &TaskBoardWorkflowSnapshot,
     reviewers: &TaskBoardResolvedReviewer,
-    stored: &StoredExecutionState,
-    ownership: &TaskBoardExecutionOwnership,
 ) -> Result<(), CliError> {
     let configuration_revision = u64::try_from(row.configuration_revision)
         .map_err(|_| db_error("workflow configuration revision is out of range"))?;
+    ensure_row_copies_match(
+        workflow_kind == snapshot.workflow_kind
+            && row.item_revision == snapshot.item_revision
+            && configuration_revision == snapshot.configuration_revision
+            && row.provider_revision == snapshot.provider_revision
+            && reviewers == &snapshot.reviewer,
+    )
+}
+
+fn validate_ownership_copies(
+    row: &WorkflowExecutionRow,
+    ownership: &TaskBoardExecutionOwnership,
+) -> Result<(), CliError> {
     let fencing_epoch = u64::try_from(row.fencing_epoch)
         .map_err(|_| db_error("workflow fencing epoch is out of range"))?;
-    let consistent = workflow_kind == snapshot.workflow_kind
-        && workflow_kind == stored.transition.workflow_kind
-        && phase == stored.transition.phase
-        && state == stored.transition.execution_state
-        && row.item_revision == snapshot.item_revision
-        && configuration_revision == snapshot.configuration_revision
-        && row.provider_revision == snapshot.provider_revision
-        && reviewers == &snapshot.reviewer
-        && row.host_id == ownership.host_id
-        && fencing_epoch == ownership.fencing_epoch;
+    ensure_row_copies_match(
+        row.host_id == ownership.host_id && fencing_epoch == ownership.fencing_epoch,
+    )
+}
+
+fn ensure_row_copies_match(consistent: bool) -> Result<(), CliError> {
     if consistent {
         Ok(())
     } else {

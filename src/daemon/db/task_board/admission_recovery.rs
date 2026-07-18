@@ -119,7 +119,9 @@ const ADMISSION_RECOVERY_SQL: &str =
         intent.payload_json, intent.status AS intent_status
      FROM task_board_dispatch_admission_ledger AS ledger
      JOIN task_board_dispatch_intents AS intent ON intent.intent_id = ledger.intent_id
-     WHERE ledger.state = 'committed' AND ledger.managed_worker_id IS NOT NULL
+     WHERE ledger.kind = 'concurrency' AND ledger.state = 'committed'
+       AND ledger.managed_worker_id IS NOT NULL
+       AND NOT (intent.status = 'starting' AND intent.compensation_pending = 1)
      ORDER BY ledger.managed_worker_id, intent.intent_id";
 
 const ADMISSION_RECOVERY_FOR_WORKER_SQL: &str =
@@ -128,7 +130,9 @@ const ADMISSION_RECOVERY_FOR_WORKER_SQL: &str =
         intent.payload_json, intent.status AS intent_status
      FROM task_board_dispatch_admission_ledger AS ledger
      JOIN task_board_dispatch_intents AS intent ON intent.intent_id = ledger.intent_id
-     WHERE ledger.state = 'committed' AND ledger.managed_worker_id = ?1
+     WHERE ledger.kind = 'concurrency' AND ledger.state = 'committed'
+       AND ledger.managed_worker_id = ?1
+       AND NOT (intent.status = 'starting' AND intent.compensation_pending = 1)
      ORDER BY ledger.managed_worker_id, intent.intent_id";
 
 fn recoveries_from_rows(

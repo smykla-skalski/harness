@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use futures_util::FutureExt;
 use tokio::task::{JoinError, spawn_blocking};
 use tokio::time::sleep;
 
@@ -135,8 +136,11 @@ async fn prepare_dispatch_side_effects(
     let read_only_workflow = super::read_only_workflow_launch::prepare_read_only_workflow_launch(
         db,
         &claim.preparation.board_item_id,
+        &claim.preparation.session_id,
         &worktree,
+        claim.preparation.source_item_revision,
     )
+    .boxed()
     .await
     .map_err(|error| (DispatchFailureKind::LinkItem, error))?;
     Ok(DispatchCheckout {

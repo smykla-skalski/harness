@@ -271,6 +271,10 @@ mod task_board_orchestrator_db;
 mod task_board_orchestrator_run_lease;
 mod task_board_orchestrator_settings;
 mod task_board_orchestrator_step_mode;
+mod task_board_read_only_coordinator;
+#[cfg(test)]
+mod task_board_read_only_coordinator_tests;
+mod task_board_read_only_runtime;
 mod task_board_runtime;
 #[cfg(test)]
 mod task_board_sync_tests;

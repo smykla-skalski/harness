@@ -3,9 +3,10 @@ use sqlx::query;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
     TaskBoardAttemptResultArtifact, TaskBoardAttemptState, TaskBoardExecutionAttemptCas,
-    TaskBoardExecutionAttemptRecord, TaskBoardExecutionState, TaskBoardPhaseVerdict,
-    TaskBoardReviewResult, TaskBoardReviewerOutcome, TaskBoardWorkflowCasMismatch,
-    TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionCasOutcome, TaskBoardWorkflowKind,
+    TaskBoardExecutionAttemptRecord, TaskBoardExecutionDiagnostic, TaskBoardExecutionState,
+    TaskBoardPhaseVerdict, TaskBoardReviewResult, TaskBoardReviewerOutcome,
+    TaskBoardWorkflowCasMismatch, TaskBoardWorkflowExecutionCas,
+    TaskBoardWorkflowExecutionCasOutcome, TaskBoardWorkflowKind,
 };
 
 use super::task_board_workflow_execution::{
@@ -16,7 +17,7 @@ use super::task_board_workflow_test_support::{
 };
 
 #[tokio::test]
-async fn active_execution_create_is_idempotent_and_survives_restart() {
+async fn active_execution_create_is_idempotent_and_rejects_competing_contracts() {
     let test = TestDatabase::open().await;
     let record = create_execution(
         &test.db,
@@ -35,15 +36,14 @@ async fn active_execution_create_is_idempotent_and_survives_restart() {
         .expect("duplicate create");
     let mut competing = record.clone();
     competing.execution_id = "execution-competing".into();
-    let existing = test
+    let error = test
         .db
         .create_or_load_task_board_workflow_execution(&competing)
         .await
-        .expect("load one active execution");
+        .expect_err("competing active execution must fail closed");
 
     assert!(!duplicate.created);
-    assert!(!existing.created);
-    assert_eq!(existing.execution.execution_id, record.execution_id);
+    assert!(error.to_string().contains("immutable contract"));
     assert_eq!(
         test.db.current_change_sequence().await.expect("sequence"),
         sequence
@@ -98,6 +98,9 @@ async fn execution_cas_rejects_stale_guards_without_change_churn() {
     let mut stale = TaskBoardWorkflowExecutionCas::from(&current);
     stale.revisions.provider_revision = Some("provider-indigo".into());
     stale_guards.push((stale, TaskBoardWorkflowCasMismatch::ProviderRevision));
+    let mut stale = TaskBoardWorkflowExecutionCas::from(&current);
+    stale.record_sha256 = "stale-record".into();
+    stale_guards.push((stale, TaskBoardWorkflowCasMismatch::Record));
 
     for (expected, mismatch) in stale_guards {
         let outcome = test
@@ -129,6 +132,99 @@ async fn execution_cas_rejects_stale_guards_without_change_churn() {
     assert!(matches!(
         outcome,
         TaskBoardWorkflowExecutionCasOutcome::Updated(_)
+    ));
+}
+
+#[tokio::test]
+async fn execution_cas_fences_same_state_record_content() {
+    let test = TestDatabase::open().await;
+    let current = create_execution(
+        &test.db,
+        "task-content-fence",
+        TaskBoardWorkflowKind::Review,
+        reviewers(1, 1),
+        Some("head-amber"),
+    )
+    .await;
+    let expected = TaskBoardWorkflowExecutionCas::from(&current);
+    let mut first = current.clone();
+    first.artifacts.diagnostics.push(diagnostic("writer-a"));
+    let mut stale = current.clone();
+    stale.artifacts.diagnostics.push(diagnostic("writer-b"));
+
+    let applied = test
+        .db
+        .compare_and_set_task_board_workflow_execution(&expected, &first)
+        .await
+        .expect("apply first content update");
+    assert!(matches!(
+        applied,
+        TaskBoardWorkflowExecutionCasOutcome::Updated(_)
+    ));
+    let sequence = test.db.current_change_sequence().await.expect("sequence");
+    let rejected = test
+        .db
+        .compare_and_set_task_board_workflow_execution(&expected, &stale)
+        .await
+        .expect("reject stale content update");
+    assert!(matches!(
+        rejected,
+        TaskBoardWorkflowExecutionCasOutcome::Stale {
+            mismatch: TaskBoardWorkflowCasMismatch::Record,
+            ..
+        }
+    ));
+    assert_eq!(
+        test.db.current_change_sequence().await.expect("sequence"),
+        sequence
+    );
+    let persisted = test
+        .db
+        .task_board_workflow_execution(&current.execution_id)
+        .await
+        .expect("load fenced execution")
+        .expect("fenced execution");
+    assert_eq!(
+        persisted.artifacts.diagnostics,
+        vec![diagnostic("writer-a")]
+    );
+}
+
+#[tokio::test]
+async fn execution_cas_fences_concurrent_child_evidence() {
+    let test = TestDatabase::open().await;
+    let current = create_execution(
+        &test.db,
+        "task-child-fence",
+        TaskBoardWorkflowKind::Review,
+        reviewers(1, 1),
+        Some("head-amber"),
+    )
+    .await;
+    let expected = TaskBoardWorkflowExecutionCas::from(&current);
+    let attempt = preparing_attempt(
+        &current.execution_id,
+        "review:reviewer-amber",
+        1,
+        "attempt-child-fence",
+    );
+    create_workflow_execution_attempt(&test.db, &attempt)
+        .await
+        .expect("create concurrent child evidence");
+    let mut stale_parent = current.clone();
+    stale_parent.transition.execution_state = TaskBoardExecutionState::Preparing;
+
+    let rejected = test
+        .db
+        .compare_and_set_task_board_workflow_execution(&expected, &stale_parent)
+        .await
+        .expect("reject parent update after child evidence");
+    assert!(matches!(
+        rejected,
+        TaskBoardWorkflowExecutionCasOutcome::Stale {
+            mismatch: TaskBoardWorkflowCasMismatch::Record,
+            ..
+        }
     ));
 }
 
@@ -333,5 +429,13 @@ fn preparing_attempt(
         started_at: CREATED_AT.into(),
         updated_at: CREATED_AT.into(),
         completed_at: None,
+    }
+}
+
+fn diagnostic(code: &str) -> TaskBoardExecutionDiagnostic {
+    TaskBoardExecutionDiagnostic {
+        code: code.into(),
+        message: format!("diagnostic from {code}"),
+        recorded_at: CREATED_AT.into(),
     }
 }

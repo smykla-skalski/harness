@@ -3,13 +3,16 @@ use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
 use super::workflow_execution_attempts::load_execution_attempts_in_tx;
+use super::workflow_execution_revisions::live_execution_revision_mismatch_in_tx;
 use super::workflow_execution_rows::{WorkflowExecutionRow, execution_json, label, phase_label};
-use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
+use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error};
 use crate::task_board::{
+    TaskBoardAttemptState, TaskBoardExecutionPhase, TaskBoardExecutionState,
     TaskBoardWorkflowCasMismatch, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionCasOutcome, TaskBoardWorkflowExecutionCreateOutcome,
     TaskBoardWorkflowExecutionRecord, advance_task_board_workflow,
-    validate_task_board_execution_update, validate_task_board_workflow_execution,
+    validate_task_board_execution_update, validate_task_board_read_only_run_context,
+    validate_task_board_workflow_execution,
 };
 
 const SELECT_EXECUTION: &str = "SELECT * FROM task_board_workflow_executions
@@ -19,13 +22,6 @@ const SELECT_ACTIVE_EXECUTIONS: &str = "SELECT * FROM task_board_workflow_execut
       AND state IN ('pending', 'preparing', 'starting', 'running', 'retry_wait',
                     'awaiting_approval', 'draining')
     ORDER BY created_at DESC, execution_id DESC LIMIT 2";
-const SELECT_READY_EXECUTIONS: &str = "SELECT * FROM task_board_workflow_executions
-    WHERE workflow_kind IN ('review', 'pr_review')
-      AND completed_at IS NULL
-      AND (state IN ('pending', 'preparing', 'starting', 'running')
-           OR (state = 'retry_wait' AND available_at <= ?1))
-    ORDER BY COALESCE(available_at, created_at), updated_at, execution_id
-    LIMIT ?2";
 
 impl AsyncDaemonDb {
     pub(crate) async fn create_or_load_task_board_workflow_execution(
@@ -34,6 +30,13 @@ impl AsyncDaemonDb {
     ) -> Result<TaskBoardWorkflowExecutionCreateOutcome, CliError> {
         validate_task_board_workflow_execution(proposed)
             .map_err(|error| db_error(format!("validate workflow execution create: {error}")))?;
+        let run_context = proposed
+            .snapshot
+            .read_only_run_context
+            .as_ref()
+            .ok_or_else(|| db_error("new read-only workflow execution has no immutable context"))?;
+        validate_task_board_read_only_run_context(run_context)
+            .map_err(|error| db_error(format!("validate workflow run context: {error}")))?;
         if !proposed.attempts.is_empty() {
             return Err(db_error("new workflow execution cannot contain attempts"));
         }
@@ -43,6 +46,7 @@ impl AsyncDaemonDb {
         if let Some(execution) =
             load_active_execution_in_tx(&mut transaction, &proposed.item_id).await?
         {
+            validate_active_execution_adoption(&execution, proposed)?;
             transaction.commit().await.map_err(|error| {
                 db_error(format!("commit workflow execution create no-op: {error}"))
             })?;
@@ -98,39 +102,6 @@ impl AsyncDaemonDb {
         Ok(execution)
     }
 
-    pub(crate) async fn ready_task_board_workflow_executions(
-        &self,
-        now: &str,
-        limit: usize,
-    ) -> Result<Vec<TaskBoardWorkflowExecutionRecord>, CliError> {
-        if limit == 0 {
-            return Ok(Vec::new());
-        }
-        let limit = i64::try_from(limit.min(100))
-            .map_err(|_| db_error("workflow execution ready limit is out of range"))?;
-        let mut transaction =
-            self.pool().begin().await.map_err(|error| {
-                db_error(format!("begin ready workflow execution load: {error}"))
-            })?;
-        let rows = query_as::<_, WorkflowExecutionRow>(SELECT_READY_EXECUTIONS)
-            .bind(now)
-            .bind(limit)
-            .fetch_all(transaction.as_mut())
-            .await
-            .map_err(|error| db_error(format!("load ready workflow executions: {error}")))?;
-        let mut executions = Vec::with_capacity(rows.len());
-        for row in rows {
-            let execution_id = row.execution_id.clone();
-            let attempts = load_execution_attempts_in_tx(&mut transaction, &execution_id).await?;
-            executions.push(row.into_record(attempts)?);
-        }
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit ready workflow execution load: {error}")))?;
-        Ok(executions)
-    }
-
     pub(crate) async fn compare_and_set_task_board_workflow_execution(
         &self,
         expected: &TaskBoardWorkflowExecutionCas,
@@ -149,10 +120,24 @@ impl AsyncDaemonDb {
                 current: None,
             });
         };
+        ensure_terminal_transition_has_no_active_side_effect(&current, updated)?;
         if let Some(mismatch) = cas_mismatch(expected, &current) {
             transaction.commit().await.map_err(|error| {
                 db_error(format!("commit stale workflow execution CAS: {error}"))
             })?;
+            return Ok(TaskBoardWorkflowExecutionCasOutcome::Stale {
+                mismatch,
+                current: Some(current),
+            });
+        }
+        if current.transition.phase != updated.transition.phase
+            && let Some(mismatch) =
+                live_execution_revision_mismatch_in_tx(&mut transaction, &current).await?
+        {
+            transaction
+                .commit()
+                .await
+                .map_err(|error| db_error(format!("commit stale workflow phase CAS: {error}")))?;
             return Ok(TaskBoardWorkflowExecutionCasOutcome::Stale {
                 mismatch,
                 current: Some(current),
@@ -226,6 +211,29 @@ async fn load_active_execution_in_tx(
     let execution_id = row.execution_id.clone();
     let attempts = load_execution_attempts_in_tx(transaction, &execution_id).await?;
     row.into_record(attempts).map(Some)
+}
+
+fn validate_active_execution_adoption(
+    current: &TaskBoardWorkflowExecutionRecord,
+    proposed: &TaskBoardWorkflowExecutionRecord,
+) -> Result<(), CliError> {
+    let same_identity =
+        current.execution_id == proposed.execution_id && current.item_id == proposed.item_id;
+    let same_frozen_contract = current.snapshot == proposed.snapshot
+        && current.resolved_reviewers == proposed.resolved_reviewers
+        && current.transition.workflow_kind == proposed.transition.workflow_kind
+        && current.transition.pull_request == proposed.transition.pull_request
+        && current.transition.exact_head_revision == proposed.transition.exact_head_revision
+        && current.ownership == proposed.ownership
+        && current.created_at == proposed.created_at;
+    if same_identity && same_frozen_contract {
+        Ok(())
+    } else {
+        Err(db_error(format!(
+            "active workflow execution '{}' conflicts with proposed execution '{}' immutable contract",
+            current.execution_id, proposed.execution_id
+        )))
+    }
 }
 
 async fn validate_current_create_revisions(
@@ -350,7 +358,7 @@ pub(super) async fn update_execution_in_tx(
     }
 }
 
-fn cas_mismatch(
+pub(super) fn cas_mismatch(
     expected: &TaskBoardWorkflowExecutionCas,
     current: &TaskBoardWorkflowExecutionRecord,
 ) -> Option<TaskBoardWorkflowCasMismatch> {
@@ -366,9 +374,51 @@ fn cas_mismatch(
         Some(TaskBoardWorkflowCasMismatch::ConfigurationRevision)
     } else if expected.revisions.provider_revision != current.snapshot.provider_revision {
         Some(TaskBoardWorkflowCasMismatch::ProviderRevision)
+    } else if expected.record_sha256 != TaskBoardWorkflowExecutionCas::from(current).record_sha256 {
+        Some(TaskBoardWorkflowCasMismatch::Record)
     } else {
         None
     }
+}
+
+fn ensure_terminal_transition_has_no_active_side_effect(
+    current: &TaskBoardWorkflowExecutionRecord,
+    updated: &TaskBoardWorkflowExecutionRecord,
+) -> Result<(), CliError> {
+    let stops = !is_stopped(current.transition.execution_state)
+        && is_stopped(updated.transition.execution_state);
+    if stops && has_active_external_side_effect(current) {
+        return Err(CliErrorKind::concurrent_modification(
+            "workflow execution has an admitted external side effect",
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn has_active_external_side_effect(execution: &TaskBoardWorkflowExecutionRecord) -> bool {
+    execution
+        .attempts
+        .iter()
+        .any(|attempt| match execution.transition.phase {
+            Some(TaskBoardExecutionPhase::Review | TaskBoardExecutionPhase::Evaluate) => {
+                matches!(attempt.state, TaskBoardAttemptState::Running)
+            }
+            Some(TaskBoardExecutionPhase::Publish) => {
+                attempt.action_key == "publish" && attempt.state == TaskBoardAttemptState::Running
+            }
+            _ => false,
+        })
+}
+
+const fn is_stopped(state: TaskBoardExecutionState) -> bool {
+    matches!(
+        state,
+        TaskBoardExecutionState::HumanRequired
+            | TaskBoardExecutionState::Completed
+            | TaskBoardExecutionState::Failed
+            | TaskBoardExecutionState::Cancelled
+    )
 }
 
 fn validate_phase_change(

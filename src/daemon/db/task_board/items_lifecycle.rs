@@ -29,6 +29,36 @@ pub(super) async fn ensure_estimates_are_editable_in_tx(
     Ok(())
 }
 
+pub(crate) async fn ensure_read_only_item_mutation_allowed_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    item_id: &str,
+) -> Result<(), CliError> {
+    let side_effect_claimed = query_scalar::<_, bool>(
+        "SELECT EXISTS(
+             SELECT 1 FROM task_board_dispatch_intents
+             WHERE item_id = ?1 AND status = 'starting'
+               AND json_type(payload_json, '$.read_only_workflow') = 'object'
+             UNION ALL
+             SELECT 1 FROM task_board_workflow_executions AS execution
+             JOIN task_board_execution_attempts AS attempt
+               ON attempt.execution_id = execution.execution_id
+             WHERE execution.item_id = ?1 AND execution.phase = 'publish'
+               AND attempt.action_key = 'publish' AND attempt.state = 'running'
+         )",
+    )
+    .bind(item_id)
+    .fetch_one(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("check read-only worker start claim: {error}")))?;
+    if side_effect_claimed {
+        return Err(CliErrorKind::invalid_transition(format!(
+            "task-board item '{item_id}' cannot change while its read-only side effect is claimed"
+        ))
+        .into());
+    }
+    Ok(())
+}
+
 pub(super) async fn cancel_prestart_dispatch_for_terminal_item_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     item_id: &str,

@@ -45,6 +45,19 @@ pub async fn resolve_review_pull_requests(
 pub(super) async fn fetch_pull_requests_by_reference(
     request: &ReviewsPullRequestResolveRequest,
 ) -> Result<ResolvedPullRequests, CliError> {
+    fetch_pull_requests_by_reference_with_freshness(request, false).await
+}
+
+pub(super) async fn fetch_pull_requests_by_reference_authoritative(
+    request: &ReviewsPullRequestResolveRequest,
+) -> Result<ResolvedPullRequests, CliError> {
+    fetch_pull_requests_by_reference_with_freshness(request, true).await
+}
+
+async fn fetch_pull_requests_by_reference_with_freshness(
+    request: &ReviewsPullRequestResolveRequest,
+    authoritative: bool,
+) -> Result<ResolvedPullRequests, CliError> {
     request.validate()?;
     let normalized = request.normalized_references();
     let references_by_key = normalized
@@ -62,7 +75,13 @@ pub(super) async fn fetch_pull_requests_by_reference(
             backport_patterns: request.normalized_backport_patterns(),
         };
         let client = ReviewsGitHubClient::new(&segment.token)?;
-        let fetch = client.fetch_by_references(&segment_request).await?;
+        let fetch = if authoritative {
+            client
+                .fetch_by_references_authoritative(&segment_request)
+                .await?
+        } else {
+            client.fetch_by_references(&segment_request).await?
+        };
         // GitHub returns both viewer-scoped values for the authenticated token.
         authoritative_viewer_keys.extend(fetch.items.iter().map(super::review_item_key));
         items.extend(fetch.items);

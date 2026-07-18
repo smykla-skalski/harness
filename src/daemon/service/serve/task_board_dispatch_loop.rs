@@ -9,8 +9,8 @@ use crate::daemon::db::{AsyncDaemonDb, ClaimedTaskBoardDispatch, TaskBoardDispat
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::service::task_board::prepare_claimed_task_board_dispatch;
 use crate::daemon::task_board_managed_agents::{
-    begin_worker_compensation, maintain_task_board_dispatch_claim, managed_admission_owner_id,
-    managed_worker_id, resume_worker_compensation, start_worker_for_applied_task,
+    maintain_task_board_dispatch_claim, managed_worker_id, resume_worker_compensation,
+    settle_claimed_task_board_worker,
 };
 
 const RECOVERY_INTERVAL: Duration = Duration::from_secs(1);
@@ -39,7 +39,7 @@ async fn run_task_board_dispatch_loop(
                     break;
                 }
             }
-            _ = ticker.tick() => recover_pending_dispatches(&state, &db).await,
+            _ = ticker.tick() => Box::pin(recover_pending_dispatches(&state, &db)).await,
         }
     }
 }
@@ -77,16 +77,21 @@ async fn recover_pending_dispatches(state: &DaemonHttpState, db: &AsyncDaemonDb)
         };
         finish_claim(state, db, claim).await;
     }
+    if let Err(error) =
+        Box::pin(
+            super::super::task_board_read_only_coordinator::
+                reconcile_task_board_read_only_workflows(state, db),
+        )
+        .await
+    {
+        warn!(%error, "read-only workflow recovery failed");
+    }
 }
 
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "worker recovery must durably complete successful claims and roll back failed claims"
-)]
 async fn finish_claim(
     state: &DaemonHttpState,
     db: &AsyncDaemonDb,
-    claim: ClaimedTaskBoardDispatch,
+    mut claim: ClaimedTaskBoardDispatch,
 ) {
     let _heartbeat =
         maintain_task_board_dispatch_claim(db.clone(), &claim.intent_id, &claim.claim_token);
@@ -94,52 +99,12 @@ async fn finish_claim(
         finish_compensating_claim(state, db, &claim, reason).await;
         return;
     }
-    let result =
-        start_worker_for_applied_task(state, &claim.applied, &claim.intent_id, &claim.claim_token)
-            .await;
-    match result {
-        Ok(_) => {
-            if let Err(error) = db
-                .renew_task_board_dispatch_claim(&claim.intent_id, &claim.claim_token)
-                .await
-            {
-                compensate_failed_completion(state, db, &claim, &error).await;
-                return;
-            }
-            if let Err(error) = db
-                .complete_task_board_dispatch(
-                    &claim.intent_id,
-                    &claim.claim_token,
-                    &managed_admission_owner_id(&claim.applied, &claim.intent_id),
-                )
-                .await
-            {
-                compensate_failed_completion(state, db, &claim, &error).await;
-            }
-        }
-        Err(start_error) => {
-            let may_rollback = start_error.may_rollback();
-            let error = start_error.into_cli_error();
-            if may_rollback {
-                if let Err(rollback_error) = db
-                    .fail_task_board_dispatch(
-                        &claim.intent_id,
-                        &claim.claim_token,
-                        claim.consumed_approval_grant_id.as_deref(),
-                        &error.to_string(),
-                    )
-                    .await
-                {
-                    warn!(board_item_id = %claim.applied.board_item_id, %rollback_error, "task board dispatch recovery rollback failed");
-                }
-            } else {
-                warn!(
-                    board_item_id = %claim.applied.board_item_id,
-                    %error,
-                    "task board worker start outcome is uncertain; leaving the claim fenced for recovery"
-                );
-            }
-        }
+    if let Err(error) = settle_claimed_task_board_worker(state, db, &mut claim).await {
+        warn!(
+            board_item_id = %claim.applied.board_item_id,
+            %error,
+            "task board worker recovery settlement failed; leaving durable state for recovery"
+        );
     }
 }
 
@@ -147,49 +112,6 @@ fn compensation_reason(action: &TaskBoardDispatchClaimAction) -> Option<&str> {
     match action {
         TaskBoardDispatchClaimAction::Start | TaskBoardDispatchClaimAction::Recover => None,
         TaskBoardDispatchClaimAction::Compensate { reason } => Some(reason.as_str()),
-    }
-}
-
-async fn compensate_failed_completion(
-    state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
-    claim: &ClaimedTaskBoardDispatch,
-    completion_error: &crate::errors::CliError,
-) {
-    if let Err(stop_error) = begin_worker_compensation(
-        state,
-        db,
-        &claim.applied,
-        &claim.intent_id,
-        &claim.claim_token,
-        &completion_error.to_string(),
-    )
-    .await
-    {
-        warn!(
-            board_item_id = %claim.applied.board_item_id,
-            %completion_error,
-            %stop_error,
-            "task board dispatch recovery completion and compensation failed; leaving claim fenced"
-        );
-        return;
-    }
-    if let Err(rollback_error) = db
-        .finalize_task_board_dispatch_compensation(
-            &claim.intent_id,
-            &claim.claim_token,
-            claim.consumed_approval_grant_id.as_deref(),
-            &managed_worker_id(&claim.applied, &claim.intent_id),
-            &completion_error.to_string(),
-        )
-        .await
-    {
-        warn!(
-            board_item_id = %claim.applied.board_item_id,
-            %completion_error,
-            %rollback_error,
-            "task board dispatch recovery stopped its worker but rollback failed"
-        );
     }
 }
 
@@ -219,7 +141,6 @@ async fn finish_compensating_claim(
         .finalize_task_board_dispatch_compensation(
             &claim.intent_id,
             &claim.claim_token,
-            claim.consumed_approval_grant_id.as_deref(),
             &managed_worker_id(&claim.applied, &claim.intent_id),
             reason,
         )

@@ -193,6 +193,7 @@ fn applied_dispatch() -> DispatchAppliedTask {
         work_item_id: "work-1".to_string(),
         lifecycle: DispatchLifecycle::planned(&worker, &reviewer, &evaluator).applied(),
         item,
+        read_only_workflow: None,
     }
 }
 
