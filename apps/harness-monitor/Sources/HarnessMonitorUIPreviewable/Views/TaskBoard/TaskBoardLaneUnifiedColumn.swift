@@ -210,7 +210,7 @@ struct TaskBoardLaneUnifiedColumn: View {
           decision: decision,
           fontScale: fontScale,
           isHovered: hoveredCardID == cardID,
-          onOpenDecision: actions.openDecision
+          actions: actions
         )
         .taskBoardCardFrame(id: cardID, in: cardHoverCoordinateSpace)
       }

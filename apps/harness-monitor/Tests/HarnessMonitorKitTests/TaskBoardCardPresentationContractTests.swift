@@ -170,6 +170,45 @@ struct TaskBoardCardPresentationContractTests {
     )
   }
 
+  @Test("Decision row accepts actions in place of the onOpenDecision closure")
+  func decisionRowAcceptsActionsInsteadOfClosure() {
+    // Compile-level proof for the de-closure: TaskBoardDecisionRow must take `actions:` (not a
+    // stored `(Decision) -> Void` closure) so the row stays structurally Equatable-comparable and
+    // diff-skippable, matching the pattern W1 used for the other rows.
+    let actions = TaskBoardOverviewActions(store: nil, scope: .dashboard)
+    let decision = Decision(
+      id: "contract-decision",
+      severity: .warn,
+      ruleID: "rule-contract",
+      sessionID: nil,
+      agentID: nil,
+      taskID: nil,
+      summary: "Contract summary",
+      contextJSON: "{}",
+      suggestedActionsJSON: "[]"
+    )
+
+    let row = TaskBoardDecisionRow(
+      decision: decision,
+      fontScale: 1,
+      isHovered: false,
+      actions: actions
+    )
+
+    #expect(row.actions == actions)
+  }
+
+  @Test("Lane column wires actions into the decision row instead of a closure")
+  func laneColumnWiresDecisionRowActions() throws {
+    let columnSource = try taskBoardSource("TaskBoardLaneUnifiedColumn.swift")
+    let decisionSource = try taskBoardSource("TaskBoardNeedsYouLaneViews.swift")
+
+    #expect(columnSource.contains("TaskBoardDecisionRow(") && columnSource.contains("actions: actions"))
+    #expect(!columnSource.contains("onOpenDecision:"))
+    #expect(!decisionSource.contains("onOpenDecision"))
+    #expect(decisionSource.contains("actions.openDecision(decision)"))
+  }
+
   private func contractTaskBoardItem() -> TaskBoardItem {
     TaskBoardItem(
       schemaVersion: 1,

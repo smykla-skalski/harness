@@ -61,7 +61,7 @@ enum TaskBoardDecisionPrimaryActionCache {
 struct TaskBoardDecisionRow: View {
   let decision: Decision
   let isHovered: Bool
-  let onOpenDecision: (Decision) -> Void
+  let actions: TaskBoardOverviewActions
   private let primaryAction: SuggestedAction?
   private let metrics: TaskBoardLaneMetrics
   private let summaryFont: Font
@@ -75,11 +75,11 @@ struct TaskBoardDecisionRow: View {
     decision: Decision,
     fontScale: CGFloat,
     isHovered: Bool = false,
-    onOpenDecision: @escaping (Decision) -> Void
+    actions: TaskBoardOverviewActions
   ) {
     self.decision = decision
     self.isHovered = isHovered
-    self.onOpenDecision = onOpenDecision
+    self.actions = actions
     primaryAction = TaskBoardDecisionPrimaryActionCache.resolve(
       decisionID: decision.id,
       suggestedActionsJSON: decision.suggestedActionsJSON
@@ -107,7 +107,7 @@ struct TaskBoardDecisionRow: View {
 
   var body: some View {
     Button {
-      onOpenDecision(decision)
+      actions.openDecision(decision)
     } label: {
       cardBody
     }
