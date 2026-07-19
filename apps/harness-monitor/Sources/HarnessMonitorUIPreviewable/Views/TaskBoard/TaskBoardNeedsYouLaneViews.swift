@@ -12,27 +12,26 @@ import SwiftUI
 /// Decoder shared by `TaskBoardDecisionPrimaryActionCache`.
 private let taskBoardNeedsYouSuggestedActionsDecoder = JSONDecoder()
 
-/// Memoizes `SuggestedAction` JSON decoding by decision id + a content hash, so a lane re-render
-/// (which recreates `TaskBoardDecisionRow`) decodes each decision at most once per distinct
-/// content instead of once per render. Internal so tests can exercise it directly.
+/// Memoizes `SuggestedAction` JSON decoding by decision id, keyed on the full JSON string (not a
+/// hash - hashes can collide and would serve a stale action for different content), so a lane
+/// re-render (which recreates `TaskBoardDecisionRow`) decodes each decision at most once per
+/// distinct content instead of once per render. Internal so tests can exercise it directly.
 @MainActor
 enum TaskBoardDecisionPrimaryActionCache {
   /// Bounds growth across a long-running session; never expect this many open decisions at once.
   private static let maxEntries = 512
 
-  private static var entriesByDecisionID: [String: (contentHash: Int, action: SuggestedAction?)] =
-    [:]
+  private static var entriesByDecisionID: [String: (json: String, action: SuggestedAction?)] = [:]
 
   static func resolve(decisionID: String, suggestedActionsJSON: String) -> SuggestedAction? {
-    let contentHash = suggestedActionsJSON.hashValue
-    if let cached = entriesByDecisionID[decisionID], cached.contentHash == contentHash {
+    if let cached = entriesByDecisionID[decisionID], cached.json == suggestedActionsJSON {
       return cached.action
     }
     let resolved = decode(suggestedActionsJSON)
     if entriesByDecisionID.count >= maxEntries {
       entriesByDecisionID.removeAll(keepingCapacity: true)
     }
-    entriesByDecisionID[decisionID] = (contentHash, resolved)
+    entriesByDecisionID[decisionID] = (suggestedActionsJSON, resolved)
     return resolved
   }
 

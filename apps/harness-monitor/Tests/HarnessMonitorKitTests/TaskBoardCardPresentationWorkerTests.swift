@@ -268,6 +268,31 @@ struct TaskBoardCardPresentationWorkerTests {
     #expect(updated?.id == "nudge")
   }
 
+  @Test("Primary action cache compares full JSON content, not a hash that could collide")
+  func primaryActionCacheComparesFullContentNotHash() {
+    // Same decision id, JSON payloads that differ by a single field: a hash-keyed cache could
+    // (in principle) treat these as the same cache entry if their hashes collided; comparing the
+    // full string can never do that.
+    let firstActions = [
+      SuggestedAction(id: "action-a", title: "Assign to agent", kind: .assignTask, payloadJSON: "{}")
+    ]
+    let secondActions = [
+      SuggestedAction(id: "action-b", title: "Assign to agent", kind: .assignTask, payloadJSON: "{}")
+    ]
+
+    let first = TaskBoardDecisionPrimaryActionCache.resolve(
+      decisionID: "decision-6",
+      suggestedActionsJSON: encoded(firstActions)
+    )
+    let second = TaskBoardDecisionPrimaryActionCache.resolve(
+      decisionID: "decision-6",
+      suggestedActionsJSON: encoded(secondActions)
+    )
+
+    #expect(first?.id == "action-a")
+    #expect(second?.id == "action-b")
+  }
+
   // MARK: - Fixtures
 
   private func glyphItem(
