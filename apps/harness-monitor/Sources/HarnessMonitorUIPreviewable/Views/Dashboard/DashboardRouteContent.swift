@@ -264,7 +264,7 @@ struct DashboardTaskBoardRouteView: View {
       decisions: store.supervisorOpenDecisions,
       orchestratorStatus: dashboardUI.taskBoardOrchestratorStatus,
       evaluationSummary: dashboardUI.taskBoardEvaluationSummary,
-      isActionInFlight: dashboardUI.isBusy || dashboardUI.connectionState != .online,
+      isActionInFlight: dashboardUI.isTaskBoardBusy || dashboardUI.connectionState != .online,
       showsOperationsPanel: false,
       isCommandFocusActive: isRouteVisible,
       operationsInspectorFocus: operationsInspectorFocus

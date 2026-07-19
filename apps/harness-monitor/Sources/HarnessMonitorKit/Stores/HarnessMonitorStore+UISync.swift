@@ -267,6 +267,7 @@ extension HarnessMonitorStore {
         policyAudit: globalPolicyAudit
       )
     )
+    contentUI.dashboard.applyTaskBoardBusy(isTaskBoardBusy)
   }
 
   private func tuiStatusByAgent(for detail: SessionDetail?) -> [String: AgentTuiStatus] {

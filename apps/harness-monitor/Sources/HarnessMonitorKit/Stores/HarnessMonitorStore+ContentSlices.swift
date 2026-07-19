@@ -321,6 +321,14 @@ extension HarnessMonitorStore {
     public var githubDataRevision: UInt64 = 0
     public var latestGitHubDataChange: GitHubDataChangedPayload?
     public var taskBoardRevision: UInt64 = 0
+    /// True while a task-board-scoped mutation is in flight. Synced
+    /// separately from `apply(_:)` via `applyTaskBoardBusy(_:)` since it is
+    /// derived from store-internal counter state, not `ContentDashboardState`.
+    public private(set) var isTaskBoardBusy = false
+    /// Bumps only when `taskBoardItems` or `taskBoardOrchestratorStatus`
+    /// actually changed during `apply(_:)`. Cheaper than whole-array
+    /// equality for a `.task(id:)` key.
+    public private(set) var taskBoardSnapshotRevision: UInt64 = 0
     public var taskBoardItems: [TaskBoardItem] = []
     public var taskBoardOrchestratorStatus: TaskBoardOrchestratorStatus?
     public var taskBoardSyncSummary: TaskBoardSyncSummary?
@@ -345,8 +353,14 @@ extension HarnessMonitorStore {
       Self.assign(&notificationHistory, state.notificationHistory)
       Self.assign(&auditEvents, state.auditEvents)
       Self.assign(&auditHasOlder, state.auditHasOlder)
-      Self.assign(&taskBoardItems, state.taskBoardItems)
-      Self.assign(&taskBoardOrchestratorStatus, state.taskBoardOrchestratorStatus)
+      let didChangeTaskBoardItems = Self.assign(&taskBoardItems, state.taskBoardItems)
+      let didChangeTaskBoardOrchestratorStatus = Self.assign(
+        &taskBoardOrchestratorStatus,
+        state.taskBoardOrchestratorStatus
+      )
+      if didChangeTaskBoardItems || didChangeTaskBoardOrchestratorStatus {
+        taskBoardSnapshotRevision &+= 1
+      }
       Self.assign(&taskBoardSyncSummary, state.taskBoardSyncSummary)
       Self.assign(&taskBoardDispatchSummary, state.taskBoardDispatchSummary)
       Self.assign(&taskBoardEvaluationSummary, state.taskBoardEvaluationSummary)
@@ -363,9 +377,18 @@ extension HarnessMonitorStore {
       Self.assign(&policyAudit, state.policyAudit)
     }
 
-    private static func assign<Value: Equatable>(_ current: inout Value, _ next: Value) {
-      guard current != next else { return }
+    /// Synced separately from `apply(_:)` because `isTaskBoardBusy` is
+    /// derived from store-internal counter state rather than
+    /// `ContentDashboardState`.
+    internal func applyTaskBoardBusy(_ value: Bool) {
+      Self.assign(&isTaskBoardBusy, value)
+    }
+
+    @discardableResult
+    private static func assign<Value: Equatable>(_ current: inout Value, _ next: Value) -> Bool {
+      guard current != next else { return false }
       current = next
+      return true
     }
   }
 

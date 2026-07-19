@@ -85,7 +85,11 @@ extension HarnessMonitorStore {
       return
     }
     isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginTaskBoardAction()
+    defer {
+      isDaemonActionInFlight = false
+      endTaskBoardAction()
+    }
     _ = await syncAndRefreshTaskBoardDashboard(
       using: client,
       request: Self.taskBoardDashboardSyncRequest,
@@ -112,7 +116,11 @@ extension HarnessMonitorStore {
       return false
     }
     isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginTaskBoardAction()
+    defer {
+      isDaemonActionInFlight = false
+      endTaskBoardAction()
+    }
 
     let createdItem: TaskBoardItem
     do {
@@ -164,7 +172,11 @@ extension HarnessMonitorStore {
       return false
     }
     isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginTaskBoardAction()
+    defer {
+      isDaemonActionInFlight = false
+      endTaskBoardAction()
+    }
 
     do {
       let measuredItem = try await Self.measureOperation {
@@ -257,7 +269,11 @@ extension HarnessMonitorStore {
       return false
     }
     isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginTaskBoardAction()
+    defer {
+      isDaemonActionInFlight = false
+      endTaskBoardAction()
+    }
 
     do {
       let measuredSummary = try await Self.measureOperation {
@@ -285,7 +301,11 @@ extension HarnessMonitorStore {
       return false
     }
     isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginTaskBoardAction()
+    defer {
+      isDaemonActionInFlight = false
+      endTaskBoardAction()
+    }
     return await syncAndRefreshTaskBoardDashboard(
       using: client,
       request: request,
@@ -302,7 +322,11 @@ extension HarnessMonitorStore {
       return false
     }
     isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginTaskBoardAction()
+    defer {
+      isDaemonActionInFlight = false
+      endTaskBoardAction()
+    }
 
     do {
       let measuredSummary = try await Self.measureOperation {
@@ -329,7 +353,11 @@ extension HarnessMonitorStore {
       return false
     }
     isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginTaskBoardAction()
+    defer {
+      isDaemonActionInFlight = false
+      endTaskBoardAction()
+    }
 
     do {
       let measuredSummary = try await Self.measureOperation {
@@ -351,7 +379,11 @@ extension HarnessMonitorStore {
       return false
     }
     isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginTaskBoardAction()
+    defer {
+      isDaemonActionInFlight = false
+      endTaskBoardAction()
+    }
 
     do {
       let measuredProjects = try await Self.measureOperation {
@@ -373,7 +405,11 @@ extension HarnessMonitorStore {
       return false
     }
     isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginTaskBoardAction()
+    defer {
+      isDaemonActionInFlight = false
+      endTaskBoardAction()
+    }
 
     do {
       let measuredMachines = try await Self.measureOperation {

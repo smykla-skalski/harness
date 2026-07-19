@@ -61,6 +61,11 @@ extension HarnessMonitorStore {
   ) -> UInt64 {
     if taskBoardRuntimeState.stepModeMutation.desiredValue == nil {
       taskBoardRuntimeState.stepModeMutation.lastAuthoritativeSettings = currentSettings
+      // One begin/end pair per mutation chain: `desiredValue` only goes from
+      // nil back to nil once, in `finishTaskBoardStepModeMutation`, even
+      // though overlapping toggles bump `latestGeneration` and re-enter this
+      // function multiple times before that chain resolves.
+      beginTaskBoardAction()
     }
     taskBoardRuntimeState.stepModeMutation.latestGeneration &+= 1
     taskBoardRuntimeState.stepModeMutation.desiredValue = enabled
@@ -124,6 +129,7 @@ extension HarnessMonitorStore {
         globalTaskBoardOrchestratorStatus = updatedStatus
       }
       isDaemonActionInFlight = false
+      endTaskBoardAction()
     }
     if didChangeStatus {
       scheduleTaskBoardSnapshotCacheWrite(
