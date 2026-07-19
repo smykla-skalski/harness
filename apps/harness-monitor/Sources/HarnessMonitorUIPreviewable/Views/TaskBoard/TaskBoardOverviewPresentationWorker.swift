@@ -18,8 +18,8 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
     inboxItemsByLane: [:],
     inboxItemsByID: [:],
     orderedCardIDs: [],
-    apiCardPresentationsByID: [:],
-    inboxCardPresentationsByID: [:],
+    apiCardPresentationsByLane: [:],
+    inboxCardPresentationsByLane: [:],
     decisionIDsByLane: [:],
     aggregateNeedsYouCount: 0,
     aggregateOpenCount: 0,
@@ -35,8 +35,8 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
   let inboxItemsByLane: [TaskBoardInboxLane: [TaskBoardInboxItem]]
   let inboxItemsByID: [TaskBoardCardID: TaskBoardInboxItem]
   let orderedCardIDs: [TaskBoardCardID]
-  let apiCardPresentationsByID: [String: TaskBoardCardPresentation]
-  let inboxCardPresentationsByID: [TaskBoardCardID: TaskBoardCardPresentation]
+  let apiCardPresentationsByLane: [TaskBoardInboxLane: [String: TaskBoardCardPresentation]]
+  let inboxCardPresentationsByLane: [TaskBoardInboxLane: [TaskBoardCardID: TaskBoardCardPresentation]]
   let decisionIDsByLane: [TaskBoardInboxLane: [String]]
   let aggregateNeedsYouCount: Int
   let aggregateOpenCount: Int
@@ -78,12 +78,14 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
     inboxItemsByID[id]
   }
 
-  func apiCardPresentation(id: String) -> TaskBoardCardPresentation? {
-    apiCardPresentationsByID[id]
+  func apiCardPresentations(in lane: TaskBoardInboxLane) -> [String: TaskBoardCardPresentation] {
+    apiCardPresentationsByLane[lane] ?? [:]
   }
 
-  func inboxCardPresentation(id: TaskBoardCardID) -> TaskBoardCardPresentation? {
-    inboxCardPresentationsByID[id]
+  func inboxCardPresentations(
+    in lane: TaskBoardInboxLane
+  ) -> [TaskBoardCardID: TaskBoardCardPresentation] {
+    inboxCardPresentationsByLane[lane] ?? [:]
   }
 }
 
@@ -175,16 +177,20 @@ actor TaskBoardOverviewPresentationWorker {
         apiItemsByLane: apiItemsByLane,
         inboxItemsByLane: inboxItemsByLane
       ),
-      apiCardPresentationsByID: Dictionary(
-        uniqueKeysWithValues: taskBoardItems.map {
-          ($0.id, TaskBoardCardPresentation.forAPIItem($0, projectLabelResolver: projectLabelResolver))
-        }
-      ),
-      inboxCardPresentationsByID: Dictionary(
-        uniqueKeysWithValues: inboxItems.map {
-          (inboxCardID(for: $0), TaskBoardCardPresentation.forInboxItem($0))
-        }
-      ),
+      apiCardPresentationsByLane: apiItemsByLane.mapValues { items in
+        Dictionary(
+          uniqueKeysWithValues: items.map {
+            ($0.id, TaskBoardCardPresentation.forAPIItem($0, projectLabelResolver: projectLabelResolver))
+          }
+        )
+      },
+      inboxCardPresentationsByLane: inboxItemsByLane.mapValues { items in
+        Dictionary(
+          uniqueKeysWithValues: items.map {
+            (inboxCardID(for: $0), TaskBoardCardPresentation.forInboxItem($0))
+          }
+        )
+      },
       decisionIDsByLane: decisionIDsByLane,
       aggregateNeedsYouCount: taskBoardNeedsYouCount
         + (inboxItemsByLane[.humanRequired]?.count ?? 0)

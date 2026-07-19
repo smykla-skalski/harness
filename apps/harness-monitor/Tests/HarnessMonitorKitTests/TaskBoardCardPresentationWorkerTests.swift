@@ -158,8 +158,12 @@ struct TaskBoardCardPresentationWorkerTests {
       )
     )
 
-    let ambiguousPresentation = try #require(presentation.apiCardPresentation(id: "ambiguous-item"))
-    let uniquePresentation = try #require(presentation.apiCardPresentation(id: "unique-item"))
+    let ambiguousPresentation = try #require(
+      presentation.apiCardPresentations(in: .todo)["ambiguous-item"]
+    )
+    let uniquePresentation = try #require(
+      presentation.apiCardPresentations(in: .todo)["unique-item"]
+    )
 
     #expect(ambiguousPresentation.repositoryLabelDefault == "alpha/console")
     #expect(ambiguousPresentation.repositoryLabelFullName == "alpha/console")
@@ -182,7 +186,7 @@ struct TaskBoardCardPresentationWorkerTests {
       )
     )
 
-    let cardPresentation = presentation.inboxCardPresentation(id: cardID)
+    let cardPresentation = presentation.inboxCardPresentations(in: .inProgress)[cardID]
 
     #expect(cardPresentation?.titleDisplayText == "Improve cache behavior")
     #expect(cardPresentation?.titleFragments.contains(where: \.isCode) == true)

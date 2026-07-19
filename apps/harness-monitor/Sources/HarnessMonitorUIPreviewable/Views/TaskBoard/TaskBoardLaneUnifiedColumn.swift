@@ -7,6 +7,10 @@ struct TaskBoardLaneUnifiedColumn: View {
   let apiItems: [TaskBoardItem]
   let inboxItems: [TaskBoardInboxItem]
   let decisions: [Decision]
+  /// This lane's own slice only (from `TaskBoardOverviewPresentation.apiCardPresentations(in:)`),
+  /// so a data change in one lane does not invalidate every column's diffed props.
+  let apiCardPresentations: [String: TaskBoardCardPresentation]
+  let inboxCardPresentations: [TaskBoardCardID: TaskBoardCardPresentation]
   let titleTypography: TaskBoardCardTitleTypography
   let isCollapsed: Bool
   let isDropEnabled: Bool
@@ -152,7 +156,8 @@ struct TaskBoardLaneUnifiedColumn: View {
           isHovered: hoveredCardID == hoverID,
           isSelected: selectionModel.selectedIDs.contains(cardID),
           selectionModel: selectionModel,
-          actions: actions
+          actions: actions,
+          cardPresentation: apiCardPresentations[item.id]
         )
         .taskBoardCardFrame(id: hoverID, in: cardHoverCoordinateSpace)
         .contextMenu {
@@ -174,7 +179,8 @@ struct TaskBoardLaneUnifiedColumn: View {
           isHovered: hoveredCardID == hoverID,
           isSelected: selectionModel.selectedIDs.contains(cardID),
           selectionModel: selectionModel,
-          actions: actions
+          actions: actions,
+          cardPresentation: inboxCardPresentations[cardID]
         )
         .taskBoardCardFrame(id: hoverID, in: cardHoverCoordinateSpace)
         .contextMenu {

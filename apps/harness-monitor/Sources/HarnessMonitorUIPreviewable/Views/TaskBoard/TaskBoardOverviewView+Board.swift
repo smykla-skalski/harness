@@ -58,6 +58,8 @@ extension TaskBoardOverviewView {
         apiItems: apiItems,
         inboxItems: inboxItems,
         decisions: decisions,
+        apiCardPresentations: currentPresentation.apiCardPresentations(in: lane),
+        inboxCardPresentations: currentPresentation.inboxCardPresentations(in: lane),
         titleTypography: titleTypography,
         isCollapsed: isCollapsed,
         isDropEnabled: !isActionInFlight,

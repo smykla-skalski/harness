@@ -119,14 +119,16 @@ struct TaskBoardCardPresentationContractTests {
       repositoryLabelFullName: nil
     )
     let typography = TaskBoardCardTitleTypography(fontScale: 1)
+    let selectionModel = TaskBoardCardSelectionModel()
+    let actions = TaskBoardOverviewActions(store: nil, scope: .dashboard)
 
     let apiRow = TaskBoardItemRow(
       item: contractTaskBoardItem(),
       titleTypography: typography,
       isHovered: false,
       isSelected: false,
-      onSelect: { _ in },
-      onOpenItem: { _ in },
+      selectionModel: selectionModel,
+      actions: actions,
       cardPresentation: presentation
     )
     let inboxRow = TaskBoardInboxItemRow(
@@ -134,13 +136,38 @@ struct TaskBoardCardPresentationContractTests {
       titleTypography: typography,
       isHovered: false,
       isSelected: false,
-      onSelect: { _ in },
-      onOpenItem: { _ in },
+      selectionModel: selectionModel,
+      actions: actions,
       cardPresentation: presentation
     )
 
     #expect(apiRow.cardPresentation == presentation)
     #expect(inboxRow.cardPresentation == presentation)
+  }
+
+  @Test("Lane column wires precomputed presentations into both row constructors")
+  func laneColumnWiresCardPresentationIntoRows() throws {
+    let columnSource = try taskBoardSource("TaskBoardLaneUnifiedColumn.swift")
+    let boardSource = try taskBoardSource("TaskBoardOverviewView+Board.swift")
+
+    #expect(columnSource.contains("let apiCardPresentations: [String: TaskBoardCardPresentation]"))
+    #expect(
+      columnSource.contains(
+        "let inboxCardPresentations: [TaskBoardCardID: TaskBoardCardPresentation]"
+      )
+    )
+    #expect(columnSource.contains("cardPresentation: apiCardPresentations[item.id]"))
+    #expect(columnSource.contains("cardPresentation: inboxCardPresentations[cardID]"))
+    #expect(
+      boardSource.contains(
+        "apiCardPresentations: currentPresentation.apiCardPresentations(in: lane)"
+      )
+    )
+    #expect(
+      boardSource.contains(
+        "inboxCardPresentations: currentPresentation.inboxCardPresentations(in: lane)"
+      )
+    )
   }
 
   private func contractTaskBoardItem() -> TaskBoardItem {
