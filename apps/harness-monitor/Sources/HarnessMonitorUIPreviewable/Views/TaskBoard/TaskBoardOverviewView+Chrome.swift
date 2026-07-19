@@ -38,7 +38,7 @@ extension TaskBoardOverviewView {
           status: orchestratorStatus,
           latestEvaluation: evaluationSummary,
           workspace: store.contentUI.dashboard.policyCanvasWorkspace,
-          targetItem: stepRailTargetItem,
+          targetItem: currentPresentation.stepRailTargetItem,
           isActionInFlight: isActionInFlight,
           onOpenReview: onOpenTaskBoardItem
         )
@@ -157,16 +157,6 @@ extension TaskBoardOverviewView {
 
   var hasBoardContent: Bool {
     currentPresentation.hasBoardContent
-  }
-
-  var stepRailTargetItem: TaskBoardItem? {
-    for cardID in orderedSelectedCardIDs {
-      guard case .api(let itemID) = cardID else { continue }
-      if let item = currentPresentation.taskBoardItem(id: itemID) {
-        return item
-      }
-    }
-    return currentPresentation.apiItems(in: .todo).first
   }
 
   var boardSection: some View {

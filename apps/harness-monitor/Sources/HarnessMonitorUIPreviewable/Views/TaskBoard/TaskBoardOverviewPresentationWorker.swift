@@ -54,6 +54,14 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
       || aggregateDoneCount != 0
   }
 
+  /// The item Step Mode targets: the next candidate the automated orchestrator
+  /// would act on, i.e. the top of the Todo lane. Step Mode exists to observe the
+  /// automated process one stage at a time, so the target is derived purely from
+  /// board state and never from the user's card selection.
+  var stepRailTargetItem: TaskBoardItem? {
+    apiItems(in: .todo).first
+  }
+
   func apiItems(in lane: TaskBoardInboxLane) -> [TaskBoardItem] {
     apiItemsByLane[lane] ?? []
   }

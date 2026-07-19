@@ -26,6 +26,33 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(presentation.apiItems(in: .todo).map(\.id) == ["session-item"])
   }
 
+  @Test("Step Mode target is the top Todo item and never another lane")
+  func stepModeTargetIsTopTodoItem() async {
+    let worker = TaskBoardOverviewPresentationWorker()
+    let backlog = taskBoardItem(id: "backlog-item", status: .backlog)
+    let todo = taskBoardItem(id: "ready", status: .todo)
+
+    let presentation = await worker.compute(
+      input: TaskBoardOverviewPresentationInput(
+        snapshot: TaskBoardInboxSnapshot(),
+        taskBoardItems: [backlog, todo],
+        decisionItems: [],
+        scopeSessionID: nil
+      )
+    )
+    #expect(presentation.stepRailTargetItem?.id == "ready")
+
+    let backlogOnly = await worker.compute(
+      input: TaskBoardOverviewPresentationInput(
+        snapshot: TaskBoardInboxSnapshot(),
+        taskBoardItems: [backlog],
+        decisionItems: [],
+        scopeSessionID: nil
+      )
+    )
+    #expect(backlogOnly.stepRailTargetItem == nil)
+  }
+
   @Test("Lane strip sizing keeps the current minimum width until the board can expand")
   func laneStripSizingKeepsMinimumWidthUntilExpansion() {
     let sizing = TaskBoardLaneStripSizing(minColumnWidth: 288, spacing: 16)
