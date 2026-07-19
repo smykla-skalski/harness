@@ -353,7 +353,7 @@ public final class HarnessMonitorStore {
   /// `isDaemonActionInFlight`. Deliberately NOT `@ObservationIgnored`:
   /// views such as `TaskBoardOperationsDispatchCard` read
   /// `isDaemonActionInFlight` directly in body and must stay reactive.
-  public var daemonActionCount = 0
+  var daemonActionCount = 0
   @ObservationIgnored var debugUISyncCounts: [UISyncArea: Int] = [:]
   @ObservationIgnored var notificationHistoryRuntimeActions: NotificationHistoryRuntimeActions = [:]
   @ObservationIgnored var notificationHistoryRefreshTask: Task<Void, Never>?
