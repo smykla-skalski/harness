@@ -275,6 +275,7 @@ fn pull_request(workflow_kind: TaskBoardWorkflowKind) -> Option<TaskBoardPullReq
     (workflow_kind == TaskBoardWorkflowKind::PrReview).then(|| TaskBoardPullRequestIdentity {
         repository: "example/compass".into(),
         number: 17,
+        head: None,
     })
 }
 
@@ -302,7 +303,7 @@ async fn seed_attempt(
     .expect("seed workflow attempt");
 }
 
-async fn insert_committed_admission(
+pub(super) async fn insert_committed_admission(
     db: &AsyncDaemonDb,
     item_id: &str,
     execution_id: &str,
@@ -486,6 +487,7 @@ pub(super) async fn seed_dispatched_initial_report(label: &str) -> Fixture {
             "branch",
             "/tmp/read-only-worktree",
             Some(launch),
+            None,
         )
         .await
         .expect("complete dispatched report preparation");

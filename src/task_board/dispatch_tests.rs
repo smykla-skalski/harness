@@ -153,6 +153,7 @@ fn spawn_policy_input_fills_subject_enrichment_and_evaluated_at() {
 #[test]
 fn ready_dispatch_plan_maps_board_fields_to_session_task_intent() {
     let mut item = ready_item();
+    item.workflow_kind = TaskBoardWorkflowKind::Unknown;
     item.priority = TaskBoardPriority::Critical;
     item.agent_mode = AgentMode::Interactive;
     item.project_id = Some("project-1".into());

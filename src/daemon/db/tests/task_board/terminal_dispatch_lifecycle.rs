@@ -4,11 +4,13 @@ use std::ops::Deref;
 use tempfile::{TempDir, tempdir};
 
 use crate::daemon::db::policy::consume_approval_grant_in_tx;
+use crate::daemon::db::task_board::write_workflow_fixture::{
+    approved_write_item, complete_write_preparation,
+};
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, NewApprovalGrant, ReservedTaskBoardDispatch};
 use crate::task_board::{
-    AgentMode, PolicyAction, PolicyReasonCode, SpawnGateSwitches, TaskBoardAutomationPolicy,
-    TaskBoardItem, TaskBoardPolicyLimit, TaskBoardPolicyScope, TaskBoardStatus,
-    build_dispatch_plans_with_policy,
+    PolicyAction, PolicyReasonCode, SpawnGateSwitches, TaskBoardAutomationPolicy, TaskBoardItem,
+    TaskBoardPolicyLimit, TaskBoardPolicyScope, TaskBoardStatus, build_dispatch_plans_with_policy,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -101,7 +103,9 @@ async fn exercise_terminal_action(action: TerminalAction) {
         if phase.is_claimed() {
             let error = result.expect_err("claimed starting dispatch must fence terminal mutation");
             assert!(
-                error.to_string().contains("dispatch is claimed"),
+                error
+                    .to_string()
+                    .contains("workflow side effect is claimed"),
                 "unexpected {phase:?} {action:?} error: {error}"
             );
             assert_fenced_state(&fixture).await;
@@ -186,13 +190,12 @@ async fn fixture(phase: IntentPhase, action: TerminalAction) -> Fixture {
     let TestDb { db, directory } = test_db().await;
     configure_policy(&db).await;
     let item_id = format!("terminal-{}-{}", phase.name(), action.name());
-    let mut item = TaskBoardItem::new(
+    let item = approved_write_item(TaskBoardItem::new(
         item_id.clone(),
         "Terminal dispatch lifecycle".to_string(),
         "Body".to_string(),
         "2026-07-17T10:00:00Z".to_string(),
-    );
-    item.agent_mode = AgentMode::Headless;
+    ));
     db.create_task_board_item(item).await.expect("create item");
     let grant_id = approved_grant(&db, &item_id).await;
     let mut plan = build_dispatch_plans_with_policy(
@@ -219,7 +222,7 @@ async fn fixture(phase: IntentPhase, action: TerminalAction) -> Fixture {
         .await
         .expect("claim preparation")
         .expect("pending preparation");
-    db.complete_task_board_dispatch_preparation(&preparation, "branch", "/tmp/worktree")
+    complete_write_preparation(&db, &preparation, "branch", "/tmp/worktree")
         .await
         .expect("publish dispatch");
     if phase == IntentPhase::Held {

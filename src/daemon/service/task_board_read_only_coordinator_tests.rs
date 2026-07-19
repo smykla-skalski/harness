@@ -6,6 +6,7 @@ mod recovery;
 mod recovery_liveness;
 mod report_claim_recovery;
 mod runtime;
+mod write_workflow;
 
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionPhase, TaskBoardExecutionState, TaskBoardStatus,

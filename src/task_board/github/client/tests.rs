@@ -57,9 +57,12 @@ fn rest_pull_request_handle_maps_response_entries() {
         "number": 42,
         "html_url": "https://github.invalid/owner/repo/pull/42",
         "draft": true,
+        "state": "open",
         "merged": false,
         "head": {
-            "sha": "deadbeef"
+            "sha": "deadbeef",
+            "ref": "feature/fix",
+            "repo": { "full_name": "contributor/fork" }
         },
         "requested_reviewers": [
             { "login": "reviewer" }
@@ -78,12 +81,43 @@ fn rest_pull_request_handle_maps_response_entries() {
             number: 42,
             html_url: Some("https://github.invalid/owner/repo/pull/42".into()),
             draft: true,
+            open: true,
             merged: false,
             head_sha: "deadbeef".into(),
+            head_repository: Some("contributor/fork".into()),
+            head_branch: Some("feature/fix".into()),
             requested_reviewers: vec!["reviewer".into()],
             requested_team_reviewers: vec!["core".into()],
         }
     );
+}
+
+#[test]
+fn rest_pull_request_handle_fails_closed_without_open_state() {
+    let pull_request: RestPullRequestResponse = serde_json::from_value(json!({
+        "number": 42,
+        "html_url": "https://github.invalid/owner/repo/pull/42",
+        "draft": false,
+        "merged": false,
+        "head": {
+            "sha": "deadbeef",
+            "ref": "feature/fix",
+            "repo": { "full_name": "contributor/fork" }
+        }
+    }))
+    .expect("rest pull request");
+
+    assert!(!rest_pull_request_handle(pull_request).open);
+}
+
+#[test]
+fn graphql_pull_request_handles_request_open_state() {
+    for query in [
+        super::super::client_graphql::PULL_REQUEST_HANDLE_QUERY,
+        super::super::client_graphql::OPEN_PULL_REQUEST_FOR_BRANCH_QUERY,
+    ] {
+        assert!(query.lines().any(|line| line.trim() == "state"));
+    }
 }
 
 fn automation_client_with_base_uri(base_uri: String) -> GitHubApiAutomationClient {

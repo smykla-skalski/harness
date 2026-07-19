@@ -77,12 +77,12 @@ async fn recover_pending_dispatches(state: &DaemonHttpState, db: &AsyncDaemonDb)
         };
         finish_claim(state, db, claim).await;
     }
-    if let Err(error) =
-        Box::pin(
-            super::super::task_board_read_only_coordinator::
-                reconcile_task_board_read_only_workflows(state, db),
-        )
-        .await
+    if let Err(error) = Box::pin(
+        super::super::task_board_read_only_coordinator::reconcile_task_board_read_only_workflows(
+            state, db,
+        ),
+    )
+    .await
     {
         warn!(%error, "read-only workflow recovery failed");
     }

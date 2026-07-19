@@ -16,7 +16,8 @@ mod ingestion;
 mod lifecycle;
 mod report_evidence;
 mod reports;
-mod requests;
+pub(crate) mod requests;
+mod revision_validation;
 
 const MAX_RECONCILIATIONS_PER_CLASS_PER_TICK: usize = 16;
 
@@ -72,10 +73,26 @@ where
     let mut seen = BTreeSet::new();
     let recoverable = db.recoverable_task_board_workflow_executions(limit).await?;
     for execution in recoverable {
-        reconcile_candidate(db, runtime, execution, now, &mut seen, &mut report).await;
+        Box::pin(reconcile_candidate(
+            db,
+            runtime,
+            execution,
+            now,
+            &mut seen,
+            &mut report,
+        ))
+        .await;
     }
     for execution in db.ready_task_board_workflow_executions(now, limit).await? {
-        reconcile_candidate(db, runtime, execution, now, &mut seen, &mut report).await;
+        Box::pin(reconcile_candidate(
+            db,
+            runtime,
+            execution,
+            now,
+            &mut seen,
+            &mut report,
+        ))
+        .await;
     }
     Ok(report)
 }

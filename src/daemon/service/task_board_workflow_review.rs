@@ -4,8 +4,9 @@ use crate::task_board::{
     TaskBoardExecutionPhase, TaskBoardExecutionState, TaskBoardReviewCycle,
     TaskBoardReviewRoundDecision, TaskBoardReviewerOutcome, TaskBoardTerminalOutcome,
     TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionCas,
-    TaskBoardWorkflowExecutionCasOutcome, advance_task_board_workflow,
-    evaluate_task_board_review_round,
+    TaskBoardWorkflowExecutionCasOutcome, TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
+    advance_task_board_workflow, evaluate_task_board_review_round,
+    restart_task_board_workflow_revision,
 };
 
 use super::task_board_workflow_execution::{
@@ -93,7 +94,7 @@ fn current_cycle_index(
 }
 
 fn apply_review_decision(
-    record: &mut crate::task_board::TaskBoardWorkflowExecutionRecord,
+    record: &mut TaskBoardWorkflowExecutionRecord,
     decision: TaskBoardReviewRoundDecision,
     updated_at: &str,
 ) -> Result<(), CliError> {
@@ -111,12 +112,32 @@ fn apply_review_decision(
             record.blocked_reason = None;
         }
         TaskBoardReviewRoundDecision::ChangesRequired => {
-            require_human(record, "review_revision_requires_new_head", updated_at);
-            record.artifacts.terminal_outcome = Some(TaskBoardTerminalOutcome {
-                kind: TaskBoardTerminalOutcomeKind::HumanRequired,
-                summary: "read-only review requires a new externally supplied head".into(),
-                recorded_at: updated_at.to_owned(),
-            });
+            if matches!(
+                record.snapshot.workflow_kind,
+                TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
+            ) && record.artifacts.current_revision_cycle
+                < record.resolved_reviewers.max_revision_cycles
+            {
+                record.transition = restart_task_board_workflow_revision(&record.transition)
+                    .map_err(|error| invalid_transition(error.to_string()))?;
+                record.artifacts.current_revision_cycle += 1;
+                record.blocked_reason = Some("review_changes_required".into());
+            } else {
+                require_human(record, "review_revision_requires_new_head", updated_at);
+                let summary = if matches!(
+                    record.snapshot.workflow_kind,
+                    TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
+                ) {
+                    "review changes exhausted the permitted revision cycles"
+                } else {
+                    "read-only review requires a new externally supplied head"
+                };
+                record.artifacts.terminal_outcome = Some(TaskBoardTerminalOutcome {
+                    kind: TaskBoardTerminalOutcomeKind::HumanRequired,
+                    summary: summary.into(),
+                    recorded_at: updated_at.to_owned(),
+                });
+            }
         }
         TaskBoardReviewRoundDecision::HumanRequired => {
             require_human(record, "review_policy_requires_human", updated_at);

@@ -131,7 +131,10 @@ async fn failed_start_without_durable_run_enters_retry_wait() {
 
     assert!(report.failures.is_empty(), "{:?}", report.failures);
     let execution = load_execution(&fixture).await;
-    assert_eq!(execution.attempts[0].state, TaskBoardAttemptState::RetryWait);
+    assert_eq!(
+        execution.attempts[0].state,
+        TaskBoardAttemptState::RetryWait
+    );
     assert_eq!(
         execution.attempts[0].failure_class,
         Some(TaskBoardFailureClass::Transient)

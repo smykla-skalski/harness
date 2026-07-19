@@ -6,7 +6,7 @@ use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardWorkflowExecutionRecord;
 
 const SELECT_READY_EXECUTIONS: &str = "SELECT * FROM task_board_workflow_executions
-    WHERE workflow_kind IN ('review', 'pr_review')
+    WHERE workflow_kind IN ('default_task', 'pr_fix', 'review', 'pr_review')
       AND completed_at IS NULL
       AND (state = 'pending' OR (state = 'retry_wait' AND available_at <= ?1))
     ORDER BY COALESCE(available_at, created_at), updated_at, execution_id
@@ -14,7 +14,7 @@ const SELECT_READY_EXECUTIONS: &str = "SELECT * FROM task_board_workflow_executi
 const SELECT_PROJECTABLE_EXECUTIONS: &str = "SELECT execution.*
     FROM task_board_workflow_executions AS execution
     JOIN task_board_items AS item ON item.item_id = execution.item_id
-    WHERE execution.workflow_kind IN ('review', 'pr_review')
+    WHERE execution.workflow_kind IN ('default_task', 'pr_fix', 'review', 'pr_review')
       AND execution.state IN ('human_required', 'completed', 'failed', 'cancelled')
       AND (
           EXISTS(SELECT 1 FROM task_board_dispatch_admission_ledger AS ledger

@@ -83,7 +83,7 @@ async fn completion_was_committed(
         &admission_owner,
         &admission_owner,
         &worker_id,
-        claim.applied.read_only_workflow.is_some(),
+        claim.applied.read_only_workflow.is_some() || claim.applied.write_workflow.is_some(),
     )
         .await
         .map_err(|status_error| {

@@ -277,9 +277,10 @@ fn viewer_approval_matches_head(
 
     review.is_some_and(|review| {
         map_review_event_state(review.state.as_deref()) == ReviewReviewEventState::Approved
-            && review.commit.as_ref().is_some_and(|commit| {
-                !commit.oid.trim().is_empty() && commit.oid == head
-            })
+            && review
+                .commit
+                .as_ref()
+                .is_some_and(|commit| !commit.oid.trim().is_empty() && commit.oid == head)
     })
 }
 

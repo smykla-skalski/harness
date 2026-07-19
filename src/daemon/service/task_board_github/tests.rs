@@ -4,8 +4,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use crate::task_board::github::{
-    GitHubAutomationClient, GitHubBranchProtectionEvidence, GitHubBranchState, GitHubCheckEvidence,
-    GitHubCreatePullRequest, GitHubMergeEvidence, GitHubMergeMethod, GitHubProjectConfig,
+    GitHubBranchProtectionEvidence, GitHubCheckEvidence, GitHubMergeEvidence, GitHubProjectConfig,
     GitHubPullRequestEvidence, GitHubPullRequestHandle, GitHubReviewEvidence,
 };
 use crate::task_board::{TaskBoardItem, TaskBoardOrchestratorDispatchInput, TaskBoardStatus};
@@ -16,116 +15,11 @@ use super::{AutomationRequest, automate_item};
 
 const TEST_HOST_ID: &str = "host1234";
 
-struct FakeGitHubClient {
-    pull_request: GitHubPullRequestHandle,
-    evidence: GitHubMergeEvidence,
-    create_calls: std::sync::Mutex<usize>,
-    publish_calls: std::sync::Mutex<usize>,
-    ready_calls: std::sync::Mutex<usize>,
-    reviewer_requests: std::sync::Mutex<Vec<(Vec<String>, Vec<String>)>>,
-    merge_calls: std::sync::Mutex<usize>,
-}
-
-#[async_trait::async_trait]
-impl GitHubAutomationClient for FakeGitHubClient {
-    async fn get_branch_state(
-        &self,
-        config: &GitHubProjectConfig,
-        branch: &str,
-    ) -> Result<Option<GitHubBranchState>, crate::errors::CliError> {
-        let remote = remote_repo_path(config.checkout_path.as_path());
-        let reference = format!("refs/heads/{branch}");
-        if !git_ref_exists(&remote, &reference) {
-            return Ok(None);
-        }
-        Ok(Some(GitHubBranchState {
-            commit_sha: git_ref(&remote, &reference),
-            tree_sha: git_tree(&remote, &reference),
-        }))
-    }
-
-    async fn publish_branch_from_worktree(
-        &self,
-        _config: &GitHubProjectConfig,
-        worktree: &Path,
-        branch: &str,
-    ) -> Result<(), crate::errors::CliError> {
-        *self.publish_calls.lock().expect("publish calls") += 1;
-        run_git(worktree, &["push", "origin", &format!("HEAD:{branch}")]);
-        Ok(())
-    }
-
-    async fn pull_request_merge_evidence(
-        &self,
-        _config: &GitHubProjectConfig,
-        _pull_request_number: u64,
-    ) -> Result<GitHubMergeEvidence, crate::errors::CliError> {
-        Ok(self.evidence.clone())
-    }
-
-    async fn get_pull_request(
-        &self,
-        _config: &GitHubProjectConfig,
-        _pull_request_number: u64,
-    ) -> Result<GitHubPullRequestHandle, crate::errors::CliError> {
-        Ok(self.pull_request.clone())
-    }
-
-    async fn ensure_pull_request(
-        &self,
-        _config: &GitHubProjectConfig,
-        _request: &GitHubCreatePullRequest,
-    ) -> Result<GitHubPullRequestHandle, crate::errors::CliError> {
-        *self.create_calls.lock().expect("create calls") += 1;
-        Ok(self.pull_request.clone())
-    }
-
-    async fn ready_pull_request_for_review(
-        &self,
-        _config: &GitHubProjectConfig,
-        _pull_request_number: u64,
-    ) -> Result<GitHubPullRequestHandle, crate::errors::CliError> {
-        *self.ready_calls.lock().expect("ready calls") += 1;
-        let mut ready = self.pull_request.clone();
-        ready.draft = false;
-        Ok(ready)
-    }
-
-    async fn request_pull_request_reviewers(
-        &self,
-        _config: &GitHubProjectConfig,
-        _pull_request_number: u64,
-        reviewers: &[String],
-        team_reviewers: &[String],
-    ) -> Result<(), crate::errors::CliError> {
-        self.reviewer_requests
-            .lock()
-            .expect("reviewer requests")
-            .push((reviewers.to_vec(), team_reviewers.to_vec()));
-        Ok(())
-    }
-
-    async fn sync_pull_request_labels(
-        &self,
-        _config: &GitHubProjectConfig,
-        _pull_request_number: u64,
-        _managed_labels: &[String],
-        _desired_labels: &[String],
-    ) -> Result<(), crate::errors::CliError> {
-        Ok(())
-    }
-
-    async fn merge_pull_request(
-        &self,
-        _config: &GitHubProjectConfig,
-        _pull_request_number: u64,
-        _method: GitHubMergeMethod,
-        _head_sha: Option<&str>,
-    ) -> Result<(), crate::errors::CliError> {
-        *self.merge_calls.lock().expect("merge calls") += 1;
-        Ok(())
-    }
-}
+#[path = "tests/fake_client.rs"]
+mod fake_client;
+use fake_client::FakeGitHubClient;
+#[path = "tests/write_publication.rs"]
+mod write_publication;
 
 #[tokio::test]
 async fn automation_opens_reviews_and_merges_prs() {
@@ -177,8 +71,11 @@ async fn automation_opens_reviews_and_merges_prs() {
             number: 42,
             html_url: Some("https://example.test/pull/42".to_string()),
             draft: true,
+            open: true,
             merged: false,
             head_sha: "abc123".to_string(),
+            head_repository: Some("owner/repo".into()),
+            head_branch: Some(expected_branch.clone()),
             requested_reviewers: Vec::new(),
             requested_team_reviewers: Vec::new(),
         },
@@ -204,6 +101,8 @@ async fn automation_opens_reviews_and_merges_prs() {
         ready_calls: std::sync::Mutex::new(0),
         reviewer_requests: std::sync::Mutex::new(Vec::new()),
         merge_calls: std::sync::Mutex::new(0),
+        ready_error: std::sync::Mutex::new(None),
+        parent_interleaving: std::sync::Mutex::new(None),
     };
 
     let workflow = automate_item(AutomationRequest {
@@ -280,8 +179,11 @@ async fn automation_waits_for_review_when_merge_evidence_is_not_approved() {
             number: 7,
             html_url: Some("https://example.test/pull/7".to_string()),
             draft: false,
+            open: true,
             merged: false,
             head_sha: "abc123".to_string(),
+            head_repository: Some("owner/repo".into()),
+            head_branch: Some(expected_branch.clone()),
             requested_reviewers: Vec::new(),
             requested_team_reviewers: Vec::new(),
         },
@@ -307,6 +209,8 @@ async fn automation_waits_for_review_when_merge_evidence_is_not_approved() {
         ready_calls: std::sync::Mutex::new(0),
         reviewer_requests: std::sync::Mutex::new(Vec::new()),
         merge_calls: std::sync::Mutex::new(0),
+        ready_error: std::sync::Mutex::new(None),
+        parent_interleaving: std::sync::Mutex::new(None),
     };
 
     let workflow = automate_item(AutomationRequest {
@@ -368,8 +272,11 @@ async fn automation_waits_for_commits_before_opening_a_pull_request() {
             number: 99,
             html_url: Some("https://example.test/pull/99".to_string()),
             draft: true,
+            open: true,
             merged: false,
             head_sha: "abc123".to_string(),
+            head_repository: Some("owner/repo".into()),
+            head_branch: Some(expected_branch.clone()),
             requested_reviewers: Vec::new(),
             requested_team_reviewers: Vec::new(),
         },
@@ -395,6 +302,8 @@ async fn automation_waits_for_commits_before_opening_a_pull_request() {
         ready_calls: std::sync::Mutex::new(0),
         reviewer_requests: std::sync::Mutex::new(Vec::new()),
         merge_calls: std::sync::Mutex::new(0),
+        ready_error: std::sync::Mutex::new(None),
+        parent_interleaving: std::sync::Mutex::new(None),
     };
 
     let workflow = automate_item(AutomationRequest {

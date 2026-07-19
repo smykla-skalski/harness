@@ -18,9 +18,13 @@ use super::policy::{PolicyApprovalGrant, PolicyDecision};
 use super::store::TaskBoardStore;
 use super::types::{AgentMode, ExternalRef, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
 use super::{
-    TaskBoardPullRequestIdentity, TaskBoardReadOnlyRunContext, TaskBoardResolvedReviewer,
-    TaskBoardWorkflowKind,
+    TaskBoardPlanApprovalBinding, TaskBoardPlanningResult, TaskBoardPullRequestIdentity,
+    TaskBoardReadOnlyRunContext, TaskBoardResolvedReviewer, TaskBoardWorkflowKind,
 };
+
+#[path = "dispatch_readiness.rs"]
+mod readiness;
+use readiness::{blocked, readiness};
 
 #[path = "dispatch_lifecycle.rs"]
 mod lifecycle;
@@ -76,6 +80,8 @@ pub struct DispatchAppliedTask {
     pub item: TaskBoardItem,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub read_only_workflow: Option<TaskBoardReadOnlyWorkflowLaunch>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub write_workflow: Option<Box<TaskBoardWriteWorkflowLaunch>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -95,6 +101,29 @@ pub struct TaskBoardReadOnlyWorkflowLaunch {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pull_request: Option<TaskBoardPullRequestIdentity>,
     pub exact_head_revision: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskBoardWriteWorkflowLaunch {
+    pub workflow_kind: TaskBoardWorkflowKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_repository: Option<String>,
+    pub configuration_revision: u64,
+    pub policy_version: String,
+    pub resolved_reviewers: TaskBoardResolvedReviewer,
+    pub source_item_revision: i64,
+    pub prepared_item_revision: i64,
+    #[serde(default)]
+    pub task_id: String,
+    #[serde(default)]
+    pub run_context: TaskBoardReadOnlyRunContext,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_revision: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pull_request: Option<TaskBoardPullRequestIdentity>,
+    pub base_head_revision: String,
+    pub planning_result: TaskBoardPlanningResult,
+    pub plan_approval: TaskBoardPlanApprovalBinding,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -387,31 +416,6 @@ pub(crate) fn machine_mismatch_plan_with_policy(
     plan
 }
 
-fn readiness(item: &TaskBoardItem, policy: &PolicyDecision) -> DispatchReadiness {
-    if item.is_deleted() {
-        return blocked(DispatchBlockReason::Deleted);
-    }
-    if let Some(work_item_id) = item.work_item_id.as_deref() {
-        return blocked(DispatchBlockReason::AlreadyLinked {
-            work_item_id: work_item_id.to_string(),
-        });
-    }
-    if let PlanApprovalGate::Blocked { reason } = approval_gate(item) {
-        return blocked(DispatchBlockReason::PlanApproval { reason });
-    }
-    if item.status != TaskBoardStatus::Todo {
-        return blocked(DispatchBlockReason::Status {
-            status: item.status,
-        });
-    }
-    if !policy.is_allow() {
-        return blocked(DispatchBlockReason::Policy {
-            decision: policy.clone(),
-        });
-    }
-    DispatchReadiness::Ready
-}
-
 #[path = "dispatch_spawn_policy.rs"]
 mod spawn_policy;
 pub use spawn_policy::SpawnGateSwitches;
@@ -470,10 +474,6 @@ const fn severity(priority: TaskBoardPriority) -> TaskSeverity {
     }
 }
 
-fn blocked(reason: DispatchBlockReason) -> DispatchReadiness {
-    DispatchReadiness::Blocked { reason }
-}
-
 fn non_empty(value: &str) -> Option<String> {
     let trimmed = value.trim();
     (!trimmed.is_empty()).then(|| trimmed.to_string())
@@ -482,3 +482,6 @@ fn non_empty(value: &str) -> Option<String> {
 #[cfg(test)]
 #[path = "dispatch_tests.rs"]
 mod tests;
+#[cfg(test)]
+#[path = "dispatch_write_workflow_tests.rs"]
+mod write_workflow_tests;

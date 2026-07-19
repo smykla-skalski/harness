@@ -4,6 +4,7 @@ use serde_json::json;
 use tempfile::{TempDir, tempdir};
 
 use super::*;
+use crate::daemon::db::task_board::write_workflow_fixture::complete_write_preparation;
 use crate::daemon::db::{NewApprovalGrant, ReservedTaskBoardDispatch};
 use crate::task_board::policy_graph::PolicyCanvasWorkspace;
 use crate::task_board::{
@@ -88,7 +89,8 @@ async fn held_fixture() -> HeldFixture {
         .await
         .expect("claim preparation")
         .expect("preparation");
-    db.complete_task_board_dispatch_preparation(
+    complete_write_preparation(
+        &db,
         &preparation,
         "harness/held-policy-item",
         "/tmp/held-policy-item",

@@ -58,6 +58,30 @@ pub trait GitHubAutomationClient: Send + Sync {
         )))
     }
 
+    /// Publish HEAD only if `expected_parent` still matches the fresh remote parent.
+    ///
+    /// Guarded publishers must override this method. The default implementation delegates only
+    /// when no expected parent is supplied and otherwise reports compare-and-publish as unsupported.
+    ///
+    /// # Errors
+    /// Returns provider, transport, or unsupported compare-and-publish errors.
+    async fn publish_branch_from_worktree_at_parent(
+        &self,
+        config: &GitHubProjectConfig,
+        worktree: &Path,
+        branch: &str,
+        expected_parent: Option<&str>,
+    ) -> Result<(), CliError> {
+        if expected_parent.is_some() {
+            return Err(CliErrorKind::workflow_io(
+                "task-board github compare-and-publish is unsupported",
+            )
+            .into());
+        }
+        self.publish_branch_from_worktree(config, worktree, branch)
+            .await
+    }
+
     /// Load merge-policy evidence for one pull request.
     ///
     /// # Errors
@@ -81,6 +105,16 @@ pub trait GitHubAutomationClient: Send + Sync {
             "task-board github get_pull_request is unsupported",
         )))
     }
+
+    /// Load current pull-request metadata without consulting a read cache.
+    ///
+    /// # Errors
+    /// Returns provider or transport errors surfaced by the implementation.
+    async fn get_pull_request_fresh(
+        &self,
+        config: &GitHubProjectConfig,
+        pull_request_number: u64,
+    ) -> Result<GitHubPullRequestHandle, CliError>;
 
     /// Find an existing open pull request for a branch or create one when absent.
     ///

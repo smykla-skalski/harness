@@ -194,9 +194,7 @@ pub(super) fn automation_config(
     };
     let external_sync_config =
         external_sync_config_for_repository(settings_repository.as_deref(), &[]);
-    let token = external_sync_config
-        .token_for(ExternalProvider::GitHub)?
-        .to_string();
+    let token = github_token_for_repository(settings_repository.as_deref())?;
     let mut config = settings.github_project.clone();
     if (config.owner.trim().is_empty() || config.repo.trim().is_empty())
         && let Some(repository) = external_sync_config.github_repository()
@@ -224,6 +222,12 @@ pub(super) fn automation_config(
             .enabled_automations
             .enables(GitHubAutomation::AutoMerge);
     enabled.then_some((config, token))
+}
+
+pub(super) fn github_token_for_repository(repository: Option<&str>) -> Option<String> {
+    external_sync_config_for_repository(repository, &[])
+        .token_for(ExternalProvider::GitHub)
+        .map(str::to_owned)
 }
 
 pub(super) fn action_policy(

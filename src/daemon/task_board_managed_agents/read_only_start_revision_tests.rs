@@ -281,6 +281,7 @@ async fn claimed_read_only_dispatch() -> (DaemonHttpState, ClaimedTaskBoardDispa
             "branch",
             &worktree_path,
             Some(launch),
+            None,
         )
         .await
         .expect("publish read-only dispatch");

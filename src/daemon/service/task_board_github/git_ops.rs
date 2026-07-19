@@ -20,6 +20,7 @@ pub(in crate::daemon::service::task_board_github) async fn branch_publication_as
     worktree: String,
     config: GitHubProjectConfig,
     branch: String,
+    expected_parent: Option<&str>,
 ) -> Result<BranchPublication, CliError> {
     let remote_branch = client.get_branch_state(&config, branch.as_str()).await?;
     let remote_default_branch = if remote_branch.is_none() {
@@ -29,6 +30,20 @@ pub(in crate::daemon::service::task_board_github) async fn branch_publication_as
     } else {
         None
     };
+    if let Some(expected_parent) = expected_parent {
+        let observed_parent = remote_branch
+            .as_ref()
+            .or(remote_default_branch.as_ref())
+            .map(|state| state.commit_sha.as_str());
+        if observed_parent != Some(expected_parent) {
+            let observed_parent = observed_parent.unwrap_or("<missing>");
+            return Err(CliErrorKind::invalid_transition(format!(
+                "task-board GitHub publication parent changed after preflight: expected \
+                 '{expected_parent}', observed '{observed_parent}'"
+            ))
+            .into());
+        }
+    }
     spawn_blocking(move || {
         branch_publication(
             &worktree,
@@ -51,9 +66,15 @@ pub(in crate::daemon::service::task_board_github) async fn push_branch_async(
     config: &GitHubProjectConfig,
     worktree: String,
     branch: String,
+    expected_parent: Option<&str>,
 ) -> Result<(), CliError> {
     client
-        .publish_branch_from_worktree(config, Path::new(worktree.as_str()), branch.as_str())
+        .publish_branch_from_worktree_at_parent(
+            config,
+            Path::new(worktree.as_str()),
+            branch.as_str(),
+            expected_parent,
+        )
         .await
 }
 

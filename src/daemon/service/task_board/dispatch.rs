@@ -194,6 +194,7 @@ fn apply_dispatch_plan(
         lifecycle: plan.applied_lifecycle(),
         item,
         read_only_workflow: None,
+        write_workflow: None,
     })
 }
 

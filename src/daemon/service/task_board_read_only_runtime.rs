@@ -1,21 +1,20 @@
-use std::path::{Path, PathBuf};
-
 use async_trait::async_trait;
-use tokio::task::spawn_blocking;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::http::{DaemonHttpState, run_codex_agent_blocking};
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest, CodexRunSnapshot};
 use crate::errors::{CliError, CliErrorKind};
-use crate::git::GitRepository;
 use crate::reviews::{
     ReviewActionKind, ReviewActionOutcome, ReviewItem, ReviewPullRequestState,
     ReviewsActionResponse, ReviewsApproveRequest, ReviewsApproveRequestSource,
 };
 use crate::task_board::{
-    TaskBoardLifecycleOutcome, TaskBoardPullRequestIdentity, TaskBoardWorkflowExecutionRecord,
-    TaskBoardWorkflowKind, validate_task_board_read_only_run_context,
+    TaskBoardImplementationResult, TaskBoardLifecycleOutcome, TaskBoardPullRequestIdentity,
+    TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
 };
+
+#[path = "task_board_read_only_runtime/git_evidence.rs"]
+mod git_evidence;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum TaskBoardPublishVerification {
@@ -37,10 +36,36 @@ pub(crate) trait TaskBoardReadOnlyRuntime: Send + Sync {
         run_id: &str,
     ) -> Result<CodexRunSnapshot, CliError>;
 
+    async fn load_codex_workspace_run(
+        &self,
+        _run_id: &str,
+    ) -> Result<Option<CodexRunSnapshot>, CliError> {
+        Err(invalid_transition(
+            "write workflow runtime does not support durable Codex run loading",
+        ))
+    }
+
+    async fn start_codex_workspace_run(
+        &self,
+        _session_id: &str,
+        _request: &CodexRunRequest,
+        _run_id: &str,
+    ) -> Result<CodexRunSnapshot, CliError> {
+        Err(invalid_transition(
+            "write workflow runtime does not support WorkspaceWrite starts",
+        ))
+    }
+
     async fn resolve_exact_head(
         &self,
         execution: &TaskBoardWorkflowExecutionRecord,
     ) -> Result<String, CliError>;
+
+    async fn implementation_result_descends_from_base(
+        &self,
+        execution: &TaskBoardWorkflowExecutionRecord,
+        result: &TaskBoardImplementationResult,
+    ) -> Result<bool, CliError>;
 
     async fn publish_pr_review(
         &self,
@@ -51,6 +76,25 @@ pub(crate) trait TaskBoardReadOnlyRuntime: Send + Sync {
         &self,
         execution: &TaskBoardWorkflowExecutionRecord,
     ) -> Result<TaskBoardPublishVerification, CliError>;
+
+    async fn publish_write_workflow(
+        &self,
+        _execution: &TaskBoardWorkflowExecutionRecord,
+    ) -> Result<TaskBoardLifecycleOutcome, CliError> {
+        Err(invalid_transition(
+            "runtime does not support write workflow publication",
+        ))
+    }
+
+    async fn verify_write_workflow_publication(
+        &self,
+        _execution: &TaskBoardWorkflowExecutionRecord,
+        _known_external_url: Option<&str>,
+    ) -> Result<TaskBoardPublishVerification, CliError> {
+        Err(invalid_transition(
+            "runtime does not support write workflow publication verification",
+        ))
+    }
 }
 
 pub(crate) struct ProductionTaskBoardReadOnlyRuntime<'a> {
@@ -105,20 +149,61 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
         .await
     }
 
+    async fn load_codex_workspace_run(
+        &self,
+        run_id: &str,
+    ) -> Result<Option<CodexRunSnapshot>, CliError> {
+        self.load_codex_report_run(run_id).await
+    }
+
+    async fn start_codex_workspace_run(
+        &self,
+        session_id: &str,
+        request: &CodexRunRequest,
+        run_id: &str,
+    ) -> Result<CodexRunSnapshot, CliError> {
+        if request.mode != CodexRunMode::WorkspaceWrite {
+            return Err(invalid_transition(
+                "write workflow runtime only starts Codex WorkspaceWrite runs",
+            ));
+        }
+        let session_id = session_id.to_owned();
+        let request = request.clone();
+        let run_id = run_id.to_owned();
+        run_codex_agent_blocking(
+            self.state,
+            "task-board write workspace start",
+            move |handle| handle.start_run_with_id(&session_id, &request, run_id),
+        )
+        .await
+    }
+
     async fn resolve_exact_head(
         &self,
         execution: &TaskBoardWorkflowExecutionRecord,
     ) -> Result<String, CliError> {
         match execution.snapshot.workflow_kind {
-            TaskBoardWorkflowKind::Review => resolve_local_review_head(execution).await,
+            TaskBoardWorkflowKind::DefaultTask
+            | TaskBoardWorkflowKind::PrFix
+            | TaskBoardWorkflowKind::Review => {
+                git_evidence::resolve_local_workflow_head(execution).await
+            }
             TaskBoardWorkflowKind::PrReview => {
                 let review = resolve_pr_review(execution).await?;
                 required_head(&review.head_sha)
             }
-            _ => Err(invalid_transition(
-                "read-only runtime requires a Review or PrReview execution",
+            TaskBoardWorkflowKind::Unknown => Err(invalid_transition(
+                "workflow runtime requires a known execution",
             )),
         }
+    }
+
+    async fn implementation_result_descends_from_base(
+        &self,
+        execution: &TaskBoardWorkflowExecutionRecord,
+        result: &TaskBoardImplementationResult,
+    ) -> Result<bool, CliError> {
+        git_evidence::implementation_result_descends_from_base(execution, result).await
     }
 
     async fn publish_pr_review(
@@ -173,29 +258,27 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
             Ok(TaskBoardPublishVerification::Absent)
         }
     }
-}
 
-async fn resolve_local_review_head(
-    execution: &TaskBoardWorkflowExecutionRecord,
-) -> Result<String, CliError> {
-    if execution.transition.workflow_kind != TaskBoardWorkflowKind::Review
-        || execution.transition.pull_request.is_some()
-    {
-        return Err(invalid_transition(
-            "Review execution and Task Board item identities do not agree",
-        ));
+    async fn publish_write_workflow(
+        &self,
+        execution: &TaskBoardWorkflowExecutionRecord,
+    ) -> Result<TaskBoardLifecycleOutcome, CliError> {
+        super::task_board_github::publish_task_board_write_execution(self.db, execution).await
     }
-    let context = execution
-        .snapshot
-        .read_only_run_context
-        .as_ref()
-        .ok_or_else(|| invalid_transition("Review workflow has no immutable run context"))?;
-    validate_task_board_read_only_run_context(context)
-        .map_err(|error| invalid_transition(error.to_string()))?;
-    let worktree = PathBuf::from(&context.worktree);
-    spawn_blocking(move || local_head(&worktree))
+
+    async fn verify_write_workflow_publication(
+        &self,
+        execution: &TaskBoardWorkflowExecutionRecord,
+        known_external_url: Option<&str>,
+    ) -> Result<TaskBoardPublishVerification, CliError> {
+        super::task_board_github::verify_task_board_write_execution_publication(
+            self.db,
+            execution,
+            known_external_url,
+        )
         .await
-        .map_err(|error| invalid_transition(format!("join local head resolver: {error}")))?
+        .map(TaskBoardPublishVerification::Applied)
+    }
 }
 
 async fn resolve_pr_review(
@@ -229,18 +312,6 @@ fn pr_review_identity(
         .as_ref()
         .ok_or_else(|| invalid_transition("PrReview execution has no frozen pull request"))?;
     Ok(frozen.clone())
-}
-
-fn local_head(worktree: &Path) -> Result<String, CliError> {
-    let repository = GitRepository::discover(worktree)
-        .map_err(|error| invalid_transition(format!("discover review repository: {error}")))?;
-    let repository = repository
-        .open_gix()
-        .map_err(|error| invalid_transition(format!("open review repository: {error}")))?;
-    repository
-        .head_commit()
-        .map(|commit| commit.id.to_hex().to_string())
-        .map_err(|error| invalid_transition(format!("resolve review HEAD: {error}")))
 }
 
 fn lifecycle_outcome(
@@ -326,7 +397,7 @@ mod tests {
         let temp = tempdir().expect("tempdir");
         harness_testkit::init_git_repo_with_seed(temp.path());
 
-        let head = local_head(temp.path()).expect("resolve local head");
+        let head = git_evidence::local_head(temp.path()).expect("resolve local head");
 
         assert_eq!(head.len(), 40);
         assert!(head.bytes().all(|byte| byte.is_ascii_hexdigit()));

@@ -10,6 +10,11 @@ use crate::github_api::{
 use super::client::{GitHubCreatePullRequest, GitHubPullRequestHandle};
 use super::config::GitHubProjectConfig;
 
+mod fresh;
+#[cfg(test)]
+mod tests;
+pub(super) use fresh::pull_request_handle_fresh;
+
 const GRAPHQL_PAGE_LIMIT: u32 = 5;
 
 pub(super) async fn pull_request_handle(
@@ -215,7 +220,7 @@ fn github_graphql_descriptor(operation: &str) -> GitHubRequestDescriptor {
     .with_expected_cost(5)
 }
 
-const PULL_REQUEST_HANDLE_QUERY: &str = r"
+pub(super) const PULL_REQUEST_HANDLE_QUERY: &str = r"
 query($owner: String!, $repo: String!, $number: Int!) {
   repository(owner: $owner, name: $repo) {
     pullRequest(number: $number) {
@@ -228,8 +233,11 @@ fragment PullRequestHandleFields on PullRequest {
   number
   url
   isDraft
+  state
   merged
   headRefOid
+  headRefName
+  headRepository { nameWithOwner }
   reviewRequests(first: 100) {
     pageInfo { hasNextPage endCursor }
     nodes {
@@ -243,7 +251,7 @@ fragment PullRequestHandleFields on PullRequest {
 }
 ";
 
-const OPEN_PULL_REQUEST_FOR_BRANCH_QUERY: &str = r"
+pub(super) const OPEN_PULL_REQUEST_FOR_BRANCH_QUERY: &str = r"
 query($query: String!) {
   search(query: $query, type: ISSUE, first: 1) {
     nodes {
@@ -258,8 +266,11 @@ fragment PullRequestHandleFields on PullRequest {
   number
   url
   isDraft
+  state
   merged
   headRefOid
+  headRefName
+  headRepository { nameWithOwner }
   reviewRequests(first: 100) {
     pageInfo { hasNextPage endCursor }
     nodes {
@@ -406,9 +417,14 @@ struct GraphqlPullRequestHandle {
     url: String,
     #[serde(rename = "isDraft")]
     is_draft: bool,
+    state: Option<String>,
     merged: bool,
     #[serde(rename = "headRefOid")]
     head_ref_oid: String,
+    #[serde(rename = "headRefName")]
+    head_ref_name: Option<String>,
+    #[serde(rename = "headRepository")]
+    head_repository: Option<GraphqlHeadRepository>,
     #[serde(rename = "reviewRequests")]
     review_requests: GitHubGraphqlConnection<GraphqlReviewRequest>,
 }
@@ -419,14 +435,23 @@ impl GraphqlPullRequestHandle {
             number: self.number,
             html_url: Some(self.url),
             draft: self.is_draft,
+            open: self.state.as_deref() == Some("OPEN"),
             merged: self.merged,
             head_sha: self.head_ref_oid,
+            head_repository: self.head_repository.map(|repo| repo.name_with_owner),
+            head_branch: self.head_ref_name,
             requested_reviewers: Vec::new(),
             requested_team_reviewers: Vec::new(),
         };
         handle.extend_review_requests(self.review_requests.nodes);
         handle
     }
+}
+
+#[derive(Debug, Deserialize)]
+struct GraphqlHeadRepository {
+    #[serde(rename = "nameWithOwner")]
+    name_with_owner: String,
 }
 
 #[derive(Debug, Deserialize)]

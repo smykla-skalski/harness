@@ -336,7 +336,7 @@ async fn running_publish_claim_rejects_public_item_mutation() {
     assert!(
         error
             .to_string()
-            .contains("read-only side effect is claimed")
+            .contains("workflow side effect is claimed")
     );
     let after = fixture
         .test

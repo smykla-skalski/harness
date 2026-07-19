@@ -136,7 +136,11 @@ fn parse_pull_request_reference(
     if task_board_read_only_execution_repository(item)?.as_deref() != Some(repository.as_str()) {
         return Err(TaskBoardReadOnlyWorkflowContractError::PullRequestRepositoryMismatch);
     }
-    Ok(TaskBoardPullRequestIdentity { repository, number })
+    Ok(TaskBoardPullRequestIdentity {
+        repository,
+        number,
+        head: None,
+    })
 }
 
 fn is_active_github_pull_request(reference: &ExternalRef) -> bool {

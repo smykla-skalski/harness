@@ -119,6 +119,7 @@ pub(super) async fn create_execution(
         (workflow_kind == TaskBoardWorkflowKind::PrReview).then(|| TaskBoardPullRequestIdentity {
             repository: "example/compass".into(),
             number: 17,
+            head: None,
         });
     let outcome = create_or_load_workflow_execution(
         db,

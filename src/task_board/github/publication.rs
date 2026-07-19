@@ -13,7 +13,7 @@ use crate::github_api::{
 use crate::sandbox;
 use crate::task_board::TaskBoardGitRuntimeConfig;
 
-use super::GitHubProjectConfig;
+use super::{GitHubAutomation, GitHubProjectConfig};
 pub(crate) use signing::{SigningVerifyOutcome, verify_signing_for_profile};
 use signing::{commit_author, local_commit_signature};
 use types::{BranchPublicationMode, LocalBranchSnapshot};
@@ -65,13 +65,24 @@ pub(crate) async fn publish_branch_from_worktree_async(
     config: &GitHubProjectConfig,
     worktree: &Path,
     branch: &str,
+    expected_parent: Option<&str>,
     github_token: &str,
     runtime_config: &TaskBoardGitRuntimeConfig,
 ) -> Result<(), CliError> {
+    if !config
+        .enabled_automations
+        .enables(GitHubAutomation::CreateBranch)
+    {
+        return Err(CliErrorKind::invalid_transition(
+            "task-board GitHub branch publication requires CreateBranch automation",
+        )
+        .into());
+    }
     let snapshot =
         load_local_branch_snapshot(worktree, config.repository_slug(), runtime_config.clone())
             .await?;
-    let Some(mode) = publication_mode(client, config, branch, &snapshot).await? else {
+    let Some(mode) = publication_mode(client, config, branch, &snapshot, expected_parent).await?
+    else {
         return Ok(());
     };
     git_ssh_publish::publish_native_branch(config, worktree, branch, github_token, &snapshot, &mode)
@@ -151,15 +162,14 @@ async fn publication_mode(
     config: &GitHubProjectConfig,
     branch: &str,
     snapshot: &LocalBranchSnapshot,
+    expected_parent: Option<&str>,
 ) -> Result<Option<BranchPublicationMode>, CliError> {
     let branch_state = branch_state_async(client, config, branch).await?;
-    if branch_state
-        .as_ref()
-        .is_some_and(|state| state.tree_sha == snapshot.head_tree_sha)
-    {
-        return Ok(None);
-    }
     if let Some(branch_state) = branch_state {
+        validate_publication_parent(expected_parent, &branch_state.commit_sha)?;
+        if branch_state.tree_sha == snapshot.head_tree_sha {
+            return Ok(None);
+        }
         return Ok(Some(BranchPublicationMode::Update {
             parent_sha: branch_state.commit_sha,
         }));
@@ -172,12 +182,30 @@ async fn publication_mode(
                 config.default_branch
             )))
         })?;
+    validate_publication_parent(expected_parent, &default_state.commit_sha)?;
     if default_state.tree_sha == snapshot.head_tree_sha {
         return Ok(None);
     }
     Ok(Some(BranchPublicationMode::Create {
         parent_sha: default_state.commit_sha,
     }))
+}
+
+fn validate_publication_parent(
+    expected_parent: Option<&str>,
+    observed_parent: &str,
+) -> Result<(), CliError> {
+    let Some(expected_parent) = expected_parent else {
+        return Ok(());
+    };
+    if expected_parent == observed_parent {
+        return Ok(());
+    }
+    Err(CliErrorKind::invalid_transition(format!(
+        "task-board GitHub publication parent changed after preflight: expected \
+         '{expected_parent}', observed '{observed_parent}'"
+    ))
+    .into())
 }
 
 const BRANCH_STATE_QUERY: &str = r"

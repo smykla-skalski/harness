@@ -8,14 +8,16 @@ use super::admission_lifecycle::{
     TaskBoardAdmissionCheck, renew_dispatch_admission_in_tx, revalidate_dispatch_admission_in_tx,
 };
 use super::admission_reservations::persist_admission_snapshot_in_tx;
+use super::dispatch_workflow_launch::{
+    prepare_workflow_launches_for_publication, rebind_write_launch,
+};
 use super::items::{bump_change_in_tx, load_item_in_tx, replace_item_in_tx};
 use crate::daemon::db::policy::consume_approval_grant_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::infra::io;
 use crate::task_board::{
-    DispatchAppliedTask, DispatchPlan, SessionIntent, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
-    TaskBoardItem, TaskBoardReadOnlyRunContext, TaskBoardReadOnlyWorkflowLaunch,
-    TaskBoardWorkflowKind,
+    DispatchAppliedTask, DispatchPlan, SessionIntent, TaskBoardItem,
+    TaskBoardReadOnlyWorkflowLaunch, TaskBoardWorkflowKind, TaskBoardWriteWorkflowLaunch,
 };
 
 const PREPARATION_LEASE_SECONDS: i64 = 30;
@@ -54,10 +56,10 @@ pub(crate) struct ClaimedTaskBoardDispatchPreparation {
 pub(crate) enum ReservedTaskBoardDispatch {
     Preparing {
         intent_id: String,
-        preparation: TaskBoardDispatchPreparation,
+        preparation: Box<TaskBoardDispatchPreparation>,
     },
-    Applied(DispatchAppliedTask),
-    Blocked(TaskBoardDispatchAdmissionSnapshot),
+    Applied(Box<DispatchAppliedTask>),
+    Blocked(Box<TaskBoardDispatchAdmissionSnapshot>),
 }
 
 fn preparation_revision_error(
@@ -69,14 +71,17 @@ fn preparation_revision_error(
         .source_item_revision
         .is_some_and(|expected| expected != item_revision)
     {
-        Some("read-only workflow item revision changed before preparation claim")
+        Some("workflow item revision changed before preparation claim")
     } else if preparation.source_item_revision.is_none()
         && matches!(
             item.workflow_kind,
-            TaskBoardWorkflowKind::Review | TaskBoardWorkflowKind::PrReview
+            TaskBoardWorkflowKind::DefaultTask
+                | TaskBoardWorkflowKind::PrFix
+                | TaskBoardWorkflowKind::Review
+                | TaskBoardWorkflowKind::PrReview
         )
     {
-        Some("legacy read-only preparation has no frozen item revision")
+        Some("legacy workflow preparation has no frozen item revision")
     } else {
         None
     }
@@ -128,7 +133,7 @@ impl AsyncDaemonDb {
             transaction.commit().await.map_err(|error| {
                 db_error(format!("commit refused task board admission: {error}"))
             })?;
-            return Ok(ReservedTaskBoardDispatch::Blocked(admission));
+            return Ok(ReservedTaskBoardDispatch::Blocked(Box::new(admission)));
         }
         let intent_id = format!("dispatch-intent-{}", Uuid::new_v4().simple());
         let workflow_execution_id = format!("workflow-{}", Uuid::new_v4().simple());
@@ -146,7 +151,10 @@ impl AsyncDaemonDb {
             plan: plan.clone(),
             source_item_revision: matches!(
                 item.workflow_kind,
-                TaskBoardWorkflowKind::Review | TaskBoardWorkflowKind::PrReview
+                TaskBoardWorkflowKind::DefaultTask
+                    | TaskBoardWorkflowKind::PrFix
+                    | TaskBoardWorkflowKind::Review
+                    | TaskBoardWorkflowKind::PrReview
             )
             .then_some(item_revision),
             hold_worker,
@@ -166,7 +174,7 @@ impl AsyncDaemonDb {
         })?;
         Ok(ReservedTaskBoardDispatch::Preparing {
             intent_id,
-            preparation,
+            preparation: Box::new(preparation),
         })
     }
 
@@ -314,8 +322,10 @@ impl AsyncDaemonDb {
         branch: &str,
         worktree: &str,
     ) -> Result<DispatchAppliedTask, CliError> {
-        self.complete_task_board_dispatch_preparation_with_workflow(claim, branch, worktree, None)
-            .await
+        self.complete_task_board_dispatch_preparation_with_workflow(
+            claim, branch, worktree, None, None,
+        )
+        .await
     }
 
     /// Atomically link a prepared session task and expose it for worker startup.
@@ -329,6 +339,7 @@ impl AsyncDaemonDb {
         branch: &str,
         worktree: &str,
         mut read_only_workflow: Option<TaskBoardReadOnlyWorkflowLaunch>,
+        mut write_workflow: Option<Box<TaskBoardWriteWorkflowLaunch>>,
     ) -> Result<DispatchAppliedTask, CliError> {
         let mut transaction = self
             .begin_immediate_transaction("task board dispatch preparation completion")
@@ -344,12 +355,13 @@ impl AsyncDaemonDb {
                 ))
             })?;
         validate_reservable_item(&item, &preparation.plan)?;
-        read_only_workflow = prepare_read_only_launch_for_publication(
+        (read_only_workflow, write_workflow) = prepare_workflow_launches_for_publication(
             preparation,
             &item,
             revision,
             worktree,
             read_only_workflow,
+            write_workflow,
         )?;
         apply_preparation_to_item(&mut item, preparation, branch, worktree);
         let prepared_item_revision = revision
@@ -358,6 +370,18 @@ impl AsyncDaemonDb {
         replace_item_in_tx(&mut transaction, &item, prepared_item_revision).await?;
         if let Some(launch) = read_only_workflow.as_mut() {
             launch.prepared_item_revision = prepared_item_revision;
+        }
+        if let Some(launch) = write_workflow.as_mut() {
+            launch.prepared_item_revision = prepared_item_revision;
+            let started_item_revision = prepared_item_revision
+                .checked_add(1)
+                .ok_or_else(|| db_error("workflow item revision is out of range"))?;
+            rebind_write_launch(
+                &item,
+                launch,
+                &preparation.workflow_execution_id,
+                started_item_revision,
+            )?;
         }
         // Immediate dispatch consumes its one-shot grant with publication.
         // Step-mode dispatch deliberately keeps the grant live while held;
@@ -379,6 +403,7 @@ impl AsyncDaemonDb {
             lifecycle: preparation.plan.applied_lifecycle(),
             item,
             read_only_workflow,
+            write_workflow,
         };
         let payload = serde_json::to_string(&applied).map_err(|error| {
             db_error(format!("serialize prepared task board dispatch: {error}"))
@@ -443,63 +468,4 @@ impl AsyncDaemonDb {
             )))
         }
     }
-}
-
-fn prepare_read_only_launch_for_publication(
-    preparation: &TaskBoardDispatchPreparation,
-    item: &TaskBoardItem,
-    revision: i64,
-    worktree: &str,
-    mut launch: Option<TaskBoardReadOnlyWorkflowLaunch>,
-) -> Result<Option<TaskBoardReadOnlyWorkflowLaunch>, CliError> {
-    match (preparation.source_item_revision, launch.as_mut()) {
-        (Some(source), Some(launch)) => {
-            crate::task_board::validate_task_board_read_only_item_revisions(
-                launch.source_item_revision,
-                launch.prepared_item_revision,
-            )
-            .map_err(|error| db_error(error.to_string()))?;
-            if revision != source
-                || launch.source_item_revision != source
-                || launch.prepared_item_revision != source
-            {
-                return Err(db_error(
-                    "read-only workflow item revision changed before preparation publication",
-                ));
-            }
-            if launch.workflow_kind != item.workflow_kind
-                || !matches!(
-                    item.workflow_kind,
-                    TaskBoardWorkflowKind::Review | TaskBoardWorkflowKind::PrReview
-                )
-                || item.agent_mode != crate::task_board::AgentMode::Evaluate
-            {
-                return Err(db_error(
-                    "read-only workflow identity changed before preparation publication",
-                ));
-            }
-            launch.run_context = TaskBoardReadOnlyRunContext {
-                schema_version: TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
-                session_id: preparation.session_id.clone(),
-                title: item.title.clone(),
-                body: item.body.clone(),
-                tags: item.tags.clone(),
-                worktree: worktree.to_string(),
-            };
-            crate::task_board::validate_task_board_read_only_run_context(&launch.run_context)
-                .map_err(|error| db_error(format!("validate read-only run context: {error}")))?;
-        }
-        (Some(_), None) => {
-            return Err(db_error(
-                "read-only dispatch preparation omitted its launch",
-            ));
-        }
-        (None, Some(_)) => {
-            return Err(db_error(
-                "non-read-only dispatch supplied a read-only launch",
-            ));
-        }
-        (None, None) => {}
-    }
-    Ok(launch)
 }

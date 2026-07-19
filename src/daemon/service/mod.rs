@@ -256,7 +256,7 @@ mod signals_timeout;
 mod status;
 mod sync_support;
 mod task_board;
-pub(crate) use task_board::validate_read_only_workflow_launch;
+pub(crate) use task_board::{validate_read_only_workflow_launch, validate_write_workflow_launch};
 mod task_board_automation_runtime;
 mod task_board_completion;
 mod task_board_db;
@@ -271,7 +271,7 @@ mod task_board_orchestrator_db;
 mod task_board_orchestrator_run_lease;
 mod task_board_orchestrator_settings;
 mod task_board_orchestrator_step_mode;
-mod task_board_read_only_coordinator;
+pub(crate) mod task_board_read_only_coordinator;
 #[cfg(test)]
 mod task_board_read_only_coordinator_tests;
 mod task_board_read_only_runtime;

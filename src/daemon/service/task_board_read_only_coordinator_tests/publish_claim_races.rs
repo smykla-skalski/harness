@@ -19,21 +19,24 @@ async fn stale_starting_snapshot_does_not_republish_settled_attempt() {
     let runtime = FakeReadOnlyRuntime::new([]);
     let stale = super::load_execution(&fixture).await;
 
-    super::super::task_board_read_only_coordinator::
-        reconcile_preloaded_read_only_execution(
-            &fixture.test.db,
-            &runtime,
-            stale.clone(),
-            NOW,
-        )
-        .await
-        .expect("settle first publish claim");
+    super::super::task_board_read_only_coordinator::reconcile_preloaded_read_only_execution(
+        &fixture.test.db,
+        &runtime,
+        stale.clone(),
+        NOW,
+    )
+    .await
+    .expect("settle first publish claim");
     assert_eq!(runtime.publish_count(), 1);
 
-    super::super::task_board_read_only_coordinator::
-        reconcile_preloaded_read_only_execution(&fixture.test.db, &runtime, stale, NOW)
-        .await
-        .expect("ignore stale publish claimant after settlement");
+    super::super::task_board_read_only_coordinator::reconcile_preloaded_read_only_execution(
+        &fixture.test.db,
+        &runtime,
+        stale,
+        NOW,
+    )
+    .await
+    .expect("ignore stale publish claimant after settlement");
 
     let completed = super::load_execution(&fixture).await;
     assert_eq!(
@@ -103,22 +106,24 @@ async fn completed_publish_phase_advance_supersedes_parent_state_repair() {
     .await
     .expect("advance completed publish evidence");
     let advanced = super::load_execution(&fixture).await;
-    assert_eq!(advanced.transition.phase, Some(TaskBoardExecutionPhase::Cleanup));
+    assert_eq!(
+        advanced.transition.phase,
+        Some(TaskBoardExecutionPhase::Cleanup)
+    );
     assert_eq!(
         advanced.transition.execution_state,
         TaskBoardExecutionState::Pending
     );
     assert_stale_claim_is_superseded(&fixture, &initial, &starting, &claimed).await;
 
-    super::super::task_board_read_only_coordinator::
-        settle_execution_running_in_phase_for_test(
-            &fixture.test.db,
-            &fixture.execution_id,
-            TaskBoardExecutionPhase::Publish,
-            NOW,
-        )
-        .await
-        .expect("phase advance supersedes stale parent repair");
+    super::super::task_board_read_only_coordinator::settle_execution_running_in_phase_for_test(
+        &fixture.test.db,
+        &fixture.execution_id,
+        TaskBoardExecutionPhase::Publish,
+        NOW,
+    )
+    .await
+    .expect("phase advance supersedes stale parent repair");
 
     assert_eq!(super::load_execution(&fixture).await, advanced);
 }

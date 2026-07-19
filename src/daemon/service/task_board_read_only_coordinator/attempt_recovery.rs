@@ -129,13 +129,25 @@ fn attempt_action_pending(
             .strip_prefix("review:")
             .is_some_and(|profile_id| {
                 !execution.artifacts.review_cycles.iter().any(|cycle| {
-                    cycle
-                        .outcomes
-                        .iter()
-                        .any(|outcome| outcome.profile_id == profile_id)
+                    cycle.revision_cycle == execution.artifacts.current_revision_cycle
+                        && cycle
+                            .outcomes
+                            .iter()
+                            .any(|outcome| outcome.profile_id == profile_id)
                 })
             }),
-        Some(TaskBoardExecutionPhase::Evaluate) => attempt.action_key == "evaluate",
+        Some(TaskBoardExecutionPhase::Implementation) => {
+            attempt.action_key
+                == format!(
+                    "implementation:{}",
+                    execution.artifacts.current_revision_cycle
+                )
+        }
+        Some(TaskBoardExecutionPhase::Evaluate) => {
+            attempt.action_key == "evaluate"
+                || attempt.action_key
+                    == format!("evaluate:{}", execution.artifacts.current_revision_cycle)
+        }
         Some(TaskBoardExecutionPhase::Publish) => attempt.action_key == "publish",
         Some(TaskBoardExecutionPhase::Cleanup) => attempt.action_key == "cleanup",
         _ => false,

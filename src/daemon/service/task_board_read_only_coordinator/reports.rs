@@ -1,20 +1,20 @@
 use chrono::{DateTime, Duration, Utc};
 
 use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::protocol::{CodexRunSnapshot, CodexRunStatus};
+use crate::daemon::protocol::{CodexRunMode, CodexRunRequest, CodexRunSnapshot, CodexRunStatus};
 use crate::errors::CliError;
 use crate::task_board::{
     TASK_BOARD_SIDE_EFFECT_CLAIM_GRACE_SECONDS, TaskBoardAttemptResultArtifact,
     TaskBoardAttemptRetryDecision, TaskBoardAttemptState, TaskBoardExecutionAttemptCas,
     TaskBoardExecutionAttemptCasOutcome, TaskBoardExecutionAttemptRecord,
-    TaskBoardExecutionDiagnostic, TaskBoardFailureClass, TaskBoardTerminalOutcomeKind,
-    TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
+    TaskBoardExecutionDiagnostic, TaskBoardExecutionState, TaskBoardFailureClass,
+    TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
     task_board_attempt_retry_decision,
 };
 
 use super::super::task_board_read_only_runtime::TaskBoardReadOnlyRuntime;
 use super::attempts::{invalid_transition, require_human, set_execution_state};
-use super::requests::codex_report_request;
+use super::requests::codex_attempt_request;
 
 pub(super) async fn reconcile_report_attempt<R>(
     db: &AsyncDaemonDb,
@@ -27,10 +27,8 @@ pub(super) async fn reconcile_report_attempt<R>(
 where
     R: TaskBoardReadOnlyRuntime,
 {
-    let expected_request = codex_report_request(execution, attempt)?;
-    let run = runtime
-        .load_codex_report_run(&attempt.idempotency_key)
-        .await?;
+    let expected_request = codex_attempt_request(execution, attempt)?;
+    let run = load_codex_run(runtime, expected_request.mode, &attempt.idempotency_key).await?;
     let run = match run {
         Some(run) => run,
         None if attempt.state == TaskBoardAttemptState::Running => {
@@ -56,16 +54,19 @@ where
                 return Ok(true);
             };
             let session_id = super::requests::run_context(execution)?.session_id.as_str();
-            match runtime
-                .start_codex_report_run(session_id, &expected_request, &claimed.idempotency_key)
-                .await
+            match start_codex_run(
+                runtime,
+                session_id,
+                &expected_request,
+                &claimed.idempotency_key,
+            )
+            .await
             {
                 Ok(run) => run,
                 Err(error) => {
-                    let Some(run) = reconcile_report_start_error(
-                        db, runtime, execution, &claimed, &error, now,
-                    )
-                    .await?
+                    let Some(run) =
+                        reconcile_report_start_error(db, runtime, execution, &claimed, &error, now)
+                            .await?
                     else {
                         return Ok(true);
                     };
@@ -88,6 +89,49 @@ where
     Ok(true)
 }
 
+async fn load_codex_run<R>(
+    runtime: &R,
+    mode: CodexRunMode,
+    run_id: &str,
+) -> Result<Option<CodexRunSnapshot>, CliError>
+where
+    R: TaskBoardReadOnlyRuntime,
+{
+    match mode {
+        CodexRunMode::Report => runtime.load_codex_report_run(run_id).await,
+        CodexRunMode::WorkspaceWrite => runtime.load_codex_workspace_run(run_id).await,
+        CodexRunMode::Approval => Err(invalid_transition(
+            "workflow attempts do not admit Codex Approval mode",
+        )),
+    }
+}
+
+async fn start_codex_run<R>(
+    runtime: &R,
+    session_id: &str,
+    request: &CodexRunRequest,
+    run_id: &str,
+) -> Result<CodexRunSnapshot, CliError>
+where
+    R: TaskBoardReadOnlyRuntime,
+{
+    match request.mode {
+        CodexRunMode::Report => {
+            runtime
+                .start_codex_report_run(session_id, request, run_id)
+                .await
+        }
+        CodexRunMode::WorkspaceWrite => {
+            runtime
+                .start_codex_workspace_run(session_id, request, run_id)
+                .await
+        }
+        CodexRunMode::Approval => Err(invalid_transition(
+            "workflow attempts do not admit Codex Approval mode",
+        )),
+    }
+}
+
 async fn reconcile_report_start_error<R>(
     db: &AsyncDaemonDb,
     runtime: &R,
@@ -99,14 +143,13 @@ async fn reconcile_report_start_error<R>(
 where
     R: TaskBoardReadOnlyRuntime,
 {
-    match runtime
-        .load_codex_report_run(&claimed.idempotency_key)
-        .await
-    {
+    let request = codex_attempt_request(execution, claimed)?;
+    match load_codex_run(runtime, request.mode, &claimed.idempotency_key).await {
         Ok(Some(run)) => Ok(Some(run)),
         Ok(None) => {
             if super::attempts::settlement_is_current(db, &execution.execution_id, now).await? {
-                record_retry_or_human(db, execution, claimed, &start_error.to_string(), now).await?;
+                record_retry_or_human(db, execution, claimed, &start_error.to_string(), now)
+                    .await?;
             }
             Ok(None)
         }
@@ -198,7 +241,7 @@ async fn handle_run_status(
             set_execution_state(
                 db,
                 &execution.execution_id,
-                crate::task_board::TaskBoardExecutionState::Running,
+                TaskBoardExecutionState::Running,
                 now,
             )
             .await

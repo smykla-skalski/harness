@@ -2,6 +2,9 @@ use std::collections::HashMap;
 
 use tempfile::tempdir;
 
+use crate::daemon::db::task_board::write_workflow_fixture::{
+    approved_write_item, complete_write_preparation,
+};
 use crate::daemon::db::{AsyncDaemonDb, NewApprovalGrant, ReservedTaskBoardDispatch};
 use crate::task_board::{
     PolicyAction, PolicyReasonCode, SessionIntent, TaskBoardItem, TaskBoardStatus,
@@ -127,12 +130,12 @@ async fn task_board_dispatch_reservation_precedes_links_and_is_reclaimable() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("open db");
-    db.create_task_board_item(TaskBoardItem::new(
+    db.create_task_board_item(approved_write_item(TaskBoardItem::new(
         "task-dispatch-reserved".to_owned(),
         "Reserved dispatch".to_owned(),
         "Body".to_owned(),
         "2026-07-11T10:00:00Z".to_owned(),
-    ))
+    )))
     .await
     .expect("create item");
     let item = db
@@ -217,14 +220,14 @@ async fn task_board_dispatch_reservation_precedes_links_and_is_reclaimable() {
         .expect("reclaim preparation")
         .expect("expired preparation");
     assert_ne!(reclaimed.claim_token, claim.claim_token);
-    let applied = db
-        .complete_task_board_dispatch_preparation(
-            &reclaimed,
-            "harness/session-reserved",
-            "/tmp/session-reserved",
-        )
-        .await
-        .expect("complete preparation");
+    let applied = complete_write_preparation(
+        &db,
+        &reclaimed,
+        "harness/session-reserved",
+        "/tmp/session-reserved",
+    )
+    .await
+    .expect("complete preparation");
     assert_eq!(applied.item.status, TaskBoardStatus::InProgress);
     assert_eq!(
         applied.item.workflow.execution_id.as_deref(),
@@ -424,12 +427,12 @@ async fn approved_grant_is_consumed_at_reservation() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("open db");
-    db.create_task_board_item(TaskBoardItem::new(
+    db.create_task_board_item(approved_write_item(TaskBoardItem::new(
         "task-grant-consume".to_owned(),
         "Grant consume".to_owned(),
         "Body".to_owned(),
         "2026-07-14T10:00:00Z".to_owned(),
-    ))
+    )))
     .await
     .expect("create item");
 
@@ -477,13 +480,9 @@ async fn approved_grant_is_consumed_at_reservation() {
         .await
         .expect("claim preparation")
         .expect("pending preparation");
-    db.complete_task_board_dispatch_preparation(
-        &claim,
-        "harness/session-grant",
-        "/tmp/session-grant",
-    )
-    .await
-    .expect("complete preparation");
+    complete_write_preparation(&db, &claim, "harness/session-grant", "/tmp/session-grant")
+        .await
+        .expect("complete preparation");
 
     assert!(
         db.live_approval_grant("task-grant-consume", PolicyAction::SpawnAgent, 1)

@@ -13,13 +13,19 @@ mod estimate_freeze_tests;
 mod read_only_revision_tests;
 #[path = "admission_dispatch_startup_reconciliation.rs"]
 mod startup_reconciliation_tests;
+#[path = "admission_dispatch_write_workflow.rs"]
+mod write_workflow_tests;
 
+use crate::daemon::db::task_board::write_workflow_fixture::{
+    approved_write_item, complete_write_preparation,
+};
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ReservedTaskBoardDispatch, workflow_owner};
 use crate::daemon::protocol::CodexRunStatus;
 use crate::task_board::{
     AgentMode, DispatchPlan, SpawnGateSwitches, TaskBoardAdmissionDecision,
     TaskBoardAutomationPolicy, TaskBoardItem, TaskBoardPolicyLimit, TaskBoardPolicyScope,
-    TaskBoardReadOnlyWorkflowLaunch, TaskBoardWorkflowKind, build_dispatch_plans_with_policy,
+    TaskBoardReadOnlyWorkflowLaunch, TaskBoardWorkflowKind, TaskBoardWriteWorkflowLaunch,
+    bind_plan_approval, build_dispatch_plans_with_policy, build_planning_result,
     resolve_task_board_reviewers,
 };
 
@@ -195,7 +201,7 @@ async fn terminal_run_before_dispatch_commit_releases_only_concurrency() {
         .await
         .expect("claim preparation")
         .expect("pending preparation");
-    db.complete_task_board_dispatch_preparation(&preparation, "branch", "/tmp/worktree")
+    complete_write_preparation(&db, &preparation, "branch", "/tmp/worktree")
         .await
         .expect("complete preparation");
     let claim = db
@@ -296,6 +302,11 @@ async fn create_plan(db: &AsyncDaemonDb, item_id: &str, mode: AgentMode) -> Disp
         "2026-07-17T10:00:00Z".to_string(),
     );
     item.agent_mode = mode;
+    let item = if mode == AgentMode::Headless {
+        approved_write_item(item)
+    } else {
+        item
+    };
     db.create_task_board_item(item).await.expect("create item");
     create_plan_for_existing(db, item_id).await
 }

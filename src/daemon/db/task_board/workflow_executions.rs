@@ -11,8 +11,8 @@ use crate::task_board::{
     TaskBoardWorkflowCasMismatch, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionCasOutcome, TaskBoardWorkflowExecutionCreateOutcome,
     TaskBoardWorkflowExecutionRecord, advance_task_board_workflow,
-    validate_task_board_execution_update, validate_task_board_read_only_run_context,
-    validate_task_board_workflow_execution,
+    restart_task_board_workflow_revision, validate_task_board_execution_update,
+    validate_task_board_read_only_run_context, validate_task_board_workflow_execution,
 };
 
 const SELECT_EXECUTION: &str = "SELECT * FROM task_board_workflow_executions
@@ -381,7 +381,7 @@ pub(super) fn cas_mismatch(
     }
 }
 
-fn ensure_terminal_transition_has_no_active_side_effect(
+pub(super) fn ensure_terminal_transition_has_no_active_side_effect(
     current: &TaskBoardWorkflowExecutionRecord,
     updated: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<(), CliError> {
@@ -401,7 +401,11 @@ fn has_active_external_side_effect(execution: &TaskBoardWorkflowExecutionRecord)
         .attempts
         .iter()
         .any(|attempt| match execution.transition.phase {
-            Some(TaskBoardExecutionPhase::Review | TaskBoardExecutionPhase::Evaluate) => {
+            Some(
+                TaskBoardExecutionPhase::Implementation
+                | TaskBoardExecutionPhase::Review
+                | TaskBoardExecutionPhase::Evaluate,
+            ) => {
                 matches!(attempt.state, TaskBoardAttemptState::Running)
             }
             Some(TaskBoardExecutionPhase::Publish) => {
@@ -421,7 +425,7 @@ const fn is_stopped(state: TaskBoardExecutionState) -> bool {
     )
 }
 
-fn validate_phase_change(
+pub(super) fn validate_phase_change(
     current: &TaskBoardWorkflowExecutionRecord,
     updated: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<(), CliError> {
@@ -440,10 +444,16 @@ fn validate_phase_change(
     let forward =
         advance_task_board_workflow(&current.transition, observed_pull_request, observed_head).ok();
     if forward.as_ref() == Some(&updated.transition) {
-        Ok(())
-    } else {
-        Err(db_error(
-            "workflow execution phase change bypasses transition matrix",
-        ))
+        return Ok(());
     }
+    let restarted = restart_task_board_workflow_revision(&current.transition).ok();
+    let next_cycle = current.artifacts.current_revision_cycle.checked_add(1);
+    if restarted.as_ref() == Some(&updated.transition)
+        && next_cycle == Some(updated.artifacts.current_revision_cycle)
+    {
+        return Ok(());
+    }
+    Err(db_error(
+        "workflow execution phase change bypasses transition matrix",
+    ))
 }

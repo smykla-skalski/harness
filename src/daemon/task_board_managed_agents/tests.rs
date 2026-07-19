@@ -10,6 +10,8 @@ use crate::task_board::{
     AgentMode, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardAttemptResultArtifact,
     TaskBoardLocalAttemptResult, TaskBoardReadOnlyRunContext, TaskBoardReadOnlyWorkflowLaunch,
     TaskBoardResolvedReviewer, TaskBoardReviewerProfile, TaskBoardWorkflowKind,
+    TaskBoardWorkflowSnapshot, TaskBoardWriteWorkflowLaunch, bind_plan_approval,
+    build_planning_result,
 };
 
 use super::test_support::{
@@ -21,6 +23,9 @@ use super::{
     resolve_start_failure, start_worker_for_applied_task, stop_worker_in_lane, terminal_worker_id,
     terminal_worker_request,
 };
+
+#[path = "write_request_recovery_tests.rs"]
+mod write_request_recovery_tests;
 
 #[test]
 fn codex_worker_request_carries_task_board_identity() {
@@ -114,6 +119,45 @@ fn read_only_review_request_freezes_identity_and_has_no_session_task() {
 }
 
 #[test]
+fn write_implementation_request_freezes_approved_plan_and_result_identity() {
+    let mut applied = applied_task(AgentMode::Headless);
+    applied.write_workflow = Some(Box::new(write_launch()));
+
+    let request = codex_worker_request(&applied, "codex-implementation-attempt");
+
+    assert_eq!(
+        request.mode,
+        crate::daemon::protocol::CodexRunMode::WorkspaceWrite
+    );
+    assert_eq!(request.task_id.as_deref(), Some("task-1"));
+    assert!(request.prompt.contains("Base head: head-base"));
+    assert!(request.prompt.contains("Implement the approved change."));
+    assert!(request.prompt.contains("Focused tests pass"));
+    let (_, encoded) = request
+        .prompt
+        .split_once("identity and shape:\n")
+        .expect("result envelope marker");
+    let envelope: TaskBoardLocalAttemptResult =
+        serde_json::from_str(encoded).expect("strict result envelope");
+    assert_eq!(envelope.execution_id, "workflow-1");
+    assert_eq!(envelope.action_key, "implementation:1");
+    assert_eq!(envelope.idempotency_key, "codex-implementation-attempt");
+    assert!(matches!(
+        envelope.artifact,
+        TaskBoardAttemptResultArtifact::Implementation(_)
+    ));
+    assert!(
+        request
+            .capabilities
+            .contains(&"task-board:workflow:write".to_string())
+    );
+    assert_eq!(
+        managed_admission_owner_id(&applied, "dispatch-intent-1"),
+        "workflow-workflow-1"
+    );
+}
+
+#[test]
 fn ordinary_dispatch_keeps_worker_scoped_admission() {
     let applied = applied_task(AgentMode::Headless);
 
@@ -166,6 +210,63 @@ fn review_launch() -> TaskBoardReadOnlyWorkflowLaunch {
         provider_revision: None,
         pull_request: None,
         exact_head_revision: "head-frozen".into(),
+    }
+}
+
+fn write_launch() -> TaskBoardWriteWorkflowLaunch {
+    let reviewer = TaskBoardResolvedReviewer {
+        reviewer_count: 1,
+        required_approvals: 1,
+        max_revision_cycles: 3,
+        profiles: vec![TaskBoardReviewerProfile::default()],
+    };
+    let snapshot = TaskBoardWorkflowSnapshot {
+        workflow_kind: TaskBoardWorkflowKind::DefaultTask,
+        execution_repository: None,
+        item_revision: 3,
+        configuration_revision: 1,
+        policy_version: "policy-v1".into(),
+        reviewer: reviewer.clone(),
+        read_only_run_context: None,
+        provider_revision: None,
+    };
+    let planning_result = build_planning_result(
+        "# Plan\n\nImplement the approved change.",
+        ["Focused tests pass".into()],
+        &snapshot,
+        "workflow-1",
+    )
+    .expect("build plan");
+    let plan_approval = bind_plan_approval(
+        &planning_result,
+        &snapshot,
+        "workflow-1",
+        "lead",
+        "2026-07-18T10:00:00Z",
+    )
+    .expect("bind approval");
+    TaskBoardWriteWorkflowLaunch {
+        workflow_kind: TaskBoardWorkflowKind::DefaultTask,
+        execution_repository: None,
+        configuration_revision: 1,
+        policy_version: "policy-v1".into(),
+        resolved_reviewers: reviewer,
+        source_item_revision: 1,
+        prepared_item_revision: 2,
+        task_id: "task-1".into(),
+        run_context: TaskBoardReadOnlyRunContext {
+            schema_version: TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
+            session_id: "session-1".into(),
+            title: "Board item".into(),
+            body: "Investigate the issue".into(),
+            tags: vec!["backend".into()],
+            worktree: "/tmp/task-worktree".into(),
+        },
+        provider_revision: None,
+        pull_request: None,
+        base_head_revision: "head-base".into(),
+        planning_result,
+        plan_approval,
     }
 }
 
@@ -250,7 +351,7 @@ fn read_only_recovery_rejects_a_conflicting_durable_run() {
     let error = recover_same_applied_worker(ManagedAgentSnapshot::Codex(run), &applied)
         .expect_err("conflicting run must fail");
     assert_eq!(error.code(), "KSRCLI092");
-    assert!(error.message().contains("frozen read-only workflow"));
+    assert!(error.message().contains("frozen workflow"));
 }
 
 #[test]

@@ -12,7 +12,7 @@ use crate::task_board::{
     DispatchAppliedTask, TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowStatus,
 };
 
-pub(super) async fn refuse_pending_admission_in_tx(
+pub(in crate::daemon::db::task_board) async fn refuse_pending_admission_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     intent_id: &str,
     applied: &DispatchAppliedTask,

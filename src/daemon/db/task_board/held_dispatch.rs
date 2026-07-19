@@ -7,6 +7,8 @@ use super::dispatch_intents::{
     ClaimedTaskBoardDispatch, TaskBoardDispatchClaimAction, decode_applied,
     ensure_dispatch_item_startable,
 };
+use super::dispatch_workflow_launch::rebind_write_launch;
+use super::dispatch_workflow_start::workflow_start_fence;
 use super::items::{bump_change_in_tx, load_item_in_tx, replace_item_in_tx};
 use crate::daemon::db::policy::{
     consume_approval_grant_in_tx_at, live_approval_grant_in_tx_at, load_workspace_in_tx,
@@ -17,7 +19,7 @@ use crate::task_board::policy_graph::PolicyCanvasWorkspace;
 use crate::task_board::{
     DispatchAppliedTask, PolicyAction, PolicyDecision, SpawnGateSwitches,
     TaskBoardHeldDispatchItem, TaskBoardHeldDispatchSummary, TaskBoardItem, consumed_grant_id,
-    dispatch_policy_from_graph, validate_task_board_read_only_item_revisions,
+    dispatch_policy_from_graph,
 };
 
 #[derive(Debug)]
@@ -92,7 +94,7 @@ impl AsyncDaemonDb {
             .await?
             .ok_or_else(|| db_error(format!("task-board item '{board_item_id}' not found")))?;
         ensure_held_linkage(&applied, &item)?;
-        validate_held_read_only_claim_revision(&applied, revision)?;
+        validate_held_workflow_claim_revision(&applied, revision)?;
         ensure_dispatch_item_startable(
             &item,
             &applied.session_id,
@@ -136,10 +138,8 @@ impl AsyncDaemonDb {
             .checked_add(1)
             .ok_or_else(|| db_error("task-board item revision is out of range"))?;
         replace_item_in_tx(&mut transaction, &item, delivered_item_revision).await?;
+        advance_held_workflow_launch(&mut applied, &item, delivered_item_revision)?;
         applied.item = item;
-        if let Some(launch) = applied.read_only_workflow.as_mut() {
-            launch.prepared_item_revision = delivered_item_revision;
-        }
         let payload = serde_json::to_string(&applied)
             .map_err(|error| db_error(format!("serialize held task board delivery: {error}")))?;
         let claim_token = format!("dispatch-claim-{}", Uuid::new_v4().simple());
@@ -173,21 +173,43 @@ impl AsyncDaemonDb {
     }
 }
 
-fn validate_held_read_only_claim_revision(
+fn advance_held_workflow_launch(
+    applied: &mut DispatchAppliedTask,
+    item: &TaskBoardItem,
+    delivered_item_revision: i64,
+) -> Result<(), CliError> {
+    if let Some(launch) = applied.read_only_workflow.as_mut() {
+        launch.prepared_item_revision = delivered_item_revision;
+    }
+    if let Some(launch) = applied.write_workflow.as_mut() {
+        launch.prepared_item_revision = delivered_item_revision;
+        let execution_id = item
+            .workflow
+            .execution_id
+            .as_deref()
+            .ok_or_else(|| db_error("held write workflow has no execution id"))?;
+        rebind_write_launch(
+            item,
+            launch,
+            execution_id,
+            delivered_item_revision
+                .checked_add(1)
+                .ok_or_else(|| db_error("workflow item revision is out of range"))?,
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_held_workflow_claim_revision(
     applied: &DispatchAppliedTask,
     item_revision: i64,
 ) -> Result<(), CliError> {
-    let Some(launch) = applied.read_only_workflow.as_ref() else {
+    let Some((prepared_item_revision, _)) = workflow_start_fence(applied)? else {
         return Ok(());
     };
-    validate_task_board_read_only_item_revisions(
-        launch.source_item_revision,
-        launch.prepared_item_revision,
-    )
-    .map_err(|error| db_error(error.to_string()))?;
-    if item_revision != launch.prepared_item_revision {
+    if item_revision != prepared_item_revision {
         return Err(db_error(
-            "read-only workflow item revision changed before held worker claim",
+            "workflow item revision changed before held worker claim",
         ));
     }
     Ok(())

@@ -2,6 +2,9 @@ use std::{collections::BTreeSet, fmt::Display};
 
 use chrono::{DateTime, Utc};
 
+use super::workflow_execution_write_validation::{
+    is_write_workflow, validate_write_attempt_artifact, validate_write_frozen_contract,
+};
 use crate::task_board::{
     MAX_TASK_BOARD_REVIEW_REVISION_CYCLES, TASK_BOARD_WORKFLOW_EXECUTION_SCHEMA_VERSION,
     TaskBoardAttemptResultArtifact, TaskBoardAttemptState, TaskBoardExecutionAttemptRecord,
@@ -140,14 +143,8 @@ fn validate_frozen_contract(
     if record.snapshot.item_revision <= 0 {
         return invalid("snapshot.item_revision", "must be greater than zero");
     }
-    if !matches!(
-        record.snapshot.workflow_kind,
-        TaskBoardWorkflowKind::PrReview | TaskBoardWorkflowKind::Review
-    ) {
-        return invalid(
-            "snapshot.workflow_kind",
-            "write and unknown workflows are not admitted by the read-only engine",
-        );
+    if record.snapshot.workflow_kind == TaskBoardWorkflowKind::Unknown {
+        return invalid("snapshot.workflow_kind", "unknown workflow is not admitted");
     }
     if record.snapshot.workflow_kind != record.transition.workflow_kind {
         return invalid("transition.workflow_kind", "does not match snapshot");
@@ -168,8 +165,9 @@ fn validate_frozen_contract(
     validate_task_board_workflow_transition_state(&record.transition)
         .map_err(|error| field_error("transition", error))?;
     if record.transition.phase.is_none() {
-        return invalid("transition.phase", "read-only workflow has no phase");
+        return invalid("transition.phase", "known workflow has no phase");
     }
+    validate_write_frozen_contract(record)?;
     let terminal = matches!(
         record.transition.execution_state,
         TaskBoardExecutionState::Completed
@@ -308,6 +306,9 @@ fn validate_attempt_artifact(
     record: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
 ) -> Result<(), TaskBoardWorkflowExecutionValidationError> {
+    if validate_write_attempt_artifact(record, attempt)? {
+        return Ok(());
+    }
     match attempt.artifact.as_ref() {
         Some(TaskBoardAttemptResultArtifact::Review(outcome)) => {
             let expected_head = record.transition.exact_head_revision.as_deref();
@@ -327,6 +328,15 @@ fn validate_attempt_artifact(
                 );
             }
             Ok(())
+        }
+        Some(TaskBoardAttemptResultArtifact::Evaluation(result))
+            if !is_write_workflow(record.snapshot.workflow_kind)
+                && (result.head_revision.is_some() || result.revision_cycle.is_some()) =>
+        {
+            invalid(
+                "attempt.artifact.evaluation",
+                "read-only evaluation carries write provenance",
+            )
         }
         _ => Ok(()),
     }

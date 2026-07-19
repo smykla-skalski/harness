@@ -17,6 +17,7 @@ async fn read_only_launch_rejects_item_revision_aba_before_publication() {
             "branch",
             "/tmp/worktree",
             Some(launch),
+            None,
         )
         .await
         .expect_err("revision ABA must prevent preparation publication");
@@ -43,6 +44,7 @@ async fn read_only_publication_rebuilds_context_from_transaction_owned_item() {
             "branch",
             "/tmp/worktree",
             Some(launch),
+            None,
         )
         .await
         .expect("publish authoritative read-only context");
@@ -82,6 +84,7 @@ async fn read_only_publication_rejects_forged_workflow_identity() {
             "branch",
             "/tmp/worktree",
             Some(launch),
+            None,
         )
         .await
         .expect_err("publication must reject a mismatched read-only workflow kind");
@@ -204,7 +207,7 @@ async fn starting_read_only_launch_blocks_public_item_mutation() {
     assert!(
         error
             .to_string()
-            .contains("cannot change while its read-only side effect is claimed")
+            .contains("cannot change while its workflow side effect is claimed")
     );
     let after = db
         .task_board_item_snapshot(&applied.board_item_id)
@@ -440,6 +443,7 @@ async fn publish_read_only(
             "branch",
             "/tmp/worktree",
             Some(launch),
+            None,
         )
         .await
         .expect("publish prepared read-only launch");

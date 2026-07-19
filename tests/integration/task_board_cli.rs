@@ -194,6 +194,7 @@ fn applied_dispatch() -> DispatchAppliedTask {
         lifecycle: DispatchLifecycle::planned(&worker, &reviewer, &evaluator).applied(),
         item,
         read_only_workflow: None,
+        write_workflow: None,
     }
 }
 

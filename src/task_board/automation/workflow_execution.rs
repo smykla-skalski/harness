@@ -5,9 +5,10 @@ use sha2::{Digest, Sha256};
 
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardEvaluationResult, TaskBoardExecutionPhase,
-    TaskBoardExecutionState, TaskBoardFailureClass, TaskBoardLifecycleOutcome,
-    TaskBoardResolvedReviewer, TaskBoardReviewRoundDecision, TaskBoardReviewerOutcome,
-    TaskBoardWorkflowSnapshot, TaskBoardWorkflowTransitionState,
+    TaskBoardExecutionState, TaskBoardFailureClass, TaskBoardImplementationResult,
+    TaskBoardLifecycleOutcome, TaskBoardPlanApprovalBinding, TaskBoardPlanApprovalInvalidation,
+    TaskBoardPlanningResult, TaskBoardResolvedReviewer, TaskBoardReviewRoundDecision,
+    TaskBoardReviewerOutcome, TaskBoardWorkflowSnapshot, TaskBoardWorkflowTransitionState,
 };
 
 pub const TASK_BOARD_WORKFLOW_EXECUTION_SCHEMA_VERSION: u32 = 1;
@@ -65,12 +66,25 @@ pub struct TaskBoardTerminalOutcome {
 pub struct TaskBoardWorkflowExecutionArtifacts {
     pub schema_version: u32,
     pub current_revision_cycle: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub planning_result: Option<TaskBoardPlanningResult>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan_approval: Option<TaskBoardPlanApprovalBinding>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub approval_invalidations: Vec<TaskBoardPlanApprovalInvalidation>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub review_cycles: Vec<TaskBoardReviewCycle>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retry: Option<TaskBoardRetrySchedule>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub diagnostics: Vec<TaskBoardExecutionDiagnostic>,
+    /// Known-but-unverified publication evidence retained for recovery and audit.
+    ///
+    /// This evidence never satisfies a completed attempt or successful terminal outcome.
+    /// `HumanRequired` executions never resume; a future resume path must clear or migrate this
+    /// evidence before performing further publication work or advancing phases.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provisional_publication: Option<TaskBoardLifecycleOutcome>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub terminal_outcome: Option<TaskBoardTerminalOutcome>,
 }
@@ -80,9 +94,13 @@ impl Default for TaskBoardWorkflowExecutionArtifacts {
         Self {
             schema_version: TASK_BOARD_WORKFLOW_EXECUTION_SCHEMA_VERSION,
             current_revision_cycle: 1,
+            planning_result: None,
+            plan_approval: None,
+            approval_invalidations: Vec::new(),
             review_cycles: Vec::new(),
             retry: None,
             diagnostics: Vec::new(),
+            provisional_publication: None,
             terminal_outcome: None,
         }
     }
@@ -101,6 +119,8 @@ pub struct TaskBoardExecutionOwnership {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", rename_all = "snake_case")]
 pub enum TaskBoardAttemptResultArtifact {
+    Planning(TaskBoardPlanningResult),
+    Implementation(TaskBoardImplementationResult),
     Review(TaskBoardReviewerOutcome),
     Evaluation(TaskBoardEvaluationResult),
     Lifecycle(TaskBoardLifecycleOutcome),

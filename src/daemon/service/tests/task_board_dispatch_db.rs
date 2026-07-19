@@ -1,11 +1,12 @@
 use super::*;
 
-use crate::daemon::db::ReservedTaskBoardDispatch;
+use crate::daemon::db::{ReservedTaskBoardDispatch, approved_write_item};
 use crate::daemon::protocol::SessionStartRequest;
 use std::collections::HashMap;
 
 use crate::task_board::{
-    AgentMode, TaskBoardItem, TaskBoardWorkflowKind, build_dispatch_plans_with_policy,
+    AgentMode, HARNESS_GITHUB_TOKEN_ENV, TaskBoardGitHubProjectConfig, TaskBoardItem,
+    TaskBoardWorkflowKind, build_dispatch_plans_with_policy,
 };
 
 #[test]
@@ -20,14 +21,25 @@ fn prepared_dispatch_resumes_without_duplicate_session_or_task() {
             let db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
                 .await
                 .expect("open async daemon db");
-            db.create_task_board_item(TaskBoardItem::new(
+            let mut settings = db
+                .task_board_orchestrator_settings()
+                .await
+                .expect("load orchestrator settings");
+            settings.github_project =
+                TaskBoardGitHubProjectConfig::new("example", "compass", project.to_path_buf());
+            db.replace_task_board_orchestrator_settings(&settings)
+                .await
+                .expect("configure write publication");
+            let mut item = approved_write_item(TaskBoardItem::new(
                 "dispatch-crash-recovery".to_string(),
                 "Recover dispatch".to_string(),
                 "Create the worker task once".to_string(),
                 "2026-07-11T10:00:00Z".to_string(),
-            ))
-            .await
-            .expect("create task board item");
+            ));
+            item.execution_repository = Some("example/compass".into());
+            db.create_task_board_item(item)
+                .await
+                .expect("create task board item");
             let item = db
                 .task_board_item("dispatch-crash-recovery")
                 .await
@@ -116,9 +128,12 @@ fn prepared_dispatch_resumes_without_duplicate_session_or_task() {
                 .expect("reclaim preparation")
                 .expect("expired preparation");
             assert_ne!(reclaimed.claim_token, first_claim.claim_token);
-            let applied = task_board::prepare_claimed_task_board_dispatch(&db, &reclaimed)
-                .await
-                .expect("resume preparation");
+            let applied = temp_env::async_with_vars(
+                [(HARNESS_GITHUB_TOKEN_ENV, Some("fixture-token"))],
+                task_board::prepare_claimed_task_board_dispatch(&db, &reclaimed),
+            )
+            .await
+            .expect("resume preparation");
             assert_eq!(applied.session_id, preparation.session_id);
             assert_eq!(applied.work_item_id, preparation.work_item_id);
 

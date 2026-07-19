@@ -56,10 +56,12 @@ mod policy_spawn_gate;
 mod policy_transfer;
 mod read_only_workflow_launch;
 mod sync;
+mod write_workflow_launch;
 
 pub(crate) use dispatch::load_live_spawn_grants;
 pub(crate) use dispatch_preparation::prepare_claimed_task_board_dispatch;
 pub(crate) use read_only_workflow_launch::validate_read_only_workflow_launch;
+pub(crate) use write_workflow_launch::validate_write_workflow_launch;
 
 pub(crate) use policy_canvas::{
     audit_policy_pipeline, create_policy_canvas, create_policy_scenario, delete_policy_canvas,
