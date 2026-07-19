@@ -4,8 +4,9 @@ use std::time::{Duration, Instant};
 use super::*;
 use crate::agents::acp::catalog::{self, AcpAgentDescriptor};
 use crate::daemon::agent_acp::manager::test_support::{
-    assert_err, assert_ok, assert_some, seeded_manager, write_cancel_recording_acp_agent,
-    write_exiting_acp_agent, write_prompt_delaying_acp_agent, write_sleeping_acp_agent,
+    ACP_CONDITION_DEADLINE, assert_err, assert_ok, assert_some, seeded_manager,
+    write_cancel_recording_acp_agent, write_exiting_acp_agent, write_prompt_delaying_acp_agent,
+    write_sleeping_acp_agent,
 };
 use crate::session::types::ManagedAgentRef;
 use tempfile::TempDir;
@@ -433,7 +434,7 @@ fn session_managed_agent(
 
 #[cfg(unix)]
 fn wait_for_cancelled_sessions(path: &Path, expected_count: usize) -> Vec<String> {
-    let deadline = Instant::now() + Duration::from_secs(2);
+    let deadline = Instant::now() + ACP_CONDITION_DEADLINE;
     loop {
         let sessions = std::fs::read_to_string(path)
             .unwrap_or_default()
@@ -470,7 +471,7 @@ fn assert_sibling_session_state_preserved(before: &AcpAgentSnapshot, after: &Acp
 }
 
 fn wait_until_disconnected(manager: &AcpAgentManagerHandle, acp_id: &str) -> AcpAgentSnapshot {
-    let deadline = Instant::now() + Duration::from_secs(2);
+    let deadline = Instant::now() + ACP_CONDITION_DEADLINE;
     loop {
         let snapshot = assert_ok(manager.get(acp_id), "refresh");
         if snapshot.status.is_disconnected() {
