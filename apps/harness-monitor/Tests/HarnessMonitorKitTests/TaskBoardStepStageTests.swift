@@ -201,6 +201,13 @@ struct TaskBoardStepStageTests {
     #expect(!plan.inlineLinks.contains(.openPullRequest))
   }
 
+  @Test("validURL trims whitespace and rejects empty input")
+  func validURLTrimsAndRejectsEmpty() {
+    #expect(TaskBoardStepStageResolver.validURL(" https://example.com/pr/1 ") != nil)
+    #expect(TaskBoardStepStageResolver.validURL("   ") == nil)
+    #expect(TaskBoardStepStageResolver.validURL(nil) == nil)
+  }
+
   @Test("Rail node state derives from the current column")
   func railNodeStatesDeriveFromColumn() {
     #expect(TaskBoardStepColumn.todo.nodeState(current: .toReview, isBlocked: false) == .done)

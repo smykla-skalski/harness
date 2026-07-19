@@ -288,7 +288,7 @@ struct TaskBoardStepRailView: View {
     case .openTask:
       openReview()
     case .openPullRequest:
-      if let raw = lockedItem?.workflow?.prUrl, let url = URL(string: raw) {
+      if let url = TaskBoardStepStageResolver.validURL(lockedItem?.workflow?.prUrl) {
         openURL(url)
       }
     }

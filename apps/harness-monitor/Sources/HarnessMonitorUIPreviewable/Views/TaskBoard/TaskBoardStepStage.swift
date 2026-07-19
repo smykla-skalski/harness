@@ -300,8 +300,9 @@ enum TaskBoardStepStageResolver {
     return links
   }
 
-  /// A non-empty, parseable URL, so a link never renders as a dead button.
-  private static func validURL(_ raw: String?) -> URL? {
+  /// A non-empty, parseable URL. Shared by the link gate and the tap handler so
+  /// the two never disagree about whether a URL is usable.
+  static func validURL(_ raw: String?) -> URL? {
     guard let raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
       return nil
     }
