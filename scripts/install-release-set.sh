@@ -803,20 +803,24 @@ validate_selected_sources() {
 }
 
 expected_core_version() {
-  local harness_path aff_path current_harness_path current_aff_path
-  harness_path="$(build_path harness)"
-  aff_path="$(build_path aff)"
-  if [[ -x "$harness_path" ]]; then
-    binary_version "$harness_path"
-    return
-  fi
-  if [[ -x "$aff_path" ]]; then
-    binary_version "$aff_path"
-    return
-  fi
-  # Neither harness nor aff was freshly built for this selection (e.g. a
-  # single-leaf install of "mcp"); fall back to whichever is already active
-  # so the candidate still gets a meaningful version-derived identity.
+  local name path current_harness_path current_aff_path
+  # $target_dir/release persists across invocations, so checking a fixed
+  # path like build_path(harness) would pick up a stale artifact left by an
+  # earlier "all"/"harness" build even when harness isn't part of this
+  # selection. Only consider binaries actually selected this run.
+  for name in "${selected_binaries[@]}"; do
+    case "$name" in
+      harness-codex-acp | harness-openrouter-agent) continue ;;
+    esac
+    path="$(build_path "$name")"
+    if [[ -x "$path" ]]; then
+      binary_version "$path"
+      return
+    fi
+  done
+  # No selected binary carries a version (e.g. a codex/openrouter-only
+  # install); fall back to whichever is already active so the candidate
+  # still gets a meaningful version-derived identity.
   current_harness_path="$current_link/bin/harness"
   if [[ -x "$current_harness_path" ]]; then
     binary_version "$current_harness_path"

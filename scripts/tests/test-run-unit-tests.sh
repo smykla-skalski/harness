@@ -74,9 +74,15 @@ reset_calls() {
   rm -rf "$calls_dir"
 }
 
+calls_snapshot() {
+  find "$calls_dir" -maxdepth 1 -name 'call-*' -print0 2>/dev/null \
+    | xargs -0 cat -- 2>/dev/null || true
+}
+
 assert_call_count() {
   local expected="$1" actual
-  actual="$(find "$calls_dir" -maxdepth 1 -name 'call-*' | wc -l | tr -d ' ')"
+  [[ -d "$calls_dir" ]] || { (( expected == 0 )); return; }
+  actual="$(find "$calls_dir" -maxdepth 1 -name 'call-*' 2>/dev/null | wc -l | tr -d ' ')"
   [[ "$actual" == "$expected" ]]
 }
 
@@ -84,6 +90,7 @@ assert_call_matches() {
   local call_number="$1"
   shift
   local expected actual
+  [[ -f "$calls_dir/call-$call_number" ]] || return 1
   expected="$(printf '%s\n' "$@")"
   actual="$(<"$calls_dir/call-$call_number")"
   [[ "$actual" == "$expected" ]]
@@ -104,7 +111,7 @@ scenario_no_arguments_preserves_all_three_groups() {
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd; then
     pass "no-argument invocation still exercises all three package groups unfiltered"
   else
-    fail "no-argument invocation did not preserve the original three-group invocations: $(ls "$calls_dir")"
+    fail "no-argument invocation did not preserve the original three-group invocations: $(calls_snapshot)"
   fi
 }
 
@@ -123,7 +130,7 @@ scenario_forwards_simple_filter_to_every_group() {
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd -E 'test(=path::to::test)'; then
     pass "a simple nextest filter reaches every package group, including harness-systemd"
   else
-    fail "simple nextest filter was not forwarded to every group: $(ls "$calls_dir")"
+    fail "simple nextest filter was not forwarded to every group: $(calls_snapshot)"
   fi
 }
 
@@ -141,7 +148,7 @@ scenario_preserves_multiword_single_token_filter() {
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd -E "$filter"; then
     pass "a filter containing spaces survives as a single token in every group"
   else
-    fail "multi-word single-token filter was split or mangled: $(cat "$calls_dir"/call-* 2>/dev/null)"
+    fail "multi-word single-token filter was split or mangled: $(calls_snapshot)"
   fi
 }
 
@@ -163,7 +170,7 @@ scenario_rejects_shell_injection_attempt() {
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime "$payload"; then
     pass "a shell metacharacter payload is forwarded as an inert literal argument"
   else
-    fail "injection-attempt payload was not forwarded as an inert literal argument: $(cat "$calls_dir"/call-* 2>/dev/null)"
+    fail "injection-attempt payload was not forwarded as an inert literal argument: $(calls_snapshot)"
   fi
 }
 

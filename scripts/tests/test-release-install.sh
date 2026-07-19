@@ -130,13 +130,12 @@ EOF
   command chmod +x "$fake_bin/codesign"
 }
 
-write_fake_release_set() {
+write_fake_release_binary() {
   local target="$1"
-  local version="$2"
-  local name
+  local name="$2"
+  local version="$3"
   command mkdir -p "$target/release"
-  for name in "${RELEASE_BINARIES[@]}"; do
-    command cat >"$target/release/$name" <<EOF
+  command cat >"$target/release/$name" <<EOF
 #!/usr/bin/env bash
 name='$name'
 version='$version'
@@ -164,7 +163,15 @@ case "\${1:-}" in
     ;;
 esac
 EOF
-    command chmod +x "$target/release/$name"
+  command chmod +x "$target/release/$name"
+}
+
+write_fake_release_set() {
+  local target="$1"
+  local version="$2"
+  local name
+  for name in "${RELEASE_BINARIES[@]}"; do
+    write_fake_release_binary "$target" "$name" "$version"
   done
 }
 
@@ -1419,6 +1426,24 @@ scenario_unknown_selector_is_rejected_cleanly() {
   if (( ok )); then pass; fi
 }
 
+scenario_single_leaf_install_ignores_stale_release_artifact() {
+  start_test "single-leaf install derives its version from the selected leaf, not a stale artifact"
+  local sandbox="$SANDBOX/stale-artifact"
+  write_fake_release_set "$sandbox/target" 47.0.0
+  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+  # build-release-set.sh never cleans $target/release, so a single-leaf
+  # build leaves every other binary's older artifact sitting there; only
+  # rewrite harness-daemon to simulate that.
+  write_fake_release_binary "$sandbox/target" harness-daemon 49.0.0
+  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" daemon >/dev/null
+
+  local ok=1
+  assert_contains "harness-daemon 49.0.0" \
+    "$("$sandbox/bin/harness-daemon" --version)" || ok=0
+  assert_contains "harness 47.0.0" "$("$sandbox/bin/harness" --version)" || ok=0
+  if (( ok )); then pass; fi
+}
+
 scenario_lock_recovers_ownerless_and_reused_pid_records() {
   start_test "install lock recovers ownerless and PID-reused stale records"
   local ownerless="$SANDBOX/lock-ownerless" reused="$SANDBOX/lock-reused"
@@ -1514,6 +1539,7 @@ run_all() {
   scenario_multi_selector_install_updates_only_requested_leaves
   scenario_harness_cli_alias_selects_only_the_cli_leaf
   scenario_unknown_selector_is_rejected_cleanly
+  scenario_single_leaf_install_ignores_stale_release_artifact
   scenario_lock_recovers_ownerless_and_reused_pid_records
   scenario_legacy_detector_is_read_only_and_blocks_activation
 }
