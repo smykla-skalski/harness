@@ -12,7 +12,7 @@ enum TaskBoardStepStageResolver {
         column: nil,
         isBlockedColumn: false,
         whatHappened: nil,
-        whatNext: whatNext(for: .noTarget, item: nil, record: nil),
+        whatNext: whatNext(for: .noTarget, item: nil, record: nil, canDeliver: false),
         primaryAction: .sync,
         inlineLinks: []
       )
@@ -28,8 +28,18 @@ enum TaskBoardStepStageResolver {
       column: column(for: stage, item: item),
       isBlockedColumn: stage == .blocked,
       whatHappened: whatHappened(for: stage, item: item, record: inputs.latestRecord),
-      whatNext: whatNext(for: stage, item: item, record: inputs.latestRecord),
-      primaryAction: primaryAction(for: stage, item: item, record: inputs.latestRecord),
+      whatNext: whatNext(
+        for: stage,
+        item: item,
+        record: inputs.latestRecord,
+        canDeliver: inputs.canDeliver
+      ),
+      primaryAction: primaryAction(
+        for: stage,
+        item: item,
+        record: inputs.latestRecord,
+        canDeliver: inputs.canDeliver
+      ),
       inlineLinks: inlineLinks(for: stage, item: item)
     )
   }
@@ -120,12 +130,13 @@ enum TaskBoardStepStageResolver {
   private static func primaryAction(
     for stage: TaskBoardStepStage,
     item: TaskBoardItem,
-    record: TaskBoardEvaluationRecord?
+    record: TaskBoardEvaluationRecord?,
+    canDeliver: Bool
   ) -> TaskBoardStepPrimaryAction? {
     switch stage {
     case .noTarget: .sync
     case .readyToPick: .pick
-    case .readyToDeliver: .deliver
+    case .readyToDeliver: canDeliver ? .deliver : nil
     // Blocked keeps Evaluate so re-evaluating after the block is resolved works.
     case .workerRunning, .awaitingReview, .inReview, .changesRequested, .blocked: .evaluate
     case .done: isFinished(item, record) ? nil : .complete
@@ -185,7 +196,8 @@ enum TaskBoardStepStageResolver {
   private static func whatNext(
     for stage: TaskBoardStepStage,
     item: TaskBoardItem?,
-    record: TaskBoardEvaluationRecord?
+    record: TaskBoardEvaluationRecord?,
+    canDeliver: Bool
   ) -> String {
     switch stage {
     case .noTarget:
@@ -193,7 +205,9 @@ enum TaskBoardStepStageResolver {
     case .readyToPick:
       "Pick loads the exact spawn prompt so you can read it before any worker starts"
     case .readyToDeliver:
-      "Deliver spawns the managed worker with the prompt shown below"
+      canDeliver
+        ? "Deliver spawns the managed worker with the prompt shown below"
+        : "Sync external sources to reacquire the held delivery before continuing"
     case .workerRunning:
       "Evaluate checks the worker and moves the item to review once its task finishes"
     case .awaitingReview:

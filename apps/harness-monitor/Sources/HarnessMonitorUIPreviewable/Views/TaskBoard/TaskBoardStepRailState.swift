@@ -5,17 +5,24 @@ import Observation
 @Observable
 final class TaskBoardStepRailState {
   enum Confirmation: Identifiable {
-    case externalSync
-    case evaluate
-    case deliver
-    case complete
+    case externalSync(itemID: String?)
+    case evaluate(itemID: String)
+    case deliver(itemID: String)
+    case complete(itemID: String)
+
+    var itemID: String? {
+      switch self {
+      case .externalSync(let itemID): itemID
+      case .evaluate(let itemID), .deliver(let itemID), .complete(let itemID): itemID
+      }
+    }
 
     var id: String {
       switch self {
-      case .externalSync: "external-sync"
-      case .evaluate: "evaluate"
-      case .deliver: "deliver"
-      case .complete: "complete"
+      case .externalSync: "external-sync-\(itemID ?? "none")"
+      case .evaluate: "evaluate-\(itemID ?? "none")"
+      case .deliver: "deliver-\(itemID ?? "none")"
+      case .complete: "complete-\(itemID ?? "none")"
       }
     }
   }
@@ -46,6 +53,33 @@ final class TaskBoardStepRailState {
 
   func requestApprovalRefresh() {
     approvalRefreshGeneration &+= 1
+  }
+
+  /// Restores or preserves the active item without overwriting an explicit flow.
+  func preserveFlowIdentity(itemID: String?) {
+    guard lockedItemID == nil, let itemID else { return }
+    lockedItemID = itemID
+  }
+
+  /// Captures the item the user is about to authorize before showing the dialog.
+  func presentConfirmation(_ confirmation: Confirmation) {
+    preserveFlowIdentity(itemID: confirmation.itemID)
+    self.confirmation = confirmation
+  }
+
+  /// Starts Sync after pinning the item currently shown by the guided flow.
+  func beginExternalSync(itemID: String?) -> Bool {
+    guard begin() else { return false }
+    preserveFlowIdentity(itemID: itemID)
+    return true
+  }
+
+  /// External Sync refreshes sources inside the current flow. It never ends it.
+  func finishExternalSync(succeeded: Bool) {
+    if succeeded {
+      requestApprovalRefresh()
+    }
+    finish()
   }
 
   /// Clears the per-item flow so the wizard follows the next target.

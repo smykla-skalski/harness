@@ -179,6 +179,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       projectDir: String?,
       actor: String?
     )
+    case deliverTaskBoardDispatch(itemID: String, dryRun: Bool)
     case evaluateTaskBoard(
       dryRun: Bool,
       status: TaskBoardStatus?,
