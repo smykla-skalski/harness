@@ -24,6 +24,7 @@ pub struct GitHubPullRequestHandle {
     pub number: u64,
     pub html_url: Option<String>,
     pub draft: bool,
+    pub open: bool,
     pub merged: bool,
     pub head_sha: String,
     pub head_repository: Option<String>,
@@ -100,6 +101,26 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
             config,
             worktree,
             branch,
+            None,
+            &self.token,
+            &self.runtime_config,
+        )
+        .await
+    }
+
+    async fn publish_branch_from_worktree_at_parent(
+        &self,
+        config: &GitHubProjectConfig,
+        worktree: &Path,
+        branch: &str,
+        expected_parent: Option<&str>,
+    ) -> Result<(), CliError> {
+        publish_branch_from_worktree_async(
+            &self.client,
+            config,
+            worktree,
+            branch,
+            expected_parent,
             &self.token,
             &self.runtime_config,
         )
@@ -294,6 +315,7 @@ struct RestPullRequestResponse {
     number: u64,
     html_url: String,
     draft: Option<bool>,
+    state: Option<String>,
     merged: Option<bool>,
     head: RestPullRequestBranch,
     #[serde(default)]
@@ -337,6 +359,9 @@ fn rest_pull_request_handle(pull_request: RestPullRequestResponse) -> GitHubPull
         number: pull_request.number,
         html_url: Some(pull_request.html_url),
         draft: pull_request.draft.unwrap_or(false),
+        open: pull_request
+            .state
+            .is_some_and(|state| state.eq_ignore_ascii_case("open")),
         merged: pull_request.merged.unwrap_or(false),
         head_sha: sha,
         head_repository: repo.map(|repository| repository.full_name),

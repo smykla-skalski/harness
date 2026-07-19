@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::sync::Mutex;
 
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::github::{
     GitHubAutomationClient, GitHubBranchState, GitHubCreatePullRequest, GitHubMergeEvidence,
     GitHubMergeMethod, GitHubProjectConfig, GitHubPullRequestHandle,
@@ -17,6 +17,8 @@ pub(super) struct FakeGitHubClient {
     pub(super) ready_calls: Mutex<usize>,
     pub(super) reviewer_requests: Mutex<Vec<(Vec<String>, Vec<String>)>>,
     pub(super) merge_calls: Mutex<usize>,
+    pub(super) ready_error: Mutex<Option<String>>,
+    pub(super) parent_interleaving: Mutex<Option<String>>,
 }
 
 #[async_trait::async_trait]
@@ -39,10 +41,45 @@ impl GitHubAutomationClient for FakeGitHubClient {
 
     async fn publish_branch_from_worktree(
         &self,
-        _config: &GitHubProjectConfig,
+        config: &GitHubProjectConfig,
         worktree: &Path,
         branch: &str,
     ) -> Result<(), CliError> {
+        self.publish_branch_from_worktree_at_parent(config, worktree, branch, None)
+            .await
+    }
+
+    async fn publish_branch_from_worktree_at_parent(
+        &self,
+        config: &GitHubProjectConfig,
+        worktree: &Path,
+        branch: &str,
+        expected_parent: Option<&str>,
+    ) -> Result<(), CliError> {
+        let remote = remote_repo_path(config.checkout_path.as_path());
+        if let Some(interloper) = self
+            .parent_interleaving
+            .lock()
+            .expect("parent interleaving")
+            .take()
+        {
+            run_git(
+                &remote,
+                &["update-ref", &format!("refs/heads/{branch}"), &interloper],
+            );
+        }
+        let branch_ref = format!("refs/heads/{branch}");
+        let observed_parent = if git_ref_exists(&remote, &branch_ref) {
+            git_ref(&remote, &branch_ref)
+        } else {
+            git_ref(&remote, &format!("refs/heads/{}", config.default_branch))
+        };
+        if expected_parent.is_some_and(|expected| expected != observed_parent) {
+            return Err(CliErrorKind::invalid_transition(
+                "task-board GitHub publication parent changed after preflight",
+            )
+            .into());
+        }
         *self.publish_calls.lock().expect("publish calls") += 1;
         run_git(worktree, &["push", "origin", &format!("HEAD:{branch}")]);
         Ok(())
@@ -86,6 +123,9 @@ impl GitHubAutomationClient for FakeGitHubClient {
         _config: &GitHubProjectConfig,
         _pull_request_number: u64,
     ) -> Result<GitHubPullRequestHandle, CliError> {
+        if let Some(error) = self.ready_error.lock().expect("ready error").take() {
+            return Err(CliErrorKind::workflow_io(error).into());
+        }
         *self.ready_calls.lock().expect("ready calls") += 1;
         let mut ready = self.pull_request.clone();
         ready.draft = false;

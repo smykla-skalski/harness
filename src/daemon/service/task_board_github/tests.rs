@@ -18,6 +18,8 @@ const TEST_HOST_ID: &str = "host1234";
 #[path = "tests/fake_client.rs"]
 mod fake_client;
 use fake_client::FakeGitHubClient;
+#[path = "tests/write_publication.rs"]
+mod write_publication;
 
 #[tokio::test]
 async fn automation_opens_reviews_and_merges_prs() {
@@ -69,6 +71,7 @@ async fn automation_opens_reviews_and_merges_prs() {
             number: 42,
             html_url: Some("https://example.test/pull/42".to_string()),
             draft: true,
+            open: true,
             merged: false,
             head_sha: "abc123".to_string(),
             head_repository: Some("owner/repo".into()),
@@ -98,6 +101,8 @@ async fn automation_opens_reviews_and_merges_prs() {
         ready_calls: std::sync::Mutex::new(0),
         reviewer_requests: std::sync::Mutex::new(Vec::new()),
         merge_calls: std::sync::Mutex::new(0),
+        ready_error: std::sync::Mutex::new(None),
+        parent_interleaving: std::sync::Mutex::new(None),
     };
 
     let workflow = automate_item(AutomationRequest {
@@ -174,6 +179,7 @@ async fn automation_waits_for_review_when_merge_evidence_is_not_approved() {
             number: 7,
             html_url: Some("https://example.test/pull/7".to_string()),
             draft: false,
+            open: true,
             merged: false,
             head_sha: "abc123".to_string(),
             head_repository: Some("owner/repo".into()),
@@ -203,6 +209,8 @@ async fn automation_waits_for_review_when_merge_evidence_is_not_approved() {
         ready_calls: std::sync::Mutex::new(0),
         reviewer_requests: std::sync::Mutex::new(Vec::new()),
         merge_calls: std::sync::Mutex::new(0),
+        ready_error: std::sync::Mutex::new(None),
+        parent_interleaving: std::sync::Mutex::new(None),
     };
 
     let workflow = automate_item(AutomationRequest {
@@ -264,6 +272,7 @@ async fn automation_waits_for_commits_before_opening_a_pull_request() {
             number: 99,
             html_url: Some("https://example.test/pull/99".to_string()),
             draft: true,
+            open: true,
             merged: false,
             head_sha: "abc123".to_string(),
             head_repository: Some("owner/repo".into()),
@@ -293,6 +302,8 @@ async fn automation_waits_for_commits_before_opening_a_pull_request() {
         ready_calls: std::sync::Mutex::new(0),
         reviewer_requests: std::sync::Mutex::new(Vec::new()),
         merge_calls: std::sync::Mutex::new(0),
+        ready_error: std::sync::Mutex::new(None),
+        parent_interleaving: std::sync::Mutex::new(None),
     };
 
     let workflow = automate_item(AutomationRequest {

@@ -218,7 +218,7 @@ fn github_graphql_descriptor(operation: &str) -> GitHubRequestDescriptor {
     .with_expected_cost(5)
 }
 
-const PULL_REQUEST_HANDLE_QUERY: &str = r"
+pub(super) const PULL_REQUEST_HANDLE_QUERY: &str = r"
 query($owner: String!, $repo: String!, $number: Int!) {
   repository(owner: $owner, name: $repo) {
     pullRequest(number: $number) {
@@ -231,6 +231,7 @@ fragment PullRequestHandleFields on PullRequest {
   number
   url
   isDraft
+  state
   merged
   headRefOid
   headRefName
@@ -248,7 +249,7 @@ fragment PullRequestHandleFields on PullRequest {
 }
 ";
 
-const OPEN_PULL_REQUEST_FOR_BRANCH_QUERY: &str = r"
+pub(super) const OPEN_PULL_REQUEST_FOR_BRANCH_QUERY: &str = r"
 query($query: String!) {
   search(query: $query, type: ISSUE, first: 1) {
     nodes {
@@ -263,6 +264,7 @@ fragment PullRequestHandleFields on PullRequest {
   number
   url
   isDraft
+  state
   merged
   headRefOid
   headRefName
@@ -413,6 +415,7 @@ struct GraphqlPullRequestHandle {
     url: String,
     #[serde(rename = "isDraft")]
     is_draft: bool,
+    state: String,
     merged: bool,
     #[serde(rename = "headRefOid")]
     head_ref_oid: String,
@@ -430,6 +433,7 @@ impl GraphqlPullRequestHandle {
             number: self.number,
             html_url: Some(self.url),
             draft: self.is_draft,
+            open: self.state == "OPEN",
             merged: self.merged,
             head_sha: self.head_ref_oid,
             head_repository: self.head_repository.map(|repo| repo.name_with_owner),

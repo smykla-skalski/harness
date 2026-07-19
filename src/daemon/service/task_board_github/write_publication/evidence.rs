@@ -23,6 +23,11 @@ pub(super) fn freeze_pull_request(
     repository: &str,
     handle: &GitHubPullRequestHandle,
 ) -> Result<TaskBoardPullRequestIdentity, CliError> {
+    if handle.merged || !handle.open {
+        return Err(invalid_transition(
+            "PrFix publication requires an open pull request",
+        ));
+    }
     let head_repository = handle
         .head_repository
         .as_deref()
@@ -188,29 +193,19 @@ pub(super) fn worktree_path(
 
 pub(super) fn publication_number(
     workflow_pr_number: Option<u64>,
-    execution: &TaskBoardWorkflowExecutionRecord,
+    frozen_number: Option<u64>,
 ) -> Result<u64, CliError> {
-    if let (Some(workflow), Some(frozen)) = (
-        workflow_pr_number,
-        execution.transition.pull_request.as_ref(),
-    ) && workflow != frozen.number
+    if let (Some(workflow), Some(frozen)) = (workflow_pr_number, frozen_number)
+        && workflow != frozen
     {
         return Err(invalid_transition(
             "write workflow publication changed its frozen pull request",
         ));
     }
-    workflow_pr_number
-        .or_else(|| {
-            execution
-                .transition
-                .pull_request
-                .as_ref()
-                .map(|pr| pr.number)
-        })
-        .ok_or_else(|| {
-            CliErrorKind::workflow_io("write workflow publication did not produce a pull request")
-                .into()
-        })
+    workflow_pr_number.or(frozen_number).ok_or_else(|| {
+        CliErrorKind::workflow_io("write workflow publication did not produce a pull request")
+            .into()
+    })
 }
 
 pub(super) fn known_publication_number(
@@ -336,6 +331,25 @@ mod tests {
     }
 
     #[test]
+    fn pull_request_target_requires_open_state_but_accepts_open_drafts() {
+        let identity = frozen_identity();
+        let head = required_frozen_head(&identity).expect("frozen head");
+
+        let mut closed = pull_request_handle("frozen-source-head");
+        closed.open = false;
+        assert!(validate_pull_request_target(&closed, &identity, head).is_err());
+
+        let mut merged = pull_request_handle("frozen-source-head");
+        merged.open = false;
+        merged.merged = true;
+        assert!(validate_pull_request_target(&merged, &identity, head).is_err());
+
+        let mut draft = pull_request_handle("frozen-source-head");
+        draft.draft = true;
+        validate_pull_request_target(&draft, &identity, head).expect("open draft target");
+    }
+
+    #[test]
     fn write_launch_repository_must_match_configured_publication() {
         validate_publication_repository(Some("example/compass"), "example/compass")
             .expect("matching repository");
@@ -360,6 +374,7 @@ mod tests {
             number: 42,
             html_url: Some("https://github.com/example/upstream/pull/42".into()),
             draft: false,
+            open: true,
             merged: false,
             head_sha: head_sha.into(),
             head_repository: Some("contributor/fork".into()),

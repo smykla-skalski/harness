@@ -353,7 +353,13 @@ where
             _ => None,
         });
     match verify_publish(runtime, execution, known_external_url).await {
-        Ok(TaskBoardPublishVerification::Applied(outcome)) => {
+        Ok(TaskBoardPublishVerification::Applied(mut outcome)) => {
+            outcome.mutated |= attempt.artifact.as_ref().is_some_and(|artifact| {
+                matches!(
+                    artifact,
+                    TaskBoardAttemptResultArtifact::Lifecycle(provisional) if provisional.mutated
+                )
+            });
             complete_lifecycle(db, execution, attempt, outcome, now).await
         }
         Ok(TaskBoardPublishVerification::Absent) if is_write(execution.snapshot.workflow_kind) => {

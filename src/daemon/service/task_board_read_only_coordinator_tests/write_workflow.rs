@@ -1,12 +1,12 @@
 use std::collections::BTreeMap;
 
 use crate::task_board::{
-    AgentMode, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardExecutionOwnership,
-    TaskBoardExecutionPhase, TaskBoardExecutionState, TaskBoardPhaseVerdict,
-    TaskBoardPlanApprovalInvalidation, TaskBoardReadOnlyRunContext, TaskBoardStatus,
-    TaskBoardWorkflowExecutionArtifacts, TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
-    TaskBoardWorkflowSnapshot, TaskBoardWorkflowStatus, TaskBoardWorkflowTransitionState,
-    bind_plan_approval, build_planning_result,
+    AgentMode, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardAttemptResultArtifact,
+    TaskBoardExecutionOwnership, TaskBoardExecutionPhase, TaskBoardExecutionState,
+    TaskBoardPhaseVerdict, TaskBoardPlanApprovalInvalidation, TaskBoardReadOnlyRunContext,
+    TaskBoardStatus, TaskBoardWorkflowExecutionArtifacts, TaskBoardWorkflowExecutionRecord,
+    TaskBoardWorkflowKind, TaskBoardWorkflowSnapshot, TaskBoardWorkflowStatus,
+    TaskBoardWorkflowTransitionState, bind_plan_approval, build_planning_result,
 };
 
 use super::super::task_board_read_only_coordinator::reconcile_task_board_read_only_workflows_with_runtime;
@@ -124,6 +124,12 @@ async fn transient_publication_verification_recovers_on_bounded_retry() {
         completed.transition.phase,
         Some(TaskBoardExecutionPhase::Terminal)
     );
+    assert!(completed.attempts.iter().any(|attempt| {
+        matches!(
+            attempt.artifact.as_ref(),
+            Some(TaskBoardAttemptResultArtifact::Lifecycle(outcome)) if outcome.mutated
+        )
+    }));
 }
 
 #[tokio::test]

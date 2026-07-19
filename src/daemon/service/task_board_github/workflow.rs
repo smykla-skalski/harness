@@ -34,6 +34,7 @@ pub(super) async fn automate_item(request: AutomationRequest<'_>) -> TaskBoardWo
         item: request.item,
         client: request.client,
         host_id: request.host_id,
+        expected_parent: None,
     };
     let mut prepared = match prepare_item(
         &context,
@@ -56,6 +57,7 @@ pub(super) async fn automate_item_with_database_policy(
         item: request.item,
         client: request.client,
         host_id: request.host_id,
+        expected_parent: request.expected_parent,
     };
     let mut prepared = match prepare_item(
         &context,
@@ -133,6 +135,7 @@ struct AutomationContext<'a> {
     item: &'a TaskBoardItem,
     client: &'a dyn GitHubAutomationClient,
     host_id: &'a str,
+    expected_parent: Option<&'a str>,
 }
 
 struct PreparedItem {
@@ -210,6 +213,7 @@ async fn publish_branch(
         prepared.worktree.clone(),
         context.config.clone(),
         prepared.branch.clone(),
+        context.expected_parent,
     )
     .await
     {
@@ -244,6 +248,7 @@ async fn publish_branch(
         context.config,
         prepared.worktree.clone(),
         prepared.branch.clone(),
+        context.expected_parent,
     )
     .await
     {

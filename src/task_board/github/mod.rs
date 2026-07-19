@@ -58,6 +58,27 @@ pub trait GitHubAutomationClient: Send + Sync {
         )))
     }
 
+    /// Publish HEAD only if `expected_parent` still matches the fresh remote parent.
+    ///
+    /// # Errors
+    /// Returns provider, transport, or unsupported compare-and-publish errors.
+    async fn publish_branch_from_worktree_at_parent(
+        &self,
+        config: &GitHubProjectConfig,
+        worktree: &Path,
+        branch: &str,
+        expected_parent: Option<&str>,
+    ) -> Result<(), CliError> {
+        if expected_parent.is_some() {
+            return Err(CliErrorKind::workflow_io(
+                "task-board github compare-and-publish is unsupported",
+            )
+            .into());
+        }
+        self.publish_branch_from_worktree(config, worktree, branch)
+            .await
+    }
+
     /// Load merge-policy evidence for one pull request.
     ///
     /// # Errors

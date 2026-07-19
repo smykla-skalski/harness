@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::state::overlay_task_board_git_runtime_secrets;
 use crate::errors::{CliError, CliErrorKind};
@@ -5,29 +7,34 @@ use crate::task_board::github::{
     GitHubApiAutomationClient, GitHubAutomationClient, GitHubProjectConfig,
 };
 use crate::task_board::{
-    TaskBoardLifecycleOutcome, TaskBoardOrchestratorSettings, TaskBoardPullRequestHeadIdentity,
-    TaskBoardPullRequestIdentity, TaskBoardStatus, TaskBoardWorkflowExecutionRecord,
-    TaskBoardWorkflowKind, normalize_repository_slug,
+    PolicyAction, PolicyGraph, TaskBoardItem, TaskBoardLifecycleOutcome,
+    TaskBoardOrchestratorSettings, TaskBoardPullRequestHeadIdentity, TaskBoardPullRequestIdentity,
+    TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind, normalize_repository_slug,
 };
 
 use super::DatabaseAutomationRequest;
 use super::support::{
-    automation_config, github_token_for_repository, load_session_worktrees_async,
-    managed_branch_name,
+    AutomationPolicy, action_policy, automation_config, github_token_for_repository,
+    load_session_worktrees_async, managed_branch_name,
 };
 use super::workflow::automate_item_with_database_policy;
 
 #[path = "write_publication/evidence.rs"]
 mod evidence;
+#[path = "write_publication/preparation.rs"]
+mod preparation;
 
 use evidence::{
     LocalHeadEvidence, freeze_pull_request, implementation_base, known_publication_number,
-    local_head_evidence, publication_number, required_branch_state, required_frozen_head,
+    local_head_evidence, required_branch_state, required_frozen_head,
     validate_publication_repository, validate_published_evidence, validate_pull_request_target,
     worktree_path,
 };
 #[cfg(test)]
 pub(super) use evidence::{parse_publication_url, reconcile_publication_number};
+pub(super) use preparation::{
+    default_publication_result, prepare_default_publication_item, validate_publication_automations,
+};
 
 const WRITE_PUBLICATION_HOST: &str = "task-board-write-workflow";
 
@@ -40,10 +47,12 @@ struct PublicationClient {
 pub(crate) async fn validate_write_workflow_launch_publication(
     db: &AsyncDaemonDb,
     settings: &TaskBoardOrchestratorSettings,
+    workflow_kind: TaskBoardWorkflowKind,
     execution_repository: Option<&str>,
     pull_request: Option<&TaskBoardPullRequestIdentity>,
 ) -> Result<Option<TaskBoardPullRequestIdentity>, CliError> {
-    let publication = configured_publication_client(db, settings, execution_repository).await?;
+    let publication =
+        configured_publication_client(db, settings, workflow_kind, execution_repository).await?;
     let Some(expected) = pull_request else {
         return Ok(None);
     };
@@ -134,27 +143,83 @@ async fn publish_pr_fix(
     }
     let head_publication =
         repository_publication_client(db, &publication.config, &head.repository).await?;
-    let before = required_branch_state(
-        &head_publication.client,
-        &head_publication.config,
-        &head.branch,
-    )
+    let item = db.task_board_item(&execution.item_id).await?;
+    let workspace = db.load_policy_workspace().await?;
+    let policy = workspace.as_ref().and_then(|workspace| {
+        workspace
+            .active_live_canvas()
+            .map(|(canvas, document)| (canvas.id.as_str(), document))
+    });
+    let mutated = publish_pr_fix_branch(PrFixBranchRequest {
+        client: &head_publication.client,
+        config: &head_publication.config,
+        worktree: worktree_path(execution)?,
+        head,
+        item: &item,
+        policy,
+        pull_request: identity.number,
+        reviewed_tree: &local.tree,
+    })
     .await?;
+    Ok((identity.number, mutated))
+}
+
+pub(super) struct PrFixBranchRequest<'a> {
+    pub(super) client: &'a dyn GitHubAutomationClient,
+    pub(super) config: &'a GitHubProjectConfig,
+    pub(super) worktree: &'a Path,
+    pub(super) head: &'a TaskBoardPullRequestHeadIdentity,
+    pub(super) item: &'a TaskBoardItem,
+    pub(super) policy: Option<(&'a str, &'a PolicyGraph)>,
+    pub(super) pull_request: u64,
+    pub(super) reviewed_tree: &'a str,
+}
+
+pub(super) async fn publish_pr_fix_branch(
+    request: PrFixBranchRequest<'_>,
+) -> Result<bool, CliError> {
+    let PrFixBranchRequest {
+        client,
+        config,
+        worktree,
+        head,
+        item,
+        policy,
+        pull_request,
+        reviewed_tree,
+    } = request;
+    let before = required_branch_state(client, config, &head.branch).await?;
     if before.commit_sha != head.revision {
         return Err(invalid_transition(
             "PrFix head branch changed before publication",
         ));
     }
-    let mutated = before.tree_sha != local.tree;
-    head_publication
-        .client
-        .publish_branch_from_worktree(
-            &head_publication.config,
-            worktree_path(execution)?,
+    validate_publication_automations(config, TaskBoardWorkflowKind::PrFix)?;
+    let mut policy_item = item.clone();
+    policy_item.project_id = Some(head.repository.clone());
+    let decision = action_policy(
+        AutomationPolicy::Database(policy),
+        &policy_item,
+        PolicyAction::PushBranch,
+        Some(&head.branch),
+        Some(pull_request),
+        None,
+    );
+    if !decision.is_allow() {
+        return Err(invalid_transition(format!(
+            "policy blocked PushBranch: {decision:?}"
+        )));
+    }
+    let mutated = before.tree_sha != reviewed_tree;
+    client
+        .publish_branch_from_worktree_at_parent(
+            config,
+            worktree,
             &head.branch,
+            Some(&before.commit_sha),
         )
         .await?;
-    Ok((identity.number, mutated))
+    Ok(mutated)
 }
 
 async fn publish_default_task(
@@ -168,10 +233,12 @@ async fn publish_default_task(
         &execution.item_id,
         WRITE_PUBLICATION_HOST,
     );
-    let mutated = preflight_default_branch(execution, publication, local, &branch).await?;
-    let mut item = db.task_board_item(&execution.item_id).await?;
-    item.status = TaskBoardStatus::InReview;
-    item.workflow.last_error = None;
+    let preflight = preflight_default_branch(execution, publication, local, &branch).await?;
+    let item = prepare_default_publication_item(
+        db.task_board_item(&execution.item_id).await?,
+        &publication.repository,
+        worktree_path(execution)?,
+    )?;
     let session_worktrees = load_session_worktrees_async(std::slice::from_ref(&item), db).await?;
     let workspace = db.load_policy_workspace().await?;
     let policy = workspace.as_ref().and_then(|workspace| {
@@ -191,15 +258,23 @@ async fn publish_default_task(
         session_worktrees: &session_worktrees,
         client: &publication.client,
         host_id: WRITE_PUBLICATION_HOST,
+        expected_parent: Some(&preflight.expected_parent),
     })
     .await;
-    if let Some(error) = workflow.last_error.as_deref() {
-        return Err(CliErrorKind::workflow_io(format!(
-            "write workflow publication failed: {error}"
-        ))
-        .into());
-    }
-    publication_number(workflow.pr_number, execution).map(|number| (number, mutated))
+    default_publication_result(
+        &workflow,
+        execution
+            .transition
+            .pull_request
+            .as_ref()
+            .map(|pull_request| pull_request.number),
+        preflight.mutated,
+    )
+}
+
+struct DefaultBranchPreflight {
+    mutated: bool,
+    expected_parent: String,
 }
 
 async fn preflight_default_branch(
@@ -207,22 +282,22 @@ async fn preflight_default_branch(
     publication: &PublicationClient,
     local: &LocalHeadEvidence,
     branch: &str,
-) -> Result<bool, CliError> {
+) -> Result<DefaultBranchPreflight, CliError> {
     let base = implementation_base(execution)?;
     let branch_state = publication
         .client
         .get_branch_state(&publication.config, branch)
         .await?;
     if let Some(branch_state) = branch_state {
-        if branch_state.tree_sha == local.tree {
-            return Ok(false);
-        }
         if branch_state.commit_sha != base {
             return Err(invalid_transition(
                 "managed publication branch changed from the implementation base",
             ));
         }
-        return Ok(true);
+        return Ok(DefaultBranchPreflight {
+            mutated: branch_state.tree_sha != local.tree,
+            expected_parent: branch_state.commit_sha,
+        });
     }
     let default = required_branch_state(
         &publication.client,
@@ -235,7 +310,10 @@ async fn preflight_default_branch(
             "publication base branch changed after implementation started",
         ));
     }
-    Ok(true)
+    Ok(DefaultBranchPreflight {
+        mutated: true,
+        expected_parent: default.commit_sha,
+    })
 }
 
 async fn verify_published(
@@ -317,6 +395,7 @@ async fn write_publication_client(
     configured_publication_client(
         db,
         &settings.settings,
+        execution.snapshot.workflow_kind,
         execution.snapshot.execution_repository.as_deref(),
     )
     .await
@@ -325,6 +404,7 @@ async fn write_publication_client(
 async fn configured_publication_client(
     db: &AsyncDaemonDb,
     settings: &TaskBoardOrchestratorSettings,
+    workflow_kind: TaskBoardWorkflowKind,
     execution_repository: Option<&str>,
 ) -> Result<PublicationClient, CliError> {
     let Some((config, token)) = automation_config(settings) else {
@@ -333,6 +413,7 @@ async fn configured_publication_client(
         )
         .into());
     };
+    validate_publication_automations(&config, workflow_kind)?;
     let repository = config.repository_slug();
     validate_publication_repository(execution_repository, &repository)?;
     let mut runtime_config = db.task_board_runtime_config().await?;

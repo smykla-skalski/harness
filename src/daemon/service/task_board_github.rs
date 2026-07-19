@@ -27,7 +27,10 @@ mod workflow;
 mod write_publication;
 
 #[cfg(test)]
-use write_publication::{parse_publication_url, reconcile_publication_number};
+use write_publication::{
+    default_publication_result, parse_publication_url, reconcile_publication_number,
+    validate_publication_automations,
+};
 pub(crate) use write_publication::{
     publish_task_board_write_execution, validate_write_workflow_launch_publication,
     verify_task_board_write_execution_publication,
@@ -61,6 +64,7 @@ pub(super) struct DatabaseAutomationRequest<'a> {
     pub session_worktrees: &'a BTreeMap<String, String>,
     pub client: &'a dyn GitHubAutomationClient,
     pub host_id: &'a str,
+    pub expected_parent: Option<&'a str>,
 }
 
 #[cfg(test)]
@@ -193,6 +197,7 @@ async fn run_task_board_github_automation_with_database_client(
             dry_run: input.dry_run,
             client,
             host_id,
+            expected_parent: None,
         })
         .await;
         if !input.dry_run && workflow != item.workflow {

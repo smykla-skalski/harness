@@ -52,6 +52,7 @@ pub(super) async fn prepare_write_workflow_launch(
     let pull_request = super::super::task_board_github::validate_write_workflow_launch_publication(
         db,
         &settings.settings,
+        item.workflow_kind,
         execution_repository.as_deref(),
         requested_pull_request.as_ref(),
     )
@@ -134,6 +135,7 @@ pub(crate) async fn validate_write_workflow_launch(
     let pull_request = super::super::task_board_github::validate_write_workflow_launch_publication(
         db,
         &settings.settings,
+        item.workflow_kind,
         execution_repository.as_deref(),
         requested_pull_request.as_ref(),
     )
