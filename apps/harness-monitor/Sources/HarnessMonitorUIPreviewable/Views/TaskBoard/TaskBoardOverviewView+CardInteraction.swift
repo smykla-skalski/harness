@@ -1,6 +1,30 @@
 import HarnessMonitorKit
 import SwiftUI
 
+/// Pure routing decision for a drag-session phase update, extracted so it stays testable without
+/// a live `TaskBoardOverviewView`. `.ignore` only applies to the active phases - terminal phases
+/// (`.ended`/`.dataTransferCompleted`) must always resolve to `.clear` even while an action is in
+/// flight, since a drop itself sets `isActionInFlight` before the session delivers `.ended`.
+enum TaskBoardCardDragSessionDecision: Equatable {
+  case processActive
+  case clear
+  case ignore
+}
+
+func taskBoardCardDragSessionDecision(
+  for phase: DragSession.Phase,
+  isActionInFlight: Bool
+) -> TaskBoardCardDragSessionDecision {
+  switch phase {
+  case .initial, .active:
+    isActionInFlight ? .ignore : .processActive
+  case .ended, .dataTransferCompleted:
+    .clear
+  @unknown default:
+    .clear
+  }
+}
+
 extension TaskBoardOverviewView {
   var orderedSelectedCardIDs: [TaskBoardCardID] {
     selectionModelValue.orderedSelectedIDs
@@ -20,13 +44,16 @@ extension TaskBoardOverviewView {
   }
 
   func updateCardDragSession(_ session: DragSession) {
-    switch session.phase {
-    case .initial, .active:
+    switch taskBoardCardDragSessionDecision(
+      for: session.phase,
+      isActionInFlight: isActionInFlight
+    ) {
+    case .processActive:
       updateActiveCardDrag(session)
-    case .ended, .dataTransferCompleted:
+    case .clear:
       updateDraggedCardIDs([])
-    @unknown default:
-      updateDraggedCardIDs([])
+    case .ignore:
+      break
     }
   }
 

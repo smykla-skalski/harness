@@ -28,7 +28,6 @@ extension TaskBoardOverviewView {
     .dragConfiguration(.init(allowMove: !isActionInFlight))
     .dragPreviewsFormation(.pile)
     .onDragSessionUpdated { session in
-      guard !isActionInFlight else { return }
       updateCardDragSession(session)
     }
   }
