@@ -153,6 +153,54 @@ struct TaskBoardStepStageTests {
     #expect(plan.primaryAction == .complete)
   }
 
+  @Test("A live task status outranks a stale failed board")
+  func taskStatusOutranksFailedBoard() {
+    let plan = TaskBoardStepStageResolver.plan(
+      for: TaskBoardStepStageInputs(
+        item: item(status: .failed),
+        latestRecord: record(taskStatus: .inReview, outcome: .reviewRunning)
+      )
+    )
+
+    #expect(plan.stage == .inReview)
+  }
+
+  @Test("A GitHub-only item can still open its task link")
+  func gitHubOnlyItemSurfacesOpenTaskLink() {
+    let githubItem = item(
+      status: .blocked,
+      sessionId: nil,
+      workItemId: nil,
+      externalRefs: [
+        TaskBoardExternalRef(
+          provider: .gitHub,
+          externalId: "example/repo#42",
+          url: "https://github.com/example/repo/issues/42"
+        )
+      ]
+    )
+
+    let plan = TaskBoardStepStageResolver.plan(for: TaskBoardStepStageInputs(item: githubItem))
+
+    #expect(plan.stage == .blocked)
+    #expect(plan.inlineLinks.contains(.openTask))
+  }
+
+  @Test("An empty pull-request URL surfaces no pull-request link")
+  func emptyPullRequestURLHidesLink() {
+    let plan = TaskBoardStepStageResolver.plan(
+      for: TaskBoardStepStageInputs(
+        item: item(
+          status: .inReview,
+          workflow: TaskBoardWorkflowState(status: .running, prUrl: "")
+        ),
+        latestRecord: record(taskStatus: .inReview, outcome: .reviewRunning)
+      )
+    )
+
+    #expect(!plan.inlineLinks.contains(.openPullRequest))
+  }
+
   @Test("Rail node state derives from the current column")
   func railNodeStatesDeriveFromColumn() {
     #expect(TaskBoardStepColumn.todo.nodeState(current: .toReview, isBlocked: false) == .done)
@@ -167,7 +215,8 @@ struct TaskBoardStepStageTests {
     status: TaskBoardStatus,
     sessionId: String? = "sess-1",
     workItemId: String? = "task-1",
-    workflow: TaskBoardWorkflowState? = nil
+    workflow: TaskBoardWorkflowState? = nil,
+    externalRefs: [TaskBoardExternalRef] = []
   ) -> TaskBoardItem {
     TaskBoardItem(
       schemaVersion: 1,
@@ -180,7 +229,7 @@ struct TaskBoardStepStageTests {
       projectId: "project-1",
       targetProjectTypes: [],
       agentMode: .interactive,
-      externalRefs: [],
+      externalRefs: externalRefs,
       planning: TaskBoardPlanningState(),
       workflow: workflow,
       sessionId: sessionId,

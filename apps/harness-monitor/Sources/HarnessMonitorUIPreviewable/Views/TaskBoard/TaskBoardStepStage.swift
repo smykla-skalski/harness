@@ -201,26 +201,35 @@ enum TaskBoardStepStageResolver {
     )
   }
 
-  /// The freshest linked-task status wins, so the wizard tracks reality even
-  /// before Evaluate applies the matching board transition. Precedence runs
-  /// end-to-start of the pipeline so the most advanced signal decides the stage.
+  /// The linked task's status, when an evaluation record exists, decides the
+  /// stage so the wizard tracks reality before Evaluate applies the matching
+  /// board transition. Board status is only the fallback when no record exists.
   static func stage(
     for item: TaskBoardItem,
     record: TaskBoardEvaluationRecord?,
     hasPicked: Bool,
     hasDelivered: Bool
   ) -> TaskBoardStepStage {
-    let task = record?.taskStatus
-    if item.status == .done || task == .done { return .done }
-    if item.status == .failed || item.status == .blocked || task == .blocked { return .blocked }
-    if task == .inReview || item.status == .inReview {
-      return record?.outcome == .reviewChangesRequested ? .changesRequested : .inReview
+    if let task = record?.taskStatus {
+      switch task {
+      case .done: return .done
+      case .blocked: return .blocked
+      case .inReview:
+        return record?.outcome == .reviewChangesRequested ? .changesRequested : .inReview
+      case .awaitingReview: return .awaitingReview
+      case .open, .inProgress: return .workerRunning
+      }
     }
-    if task == .awaitingReview || item.status == .toReview { return .awaitingReview }
-    if item.status == .inProgress || task == .inProgress || task == .open || hasDelivered {
-      return .workerRunning
+    switch item.status {
+    case .done: return .done
+    case .failed, .blocked: return .blocked
+    case .inReview: return .inReview
+    case .toReview: return .awaitingReview
+    case .inProgress: return .workerRunning
+    default:
+      if hasDelivered { return .workerRunning }
+      return hasPicked ? .readyToDeliver : .readyToPick
     }
-    return hasPicked ? .readyToDeliver : .readyToPick
   }
 
   private static func column(
@@ -268,26 +277,35 @@ enum TaskBoardStepStageResolver {
     item: TaskBoardItem
   ) -> [TaskBoardStepInlineLink] {
     let hasSession = item.sessionId != nil
-    let hasTask = item.sessionId != nil && item.workItemId != nil
-    let hasPullRequest = item.workflow?.prUrl != nil
+    // Matches openReview: a linked session task or, failing that, a GitHub URL.
+    let canOpenTask = item.hasLinkedSessionTask || item.taskBoardGitHubURL != nil
+    let hasPullRequest = validURL(item.workflow?.prUrl) != nil
     var links: [TaskBoardStepInlineLink] = []
     switch stage {
     case .workerRunning:
       if hasSession { links.append(.watch) }
     case .awaitingReview:
       if hasSession { links.append(.watch) }
-      if hasTask { links.append(.openTask) }
+      if canOpenTask { links.append(.openTask) }
     case .inReview, .changesRequested:
-      if hasTask { links.append(.openTask) }
+      if canOpenTask { links.append(.openTask) }
       if hasPullRequest { links.append(.openPullRequest) }
     case .done:
       if hasPullRequest { links.append(.openPullRequest) }
     case .blocked:
-      if hasTask { links.append(.openTask) }
+      if canOpenTask { links.append(.openTask) }
     case .noTarget, .readyToPick, .readyToDeliver:
       break
     }
     return links
+  }
+
+  /// A non-empty, parseable URL, so a link never renders as a dead button.
+  private static func validURL(_ raw: String?) -> URL? {
+    guard let raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+      return nil
+    }
+    return URL(string: raw)
   }
 
   private static func whatNext(for stage: TaskBoardStepStage, item: TaskBoardItem?) -> String {
