@@ -165,6 +165,8 @@ actor TaskBoardOverviewPresentationWorker {
     let projectLabelResolver = TaskBoardProjectLabelResolver(
       projectIDs: taskBoardItems.compactMap(\.projectId)
     )
+    // One parser (and its 3 formatters) for the whole snapshot, not one per card.
+    let dateParser = TaskBoardCardDateParser()
 
     return TaskBoardOverviewPresentation(
       taskBoardItems: taskBoardItems,
@@ -180,14 +182,21 @@ actor TaskBoardOverviewPresentationWorker {
       apiCardPresentationsByLane: apiItemsByLane.mapValues { items in
         Dictionary(
           uniqueKeysWithValues: items.map {
-            ($0.id, TaskBoardCardPresentation.forAPIItem($0, projectLabelResolver: projectLabelResolver))
+            (
+              $0.id,
+              TaskBoardCardPresentation.forAPIItem(
+                $0,
+                projectLabelResolver: projectLabelResolver,
+                dateParser: dateParser
+              )
+            )
           }
         )
       },
       inboxCardPresentationsByLane: inboxItemsByLane.mapValues { items in
         Dictionary(
           uniqueKeysWithValues: items.map {
-            (inboxCardID(for: $0), TaskBoardCardPresentation.forInboxItem($0))
+            (inboxCardID(for: $0), TaskBoardCardPresentation.forInboxItem($0, dateParser: dateParser))
           }
         )
       },

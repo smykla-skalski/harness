@@ -15,7 +15,8 @@ struct TaskBoardCardPresentation: Equatable, Sendable {
 
   static func forAPIItem(
     _ item: TaskBoardItem,
-    projectLabelResolver: TaskBoardProjectLabelResolver
+    projectLabelResolver: TaskBoardProjectLabelResolver,
+    dateParser: TaskBoardCardDateParser
   ) -> TaskBoardCardPresentation {
     let titlePresentation = TaskBoardCardTitlePresentation(item: item)
     let fragments = TaskBoardInlineCodeFormatter.fragments(in: titlePresentation.title)
@@ -42,20 +43,23 @@ struct TaskBoardCardPresentation: Equatable, Sendable {
         leadingText: titlePresentation.leadingText
       ),
       glyph: TaskBoardGitHubCardGlyph.resolve(for: item),
-      updatedAt: TaskBoardCardDateParsing.parse(item.updatedAt),
+      updatedAt: dateParser.parse(item.updatedAt),
       repositoryLabelDefault: repositoryLabelDefault,
       repositoryLabelFullName: repositoryLabelFullName
     )
   }
 
-  static func forInboxItem(_ item: TaskBoardInboxItem) -> TaskBoardCardPresentation {
+  static func forInboxItem(
+    _ item: TaskBoardInboxItem,
+    dateParser: TaskBoardCardDateParser
+  ) -> TaskBoardCardPresentation {
     let fragments = TaskBoardInlineCodeFormatter.fragments(in: item.task.title)
     return TaskBoardCardPresentation(
       titleFragments: fragments,
       titleLeadingText: nil,
       titleDisplayText: TaskBoardInlineCodeFormatter.displayText(for: fragments),
       glyph: nil,
-      updatedAt: TaskBoardCardDateParsing.parse(item.task.updatedAt),
+      updatedAt: dateParser.parse(item.task.updatedAt),
       repositoryLabelDefault: nil,
       repositoryLabelFullName: nil
     )
@@ -63,24 +67,42 @@ struct TaskBoardCardPresentation: Equatable, Sendable {
 }
 
 /// Timestamp parsing usable off the main actor: the worker actor can't reach the cached
-/// `@MainActor` formatters in `HarnessMonitorFormatters.swift`, so formatters here are allocated
-/// fresh per call instead of shared, avoiding cross-thread mutable state.
-enum TaskBoardCardDateParsing {
-  static func parse(_ value: String) -> Date? {
+/// `@MainActor` formatters in `HarnessMonitorFormatters.swift`. `TaskBoardCardDateParser` holds
+/// the 3 formatters as instance state so the presentation worker allocates them once per snapshot
+/// compute (not once per card); `TaskBoardCardDateParsing.parse(_:)` stays as a static, per-call
+/// allocating fallback for the `TaskBoardLaneViews` row path, which is dead on the live render
+/// path now that the worker wires `cardPresentation` through, but must keep working for any
+/// caller that never received a precomputed presentation (e.g. previews).
+struct TaskBoardCardDateParser {
+  private let fractional: ISO8601DateFormatter
+  private let standard: ISO8601DateFormatter
+  private let spaceSeparated: DateFormatter
+
+  init() {
     let fractional = ISO8601DateFormatter()
     fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    if let date = fractional.date(from: value) {
-      return date
-    }
+    self.fractional = fractional
+
     let standard = ISO8601DateFormatter()
     standard.formatOptions = [.withInternetDateTime]
-    if let date = standard.date(from: value) {
-      return date
-    }
+    self.standard = standard
+
     let spaceSeparated = DateFormatter()
     spaceSeparated.locale = Locale(identifier: "en_US_POSIX")
     spaceSeparated.timeZone = TimeZone(secondsFromGMT: 0)
     spaceSeparated.dateFormat = "yyyy-MM-dd HH:mm:ss"
-    return spaceSeparated.date(from: value)
+    self.spaceSeparated = spaceSeparated
+  }
+
+  func parse(_ value: String) -> Date? {
+    fractional.date(from: value)
+      ?? standard.date(from: value)
+      ?? spaceSeparated.date(from: value)
+  }
+}
+
+enum TaskBoardCardDateParsing {
+  static func parse(_ value: String) -> Date? {
+    TaskBoardCardDateParser().parse(value)
   }
 }
