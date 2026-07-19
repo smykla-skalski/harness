@@ -22,8 +22,17 @@ struct HarnessMonitorRelativeFormatterTests {
 
   @Test("Nil and unparsable inputs fall back to the raw value or n/a")
   func returnsFallbackForUnparsableInput() {
-    #expect(formatRelativeUpdatedAt(nil) == "n/a")
+    #expect(formatRelativeUpdatedAt(nil as String?) == "n/a")
     #expect(formatRelativeUpdatedAt("not-a-date") == "not-a-date")
+  }
+
+  @Test("The precomputed-date overload mirrors the string overload for card presentations")
+  func precomputedDateOverloadMirrorsStringOverload() {
+    let reference = Date(timeIntervalSince1970: 1_780_000_000)
+    let twoMinutesAgo = reference.addingTimeInterval(-120)
+
+    #expect(formatRelativeUpdatedAt(twoMinutesAgo, reference: reference) != "n/a")
+    #expect(formatRelativeUpdatedAt(nil as Date?, reference: reference) == "n/a")
   }
 }
 
@@ -52,8 +61,17 @@ struct HarnessMonitorCompactRelativeFormatterTests {
 
   @Test("Omits missing or invalid timestamps")
   func omitsInvalidTimestamps() {
-    #expect(formatCompactRelativeUpdatedAt(nil).isEmpty)
+    #expect(formatCompactRelativeUpdatedAt(nil as String?).isEmpty)
     #expect(formatCompactRelativeUpdatedAt("not-a-date").isEmpty)
+  }
+
+  @Test("The precomputed-date overload mirrors the string overload for card presentations")
+  func precomputedDateOverloadMirrorsStringOverload() {
+    let reference = Date(timeIntervalSince1970: 1_800_000_000)
+    let oneMinuteAgo = reference.addingTimeInterval(-60)
+
+    #expect(formatCompactRelativeUpdatedAt(oneMinuteAgo, reference: reference) == "1m ago")
+    #expect(formatCompactRelativeUpdatedAt(nil as Date?, reference: reference).isEmpty)
   }
 
   private func format(secondsAgo: TimeInterval, reference: Date) -> String {
