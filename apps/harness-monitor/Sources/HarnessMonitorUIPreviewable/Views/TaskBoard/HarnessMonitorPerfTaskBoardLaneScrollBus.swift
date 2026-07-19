@@ -35,6 +35,9 @@ public enum HarnessMonitorPerfTaskBoardLaneScrollBus {
     return activeScenarioIDs.contains(raw)
   }
 
+  /// The environment cannot change after launch, so per-init callers should read this instead of re-bridging it via `isActive()`.
+  public static let isActiveAtLaunch: Bool = isActive()
+
   public static func requestScroll(
     laneRaw: String,
     edge: String

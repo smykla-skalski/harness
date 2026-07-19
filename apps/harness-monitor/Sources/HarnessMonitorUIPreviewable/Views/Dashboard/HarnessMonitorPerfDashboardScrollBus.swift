@@ -47,6 +47,9 @@ public enum HarnessMonitorPerfDashboardScrollBus {
     return activeScenarioIDs.contains(raw)
   }
 
+  /// The environment cannot change after launch, so per-init callers should read this instead of re-bridging it via `isActive()`.
+  public static let isActiveAtLaunch: Bool = isActive()
+
   /// Route scroll-trigger events through the shared perf trace bus so the audit
   /// JSONL records them alongside the driver-side scroll.post events. Without
   /// this, the os_signpost trace still gets the data but the extractor's app-trace

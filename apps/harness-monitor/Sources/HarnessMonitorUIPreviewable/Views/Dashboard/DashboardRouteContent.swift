@@ -176,7 +176,7 @@ struct DashboardTaskBoardRouteView: View {
   @State private var operationsInspectorDispatcher =
     TaskBoardOperationsInspectorFocusDispatcher()
   @State private var policyWorkspaceLoadState = TaskBoardPolicyWorkspaceLoadState()
-  private let perfScrollHookEnabled = HarnessMonitorPerfDashboardScrollBus.isActive()
+  private let perfScrollHookEnabled = HarnessMonitorPerfDashboardScrollBus.isActiveAtLaunch
 
   private var visibleTaskBoardSessions: [SessionSummary] {
     let visible = store.visibleSessions
