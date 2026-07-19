@@ -133,6 +133,8 @@ for line in mise_path.read_text().splitlines():
     script_match = script_run_pattern.search(line)
     if script_match:
         script_path = repo_root / script_match.group(1)
+        if not script_path.is_file():
+            raise SystemExit(f"{task_name} delegates to a missing script: {script_path}")
         for script_line in script_path.read_text().splitlines():
             scan_line(script_line, task_name, script_path.name)
         continue

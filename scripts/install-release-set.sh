@@ -461,12 +461,8 @@ binary_is_known() {
   return 1
 }
 
-selection_has_harness_binary() {
-  local name
-  for name in "${selected_binaries[@]}"; do
-    [[ "$name" != "aff" ]] && return 0
-  done
-  return 1
+harness_cli_is_selected() {
+  binary_is_selected harness
 }
 
 copy_known_bundle_contents() {
@@ -1030,7 +1026,7 @@ detect_legacy_runtime_configs() {
     "$HOME/.opencode/config.json"
   )
 
-  selection_has_harness_binary || return 0
+  harness_cli_is_selected || return 0
   for path in "${config_paths[@]}"; do
     [[ "$seen" != *"|$path|"* ]] || continue
     seen+="$path|"
@@ -1046,7 +1042,7 @@ detect_legacy_runtime_configs() {
 
 cleanup_cli_launch_agent() {
   local harness_path
-  selection_has_harness_binary || return 0
+  harness_cli_is_selected || return 0
   [[ "${HARNESS_INSTALL_CLEANUP_CLI_DAEMON:-1}" != "0" ]] || return 0
   harness_path="$(stable_path harness)"
   if ! command env -u HARNESS_APP_GROUP_ID -u HARNESS_DAEMON_DATA_HOME \
@@ -1079,7 +1075,7 @@ if [[ -z "$expected_version" ]]; then
 fi
 
 shadow_candidates=()
-if selection_has_harness_binary; then
+if harness_cli_is_selected; then
   preflight_shadowed_harness_binaries
 fi
 
@@ -1116,7 +1112,7 @@ for name in "${selected_binaries[@]}"; do
 done
 
 validate_candidate_set "$current_link/bin" "$expected_version"
-if selection_has_harness_binary; then
+if harness_cli_is_selected; then
   reconcile_shadowed_harness_binaries
 fi
 prune_release_sets

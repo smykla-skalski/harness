@@ -1444,6 +1444,26 @@ scenario_single_leaf_install_ignores_stale_release_artifact() {
   if (( ok )); then pass; fi
 }
 
+scenario_leaf_only_install_skips_cli_legacy_detection() {
+  start_test "leaf-only install skips CLI-specific legacy config detection"
+  local sandbox="$SANDBOX/leaf-legacy-skip" path
+  write_fake_release_set "$sandbox/target" 47.0.0
+  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+  path="$sandbox/project/.claude/settings.json"
+  command mkdir -p "$(dirname -- "$path")"
+  printf '{"command":"harness hook tool-guard"}\n' >"$path"
+  write_fake_release_binary "$sandbox/target" harness-daemon 48.0.0
+
+  local ok=1
+  if ! run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" daemon >/dev/null 2>&1; then
+    fail "daemon-only install was blocked by a legacy config unrelated to the CLI"
+    ok=0
+  fi
+  assert_contains "harness-daemon 48.0.0" \
+    "$("$sandbox/bin/harness-daemon" --version)" || ok=0
+  if (( ok )); then pass; fi
+}
+
 scenario_lock_recovers_ownerless_and_reused_pid_records() {
   start_test "install lock recovers ownerless and PID-reused stale records"
   local ownerless="$SANDBOX/lock-ownerless" reused="$SANDBOX/lock-reused"
@@ -1540,6 +1560,7 @@ run_all() {
   scenario_harness_cli_alias_selects_only_the_cli_leaf
   scenario_unknown_selector_is_rejected_cleanly
   scenario_single_leaf_install_ignores_stale_release_artifact
+  scenario_leaf_only_install_skips_cli_legacy_detection
   scenario_lock_recovers_ownerless_and_reused_pid_records
   scenario_legacy_detector_is_read_only_and_blocks_activation
 }
