@@ -61,13 +61,17 @@ impl SessionStore {
     /// Snapshot the session's history, project dir, model, reasoning effort,
     /// and cancel-flag handle. Returns `None` if no such session exists.
     pub async fn snapshot(&self, session_id: &SessionId) -> Option<SessionSnapshot> {
-        self.inner.lock().await.get(session_id).map(|state| SessionSnapshot {
-            project_dir: state.project_dir.clone(),
-            model: state.model.clone(),
-            reasoning_effort: state.reasoning_effort.clone(),
-            history: state.history.clone(),
-            cancel_flag: state.cancel_flag.clone(),
-        })
+        self.inner
+            .lock()
+            .await
+            .get(session_id)
+            .map(|state| SessionSnapshot {
+                project_dir: state.project_dir.clone(),
+                model: state.model.clone(),
+                reasoning_effort: state.reasoning_effort.clone(),
+                history: state.history.clone(),
+                cancel_flag: state.cancel_flag.clone(),
+            })
     }
 
     /// Append `messages` to the named session's history. Silently drops the

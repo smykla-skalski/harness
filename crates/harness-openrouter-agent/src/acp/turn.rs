@@ -21,8 +21,8 @@
 
 use std::collections::BTreeMap;
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use agent_client_protocol::schema::v1::{
     ContentBlock, ContentChunk, SessionId, SessionNotification, SessionUpdate, StopReason,
@@ -61,9 +61,7 @@ pub async fn drive_turn(
     };
 
     let user_message = user_message_from_content(&user_prompt);
-    store
-        .extend_history(session_id, vec![user_message])
-        .await;
+    store.extend_history(session_id, vec![user_message]).await;
 
     for _ in 0..MAX_TOOL_ITERATIONS {
         let snapshot = match store.snapshot(session_id).await {
@@ -117,7 +115,10 @@ async fn drain_stream(
     session_id: &SessionId,
     cancel_flag: &Arc<AtomicBool>,
     mut stream: std::pin::Pin<
-        Box<dyn futures_util::Stream<Item = Result<crate::openrouter::StreamChunk, OpenRouterError>> + Send>,
+        Box<
+            dyn futures_util::Stream<Item = Result<crate::openrouter::StreamChunk, OpenRouterError>>
+                + Send,
+        >,
     >,
 ) -> Result<TurnResult, StopReason> {
     let mut text = String::new();
@@ -200,7 +201,10 @@ async fn execute_tool_calls(
     let mut messages = Vec::with_capacity(calls.len());
     for call in calls {
         if cancel_flag.load(Ordering::SeqCst) {
-            messages.push(tool_message(call, &serde_json::json!({ "error": "cancelled" })));
+            messages.push(tool_message(
+                call,
+                &serde_json::json!({ "error": "cancelled" }),
+            ));
             continue;
         }
         let result = dispatch_tool_call(
@@ -285,10 +289,13 @@ fn build_request(snapshot: &SessionSnapshot) -> ChatRequest {
         tools: tool_catalog(),
         tool_choice: Some(ToolChoice::Mode(ToolChoiceMode::Auto)),
         parallel_tool_calls: None,
-        reasoning: snapshot.reasoning_effort.clone().map(|effort| ReasoningRequest {
-            effort: Some(effort),
-            exclude: None,
-        }),
+        reasoning: snapshot
+            .reasoning_effort
+            .clone()
+            .map(|effort| ReasoningRequest {
+                effort: Some(effort),
+                exclude: None,
+            }),
         temperature: None,
         max_tokens: None,
     }

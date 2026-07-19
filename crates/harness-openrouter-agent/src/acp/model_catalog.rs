@@ -79,7 +79,11 @@ mod tests {
     #[test]
     fn curated_list_includes_default_model() {
         let models = curated_models();
-        assert!(models.iter().any(|m| m.value.0.as_ref() == DEFAULT_MODEL_ID));
+        assert!(
+            models
+                .iter()
+                .any(|m| m.value.0.as_ref() == DEFAULT_MODEL_ID)
+        );
     }
 
     #[test]

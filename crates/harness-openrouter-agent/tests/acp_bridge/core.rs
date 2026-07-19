@@ -222,7 +222,7 @@ async fn session_new_returns_session_id_and_models() {
                 .block_task()
                 .await?;
             let response = cx
-                .send_request(NewSessionRequest::new(PathBuf::from(std::env::temp_dir())))
+                .send_request(NewSessionRequest::new(std::env::temp_dir()))
                 .block_task()
                 .await?;
             assert!(!response.session_id.0.as_ref().is_empty());
