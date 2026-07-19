@@ -46,29 +46,24 @@ extension TaskBoardOverviewView {
   }
 
   func requestLiveBoardEvaluation() {
-    guard onEvaluateTaskBoard != nil else { return }
+    guard actions.canEvaluateBoard else { return }
     evaluatePreviewSummaryValue = nil
     pendingLiveOperationValue = .evaluateBoard
   }
 
   func requestTaskBoardItemEvaluation(_ item: TaskBoardItem) {
-    selectedTaskBoardItemIDValue = item.id
-    guard !evaluateDryRun else {
-      enqueueTaskBoardItemEvaluationPreview(item)
-      return
-    }
-    guard onEvaluateTaskBoardItem != nil || onEvaluateTaskBoard != nil else { return }
-    if let onEvaluateTaskBoardItem {
-      onEvaluateTaskBoardItem(item)
-    } else {
-      onEvaluateTaskBoard?()
-    }
+    selectionModelValue.selectedItemID = item.id
+    actions.evaluateTaskBoardItemOrPreview(
+      item,
+      dryRun: evaluateDryRun,
+      previewState: evaluatePreviewStateValue
+    )
   }
 
   func requestRunOnce(_ request: TaskBoardOrchestratorRunOnceRequest) {
-    guard onRunTaskBoardOrchestratorOnce != nil else { return }
+    guard actions.canRunOrchestratorOnce else { return }
     guard request.dryRun != true else {
-      onRunTaskBoardOrchestratorOnce?(request)
+      actions.runTaskBoardOrchestratorOnce(request)
       return
     }
     pendingLiveOperationValue = .runOnce(request)
@@ -77,22 +72,9 @@ extension TaskBoardOverviewView {
   func performLiveOperation(_ operation: TaskBoardOverviewLiveOperation) {
     switch operation {
     case .evaluateBoard:
-      onEvaluateTaskBoard?()
+      actions.evaluateTaskBoard()
     case .runOnce(let request):
-      onRunTaskBoardOrchestratorOnce?(request)
+      actions.runTaskBoardOrchestratorOnce(request)
     }
-  }
-
-  private func enqueueTaskBoardItemEvaluationPreview(_ item: TaskBoardItem) {
-    guard let store else { return }
-    let previewState = evaluatePreviewStateValue
-    HarnessMonitorAsyncWorkQueue.shared.submit(
-      .init(title: "Previewing task-board item evaluate") {
-        let summary = await store.previewEvaluateTaskBoard(status: item.status, itemID: item.id)
-        await MainActor.run {
-          previewState.summary = summary
-        }
-      }
-    )
   }
 }

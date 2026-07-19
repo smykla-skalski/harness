@@ -8,10 +8,8 @@ struct TaskBoardOrchestratorSummaryView: View {
   let latestEvaluation: TaskBoardEvaluationSummary?
   let latestEvaluationBaselineRunID: String?
   let isActionInFlight: Bool
-  let onStart: (() -> Void)?
-  let onStop: (() -> Void)?
-  let onRunOnce: (() -> Void)?
-  let onStepModeChange: (@MainActor @Sendable (Bool) -> Void)?
+  let actions: TaskBoardOverviewActions
+  @Binding var pendingLiveOperation: TaskBoardOverviewLiveOperation?
   @Environment(\.fontScale)
   private var fontScale
 
@@ -41,10 +39,8 @@ struct TaskBoardOrchestratorSummaryView: View {
     latestEvaluation: TaskBoardEvaluationSummary? = nil,
     latestEvaluationBaselineRunID: String? = nil,
     isActionInFlight: Bool = false,
-    onStart: (() -> Void)? = nil,
-    onStop: (() -> Void)? = nil,
-    onRunOnce: (() -> Void)? = nil,
-    onStepModeChange: (@MainActor @Sendable (Bool) -> Void)? = nil
+    actions: TaskBoardOverviewActions,
+    pendingLiveOperation: Binding<TaskBoardOverviewLiveOperation?>
   ) {
     self.status = status
     self.taskBoardItems = taskBoardItems
@@ -52,10 +48,8 @@ struct TaskBoardOrchestratorSummaryView: View {
     self.latestEvaluation = latestEvaluation
     self.latestEvaluationBaselineRunID = latestEvaluationBaselineRunID
     self.isActionInFlight = isActionInFlight
-    self.onStart = onStart
-    self.onStop = onStop
-    self.onRunOnce = onRunOnce
-    self.onStepModeChange = onStepModeChange
+    self.actions = actions
+    _pendingLiveOperation = pendingLiveOperation
   }
 
   var body: some View {
@@ -133,12 +127,12 @@ struct TaskBoardOrchestratorSummaryView: View {
   }
 
   @ViewBuilder private var controlButtons: some View {
-    if let onStepModeChange {
+    if actions.canSetStepMode {
       Toggle(
         "Step Mode",
         isOn: Binding(
           get: { status.stepMode },
-          set: { enabled in onStepModeChange(enabled) }
+          set: { enabled in actions.setTaskBoardStepMode(enabled) }
         )
       )
       .toggleStyle(.switch)
@@ -149,9 +143,9 @@ struct TaskBoardOrchestratorSummaryView: View {
     }
 
     if status.running {
-      if let onStop {
+      if actions.canStopOrchestrator {
         Button {
-          onStop()
+          actions.stopTaskBoardOrchestrator()
         } label: {
           Label("Stop", systemImage: "stop.circle")
             .font(captionSemibold)
@@ -163,9 +157,9 @@ struct TaskBoardOrchestratorSummaryView: View {
         .help("Stop task-board orchestrator")
         .accessibilityIdentifier("harness.task-board.orchestrator.stop")
       }
-    } else if let onStart {
+    } else if actions.canStartOrchestrator {
       Button {
-        onStart()
+        actions.startTaskBoardOrchestrator()
       } label: {
         Label("Start", systemImage: "play.circle")
           .font(captionSemibold)
@@ -178,9 +172,9 @@ struct TaskBoardOrchestratorSummaryView: View {
       .accessibilityIdentifier("harness.task-board.orchestrator.start")
     }
 
-    if let onRunOnce {
+    if actions.canRunOrchestratorOnce {
       Button {
-        onRunOnce()
+        triggerRunOnce()
       } label: {
         Label(runOnceTitle, systemImage: "playpause")
           .font(captionSemibold)
@@ -192,6 +186,17 @@ struct TaskBoardOrchestratorSummaryView: View {
       .help(runOnceHelp)
       .accessibilityIdentifier("harness.task-board.orchestrator.run-once")
     }
+  }
+
+  /// Mirrors `TaskBoardOverviewView.requestRunOnce`: dry runs apply directly,
+  /// live runs route through the shared confirmation dialog.
+  private func triggerRunOnce() {
+    let request = TaskBoardOrchestratorRunOnceRequest(dryRun: status.settings.dryRunDefault)
+    guard request.dryRun != true else {
+      actions.runTaskBoardOrchestratorOnce(request)
+      return
+    }
+    pendingLiveOperation = .runOnce(request)
   }
 
   @ViewBuilder

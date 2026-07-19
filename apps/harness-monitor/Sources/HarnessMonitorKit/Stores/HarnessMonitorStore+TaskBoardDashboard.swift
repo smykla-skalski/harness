@@ -1,91 +1,16 @@
 import Foundation
 
 extension HarnessMonitorStore {
-  struct TaskBoardSnapshotLoad<Value: Sendable>: Sendable {
-    let measured: MeasuredOperation<Value>?
-
-    var value: Value? { measured?.value }
-  }
-
-  struct TaskBoardRefreshSnapshot: Sendable {
-    let items: TaskBoardSnapshotLoad<[TaskBoardItem]>
-    let orchestratorStatus: TaskBoardSnapshotLoad<TaskBoardOrchestratorStatus?>
-    let stepModeConfirmationRevision: UInt64
-  }
-
-  private static let taskBoardDashboardSyncRequest = TaskBoardSyncRequest(
-    direction: .pull,
-    dryRun: false
-  )
-  private static let taskBoardDashboardRefreshActivityKey = "task-board-dashboard-refresh"
-
-  nonisolated static func loadTaskBoardItemsSnapshot(
-    using client: any HarnessMonitorClientProtocol
-  ) async -> TaskBoardSnapshotLoad<[TaskBoardItem]> {
-    do {
-      return TaskBoardSnapshotLoad(
-        measured: try await measureOperation {
-          try await client.taskBoardItems(status: nil)
-        }
-      )
-    } catch {
-      let description = RefreshSnapshotErrorFormatting.describeUnderlying(error)
-      HarnessMonitorLogger.store.debug(
-        "task-board snapshot unavailable during refresh: \(description, privacy: .public)"
-      )
-      return TaskBoardSnapshotLoad(measured: nil)
-    }
-  }
-
-  nonisolated static func loadTaskBoardOrchestratorStatusSnapshot(
-    using client: any HarnessMonitorClientProtocol
-  ) async -> TaskBoardSnapshotLoad<TaskBoardOrchestratorStatus?> {
-    do {
-      return TaskBoardSnapshotLoad(
-        measured: try await measureOperation {
-          try await client.taskBoardOrchestratorStatus()
-        }
-      )
-    } catch {
-      let description = RefreshSnapshotErrorFormatting.describeUnderlying(error)
-      HarnessMonitorLogger.store.debug(
-        "task-board orchestrator snapshot unavailable during refresh: \(description, privacy: .public)"
-      )
-      return TaskBoardSnapshotLoad(measured: nil)
-    }
-  }
-
-  nonisolated static func loadTaskBoardRefreshSnapshot(
-    using client: any HarnessMonitorClientProtocol,
-    stepModeConfirmationRevision: UInt64,
-    includeItems: Bool = true,
-    includeOrchestratorStatus: Bool = true
-  ) async -> TaskBoardRefreshSnapshot {
-    async let items =
-      if includeItems {
-        loadTaskBoardItemsSnapshot(using: client)
-      } else {
-        TaskBoardSnapshotLoad<[TaskBoardItem]>(measured: nil)
-      }
-    async let orchestratorStatus =
-      if includeOrchestratorStatus {
-        loadTaskBoardOrchestratorStatusSnapshot(using: client)
-      } else {
-        TaskBoardSnapshotLoad<TaskBoardOrchestratorStatus?>(measured: nil)
-      }
-    return TaskBoardRefreshSnapshot(
-      items: await items,
-      orchestratorStatus: await orchestratorStatus,
-      stepModeConfirmationRevision: stepModeConfirmationRevision
-    )
-  }
-
   public func refreshTaskBoardDashboard() async {
-    guard let client, !isDaemonActionInFlight else {
+    guard let client, !isTaskBoardBusy else {
       return
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    beginTaskBoardAction()
+    defer {
+      endDaemonAction()
+      endTaskBoardAction()
+    }
     _ = await syncAndRefreshTaskBoardDashboard(
       using: client,
       request: Self.taskBoardDashboardSyncRequest,
@@ -111,8 +36,12 @@ extension HarnessMonitorStore {
     guard let client else {
       return false
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    beginTaskBoardAction()
+    defer {
+      endDaemonAction()
+      endTaskBoardAction()
+    }
 
     let createdItem: TaskBoardItem
     do {
@@ -163,8 +92,12 @@ extension HarnessMonitorStore {
     guard let client else {
       return false
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    beginTaskBoardAction()
+    defer {
+      endDaemonAction()
+      endTaskBoardAction()
+    }
 
     do {
       let measuredItem = try await Self.measureOperation {
@@ -256,8 +189,12 @@ extension HarnessMonitorStore {
     guard let client else {
       return false
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    beginTaskBoardAction()
+    defer {
+      endDaemonAction()
+      endTaskBoardAction()
+    }
 
     do {
       let measuredSummary = try await Self.measureOperation {
@@ -284,8 +221,12 @@ extension HarnessMonitorStore {
     guard let client else {
       return false
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    beginTaskBoardAction()
+    defer {
+      endDaemonAction()
+      endTaskBoardAction()
+    }
     return await syncAndRefreshTaskBoardDashboard(
       using: client,
       request: request,
@@ -301,8 +242,12 @@ extension HarnessMonitorStore {
     guard let client else {
       return false
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    beginTaskBoardAction()
+    defer {
+      endDaemonAction()
+      endTaskBoardAction()
+    }
 
     do {
       let measuredSummary = try await Self.measureOperation {
@@ -328,8 +273,12 @@ extension HarnessMonitorStore {
     guard let client else {
       return false
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    beginTaskBoardAction()
+    defer {
+      endDaemonAction()
+      endTaskBoardAction()
+    }
 
     do {
       let measuredSummary = try await Self.measureOperation {
@@ -350,8 +299,12 @@ extension HarnessMonitorStore {
     guard let client else {
       return false
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    beginTaskBoardAction()
+    defer {
+      endDaemonAction()
+      endTaskBoardAction()
+    }
 
     do {
       let measuredProjects = try await Self.measureOperation {
@@ -372,8 +325,12 @@ extension HarnessMonitorStore {
     guard let client else {
       return false
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    beginTaskBoardAction()
+    defer {
+      endDaemonAction()
+      endTaskBoardAction()
+    }
 
     do {
       let measuredMachines = try await Self.measureOperation {

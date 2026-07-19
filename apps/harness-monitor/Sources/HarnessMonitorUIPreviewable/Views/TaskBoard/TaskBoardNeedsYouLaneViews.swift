@@ -9,15 +9,58 @@ import SwiftUI
   return formatter
 }()
 
-/// Decoder shared by `TaskBoardDecisionRow.resolvePrimaryAction(for:)`, which
-/// runs from the per-row init. A fresh `JSONDecoder()` per init shows up as
-/// steady-state churn while the lane re-renders.
+/// Decoder shared by `TaskBoardDecisionPrimaryActionCache`.
 private let taskBoardNeedsYouSuggestedActionsDecoder = JSONDecoder()
 
+/// Memoizes `SuggestedAction` JSON decoding by decision id, keyed on the full JSON string (not a
+/// hash - hashes can collide and would serve a stale action for different content), so a lane
+/// re-render (which recreates `TaskBoardDecisionRow`) decodes each decision at most once per
+/// distinct content instead of once per render. Internal so tests can exercise it directly.
+@MainActor
+enum TaskBoardDecisionPrimaryActionCache {
+  /// Bounds growth across a long-running session; never expect this many open decisions at once.
+  private static let maxEntries = 512
+
+  private static var entriesByDecisionID: [String: (json: String, action: SuggestedAction?)] = [:]
+
+  static func resolve(decisionID: String, suggestedActionsJSON: String) -> SuggestedAction? {
+    if let cached = entriesByDecisionID[decisionID], cached.json == suggestedActionsJSON {
+      return cached.action
+    }
+    let resolved = decode(suggestedActionsJSON)
+    if entriesByDecisionID.count >= maxEntries {
+      entriesByDecisionID.removeAll(keepingCapacity: true)
+    }
+    entriesByDecisionID[decisionID] = (suggestedActionsJSON, resolved)
+    return resolved
+  }
+
+  private static func decode(_ json: String) -> SuggestedAction? {
+    guard
+      let actions = try? taskBoardNeedsYouSuggestedActionsDecoder.decode(
+        [SuggestedAction].self,
+        from: Data(json.utf8)
+      ),
+      !actions.isEmpty
+    else {
+      return nil
+    }
+    return actions.first { isProminent($0) } ?? actions.first
+  }
+
+  private static func isProminent(_ action: SuggestedAction) -> Bool {
+    switch action.kind {
+    case .dismiss, .snooze: false
+    default: true
+    }
+  }
+}
+
+@MainActor
 struct TaskBoardDecisionRow: View {
   let decision: Decision
   let isHovered: Bool
-  let onOpenDecision: (Decision) -> Void
+  let actions: TaskBoardOverviewActions
   private let primaryAction: SuggestedAction?
   private let metrics: TaskBoardLaneMetrics
   private let summaryFont: Font
@@ -31,12 +74,15 @@ struct TaskBoardDecisionRow: View {
     decision: Decision,
     fontScale: CGFloat,
     isHovered: Bool = false,
-    onOpenDecision: @escaping (Decision) -> Void
+    actions: TaskBoardOverviewActions
   ) {
     self.decision = decision
     self.isHovered = isHovered
-    self.onOpenDecision = onOpenDecision
-    primaryAction = Self.resolvePrimaryAction(for: decision)
+    self.actions = actions
+    primaryAction = TaskBoardDecisionPrimaryActionCache.resolve(
+      decisionID: decision.id,
+      suggestedActionsJSON: decision.suggestedActionsJSON
+    )
     metrics = TaskBoardLaneMetrics(fontScale: fontScale)
     summaryFont = HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
     summaryCodeFont = HarnessMonitorTextSize.scaledFont(.caption.monospaced(), by: fontScale)
@@ -60,7 +106,7 @@ struct TaskBoardDecisionRow: View {
 
   var body: some View {
     Button {
-      onOpenDecision(decision)
+      actions.openDecision(decision)
     } label: {
       cardBody
     }
@@ -186,26 +232,6 @@ struct TaskBoardDecisionRow: View {
     case .dismiss: HarnessMonitorTheme.danger
     case .snooze: HarnessMonitorTheme.caution
     default: HarnessMonitorTheme.accent
-    }
-  }
-
-  private static func resolvePrimaryAction(for decision: Decision) -> SuggestedAction? {
-    guard
-      let actions = try? taskBoardNeedsYouSuggestedActionsDecoder.decode(
-        [SuggestedAction].self,
-        from: Data(decision.suggestedActionsJSON.utf8)
-      ),
-      !actions.isEmpty
-    else {
-      return nil
-    }
-    return actions.first { isProminent($0) } ?? actions.first
-  }
-
-  private static func isProminent(_ action: SuggestedAction) -> Bool {
-    switch action.kind {
-    case .dismiss, .snooze: false
-    default: true
     }
   }
 

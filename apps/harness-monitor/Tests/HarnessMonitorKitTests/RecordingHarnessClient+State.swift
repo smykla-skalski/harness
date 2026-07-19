@@ -18,6 +18,7 @@ extension RecordingHarnessClient {
   }
 
   func configuredMutationDelay() -> Duration? { lock.withLock { mutationDelay } }
+  func configuredTaskUpdateError() -> (any Error)? { lock.withLock { taskUpdateError } }
   func configuredDiagnosticsReport() -> DaemonDiagnosticsReport? {
     lock.withLock { diagnosticsReportOverride }
   }

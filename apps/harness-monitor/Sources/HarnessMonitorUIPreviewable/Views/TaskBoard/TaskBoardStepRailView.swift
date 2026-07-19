@@ -8,7 +8,7 @@ struct TaskBoardStepRailView: View {
   let workspace: PolicyCanvasWorkspace?
   let targetItem: TaskBoardItem?
   let isActionInFlight: Bool
-  let onOpenReview: (TaskBoardItem) -> Void
+  let actions: TaskBoardOverviewActions
 
   @Environment(\.openWindow)
   var openWindow

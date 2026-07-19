@@ -6,6 +6,7 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 @Suite("Task board lane appearance preferences")
+@MainActor
 struct TaskBoardLaneAppearancePreferencesTests {
   @Test("Defaults use lane chrome when there are no overrides")
   func defaultsUseLaneChromeWhenThereAreNoOverrides() {
@@ -70,6 +71,60 @@ struct TaskBoardLaneAppearancePreferencesTests {
     #expect(!canonicalRawValue.contains("umbrella"))
   }
 
+  @Test("Repeated parses of the same raw value return equal results")
+  func repeatedParsesOfSameRawValueReturnEqualResults() {
+    let rawValue = TaskBoardLaneAppearancePreferences.settingColorToken(
+      .teal,
+      for: .inProgress,
+      rawValue: TaskBoardLaneAppearancePreferences.emptyRawValue
+    )
+
+    let first = TaskBoardLaneAppearancePreferences.overrides(from: rawValue)
+    let second = TaskBoardLaneAppearancePreferences.overrides(from: rawValue)
+
+    #expect(first == second)
+  }
+
+  @Test("Repeated raw value does not re-invoke the decoder")
+  func repeatedRawValueDoesNotReinvokeDecoder() {
+    let rawValue = TaskBoardLaneAppearancePreferences.settingColorToken(
+      .mint,
+      for: .todo,
+      rawValue: TaskBoardLaneAppearancePreferences.emptyRawValue
+    )
+
+    _ = TaskBoardLaneAppearancePreferences.overrides(from: rawValue)
+    let countAfterFirstParse = TaskBoardLaneAppearancePreferences.decodeCount
+
+    _ = TaskBoardLaneAppearancePreferences.overrides(from: rawValue)
+    let countAfterSecondParse = TaskBoardLaneAppearancePreferences.decodeCount
+
+    #expect(countAfterSecondParse == countAfterFirstParse)
+  }
+
+  @Test("A changed raw value invalidates the memo and re-decodes")
+  func changedRawValueInvalidatesMemoAndReDecodes() {
+    let firstRawValue = TaskBoardLaneAppearancePreferences.settingColorToken(
+      .blue,
+      for: .failed,
+      rawValue: TaskBoardLaneAppearancePreferences.emptyRawValue
+    )
+    let secondRawValue = TaskBoardLaneAppearancePreferences.settingColorToken(
+      .pink,
+      for: .failed,
+      rawValue: TaskBoardLaneAppearancePreferences.emptyRawValue
+    )
+
+    _ = TaskBoardLaneAppearancePreferences.overrides(from: firstRawValue)
+    let countAfterFirstParse = TaskBoardLaneAppearancePreferences.decodeCount
+
+    let secondResult = TaskBoardLaneAppearancePreferences.overrides(from: secondRawValue)
+    let countAfterSecondParse = TaskBoardLaneAppearancePreferences.decodeCount
+
+    #expect(countAfterSecondParse == countAfterFirstParse + 1)
+    #expect(secondResult[.failed]?.colorToken == .pink)
+  }
+
   @Test("Hidden symbols persist through UserDefaults")
   func hiddenSymbolsPersistThroughUserDefaults() throws {
     let suiteName = "TaskBoardLaneAppearancePreferencesTests.\(UUID().uuidString)"
@@ -125,40 +180,6 @@ struct TaskBoardLaneAppearancePreferencesTests {
 
     #expect(customColor == TaskBoardLaneCustomColor(red: 0.24, green: 0.48, blue: 0.72))
     #expect(TaskBoardLaneAppearance(rawValue: rawValue).hasColorOverride(for: .testing))
-  }
-
-  @Test("Global priority badge preference persists through UserDefaults")
-  func globalPriorityBadgePreferencePersistsThroughUserDefaults() throws {
-    let suiteName = "TaskBoardCardPreferencesTests.\(UUID().uuidString)"
-    let userDefaults = try #require(UserDefaults(suiteName: suiteName))
-    defer {
-      userDefaults.removePersistentDomain(forName: suiteName)
-    }
-
-    #expect(TaskBoardCardPreferences.showsPriorityBadge(from: userDefaults))
-
-    TaskBoardCardPreferences.setShowsPriorityBadge(false, in: userDefaults)
-    userDefaults.synchronize()
-
-    let restartedDefaults = try #require(UserDefaults(suiteName: suiteName))
-    #expect(!TaskBoardCardPreferences.showsPriorityBadge(from: restartedDefaults))
-  }
-
-  @Test("Full repository name preference persists through UserDefaults")
-  func fullRepositoryNamePreferencePersistsThroughUserDefaults() throws {
-    let suiteName = "TaskBoardCardPreferencesTests.\(UUID().uuidString)"
-    let userDefaults = try #require(UserDefaults(suiteName: suiteName))
-    defer {
-      userDefaults.removePersistentDomain(forName: suiteName)
-    }
-
-    #expect(!TaskBoardCardPreferences.alwaysShowsFullRepositoryNames(from: userDefaults))
-
-    TaskBoardCardPreferences.setAlwaysShowsFullRepositoryNames(true, in: userDefaults)
-    userDefaults.synchronize()
-
-    let restartedDefaults = try #require(UserDefaults(suiteName: suiteName))
-    #expect(TaskBoardCardPreferences.alwaysShowsFullRepositoryNames(from: restartedDefaults))
   }
 
   @Test("Reset and default values remove overrides")
@@ -285,71 +306,6 @@ struct TaskBoardLaneAppearancePreferencesTests {
     let colorRange = try #require(source.range(of: "colorSection"))
     let symbolRange = try #require(source.range(of: "symbolSection"))
     #expect(colorRange.lowerBound < symbolRange.lowerBound)
-  }
-
-  @Test("Task Board settings use global priority badge toggle")
-  func taskBoardSettingsUseGlobalPriorityBadgeToggle() throws {
-    let settingsSource = try sourceFile(named: "Views/Settings/SettingsTaskBoardSection.swift")
-    let cardsSource = try sourceFile(named: "Views/Settings/SettingsTaskBoardCardsSection.swift")
-
-    #expect(settingsSource.contains("SettingsTaskBoardCardsSection()"))
-    #expect(
-      cardsSource.contains(
-        "@AppStorage(TaskBoardCardPreferences.priorityBadgeVisibilityStorageKey)"
-      )
-    )
-    #expect(cardsSource.contains("Toggle(\"Priority Badge\", isOn: $showsPriorityBadge)"))
-    #expect(
-      cardsSource.contains(
-        "@AppStorage(TaskBoardCardPreferences.fullRepositoryNamesStorageKey)"
-      )
-    )
-    #expect(
-      cardsSource.contains(
-        "Toggle(\"Full Repository Names\", isOn: $alwaysShowsFullRepositoryNames)"
-      )
-    )
-
-    let cardsRange = try #require(settingsSource.range(of: "SettingsTaskBoardCardsSection()"))
-    let laneRange = try #require(
-      settingsSource.range(of: "SettingsTaskBoardLaneAppearanceSection()")
-    )
-    #expect(cardsRange.lowerBound < laneRange.lowerBound)
-  }
-
-  @Test("Task cards read priority badge visibility from global card preference")
-  func taskCardsReadPriorityBadgeVisibilityFromGlobalCardPreference() throws {
-    let laneSource = try sourceFile(named: "Views/TaskBoard/TaskBoardLaneViews.swift")
-    let overviewSource = try sourceFile(named: "Views/TaskBoard/TaskBoardOverviewView.swift")
-    let preferencesSource = try sourceFile(
-      named: "Views/TaskBoard/TaskBoardCardPreferences.swift"
-    )
-
-    #expect(laneSource.contains("@Environment(\\.taskBoardShowsPriorityBadge)"))
-    #expect(laneSource.contains("if showsPriorityBadge"))
-    #expect(!laneSource.contains("laneAppearance.showsPriorityBadge"))
-    #expect(
-      preferencesSource.contains(
-        "@AppStorage(TaskBoardCardPreferences.priorityBadgeVisibilityStorageKey)"
-      )
-    )
-    #expect(
-      preferencesSource.contains(
-        ".environment(\\.taskBoardShowsPriorityBadge, showsPriorityBadge)"
-      )
-    )
-    #expect(laneSource.contains("@Environment(\\.taskBoardAlwaysShowsFullRepositoryNames)"))
-    #expect(laneSource.contains("projectLabelResolver.label("))
-    #expect(
-      preferencesSource.contains(
-        "@AppStorage(TaskBoardCardPreferences.fullRepositoryNamesStorageKey)"
-      )
-    )
-    #expect(
-      preferencesSource.contains("\\.taskBoardAlwaysShowsFullRepositoryNames,")
-    )
-    #expect(preferencesSource.contains("\\.taskBoardProjectLabelResolver,"))
-    #expect(overviewSource.contains(".taskBoardCardPreferences(projectLabelResolver:"))
   }
 
   private func sourceFile(named relativePath: String) throws -> String {

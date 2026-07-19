@@ -32,25 +32,28 @@ extension TaskBoardOverviewView {
   }
 
   var selectedTaskBoardItem: TaskBoardItem? {
-    guard let selectedTaskBoardItemIDValue else { return nil }
-    return currentPresentation.taskBoardItem(id: selectedTaskBoardItemIDValue)
-      ?? taskBoardItems.first { $0.id == selectedTaskBoardItemIDValue }
+    guard let selectedItemID = selectionModelValue.selectedItemID else { return nil }
+    return currentPresentation.taskBoardItem(id: selectedItemID)
+      ?? taskBoardItems.first { $0.id == selectedItemID }
   }
 
   var taskBoardManagementSheet: Binding<TaskBoardManagementSheet?> {
     Binding(
       get: {
-        if isCreatingTaskBoardItemValue {
+        if selectionModelValue.isCreatingItem {
           return .create
         }
-        guard let selectedTaskBoardItemIDValue, selectedTaskBoardItem != nil else {
+        guard
+          let selectedItemID = selectionModelValue.selectedItemID,
+          selectedTaskBoardItem != nil
+        else {
           return nil
         }
-        return .edit(itemID: selectedTaskBoardItemIDValue)
+        return .edit(itemID: selectedItemID)
       },
       set: { sheet in
         if sheet == nil {
-          clearSelectedTaskBoardItem()
+          selectionModelValue.clearSelectedItem()
         }
       }
     )
@@ -64,18 +67,8 @@ extension TaskBoardOverviewView {
         isActionInFlight: isActionInFlight,
         runOnceDryRun: runOnceDryRun,
         evaluateDryRun: evaluateDryRun,
-        store: store,
-        onCreate: onCreateTaskBoardItem,
-        onUpdate: onUpdateTaskBoardItem,
-        onDelete: selectionClearingDeleteAction,
-        onRunOnce: runOrchestratorOnceForItem,
-        onEvaluate: selectedTaskBoardItemEvaluateAction,
-        onBeginPlan: onBeginTaskBoardPlan,
-        onSubmitPlan: onSubmitTaskBoardPlan,
-        onApprovePlan: onApproveTaskBoardPlan,
-        onRevokePlan: onRevokeTaskBoardPlan,
-        onRefresh: onRefreshTaskBoard,
-        onClose: clearSelectedTaskBoardItem
+        actions: actions,
+        evaluatePreviewState: evaluatePreviewStateValue
       )
       .padding(HarnessMonitorTheme.spacingLG)
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -89,20 +82,8 @@ extension TaskBoardOverviewView {
     )
   }
 
-  func openTaskBoardItem(_ item: TaskBoardItem) {
-    switch TaskBoardOverviewItemBehavior.selectionAction(for: item) {
-    case .openLinkedTask:
-      isCreatingTaskBoardItemValue = false
-      selectedTaskBoardItemIDValue = nil
-      onOpenTaskBoardItem(item)
-    case .selectBoardItem:
-      isCreatingTaskBoardItemValue = false
-      selectedTaskBoardItemIDValue = item.id
-    }
-  }
-
   func moveTaskBoardItem(_ itemID: String, to lane: TaskBoardInboxLane) -> Bool {
-    guard let onMoveTaskBoardItems else {
+    guard actions.canMoveTaskBoardItems else {
       return false
     }
     guard
@@ -113,7 +94,7 @@ extension TaskBoardOverviewView {
     else {
       return false
     }
-    onMoveTaskBoardItems([
+    actions.moveTaskBoardItems([
       TaskBoardItemStatusUpdate(id: itemID, status: lane.taskBoardDropStatus(for: item))
     ])
     return true
@@ -125,7 +106,7 @@ extension TaskBoardOverviewView {
     to lane: TaskBoardInboxLane
   ) -> Bool {
     guard
-      let onMoveInboxItems,
+      actions.canMoveInboxItems,
       let status = lane.taskDropStatus,
       let item = snapshot.items.first(where: {
         $0.session.sessionId == sessionID && $0.task.taskId == taskID
@@ -134,7 +115,7 @@ extension TaskBoardOverviewView {
     else {
       return false
     }
-    onMoveInboxItems([
+    actions.moveInboxItems([
       TaskBoardInboxStatusUpdate(
         sessionID: item.session.sessionId,
         taskID: item.task.taskId,
@@ -144,45 +125,12 @@ extension TaskBoardOverviewView {
     return true
   }
 
-  func clearSelectedTaskBoardItem() {
-    selectedTaskBoardItemIDValue = nil
-    isCreatingTaskBoardItemValue = false
-  }
-
-  var selectionClearingDeleteAction: ((TaskBoardItem) -> Void)? {
-    guard let delete = onDeleteTaskBoardItem else { return nil }
-    return { item in
-      if selectedTaskBoardItemIDValue == item.id {
-        selectedTaskBoardItemIDValue = nil
-      }
-      delete(item)
-    }
-  }
-
   func startTaskBoardItemCreation() {
-    selectedTaskBoardItemIDValue = nil
-    isCreatingTaskBoardItemValue = true
+    selectionModelValue.beginCreatingItem()
   }
 
   func runOrchestratorOnce() {
     requestRunOnce(TaskBoardOrchestratorRunOnceRequest(dryRun: runOnceDryRun))
-  }
-
-  func runOrchestratorOnceForItem(_ item: TaskBoardItem) {
-    onRunTaskBoardOrchestratorOnce?(
-      TaskBoardOverviewItemBehavior.runOnceRequest(for: item, dryRun: runOnceDryRun)
-    )
-  }
-
-  var selectedTaskBoardItemEvaluateAction: ((TaskBoardItem) -> Void)? {
-    guard onEvaluateTaskBoardItem != nil || onEvaluateTaskBoard != nil else {
-      return nil
-    }
-    return evaluateSelectedTaskBoardItem
-  }
-
-  func evaluateSelectedTaskBoardItem(_ item: TaskBoardItem) {
-    requestTaskBoardItemEvaluation(item)
   }
 
   private func taskBoardManagementItem(for sheet: TaskBoardManagementSheet) -> TaskBoardItem? {
@@ -194,5 +142,4 @@ extension TaskBoardOverviewView {
         ?? taskBoardItems.first(where: { $0.id == itemID })
     }
   }
-
 }

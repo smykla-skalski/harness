@@ -4,7 +4,7 @@ import SwiftUI
 struct TaskBoardCollapsedLane: View {
   let lane: TaskBoardInboxLane
   let count: Int
-  let onExpand: () -> Void
+  @Binding var collapseOverridesRawValue: String
   @Environment(\.fontScale)
   private var fontScale
 
@@ -26,7 +26,7 @@ struct TaskBoardCollapsedLane: View {
   }
 
   var body: some View {
-    Button(action: onExpand) {
+    Button(action: expand) {
       VStack(spacing: metrics.laneCollapsedContentTopPadding) {
         Text("\(count)")
           .font(countFont)
@@ -68,6 +68,14 @@ struct TaskBoardCollapsedLane: View {
     .help("Expand \(lane.title) board")
     .accessibilityLabel("Expand \(lane.title) board")
     .accessibilityValue("\(count) items")
+  }
+
+  private func expand() {
+    collapseOverridesRawValue = TaskBoardLaneCollapsePreferences.toggledRawValue(
+      lane: lane,
+      contentCount: count,
+      rawValue: collapseOverridesRawValue
+    )
   }
 
   private var collapsedTitle: some View {

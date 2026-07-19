@@ -5,6 +5,7 @@ extension TaskBoardOverviewView {
   @ViewBuilder var boardContent: some View {
     if hasBoardContent {
       taskBoardColumns
+        .environment(\.taskBoardCardContextMenuActions, taskBoardCardContextMenuActions)
     } else {
       emptyState
     }
@@ -20,12 +21,15 @@ extension TaskBoardOverviewView {
       }
       .scrollClipDisabled()
     }
-    .taskBoardCardDragContainer(
-      isEnabled: !isActionInFlight,
-      selectedIDs: orderedSelectedCardIDs,
-      payloads: cardDragPayloads,
-      onSessionUpdated: updateCardDragSession
-    )
+    .dragContainer(for: TaskBoardCardDragPayload.self, itemID: \.id) { cardIDs in
+      isActionInFlight ? [] : cardDragPayloads(cardIDs)
+    }
+    .dragContainerSelection(isActionInFlight ? [] : orderedSelectedCardIDs)
+    .dragConfiguration(.init(allowMove: !isActionInFlight))
+    .dragPreviewsFormation(.pile)
+    .onDragSessionUpdated { session in
+      updateCardDragSession(session)
+    }
   }
 
   func taskBoardLaneStrip(
@@ -54,24 +58,16 @@ extension TaskBoardOverviewView {
         apiItems: apiItems,
         inboxItems: inboxItems,
         decisions: decisions,
+        apiCardPresentations: currentPresentation.apiCardPresentations(in: lane),
+        inboxCardPresentations: currentPresentation.inboxCardPresentations(in: lane),
         titleTypography: titleTypography,
         isCollapsed: isCollapsed,
         isDropEnabled: !isActionInFlight,
-        isDropCandidate:
-          !isActionInFlight && cardDropPlan(draggedCardIDsValue, to: lane) != nil,
-        selectedCardIDs: cardSelectionValue.selectedIDs,
-        onOpenAPIItem: openTaskBoardItem,
-        onOpenInboxItem: onOpenItem,
-        onOpenDecision: onOpenDecision,
-        onToggleCollapse: {
-          toggleLaneCollapse(lane, contentCount: contentCount)
-        },
-        onSelectCard: selectCard,
-        contextMenuActions: taskBoardCardContextMenuActions,
-        dropPlanForCardIDs: { cardIDs in
-          cardDropPlan(cardIDs, to: lane)
-        },
-        onMoveCards: moveCards
+        isDropCandidate: !isActionInFlight && dropCandidateLanesValue.contains(lane),
+        selectionModel: selectionModelValue,
+        actions: actions,
+        liveInboxItems: liveInboxItemsValue,
+        collapseOverridesRawValue: laneCollapsePreferencesRawValueBinding
       )
       .layoutValue(
         key: TaskBoardLanePreferredWidthKey.self,

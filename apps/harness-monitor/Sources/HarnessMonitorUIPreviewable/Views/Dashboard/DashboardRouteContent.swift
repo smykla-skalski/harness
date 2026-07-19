@@ -176,7 +176,7 @@ struct DashboardTaskBoardRouteView: View {
   @State private var operationsInspectorDispatcher =
     TaskBoardOperationsInspectorFocusDispatcher()
   @State private var policyWorkspaceLoadState = TaskBoardPolicyWorkspaceLoadState()
-  private let perfScrollHookEnabled = HarnessMonitorPerfDashboardScrollBus.isActive()
+  private let perfScrollHookEnabled = HarnessMonitorPerfDashboardScrollBus.isActiveAtLaunch
 
   private var visibleTaskBoardSessions: [SessionSummary] {
     let visible = store.visibleSessions
@@ -264,7 +264,7 @@ struct DashboardTaskBoardRouteView: View {
       decisions: store.supervisorOpenDecisions,
       orchestratorStatus: dashboardUI.taskBoardOrchestratorStatus,
       evaluationSummary: dashboardUI.taskBoardEvaluationSummary,
-      isActionInFlight: dashboardUI.isBusy || dashboardUI.connectionState != .online,
+      isActionInFlight: dashboardUI.isTaskBoardBusy || dashboardUI.connectionState != .online,
       showsOperationsPanel: false,
       isCommandFocusActive: isRouteVisible,
       operationsInspectorFocus: operationsInspectorFocus

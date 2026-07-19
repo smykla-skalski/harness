@@ -2,7 +2,7 @@ import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
-struct TaskBoardCardGlyph {
+struct TaskBoardCardGlyph: Equatable, Sendable {
   let systemImage: String?
   let tint: Color
 }

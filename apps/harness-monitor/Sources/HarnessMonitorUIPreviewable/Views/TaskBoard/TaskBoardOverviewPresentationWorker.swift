@@ -18,6 +18,8 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
     inboxItemsByLane: [:],
     inboxItemsByID: [:],
     orderedCardIDs: [],
+    apiCardPresentationsByLane: [:],
+    inboxCardPresentationsByLane: [:],
     decisionIDsByLane: [:],
     aggregateNeedsYouCount: 0,
     aggregateOpenCount: 0,
@@ -33,6 +35,9 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
   let inboxItemsByLane: [TaskBoardInboxLane: [TaskBoardInboxItem]]
   let inboxItemsByID: [TaskBoardCardID: TaskBoardInboxItem]
   let orderedCardIDs: [TaskBoardCardID]
+  let apiCardPresentationsByLane: [TaskBoardInboxLane: [String: TaskBoardCardPresentation]]
+  let inboxCardPresentationsByLane:
+    [TaskBoardInboxLane: [TaskBoardCardID: TaskBoardCardPresentation]]
   let decisionIDsByLane: [TaskBoardInboxLane: [String]]
   let aggregateNeedsYouCount: Int
   let aggregateOpenCount: Int
@@ -80,6 +85,16 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
 
   func inboxItem(id: TaskBoardCardID) -> TaskBoardInboxItem? {
     inboxItemsByID[id]
+  }
+
+  func apiCardPresentations(in lane: TaskBoardInboxLane) -> [String: TaskBoardCardPresentation] {
+    apiCardPresentationsByLane[lane] ?? [:]
+  }
+
+  func inboxCardPresentations(
+    in lane: TaskBoardInboxLane
+  ) -> [TaskBoardCardID: TaskBoardCardPresentation] {
+    inboxCardPresentationsByLane[lane] ?? [:]
   }
 }
 
@@ -156,13 +171,16 @@ actor TaskBoardOverviewPresentationWorker {
       $0.deletedAt == nil && $0.status == .done
     }
     let taskBoardOpenCount = taskBoardItems.count
+    let projectLabelResolver = TaskBoardProjectLabelResolver(
+      projectIDs: taskBoardItems.compactMap(\.projectId)
+    )
+    // One parser (and its 3 formatters) for the whole snapshot, not one per card.
+    let dateParser = TaskBoardCardDateParser()
 
     return TaskBoardOverviewPresentation(
       taskBoardItems: taskBoardItems,
       taskBoardItemsByID: Dictionary(uniqueKeysWithValues: taskBoardItems.map { ($0.id, $0) }),
-      projectLabelResolver: TaskBoardProjectLabelResolver(
-        projectIDs: taskBoardItems.compactMap(\.projectId)
-      ),
+      projectLabelResolver: projectLabelResolver,
       apiItemsByLane: apiItemsByLane,
       inboxItemsByLane: inboxItemsByLane,
       inboxItemsByID: inboxItemsByID,
@@ -170,6 +188,30 @@ actor TaskBoardOverviewPresentationWorker {
         apiItemsByLane: apiItemsByLane,
         inboxItemsByLane: inboxItemsByLane
       ),
+      apiCardPresentationsByLane: apiItemsByLane.mapValues { items in
+        Dictionary(
+          uniqueKeysWithValues: items.map {
+            (
+              $0.id,
+              TaskBoardCardPresentation.forAPIItem(
+                $0,
+                projectLabelResolver: projectLabelResolver,
+                dateParser: dateParser
+              )
+            )
+          }
+        )
+      },
+      inboxCardPresentationsByLane: inboxItemsByLane.mapValues { items in
+        Dictionary(
+          uniqueKeysWithValues: items.map {
+            (
+              inboxCardID(for: $0),
+              TaskBoardCardPresentation.forInboxItem($0, dateParser: dateParser)
+            )
+          }
+        )
+      },
       decisionIDsByLane: decisionIDsByLane,
       aggregateNeedsYouCount: taskBoardNeedsYouCount
         + (inboxItemsByLane[.humanRequired]?.count ?? 0)

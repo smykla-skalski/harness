@@ -5,8 +5,12 @@ extension HarnessMonitorStore {
     guard let client else {
       return nil
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    beginTaskBoardAction()
+    defer {
+      endDaemonAction()
+      endTaskBoardAction()
+    }
 
     do {
       let measuredResult = try await Self.measureOperation {
@@ -33,8 +37,12 @@ extension HarnessMonitorStore {
     guard let client else {
       return nil
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    beginTaskBoardAction()
+    defer {
+      endDaemonAction()
+      endTaskBoardAction()
+    }
 
     do {
       let measuredDelivery = try await Self.measureOperation {
@@ -115,8 +123,12 @@ extension HarnessMonitorStore {
     guard let client else {
       return nil
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    beginTaskBoardAction()
+    defer {
+      endDaemonAction()
+      endTaskBoardAction()
+    }
 
     do {
       let measuredGrant = try await Self.measureOperation {
@@ -144,8 +156,12 @@ extension HarnessMonitorStore {
     guard let client else {
       return nil
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    beginTaskBoardAction()
+    defer {
+      endDaemonAction()
+      endTaskBoardAction()
+    }
 
     do {
       let measuredGrant = try await Self.measureOperation {
@@ -193,8 +209,12 @@ extension HarnessMonitorStore {
     guard let client else {
       return false
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    beginTaskBoardAction()
+    defer {
+      endDaemonAction()
+      endTaskBoardAction()
+    }
 
     do {
       let measuredWorkspace = try await Self.measureOperation {

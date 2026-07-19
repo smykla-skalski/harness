@@ -258,10 +258,7 @@ struct TaskBoardPlanLifecycleActionButtons: View {
   let draft: TaskBoardItemEditorDraft
   let metrics: TaskBoardOverviewMetrics
   let isActionInFlight: Bool
-  let onBeginPlan: ((TaskBoardItem) -> Void)?
-  let onSubmitPlan: ((TaskBoardItem, String) -> Void)?
-  let onApprovePlan: ((TaskBoardItem, String, String?) -> Void)?
-  let onRevokePlan: ((TaskBoardItem) -> Void)?
+  let actions: TaskBoardOverviewActions
   @Environment(\.fontScale)
   private var fontScale
   @State private var isConfirmingRevoke = false
@@ -294,7 +291,7 @@ struct TaskBoardPlanLifecycleActionButtons: View {
     .frame(minHeight: metrics.controlMinHeight)
     .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.caution)
     .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-    .disabled(isActionInFlight || onRevokePlan == nil || !canRevoke)
+    .disabled(isActionInFlight || !actions.canRevokePlan || !canRevoke)
     .help("Revoke this plan and return the item to unapproved planning")
     .accessibilityIdentifier("harness.task-board.manage-item.revoke-plan")
     .confirmationDialog(
@@ -303,9 +300,9 @@ struct TaskBoardPlanLifecycleActionButtons: View {
       titleVisibility: .visible
     ) {
       Button("Revoke Plan", role: .destructive) {
-        onRevokePlan?(item)
+        actions.revokeTaskBoardPlan(item)
       }
-      .disabled(isActionInFlight || onRevokePlan == nil || !canRevoke)
+      .disabled(isActionInFlight || !actions.canRevokePlan || !canRevoke)
       Button("Cancel", role: .cancel) {}
     } message: {
       Text("The plan summary and any approval are cleared. This cannot be undone.")
@@ -314,7 +311,7 @@ struct TaskBoardPlanLifecycleActionButtons: View {
 
   private func beginPlanButton(labelFont: Font) -> some View {
     Button {
-      onBeginPlan?(item)
+      actions.beginTaskBoardPlan(item)
     } label: {
       Label("Begin Plan", systemImage: "pencil.and.list.clipboard")
         .font(labelFont)
@@ -322,7 +319,7 @@ struct TaskBoardPlanLifecycleActionButtons: View {
     .frame(minHeight: metrics.controlMinHeight)
     .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
     .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-    .disabled(isActionInFlight || onBeginPlan == nil)
+    .disabled(isActionInFlight || !actions.canBeginPlan)
     .help("Move this board item into planning")
     .accessibilityIdentifier("harness.task-board.manage-item.begin-plan")
   }
@@ -330,7 +327,7 @@ struct TaskBoardPlanLifecycleActionButtons: View {
   private func submitPlanButton(labelFont: Font) -> some View {
     Button {
       guard let summary = draft.planSummaryForSubmit else { return }
-      onSubmitPlan?(item, summary)
+      actions.submitTaskBoardPlan(item, summary: summary)
     } label: {
       Label("Submit Plan", systemImage: "paperplane")
         .font(labelFont)
@@ -338,7 +335,7 @@ struct TaskBoardPlanLifecycleActionButtons: View {
     .frame(minHeight: metrics.controlMinHeight)
     .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
     .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-    .disabled(isActionInFlight || onSubmitPlan == nil || draft.planSummaryForSubmit == nil)
+    .disabled(isActionInFlight || !actions.canSubmitPlan || draft.planSummaryForSubmit == nil)
     .help("Submit this plan for review")
     .accessibilityIdentifier("harness.task-board.manage-item.submit-plan")
   }
@@ -346,7 +343,11 @@ struct TaskBoardPlanLifecycleActionButtons: View {
   private func approvePlanButton(labelFont: Font) -> some View {
     Button {
       guard let approvedBy = draft.approverForApproval else { return }
-      onApprovePlan?(item, approvedBy, draft.approvalTimestampForRequest)
+      actions.approveTaskBoardPlan(
+        item,
+        approvedBy: approvedBy,
+        approvedAt: draft.approvalTimestampForRequest
+      )
     } label: {
       Label("Approve Plan", systemImage: "checkmark.seal")
         .font(labelFont)
@@ -354,7 +355,7 @@ struct TaskBoardPlanLifecycleActionButtons: View {
     .frame(minHeight: metrics.controlMinHeight)
     .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
     .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-    .disabled(isActionInFlight || onApprovePlan == nil || draft.approverForApproval == nil)
+    .disabled(isActionInFlight || !actions.canApprovePlan || draft.approverForApproval == nil)
     .help("Approve this plan")
     .accessibilityIdentifier("harness.task-board.manage-item.approve-plan")
   }

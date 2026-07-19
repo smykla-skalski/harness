@@ -5,7 +5,26 @@ enum TaskBoardLaneCollapsePreferences {
   static let storageKey = "harness.task-board.lane-collapse-overrides.v1"
   static let emptyRawValue = "{}"
 
+  /// Advances only on a memo miss, so tests can assert a repeat raw value skips the decoder.
+  @MainActor private(set) static var decodeCount = 0
+
+  @MainActor private static var memoizedRawValue: String?
+  @MainActor private static var memoizedOverrides: [TaskBoardInboxLane: Bool] = [:]
+
+  @MainActor
   static func overrides(from rawValue: String) -> [TaskBoardInboxLane: Bool] {
+    if let memoizedRawValue, memoizedRawValue == rawValue {
+      return memoizedOverrides
+    }
+    let decoded = decodeOverrides(from: rawValue)
+    memoizedRawValue = rawValue
+    memoizedOverrides = decoded
+    return decoded
+  }
+
+  @MainActor
+  private static func decodeOverrides(from rawValue: String) -> [TaskBoardInboxLane: Bool] {
+    decodeCount += 1
     guard let data = rawValue.data(using: .utf8) else {
       return [:]
     }
@@ -44,6 +63,7 @@ enum TaskBoardLaneCollapsePreferences {
     return rawValue
   }
 
+  @MainActor
   static func load(from userDefaults: UserDefaults = .standard) -> [TaskBoardInboxLane: Bool] {
     overrides(from: userDefaults.string(forKey: storageKey) ?? emptyRawValue)
   }
@@ -55,6 +75,7 @@ enum TaskBoardLaneCollapsePreferences {
     userDefaults.set(rawValue(for: overrides), forKey: storageKey)
   }
 
+  @MainActor
   static func isCollapsed(
     lane: TaskBoardInboxLane,
     contentCount: Int,
@@ -74,6 +95,7 @@ enum TaskBoardLaneCollapsePreferences {
     return contentCount == 0
   }
 
+  @MainActor
   static func toggledRawValue(
     lane: TaskBoardInboxLane,
     contentCount: Int,

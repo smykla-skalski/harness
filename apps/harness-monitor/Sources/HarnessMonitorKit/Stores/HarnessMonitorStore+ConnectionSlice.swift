@@ -9,7 +9,6 @@ extension HarnessMonitorStore {
       case connectionState
       case daemonStatus
       case refreshState
-      case daemonActivity
       case persistedDataAvailability
       case metrics
       case remoteDaemon
@@ -36,6 +35,9 @@ extension HarnessMonitorStore {
     @ObservationIgnored var connectionRecoveryTask: Task<Void, Never>?
     @ObservationIgnored var connectionRecoveryGeneration: UInt64 = 0
     @ObservationIgnored var isPreparingForTermination = false
+    /// Store-wide daemon mutation count. Observable because toolbar and task-board
+    /// operation views read `isDaemonActionInFlight` directly.
+    var daemonActionCount = 0
     public var connectionState: ConnectionState = .idle {
       didSet {
         guard oldValue != connectionState else { return }
@@ -57,12 +59,6 @@ extension HarnessMonitorStore {
       }
     }
     public var isDiagnosticsRefreshInFlight = false
-    public var isDaemonActionInFlight = false {
-      didSet {
-        guard oldValue != isDaemonActionInFlight else { return }
-        onChanged?(.daemonActivity)
-      }
-    }
     public var activeTransport: TransportKind = .webSocket
     public var connectionMetrics: ConnectionMetrics = .initial {
       didSet {

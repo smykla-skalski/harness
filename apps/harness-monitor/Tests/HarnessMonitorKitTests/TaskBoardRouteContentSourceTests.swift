@@ -23,18 +23,20 @@ struct TaskBoardRouteContentSourceTests {
       named: "TaskBoardItemManagementSupport.swift"
     )
     let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
+    let selectionModelSource = try taskBoardSourceFile(named: "TaskBoardCardSelectionModel.swift")
+    let actionsSource = try taskBoardSourceFile(named: "TaskBoardOverviewActions.swift")
 
     #expect(overviewSource.contains("TaskBoardItemManagementPanel("))
     #expect(overviewSource.contains(".sheet(item: taskBoardManagementSheet)"))
     #expect(managementPanelSource.contains("harness.task-board.manage-item"))
     #expect(
-      overviewSource.contains(
+      managementActionsSource.contains(
         "TaskBoardOverviewItemBehavior.runOnceRequest(for: item, dryRun: runOnceDryRun)"
       )
     )
-    #expect(overviewSource.contains("onEvaluateTaskBoardItem(item)"))
+    #expect(actionsSource.contains("evaluateTaskBoardItem(item)"))
     #expect(!overviewSource.contains("if !item.hasLinkedSessionTask"))
-    #expect(overviewSource.contains("TaskBoardOverviewItemBehavior.selectionAction("))
+    #expect(selectionModelSource.contains("TaskBoardOverviewItemBehavior.selectionAction("))
     #expect(overviewSource.contains("let inboxItems = currentPresentation.inboxItems(in: lane)"))
     #expect(managementPanelSource.contains("Session Task"))
     #expect(managementPanelSource.contains("Board Only"))
@@ -83,6 +85,7 @@ struct TaskBoardRouteContentSourceTests {
     let laneDropSource = try taskBoardSourceFile(named: "TaskBoardLaneDropSupport.swift")
     let dragSource = try taskBoardSourceFile(named: "TaskBoardCardDragSupport.swift")
     let unifiedSource = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
+    let boardSource = try taskBoardSourceFile(named: "TaskBoardOverviewView+Board.swift")
 
     #expect(overviewSource.contains("lane.taskBoardDropStatus"))
     #expect(dragSource.contains("TaskBoardCardDragPayload"))
@@ -98,12 +101,12 @@ struct TaskBoardRouteContentSourceTests {
     #expect(unifiedSource.contains(".dropConfiguration(dropConfiguration)"))
     #expect(unifiedSource.contains(".onDropSessionUpdated(updateDropSession)"))
     #expect(unifiedSource.contains("? .move : .forbidden"))
-    #expect(unifiedSource.contains("dropPlan(for: session) != nil"))
+    #expect(unifiedSource.contains("isDropEnabled && isDropCandidate"))
     #expect(unifiedSource.contains("TaskBoardCardDropPlan.resolve(payloads, to: lane)"))
     #expect(!unifiedSource.contains(".onDrop("))
     #expect(!unifiedSource.contains("let dragPayload:"))
-    #expect(dragSource.contains(".dragContainerSelection("))
-    #expect(dragSource.contains(".dragContainer("))
+    #expect(boardSource.contains(".dragContainerSelection("))
+    #expect(boardSource.contains(".dragContainer("))
     #expect(!laneSource.contains("TaskBoardItemDragPayload"))
     #expect(!laneSource.contains("TaskBoardInboxItemDragPayload"))
   }
@@ -113,7 +116,8 @@ struct TaskBoardRouteContentSourceTests {
     let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
     let supportSource = try taskBoardSourceFile(named: "TaskBoardCardSelection.swift")
 
-    #expect(laneSource.contains("onSelect(Self.currentEventModifiers)"))
+    #expect(
+      laneSource.contains("selectionModel.select(cardID, modifiers: Self.currentEventModifiers)"))
     #expect(laneSource.contains("Self.currentClickCount == 2"))
     #expect(!laneSource.contains("TapGesture(count: 2)"))
     #expect(laneSource.contains(".accessibilityAddTraits(isSelected ? .isSelected : [])"))

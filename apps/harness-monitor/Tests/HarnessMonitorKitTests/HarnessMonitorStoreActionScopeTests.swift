@@ -39,6 +39,43 @@ struct HarnessMonitorStoreActionScopeTests {
     #expect(store.inFlightActionID == nil)
   }
 
+  @Test("Session action tokens restore the remaining action ID")
+  func sessionActionTokensRestoreRemainingActionID() async {
+    let store = await makeBootstrappedStore()
+    let firstToken = store.beginSessionAction(actionID: "first")
+    let secondToken = store.beginSessionAction(actionID: "second")
+
+    #expect(store.isSessionActionInFlight)
+    #expect(store.inFlightActionID == "second")
+
+    store.endSessionAction(secondToken)
+
+    #expect(store.isSessionActionInFlight)
+    #expect(store.inFlightActionID == "first")
+
+    store.endSessionAction(firstToken)
+
+    #expect(store.isSessionActionInFlight == false)
+    #expect(store.inFlightActionID == nil)
+  }
+
+  @Test("Ending an older session action keeps the newer owner")
+  func endingOlderSessionActionKeepsNewerOwner() async {
+    let store = await makeBootstrappedStore()
+    let firstToken = store.beginSessionAction(actionID: "first")
+    let secondToken = store.beginSessionAction(actionID: "second")
+
+    store.endSessionAction(firstToken)
+
+    #expect(store.isSessionActionInFlight)
+    #expect(store.inFlightActionID == "second")
+
+    store.endSessionAction(secondToken)
+
+    #expect(store.isSessionActionInFlight == false)
+    #expect(store.inFlightActionID == nil)
+  }
+
   @Test("mutateSelectedSession sets inFlightActionID during the mutation and clears it after")
   func mutateSelectedSessionSetsAndClearsActionID() async {
     let client = RecordingHarnessClient()
@@ -100,6 +137,24 @@ struct HarnessMonitorStoreActionScopeTests {
 
     store.primeSessionSelection(nil)
     #expect(store.inFlightActionID == nil)
+  }
+
+  @Test("Switching sessions hides active action IDs without releasing ownership")
+  func sessionSwitchHidesActiveActionIDWithoutReleasingOwnership() async {
+    let store = await makeBootstrappedStore()
+    let sessionID = PreviewFixtures.summary.sessionId
+    await store.selectSession(sessionID)
+    let token = store.beginSessionAction(
+      actionID: ActionID.createTask(sessionID: sessionID).key
+    )
+
+    store.primeSessionSelection(nil)
+
+    #expect(store.isSessionActionInFlight)
+    #expect(store.inFlightActionID == nil)
+
+    store.endSessionAction(token)
+    #expect(store.isSessionActionInFlight == false)
   }
 
   @Test("Re-priming the same session does not clear inFlightActionID")

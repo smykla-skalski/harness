@@ -16,12 +16,4 @@ extension TaskBoardOverviewView {
       rawValue: laneCollapsePreferencesRawValue
     )
   }
-
-  func toggleLaneCollapse(_ lane: TaskBoardInboxLane, contentCount: Int) {
-    laneCollapsePreferencesRawValue = TaskBoardLaneCollapsePreferences.toggledRawValue(
-      lane: lane,
-      contentCount: contentCount,
-      rawValue: laneCollapsePreferencesRawValue
-    )
-  }
 }

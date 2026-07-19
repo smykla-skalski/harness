@@ -1,6 +1,11 @@
 import Foundation
+import HarnessMonitorKit
+import SwiftUI
 import Testing
 
+@testable import HarnessMonitorUIPreviewable
+
+@MainActor
 @Suite("Task board card presentation contracts")
 struct TaskBoardCardPresentationContractTests {
   @Test("Repository leads the footer before card badges")
@@ -21,8 +26,8 @@ struct TaskBoardCardPresentationContractTests {
     let rows = try taskBoardSource("TaskBoardLaneViews.swift")
     let text = try taskBoardSource("TaskBoardInlineCodeText.swift")
 
-    #expect(rows.contains("titlePresentation.title"))
-    #expect(rows.contains("leadingText: titlePresentation.leadingText"))
+    #expect(rows.contains("fallbackTitlePresentation.title"))
+    #expect(rows.contains("titleLeadingText"))
     #expect(text.contains("attributedLeadingText.foregroundColor = leadingForeground"))
     #expect(text.contains("leadingForeground: Color = HarnessMonitorTheme.tertiaryInk"))
     #expect(!rows.contains("Text(\"Review: \""))
@@ -37,8 +42,7 @@ struct TaskBoardCardPresentationContractTests {
     #expect(overview.contains("@State private var relativeTimeClock"))
     #expect(overview.contains(".environment(relativeTimeClock)"))
     #expect(overview.contains("await relativeTimeClock.run()"))
-    #expect(rows.contains("updatedAt: item.updatedAt"))
-    #expect(rows.contains("updatedAt: item.task.updatedAt"))
+    #expect(rows.components(separatedBy: "updatedAt: updatedAtDate").count == 3)
     #expect(support.contains("@Environment(TaskBoardRelativeTimeClock.self)"))
     #expect(support.contains("Task.sleep(for: .seconds(60))"))
     #expect(support.contains("let referenceDate = relativeTimeClock.referenceDate"))
@@ -98,6 +102,157 @@ struct TaskBoardCardPresentationContractTests {
     #expect(!decisionSource.contains(".taskBoardCardBackgroundGlyph("))
     #expect(glyphSource.contains("func taskBoardCardBackgroundGlyph("))
     #expect(glyphSource.contains(".rotationEffect(glyphRotation)"))
+  }
+
+  @Test("Card rows accept an explicit cardPresentation argument")
+  func cardRowsAcceptExplicitCardPresentation() {
+    // Compile-level proof: `var` (not `let`) so this stays passable via the memberwise init.
+    let presentation = TaskBoardCardPresentation(
+      titleFragments: [TaskBoardInlineCodeFragment(text: "Improve caching", isCode: false)],
+      titleLeadingText: nil,
+      titleDisplayText: "Improve caching",
+      glyph: nil,
+      updatedAt: nil,
+      repositoryLabelDefault: nil,
+      repositoryLabelFullName: nil
+    )
+    let typography = TaskBoardCardTitleTypography(fontScale: 1)
+    let selectionModel = TaskBoardCardSelectionModel()
+    let actions = TaskBoardOverviewActions(store: nil, scope: .dashboard)
+
+    let apiRow = TaskBoardItemRow(
+      item: contractTaskBoardItem(),
+      titleTypography: typography,
+      isHovered: false,
+      isSelected: false,
+      selectionModel: selectionModel,
+      actions: actions,
+      cardPresentation: presentation
+    )
+    let inboxRow = TaskBoardInboxItemRow(
+      item: contractInboxItem(),
+      titleTypography: typography,
+      isHovered: false,
+      isSelected: false,
+      selectionModel: selectionModel,
+      actions: actions,
+      cardPresentation: presentation
+    )
+
+    #expect(apiRow.cardPresentation == presentation)
+    #expect(inboxRow.cardPresentation == presentation)
+  }
+
+  @Test("Lane column wires precomputed presentations into both row constructors")
+  func laneColumnWiresCardPresentationIntoRows() throws {
+    let columnSource = try taskBoardSource("TaskBoardLaneUnifiedColumn.swift")
+    let boardSource = try taskBoardSource("TaskBoardOverviewView+Board.swift")
+
+    #expect(columnSource.contains("let apiCardPresentations: [String: TaskBoardCardPresentation]"))
+    #expect(
+      columnSource.contains(
+        "let inboxCardPresentations: [TaskBoardCardID: TaskBoardCardPresentation]"
+      )
+    )
+    #expect(columnSource.contains("cardPresentation: apiCardPresentations[item.id]"))
+    #expect(columnSource.contains("cardPresentation: inboxCardPresentations[cardID]"))
+    #expect(
+      boardSource.contains(
+        "apiCardPresentations: currentPresentation.apiCardPresentations(in: lane)"
+      )
+    )
+    #expect(
+      boardSource.contains(
+        "inboxCardPresentations: currentPresentation.inboxCardPresentations(in: lane)"
+      )
+    )
+  }
+
+  @Test("Decision row accepts actions in place of the onOpenDecision closure")
+  func decisionRowAcceptsActionsInsteadOfClosure() {
+    let actions = TaskBoardOverviewActions(store: nil, scope: .dashboard)
+    let decision = Decision(
+      id: "contract-decision",
+      severity: .warn,
+      ruleID: "rule-contract",
+      sessionID: nil,
+      agentID: nil,
+      taskID: nil,
+      summary: "Contract summary",
+      contextJSON: "{}",
+      suggestedActionsJSON: "[]"
+    )
+
+    let row = TaskBoardDecisionRow(
+      decision: decision,
+      fontScale: 1,
+      isHovered: false,
+      actions: actions
+    )
+
+    #expect(row.actions == actions)
+  }
+
+  @Test("Lane column wires actions into the decision row instead of a closure")
+  func laneColumnWiresDecisionRowActions() throws {
+    let columnSource = try taskBoardSource("TaskBoardLaneUnifiedColumn.swift")
+    let decisionSource = try taskBoardSource("TaskBoardNeedsYouLaneViews.swift")
+
+    #expect(
+      columnSource.contains("TaskBoardDecisionRow(") && columnSource.contains("actions: actions"))
+    #expect(!columnSource.contains("onOpenDecision:"))
+    #expect(!decisionSource.contains("onOpenDecision"))
+    #expect(decisionSource.contains("actions.openDecision(decision)"))
+  }
+
+  private func contractTaskBoardItem() -> TaskBoardItem {
+    TaskBoardItem(
+      schemaVersion: 1,
+      id: "contract-item",
+      title: "Board item",
+      body: "Body",
+      status: .todo,
+      priority: .medium,
+      tags: [],
+      projectId: "example/project",
+      agentMode: .interactive,
+      externalRefs: [],
+      planning: TaskBoardPlanningState(),
+      workflow: nil,
+      sessionId: nil,
+      workItemId: nil,
+      usage: TaskBoardUsage(),
+      createdAt: "2026-07-13T10:00:00Z",
+      updatedAt: "2026-07-13T10:01:00Z",
+      deletedAt: nil
+    )
+  }
+
+  private func contractInboxItem() -> TaskBoardInboxItem {
+    let item = TaskBoardInboxItem(
+      session: PreviewFixtures.summary,
+      task: WorkItem(
+        taskId: "contract-task",
+        title: "Linked task",
+        context: nil,
+        severity: .medium,
+        status: .inProgress,
+        assignedTo: nil,
+        createdAt: "2026-05-14T10:00:00Z",
+        updatedAt: "2026-05-14T10:01:00Z",
+        createdBy: nil,
+        notes: [],
+        suggestedFix: nil,
+        source: .manual,
+        blockedReason: nil,
+        completedAt: nil,
+        checkpointSummary: nil
+      )
+    )
+    guard let item else {
+      preconditionFailure("expected task board inbox item fixture")
+    }
+    return item
   }
 
   private func taskBoardSource(_ fileName: String) throws -> String {

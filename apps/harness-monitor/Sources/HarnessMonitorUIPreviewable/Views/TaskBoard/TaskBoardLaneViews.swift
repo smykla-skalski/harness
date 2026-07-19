@@ -7,8 +7,10 @@ struct TaskBoardItemRow: View {
   let titleTypography: TaskBoardCardTitleTypography
   let isHovered: Bool
   let isSelected: Bool
-  let onSelect: (EventModifiers) -> Void
-  let onOpenItem: (TaskBoardItem) -> Void
+  let selectionModel: TaskBoardCardSelectionModel
+  let actions: TaskBoardOverviewActions
+  /// `var` (not `let`): a `let` with a default is excluded from the memberwise init entirely.
+  var cardPresentation: TaskBoardCardPresentation?
   @Environment(\.fontScale)
   private var fontScale
   @Environment(\.taskBoardLaneAppearance)
@@ -24,26 +26,52 @@ struct TaskBoardItemRow: View {
 
   private var cardID: TaskBoardCardID { .api(item.id) }
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
+
+  /// On-the-fly fallback used only when `cardPresentation` has not been wired in yet.
+  private var fallbackTitlePresentation: TaskBoardCardTitlePresentation {
+    TaskBoardCardTitlePresentation(item: item)
+  }
+  private var titleFragments: [TaskBoardInlineCodeFragment] {
+    cardPresentation?.titleFragments
+      ?? TaskBoardInlineCodeFormatter.fragments(in: fallbackTitlePresentation.title)
+  }
+  private var titleLeadingText: String? {
+    cardPresentation?.titleLeadingText ?? fallbackTitlePresentation.leadingText
+  }
+  private var titleDisplayText: String {
+    cardPresentation?.titleDisplayText
+      ?? TaskBoardInlineCodeFormatter.displayText(
+        for: titleFragments,
+        leadingText: titleLeadingText
+      )
+  }
+  private var updatedAtDate: Date? {
+    if let cardPresentation {
+      return cardPresentation.updatedAt
+    }
+    return TaskBoardCardDateParsing.parse(item.updatedAt)
+  }
+
   var body: some View {
-    let titlePresentation = TaskBoardCardTitlePresentation(item: item)
-    return Button {
-      onSelect(Self.currentEventModifiers)
+    Button {
+      selectionModel.select(cardID, modifiers: Self.currentEventModifiers)
       if Self.currentClickCount == 2 {
-        onOpenItem(item)
+        selectionModel.openAPIItem(item, actions: actions)
       }
     } label: {
       VStack(alignment: .leading, spacing: metrics.laneSpacing) {
         VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
           TaskBoardInlineCodeText(
-            titlePresentation.title,
+            fragments: titleFragments,
+            displayText: titleDisplayText,
             font: titleTypography.font,
             codeFont: titleTypography.codeFont,
-            leadingText: titlePresentation.leadingText,
+            leadingText: titleLeadingText,
             foregroundStyle: HarnessMonitorTheme.ink,
             lineLimit: 2
           )
         }
-        TaskBoardCardFooter(repository: repositoryLabel, updatedAt: item.updatedAt) {
+        TaskBoardCardFooter(repository: repositoryLabel, updatedAt: updatedAtDate) {
           badgeContent
         }
       }
@@ -60,7 +88,7 @@ struct TaskBoardItemRow: View {
     .accessibilityHint("Click to select. Double-click to open.")
     .accessibilityAddTraits(isSelected ? .isSelected : [])
     .accessibilityAction(named: Text("Open")) {
-      onOpenItem(item)
+      selectionModel.openAPIItem(item, actions: actions)
     }
     .accessibilityIdentifier("harness.task-board.api-item.\(item.id)")
   }
@@ -71,6 +99,15 @@ struct TaskBoardItemRow: View {
     guard let projectID = item.projectId else {
       return item.agentMode.title
     }
+    if let cardPresentation {
+      let precomputed =
+        alwaysShowsFullRepositoryNames
+        ? cardPresentation.repositoryLabelFullName
+        : cardPresentation.repositoryLabelDefault
+      if let precomputed {
+        return precomputed
+      }
+    }
     return projectLabelResolver.label(
       for: projectID,
       alwaysShowFullName: alwaysShowsFullRepositoryNames
@@ -78,8 +115,13 @@ struct TaskBoardItemRow: View {
   }
 
   private var cardGlyph: TaskBoardCardGlyph {
-    TaskBoardGitHubCardGlyph.resolve(for: item)
-      ?? TaskBoardCardGlyph(systemImage: statusSymbol, tint: statusTint)
+    let resolvedGlyph: TaskBoardCardGlyph? =
+      if let cardPresentation {
+        cardPresentation.glyph
+      } else {
+        TaskBoardGitHubCardGlyph.resolve(for: item)
+      }
+    return resolvedGlyph ?? TaskBoardCardGlyph(systemImage: statusSymbol, tint: statusTint)
   }
 
   private var statusSymbol: String? {
@@ -119,8 +161,10 @@ struct TaskBoardInboxItemRow: View {
   let titleTypography: TaskBoardCardTitleTypography
   let isHovered: Bool
   let isSelected: Bool
-  let onSelect: (EventModifiers) -> Void
-  let onOpenItem: (TaskBoardInboxItem) -> Void
+  let selectionModel: TaskBoardCardSelectionModel
+  let actions: TaskBoardOverviewActions
+  /// `var` (not `let`): a `let` with a default is excluded from the memberwise init entirely.
+  var cardPresentation: TaskBoardCardPresentation?
   @Environment(\.fontScale)
   private var fontScale
 
@@ -129,24 +173,39 @@ struct TaskBoardInboxItemRow: View {
     .inbox(sessionID: item.session.sessionId, taskID: item.task.taskId)
   }
 
+  private var titleFragments: [TaskBoardInlineCodeFragment] {
+    cardPresentation?.titleFragments ?? TaskBoardInlineCodeFormatter.fragments(in: item.task.title)
+  }
+  private var titleDisplayText: String {
+    cardPresentation?.titleDisplayText
+      ?? TaskBoardInlineCodeFormatter.displayText(for: titleFragments)
+  }
+  private var updatedAtDate: Date? {
+    if let cardPresentation {
+      return cardPresentation.updatedAt
+    }
+    return TaskBoardCardDateParsing.parse(item.task.updatedAt)
+  }
+
   var body: some View {
     Button {
-      onSelect(Self.currentEventModifiers)
+      selectionModel.select(cardID, modifiers: Self.currentEventModifiers)
       if Self.currentClickCount == 2 {
-        onOpenItem(item)
+        actions.openInboxItem(item)
       }
     } label: {
       VStack(alignment: .leading, spacing: metrics.laneSpacing) {
         VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
           TaskBoardInlineCodeText(
-            item.task.title,
+            fragments: titleFragments,
+            displayText: titleDisplayText,
             font: titleTypography.font,
             codeFont: titleTypography.codeFont,
             foregroundStyle: HarnessMonitorTheme.ink,
             lineLimit: 2
           )
         }
-        TaskBoardCardFooter(repository: item.subtitle, updatedAt: item.task.updatedAt) {
+        TaskBoardCardFooter(repository: item.subtitle, updatedAt: updatedAtDate) {
           badgeContent
         }
       }
@@ -163,7 +222,7 @@ struct TaskBoardInboxItemRow: View {
     .accessibilityHint("Click to select. Double-click to open.")
     .accessibilityAddTraits(isSelected ? .isSelected : [])
     .accessibilityAction(named: Text("Open")) {
-      onOpenItem(item)
+      actions.openInboxItem(item)
     }
     .accessibilityIdentifier("harness.task-board.item.\(item.task.taskId)")
   }

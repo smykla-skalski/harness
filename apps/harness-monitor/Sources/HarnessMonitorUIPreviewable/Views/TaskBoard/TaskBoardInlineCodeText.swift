@@ -1,18 +1,45 @@
 import Foundation
 import SwiftUI
 
-private struct TaskBoardInlineCodeFragment: Equatable {
+/// Internal (not private) and `Sendable` so the presentation worker can scan once, off the main
+/// actor, and hand fragments to leaf views instead of every render re-running the scanner.
+struct TaskBoardInlineCodeFragment: Equatable, Sendable {
   let text: String
   let isCode: Bool
 }
 
 enum TaskBoardInlineCodeFormatter {
   static func displayText(for rawText: String, leadingText: String? = nil) -> String {
-    (leadingText ?? "") + fragments(in: rawText).map(\.text).joined()
+    displayText(for: fragments(in: rawText), leadingText: leadingText)
+  }
+
+  static func displayText(
+    for fragments: [TaskBoardInlineCodeFragment],
+    leadingText: String? = nil
+  ) -> String {
+    (leadingText ?? "") + fragments.map(\.text).joined()
   }
 
   static func attributedText(
     for rawText: String,
+    codeFont: Font,
+    leadingText: String? = nil,
+    leadingForeground: Color = HarnessMonitorTheme.tertiaryInk,
+    codeForeground: Color = HarnessMonitorTheme.inlineCodeText,
+    codeBackground: Color = HarnessMonitorTheme.inlineCodeBackground
+  ) -> AttributedString {
+    attributedText(
+      for: fragments(in: rawText),
+      codeFont: codeFont,
+      leadingText: leadingText,
+      leadingForeground: leadingForeground,
+      codeForeground: codeForeground,
+      codeBackground: codeBackground
+    )
+  }
+
+  static func attributedText(
+    for fragments: [TaskBoardInlineCodeFragment],
     codeFont: Font,
     leadingText: String? = nil,
     leadingForeground: Color = HarnessMonitorTheme.tertiaryInk,
@@ -25,7 +52,7 @@ enum TaskBoardInlineCodeFormatter {
       attributedLeadingText.foregroundColor = leadingForeground
       result += attributedLeadingText
     }
-    return fragments(in: rawText).reduce(into: result) { result, fragment in
+    return fragments.reduce(into: result) { result, fragment in
       var attributedFragment = AttributedString(fragment.text)
       if fragment.isCode {
         attributedFragment.font = codeFont
@@ -36,7 +63,7 @@ enum TaskBoardInlineCodeFormatter {
     }
   }
 
-  private static func fragments(in rawText: String) -> [TaskBoardInlineCodeFragment] {
+  static func fragments(in rawText: String) -> [TaskBoardInlineCodeFragment] {
     guard rawText.contains("`") else {
       return [.init(text: rawText, isCode: false)]
     }
@@ -77,8 +104,13 @@ enum TaskBoardInlineCodeFormatter {
 }
 
 /// Lightweight backtick-span renderer that consumes fonts scaled by its container.
+///
+/// Prefer the `fragments:displayText:` init when the caller already has worker-precomputed
+/// fragments, so the scanner never re-runs on the render path. The raw-text init stays for callers
+/// outside the per-card presentation pipeline (e.g. the step-rail prompt preview).
 struct TaskBoardInlineCodeText: View {
-  let text: String
+  private let fragments: [TaskBoardInlineCodeFragment]
+  private let displayText: String
   let font: Font
   let codeFont: Font
   var leadingText: String?
@@ -103,7 +135,42 @@ struct TaskBoardInlineCodeText: View {
     truncationMode: Text.TruncationMode = .tail,
     multilineTextAlignment: TextAlignment = .leading
   ) {
-    self.text = text
+    let fragments = TaskBoardInlineCodeFormatter.fragments(in: text)
+    self.init(
+      fragments: fragments,
+      displayText: TaskBoardInlineCodeFormatter.displayText(
+        for: fragments,
+        leadingText: leadingText
+      ),
+      font: font,
+      codeFont: codeFont,
+      leadingText: leadingText,
+      leadingForeground: leadingForeground,
+      foregroundStyle: foregroundStyle,
+      codeForeground: codeForeground,
+      codeBackground: codeBackground,
+      lineLimit: lineLimit,
+      truncationMode: truncationMode,
+      multilineTextAlignment: multilineTextAlignment
+    )
+  }
+
+  init(
+    fragments: [TaskBoardInlineCodeFragment],
+    displayText: String,
+    font: Font,
+    codeFont: Font,
+    leadingText: String? = nil,
+    leadingForeground: Color = HarnessMonitorTheme.tertiaryInk,
+    foregroundStyle: Color = .primary,
+    codeForeground: Color = HarnessMonitorTheme.inlineCodeText,
+    codeBackground: Color = HarnessMonitorTheme.inlineCodeBackground,
+    lineLimit: Int? = nil,
+    truncationMode: Text.TruncationMode = .tail,
+    multilineTextAlignment: TextAlignment = .leading
+  ) {
+    self.fragments = fragments
+    self.displayText = displayText
     self.font = font
     self.codeFont = codeFont
     self.leadingText = leadingText
@@ -119,7 +186,7 @@ struct TaskBoardInlineCodeText: View {
   var body: some View {
     Text(
       TaskBoardInlineCodeFormatter.attributedText(
-        for: text,
+        for: fragments,
         codeFont: codeFont,
         leadingText: leadingText,
         leadingForeground: leadingForeground,
@@ -132,8 +199,6 @@ struct TaskBoardInlineCodeText: View {
     .lineLimit(lineLimit)
     .truncationMode(truncationMode)
     .multilineTextAlignment(multilineTextAlignment)
-    .accessibilityLabel(
-      TaskBoardInlineCodeFormatter.displayText(for: text, leadingText: leadingText)
-    )
+    .accessibilityLabel(displayText)
   }
 }

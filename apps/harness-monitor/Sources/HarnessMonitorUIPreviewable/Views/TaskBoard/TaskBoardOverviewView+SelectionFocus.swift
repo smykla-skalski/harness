@@ -3,45 +3,35 @@ import HarnessMonitorKit
 extension TaskBoardOverviewView {
   var taskBoardCommandFocus: TaskBoardCommandFocus? {
     guard isCommandFocusActive else { return nil }
+    let selectedIDs = selectionModelValue.orderedSelectedIDs
     return TaskBoardCommandFocus(
-      selection: taskBoardSelectionFocus,
+      selection: TaskBoardSelectionFocus(
+        selectionCount: selectedIDs.count,
+        canDelete: canDeleteTaskBoardCards(selectedIDs),
+        dispatcher: taskBoardSelectionDispatcherValue
+      ),
       operationsInspector: operationsInspectorFocus
     )
-  }
-
-  var taskBoardSelectionFocus: TaskBoardSelectionFocus {
-    TaskBoardSelectionFocus(
-      selectionCount: orderedSelectedCardIDs.count,
-      canDelete: canDeleteSelectedTaskBoardCards,
-      dispatcher: taskBoardSelectionDispatcherValue
-    )
-  }
-
-  private var canDeleteSelectedTaskBoardCards: Bool {
-    canDeleteTaskBoardCards(orderedSelectedCardIDs)
   }
 
   func canDeleteTaskBoardCards(_ selectedIDs: [TaskBoardCardID]) -> Bool {
     guard
       !selectedIDs.isEmpty,
       !isActionInFlight,
-      selectedTaskBoardItemIDValue == nil,
-      !isCreatingTaskBoardItemValue,
-      onDeleteTaskBoardTargets != nil,
-      deletionTargets(for: selectedIDs).count == selectedIDs.count
+      selectionModelValue.selectedItemID == nil,
+      !selectionModelValue.isCreatingItem,
+      actions.canDeleteTargets
     else {
       return false
     }
-    guard let store else {
-      return true
-    }
-    return !store.isBusy && !store.isSessionReadOnly && store.apiClient != nil
+    return deletionTargets(for: selectedIDs).count == selectedIDs.count
   }
 
   func requestDeleteSelectedTaskBoardCards() {
-    guard canDeleteSelectedTaskBoardCards else {
+    let selectedIDs = selectionModelValue.orderedSelectedIDs
+    guard canDeleteTaskBoardCards(selectedIDs) else {
       return
     }
-    onDeleteTaskBoardTargets?(deletionTargets(for: orderedSelectedCardIDs))
+    actions.deleteTaskBoardTargets(deletionTargets(for: selectedIDs))
   }
 }

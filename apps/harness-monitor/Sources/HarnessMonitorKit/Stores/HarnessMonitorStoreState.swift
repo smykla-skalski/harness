@@ -24,6 +24,7 @@ struct CacheWriteSyncState {
 struct TaskBoardRuntimeState {
   var connection = TaskBoardConnectionState()
   var stepModeMutation = TaskBoardStepModeMutationState()
+  var actionCount = 0
 }
 
 struct TaskBoardStepModeMutationState {

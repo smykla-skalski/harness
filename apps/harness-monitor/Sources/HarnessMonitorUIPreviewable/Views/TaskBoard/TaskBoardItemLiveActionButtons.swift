@@ -8,10 +8,13 @@ struct TaskBoardItemLiveActionButtons: View {
   let isActionInFlight: Bool
   let runOnceDryRun: Bool
   let evaluateDryRun: Bool
-  let onRunOnce: ((TaskBoardItem) -> Void)?
-  let onEvaluate: ((TaskBoardItem) -> Void)?
+  let actions: TaskBoardOverviewActions
+  let evaluatePreviewState: TaskBoardEvaluatePreviewState
 
   @State private var pendingAction: LiveAction?
+
+  private var canRunOnce: Bool { actions.canRunOrchestratorOnce }
+  private var canEvaluate: Bool { actions.canEvaluateItem || actions.canEvaluateBoard }
 
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
@@ -40,7 +43,7 @@ struct TaskBoardItemLiveActionButtons: View {
   private var runOnceButton: some View {
     Button {
       if runOnceDryRun {
-        onRunOnce?(item)
+        runOnce()
       } else {
         pendingAction = .runOnce
       }
@@ -51,7 +54,7 @@ struct TaskBoardItemLiveActionButtons: View {
     .frame(minHeight: metrics.controlMinHeight)
     .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
     .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-    .disabled(isActionInFlight || onRunOnce == nil)
+    .disabled(isActionInFlight || !canRunOnce)
     .help(
       runOnceDryRun
         ? "Preview one orchestrator run without applying changes"
@@ -62,7 +65,7 @@ struct TaskBoardItemLiveActionButtons: View {
   private var evaluateButton: some View {
     Button {
       if evaluateDryRun {
-        onEvaluate?(item)
+        evaluate()
       } else {
         pendingAction = .evaluate
       }
@@ -76,7 +79,7 @@ struct TaskBoardItemLiveActionButtons: View {
     .frame(minHeight: metrics.controlMinHeight)
     .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
     .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-    .disabled(isActionInFlight || onEvaluate == nil)
+    .disabled(isActionInFlight || !canEvaluate)
     .help(
       evaluateDryRun
         ? "Preview this board item's evaluation without applying changes"
@@ -87,10 +90,24 @@ struct TaskBoardItemLiveActionButtons: View {
   private func perform(_ action: LiveAction) {
     switch action {
     case .runOnce:
-      onRunOnce?(item)
+      runOnce()
     case .evaluate:
-      onEvaluate?(item)
+      evaluate()
     }
+  }
+
+  private func runOnce() {
+    actions.runTaskBoardOrchestratorOnce(
+      TaskBoardOverviewItemBehavior.runOnceRequest(for: item, dryRun: runOnceDryRun)
+    )
+  }
+
+  private func evaluate() {
+    actions.evaluateTaskBoardItemOrPreview(
+      item,
+      dryRun: evaluateDryRun,
+      previewState: evaluatePreviewState
+    )
   }
 }
 
@@ -132,12 +149,12 @@ struct TaskBoardItemSyncActionButton: View {
   let metrics: TaskBoardOverviewMetrics
   let captionFont: Font
   let isActionInFlight: Bool
-  let onSync: (() -> Void)?
+  let actions: TaskBoardOverviewActions
 
   @State private var isConfirming = false
 
   var body: some View {
-    if let onSync {
+    if actions.canRefreshBoard {
       Button {
         isConfirming = true
       } label: {
@@ -151,8 +168,10 @@ struct TaskBoardItemSyncActionButton: View {
       .help("Pull external sources and apply live board changes after confirmation")
       .accessibilityIdentifier("harness.task-board.manage-item.refresh")
       .confirmationDialog("Sync the live task board?", isPresented: $isConfirming) {
-        Button("Sync Live", role: .destructive, action: onSync)
-          .disabled(isActionInFlight)
+        Button("Sync Live", role: .destructive) {
+          actions.refreshTaskBoard()
+        }
+        .disabled(isActionInFlight)
         Button("Cancel", role: .cancel) {}
       } message: {
         Text("This pulls external task sources and applies changes to the live board.")

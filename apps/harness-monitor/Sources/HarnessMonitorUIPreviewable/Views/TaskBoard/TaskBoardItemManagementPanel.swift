@@ -8,23 +8,15 @@ struct TaskBoardItemManagementPanel: View {
   let isActionInFlight: Bool
   let runOnceDryRun: Bool
   let evaluateDryRun: Bool
-  let store: HarnessMonitorStore?
-  let onCreate: ((TaskBoardCreateItemRequest, TaskBoardStatus) -> Void)?
-  let onUpdate: ((String, TaskBoardUpdateItemRequest) -> Void)?
-  let onDelete: ((TaskBoardItem) -> Void)?
-  let onRunOnce: ((TaskBoardItem) -> Void)?
-  let onEvaluate: ((TaskBoardItem) -> Void)?
-  let onBeginPlan: ((TaskBoardItem) -> Void)?
-  let onSubmitPlan: ((TaskBoardItem, String) -> Void)?
-  let onApprovePlan: ((TaskBoardItem, String, String?) -> Void)?
-  let onRevokePlan: ((TaskBoardItem) -> Void)?
-  let onRefresh: (() -> Void)?
-  let onClose: () -> Void
+  let actions: TaskBoardOverviewActions
+  let evaluatePreviewState: TaskBoardEvaluatePreviewState
 
   @State private var draft: TaskBoardItemEditorDraft
   @State private var projectTypeSuggestions: [String] = []
   @Environment(\.fontScale)
   var fontScale
+  @Environment(\.dismiss)
+  private var dismiss
 
   var headerTitleFont: Font {
     HarnessMonitorTextSize.scaledFont(.title2.weight(.semibold), by: fontScale)
@@ -45,36 +37,16 @@ struct TaskBoardItemManagementPanel: View {
     isActionInFlight: Bool,
     runOnceDryRun: Bool = true,
     evaluateDryRun: Bool = true,
-    store: HarnessMonitorStore? = nil,
-    onCreate: ((TaskBoardCreateItemRequest, TaskBoardStatus) -> Void)?,
-    onUpdate: ((String, TaskBoardUpdateItemRequest) -> Void)?,
-    onDelete: ((TaskBoardItem) -> Void)?,
-    onRunOnce: ((TaskBoardItem) -> Void)?,
-    onEvaluate: ((TaskBoardItem) -> Void)?,
-    onBeginPlan: ((TaskBoardItem) -> Void)?,
-    onSubmitPlan: ((TaskBoardItem, String) -> Void)?,
-    onApprovePlan: ((TaskBoardItem, String, String?) -> Void)?,
-    onRevokePlan: ((TaskBoardItem) -> Void)?,
-    onRefresh: (() -> Void)?,
-    onClose: @escaping () -> Void
+    actions: TaskBoardOverviewActions,
+    evaluatePreviewState: TaskBoardEvaluatePreviewState
   ) {
     self.item = item
     self.metrics = metrics
     self.isActionInFlight = isActionInFlight
     self.runOnceDryRun = runOnceDryRun
     self.evaluateDryRun = evaluateDryRun
-    self.store = store
-    self.onCreate = onCreate
-    self.onUpdate = onUpdate
-    self.onDelete = onDelete
-    self.onRunOnce = onRunOnce
-    self.onEvaluate = onEvaluate
-    self.onBeginPlan = onBeginPlan
-    self.onSubmitPlan = onSubmitPlan
-    self.onApprovePlan = onApprovePlan
-    self.onRevokePlan = onRevokePlan
-    self.onRefresh = onRefresh
-    self.onClose = onClose
+    self.actions = actions
+    self.evaluatePreviewState = evaluatePreviewState
     _draft = State(
       initialValue: item.map(TaskBoardItemEditorDraft.init) ?? TaskBoardItemEditorDraft()
     )
@@ -106,7 +78,7 @@ struct TaskBoardItemManagementPanel: View {
 
   @MainActor
   func loadProjectTypeSuggestions() async {
-    projectTypeSuggestions = await TaskBoardHostProjectTypeSuggestions.load(from: store)
+    projectTypeSuggestions = await TaskBoardHostProjectTypeSuggestions.load(from: actions.store)
   }
 
   var panelCaptionSemibold: Font {
@@ -158,7 +130,9 @@ struct TaskBoardItemManagementPanel: View {
       .accessibilityElement(children: .combine)
       .accessibilityAddTraits(.isHeader)
       Spacer(minLength: HarnessMonitorTheme.spacingSM)
-      Button(action: onClose) {
+      Button {
+        dismiss()
+      } label: {
         Image(systemName: "xmark.circle.fill")
           .scaledFont(.title3)
           .foregroundStyle(.secondary)
@@ -281,10 +255,7 @@ struct TaskBoardItemManagementPanel: View {
         draft: draft,
         metrics: metrics,
         isActionInFlight: isActionInFlight,
-        onBeginPlan: onBeginPlan,
-        onSubmitPlan: onSubmitPlan,
-        onApprovePlan: onApprovePlan,
-        onRevokePlan: onRevokePlan
+        actions: actions
       )
 
       TaskBoardItemLiveActionButtons(
@@ -294,27 +265,27 @@ struct TaskBoardItemManagementPanel: View {
         isActionInFlight: isActionInFlight,
         runOnceDryRun: runOnceDryRun,
         evaluateDryRun: evaluateDryRun,
-        onRunOnce: onRunOnce,
-        onEvaluate: onEvaluate
+        actions: actions,
+        evaluatePreviewState: evaluatePreviewState
       )
 
       Button(role: .destructive) {
-        onDelete?(item)
-        onClose()
+        actions.deleteTaskBoardItem(item)
+        dismiss()
       } label: {
         Label("Delete", systemImage: "trash")
           .font(captionSemibold)
       }
       .frame(minHeight: metrics.controlMinHeight)
       .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-      .disabled(isActionInFlight || onDelete == nil)
+      .disabled(isActionInFlight || !actions.canDeleteItem)
     }
 
     TaskBoardItemSyncActionButton(
       metrics: metrics,
       captionFont: captionSemibold,
       isActionInFlight: isActionInFlight,
-      onSync: onRefresh
+      actions: actions
     )
   }
 
@@ -323,7 +294,7 @@ struct TaskBoardItemManagementPanel: View {
   }
 
   var canSubmit: Bool {
-    isCreating ? onCreate != nil : onUpdate != nil
+    isCreating ? actions.canCreateItem : actions.canUpdateItem
   }
 
   var linkLabel: String {
@@ -366,9 +337,9 @@ struct TaskBoardItemManagementPanel: View {
 
   func submitDraft() {
     if let item {
-      onUpdate?(item.id, draft.updateRequest)
+      actions.updateTaskBoardItem(item.id, request: draft.updateRequest)
     } else {
-      onCreate?(draft.createRequest, draft.status)
+      actions.createTaskBoardItem(draft.createRequest, initialStatus: draft.status)
     }
   }
 }

@@ -15,8 +15,8 @@ extension HarnessMonitorStore {
       return .failed
     }
 
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    defer { endDaemonAction() }
 
     return await mutateHostBridgeCapability(
       using: client,
@@ -104,8 +104,8 @@ extension HarnessMonitorStore {
       return nil
     }
 
-    isSessionActionInFlight = true
-    defer { isSessionActionInFlight = false }
+    let sessionActionToken = beginSessionAction()
+    defer { endSessionAction(sessionActionToken) }
 
     let request = CodexRunRequest(
       actor: resolvedActor,
@@ -358,16 +358,8 @@ extension HarnessMonitorStore {
     actionID: String? = nil,
     mutation: @escaping @Sendable () async throws -> CodexRunSnapshot
   ) async -> Bool {
-    isSessionActionInFlight = true
-    if let actionID {
-      inFlightActionID = actionID
-    }
-    defer {
-      isSessionActionInFlight = false
-      if let actionID, inFlightActionID == actionID {
-        inFlightActionID = nil
-      }
-    }
+    let sessionActionToken = beginSessionAction(actionID: actionID)
+    defer { endSessionAction(sessionActionToken) }
 
     do {
       let measuredRun = try await Self.measureOperation {

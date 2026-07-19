@@ -10,8 +10,12 @@ extension HarnessMonitorStore {
     guard let client else {
       return false
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    beginTaskBoardAction()
+    defer {
+      endDaemonAction()
+      endTaskBoardAction()
+    }
 
     do {
       let measuredResponse = try await Self.measureOperation {
@@ -37,8 +41,12 @@ extension HarnessMonitorStore {
     guard let client else {
       return false
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    beginTaskBoardAction()
+    defer {
+      endDaemonAction()
+      endTaskBoardAction()
+    }
 
     do {
       let measuredStatus = try await Self.measureOperation {

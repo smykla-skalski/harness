@@ -50,7 +50,7 @@ extension HarnessMonitorStore {
       ])
     case .daemonStatus:
       scheduleUISync([.contentToolbar, .contentDashboard, .sidebar])
-    case .refreshState, .daemonActivity:
+    case .refreshState:
       scheduleUISync([.contentToolbar, .contentDashboard])
     case .persistedDataAvailability:
       scheduleUISync([.contentToolbar, .contentChrome])
@@ -267,6 +267,7 @@ extension HarnessMonitorStore {
         policyAudit: globalPolicyAudit
       )
     )
+    contentUI.dashboard.applyTaskBoardBusy(isTaskBoardBusy)
   }
 
   private func tuiStatusByAgent(for detail: SessionDetail?) -> [String: AgentTuiStatus] {

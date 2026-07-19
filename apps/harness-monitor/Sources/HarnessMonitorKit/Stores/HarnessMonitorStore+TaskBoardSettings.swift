@@ -92,8 +92,13 @@ extension HarnessMonitorStore {
     snapshot: TaskBoardGitSettingsSnapshot,
     origin: TaskBoardSettingsSaveOrigin
   ) async -> Bool {
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    guard !isTaskBoardBusy else { return false }
+    beginDaemonAction()
+    beginTaskBoardAction()
+    defer {
+      endDaemonAction()
+      endTaskBoardAction()
+    }
 
     do {
       let client = try await taskBoardSettingsClient()

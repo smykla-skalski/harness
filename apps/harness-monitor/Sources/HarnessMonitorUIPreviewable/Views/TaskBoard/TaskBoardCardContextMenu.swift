@@ -20,9 +20,41 @@ struct TaskBoardCardContextMenuActions {
   let primeSelection: ([TaskBoardCardID]) -> Void
 }
 
+extension TaskBoardCardContextMenuActions {
+  /// Environment default before `TaskBoardOverviewView` installs the real
+  /// value. Never rendered live: `.contextMenu` content is only built when a
+  /// menu actually opens, by which point the environment carries the real
+  /// actions - this only backstops previews/tests that mount a card in
+  /// isolation, so every branch is disabled/no-op.
+  static var inert: TaskBoardCardContextMenuActions {
+    TaskBoardCardContextMenuActions(
+      selectedIDs: [],
+      orderedVisibleIDs: [],
+      isActionInFlight: true,
+      canOpen: { _ in false },
+      open: { _ in },
+      canOpenAgent: { _ in false },
+      openAgent: { _ in },
+      githubURL: { _ in nil },
+      openGitHubURL: { _ in },
+      canMove: { _, _ in false },
+      move: { _, _ in },
+      deletionTargets: { _ in [] },
+      canDelete: { _ in false },
+      deleteTargets: nil,
+      primeSelection: { _ in }
+    )
+  }
+}
+
+extension EnvironmentValues {
+  @Entry var taskBoardCardContextMenuActions: TaskBoardCardContextMenuActions = .inert
+}
+
 struct TaskBoardCardContextMenu: View {
   let cardID: TaskBoardCardID
-  let actions: TaskBoardCardContextMenuActions
+  @Environment(\.taskBoardCardContextMenuActions)
+  private var actions
 
   var body: some View {
     if let scope = TaskBoardCardContextMenuScope.resolve(

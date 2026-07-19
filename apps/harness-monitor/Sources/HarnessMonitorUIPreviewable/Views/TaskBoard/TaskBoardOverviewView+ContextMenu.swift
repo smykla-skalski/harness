@@ -3,8 +3,12 @@ import HarnessMonitorKit
 
 extension TaskBoardOverviewView {
   var taskBoardCardContextMenuActions: TaskBoardCardContextMenuActions {
-    TaskBoardCardContextMenuActions(
-      selectedIDs: cardSelectionValue.selectedIDs,
+    let deleteTargetsAction: (([TaskBoardDeletionTarget]) -> Void)? =
+      actions.canDeleteTargets
+      ? { targets in actions.deleteTaskBoardTargets(targets) }
+      : nil
+    return TaskBoardCardContextMenuActions(
+      selectedIDs: selectionModelValue.selectedIDs,
       orderedVisibleIDs: currentPresentation.orderedCardIDs,
       isActionInFlight: isActionInFlight,
       canOpen: canOpenCard,
@@ -19,16 +23,13 @@ extension TaskBoardOverviewView {
       move: moveCardContextMenuSelection,
       deletionTargets: deletionTargets,
       canDelete: canDeleteTaskBoardCards,
-      deleteTargets: onDeleteTaskBoardTargets,
+      deleteTargets: deleteTargetsAction,
       primeSelection: primeCardSelectionForContextMenu
     )
   }
 
   func primeCardSelectionForContextMenu(_ cardIDs: [TaskBoardCardID]) {
-    let next = cardSelectionValue.selectingForContextMenu(cardIDs)
-    if cardSelectionValue != next {
-      cardSelectionValue = next
-    }
+    selectionModelValue.primeForContextMenu(cardIDs)
   }
 
   private func canMoveCardContextMenuSelection(
@@ -41,9 +42,9 @@ extension TaskBoardOverviewView {
     return plan.items.allSatisfy { item in
       switch item {
       case .api:
-        onMoveTaskBoardItems != nil
+        actions.canMoveTaskBoardItems
       case .inbox:
-        onMoveInboxItems != nil
+        actions.canMoveInboxItems
       }
     }
   }
@@ -55,7 +56,11 @@ extension TaskBoardOverviewView {
     guard let plan = cardContextMenuMovePlan(cardIDs, to: lane) else {
       return
     }
-    _ = moveCards(plan.items, to: lane)
+    actions.moveCardsOrReportRejection(
+      plan.items,
+      to: lane,
+      liveInboxItems: liveInboxItemsValue
+    )
   }
 
   private func cardContextMenuMovePlan(
@@ -78,11 +83,11 @@ extension TaskBoardOverviewView {
     switch cardID {
     case .api(let itemID):
       if let item = currentPresentation.taskBoardItem(id: itemID) {
-        openTaskBoardItem(item)
+        selectionModelValue.openAPIItem(item, actions: actions)
       }
     case .inbox:
       if let item = currentPresentation.inboxItem(id: cardID) {
-        onOpenItem(item)
+        actions.openInboxItem(item)
       }
     }
   }

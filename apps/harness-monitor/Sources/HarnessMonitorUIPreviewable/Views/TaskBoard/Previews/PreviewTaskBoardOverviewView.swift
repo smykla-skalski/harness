@@ -8,11 +8,9 @@ import SwiftUI
     store: TaskBoardPreviewFixtures.store,
     orchestratorStatus: TaskBoardPreviewFixtures.orchestratorStatus,
     evaluationSummary: TaskBoardPreviewFixtures.evaluationSummary,
-    onEvaluateTaskBoard: {},
-    onRefreshTaskBoard: {},
-    onStartTaskBoardOrchestrator: {},
-    onStopTaskBoardOrchestrator: {},
-    onRunTaskBoardOrchestratorOnce: { _ in }
+    actions: TaskBoardOverviewActions(store: TaskBoardPreviewFixtures.store, scope: .dashboard),
+    decisionItems: [],
+    decisionsByID: [:]
   )
   .padding(24)
   .frame(width: 1_120)

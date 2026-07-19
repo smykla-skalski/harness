@@ -6,6 +6,27 @@ import Testing
 @MainActor
 @Suite("Harness Monitor task-board deletion")
 struct HarnessMonitorStoreTaskBoardDeletionTests {
+  @Test("Deletion readiness matches every store guard")
+  func deletionReadinessMatchesStoreGuard() async {
+    let store = await makeBootstrappedStore()
+    #expect(store.canDeleteTaskBoardTargets)
+
+    store.beginTaskBoardAction()
+    #expect(store.canDeleteTaskBoardTargets == false)
+    store.endTaskBoardAction()
+
+    store.beginDaemonAction()
+    #expect(store.canDeleteTaskBoardTargets == false)
+    store.endDaemonAction()
+
+    store.connectionState = .offline("Unavailable for test")
+    #expect(store.canDeleteTaskBoardTargets == false)
+
+    let unavailableStore = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    unavailableStore.connectionState = .online
+    #expect(unavailableStore.canDeleteTaskBoardTargets == false)
+  }
+
   @Test("Deletion targets expose stable kind-scoped identities and titles")
   func deletionTargetsExposeStableIdentityAndTitle() throws {
     let boardItem = deletionBoardItem(id: "board-1", title: "Board draft")
@@ -65,7 +86,8 @@ struct HarnessMonitorStoreTaskBoardDeletionTests {
   @Test("Deletion request is gated while another action is in progress")
   func deletionRequestRejectsBusyStore() async {
     let store = await makeBootstrappedStore()
-    store.isDaemonActionInFlight = true
+    store.beginDaemonAction()
+    #expect(store.canDeleteTaskBoardTargets == false)
 
     store.requestTaskBoardDeletionConfirmation(
       targets: [.taskBoardItem(id: "board-1", title: "Board draft")]
@@ -79,6 +101,7 @@ struct HarnessMonitorStoreTaskBoardDeletionTests {
   func deletionRequestRejectsReadOnlyStore() async {
     let store = await makeBootstrappedStore()
     store.connectionState = .offline("Unavailable for test")
+    #expect(store.canDeleteTaskBoardTargets == false)
 
     store.requestTaskBoardDeletionConfirmation(
       targets: [.taskBoardItem(id: "board-1", title: "Board draft")]
@@ -92,6 +115,7 @@ struct HarnessMonitorStoreTaskBoardDeletionTests {
   func deletionRequestRequiresActionChannel() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.connectionState = .online
+    #expect(store.canDeleteTaskBoardTargets == false)
 
     store.requestTaskBoardDeletionConfirmation(
       targets: [.taskBoardItem(id: "board-1", title: "Board draft")]
@@ -187,6 +211,46 @@ struct HarnessMonitorStoreTaskBoardDeletionTests {
         ]
     )
     #expect(store.currentSuccessFeedbackMessage == "Deleted 3 tasks")
+  }
+
+  @Test("Mixed deletion stays board-busy through the inbox phase")
+  func mixedDeletionStaysBoardBusyThroughInboxPhase() async {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardItems([
+      deletionBoardItem(id: "board-1", title: "Board draft")
+    ])
+    client.configureMutationDelay(.milliseconds(200))
+    let store = await makeBootstrappedStore(client: client)
+    store.stopAllStreams()
+    let baselineReads = client.readCallCount(.taskBoardItems(nil))
+    let inboxTask = PreviewFixtures.tasks[0]
+
+    let deletion = Task { @MainActor in
+      await store.deleteTaskBoardTargets([
+        .taskBoardItem(id: "board-1", title: "Board draft"),
+        .inboxTask(
+          sessionID: PreviewFixtures.summary.sessionId,
+          taskID: inboxTask.taskId,
+          title: inboxTask.title
+        ),
+      ])
+    }
+
+    for _ in 0..<100 {
+      if client.readCallCount(.taskBoardItems(nil)) > baselineReads {
+        break
+      }
+      try? await Task.sleep(for: .milliseconds(5))
+    }
+    await Task.yield()
+
+    #expect(client.readCallCount(.taskBoardItems(nil)) == baselineReads + 1)
+    #expect(store.globalTaskBoardItems.isEmpty)
+    #expect(store.isTaskBoardBusy)
+
+    let success = await deletion.value
+    #expect(success)
+    #expect(store.isTaskBoardBusy == false)
   }
 
   private func deletionBoardItem(id: String, title: String) -> TaskBoardItem {

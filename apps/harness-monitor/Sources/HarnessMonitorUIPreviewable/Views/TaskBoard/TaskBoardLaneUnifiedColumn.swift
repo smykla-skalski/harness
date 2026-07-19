@@ -2,33 +2,55 @@ import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
+/// Pure routing decision for a drop delivery, extracted so the reject-reason mapping stays
+/// testable without a live view. The guard legs here are reachable only through config/delivery
+/// races (a normal forbidden-lane drop never delivers because `dropConfiguration` returns
+/// `.forbidden`), so this cannot spam feedback in the common case.
+enum TaskBoardCardDropGate: Equatable {
+  case proceed(TaskBoardCardDropPlan)
+  case reject(String)
+}
+
+func taskBoardCardDropGate(
+  payloads: [TaskBoardCardDragPayload],
+  lane: TaskBoardInboxLane,
+  isDropEnabled: Bool,
+  isDropCandidate: Bool
+) -> TaskBoardCardDropGate {
+  guard isDropEnabled else {
+    return .reject("Cannot move task: an action is already in progress")
+  }
+  guard isDropCandidate, let plan = TaskBoardCardDropPlan.resolve(payloads, to: lane) else {
+    return .reject("Cannot move task: it can no longer move to this lane")
+  }
+  return .proceed(plan)
+}
+
 struct TaskBoardLaneUnifiedColumn: View {
   let lane: TaskBoardInboxLane
   let apiItems: [TaskBoardItem]
   let inboxItems: [TaskBoardInboxItem]
   let decisions: [Decision]
+  /// This lane's own slice only (from `TaskBoardOverviewPresentation.apiCardPresentations(in:)`),
+  /// so a data change in one lane does not invalidate every column's diffed props.
+  let apiCardPresentations: [String: TaskBoardCardPresentation]
+  let inboxCardPresentations: [TaskBoardCardID: TaskBoardCardPresentation]
   let titleTypography: TaskBoardCardTitleTypography
   let isCollapsed: Bool
   let isDropEnabled: Bool
   let isDropCandidate: Bool
-  let selectedCardIDs: Set<TaskBoardCardID>
-  let onOpenAPIItem: (TaskBoardItem) -> Void
-  let onOpenInboxItem: (TaskBoardInboxItem) -> Void
-  let onOpenDecision: (Decision) -> Void
-  let onToggleCollapse: () -> Void
-  let onSelectCard: (TaskBoardCardID, [TaskBoardCardID], EventModifiers) -> Void
-  let contextMenuActions: TaskBoardCardContextMenuActions
-  let dropPlanForCardIDs: ([TaskBoardCardID]) -> TaskBoardCardDropPlan?
-  let onMoveCards: ([TaskBoardCardDragItem], TaskBoardInboxLane) -> Bool
+  let selectionModel: TaskBoardCardSelectionModel
+  let actions: TaskBoardOverviewActions
+  let liveInboxItems: TaskBoardLiveInboxItems
+  @Binding var collapseOverridesRawValue: String
   @Environment(\.fontScale)
   private var fontScale
   @State private var isDropTargeted = false
   @State private var dropDeduper = TaskBoardDropDeduper<TaskBoardCardDropSignature>()
   @State private var perfScrollPosition = ScrollPosition()
-  @State private var cardHoverLocation: CGPoint?
-  @State private var cardHoverFrames: [TaskBoardLaneCardFrame] = []
+  @State private var hoverTracking = TaskBoardLaneHoverTracking()
   @State private var hoveredCardID: TaskBoardLaneCardHoverID?
-  private let perfScrollHookEnabled = HarnessMonitorPerfTaskBoardLaneScrollBus.isActive()
+  private let perfScrollHookEnabled = HarnessMonitorPerfTaskBoardLaneScrollBus.isActiveAtLaunch
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
   private var cardHoverCoordinateSpace: String {
@@ -41,13 +63,6 @@ struct TaskBoardLaneUnifiedColumn: View {
 
   private var isEmpty: Bool {
     apiItems.isEmpty && inboxItems.isEmpty && decisions.isEmpty
-  }
-
-  private var orderedCardIDs: [TaskBoardCardID] {
-    apiItems.map { .api($0.id) }
-      + inboxItems.map {
-        .inbox(sessionID: $0.session.sessionId, taskID: $0.task.taskId)
-      }
   }
 
   var body: some View {
@@ -74,7 +89,7 @@ struct TaskBoardLaneUnifiedColumn: View {
       TaskBoardCollapsedLane(
         lane: lane,
         count: totalCount,
-        onExpand: onToggleCollapse
+        collapseOverridesRawValue: $collapseOverridesRawValue
       )
     } else {
       expandedLaneContent
@@ -86,7 +101,7 @@ struct TaskBoardLaneUnifiedColumn: View {
       TaskBoardLaneHeader(
         lane: lane,
         count: totalCount,
-        onToggleCollapse: onToggleCollapse
+        collapseOverridesRawValue: $collapseOverridesRawValue
       )
 
       Group {
@@ -152,7 +167,7 @@ struct TaskBoardLaneUnifiedColumn: View {
   }
 
   @ViewBuilder private var laneRows: some View {
-    VStack(spacing: metrics.laneSpacing) {
+    LazyVStack(spacing: metrics.laneSpacing) {
       if !decisions.isEmpty {
         decisionRows
       }
@@ -163,15 +178,14 @@ struct TaskBoardLaneUnifiedColumn: View {
           item: item,
           titleTypography: titleTypography,
           isHovered: hoveredCardID == hoverID,
-          isSelected: selectedCardIDs.contains(cardID),
-          onSelect: { modifiers in
-            onSelectCard(cardID, orderedCardIDs, modifiers)
-          },
-          onOpenItem: onOpenAPIItem
+          isSelected: selectionModel.selectedIDs.contains(cardID),
+          selectionModel: selectionModel,
+          actions: actions,
+          cardPresentation: apiCardPresentations[item.id]
         )
         .taskBoardCardFrame(id: hoverID, in: cardHoverCoordinateSpace)
         .contextMenu {
-          TaskBoardCardContextMenu(cardID: cardID, actions: contextMenuActions)
+          TaskBoardCardContextMenu(cardID: cardID)
         }
       }
       ForEach(inboxItems) { item in
@@ -187,15 +201,14 @@ struct TaskBoardLaneUnifiedColumn: View {
           item: item,
           titleTypography: titleTypography,
           isHovered: hoveredCardID == hoverID,
-          isSelected: selectedCardIDs.contains(cardID),
-          onSelect: { modifiers in
-            onSelectCard(cardID, orderedCardIDs, modifiers)
-          },
-          onOpenItem: onOpenInboxItem
+          isSelected: selectionModel.selectedIDs.contains(cardID),
+          selectionModel: selectionModel,
+          actions: actions,
+          cardPresentation: inboxCardPresentations[cardID]
         )
         .taskBoardCardFrame(id: hoverID, in: cardHoverCoordinateSpace)
         .contextMenu {
-          TaskBoardCardContextMenu(cardID: cardID, actions: contextMenuActions)
+          TaskBoardCardContextMenu(cardID: cardID)
         }
       }
     }
@@ -205,11 +218,11 @@ struct TaskBoardLaneUnifiedColumn: View {
       updateHoveredCard(phase: phase)
     }
     .onPreferenceChange(TaskBoardLaneCardFramePreferenceKey.self) { frames in
-      guard cardHoverFrames != frames else {
+      guard hoverTracking.frames != frames else {
         return
       }
-      cardHoverFrames = frames
-      updateHoveredCard(location: cardHoverLocation, frames: frames)
+      hoverTracking.frames = frames
+      updateHoveredCard(location: hoverTracking.location, frames: frames)
     }
   }
 
@@ -221,7 +234,7 @@ struct TaskBoardLaneUnifiedColumn: View {
           decision: decision,
           fontScale: fontScale,
           isHovered: hoveredCardID == cardID,
-          onOpenDecision: onOpenDecision
+          actions: actions
         )
         .taskBoardCardFrame(id: cardID, in: cardHoverCoordinateSpace)
       }
@@ -231,10 +244,10 @@ struct TaskBoardLaneUnifiedColumn: View {
   private func updateHoveredCard(phase: HoverPhase) {
     switch phase {
     case .active(let location):
-      cardHoverLocation = location
-      updateHoveredCard(location: location, frames: cardHoverFrames)
+      hoverTracking.location = location
+      updateHoveredCard(location: location, frames: hoverTracking.frames)
     case .ended:
-      cardHoverLocation = nil
+      hoverTracking.location = nil
       updateHoveredCard(id: nil)
     }
   }
@@ -260,27 +273,33 @@ struct TaskBoardLaneUnifiedColumn: View {
   }
 
   private func handleDrop(_ payloads: [TaskBoardCardDragPayload], session: DropSession) {
-    guard
-      dropPlan(for: session) != nil,
-      let plan = TaskBoardCardDropPlan.resolve(payloads, to: lane)
-    else {
-      updateDropTargeted(false)
-      return
-    }
-    _ = performDrop(
-      signature: TaskBoardCardDropSignature(
-        cardIDs: plan.items.map(\.id),
-        destination: lane
-      )
+    defer { updateDropTargeted(false) }
+    switch taskBoardCardDropGate(
+      payloads: payloads,
+      lane: lane,
+      isDropEnabled: isDropEnabled,
+      isDropCandidate: isDropCandidate
     ) {
-      onMoveCards(plan.items, lane)
+    case .reject(let reason):
+      actions.reportDropRejection(reason)
+    case .proceed(let plan):
+      _ = performDrop(
+        signature: TaskBoardCardDropSignature(
+          cardIDs: plan.items.map(\.id),
+          destination: lane
+        )
+      ) {
+        actions.moveCardsOrReportRejection(
+          plan.items,
+          to: lane,
+          liveInboxItems: liveInboxItems
+        )
+      }
     }
-    updateDropTargeted(false)
   }
 
   private func dropConfiguration(for session: DropSession) -> DropConfiguration {
-    let operation: DropOperation =
-      isDropEnabled && dropPlan(for: session) != nil ? .move : .forbidden
+    let operation: DropOperation = isDropEnabled && isDropCandidate ? .move : .forbidden
     return DropConfiguration(operation: operation)
   }
 
@@ -288,22 +307,14 @@ struct TaskBoardLaneUnifiedColumn: View {
     switch session.phase {
     case .entering:
       dropDeduper.reset()
-      updateDropTargeted(dropPlan(for: session) != nil)
+      updateDropTargeted(isDropEnabled && isDropCandidate)
     case .active:
-      updateDropTargeted(dropPlan(for: session) != nil)
+      updateDropTargeted(isDropEnabled && isDropCandidate)
     case .exiting, .ended, .dataTransferCompleted:
       updateDropTargeted(false)
     @unknown default:
       updateDropTargeted(false)
     }
-  }
-
-  private func dropPlan(for session: DropSession) -> TaskBoardCardDropPlan? {
-    guard isDropEnabled, let localSession = session.localSession else {
-      return nil
-    }
-    let cardIDs = localSession.draggedItemIDs(for: TaskBoardCardID.self)
-    return dropPlanForCardIDs(cardIDs)
   }
 
   private func updateDropTargeted(_ targeted: Bool) {

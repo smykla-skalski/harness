@@ -87,21 +87,41 @@ extension HarnessMonitorStore {
     pendingConfirmation = .deleteTaskBoardTargets(targets: targets)
   }
 
+  public var canDeleteTaskBoardTargets: Bool {
+    !isBusy && !isTaskBoardBusy && !isSessionReadOnly && client != nil
+  }
+
   @discardableResult
   func deleteTaskBoardTargets(_ targets: [TaskBoardDeletionTarget]) async -> Bool {
     let targets = orderedUniqueTaskBoardDeletionTargets(targets)
     guard !targets.isEmpty else { return false }
     let actionName = targets.count == 1 ? "Delete task" : "Delete tasks"
-    guard taskBoardDeletionActionIsAvailable(actionName: actionName) else { return false }
+    guard taskBoardDeletionActionIsAvailable(actionName: actionName), let client else {
+      return false
+    }
 
     let taskBoardItemIDs = targets.compactMap { target -> String? in
       guard case .taskBoardItem(let id, _) = target else { return nil }
       return id
     }
+    let inboxGroups = taskBoardInboxDeletionGroups(targets)
+    beginTaskBoardAction()
+    let sessionActionToken =
+      inboxGroups.isEmpty
+      ? nil
+      : beginSessionAction(actionID: "task-board/delete-targets")
+    defer {
+      if let sessionActionToken {
+        endSessionAction(sessionActionToken)
+      }
+      endTaskBoardAction()
+    }
+
     if !taskBoardItemIDs.isEmpty {
       guard
-        await deleteTaskBoardItems(
+        await performTaskBoardItemDeletion(
           ids: taskBoardItemIDs,
+          using: client,
           presentsSuccessFeedback: false
         )
       else {
@@ -109,7 +129,7 @@ extension HarnessMonitorStore {
       }
     }
 
-    for group in taskBoardInboxDeletionGroups(targets) {
+    for group in inboxGroups {
       guard
         await deleteTasks(
           sessionID: group.sessionID,
@@ -137,11 +157,25 @@ extension HarnessMonitorStore {
     presentsSuccessFeedback: Bool
   ) async -> Bool {
     let ids = orderedUniqueDeletionTaskIDs(ids)
-    guard let client, !ids.isEmpty, !isDaemonActionInFlight else {
+    guard let client, !ids.isEmpty, !isTaskBoardBusy else {
       return false
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginTaskBoardAction()
+    defer { endTaskBoardAction() }
+    return await performTaskBoardItemDeletion(
+      ids: ids,
+      using: client,
+      presentsSuccessFeedback: presentsSuccessFeedback
+    )
+  }
+
+  private func performTaskBoardItemDeletion(
+    ids: [String],
+    using client: any HarnessMonitorClientProtocol,
+    presentsSuccessFeedback: Bool
+  ) async -> Bool {
+    beginDaemonAction()
+    defer { endDaemonAction() }
 
     var deletedIDs: Set<String> = []
     var firstFailure: (index: Int, error: any Error)?
@@ -245,7 +279,7 @@ extension HarnessMonitorStore {
   }
 
   private func taskBoardDeletionActionIsAvailable(actionName: String) -> Bool {
-    if isBusy {
+    if isBusy || isTaskBoardBusy {
       presentFailureFeedback(
         "\(actionName) is unavailable because another action is already in progress. "
           + "Try again when it finishes"
@@ -262,7 +296,7 @@ extension HarnessMonitorStore {
       )
       return false
     }
-    return true
+    return canDeleteTaskBoardTargets
   }
 
   private func taskBoardDeletionFailureMessage(

@@ -310,67 +310,6 @@ extension HarnessMonitorStore {
 
   @MainActor
   @Observable
-  public final class ContentDashboardSlice {
-    public var connectionState: ConnectionState = .idle
-    public var isBusy = false
-    public var isRefreshing = false
-    public var isLaunchAgentInstalled = false
-    public var notificationHistory: [NotificationHistoryEntry] = []
-    public var auditEvents: [HarnessMonitorAuditEvent] = []
-    public var auditHasOlder = false
-    public var githubDataRevision: UInt64 = 0
-    public var latestGitHubDataChange: GitHubDataChangedPayload?
-    public var taskBoardRevision: UInt64 = 0
-    public var taskBoardItems: [TaskBoardItem] = []
-    public var taskBoardOrchestratorStatus: TaskBoardOrchestratorStatus?
-    public var taskBoardSyncSummary: TaskBoardSyncSummary?
-    public var taskBoardDispatchSummary: TaskBoardDispatchSummary?
-    public var taskBoardEvaluationSummary: TaskBoardEvaluationSummary?
-    public var taskBoardEvaluationBaselineRunID: String?
-    public var taskBoardItemAuditSummary: TaskBoardAuditSummary?
-    public var taskBoardProjects: [TaskBoardProjectSummary]?
-    public var taskBoardMachines: [TaskBoardMachineSummary]?
-    public var policyCanvasWorkspace: PolicyCanvasWorkspace?
-    public var policyPipeline: PolicyPipelineDocument?
-    public var policySimulation: PolicyPipelineSimulationResult?
-    public var policyAudit: PolicyPipelineAuditSummary?
-
-    public init() {}
-
-    internal func apply(_ state: ContentDashboardState) {
-      Self.assign(&connectionState, state.connectionState)
-      Self.assign(&isBusy, state.isBusy)
-      Self.assign(&isRefreshing, state.isRefreshing)
-      Self.assign(&isLaunchAgentInstalled, state.isLaunchAgentInstalled)
-      Self.assign(&notificationHistory, state.notificationHistory)
-      Self.assign(&auditEvents, state.auditEvents)
-      Self.assign(&auditHasOlder, state.auditHasOlder)
-      Self.assign(&taskBoardItems, state.taskBoardItems)
-      Self.assign(&taskBoardOrchestratorStatus, state.taskBoardOrchestratorStatus)
-      Self.assign(&taskBoardSyncSummary, state.taskBoardSyncSummary)
-      Self.assign(&taskBoardDispatchSummary, state.taskBoardDispatchSummary)
-      Self.assign(&taskBoardEvaluationSummary, state.taskBoardEvaluationSummary)
-      Self.assign(
-        &taskBoardEvaluationBaselineRunID,
-        state.taskBoardEvaluationBaselineRunID
-      )
-      Self.assign(&taskBoardItemAuditSummary, state.taskBoardItemAuditSummary)
-      Self.assign(&taskBoardProjects, state.taskBoardProjects)
-      Self.assign(&taskBoardMachines, state.taskBoardMachines)
-      Self.assign(&policyCanvasWorkspace, state.policyCanvasWorkspace)
-      Self.assign(&policyPipeline, state.policyPipeline)
-      Self.assign(&policySimulation, state.policySimulation)
-      Self.assign(&policyAudit, state.policyAudit)
-    }
-
-    private static func assign<Value: Equatable>(_ current: inout Value, _ next: Value) {
-      guard current != next else { return }
-      current = next
-    }
-  }
-
-  @MainActor
-  @Observable
   public final class SidebarUISlice {
     public var selectedSessionID: String?
     public var isPersistenceAvailable = false

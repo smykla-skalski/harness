@@ -57,8 +57,30 @@ extension HarnessMonitorStore {
   }
 
   public var isDaemonActionInFlight: Bool {
-    get { connection.isDaemonActionInFlight }
-    set { connection.isDaemonActionInFlight = newValue }
+    connection.daemonActionCount > 0
+  }
+
+  /// Call before starting a daemon-scoped mutation, paired with
+  /// `endDaemonAction()` in a `defer`. Counter-backed so concurrent daemon
+  /// actions cannot clobber each other's ownership - the first to finish no
+  /// longer releases busy state that a still-running second action needs.
+  /// `public` because non-`HarnessMonitorKit` conformances (e.g.
+  /// `PolicyCanvasEditorRuntime`) drive it through a protocol setter.
+  public func beginDaemonAction() {
+    connection.daemonActionCount += 1
+    if connection.daemonActionCount == 1 {
+      scheduleUISync([.contentToolbar, .contentDashboard])
+    }
+  }
+
+  public func endDaemonAction() {
+    guard connection.daemonActionCount > 0 else {
+      return
+    }
+    connection.daemonActionCount -= 1
+    if connection.daemonActionCount == 0 {
+      scheduleUISync([.contentToolbar, .contentDashboard])
+    }
   }
 
   public var activeTransport: TransportKind {
@@ -122,6 +144,36 @@ extension HarnessMonitorStore {
 
   public var isBusy: Bool {
     isDaemonActionInFlight || isSessionActionInFlight
+  }
+
+  /// True while a task-board-scoped mutation (status move, orchestrator
+  /// action, step-mode toggle, dashboard refresh) is in flight. Unlike
+  /// `isBusy`, daemon or session actions on other surfaces (reviews,
+  /// policies, non-board session actions) do not flip this on, so those
+  /// actions no longer visually disable the task board.
+  public var isTaskBoardBusy: Bool {
+    taskBoardRuntimeState.actionCount > 0
+  }
+
+  /// Call before starting a task-board mutation, paired with
+  /// `endTaskBoardAction()` in a `defer`. Reentrant: nested/concurrent
+  /// task-board mutations only flip `isTaskBoardBusy` off once the last one
+  /// completes.
+  func beginTaskBoardAction() {
+    taskBoardRuntimeState.actionCount += 1
+    if taskBoardRuntimeState.actionCount == 1 {
+      scheduleUISync([.contentDashboard])
+    }
+  }
+
+  func endTaskBoardAction() {
+    guard taskBoardRuntimeState.actionCount > 0 else {
+      return
+    }
+    taskBoardRuntimeState.actionCount -= 1
+    if taskBoardRuntimeState.actionCount == 0 {
+      scheduleUISync([.contentDashboard])
+    }
   }
 
   public var isSessionReadOnly: Bool {

@@ -138,12 +138,12 @@ struct TaskBoardCardTitleTypography {
 
 struct TaskBoardCardFooter<Badges: View>: View {
   let repository: String
-  let updatedAt: String
+  let updatedAt: Date?
   let badges: Badges
   @Environment(\.fontScale)
   private var fontScale
 
-  init(repository: String, updatedAt: String, @ViewBuilder badges: () -> Badges) {
+  init(repository: String, updatedAt: Date?, @ViewBuilder badges: () -> Badges) {
     self.repository = repository
     self.updatedAt = updatedAt
     self.badges = badges()
@@ -214,7 +214,7 @@ final class TaskBoardRelativeTimeClock {
 }
 
 private struct TaskBoardCardUpdatedAtLabel: View {
-  let updatedAt: String
+  let updatedAt: Date?
   let font: Font
   @Environment(TaskBoardRelativeTimeClock.self)
   private var relativeTimeClock

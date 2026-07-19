@@ -14,10 +14,8 @@ extension TaskBoardOverviewView {
             latestEvaluationBaselineRunID: store?.contentUI.dashboard
               .taskBoardEvaluationBaselineRunID,
             isActionInFlight: isActionInFlight,
-            onStart: onStartTaskBoardOrchestrator,
-            onStop: onStopTaskBoardOrchestrator,
-            onRunOnce: runOrchestratorOnce,
-            onStepModeChange: onSetTaskBoardStepMode
+            actions: actions,
+            pendingLiveOperation: pendingLiveOperationBinding
           )
         }
       } else if let evaluationSummary {
@@ -40,7 +38,7 @@ extension TaskBoardOverviewView {
           workspace: store.contentUI.dashboard.policyCanvasWorkspace,
           targetItem: currentPresentation.stepRailTargetItem,
           isActionInFlight: isActionInFlight,
-          onOpenReview: onOpenTaskBoardItem
+          actions: actions
         )
       }
     }
@@ -83,11 +81,11 @@ extension TaskBoardOverviewView {
   }
 
   var hasHeaderActions: Bool {
-    onCreateTaskBoardItem != nil || onEvaluateTaskBoard != nil || onRefreshTaskBoard != nil
+    actions.canCreateItem || actions.canEvaluateBoard || actions.canRefreshBoard
   }
 
   @ViewBuilder var headerActionButtons: some View {
-    if onCreateTaskBoardItem != nil {
+    if actions.canCreateItem {
       Button {
         startTaskBoardItemCreation()
       } label: {
@@ -102,15 +100,13 @@ extension TaskBoardOverviewView {
       .accessibilityIdentifier("harness.task-board.new-item")
     }
 
-    if onEvaluateTaskBoard != nil {
-      if store != nil {
-        Toggle("Dry run", isOn: $evaluateDryRun)
-          .toggleStyle(.checkbox)
-          .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-          .disabled(isActionInFlight)
-          .help("Preview the evaluate without applying any board changes")
-          .accessibilityIdentifier("harness.task-board.evaluate.dry-run")
-      }
+    if actions.canEvaluateBoard {
+      Toggle("Dry run", isOn: $evaluateDryRun)
+        .toggleStyle(.checkbox)
+        .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+        .disabled(isActionInFlight)
+        .help("Preview the evaluate without applying any board changes")
+        .accessibilityIdentifier("harness.task-board.evaluate.dry-run")
       Button {
         triggerBoardEvaluate()
       } label: {
@@ -132,9 +128,9 @@ extension TaskBoardOverviewView {
       .accessibilityIdentifier("harness.task-board.evaluate")
     }
 
-    if let onRefreshTaskBoard {
+    if actions.canRefreshBoard {
       Button {
-        onRefreshTaskBoard()
+        actions.refreshTaskBoard()
       } label: {
         Label("Sync", systemImage: "arrow.clockwise")
           .font(captionSemibold)

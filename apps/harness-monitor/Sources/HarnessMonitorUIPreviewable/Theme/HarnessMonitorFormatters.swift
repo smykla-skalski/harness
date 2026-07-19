@@ -309,6 +309,17 @@ public func formatRelativeUpdatedAt(_ value: String?, reference: Date = .now) ->
   guard let value, let date = parsedTimestampDate(from: value) else {
     return value ?? "n/a"
   }
+  return formatRelativeUpdatedAt(date, reference: reference)
+}
+
+/// Overload for a card's precomputed `updatedAt` date (parsed once by
+/// `TaskBoardOverviewPresentationWorker` instead of every render). `nil` means the source string
+/// did not parse under any accepted format.
+@MainActor
+public func formatRelativeUpdatedAt(_ date: Date?, reference: Date = .now) -> String {
+  guard let date else {
+    return "n/a"
+  }
   return relativeUpdatedAtFormatter.localizedString(for: date, relativeTo: reference)
 }
 
@@ -318,6 +329,18 @@ public func formatCompactRelativeUpdatedAt(
   reference: Date = .now
 ) -> String {
   guard let value, let date = parsedTimestampDate(from: value) else {
+    return ""
+  }
+  return formatCompactRelativeUpdatedAt(date, reference: reference)
+}
+
+/// Overload for a card's precomputed `updatedAt` date. See `formatRelativeUpdatedAt(_:reference:)`.
+@MainActor
+public func formatCompactRelativeUpdatedAt(
+  _ date: Date?,
+  reference: Date = .now
+) -> String {
+  guard let date else {
     return ""
   }
 

@@ -97,7 +97,7 @@ extension TaskBoardStepRailView {
   func openReview() {
     guard let item = activeItem else { return }
     if item.hasLinkedSessionTask {
-      onOpenReview(item)
+      actions.openTaskBoardItem(item)
     } else if let url = item.taskBoardGitHubURL {
       openURL(url)
     } else {
