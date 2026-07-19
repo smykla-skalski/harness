@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 
-use super::workflow_execution_write_validation::validate_write_frozen_contract;
+use super::workflow_execution_write_validation::{
+    validate_write_attempt_artifact, validate_write_frozen_contract,
+};
 use super::*;
 use crate::task_board::{
     AgentMode, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardReadOnlyRunContext,
@@ -82,6 +84,57 @@ fn later_implementation_cycle_is_chained_to_the_preceding_review_head() {
         &record,
         "attempt.artifact.implementation",
         "forged base must fail",
+    );
+}
+
+#[test]
+fn pr_fix_cycle_one_implementation_binds_the_frozen_pull_request_head() {
+    let mut record = write_execution();
+    record.snapshot.workflow_kind = TaskBoardWorkflowKind::PrFix;
+    record.transition.workflow_kind = TaskBoardWorkflowKind::PrFix;
+    record.transition.pull_request = Some(TaskBoardPullRequestIdentity {
+        repository: "example/compass".into(),
+        number: 42,
+        head: Some(TaskBoardPullRequestHeadIdentity {
+            repository: "contributor/compass".into(),
+            branch: "feature/fix".into(),
+            revision: "head-base".into(),
+        }),
+    });
+    let valid = implementation_attempt(1);
+    assert!(validate_write_attempt_artifact(&record, &valid).expect("frozen cycle-one base"));
+
+    let mut missing_head = record.clone();
+    missing_head
+        .transition
+        .pull_request
+        .as_mut()
+        .expect("pull request")
+        .head = None;
+    let error = validate_write_attempt_artifact(&missing_head, &valid)
+        .expect_err("missing frozen cycle-one base must fail");
+    assert_eq!(
+        error,
+        TaskBoardWorkflowExecutionValidationError::InvalidField {
+            field: "attempt.artifact.implementation",
+            detail: "frozen pull request head is missing".into(),
+        }
+    );
+
+    let mut forged = valid;
+    let Some(TaskBoardAttemptResultArtifact::Implementation(result)) = forged.artifact.as_mut()
+    else {
+        panic!("implementation artifact")
+    };
+    result.base_head_revision = "head-forged".into();
+    let error = validate_write_attempt_artifact(&record, &forged)
+        .expect_err("forged cycle-one base must fail");
+    assert_eq!(
+        error,
+        TaskBoardWorkflowExecutionValidationError::InvalidField {
+            field: "attempt.artifact.implementation",
+            detail: "base head does not match the frozen pull request head".into(),
+        }
     );
 }
 

@@ -81,6 +81,8 @@ pub struct TaskBoardWorkflowExecutionArtifacts {
     /// Known-but-unverified publication evidence retained for recovery and audit.
     ///
     /// This evidence never satisfies a completed attempt or successful terminal outcome.
+    /// `HumanRequired` executions never resume; a future resume path must clear or migrate this
+    /// evidence before performing further publication work or advancing phases.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provisional_publication: Option<TaskBoardLifecycleOutcome>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

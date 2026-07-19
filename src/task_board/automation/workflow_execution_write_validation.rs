@@ -253,8 +253,31 @@ fn validate_implementation_result(
                 "base head does not match the preceding reviewed cycle",
             );
         }
+    } else if record.snapshot.workflow_kind == TaskBoardWorkflowKind::PrFix {
+        let frozen_head = frozen_pr_fix_head(record).ok_or_else(|| {
+            field_error(
+                "attempt.artifact.implementation",
+                "frozen pull request head is missing",
+            )
+        })?;
+        if frozen_head != result.base_head_revision {
+            return invalid(
+                "attempt.artifact.implementation",
+                "base head does not match the frozen pull request head",
+            );
+        }
     }
     Ok(())
+}
+
+fn frozen_pr_fix_head(record: &TaskBoardWorkflowExecutionRecord) -> Option<&str> {
+    record
+        .transition
+        .pull_request
+        .as_ref()?
+        .head
+        .as_ref()
+        .map(|head| head.revision.as_str())
 }
 
 fn head_belongs_to_execution(

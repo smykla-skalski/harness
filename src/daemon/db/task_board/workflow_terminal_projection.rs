@@ -123,7 +123,13 @@ fn publication_identity(
     execution: &TaskBoardWorkflowExecutionRecord,
 ) -> (Option<u64>, Option<String>) {
     let Some(pull_request) = execution.transition.pull_request.as_ref() else {
-        return (None, None);
+        return execution
+            .artifacts
+            .provisional_publication
+            .as_ref()
+            .and_then(|outcome| outcome.external_url.as_deref())
+            .and_then(publication_url_identity)
+            .unwrap_or((None, None));
     };
     let canonical = format!(
         "https://github.com/{}/pull/{}",
@@ -144,4 +150,10 @@ fn publication_identity(
         Some(pull_request.number),
         Some(external.unwrap_or(canonical)),
     )
+}
+
+fn publication_url_identity(url: &str) -> Option<(Option<u64>, Option<String>)> {
+    let (_, number) = url.rsplit_once("/pull/")?;
+    let number = number.parse::<u64>().ok().filter(|number| *number > 0)?;
+    Some((Some(number), Some(url.to_owned())))
 }

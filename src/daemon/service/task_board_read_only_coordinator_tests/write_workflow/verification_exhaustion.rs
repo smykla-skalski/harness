@@ -80,6 +80,17 @@ async fn exhausted_publication_verification_preserves_non_authoritative_mutation
         reloaded.artifacts.provisional_publication,
         exhausted.artifacts.provisional_publication
     );
+    let item = fixture
+        .test
+        .db
+        .task_board_item(&fixture.item_id)
+        .await
+        .expect("load projected item");
+    assert_eq!(item.workflow.pr_number, Some(42));
+    assert_eq!(
+        item.workflow.pr_url.as_deref(),
+        Some("https://github.com/example/compass/pull/42")
+    );
 }
 
 #[tokio::test]
