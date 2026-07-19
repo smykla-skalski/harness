@@ -43,6 +43,8 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
+#[cfg(test)]
+use std::time::Duration;
 
 use agent_client_protocol::schema::{
     CreateTerminalRequest, CreateTerminalResponse, KillTerminalRequest, KillTerminalResponse,
@@ -364,6 +366,27 @@ impl HarnessAcpClient {
         request: &ReleaseTerminalRequest,
     ) -> ClientResult<ReleaseTerminalResponse> {
         self.terminals.handle_release(request)
+    }
+
+    /// Snapshot of how many terminal waits have registered before blocking.
+    #[cfg(test)]
+    pub(super) fn terminal_wait_started_count(&self) -> u64 {
+        self.terminals.wait_started_count()
+    }
+
+    /// Block until at least `target` terminal waits have registered, or the
+    /// timeout elapses. Returns whether the target was reached.
+    #[cfg(test)]
+    pub(super) fn await_terminal_wait_started(&self, target: u64, timeout: Duration) -> bool {
+        self.terminals.await_wait_started(target, timeout)
+    }
+
+    /// Snapshot of how many terminal waits have finished. A wait records this
+    /// before its handler releases, so a probe on another terminal that only
+    /// returns after the wait completes will observe an increment.
+    #[cfg(test)]
+    pub(super) fn terminal_wait_finished_count(&self) -> u64 {
+        self.terminals.wait_finished_count()
     }
 
     /// Handle `session/request_permission`.

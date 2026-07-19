@@ -25,6 +25,8 @@ mod output;
 mod policy;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod wait_event;
 
 use lifecycle::{
     close_reader, refresh_exit_status, spawn_exit_monitor, terminate_process_group,
@@ -32,6 +34,8 @@ use lifecycle::{
 };
 use output::spawn_output_reader;
 use policy::denied_binary_name;
+#[cfg(test)]
+use wait_event::WaitEventCounter;
 
 pub(super) struct TerminalOutputState {
     pub(super) output: Vec<u8>,
@@ -198,6 +202,14 @@ pub struct TerminalManager {
     cap: usize,
     /// Maximum wall-clock per terminal.
     wall_clock_limit: Duration,
+    /// Test-only count of waits that have registered before blocking.
+    #[cfg(test)]
+    wait_started: WaitEventCounter,
+    /// Test-only count of waits that have finished, recorded before the handler
+    /// releases so tests can prove a wait was still outstanding when a probe on
+    /// another terminal returned.
+    #[cfg(test)]
+    wait_finished: WaitEventCounter,
 }
 
 impl TerminalManager {
@@ -213,6 +225,10 @@ impl TerminalManager {
             counter: Mutex::new(0),
             cap,
             wall_clock_limit,
+            #[cfg(test)]
+            wait_started: WaitEventCounter::new(),
+            #[cfg(test)]
+            wait_finished: WaitEventCounter::new(),
         }
     }
 
@@ -376,7 +392,11 @@ impl TerminalManager {
         let terminal_id = request.terminal_id.0.as_ref();
 
         let state = self.terminal_state(terminal_id, &request.terminal_id)?;
+        #[cfg(test)]
+        self.wait_started.record();
         let exit_status = wait_for_terminal_exit_state(&state)?;
+        #[cfg(test)]
+        self.wait_finished.record();
 
         Ok(WaitForTerminalExitResponse::new(exit_status))
     }
@@ -472,5 +492,20 @@ impl TerminalManager {
                 TerminalSlot::Ready(state) => Some(Arc::clone(state)),
             })
             .ok_or_else(|| ClientError::terminal_not_found(schema_id))
+    }
+
+    #[cfg(test)]
+    pub(super) fn wait_started_count(&self) -> u64 {
+        self.wait_started.count()
+    }
+
+    #[cfg(test)]
+    pub(super) fn await_wait_started(&self, target: u64, timeout: Duration) -> bool {
+        self.wait_started.wait_until(target, timeout)
+    }
+
+    #[cfg(test)]
+    pub(super) fn wait_finished_count(&self) -> u64 {
+        self.wait_finished.count()
     }
 }
