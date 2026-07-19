@@ -18,6 +18,8 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
     inboxItemsByLane: [:],
     inboxItemsByID: [:],
     orderedCardIDs: [],
+    apiCardPresentationsByID: [:],
+    inboxCardPresentationsByID: [:],
     decisionIDsByLane: [:],
     aggregateNeedsYouCount: 0,
     aggregateOpenCount: 0,
@@ -33,6 +35,8 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
   let inboxItemsByLane: [TaskBoardInboxLane: [TaskBoardInboxItem]]
   let inboxItemsByID: [TaskBoardCardID: TaskBoardInboxItem]
   let orderedCardIDs: [TaskBoardCardID]
+  let apiCardPresentationsByID: [String: TaskBoardCardPresentation]
+  let inboxCardPresentationsByID: [TaskBoardCardID: TaskBoardCardPresentation]
   let decisionIDsByLane: [TaskBoardInboxLane: [String]]
   let aggregateNeedsYouCount: Int
   let aggregateOpenCount: Int
@@ -72,6 +76,14 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
 
   func inboxItem(id: TaskBoardCardID) -> TaskBoardInboxItem? {
     inboxItemsByID[id]
+  }
+
+  func apiCardPresentation(id: String) -> TaskBoardCardPresentation? {
+    apiCardPresentationsByID[id]
+  }
+
+  func inboxCardPresentation(id: TaskBoardCardID) -> TaskBoardCardPresentation? {
+    inboxCardPresentationsByID[id]
   }
 }
 
@@ -148,19 +160,30 @@ actor TaskBoardOverviewPresentationWorker {
       $0.deletedAt == nil && $0.status == .done
     }
     let taskBoardOpenCount = taskBoardItems.count
+    let projectLabelResolver = TaskBoardProjectLabelResolver(
+      projectIDs: taskBoardItems.compactMap(\.projectId)
+    )
 
     return TaskBoardOverviewPresentation(
       taskBoardItems: taskBoardItems,
       taskBoardItemsByID: Dictionary(uniqueKeysWithValues: taskBoardItems.map { ($0.id, $0) }),
-      projectLabelResolver: TaskBoardProjectLabelResolver(
-        projectIDs: taskBoardItems.compactMap(\.projectId)
-      ),
+      projectLabelResolver: projectLabelResolver,
       apiItemsByLane: apiItemsByLane,
       inboxItemsByLane: inboxItemsByLane,
       inboxItemsByID: inboxItemsByID,
       orderedCardIDs: orderedCardIDs(
         apiItemsByLane: apiItemsByLane,
         inboxItemsByLane: inboxItemsByLane
+      ),
+      apiCardPresentationsByID: Dictionary(
+        uniqueKeysWithValues: taskBoardItems.map {
+          ($0.id, TaskBoardCardPresentation.forAPIItem($0, projectLabelResolver: projectLabelResolver))
+        }
+      ),
+      inboxCardPresentationsByID: Dictionary(
+        uniqueKeysWithValues: inboxItems.map {
+          (inboxCardID(for: $0), TaskBoardCardPresentation.forInboxItem($0))
+        }
       ),
       decisionIDsByLane: decisionIDsByLane,
       aggregateNeedsYouCount: taskBoardNeedsYouCount
