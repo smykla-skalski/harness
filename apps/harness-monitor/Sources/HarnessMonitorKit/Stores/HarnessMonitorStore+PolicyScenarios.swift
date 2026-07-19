@@ -56,8 +56,8 @@ extension HarnessMonitorStore {
     guard let client else {
       return false
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    defer { endDaemonAction() }
 
     do {
       let workspace = try await perform(client)

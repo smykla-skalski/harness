@@ -12,8 +12,8 @@ extension HarnessMonitorStore {
     guard let client else {
       return false
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    defer { endDaemonAction() }
 
     do {
       let response = try await client.makeLivePolicyPipeline(

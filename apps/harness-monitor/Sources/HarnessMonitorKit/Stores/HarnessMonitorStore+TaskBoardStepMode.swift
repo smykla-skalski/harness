@@ -65,11 +65,11 @@ extension HarnessMonitorStore {
       // nil back to nil once, in `finishTaskBoardStepModeMutation`, even
       // though overlapping toggles bump `latestGeneration` and re-enter this
       // function multiple times before that chain resolves.
+      beginDaemonAction()
       beginTaskBoardAction()
     }
     taskBoardRuntimeState.stepModeMutation.latestGeneration &+= 1
     taskBoardRuntimeState.stepModeMutation.desiredValue = enabled
-    isDaemonActionInFlight = true
     return taskBoardRuntimeState.stepModeMutation.latestGeneration
   }
 
@@ -128,7 +128,7 @@ extension HarnessMonitorStore {
       if let updatedStatus {
         globalTaskBoardOrchestratorStatus = updatedStatus
       }
-      isDaemonActionInFlight = false
+      endDaemonAction()
       endTaskBoardAction()
     }
     if didChangeStatus {

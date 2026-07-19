@@ -50,7 +50,7 @@ extension HarnessMonitorStore {
       ])
     case .daemonStatus:
       scheduleUISync([.contentToolbar, .contentDashboard, .sidebar])
-    case .refreshState, .daemonActivity:
+    case .refreshState:
       scheduleUISync([.contentToolbar, .contentDashboard])
     case .persistedDataAvailability:
       scheduleUISync([.contentToolbar, .contentChrome])

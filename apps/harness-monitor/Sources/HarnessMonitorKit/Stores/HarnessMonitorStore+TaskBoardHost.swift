@@ -22,8 +22,8 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func updateTaskBoardHostProjectTypes(_ projectTypes: [String]) async -> Bool {
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    defer { endDaemonAction() }
 
     do {
       let client = try await taskBoardHostClient()

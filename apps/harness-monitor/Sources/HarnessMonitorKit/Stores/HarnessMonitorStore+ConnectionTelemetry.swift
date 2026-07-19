@@ -57,8 +57,30 @@ extension HarnessMonitorStore {
   }
 
   public var isDaemonActionInFlight: Bool {
-    get { connection.isDaemonActionInFlight }
-    set { connection.isDaemonActionInFlight = newValue }
+    daemonActionCount > 0
+  }
+
+  /// Call before starting a daemon-scoped mutation, paired with
+  /// `endDaemonAction()` in a `defer`. Counter-backed so concurrent daemon
+  /// actions cannot clobber each other's ownership - the first to finish no
+  /// longer releases busy state that a still-running second action needs.
+  /// `public` because non-`HarnessMonitorKit` conformances (e.g.
+  /// `PolicyCanvasEditorRuntime`) drive it through a protocol setter.
+  public func beginDaemonAction() {
+    daemonActionCount += 1
+    if daemonActionCount == 1 {
+      scheduleUISync([.contentToolbar, .contentDashboard])
+    }
+  }
+
+  public func endDaemonAction() {
+    guard daemonActionCount > 0 else {
+      return
+    }
+    daemonActionCount -= 1
+    if daemonActionCount == 0 {
+      scheduleUISync([.contentToolbar, .contentDashboard])
+    }
   }
 
   public var activeTransport: TransportKind {

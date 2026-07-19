@@ -40,7 +40,13 @@ extension HarnessMonitorStore: PolicyCanvasEditorRuntime {
 
   public var policyCanvasActionInFlight: Bool {
     get { isDaemonActionInFlight }
-    set { isDaemonActionInFlight = newValue }
+    set {
+      if newValue {
+        beginDaemonAction()
+      } else {
+        endDaemonAction()
+      }
+    }
   }
 
   public func bootstrapPolicyCanvas() async {

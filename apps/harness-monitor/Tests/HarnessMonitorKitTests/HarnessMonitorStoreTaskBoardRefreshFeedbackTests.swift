@@ -48,12 +48,12 @@ struct HarnessMonitorStoreTaskBoardRefreshFeedbackTests {
     #expect(store.currentFailureFeedbackMessage == nil)
   }
 
-  @Test("Refresh is ignored while another daemon action is in flight")
-  func refreshIsIgnoredWhileAnotherDaemonActionIsInFlight() async {
+  @Test("Refresh is ignored while another task-board action is in flight")
+  func refreshIsIgnoredWhileAnotherTaskBoardActionIsInFlight() async {
     let client = RecordingHarnessClient()
     let store = await makeBootstrappedStore(client: client)
-    store.isDaemonActionInFlight = true
-    defer { store.isDaemonActionInFlight = false }
+    store.beginTaskBoardAction()
+    defer { store.endTaskBoardAction() }
 
     await store.refreshTaskBoardDashboard()
 
@@ -63,6 +63,22 @@ struct HarnessMonitorStoreTaskBoardRefreshFeedbackTests {
       )
     )
     #expect(store.toast.activeFeedback.isEmpty)
+  }
+
+  @Test("Refresh proceeds while an unrelated daemon action is in flight")
+  func refreshProceedsWhileUnrelatedDaemonActionIsInFlight() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    store.beginDaemonAction()
+    defer { store.endDaemonAction() }
+
+    await store.refreshTaskBoardDashboard()
+
+    #expect(
+      client.recordedCalls().contains(
+        .syncTaskBoard(direction: .pull, dryRun: false, status: nil, provider: nil)
+      )
+    )
   }
 
   @Test("Successful sync configuration clears a prior fixture error")

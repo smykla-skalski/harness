@@ -5,10 +5,10 @@ extension HarnessMonitorStore {
     guard let client else {
       return nil
     }
-    isDaemonActionInFlight = true
+    beginDaemonAction()
     beginTaskBoardAction()
     defer {
-      isDaemonActionInFlight = false
+      endDaemonAction()
       endTaskBoardAction()
     }
 
@@ -37,10 +37,10 @@ extension HarnessMonitorStore {
     guard let client else {
       return nil
     }
-    isDaemonActionInFlight = true
+    beginDaemonAction()
     beginTaskBoardAction()
     defer {
-      isDaemonActionInFlight = false
+      endDaemonAction()
       endTaskBoardAction()
     }
 
@@ -123,10 +123,10 @@ extension HarnessMonitorStore {
     guard let client else {
       return nil
     }
-    isDaemonActionInFlight = true
+    beginDaemonAction()
     beginTaskBoardAction()
     defer {
-      isDaemonActionInFlight = false
+      endDaemonAction()
       endTaskBoardAction()
     }
 
@@ -156,10 +156,10 @@ extension HarnessMonitorStore {
     guard let client else {
       return nil
     }
-    isDaemonActionInFlight = true
+    beginDaemonAction()
     beginTaskBoardAction()
     defer {
-      isDaemonActionInFlight = false
+      endDaemonAction()
       endTaskBoardAction()
     }
 
@@ -209,10 +209,10 @@ extension HarnessMonitorStore {
     guard let client else {
       return false
     }
-    isDaemonActionInFlight = true
+    beginDaemonAction()
     beginTaskBoardAction()
     defer {
-      isDaemonActionInFlight = false
+      endDaemonAction()
       endTaskBoardAction()
     }
 

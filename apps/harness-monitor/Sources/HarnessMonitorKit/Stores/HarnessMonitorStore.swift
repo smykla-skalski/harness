@@ -349,6 +349,11 @@ public final class HarnessMonitorStore {
   /// `isTaskBoardBusy`, which only the task-board UI reads, so an unrelated
   /// daemon action elsewhere does not visually disable the board.
   @ObservationIgnored var taskBoardActionCount = 0
+  /// Count of daemon actions currently in flight, store-wide. Backs
+  /// `isDaemonActionInFlight`. Deliberately NOT `@ObservationIgnored`:
+  /// views such as `TaskBoardOperationsDispatchCard` read
+  /// `isDaemonActionInFlight` directly in body and must stay reactive.
+  public var daemonActionCount = 0
   @ObservationIgnored var debugUISyncCounts: [UISyncArea: Int] = [:]
   @ObservationIgnored var notificationHistoryRuntimeActions: NotificationHistoryRuntimeActions = [:]
   @ObservationIgnored var notificationHistoryRefreshTask: Task<Void, Never>?

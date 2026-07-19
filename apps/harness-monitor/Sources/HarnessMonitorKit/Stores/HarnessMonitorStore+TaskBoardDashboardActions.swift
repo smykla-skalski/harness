@@ -25,8 +25,8 @@ extension HarnessMonitorStore {
     guard let client else {
       return nil
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    defer { endDaemonAction() }
 
     do {
       let measuredSummary = try await Self.measureOperation {

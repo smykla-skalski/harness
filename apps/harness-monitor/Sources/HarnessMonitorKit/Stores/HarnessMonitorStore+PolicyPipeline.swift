@@ -138,8 +138,8 @@ extension HarnessMonitorStore {
     guard let canvasId = existingCanvasId ?? loadedWorkspace?.activeCanvasId else {
       return nil
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    defer { endDaemonAction() }
 
     do {
       let response = try await Self.savePolicyPipelineDraft(
@@ -198,8 +198,8 @@ extension HarnessMonitorStore {
     guard let client else {
       return false
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    defer { endDaemonAction() }
 
     do {
       let simulation = try await client.simulatePolicyPipeline(
@@ -251,8 +251,8 @@ extension HarnessMonitorStore {
     guard let client else {
       return false
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    defer { endDaemonAction() }
 
     do {
       let workspace = try await client.createPolicyCanvas(
@@ -279,8 +279,8 @@ extension HarnessMonitorStore {
     guard let client else {
       return false
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    defer { endDaemonAction() }
 
     do {
       let workspace = try await client.duplicatePolicyCanvas(
@@ -307,8 +307,8 @@ extension HarnessMonitorStore {
     guard let client else {
       return false
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    defer { endDaemonAction() }
 
     do {
       let workspace = try await client.renamePolicyCanvas(
@@ -328,8 +328,8 @@ extension HarnessMonitorStore {
     guard let client else {
       return false
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    defer { endDaemonAction() }
 
     do {
       let workspace = try await client.activatePolicyCanvas(
@@ -353,8 +353,8 @@ extension HarnessMonitorStore {
     guard let client else {
       return false
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    defer { endDaemonAction() }
 
     do {
       let workspace = try await client.deletePolicyCanvas(
@@ -379,8 +379,8 @@ extension HarnessMonitorStore {
     guard let client else {
       return false
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    defer { endDaemonAction() }
 
     do {
       let workspace = try await client.setPolicyCanvasGlobalEnforcement(

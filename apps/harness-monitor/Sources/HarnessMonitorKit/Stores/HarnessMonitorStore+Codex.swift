@@ -15,8 +15,8 @@ extension HarnessMonitorStore {
       return .failed
     }
 
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    defer { endDaemonAction() }
 
     return await mutateHostBridgeCapability(
       using: client,

@@ -7,11 +7,17 @@ extension HarnessMonitorStore {
     actor: String = "harness-app"
   ) async -> Bool {
     let updates = deduplicatedTaskBoardInboxStatusUpdates(updates)
+    // Scoped to the board's own re-entrancy, not the store-wide
+    // isSessionActionInFlight: that flag is shared with unrelated session
+    // actions (assign, role change, signals, ...), so an enabled board
+    // control must not be silently dropped just because one of those is
+    // mid-flight elsewhere. isSessionActionInFlight is still set below -
+    // its single-owner inFlightActionID discipline is unchanged.
     guard
       let client,
       !updates.isEmpty,
       !isSessionReadOnly,
-      !isSessionActionInFlight
+      !isTaskBoardBusy
     else {
       return false
     }

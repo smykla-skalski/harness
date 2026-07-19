@@ -137,13 +137,13 @@ extension HarnessMonitorStore {
     presentsSuccessFeedback: Bool
   ) async -> Bool {
     let ids = orderedUniqueDeletionTaskIDs(ids)
-    guard let client, !ids.isEmpty, !isDaemonActionInFlight else {
+    guard let client, !ids.isEmpty, !isTaskBoardBusy else {
       return false
     }
-    isDaemonActionInFlight = true
+    beginDaemonAction()
     beginTaskBoardAction()
     defer {
-      isDaemonActionInFlight = false
+      endDaemonAction()
       endTaskBoardAction()
     }
 

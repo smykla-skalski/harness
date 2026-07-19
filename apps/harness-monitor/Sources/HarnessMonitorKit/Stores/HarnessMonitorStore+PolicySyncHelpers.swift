@@ -192,8 +192,8 @@ extension HarnessMonitorStore {
     title: String? = nil
   ) async -> Bool {
     guard let client else { return false }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    defer { endDaemonAction() }
     do {
       let workspace = try await client.importPolicyCanvas(
         request: PolicyCanvasImportRequest(document: document, title: title)

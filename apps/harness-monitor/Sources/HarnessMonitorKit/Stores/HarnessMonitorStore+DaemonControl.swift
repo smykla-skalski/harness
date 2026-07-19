@@ -234,8 +234,8 @@ extension HarnessMonitorStore {
       presentFailureFeedback("Start Daemon is unavailable while a remote profile is active")
       return
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    defer { endDaemonAction() }
 
     let registrationState: DaemonLaunchAgentRegistrationState
     do {
@@ -272,8 +272,8 @@ extension HarnessMonitorStore {
   }
 
   public func stopDaemon() async {
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    defer { endDaemonAction() }
 
     do {
       _ = try await daemonController.stopDaemon()
@@ -296,8 +296,8 @@ extension HarnessMonitorStore {
       presentFailureFeedback("Install Launch Agent is unavailable while a remote profile is active")
       return
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    defer { endDaemonAction() }
 
     do {
       _ = try await daemonController.installLaunchAgent()
@@ -313,8 +313,8 @@ extension HarnessMonitorStore {
       presentFailureFeedback("Remove Launch Agent is unavailable while a remote profile is active")
       return
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    defer { endDaemonAction() }
 
     do {
       _ = try await daemonController.removeLaunchAgent()
@@ -330,8 +330,8 @@ extension HarnessMonitorStore {
       presentFailureFeedback("Repair Launch Agent is unavailable while a remote profile is active")
       return
     }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginDaemonAction()
+    defer { endDaemonAction() }
 
     do {
       let outcome = try await daemonController.repairLaunchAgentRegistration()

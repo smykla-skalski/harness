@@ -6,15 +6,15 @@ extension HarnessMonitorStore {
     _ updates: [TaskBoardItemStatusUpdate]
   ) async -> Bool {
     let updates = deduplicatedTaskBoardItemStatusUpdates(updates)
-    guard let client, !updates.isEmpty, !isDaemonActionInFlight else {
+    guard let client, !updates.isEmpty, !isTaskBoardBusy else {
       return false
     }
     // Ordering matters: flip in-flight before the optimistic write below,
     // or a re-entrant call could pass the guard above.
-    isDaemonActionInFlight = true
+    beginDaemonAction()
     beginTaskBoardAction()
     defer {
-      isDaemonActionInFlight = false
+      endDaemonAction()
       endTaskBoardAction()
     }
 

@@ -9,7 +9,6 @@ extension HarnessMonitorStore {
       case connectionState
       case daemonStatus
       case refreshState
-      case daemonActivity
       case persistedDataAvailability
       case metrics
       case remoteDaemon
@@ -57,12 +56,6 @@ extension HarnessMonitorStore {
       }
     }
     public var isDiagnosticsRefreshInFlight = false
-    public var isDaemonActionInFlight = false {
-      didSet {
-        guard oldValue != isDaemonActionInFlight else { return }
-        onChanged?(.daemonActivity)
-      }
-    }
     public var activeTransport: TransportKind = .webSocket
     public var connectionMetrics: ConnectionMetrics = .initial {
       didSet {

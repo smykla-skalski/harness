@@ -93,7 +93,7 @@ struct HarnessMonitorContentSelectionTests {
     let store = await makeBootstrappedStore()
     store.debugResetUISyncCounts()
 
-    store.isDaemonActionInFlight = true
+    store.beginDaemonAction()
 
     #expect(store.debugUISyncCount(for: .contentToolbar) == 1)
     #expect(store.debugUISyncCount(for: .contentDashboard) == 1)

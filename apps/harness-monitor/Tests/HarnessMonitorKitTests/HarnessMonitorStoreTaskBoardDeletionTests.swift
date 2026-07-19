@@ -65,7 +65,7 @@ struct HarnessMonitorStoreTaskBoardDeletionTests {
   @Test("Deletion request is gated while another action is in progress")
   func deletionRequestRejectsBusyStore() async {
     let store = await makeBootstrappedStore()
-    store.isDaemonActionInFlight = true
+    store.beginDaemonAction()
 
     store.requestTaskBoardDeletionConfirmation(
       targets: [.taskBoardItem(id: "board-1", title: "Board draft")]
