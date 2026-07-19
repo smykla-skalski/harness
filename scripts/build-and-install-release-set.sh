@@ -5,16 +5,17 @@ unalias -a 2>/dev/null || true
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 # shellcheck source=scripts/lib/release-set.sh
 source "$ROOT/scripts/lib/release-set.sh"
-scope="${1:-all}"
+if (( $# > 0 )); then
+  selectors=("$@")
+else
+  selectors=(all)
+fi
 
-case "$scope" in
-  all|harness|aff)
-    ;;
-  *)
-    printf 'usage: %s [all|harness|aff]\n' "${0##*/}" >&2
-    exit 2
-    ;;
-esac
+if ! release_set_resolve_selectors "${selectors[@]}"; then
+  printf 'usage: %s [<selector>...]\n' "${0##*/}" >&2
+  printf 'selector: all, harness, aff, or a leaf (harness-cli, daemon, systemd, bridge, mcp, hook, codex, openrouter)\n' >&2
+  exit 2
+fi
 
 resolve_target_dir() {
   if [[ -n "${CARGO_TARGET_DIR:-}" ]]; then
@@ -48,5 +49,5 @@ export CARGO_TARGET_DIR="$target_dir"
 release_pipeline_lock_acquire "$target_dir"
 
 "$ROOT/scripts/cargo-local.sh" --with-group-lease \
-  "$ROOT/scripts/build-release-set.sh" "$scope"
-"$ROOT/scripts/install-release-set.sh" "$scope"
+  "$ROOT/scripts/build-release-set.sh" "${selectors[@]}"
+"$ROOT/scripts/install-release-set.sh" "${selectors[@]}"

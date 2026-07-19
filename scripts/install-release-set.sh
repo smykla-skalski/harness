@@ -6,15 +6,39 @@ shopt -s nullglob
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 # shellcheck source=scripts/lib/release-set.sh
 source "$ROOT/scripts/lib/release-set.sh"
-scope="${1:-all}"
-case "$scope" in
-  all|harness|aff)
-    ;;
-  *)
-    printf 'usage: %s [all|harness|aff]\n' "${0##*/}" >&2
-    exit 2
-    ;;
-esac
+
+selectors=()
+print_mode=""
+for arg in "$@"; do
+  case "$arg" in
+    --print-build-binary|--print-build-codex-acp-binary|--print-build-openrouter-binary)
+      if [[ -n "$print_mode" ]]; then
+        printf 'only one --print-build-* option may be given\n' >&2
+        exit 2
+      fi
+      print_mode="$arg"
+      ;;
+    --*)
+      printf 'unknown install-release-set option: %s\n' "$arg" >&2
+      exit 2
+      ;;
+    *)
+      selectors+=("$arg")
+      ;;
+  esac
+done
+(( ${#selectors[@]} > 0 )) || selectors=(all)
+
+requested_all=0
+for selector in "${selectors[@]}"; do
+  [[ "$selector" == all ]] && requested_all=1
+done
+
+if ! release_set_resolve_selectors "${selectors[@]}"; then
+  printf 'usage: %s [<selector>...] [--print-build-binary|--print-build-codex-acp-binary|--print-build-openrouter-binary]\n' "${0##*/}" >&2
+  printf 'selector: all, harness, aff, or a leaf (harness-cli, daemon, systemd, bridge, mcp, hook, codex, openrouter)\n' >&2
+  exit 2
+fi
 
 harness_binary_dir="${HARNESS_INSTALL_BINARY_DIR:-${HOME}/.local/bin}"
 aff_binary_dir="${AFF_INSTALL_BINARY_DIR:-$harness_binary_dir}"
@@ -47,19 +71,8 @@ shadow_candidates=()
 shadow_backup_paths=()
 shadow_backup_sources=()
 
-harness_binaries=("${HARNESS_RELEASE_BINARIES[@]}")
 all_binaries=("${HARNESS_RELEASE_ALL_BINARIES[@]}")
-case "$scope" in
-  all)
-    selected_binaries=("${all_binaries[@]}")
-    ;;
-  harness)
-    selected_binaries=("${harness_binaries[@]}")
-    ;;
-  aff)
-    selected_binaries=(aff)
-    ;;
-esac
+selected_binaries=("${RELEASE_SET_SELECTED_BINARIES[@]}")
 
 resolve_target_dir() {
   if [[ -n "${CARGO_TARGET_DIR:-}" ]]; then
@@ -79,11 +92,11 @@ fi
 target_dir="$(release_normalize_target_dir "$target_dir")"
 export CARGO_TARGET_DIR="$target_dir"
 
-case "${2:-}" in
+case "$print_mode" in
   "")
     ;;
   --print-build-binary)
-    if [[ "$scope" == "aff" ]]; then
+    if [[ "${#selected_binaries[@]}" -eq 1 && "${selected_binaries[0]}" == "aff" ]]; then
       printf '%s/release/aff\n' "$target_dir"
     else
       printf '%s/release/harness\n' "$target_dir"
@@ -97,10 +110,6 @@ case "${2:-}" in
   --print-build-openrouter-binary)
     printf '%s/release/harness-openrouter-agent\n' "$target_dir"
     exit 0
-    ;;
-  *)
-    printf 'unknown install-release-set option: %s\n' "$2" >&2
-    exit 2
     ;;
 esac
 
@@ -452,6 +461,14 @@ binary_is_known() {
   return 1
 }
 
+selection_has_harness_binary() {
+  local name
+  for name in "${selected_binaries[@]}"; do
+    [[ "$name" != "aff" ]] && return 0
+  done
+  return 1
+}
+
 copy_known_bundle_contents() {
   local source_dir="$1"
   local destination_dir="$2"
@@ -475,6 +492,9 @@ backup_entrypoint() {
 
 remove_inactive_managed_entrypoints() {
   local name path
+  # bash 3.2 (macOS /bin/bash) treats expanding an empty array under
+  # `set -u` as an unbound-variable error; this list is empty on Linux.
+  (( ${#HARNESS_RELEASE_INACTIVE_BINARIES[@]} == 0 )) && return 0
   for name in "${HARNESS_RELEASE_INACTIVE_BINARIES[@]}"; do
     path="$(stable_path "$name")"
     if is_managed_link "$name" "$path"; then
@@ -783,13 +803,28 @@ validate_selected_sources() {
 }
 
 expected_core_version() {
-  local harness_path aff_path
+  local harness_path aff_path current_harness_path current_aff_path
   harness_path="$(build_path harness)"
   aff_path="$(build_path aff)"
-  if [[ -x "$harness_path" ]] && [[ "$scope" != "aff" ]]; then
+  if [[ -x "$harness_path" ]]; then
     binary_version "$harness_path"
-  else
+    return
+  fi
+  if [[ -x "$aff_path" ]]; then
     binary_version "$aff_path"
+    return
+  fi
+  # Neither harness nor aff was freshly built for this selection (e.g. a
+  # single-leaf install of "mcp"); fall back to whichever is already active
+  # so the candidate still gets a meaningful version-derived identity.
+  current_harness_path="$current_link/bin/harness"
+  if [[ -x "$current_harness_path" ]]; then
+    binary_version "$current_harness_path"
+    return
+  fi
+  current_aff_path="$current_link/bin/aff"
+  if [[ -x "$current_aff_path" ]]; then
+    binary_version "$current_aff_path"
   fi
 }
 
@@ -814,7 +849,7 @@ validate_exact_inventory() {
       return 1
     fi
   done
-  if [[ "$scope" == "all" ]]; then
+  if (( requested_all == 1 )); then
     for name in "${all_binaries[@]}"; do
       if [[ ! -f "$bin_dir/$name" ]]; then
         printf 'full candidate is missing binary %s\n' "$name" >&2
@@ -858,13 +893,13 @@ validate_candidate_set() {
 
 prepare_candidate() {
   local expected_version="$1"
-  local digest_input="$scope|$previous_target|$harness_signing_identity|$aff_signing_identity|$harness_skip_codesign|$aff_skip_codesign"
+  local digest_input="${selected_binaries[*]}|$previous_target|$harness_signing_identity|$aff_signing_identity|$harness_skip_codesign|$aff_skip_codesign"
   local name source checksum build_id candidate_id candidate_dir identity
 
   candidate_stage="$install_root/.candidate-${lock_token}.staging"
   command rm -rf "$candidate_stage"
   command mkdir -p "$candidate_stage/bin"
-  if [[ "$scope" != "all" ]]; then
+  if (( requested_all == 0 )); then
     copy_known_bundle_contents "$current_link/bin" "$candidate_stage/bin"
   fi
 
@@ -915,6 +950,7 @@ preflight_shadowed_harness_binaries() {
   local path_entry candidate candidate_dir existing
   shadow_candidates=()
   IFS=: read -r -a path_entries <<<"${PATH:-}"
+  (( ${#path_entries[@]} == 0 )) && return 0
   for path_entry in "${path_entries[@]}"; do
     [[ -n "$path_entry" ]] || continue
     candidate="$path_entry/harness"
@@ -990,7 +1026,7 @@ detect_legacy_runtime_configs() {
     "$HOME/.opencode/config.json"
   )
 
-  [[ "$scope" != "aff" ]] || return 0
+  selection_has_harness_binary || return 0
   for path in "${config_paths[@]}"; do
     [[ "$seen" != *"|$path|"* ]] || continue
     seen+="$path|"
@@ -1006,7 +1042,7 @@ detect_legacy_runtime_configs() {
 
 cleanup_cli_launch_agent() {
   local harness_path
-  [[ "$scope" != "aff" ]] || return 0
+  selection_has_harness_binary || return 0
   [[ "${HARNESS_INSTALL_CLEANUP_CLI_DAEMON:-1}" != "0" ]] || return 0
   harness_path="$(stable_path harness)"
   if ! command env -u HARNESS_APP_GROUP_ID -u HARNESS_DAEMON_DATA_HOME \
@@ -1039,7 +1075,7 @@ if [[ -z "$expected_version" ]]; then
 fi
 
 shadow_candidates=()
-if [[ "$scope" != "aff" ]]; then
+if selection_has_harness_binary; then
   preflight_shadowed_harness_binaries
 fi
 
@@ -1076,7 +1112,7 @@ for name in "${selected_binaries[@]}"; do
 done
 
 validate_candidate_set "$current_link/bin" "$expected_version"
-if [[ "$scope" != "aff" ]]; then
+if selection_has_harness_binary; then
   reconcile_shadowed_harness_binaries
 fi
 prune_release_sets
@@ -1084,4 +1120,4 @@ prune_release_sets
 completed=1
 cleanup_cli_launch_agent
 printf 'installed %s release set %s at %s (entrypoints: %s, aff: %s)\n' \
-  "$scope" "$candidate_id" "$candidate_dir" "$harness_binary_dir" "$aff_binary_dir"
+  "${selectors[*]}" "$candidate_id" "$candidate_dir" "$harness_binary_dir" "$aff_binary_dir"

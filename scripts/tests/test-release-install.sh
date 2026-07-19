@@ -1340,6 +1340,85 @@ scenario_aff_install_ignores_unrelated_foreign_harness() {
   if (( ok )); then pass; fi
 }
 
+scenario_single_leaf_install_carries_the_rest_forward() {
+  start_test "single-leaf install rebuilds one binary and carries the rest forward"
+  local sandbox="$SANDBOX/single-leaf" name
+  write_fake_release_set "$sandbox/target" 47.0.0
+  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+  write_fake_release_set "$sandbox/target" 48.0.0
+  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" daemon >/dev/null
+
+  local ok=1
+  assert_contains "harness-daemon 48.0.0" \
+    "$("$sandbox/bin/harness-daemon" --version)" || ok=0
+  for name in "${HARNESS_BINARIES[@]}"; do
+    [[ "$name" != harness-daemon ]] || continue
+    assert_contains "$name 47.0.0" "$("$sandbox/bin/$name" --version)" || ok=0
+  done
+  assert_contains "aff 47.0.0" "$("$sandbox/aff-bin/aff" --version)" || ok=0
+  if (( ok )); then pass; fi
+}
+
+scenario_multi_selector_install_updates_only_requested_leaves() {
+  start_test "multi-selector install updates only the requested leaves"
+  local sandbox="$SANDBOX/multi-selector" name
+  write_fake_release_set "$sandbox/target" 47.0.0
+  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+  write_fake_release_set "$sandbox/target" 48.0.0
+  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" daemon mcp >/dev/null
+
+  local ok=1
+  assert_contains "harness-daemon 48.0.0" \
+    "$("$sandbox/bin/harness-daemon" --version)" || ok=0
+  assert_contains "harness-mcp 48.0.0" "$("$sandbox/bin/harness-mcp" --version)" || ok=0
+  for name in "${HARNESS_BINARIES[@]}"; do
+    case "$name" in
+      harness-daemon|harness-mcp) continue ;;
+    esac
+    assert_contains "$name 47.0.0" "$("$sandbox/bin/$name" --version)" || ok=0
+  done
+  if (( ok )); then pass; fi
+}
+
+scenario_harness_cli_alias_selects_only_the_cli_leaf() {
+  start_test "harness-cli selector updates only the CLI binary, not the whole harness set"
+  local sandbox="$SANDBOX/harness-cli-alias" name
+  write_fake_release_set "$sandbox/target" 47.0.0
+  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+  write_fake_release_set "$sandbox/target" 48.0.0
+  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" harness-cli >/dev/null
+
+  local ok=1
+  assert_contains "harness 48.0.0" "$("$sandbox/bin/harness" --version)" || ok=0
+  for name in "${HARNESS_BINARIES[@]}"; do
+    [[ "$name" != harness ]] || continue
+    assert_contains "$name 47.0.0" "$("$sandbox/bin/$name" --version)" || ok=0
+  done
+  if (( ok )); then pass; fi
+}
+
+scenario_unknown_selector_is_rejected_cleanly() {
+  start_test "an unknown selector is rejected without touching current"
+  local sandbox="$SANDBOX/unknown-selector" old_current status=0 output
+  write_fake_release_set "$sandbox/target" 47.0.0
+  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+  old_current="$(readlink "$sandbox/install-root/current")"
+  output="$(run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" \
+    bogus-selector 2>&1)" || status=$?
+
+  local ok=1
+  if (( status == 0 )); then
+    fail "unknown selector was accepted"
+    ok=0
+  fi
+  assert_contains "usage:" "$output" || ok=0
+  if [[ "$(readlink "$sandbox/install-root/current")" != "$old_current" ]]; then
+    fail "rejected selector changed current"
+    ok=0
+  fi
+  if (( ok )); then pass; fi
+}
+
 scenario_lock_recovers_ownerless_and_reused_pid_records() {
   start_test "install lock recovers ownerless and PID-reused stale records"
   local ownerless="$SANDBOX/lock-ownerless" reused="$SANDBOX/lock-reused"
@@ -1431,6 +1510,10 @@ run_all() {
   scenario_same_version_shadow_is_reconciled
   scenario_shadow_failure_restores_original_on_first_install
   scenario_aff_install_ignores_unrelated_foreign_harness
+  scenario_single_leaf_install_carries_the_rest_forward
+  scenario_multi_selector_install_updates_only_requested_leaves
+  scenario_harness_cli_alias_selects_only_the_cli_leaf
+  scenario_unknown_selector_is_rejected_cleanly
   scenario_lock_recovers_ownerless_and_reused_pid_records
   scenario_legacy_detector_is_read_only_and_blocks_activation
 }

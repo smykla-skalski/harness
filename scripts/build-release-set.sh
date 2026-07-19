@@ -5,7 +5,11 @@ unalias -a 2>/dev/null || true
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 # shellcheck source=scripts/lib/release-set.sh
 source "$ROOT/scripts/lib/release-set.sh"
-scope="${1:-all}"
+if (( $# > 0 )); then
+  selectors=("$@")
+else
+  selectors=(all)
+fi
 cd "$ROOT"
 
 if (( ${#HARNESS_RELEASE_BINARIES[@]} != ${#HARNESS_RELEASE_BUILD_LEAVES[@]} )); then
@@ -13,14 +17,12 @@ if (( ${#HARNESS_RELEASE_BINARIES[@]} != ${#HARNESS_RELEASE_BUILD_LEAVES[@]} ));
   exit 2
 fi
 
-case "$scope" in
-  all|harness|aff)
-    ;;
-  *)
-    printf 'usage: %s [all|harness|aff]\n' "${0##*/}" >&2
-    exit 2
-    ;;
-esac
+if ! release_set_resolve_selectors "${selectors[@]}"; then
+  printf 'usage: %s [<selector>...]\n' "${0##*/}" >&2
+  printf 'selector: all, harness, aff, or a leaf (harness-cli, daemon, systemd, bridge, mcp, hook, codex, openrouter)\n' >&2
+  exit 2
+fi
+scope="${selectors[*]}"
 
 resolve_target_dir() {
   if [[ -n "${CARGO_TARGET_DIR:-}" ]]; then
@@ -55,20 +57,8 @@ trace_path="${HARNESS_RELEASE_BUILD_TRACE:-}"
 publish_dir="$state_root/publish/$invocation_id"
 mkdir -p "$log_dir" "$build_root"
 
-case "$scope" in
-  all)
-    leaf_names=("${HARNESS_RELEASE_ALL_BUILD_LEAVES[@]}")
-    binary_names=("${HARNESS_RELEASE_ALL_BINARIES[@]}")
-    ;;
-  harness)
-    leaf_names=("${HARNESS_RELEASE_BUILD_LEAVES[@]}")
-    binary_names=("${HARNESS_RELEASE_BINARIES[@]}")
-    ;;
-  aff)
-    leaf_names=(aff)
-    binary_names=(aff)
-    ;;
-esac
+leaf_names=("${RELEASE_SET_SELECTED_LEAVES[@]}")
+binary_names=("${RELEASE_SET_SELECTED_BINARIES[@]}")
 leaf_count=${#leaf_names[@]}
 
 if (( leaf_count != ${#binary_names[@]} )); then

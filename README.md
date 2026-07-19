@@ -253,7 +253,7 @@ HARNESS_FEATURE_SUITE_HOOKS=1 mise run setup:bootstrap
 # aff-owned runtime hook wiring is manual and separate, but standard `mise run install`
 # now installs the global `aff` binary those hook commands expect on PATH.
 mise run aff:setup:bootstrap -- --agents codex
-mise run aff:install
+mise run install:aff
 ```
 
 ### Runtime

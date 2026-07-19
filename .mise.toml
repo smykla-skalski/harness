@@ -325,11 +325,43 @@ run = ["./scripts/cargo-local.sh fmt", "./scripts/cargo-local.sh clippy --fix --
 description = "Build the complete release set concurrently, sign it, and activate it atomically"
 run = "./scripts/build-and-install-release-set.sh all"
 
-[tasks."harness:install"]
+[tasks."install:harness"]
 description = "Build the Harness CLI/runtime binaries and isolated adapters concurrently, then activate the signed set atomically"
 run = "./scripts/build-and-install-release-set.sh harness"
 
-[tasks."aff:install"]
+[tasks."install:harness:cli"]
+description = "Build and atomically activate only the harness CLI binary, copying the rest of the current release set forward unchanged"
+run = "./scripts/build-and-install-release-set.sh harness-cli"
+
+[tasks."install:harness:daemon"]
+description = "Build and atomically activate only harness-daemon, copying the rest of the current release set forward unchanged"
+run = "./scripts/build-and-install-release-set.sh daemon"
+
+[tasks."install:harness:systemd"]
+description = "Build and atomically activate only harness-systemd, copying the rest of the current release set forward unchanged (Linux only)"
+run = "./scripts/run-linux-only.sh ./scripts/build-and-install-release-set.sh systemd"
+
+[tasks."install:harness:bridge"]
+description = "Build and atomically activate only harness-bridge, copying the rest of the current release set forward unchanged"
+run = "./scripts/build-and-install-release-set.sh bridge"
+
+[tasks."install:harness:mcp"]
+description = "Build and atomically activate only harness-mcp, copying the rest of the current release set forward unchanged"
+run = "./scripts/build-and-install-release-set.sh mcp"
+
+[tasks."install:harness:hook"]
+description = "Build and atomically activate only harness-hook, copying the rest of the current release set forward unchanged"
+run = "./scripts/build-and-install-release-set.sh hook"
+
+[tasks."install:harness:codex"]
+description = "Build and atomically activate only harness-codex-acp, copying the rest of the current release set forward unchanged"
+run = "./scripts/build-and-install-release-set.sh codex"
+
+[tasks."install:harness:openrouter"]
+description = "Build and atomically activate only harness-openrouter-agent, copying the rest of the current release set forward unchanged"
+run = "./scripts/build-and-install-release-set.sh openrouter"
+
+[tasks."install:aff"]
 description = "Build aff only, then activate it in the signed versioned release set"
 run = "./scripts/build-and-install-release-set.sh aff"
 
