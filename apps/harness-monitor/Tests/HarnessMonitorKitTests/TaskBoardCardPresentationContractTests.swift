@@ -1,6 +1,11 @@
 import Foundation
+import HarnessMonitorKit
+import SwiftUI
 import Testing
 
+@testable import HarnessMonitorUIPreviewable
+
+@MainActor
 @Suite("Task board card presentation contracts")
 struct TaskBoardCardPresentationContractTests {
   @Test("Repository leads the footer before card badges")
@@ -97,6 +102,95 @@ struct TaskBoardCardPresentationContractTests {
     #expect(!decisionSource.contains(".taskBoardCardBackgroundGlyph("))
     #expect(glyphSource.contains("func taskBoardCardBackgroundGlyph("))
     #expect(glyphSource.contains(".rotationEffect(glyphRotation)"))
+  }
+
+  @Test("Card rows accept an explicit cardPresentation argument")
+  func cardRowsAcceptExplicitCardPresentation() {
+    // Compile-level proof: `cardPresentation` must be `var` (not `let`) with its default, or a
+    // `let` with an initializer is excluded from the memberwise init entirely and this call site
+    // would fail to build - it would never become passable once the lane column wires it through.
+    let presentation = TaskBoardCardPresentation(
+      titleFragments: [TaskBoardInlineCodeFragment(text: "Improve caching", isCode: false)],
+      titleLeadingText: nil,
+      titleDisplayText: "Improve caching",
+      glyph: nil,
+      updatedAt: nil,
+      repositoryLabelDefault: nil,
+      repositoryLabelFullName: nil
+    )
+    let typography = TaskBoardCardTitleTypography(fontScale: 1)
+
+    let apiRow = TaskBoardItemRow(
+      item: contractTaskBoardItem(),
+      titleTypography: typography,
+      isHovered: false,
+      isSelected: false,
+      onSelect: { _ in },
+      onOpenItem: { _ in },
+      cardPresentation: presentation
+    )
+    let inboxRow = TaskBoardInboxItemRow(
+      item: contractInboxItem(),
+      titleTypography: typography,
+      isHovered: false,
+      isSelected: false,
+      onSelect: { _ in },
+      onOpenItem: { _ in },
+      cardPresentation: presentation
+    )
+
+    #expect(apiRow.cardPresentation == presentation)
+    #expect(inboxRow.cardPresentation == presentation)
+  }
+
+  private func contractTaskBoardItem() -> TaskBoardItem {
+    TaskBoardItem(
+      schemaVersion: 1,
+      id: "contract-item",
+      title: "Board item",
+      body: "Body",
+      status: .todo,
+      priority: .medium,
+      tags: [],
+      projectId: "example/project",
+      agentMode: .interactive,
+      externalRefs: [],
+      planning: TaskBoardPlanningState(),
+      workflow: nil,
+      sessionId: nil,
+      workItemId: nil,
+      usage: TaskBoardUsage(),
+      createdAt: "2026-07-13T10:00:00Z",
+      updatedAt: "2026-07-13T10:01:00Z",
+      deletedAt: nil
+    )
+  }
+
+  private func contractInboxItem() -> TaskBoardInboxItem {
+    let item = TaskBoardInboxItem(
+      session: PreviewFixtures.summary,
+      task: WorkItem(
+        taskId: "contract-task",
+        title: "Linked task",
+        context: nil,
+        severity: .medium,
+        status: .inProgress,
+        assignedTo: nil,
+        createdAt: "2026-05-14T10:00:00Z",
+        updatedAt: "2026-05-14T10:01:00Z",
+        createdBy: nil,
+        notes: [],
+        suggestedFix: nil,
+        source: .manual,
+        blockedReason: nil,
+        completedAt: nil,
+        checkpointSummary: nil
+      )
+    )
+    guard let item else {
+      preconditionFailure("expected task board inbox item fixture")
+    }
+    return item
   }
 
   private func taskBoardSource(_ fileName: String) throws -> String {

@@ -10,8 +10,10 @@ struct TaskBoardItemRow: View {
   let selectionModel: TaskBoardCardSelectionModel
   let actions: TaskBoardOverviewActions
   /// `nil` until the lane column wires the presentation lookup through; falls back to on-the-fly
-  /// computation below so behavior is identical either way.
-  let cardPresentation: TaskBoardCardPresentation? = nil
+  /// computation below so behavior is identical either way. `var` (not `let`) so the default
+  /// participates in the memberwise init as a defaulted trailing parameter - a `let` with an
+  /// initializer is excluded from it entirely, which would make this permanently unpassable.
+  var cardPresentation: TaskBoardCardPresentation? = nil
   @Environment(\.fontScale)
   private var fontScale
   @Environment(\.taskBoardLaneAppearance)
@@ -162,8 +164,10 @@ struct TaskBoardInboxItemRow: View {
   let selectionModel: TaskBoardCardSelectionModel
   let actions: TaskBoardOverviewActions
   /// `nil` until the lane column wires the presentation lookup through; falls back to on-the-fly
-  /// computation below so behavior is identical either way.
-  let cardPresentation: TaskBoardCardPresentation? = nil
+  /// computation below so behavior is identical either way. `var` (not `let`) so the default
+  /// participates in the memberwise init as a defaulted trailing parameter - a `let` with an
+  /// initializer is excluded from it entirely, which would make this permanently unpassable.
+  var cardPresentation: TaskBoardCardPresentation? = nil
   @Environment(\.fontScale)
   private var fontScale
 
