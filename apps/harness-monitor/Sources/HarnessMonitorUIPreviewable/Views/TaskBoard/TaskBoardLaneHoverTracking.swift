@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 /// Not `@Observable` on purpose: writes here must not invalidate the view.
