@@ -35,7 +35,9 @@ struct TaskBoardStepProgressRail: View {
   private func node(_ column: TaskBoardStepColumn) -> some View {
     let nodeState = column.nodeState(current: current, isBlocked: isBlocked)
     return Button {
-      state.viewingColumn = state.viewingColumn == column ? nil : column
+      // Tapping the current node (or the one already previewed) exits preview;
+      // any other node previews that stage.
+      state.viewingColumn = (column == current || state.viewingColumn == column) ? nil : column
     } label: {
       VStack(spacing: HarnessMonitorTheme.spacingXS) {
         badge(nodeState, column: column)
@@ -55,7 +57,10 @@ struct TaskBoardStepProgressRail: View {
     .accessibilityAddTraits(column == viewing ? [.isButton, .isSelected] : .isButton)
   }
 
-  private func badge(_ nodeState: TaskBoardStepNodeState, column: TaskBoardStepColumn) -> some View {
+  private func badge(
+    _ nodeState: TaskBoardStepNodeState,
+    column: TaskBoardStepColumn
+  ) -> some View {
     ZStack {
       Circle().fill(fillColor(nodeState))
       Circle().strokeBorder(borderColor(nodeState), lineWidth: column == viewing ? 2.5 : 1.5)
@@ -68,9 +73,13 @@ struct TaskBoardStepProgressRail: View {
   private func badgeGlyph(_ nodeState: TaskBoardStepNodeState, order: Int) -> some View {
     switch nodeState {
     case .done:
-      Image(systemName: "checkmark").font(numberFont).foregroundStyle(HarnessMonitorTheme.success)
+      Image(systemName: "checkmark")
+        .font(numberFont)
+        .foregroundStyle(HarnessMonitorTheme.success)
     case .failed:
-      Image(systemName: "exclamationmark").font(numberFont).foregroundStyle(HarnessMonitorTheme.danger)
+      Image(systemName: "exclamationmark")
+        .font(numberFont)
+        .foregroundStyle(HarnessMonitorTheme.danger)
     case .current:
       Text("\(order + 1)").font(numberFont).foregroundStyle(HarnessMonitorTheme.accent)
     case .upcoming:

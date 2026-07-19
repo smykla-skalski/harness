@@ -43,7 +43,8 @@ extension TaskBoardStepRailView {
           state.requestApprovalRefresh()
           state.pickedSelection = selection
           state.delivery = nil
-          if let selection { state.lockedItemID = selection.item.id }
+          // Always track the picked item, clearing the lock when Pick returned nil.
+          state.lockedItemID = selection?.item.id
           state.finish()
         }
       }

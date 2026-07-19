@@ -43,7 +43,10 @@ struct TaskBoardStepStageTests {
   func workerRunningWhenInProgress() {
     let plan = TaskBoardStepStageResolver.plan(
       for: TaskBoardStepStageInputs(
-        item: item(status: .inProgress, workflow: TaskBoardWorkflowState(status: .running, currentStepId: "worker"))
+        item: item(
+          status: .inProgress,
+          workflow: TaskBoardWorkflowState(status: .running, currentStepId: "worker")
+        )
       )
     )
 
@@ -113,8 +116,8 @@ struct TaskBoardStepStageTests {
     #expect(plan.inlineLinks.contains(.openPullRequest))
   }
 
-  @Test("Blocked board status has no primary action and shows the reason")
-  func blockedFromBoardStatus() {
+  @Test("Blocked keeps Evaluate available and shows the reason")
+  func blockedKeepsEvaluate() {
     let plan = TaskBoardStepStageResolver.plan(
       for: TaskBoardStepStageInputs(
         item: item(
@@ -125,8 +128,37 @@ struct TaskBoardStepStageTests {
     )
 
     #expect(plan.stage == .blocked)
-    #expect(plan.primaryAction == nil)
+    #expect(plan.primaryAction == .evaluate)
     #expect(plan.whatHappened?.contains("needs human decision") == true)
+  }
+
+  @Test("A held awaiting-delivery item is ready to deliver, not running")
+  func awaitingDeliveryItemIsReadyToDeliver() {
+    let plan = TaskBoardStepStageResolver.plan(
+      for: TaskBoardStepStageInputs(
+        item: item(
+          status: .inProgress,
+          workflow: TaskBoardWorkflowState(status: .running, currentStepId: "awaiting_delivery")
+        ),
+        latestRecord: record(taskStatus: .open, outcome: .workerPending)
+      )
+    )
+
+    #expect(plan.stage == .readyToDeliver)
+    #expect(plan.primaryAction == .deliver)
+  }
+
+  @Test("A finished board reported by the record is terminal")
+  func finishedBoardViaRecordIsTerminal() {
+    let plan = TaskBoardStepStageResolver.plan(
+      for: TaskBoardStepStageInputs(
+        item: item(status: .inReview),
+        latestRecord: record(taskStatus: .done, outcome: .completed, boardStatus: .done)
+      )
+    )
+
+    #expect(plan.stage == .done)
+    #expect(plan.primaryAction == nil)
   }
 
   @Test("Done board status is terminal with no primary action")
@@ -211,9 +243,13 @@ struct TaskBoardStepStageTests {
   @Test("Rail node state derives from the current column")
   func railNodeStatesDeriveFromColumn() {
     #expect(TaskBoardStepColumn.todo.nodeState(current: .toReview, isBlocked: false) == .done)
-    #expect(TaskBoardStepColumn.toReview.nodeState(current: .toReview, isBlocked: false) == .current)
+    #expect(
+      TaskBoardStepColumn.toReview.nodeState(current: .toReview, isBlocked: false) == .current
+    )
     #expect(TaskBoardStepColumn.toReview.nodeState(current: .toReview, isBlocked: true) == .failed)
-    #expect(TaskBoardStepColumn.inReview.nodeState(current: .toReview, isBlocked: false) == .upcoming)
+    #expect(
+      TaskBoardStepColumn.inReview.nodeState(current: .toReview, isBlocked: false) == .upcoming
+    )
   }
 
   // MARK: - Fixtures
@@ -251,7 +287,8 @@ struct TaskBoardStepStageTests {
   private func record(
     taskStatus: TaskStatus?,
     outcome: TaskBoardEvaluationOutcome,
-    reason: String? = nil
+    reason: String? = nil,
+    boardStatus: TaskBoardStatus? = nil
   ) -> TaskBoardEvaluationRecord {
     TaskBoardEvaluationRecord(
       boardItemId: "board-1",
@@ -259,6 +296,7 @@ struct TaskBoardStepStageTests {
       workItemId: "task-1",
       outcome: outcome,
       taskStatus: taskStatus,
+      boardStatus: boardStatus,
       reason: reason
     )
   }

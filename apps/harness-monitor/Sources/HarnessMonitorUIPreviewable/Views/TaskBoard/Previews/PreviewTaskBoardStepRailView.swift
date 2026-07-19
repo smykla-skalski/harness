@@ -18,13 +18,19 @@ import SwiftUI
 #Preview("Step Mode - awaiting review") {
   TaskBoardStepRailPreviewFixtures.panel(
     item: TaskBoardStepRailPreviewFixtures.item(status: .toReview),
-    record: TaskBoardStepRailPreviewFixtures.record(taskStatus: .awaitingReview, outcome: .reviewPending)
+    record: TaskBoardStepRailPreviewFixtures.record(
+      taskStatus: .awaitingReview,
+      outcome: .reviewPending
+    )
   )
 }
 
 #Preview("Step Mode - changes requested") {
   TaskBoardStepRailPreviewFixtures.panel(
-    item: TaskBoardStepRailPreviewFixtures.item(status: .inReview, prUrl: "https://example.com/pr/7"),
+    item: TaskBoardStepRailPreviewFixtures.item(
+      status: .inReview,
+      prUrl: "https://example.com/pr/7"
+    ),
     record: TaskBoardStepRailPreviewFixtures.record(
       taskStatus: .inReview,
       outcome: .reviewChangesRequested,
@@ -73,7 +79,11 @@ private enum TaskBoardStepRailPreviewFixtures {
       agentMode: .interactive,
       externalRefs: [],
       planning: TaskBoardPlanningState(),
-      workflow: TaskBoardWorkflowState(status: .running, currentStepId: currentStepId, prUrl: prUrl),
+      workflow: TaskBoardWorkflowState(
+        status: .running,
+        currentStepId: currentStepId,
+        prUrl: prUrl
+      ),
       sessionId: "sess-task-board",
       workItemId: "task-board-refresh",
       usage: TaskBoardUsage(),

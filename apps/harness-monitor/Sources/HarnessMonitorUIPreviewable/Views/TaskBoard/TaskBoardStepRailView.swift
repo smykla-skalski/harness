@@ -23,13 +23,16 @@ struct TaskBoardStepRailView: View {
 
   var stepRailState: TaskBoardStepRailState { state }
 
-  /// The item the flow follows: the locked item resolved to its live board copy,
-  /// falling back to the current target (top Todo) when nothing is locked.
+  /// The item the flow follows: the locked item resolved to its live board copy.
+  /// When nothing is locked it is the current target (top Todo). A locked item
+  /// can leave the visible lanes - it reaches Done and the board filters it out -
+  /// so fall back to the retained snapshot rather than jumping to the next Todo,
+  /// which would otherwise be mislabeled by the completed item's picked/delivery.
   var lockedItem: TaskBoardItem? {
-    if let id = state.lockedItemID, let live = taskBoardItems.first(where: { $0.id == id }) {
-      return live
-    }
-    return targetItem
+    guard let id = state.lockedItemID else { return targetItem }
+    return taskBoardItems.first { $0.id == id }
+      ?? state.delivery?.applied.item
+      ?? state.pickedSelection?.item
   }
 
   var activeItem: TaskBoardItem? { lockedItem }
