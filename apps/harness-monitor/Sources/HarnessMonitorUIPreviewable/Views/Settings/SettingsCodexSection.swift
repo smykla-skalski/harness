@@ -147,7 +147,7 @@ public struct SettingsHostBridgeSection: View {
             variant: state == .ready ? .bordered : .prominent,
             tint: state == .ready ? .secondary : nil
           )
-          .disabled(snapshot.isCapabilityActionInFlight)
+          .disabled(snapshot.isDaemonActionInFlight)
         }
       }
     }
@@ -237,7 +237,7 @@ private struct SettingsHostBridgeSnapshot: Equatable {
   let isSandboxActive: Bool
   let capabilityNames: [String]
   let capabilityStates: [String: HarnessMonitorStore.HostBridgeCapabilityState]
-  let isCapabilityActionInFlight: Bool
+  let isDaemonActionInFlight: Bool
 
   @MainActor
   init(store: HarnessMonitorStore) {
@@ -251,7 +251,7 @@ private struct SettingsHostBridgeSnapshot: Equatable {
         (name, store.hostBridgeCapabilityState(for: name))
       }
     )
-    isCapabilityActionInFlight = store.isDaemonActionInFlight
+    isDaemonActionInFlight = store.isDaemonActionInFlight
   }
 }
 
