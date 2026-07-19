@@ -69,10 +69,10 @@ struct TaskBoardCardPresentation: Equatable, Sendable {
 /// Timestamp parsing usable off the main actor: the worker actor can't reach the cached
 /// `@MainActor` formatters in `HarnessMonitorFormatters.swift`. `TaskBoardCardDateParser` holds
 /// the 3 formatters as instance state so the presentation worker allocates them once per snapshot
-/// compute (not once per card); `TaskBoardCardDateParsing.parse(_:)` stays as a static, per-call
-/// allocating fallback for the `TaskBoardLaneViews` row path, which is dead on the live render
-/// path now that the worker wires `cardPresentation` through, but must keep working for any
-/// caller that never received a precomputed presentation (e.g. previews).
+/// compute (not once per card); `TaskBoardCardDateParsing.parse(_:)` is the fallback used by the
+/// `TaskBoardLaneViews` row path when `cardPresentation` is nil (dictionary miss, previews,
+/// tests) - it caches one `@MainActor` instance instead of allocating per call, since that
+/// fallback is still reachable during body evaluation.
 struct TaskBoardCardDateParser {
   private let fractional: ISO8601DateFormatter
   private let standard: ISO8601DateFormatter
@@ -102,7 +102,9 @@ struct TaskBoardCardDateParser {
 }
 
 enum TaskBoardCardDateParsing {
-  static func parse(_ value: String) -> Date? {
-    TaskBoardCardDateParser().parse(value)
+  @MainActor private static let parser = TaskBoardCardDateParser()
+
+  @MainActor static func parse(_ value: String) -> Date? {
+    parser.parse(value)
   }
 }
