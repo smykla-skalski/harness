@@ -106,9 +106,7 @@ struct TaskBoardCardPresentationContractTests {
 
   @Test("Card rows accept an explicit cardPresentation argument")
   func cardRowsAcceptExplicitCardPresentation() {
-    // Compile-level proof: `cardPresentation` must be `var` (not `let`) with its default, or a
-    // `let` with an initializer is excluded from the memberwise init entirely and this call site
-    // would fail to build - it would never become passable once the lane column wires it through.
+    // Compile-level proof: `var` (not `let`) so this stays passable via the memberwise init.
     let presentation = TaskBoardCardPresentation(
       titleFragments: [TaskBoardInlineCodeFragment(text: "Improve caching", isCode: false)],
       titleLeadingText: nil,
@@ -172,9 +170,6 @@ struct TaskBoardCardPresentationContractTests {
 
   @Test("Decision row accepts actions in place of the onOpenDecision closure")
   func decisionRowAcceptsActionsInsteadOfClosure() {
-    // Compile-level proof for the de-closure: TaskBoardDecisionRow must take `actions:` (not a
-    // stored `(Decision) -> Void` closure) so the row stays structurally Equatable-comparable and
-    // diff-skippable, matching the pattern W1 used for the other rows.
     let actions = TaskBoardOverviewActions(store: nil, scope: .dashboard)
     let decision = Decision(
       id: "contract-decision",
