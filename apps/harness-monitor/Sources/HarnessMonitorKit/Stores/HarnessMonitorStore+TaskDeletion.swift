@@ -141,7 +141,11 @@ extension HarnessMonitorStore {
       return false
     }
     isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
+    beginTaskBoardAction()
+    defer {
+      isDaemonActionInFlight = false
+      endTaskBoardAction()
+    }
 
     var deletedIDs: Set<String> = []
     var firstFailure: (index: Int, error: any Error)?
