@@ -116,7 +116,9 @@ struct TaskBoardStepRailView: View {
 
   private var cardArea: some View {
     Group {
-      if let viewing = state.viewingColumn, viewing != stagePlan.column {
+      if stagePlan.stage == .noTarget {
+        emptyState
+      } else if let viewing = state.viewingColumn, viewing != stagePlan.column {
         previewCard(for: viewing)
       } else {
         liveCard(stagePlan)
@@ -125,6 +127,23 @@ struct TaskBoardStepRailView: View {
     .id(cardIdentity)
     .transition(.opacity)
     .animation(.easeInOut(duration: reduceMotion ? 0 : 0.2), value: cardIdentity)
+  }
+
+  private var emptyState: some View {
+    ContentUnavailableView {
+      Label("No ready item", systemImage: "tray")
+    } description: {
+      Text(stagePlan.whatNext)
+    } actions: {
+      Button {
+        state.confirmation = .externalSync
+      } label: {
+        Label("Sync external sources", systemImage: "arrow.triangle.2.circlepath")
+      }
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      .disabled(controlsDisabled)
+    }
+    .accessibilityIdentifier("harness.task-board.step.empty")
   }
 
   private func previewCard(for column: TaskBoardStepColumn) -> some View {
