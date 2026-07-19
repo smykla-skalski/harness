@@ -82,6 +82,53 @@ struct HarnessMonitorStoreTaskBoardStatusUpdateTests {
     #expect(store.currentSuccessFeedbackMessage == "Moved session tasks")
   }
 
+  @Test("Optimistic move shows the new status before the network call resolves")
+  func optimisticMoveShowsNewStatusBeforeNetworkResolves() async {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardItems([taskBoardItem(id: "board-1", status: .todo)])
+    client.configureMutationDelay(.milliseconds(200))
+    let store = await makeBootstrappedStore(client: client)
+
+    let mutation = Task { @MainActor in
+      await store.updateTaskBoardItemStatuses([
+        TaskBoardItemStatusUpdate(id: "board-1", status: .inProgress)
+      ])
+    }
+
+    var observedOptimisticStatus: TaskBoardStatus?
+    for _ in 0..<50 {
+      if let status = store.globalTaskBoardItems.first(where: { $0.id == "board-1" })?.status,
+        status == .inProgress
+      {
+        observedOptimisticStatus = status
+        break
+      }
+      await Task.yield()
+    }
+    _ = await mutation.value
+
+    #expect(observedOptimisticStatus == .inProgress)
+    #expect(store.globalTaskBoardItems.first(where: { $0.id == "board-1" })?.status == .inProgress)
+  }
+
+  @Test("Optimistic move rolls back to the prior status on failure")
+  func optimisticMoveRollsBackOnFailure() async {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardItems([taskBoardItem(id: "board-1", status: .todo)])
+    client.configureTaskBoardUpdateError(
+      HarnessMonitorAPIError.server(code: 500, message: "boom")
+    )
+    let store = await makeBootstrappedStore(client: client)
+
+    let success = await store.updateTaskBoardItemStatuses([
+      TaskBoardItemStatusUpdate(id: "board-1", status: .inProgress)
+    ])
+
+    #expect(success == false)
+    #expect(store.globalTaskBoardItems.first(where: { $0.id == "board-1" })?.status == .todo)
+    #expect(store.currentFailureFeedbackMessage != nil)
+  }
+
   private func taskBoardItem(id: String, status: TaskBoardStatus) -> TaskBoardItem {
     TaskBoardItem(
       schemaVersion: 1,
