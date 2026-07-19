@@ -131,6 +131,11 @@ public struct TaskBoardOverviewActions: Equatable {
 
   // MARK: - Card moves
 
+  @MainActor
+  func reportDropRejection(_ reason: String) {
+    store?.reportDropRejection(reason)
+  }
+
   /// Re-validates each item's live status/lane against the drag payload's
   /// captured source before applying: the orchestrator can move items
   /// autonomously between drag-start and drop, and a stale drop must not

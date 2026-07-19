@@ -2,6 +2,30 @@ import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
+/// Pure routing decision for a drop delivery, extracted so the reject-reason mapping stays
+/// testable without a live view. The guard legs here are reachable only through config/delivery
+/// races (a normal forbidden-lane drop never delivers because `dropConfiguration` returns
+/// `.forbidden`), so this cannot spam feedback in the common case.
+enum TaskBoardCardDropGate: Equatable {
+  case proceed(TaskBoardCardDropPlan)
+  case reject(String)
+}
+
+func taskBoardCardDropGate(
+  payloads: [TaskBoardCardDragPayload],
+  lane: TaskBoardInboxLane,
+  isDropEnabled: Bool,
+  isDropCandidate: Bool
+) -> TaskBoardCardDropGate {
+  guard isDropEnabled else {
+    return .reject("Cannot move task: an action is already in progress")
+  }
+  guard isDropCandidate, let plan = TaskBoardCardDropPlan.resolve(payloads, to: lane) else {
+    return .reject("Cannot move task: it can no longer move to this lane")
+  }
+  return .proceed(plan)
+}
+
 struct TaskBoardLaneUnifiedColumn: View {
   let lane: TaskBoardInboxLane
   let apiItems: [TaskBoardItem]
@@ -248,22 +272,28 @@ struct TaskBoardLaneUnifiedColumn: View {
   }
 
   private func handleDrop(_ payloads: [TaskBoardCardDragPayload], session: DropSession) {
-    guard
-      isDropEnabled, isDropCandidate,
-      let plan = TaskBoardCardDropPlan.resolve(payloads, to: lane)
-    else {
-      updateDropTargeted(false)
-      return
-    }
-    _ = performDrop(
-      signature: TaskBoardCardDropSignature(
-        cardIDs: plan.items.map(\.id),
-        destination: lane
-      )
+    defer { updateDropTargeted(false) }
+    switch taskBoardCardDropGate(
+      payloads: payloads,
+      lane: lane,
+      isDropEnabled: isDropEnabled,
+      isDropCandidate: isDropCandidate
     ) {
-      actions.moveCards(plan.items, to: lane)
+    case .reject(let reason):
+      actions.reportDropRejection(reason)
+    case .proceed(let plan):
+      let moved = performDrop(
+        signature: TaskBoardCardDropSignature(
+          cardIDs: plan.items.map(\.id),
+          destination: lane
+        )
+      ) {
+        actions.moveCards(plan.items, to: lane)
+      }
+      if !moved {
+        actions.reportDropRejection("Cannot move task: the board changed before the drop completed")
+      }
     }
-    updateDropTargeted(false)
   }
 
   private func dropConfiguration(for session: DropSession) -> DropConfiguration {

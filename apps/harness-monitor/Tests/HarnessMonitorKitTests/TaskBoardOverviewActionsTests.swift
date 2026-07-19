@@ -73,6 +73,27 @@ struct TaskBoardOverviewActionsTests {
     #expect(actions.moveCards([dragItem], to: .inProgress))
   }
 
+  @Test("Report drop rejection forwards the reason to the store as failure feedback")
+  func reportDropRejectionForwardsToStore() {
+    let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .empty)
+    let actions = TaskBoardOverviewActions(store: store, scope: .dashboard)
+
+    actions.reportDropRejection("Cannot move task: an action is already in progress")
+
+    #expect(
+      store.toast.activeFeedback.last?.message
+        == "Cannot move task: an action is already in progress"
+    )
+    #expect(store.toast.activeFeedback.last?.severity == .failure)
+  }
+
+  @Test("Report drop rejection stays inert with no store")
+  func reportDropRejectionStaysInertWithNoStore() {
+    let actions = TaskBoardOverviewActions(store: nil, scope: .dashboard)
+
+    actions.reportDropRejection("Cannot move task: an action is already in progress")
+  }
+
   private static func makeAPIItem(id: String, status: TaskBoardStatus) -> TaskBoardItem {
     TaskBoardItem(
       schemaVersion: 1,
