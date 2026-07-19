@@ -10,6 +10,9 @@ extension HarnessMonitorStore {
       guard oldValue != newValue else {
         return
       }
+      if newValue != .online {
+        globalTaskBoardAutomationSnapshot = nil
+      }
       if newValue == .online {
         dismissDaemonDisconnectDecisionsAfterReconnect()
       }

@@ -23,6 +23,8 @@ struct TaskBoardItemWireDecodingTests {
     #expect(item.status == .inProgress)
     #expect(item.priority == .high)
     #expect(item.agentMode == .interactive)
+    #expect(item.workflowKind == .prFix)
+    #expect(item.executionRepository == "acme/widget")
     #expect(item.tags == ["urgent"])
     #expect(item.importedFromProvider == .gitHub)
 
@@ -54,6 +56,8 @@ struct TaskBoardItemWireDecodingTests {
     #expect(item.status == .todo)
     #expect(item.priority == .medium)
     #expect(item.agentMode == .headless)
+    #expect(item.workflowKind == .defaultTask)
+    #expect(item.executionRepository == nil)
     #expect(item.tags.isEmpty)
     #expect(item.externalRefs.isEmpty)
     #expect(item.importedFromProvider == nil)
@@ -234,6 +238,8 @@ private let fullItemPayloadFixture = """
     "project_id": "owner/repo",
     "target_project_types": ["rust"],
     "agent_mode": "interactive",
+    "workflow_kind": "pr_fix",
+    "execution_repository": "acme/widget",
     "external_refs": [
       {
         "provider": "github",

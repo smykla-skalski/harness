@@ -42,6 +42,9 @@ struct TaskBoardOrchestratorWireDecodingTests {
     let wire = try decoder.decode(TaskBoardOrchestratorSettingsWire.self, from: data)
     let settings = TaskBoardOrchestratorSettings(wire: wire)
 
+    #expect(wire.scheduling == nil)
+    #expect(wire.retry == nil)
+    #expect(wire.reviewers == nil)
     #expect(settings.enabledWorkflows == [.defaultTask, .prFix, .prReview, .review])
     #expect(settings.stepMode)
     #expect(settings.dryRunDefault == false)
@@ -53,6 +56,7 @@ struct TaskBoardOrchestratorWireDecodingTests {
     #expect(settings.githubInbox.labelFilter == ["bug"])
     #expect(settings.todoistInbox.projectFilter == ["Inbox"])
     #expect(settings.policyVersion == "task-board-policy-v1")
+    expectAutomationDefaults(settings)
   }
 
   @Test("status maps the tick, run summary and workflow counts including the bare enums")
@@ -99,6 +103,10 @@ struct TaskBoardOrchestratorWireDecodingTests {
     let wire = try decoder.decode(TaskBoardOrchestratorStatusWire.self, from: data)
     let status = TaskBoardOrchestratorStatus(wire: wire)
 
+    #expect(wire.automation == nil)
+    #expect(wire.settings.scheduling == nil)
+    #expect(wire.settings.retry == nil)
+    #expect(wire.settings.reviewers == nil)
     #expect(status.enabled)
     #expect(status.running)
     #expect(status.stepMode)
@@ -114,5 +122,75 @@ struct TaskBoardOrchestratorWireDecodingTests {
     #expect(status.workflowExecutionCounts.map(\.count) == [3, 7])
     #expect(status.settings.enabledWorkflows == [.defaultTask])
     #expect(status.settings.githubProject.repo == "widget")
+    #expect(status.automation == nil)
+    expectAutomationDefaults(status.settings)
+  }
+
+  @Test("automation snapshot decodes current fields and legacy schema default")
+  func automationSnapshotCurrentContract() throws {
+    let data = Data(
+      #"""
+      {
+        "revision": 7,
+        "desired_mode": "off",
+        "admission_state": "stopped",
+        "effective_state": "idle",
+        "observed_at": "2026-07-19T12:00:00Z",
+        "heartbeat_at": "2026-07-19T12:00:00Z",
+        "settings_revision": 3,
+        "policy_revision": 4,
+        "queue": {
+          "ready": 1, "awaiting_approval": 2, "policy_blocked": 3,
+          "preparing": 4, "retrying": 5, "starting": 6, "active": 7,
+          "draining": 8, "cleanup_required": 9
+        }
+      }
+      """#.utf8
+    )
+
+    let snapshot = try decoder.decode(TaskBoardAutomationSnapshot.self, from: data)
+
+    #expect(snapshot.schemaVersion == 1)
+    #expect(snapshot.desiredMode == .off)
+    #expect(snapshot.effectiveState == .idle)
+    #expect(snapshot.queue.cleanupRequired == 9)
+    #expect(snapshot.activeRun == nil)
+  }
+
+  private func expectAutomationDefaults(_ settings: TaskBoardOrchestratorSettings) {
+    #expect(
+      settings.scheduling
+        == TaskBoardAutomationSchedulingSettings(
+          maxDispatchesPerRun: 1,
+          maxConcurrentWorkflows: 1,
+          reconcileIntervalSeconds: 60
+        )
+    )
+    #expect(
+      settings.retry
+        == TaskBoardAutomationRetrySettings(
+          maxAttempts: 3,
+          baseDelaySeconds: 30,
+          multiplier: 4,
+          maxDelaySeconds: 600,
+          deterministicJitterPercent: 10
+        )
+    )
+    #expect(
+      settings.reviewers
+        == TaskBoardReviewerSettings(
+          reviewerCount: 1,
+          requiredApprovals: 1,
+          maxRevisionCycles: 3,
+          profiles: [
+            TaskBoardReviewerProfile(
+              id: "default-code-reviewer",
+              runtime: "codex",
+              persona: "code-reviewer",
+              agentMode: .evaluate
+            )
+          ]
+        )
+    )
   }
 }

@@ -15,6 +15,7 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
   public var projectId: String?
   public var targetProjectTypes: [String]
   public var agentMode: TaskBoardAgentMode
+  public var workflowKind: TaskBoardWorkflowKind
   public var kind: TaskBoardItemKind
   public var executionRepository: String?
   public var estimatedTokens: UInt64?
@@ -35,7 +36,7 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
   public var updatedAt: String
   public var deletedAt: String?
 
-  public init(schemaVersion: UInt32, id: String, title: String, body: String = "", status: TaskBoardStatus = .todo, priority: TaskBoardPriority = .medium, tags: [String] = [], projectId: String? = nil, targetProjectTypes: [String] = [], agentMode: TaskBoardAgentMode = .headless, kind: TaskBoardItemKind = .task, executionRepository: String? = nil, estimatedTokens: UInt64? = nil, estimatedCostMicrousd: UInt64? = nil, externalRefs: [ExternalRefWire] = [], importedFromProvider: ExternalRefProviderWire? = nil, planning: PlanningStateWire = PlanningStateWire(), workflow: TaskBoardWorkflowStateWire? = nil, sessionId: String? = nil, workItemId: String? = nil, usage: TaskUsageWire = TaskUsageWire(), parentItemId: String? = nil, childOrder: UInt32 = 0, lanePosition: UInt32? = nil, laneOrigin: TaskBoardLaneOriginWire? = nil, laneSetAt: String? = nil, createdAt: String, updatedAt: String, deletedAt: String? = nil) {
+  public init(schemaVersion: UInt32, id: String, title: String, body: String = "", status: TaskBoardStatus = .todo, priority: TaskBoardPriority = .medium, tags: [String] = [], projectId: String? = nil, targetProjectTypes: [String] = [], agentMode: TaskBoardAgentMode = .headless, workflowKind: TaskBoardWorkflowKind = .defaultTask, kind: TaskBoardItemKind = .task, executionRepository: String? = nil, estimatedTokens: UInt64? = nil, estimatedCostMicrousd: UInt64? = nil, externalRefs: [ExternalRefWire] = [], importedFromProvider: ExternalRefProviderWire? = nil, planning: PlanningStateWire = PlanningStateWire(), workflow: TaskBoardWorkflowStateWire? = nil, sessionId: String? = nil, workItemId: String? = nil, usage: TaskUsageWire = TaskUsageWire(), parentItemId: String? = nil, childOrder: UInt32 = 0, lanePosition: UInt32? = nil, laneOrigin: TaskBoardLaneOriginWire? = nil, laneSetAt: String? = nil, createdAt: String, updatedAt: String, deletedAt: String? = nil) {
     self.schemaVersion = schemaVersion
     self.id = id
     self.title = title
@@ -46,6 +47,7 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
     self.projectId = projectId
     self.targetProjectTypes = targetProjectTypes
     self.agentMode = agentMode
+    self.workflowKind = workflowKind
     self.kind = kind
     self.executionRepository = executionRepository
     self.estimatedTokens = estimatedTokens
@@ -79,6 +81,7 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
     projectId = try container.decodeIfPresent(String.self, forKey: .projectId)
     targetProjectTypes = try container.decodeIfPresent([String].self, forKey: .targetProjectTypes) ?? []
     agentMode = try container.decodeIfPresent(TaskBoardAgentMode.self, forKey: .agentMode) ?? .headless
+    workflowKind = try container.decodeIfPresent(TaskBoardWorkflowKind.self, forKey: .workflowKind) ?? .defaultTask
     kind = try container.decodeIfPresent(TaskBoardItemKind.self, forKey: .kind) ?? .task
     executionRepository = try container.decodeIfPresent(String.self, forKey: .executionRepository)
     estimatedTokens = try container.decodeIfPresent(UInt64.self, forKey: .estimatedTokens)
@@ -111,6 +114,7 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
     case projectId = "project_id"
     case targetProjectTypes = "target_project_types"
     case agentMode = "agent_mode"
+    case workflowKind = "workflow_kind"
     case kind
     case executionRepository = "execution_repository"
     case estimatedTokens = "estimated_tokens"

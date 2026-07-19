@@ -33,6 +33,41 @@ private func fixtureJSONValue(_ text: String) -> JSONValue {
   }
 }
 
+let sampleTaskBoardAutomationHistoryText = #"""
+  {
+    "runs": [{
+      "run_id": "run/42 ?#%", "trigger": "manual", "state": "terminal",
+      "outcome": "completed", "dry_run": false, "scope": {"item_id": "board-1"},
+      "started_at": "2026-07-19T12:00:00Z", "heartbeat_at": "2026-07-19T12:01:00Z",
+      "completed_at": "2026-07-19T12:02:00Z"
+    }],
+    "next_cursor": "cursor-2", "has_older": true
+  }
+  """#
+
+let sampleTaskBoardAutomationDetailText = #"""
+  {
+    "run": {
+      "run_id": "run/42 ?#%", "trigger": "manual", "state": "terminal",
+      "outcome": "completed", "dry_run": false, "scope": {"item_id": "board-1"},
+      "started_at": "2026-07-19T12:00:00Z", "heartbeat_at": "2026-07-19T12:01:00Z",
+      "completed_at": "2026-07-19T12:02:00Z"
+    },
+    "stages": [{
+      "sequence": 1, "stage": "reconcile", "state": "completed",
+      "recorded_at": "2026-07-19T12:01:30Z", "summary": "Reconciled one item"
+    }]
+  }
+  """#
+
+let sampleTaskBoardAutomationMetricsText = #"""
+  {
+    "runs_total": 9, "runs_running": 1, "runs_completed": 5, "runs_noop": 1,
+    "runs_partial": 1, "runs_failed": 1, "runs_cancelled": 1, "open_conflicts": 2,
+    "captured_at": "2026-07-19T12:03:00Z"
+  }
+  """#
+
 private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
   .taskBoardCapabilities: .object([
     "storage": .string("database"),
@@ -84,6 +119,9 @@ private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
   .taskBoardOrchestratorRunOnce: .object(sampleTaskBoardOrchestratorRunOnceJSON),
   .taskBoardOrchestratorSettingsGet: .object(sampleTaskBoardOrchestratorSettingsJSON),
   .taskBoardOrchestratorSettingsUpdate: .object(sampleTaskBoardOrchestratorSettingsJSON),
+  .taskBoardOrchestratorRuns: fixtureJSONValue(sampleTaskBoardAutomationHistoryText),
+  .taskBoardOrchestratorRunDetail: fixtureJSONValue(sampleTaskBoardAutomationDetailText),
+  .taskBoardOrchestratorMetrics: fixtureJSONValue(sampleTaskBoardAutomationMetricsText),
   .taskBoardOrchestratorRuntimeConfigGet: .object(sampleTaskBoardGitRuntimeConfigJSON),
   .taskBoardOrchestratorRuntimeConfigUpdate: .object(sampleTaskBoardGitRuntimeConfigJSON),
   .taskBoardOrchestratorGitHubTokensSync: .object(sampleGitHubTokensSyncJSON),
@@ -159,6 +197,7 @@ private let sampleSecretHandoffPrepareText =
 final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
   struct RecordedRequest {
     let path: String
+    let percentEncodedPath: String
     let query: String?
     let method: String
     let body: [String: Any]?
@@ -202,6 +241,12 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
     Route("/v1/task-board/orchestrator/stop"): sampleOrchestratorStatusText,
     Route("/v1/task-board/orchestrator/run-once"): sampleOrchestratorRunOnceText,
     Route("/v1/task-board/orchestrator/settings"): sampleOrchestratorSettingsText,
+    Route("/v1/task-board/orchestrator/runs", method: "GET"):
+      sampleTaskBoardAutomationHistoryText,
+    Route("/v1/task-board/orchestrator/runs/run/42 ?#%", method: "GET"):
+      sampleTaskBoardAutomationDetailText,
+    Route("/v1/task-board/orchestrator/metrics", method: "GET"):
+      sampleTaskBoardAutomationMetricsText,
     Route("/v1/task-board/orchestrator/runtime-config"): sampleTaskBoardGitRuntimeConfigText,
     Route("/v1/task-board/orchestrator/github-tokens"): sampleGitHubTokensSyncText,
     Route("/v1/task-board/orchestrator/todoist-token"): sampleTodoistTokenSyncText,
@@ -293,6 +338,9 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
       Self.recordedRequests.append(
         RecordedRequest(
           path: url.path,
+          percentEncodedPath:
+            URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedPath
+            ?? url.path,
           query: url.query,
           method: request.httpMethod ?? "",
           body: Self.jsonBody(for: request)
@@ -320,7 +368,10 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
   override func stopLoading() {}
 
   private static func responseBody(for path: String, method: String) -> String {
-    responseBodies[Route(path, method: method)]
+    if method == "GET", path.hasPrefix("/v1/task-board/orchestrator/runs/") {
+      return sampleTaskBoardAutomationDetailText
+    }
+    return responseBodies[Route(path, method: method)]
       ?? responseBodies[Route(path)]
       ?? sampleTaskBoardItemJSONString
   }

@@ -187,5 +187,6 @@ extension WebSocketProtocolTests {
       payload.scopes
         == ["task_board:items", "task_board:orchestrator", "task_board:policy_pipeline"]
     )
+    #expect(payload.automation == nil)
   }
 }

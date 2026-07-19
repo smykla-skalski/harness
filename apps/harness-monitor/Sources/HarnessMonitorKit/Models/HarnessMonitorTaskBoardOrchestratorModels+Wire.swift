@@ -28,6 +28,9 @@ extension TaskBoardOrchestratorSettings {
       githubProject: TaskBoardGitHubProjectConfig(wire: wire.githubProject),
       githubInbox: TaskBoardGitHubInboxConfig(wire: wire.githubInbox),
       todoistInbox: TaskBoardTodoistInboxConfig(wire: wire.todoistInbox),
+      scheduling: wire.scheduling,
+      retry: wire.retry,
+      reviewers: wire.reviewers,
       policyVersion: wire.policyVersion
     )
   }
@@ -80,6 +83,7 @@ extension TaskBoardOrchestratorStatus {
       lastRun: wire.lastRun.map(TaskBoardOrchestratorRunSummary.init(wire:)),
       workflowExecutionCounts: wire.workflowExecutionCounts
         .map(TaskBoardWorkflowExecutionCount.init(wire:)),
+      automation: wire.automation,
       settings: TaskBoardOrchestratorSettings(wire: wire.settings)
     )
   }

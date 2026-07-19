@@ -1,0 +1,238 @@
+import Foundation
+import Testing
+
+@testable import HarnessMonitorKit
+@testable import HarnessMonitorUIPreviewable
+
+@Suite("Task-board automation inspector presentation worker")
+struct TaskBoardAutomationPresentationTests {
+  @Test("Presentation uses the current metrics and queue contract")
+  func presentationUsesCurrentMetrics() async throws {
+    let presentation = await TaskBoardAutomationInspectorPresentationWorker().compute(
+      input: input(
+        snapshot: snapshot(cleanupRequired: 3),
+        metrics: TaskBoardAutomationMetrics(
+          runsTotal: 12,
+          runsRunning: 1,
+          runsCompleted: 5,
+          runsNoop: 2,
+          runsPartial: 1,
+          runsFailed: 1,
+          runsCancelled: 2,
+          openConflicts: 4,
+          capturedAt: "1970-01-01T00:00:00Z"
+        )
+      )
+    )
+
+    #expect(
+      presentation.metricRows.map(\.id) == [
+        "runs-total",
+        "runs-running",
+        "runs-completed",
+        "runs-noop",
+        "runs-partial",
+        "runs-failed",
+        "runs-cancelled",
+        "conflicts",
+        "captured",
+      ]
+    )
+    #expect(presentation.metricRows.first(where: { $0.id == "runs-partial" })?.value == "1")
+    #expect(
+      presentation.issueRows.first(where: { $0.id == "cleanup-required" })?.value == "3"
+    )
+    #expect(presentation.controlAvailability.controlBlockedReason == nil)
+  }
+
+  @Test("Controls require fresh status, connectivity, write access, and an idle daemon")
+  func controlGatingUsesIndependentContract() async {
+    let missing = await availability(snapshot: nil)
+    let offline = await availability(snapshot: snapshot(), isOnline: false)
+    let readOnly = await availability(snapshot: snapshot(), isWriteAuthorized: false)
+    let busy = await availability(snapshot: snapshot(), isGloballyBusy: true)
+    #expect(missing.controlBlockedReason != nil)
+    #expect(offline.controlBlockedReason != nil)
+    #expect(readOnly.controlBlockedReason != nil)
+    #expect(busy.controlBlockedReason != nil)
+
+    let stale = await availability(
+      snapshot: snapshot(
+        desiredMode: .continuous,
+        admissionState: .accepting,
+        heartbeatAgeSeconds: 181
+      )
+    )
+    #expect(stale.controlBlockedReason != nil)
+    #expect(stale.isSnapshotStale)
+
+    let defaultOff = await availability(snapshot: snapshot(heartbeatAgeSeconds: 3_600))
+    #expect(defaultOff.controlBlockedReason == nil)
+    #expect(!defaultOff.isSnapshotStale)
+
+    let available = await availability(snapshot: snapshot())
+    #expect(available.controlBlockedReason == nil)
+    #expect(!available.isSnapshotStale)
+  }
+
+  @MainActor
+  @Test("History state deduplicates pages and rejects looping cursors")
+  func historyStateDeduplicatesPages() throws {
+    let state = TaskBoardAutomationInspectorState()
+    let initial = try #require(state.beginInitialHistoryLoad(force: true))
+    state.completeHistory(
+      request: initial,
+      response: TaskBoardAutomationHistoryResponse(
+        runs: [run(id: "run-1"), run(id: "run-1")],
+        nextCursor: "cursor-2",
+        hasOlder: true
+      )
+    )
+
+    #expect(state.runs.map(\.runId) == ["run-1"])
+    #expect(state.hasOlder)
+
+    let older = try #require(state.beginOlderHistoryLoad())
+    state.completeHistory(
+      request: older,
+      response: TaskBoardAutomationHistoryResponse(
+        runs: [run(id: "run-1"), run(id: "run-2")],
+        nextCursor: "cursor-2",
+        hasOlder: true
+      )
+    )
+
+    #expect(state.runs.map(\.runId) == ["run-1", "run-2"])
+    #expect(!state.hasOlder)
+  }
+
+  @Test("Presentation trigger tracks a fresh observation at the same revision")
+  func presentationTriggerTracksSnapshotObservation() {
+    let earlier = presentationTrigger(observedAt: "1970-01-01T00:00:00Z")
+    let later = presentationTrigger(observedAt: "1970-01-01T00:01:00Z")
+
+    #expect(earlier != later)
+  }
+
+  @MainActor
+  @Test("Disconnect clears remote history and rejects stale completions")
+  func disconnectClearsRemoteInspectorState() throws {
+    let state = TaskBoardAutomationInspectorState()
+    let historyRequest = try #require(state.beginInitialHistoryLoad(force: true))
+    let metricsRequest = try #require(state.beginMetricsLoad(force: true))
+    let staleAction = try #require(state.beginAction(.runOnce))
+    let history = TaskBoardAutomationHistoryResponse(runs: [run(id: "run-1")], hasOlder: false)
+    state.completeHistory(request: historyRequest, response: history)
+    state.completeMetrics(
+      request: metricsRequest,
+      metrics: TaskBoardAutomationMetrics(runsTotal: 1)
+    )
+
+    state.resetRemoteData()
+    #expect(state.runs.isEmpty)
+    #expect(state.metrics == nil)
+
+    let currentAction = try #require(state.beginAction(.start))
+    #expect(!state.isCurrentAction(staleAction))
+    #expect(state.isCurrentAction(currentAction))
+    #expect(!state.completeAction(staleAction))
+    #expect(state.activeAction == .start)
+    #expect(state.completeAction(currentAction))
+
+    state.completeHistory(request: historyRequest, response: history)
+    state.completeMetrics(
+      request: metricsRequest,
+      metrics: TaskBoardAutomationMetrics(runsTotal: 1)
+    )
+    #expect(state.runs.isEmpty)
+    #expect(state.metrics == nil)
+    #expect(state.beginInitialHistoryLoad(force: false) != nil)
+    #expect(state.beginMetricsLoad(force: false) != nil)
+  }
+
+  private func availability(
+    snapshot: TaskBoardAutomationSnapshot?,
+    isOnline: Bool = true,
+    isWriteAuthorized: Bool = true,
+    isGloballyBusy: Bool = false
+  ) async -> TaskBoardAutomationControlAvailability {
+    let presentation = await TaskBoardAutomationInspectorPresentationWorker().compute(
+      input: input(
+        snapshot: snapshot,
+        isOnline: isOnline,
+        isWriteAuthorized: isWriteAuthorized,
+        isGloballyBusy: isGloballyBusy
+      )
+    )
+    return presentation.controlAvailability
+  }
+
+  private func input(
+    snapshot: TaskBoardAutomationSnapshot?,
+    metrics: TaskBoardAutomationMetrics? = nil,
+    isOnline: Bool = true,
+    isWriteAuthorized: Bool = true,
+    isGloballyBusy: Bool = false
+  ) -> TaskBoardAutomationPresentationInput {
+    TaskBoardAutomationPresentationInput(
+      snapshot: snapshot,
+      runs: [],
+      selectedRunID: nil,
+      detail: nil,
+      metrics: metrics,
+      referenceDate: Date(timeIntervalSince1970: 0),
+      reconcileIntervalSeconds: 60,
+      isOnline: isOnline,
+      isWriteAuthorized: isWriteAuthorized,
+      isGloballyBusy: isGloballyBusy
+    )
+  }
+
+  private func presentationTrigger(observedAt: String) -> TaskBoardAutomationPresentationTrigger {
+    TaskBoardAutomationPresentationTrigger(
+      isActive: true,
+      snapshotRevision: 1,
+      snapshotObservedAt: observedAt,
+      stateRevision: 0,
+      referenceMinute: 0,
+      reconcileIntervalSeconds: 60,
+      isOnline: true,
+      isWriteAuthorized: true,
+      isGloballyBusy: false
+    )
+  }
+
+  private func snapshot(
+    desiredMode: TaskBoardAutomationDesiredMode = .off,
+    admissionState: TaskBoardAutomationAdmissionState = .stopped,
+    heartbeatAgeSeconds: UInt64 = 0,
+    cleanupRequired: UInt = 0
+  ) -> TaskBoardAutomationSnapshot {
+    TaskBoardAutomationSnapshot(
+      revision: 1,
+      desiredMode: desiredMode,
+      admissionState: admissionState,
+      effectiveState: .idle,
+      observedAt: "1970-01-01T00:00:00Z",
+      heartbeatAt: "1970-01-01T00:00:00Z",
+      heartbeatAgeSeconds: heartbeatAgeSeconds,
+      settingsRevision: 1,
+      policyRevision: 1,
+      queue: TaskBoardAutomationQueueSummary(cleanupRequired: cleanupRequired)
+    )
+  }
+
+  private func run(id: String) -> TaskBoardAutomationRunInfo {
+    TaskBoardAutomationRunInfo(
+      runId: id,
+      trigger: .manual,
+      state: .terminal,
+      outcome: .completed,
+      dryRun: false,
+      scope: TaskBoardAutomationScope(),
+      startedAt: "1970-01-01T00:00:00Z",
+      heartbeatAt: "1970-01-01T00:00:00Z",
+      completedAt: "1970-01-01T00:01:00Z"
+    )
+  }
+}

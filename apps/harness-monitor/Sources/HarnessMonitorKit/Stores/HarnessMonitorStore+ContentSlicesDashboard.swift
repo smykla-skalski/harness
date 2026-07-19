@@ -25,6 +25,7 @@ extension HarnessMonitorStore {
     public private(set) var taskBoardSnapshotRevision: UInt64 = 0
     public var taskBoardItems: [TaskBoardItem] = []
     public var taskBoardOrchestratorStatus: TaskBoardOrchestratorStatus?
+    public var taskBoardAutomationSnapshot: TaskBoardAutomationSnapshot?
     public var taskBoardSyncSummary: TaskBoardSyncSummary?
     public var taskBoardDispatchSummary: TaskBoardDispatchSummary?
     public var taskBoardEvaluationSummary: TaskBoardEvaluationSummary?
@@ -55,6 +56,7 @@ extension HarnessMonitorStore {
       if didChangeTaskBoardItems || didChangeTaskBoardOrchestratorStatus {
         taskBoardSnapshotRevision &+= 1
       }
+      Self.assign(&taskBoardAutomationSnapshot, state.taskBoardAutomationSnapshot)
       Self.assign(&taskBoardSyncSummary, state.taskBoardSyncSummary)
       Self.assign(&taskBoardDispatchSummary, state.taskBoardDispatchSummary)
       Self.assign(&taskBoardEvaluationSummary, state.taskBoardEvaluationSummary)
