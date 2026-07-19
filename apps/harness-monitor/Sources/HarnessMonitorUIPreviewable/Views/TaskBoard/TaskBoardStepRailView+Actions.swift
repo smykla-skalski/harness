@@ -3,7 +3,7 @@ import SwiftUI
 
 extension TaskBoardStepRailView {
   func enqueueExternalSync() {
-    guard stepRailState.begin(step: 1) else { return }
+    guard stepRailState.begin() else { return }
     let state = stepRailState
     HarnessMonitorAsyncWorkQueue.shared.submit(
       .init(title: "Running task-board external sync") {
@@ -12,30 +12,29 @@ extension TaskBoardStepRailView {
         )
         await MainActor.run {
           if succeeded { state.resetFlow() }
-          state.finish(step: 1, succeeded: succeeded)
+          state.finish()
         }
       }
     )
   }
 
-  func enqueueEvaluation(step: Int) {
-    guard let item = activeItem, stepRailState.begin(step: step) else { return }
+  func enqueueEvaluation() {
+    guard let item = activeItem, stepRailState.begin() else { return }
     let state = stepRailState
     let request = TaskBoardOverviewItemBehavior.evaluationRequest(for: item)
     HarnessMonitorAsyncWorkQueue.shared.submit(
       .init(title: "Evaluating task-board item") {
-        let succeeded = await store.evaluateTaskBoard(request: request)
+        _ = await store.evaluateTaskBoard(request: request)
         await MainActor.run {
           state.requestApprovalRefresh()
-          if succeeded, step == 2 { state.resetFlow() }
-          state.finish(step: step, succeeded: succeeded)
+          state.finish()
         }
       }
     )
   }
 
   func enqueuePick() {
-    guard stepRailState.begin(step: 3) else { return }
+    guard stepRailState.begin() else { return }
     let state = stepRailState
     HarnessMonitorAsyncWorkQueue.shared.submit(
       .init(title: "Picking top task-board item") {
@@ -44,8 +43,9 @@ extension TaskBoardStepRailView {
           state.requestApprovalRefresh()
           state.pickedSelection = selection
           state.delivery = nil
-          state.completedSteps.subtract([4, 5, 6, 7, 8])
-          state.finish(step: 3, succeeded: selection != nil)
+          // Always track the picked item, clearing the lock when Pick returned nil.
+          state.lockedItemID = selection?.item.id
+          state.finish()
         }
       }
     )
@@ -54,7 +54,7 @@ extension TaskBoardStepRailView {
   func enqueueDelivery() {
     guard
       let selection = stepRailState.pickedSelection,
-      stepRailState.begin(step: 4)
+      stepRailState.begin()
     else { return }
     let itemID = selection.item.id
     let isAlreadyHeld = status.heldDispatches.items.contains { $0.boardItemId == itemID }
@@ -73,7 +73,7 @@ extension TaskBoardStepRailView {
         await MainActor.run {
           state.requestApprovalRefresh()
           state.delivery = delivery
-          state.finish(step: 4, succeeded: delivery != nil)
+          state.finish()
         }
       }
     )
@@ -91,7 +91,6 @@ extension TaskBoardStepRailView {
       workItemID: stepRailState.delivery?.applied.workItemId ?? item.workItemId,
       managedAgent: stepRailState.delivery?.startedAgent
     )
-    stepRailState.completedSteps.insert(5)
   }
 
   func openReview() {
@@ -100,14 +99,11 @@ extension TaskBoardStepRailView {
       actions.openTaskBoardItem(item)
     } else if let url = item.taskBoardGitHubURL {
       openURL(url)
-    } else {
-      return
     }
-    stepRailState.completedSteps.insert(7)
   }
 
   func enqueueCompletion() {
-    guard let item = activeItem, stepRailState.begin(step: 8) else { return }
+    guard let item = activeItem, stepRailState.begin() else { return }
     let state = stepRailState
     HarnessMonitorAsyncWorkQueue.shared.submit(
       .init(title: "Completing task-board item") {
@@ -116,9 +112,11 @@ extension TaskBoardStepRailView {
           request: TaskBoardUpdateItemRequest(status: .done),
           successMessage: "Completed task-board item"
         )
-        await state.finish(step: 8, succeeded: succeeded)
+        await MainActor.run {
+          if succeeded { state.resetFlow() }
+          state.finish()
+        }
       }
     )
   }
-
 }
