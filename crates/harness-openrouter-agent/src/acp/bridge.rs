@@ -13,16 +13,19 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use agent_client_protocol::schema::{
+use agent_client_protocol::schema::v1::{
     AgentCapabilities, CancelNotification, Implementation, InitializeRequest, InitializeResponse,
-    NewSessionRequest, NewSessionResponse, PromptRequest, PromptResponse, SessionId, StopReason,
+    NewSessionRequest, NewSessionResponse, PromptRequest, PromptResponse, SessionId,
+    SetSessionConfigOptionRequest, SetSessionConfigOptionResponse, StopReason,
 };
 use agent_client_protocol::util::internal_error;
 use agent_client_protocol::{Agent, ConnectionTo, Dispatch, Stdio};
 
 use crate::openrouter::{AgentConfig, ConfigError, OpenRouterClient, discard_api_key_file};
 
-use super::model_catalog::{DEFAULT_MODEL_ID, build_session_models};
+use super::model_catalog::{
+    DEFAULT_MODEL_ID, MODEL_CONFIG_OPTION_ID, build_model_config_option,
+};
 use super::session::{SessionState, SessionStore};
 use super::turn::drive_turn;
 
@@ -52,6 +55,8 @@ pub async fn run_stdio(
 
     let store_new = store.clone();
     let config_new = config.clone();
+    let store_config = store.clone();
+    let config_config = config.clone();
     let store_prompt = store.clone();
     let config_prompt = config.clone();
     let store_cancel = store.clone();
@@ -68,6 +73,17 @@ pub async fn run_stdio(
         .on_receive_request(
             async move |request: NewSessionRequest, responder, _connection| {
                 let response = handle_new_session(&store_new, &config_new, request).await;
+                match response {
+                    Ok(response) => responder.respond(response),
+                    Err(error) => responder.respond_with_error(error),
+                }
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: SetSessionConfigOptionRequest, responder, _connection| {
+                let response =
+                    handle_set_config_option(&store_config, &config_config, request).await;
                 match response {
                     Ok(response) => responder.respond(response),
                     Err(error) => responder.respond_with_error(error),
@@ -161,23 +177,58 @@ async fn handle_new_session(
     )
     .map_err(|error| internal_error(format!("failed to build OpenRouter client: {error}")))?;
 
-    let model_state = build_session_models(&client, DEFAULT_MODEL_ID).await;
-    let selected_model = model_state.current_model_id.0.as_ref().to_owned();
+    let model_option = build_model_config_option(&client, DEFAULT_MODEL_ID).await;
 
     store
         .insert(
             session_id.clone(),
-            SessionState::new(request.cwd, selected_model),
+            SessionState::new(request.cwd, DEFAULT_MODEL_ID.to_owned()),
         )
         .await;
 
-    Ok(NewSessionResponse::new(session_id).models(Some(model_state)))
+    Ok(NewSessionResponse::new(session_id).config_options(vec![model_option]))
+}
+
+async fn handle_set_config_option(
+    store: &SessionStore,
+    config: &AgentConfig,
+    request: SetSessionConfigOptionRequest,
+) -> Result<SetSessionConfigOptionResponse, agent_client_protocol::Error> {
+    if request.config_id.0.as_ref() != MODEL_CONFIG_OPTION_ID {
+        return Err(internal_error(format!(
+            "unknown session config option '{}'",
+            request.config_id.0
+        )));
+    }
+    let Some(model) = request.value.as_value_id() else {
+        return Err(internal_error("model config option expects a select value"));
+    };
+    let model = model.0.to_string();
+    if !store.set_model(&request.session_id, &model).await {
+        return Err(internal_error(format!(
+            "unknown ACP session '{}'",
+            request.session_id.0
+        )));
+    }
+    let client = OpenRouterClient::new(
+        config.base_url.clone(),
+        config.api_key.clone(),
+        config.http_referer.clone(),
+        config.x_title.clone(),
+    )
+    .map_err(|error| internal_error(format!("failed to build OpenRouter client: {error}")))?;
+    let option = build_model_config_option(&client, &model).await;
+    Ok(SetSessionConfigOptionResponse::new(vec![option]))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use agent_client_protocol::schema::ProtocolVersion;
+    use agent_client_protocol::schema::v1::{
+        SessionConfigKind, SessionConfigOption, SessionConfigOptionCategory,
+        SessionConfigSelectOptions,
+    };
     use std::path::PathBuf;
 
     fn initialize_request() -> InitializeRequest {
@@ -201,12 +252,22 @@ mod tests {
         assert_eq!(info.version, env!("CARGO_PKG_VERSION"));
     }
 
+    fn model_option_state(option: &SessionConfigOption) -> (String, usize) {
+        let SessionConfigKind::Select(select) = &option.kind else {
+            panic!("model option must be a select, got {:?}", option.kind);
+        };
+        let SessionConfigSelectOptions::Ungrouped(choices) = &select.options else {
+            panic!("model options must be ungrouped");
+        };
+        (select.current_value.0.to_string(), choices.len())
+    }
+
     #[tokio::test]
     async fn new_session_assigns_uuid_and_stores_state() {
         let store = SessionStore::new();
         let config = test_config();
-        // base_url:0 means the list_models call fails fast; build_session_models
-        // falls back to the curated list, so handle_new_session still succeeds.
+        // base_url:0 fails the live model fetch fast; the curated fallback
+        // keeps handle_new_session successful.
         let request = NewSessionRequest::new(PathBuf::from("/tmp/proj"));
         let response = handle_new_session(&store, &config, request)
             .await
@@ -218,8 +279,69 @@ mod tests {
             .expect("session stored");
         assert_eq!(snapshot.project_dir, PathBuf::from("/tmp/proj"));
         assert_eq!(snapshot.model, DEFAULT_MODEL_ID);
-        let models = response.models.expect("models");
-        assert_eq!(models.current_model_id.0.as_ref(), DEFAULT_MODEL_ID);
-        assert!(!models.available_models.is_empty());
+        let options = response.config_options.expect("config options");
+        let option = options.first().expect("model option");
+        assert_eq!(option.id.0.as_ref(), MODEL_CONFIG_OPTION_ID);
+        assert_eq!(option.category, Some(SessionConfigOptionCategory::Model));
+        let (current, choice_count) = model_option_state(option);
+        assert_eq!(current, DEFAULT_MODEL_ID);
+        assert!(choice_count > 0);
+    }
+
+    #[tokio::test]
+    async fn set_config_option_updates_model_and_returns_snapshot() {
+        let store = SessionStore::new();
+        let config = test_config();
+        let request = NewSessionRequest::new(PathBuf::from("/tmp/proj"));
+        let response = handle_new_session(&store, &config, request)
+            .await
+            .expect("new session");
+        let session_id = response.session_id.clone();
+
+        let set = SetSessionConfigOptionRequest::new(
+            session_id.clone(),
+            MODEL_CONFIG_OPTION_ID,
+            "anthropic/claude-haiku-4-5",
+        );
+        let snapshot_response = handle_set_config_option(&store, &config, set)
+            .await
+            .expect("set model");
+
+        let stored = store.snapshot(&session_id).await.expect("session stored");
+        assert_eq!(stored.model, "anthropic/claude-haiku-4-5");
+        let option = snapshot_response
+            .config_options
+            .first()
+            .expect("model option");
+        let (current, _) = model_option_state(option);
+        assert_eq!(current, "anthropic/claude-haiku-4-5");
+    }
+
+    #[tokio::test]
+    async fn set_config_option_rejects_unknown_option_and_session() {
+        let store = SessionStore::new();
+        let config = test_config();
+        let request = NewSessionRequest::new(PathBuf::from("/tmp/proj"));
+        let response = handle_new_session(&store, &config, request)
+            .await
+            .expect("new session");
+
+        let unknown_option = SetSessionConfigOptionRequest::new(
+            response.session_id.clone(),
+            "sampling",
+            "anthropic/claude-haiku-4-5",
+        );
+        handle_set_config_option(&store, &config, unknown_option)
+            .await
+            .expect_err("unknown option id must be rejected");
+
+        let unknown_session = SetSessionConfigOptionRequest::new(
+            SessionId::new("missing-session"),
+            MODEL_CONFIG_OPTION_ID,
+            "anthropic/claude-haiku-4-5",
+        );
+        handle_set_config_option(&store, &config, unknown_session)
+            .await
+            .expect_err("unknown session must be rejected");
     }
 }

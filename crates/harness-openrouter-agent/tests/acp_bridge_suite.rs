@@ -1,8 +1,9 @@
 //! Integration tests for the OpenRouter ACP bridge.
 
-use agent_client_protocol::schema::{
+use agent_client_protocol::schema::ProtocolVersion;
+use agent_client_protocol::schema::v1::{
     CancelNotification, ContentBlock, InitializeRequest, NewSessionRequest, PromptRequest,
-    ProtocolVersion, StopReason, TextContent,
+    StopReason, TextContent,
 };
 use agent_client_protocol::{Agent, ConnectionTo};
 use wiremock::matchers::{method, path};

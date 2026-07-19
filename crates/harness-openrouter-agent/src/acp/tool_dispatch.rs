@@ -8,7 +8,7 @@
 
 use std::path::{Path, PathBuf};
 
-use agent_client_protocol::schema::{
+use agent_client_protocol::schema::v1::{
     CreateTerminalRequest, KillTerminalRequest, ReadTextFileRequest, ReleaseTerminalRequest,
     SessionId, TerminalId, TerminalOutputRequest, WaitForTerminalExitRequest, WriteTextFileRequest,
 };
