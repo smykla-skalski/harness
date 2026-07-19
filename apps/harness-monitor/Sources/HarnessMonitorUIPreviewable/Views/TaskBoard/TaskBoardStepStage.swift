@@ -24,6 +24,17 @@ enum TaskBoardStepColumn: String, CaseIterable, Identifiable, Sendable {
   /// Position used to derive done / current / upcoming node states.
   var order: Int { Self.allCases.firstIndex(of: self) ?? 0 }
 
+  /// Forward-looking summary shown when the user taps a rail node to read ahead.
+  var explanation: String {
+    switch self {
+    case .todo: "The automation picks the top Todo item and delivers a worker for it"
+    case .inProgress: "The delivered worker runs; Evaluate advances the item when its task finishes"
+    case .toReview: "The finished work waits for a reviewer; Evaluate signals the reviewer"
+    case .inReview: "The reviewer checks the work; Evaluate applies the verdict"
+    case .done: "The item is complete once its review is approved"
+    }
+  }
+
   func nodeState(current: TaskBoardStepColumn?, isBlocked: Bool) -> TaskBoardStepNodeState {
     guard let current else { return .upcoming }
     if order < current.order { return .done }
@@ -38,6 +49,15 @@ enum TaskBoardStepNodeState: Sendable {
   case current
   case upcoming
   case failed
+
+  var accessibilityDescription: String {
+    switch self {
+    case .done: "done"
+    case .current: "current step"
+    case .upcoming: "upcoming"
+    case .failed: "blocked"
+    }
+  }
 }
 
 /// The guided stage the wizard presents, derived from live board, worker, and

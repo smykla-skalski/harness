@@ -30,6 +30,11 @@ final class TaskBoardStepRailState {
   var delivery: TaskBoardDispatchDelivery?
   var confirmation: Confirmation?
   var approvalRefreshGeneration: UInt64 = 0
+  /// The board item the guided flow follows through its lifecycle, even after it
+  /// leaves the Todo column. Set on pick or deliver.
+  var lockedItemID: String?
+  /// A rail node the user tapped to read ahead; nil shows the live current stage.
+  var viewingColumn: TaskBoardStepColumn?
 
   var isBusy: Bool { activeStep != nil }
 
