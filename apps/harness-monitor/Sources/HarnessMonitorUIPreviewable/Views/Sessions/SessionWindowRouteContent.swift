@@ -8,6 +8,10 @@ struct SessionWindowOverview: View {
   let tuiStatusByAgent: [String: AgentTuiStatus]
   @Environment(\.fontScale)
   var fontScale
+  @State private var taskBoardSnapshot = TaskBoardInboxSnapshot(
+    generatedAt: nil,
+    isFromCache: true
+  )
 
   var metrics: SessionWindowRouteContentMetrics {
     SessionWindowRouteContentMetrics(fontScale: fontScale)
@@ -48,12 +52,15 @@ struct SessionWindowOverview: View {
           decisions: decisions,
           orchestratorStatus: store.contentUI.dashboard.taskBoardOrchestratorStatus,
           evaluationSummary: store.contentUI.dashboard.taskBoardEvaluationSummary,
-          isActionInFlight: store.contentUI.dashboard.isBusy
+          isActionInFlight: store.contentUI.dashboard.isTaskBoardBusy
             || store.contentUI.dashboard.connectionState != .online,
           showsOperationsPanel: false
         )
       }
       .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    .task(id: taskBoardSnapshotKey) {
+      taskBoardSnapshot = makeTaskBoardSnapshot()
     }
   }
 
