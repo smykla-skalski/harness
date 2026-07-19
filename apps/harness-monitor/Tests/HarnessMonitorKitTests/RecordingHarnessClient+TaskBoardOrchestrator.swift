@@ -206,6 +206,29 @@ extension RecordingHarnessClient {
     }
   }
 
+  func deliverTaskBoardDispatch(
+    request: TaskBoardDispatchDeliverRequest
+  ) async throws -> TaskBoardDispatchDelivery {
+    calls.append(
+      .deliverTaskBoardDispatch(itemID: request.itemId, dryRun: request.dryRun)
+    )
+    return try lock.withLock {
+      guard let item = taskBoardItemsStorage.first(where: { $0.id == request.itemId }) else {
+        throw HarnessMonitorAPIError.server(code: 404, message: "Task board item unavailable.")
+      }
+      return TaskBoardDispatchDelivery(
+        intentId: "intent-\(item.id)",
+        applied: TaskBoardDispatchAppliedTask(
+          boardItemId: item.id,
+          sessionId: item.sessionId ?? "sess-\(item.id)",
+          workItemId: item.workItemId ?? "task-\(item.id)",
+          item: item
+        ),
+        renderedPrompt: "durable prompt"
+      )
+    }
+  }
+
   func taskBoardOrchestratorStatus() async throws -> TaskBoardOrchestratorStatus {
     recordReadCall(.taskBoardOrchestratorStatus)
     return sampleTaskBoardOrchestratorStatus()

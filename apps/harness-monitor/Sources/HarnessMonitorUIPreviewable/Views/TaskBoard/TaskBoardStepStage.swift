@@ -142,17 +142,20 @@ struct TaskBoardStepStageInputs {
   var latestRecord: TaskBoardEvaluationRecord?
   var hasPicked: Bool
   var hasDelivered: Bool
+  var canDeliver: Bool
 
   init(
     item: TaskBoardItem?,
     latestRecord: TaskBoardEvaluationRecord? = nil,
     hasPicked: Bool = false,
-    hasDelivered: Bool = false
+    hasDelivered: Bool = false,
+    canDeliver: Bool = true
   ) {
     self.item = item
     self.latestRecord = latestRecord
     self.hasPicked = hasPicked
     self.hasDelivered = hasDelivered
+    self.canDeliver = canDeliver
   }
 }
 

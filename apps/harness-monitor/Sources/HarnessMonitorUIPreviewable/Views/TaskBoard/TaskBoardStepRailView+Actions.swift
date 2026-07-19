@@ -2,8 +2,8 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension TaskBoardStepRailView {
-  func enqueueExternalSync() {
-    guard stepRailState.begin() else { return }
+  func enqueueExternalSync(itemID: String?) {
+    guard stepRailState.beginExternalSync(itemID: itemID) else { return }
     let state = stepRailState
     HarnessMonitorAsyncWorkQueue.shared.submit(
       .init(title: "Running task-board external sync") {
@@ -11,16 +11,16 @@ extension TaskBoardStepRailView {
           request: TaskBoardSyncRequest(direction: .pull, dryRun: false)
         )
         await MainActor.run {
-          if succeeded { state.resetFlow() }
-          state.finish()
+          state.finishExternalSync(succeeded: succeeded)
         }
       }
     )
   }
 
-  func enqueueEvaluation() {
-    guard let item = activeItem, stepRailState.begin() else { return }
+  func enqueueEvaluation(itemID: String) {
+    guard let item = activeItem, item.id == itemID, stepRailState.begin() else { return }
     let state = stepRailState
+    state.preserveFlowIdentity(itemID: item.id)
     let request = TaskBoardOverviewItemBehavior.evaluationRequest(for: item)
     HarnessMonitorAsyncWorkQueue.shared.submit(
       .init(title: "Evaluating task-board item") {
@@ -51,12 +51,12 @@ extension TaskBoardStepRailView {
     )
   }
 
-  func enqueueDelivery() {
+  func enqueueDelivery(itemID: String) {
     guard
-      let selection = stepRailState.pickedSelection,
+      deliveryItemID == itemID,
       stepRailState.begin()
     else { return }
-    let itemID = selection.item.id
+    stepRailState.preserveFlowIdentity(itemID: itemID)
     let isAlreadyHeld = status.heldDispatches.items.contains { $0.boardItemId == itemID }
     let projectDir = status.settings.projectDir
     let state = stepRailState
@@ -102,9 +102,10 @@ extension TaskBoardStepRailView {
     }
   }
 
-  func enqueueCompletion() {
-    guard let item = activeItem, stepRailState.begin() else { return }
+  func enqueueCompletion(itemID: String) {
+    guard let item = activeItem, item.id == itemID, stepRailState.begin() else { return }
     let state = stepRailState
+    state.preserveFlowIdentity(itemID: item.id)
     HarnessMonitorAsyncWorkQueue.shared.submit(
       .init(title: "Completing task-board item") {
         let succeeded = await store.updateTaskBoardItem(

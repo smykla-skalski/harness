@@ -23,45 +23,8 @@ struct TaskBoardStepRailView: View {
 
   var stepRailState: TaskBoardStepRailState { state }
 
-  /// The item the flow follows: the locked item resolved to its live board copy.
-  /// When nothing is locked it is the current target (top Todo). A locked item
-  /// can leave the visible lanes - it reaches Done and the board filters it out -
-  /// so fall back to the retained snapshot rather than jumping to the next Todo,
-  /// which would otherwise be mislabeled by the completed item's picked/delivery.
-  var lockedItem: TaskBoardItem? {
-    guard let id = state.lockedItemID else { return targetItem }
-    return taskBoardItems.first { $0.id == id }
-      ?? state.delivery?.applied.item
-      ?? state.pickedSelection?.item
-  }
-
-  var activeItem: TaskBoardItem? { lockedItem }
-
-  private var latestRecord: TaskBoardEvaluationRecord? {
-    guard let id = lockedItem?.id else { return nil }
-    return latestEvaluation?.records.first { $0.boardItemId == id }
-  }
-
-  private var stagePlan: TaskBoardStepStagePlan {
-    TaskBoardStepStageResolver.plan(
-      for: TaskBoardStepStageInputs(
-        item: lockedItem,
-        latestRecord: latestRecord,
-        hasPicked: state.pickedSelection != nil,
-        hasDelivered: state.delivery != nil
-      )
-    )
-  }
-
   private var controlsDisabled: Bool {
     isActionInFlight || state.isBusy || store.contentUI.dashboard.connectionState != .online
-  }
-
-  private var cardIdentity: String {
-    if let viewing = state.viewingColumn, viewing != stagePlan.column {
-      return "preview-\(viewing.rawValue)"
-    }
-    return "live-\(stagePlan.stage.rawValue)"
   }
 
   private var cautionFont: Font {
@@ -76,12 +39,8 @@ struct TaskBoardStepRailView: View {
 
   var body: some View {
     TaskBoardSection(title: "Manual Steps") {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-        TaskBoardStepRailTargetView(item: activeItem, isPicked: state.pickedSelection != nil)
-        Label("Live manual operations", systemImage: "bolt.shield.fill")
-          .font(cautionFont)
-          .foregroundStyle(HarnessMonitorTheme.caution)
-          .accessibilityIdentifier("harness.task-board.step.live-mode")
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
+        TaskBoardStepRailTargetView(item: activeItem, isPicked: stepFlow.hasPicked)
         TaskBoardStepProgressRail(
           current: stagePlan.column,
           isBlocked: stagePlan.isBlockedColumn,
@@ -91,11 +50,14 @@ struct TaskBoardStepRailView: View {
         cardArea
         contextDisclosure
       }
-      .padding(HarnessMonitorTheme.spacingMD)
-      .background(HarnessMonitorTheme.ink.opacity(0.025), in: .rect(cornerRadius: 12))
+      .padding(HarnessMonitorTheme.spacingLG)
+      .background(
+        HarnessMonitorTheme.ink.opacity(0.025),
+        in: .rect(cornerRadius: HarnessMonitorTheme.cornerRadiusMD)
+      )
       .overlay {
-        RoundedRectangle(cornerRadius: 12)
-          .strokeBorder(HarnessMonitorTheme.ink.opacity(0.12))
+        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD)
+          .strokeBorder(HarnessMonitorTheme.ink.opacity(0.10))
       }
     }
     .confirmationDialog(
@@ -119,11 +81,12 @@ struct TaskBoardStepRailView: View {
 
   private var cardArea: some View {
     Group {
-      if stagePlan.stage == .noTarget {
+      switch cardPresentation {
+      case .empty:
         emptyState
-      } else if let viewing = state.viewingColumn, viewing != stagePlan.column {
-        previewCard(for: viewing)
-      } else {
+      case .preview(let column):
+        previewCard(for: column)
+      case .live:
         liveCard(stagePlan)
       }
     }
@@ -139,13 +102,14 @@ struct TaskBoardStepRailView: View {
       Text(stagePlan.whatNext)
     } actions: {
       Button {
-        state.confirmation = .externalSync
+        state.presentConfirmation(.externalSync(itemID: activeItem?.id))
       } label: {
         Label("Sync external sources", systemImage: "arrow.triangle.2.circlepath")
       }
       .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
       .disabled(controlsDisabled)
     }
+    .frame(maxWidth: .infinity)
     .accessibilityIdentifier("harness.task-board.step.empty")
   }
 
@@ -155,6 +119,8 @@ struct TaskBoardStepRailView: View {
       whatHappened: nil,
       whatNext: column.explanation
     ) {
+      EmptyView()
+    } actions: {
       Button {
         state.viewingColumn = nil
       } label: {
@@ -172,12 +138,13 @@ struct TaskBoardStepRailView: View {
       whatHappened: plan.whatHappened,
       whatNext: plan.whatNext
     ) {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        if plan.stage == .readyToDeliver, let selection = state.pickedSelection {
+      if let action = plan.primaryAction {
+        primaryButton(action)
+      }
+    } actions: {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+        if plan.stage == .readyToDeliver, let selection = activeSelection {
           TaskBoardStepPromptPreview(prompt: selection.plan.renderedPrompt)
-        }
-        if let action = plan.primaryAction {
-          primaryButton(action)
         }
         if !plan.inlineLinks.isEmpty {
           inlineLinksRow(plan.inlineLinks)
@@ -219,7 +186,6 @@ struct TaskBoardStepRailView: View {
         Text("Next: \(action.buttonTitle)")
       }
       .font(primaryButtonFont)
-      .frame(maxWidth: .infinity)
     }
     .harnessActionButtonStyle(variant: .prominent)
     .controlSize(.large)
@@ -246,7 +212,7 @@ struct TaskBoardStepRailView: View {
 
   private var syncButton: some View {
     Button {
-      state.confirmation = .externalSync
+      state.presentConfirmation(.externalSync(itemID: activeItem?.id))
     } label: {
       Label("Sync external sources", systemImage: "arrow.triangle.2.circlepath").font(linkFont)
     }
@@ -269,18 +235,28 @@ struct TaskBoardStepRailView: View {
   private func linkIcon(_ link: TaskBoardStepInlineLink) -> String {
     switch link {
     case .watch: "eye"
-    case .openTask: "person.2.badge.gearshape"
+    case .openTask: "list.bullet.rectangle"
     case .openPullRequest: "arrow.up.forward.square"
     }
   }
 
   func runPrimary(_ action: TaskBoardStepPrimaryAction) {
     switch action {
-    case .sync: state.confirmation = .externalSync
+    case .sync:
+      state.presentConfirmation(.externalSync(itemID: activeItem?.id))
     case .pick: enqueuePick()
-    case .deliver: state.confirmation = .deliver
-    case .evaluate: state.confirmation = .evaluate
-    case .complete: state.confirmation = .complete
+    case .deliver:
+      if let itemID = deliveryItemID {
+        state.presentConfirmation(.deliver(itemID: itemID))
+      }
+    case .evaluate:
+      if let itemID = activeItem?.id {
+        state.presentConfirmation(.evaluate(itemID: itemID))
+      }
+    case .complete:
+      if let itemID = activeItem?.id {
+        state.presentConfirmation(.complete(itemID: itemID))
+      }
     }
   }
 
@@ -291,7 +267,7 @@ struct TaskBoardStepRailView: View {
     case .openTask:
       openReview()
     case .openPullRequest:
-      if let url = TaskBoardStepStageResolver.validURL(lockedItem?.workflow?.prUrl) {
+      if let url = TaskBoardStepStageResolver.validURL(activeItem?.workflow?.prUrl) {
         openURL(url)
       }
     }
@@ -315,7 +291,7 @@ struct TaskBoardStepRailView: View {
       }
       .padding(.top, HarnessMonitorTheme.spacingSM)
     } label: {
-      Label("Automation context", systemImage: "gearshape.2").font(cautionFont)
+      Label("Automation context", systemImage: "gearshape").font(cautionFont)
     }
     .accessibilityIdentifier("harness.task-board.step.context")
   }
@@ -344,34 +320,43 @@ struct TaskBoardStepRailView: View {
     switch confirmation {
     case .externalSync:
       Button("Sync Live", role: .destructive) {
-        state.confirmation = nil
-        enqueueExternalSync()
+        runConfirmation(confirmation)
       }
       .disabled(controlsDisabled)
     case .evaluate:
       Button("Evaluate Live", role: .destructive) {
-        state.confirmation = nil
-        enqueueEvaluation()
+        runConfirmation(confirmation)
       }
       .disabled(controlsDisabled)
-    case .deliver:
+    case .deliver(let itemID):
       Button("Deliver Live", role: .destructive) {
-        state.confirmation = nil
-        enqueueDelivery()
+        runConfirmation(confirmation)
       }
-      .disabled(controlsDisabled)
+      .disabled(controlsDisabled || deliveryItemID != itemID)
     case .complete:
       Button("Complete", role: .destructive) {
-        state.confirmation = nil
-        enqueueCompletion()
+        runConfirmation(confirmation)
       }
       .disabled(controlsDisabled)
     }
     Button("Cancel", role: .cancel) {}
   }
 
+  func runConfirmation(_ confirmation: TaskBoardStepRailState.Confirmation) {
+    state.confirmation = nil
+    switch confirmation {
+    case .externalSync(let itemID): enqueueExternalSync(itemID: itemID)
+    case .evaluate(let itemID): enqueueEvaluation(itemID: itemID)
+    case .deliver(let itemID): enqueueDelivery(itemID: itemID)
+    case .complete(let itemID): enqueueCompletion(itemID: itemID)
+    }
+  }
+
   private func confirmationMessage(_ confirmation: TaskBoardStepRailState.Confirmation) -> String {
-    let title = activeItem?.title ?? "the current item"
+    let title =
+      confirmation.itemID.flatMap { itemID in
+        activeItem.flatMap { $0.id == itemID ? $0.title : nil }
+      } ?? "the current item"
     return switch confirmation {
     case .externalSync:
       "This pulls external task sources and applies changes to the live board"

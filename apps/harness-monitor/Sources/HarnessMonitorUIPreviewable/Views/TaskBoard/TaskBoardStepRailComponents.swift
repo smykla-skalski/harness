@@ -20,29 +20,50 @@ struct TaskBoardStepRailTargetView: View {
   private var placeholderFont: Font {
     HarnessMonitorTextSize.scaledFont(.body, by: fontScale)
   }
+  private var badgeFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
 
   var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-      Label(isPicked ? "Picked item" : "Current target", systemImage: "scope")
-        .font(labelFont)
-        .foregroundStyle(.secondary)
-      if let item {
-        Text(item.title)
-          .font(titleFont)
-          .lineLimit(1)
-        Text(item.id)
-          .font(idFont)
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
+        Label(isPicked ? "Picked item" : "Current target", systemImage: "scope")
+          .font(labelFont)
           .foregroundStyle(.secondary)
-          .lineLimit(1)
-          .truncationMode(.middle)
-      } else {
-        Text("No selected or ready Todo item")
-          .font(placeholderFont)
-          .foregroundStyle(.secondary)
+        identity
       }
-      Spacer(minLength: 0)
+      Spacer(minLength: HarnessMonitorTheme.spacingSM)
+      liveBadge
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  @ViewBuilder private var identity: some View {
+    if let item {
+      Text(item.title)
+        .font(titleFont)
+        .lineLimit(1)
+      Text(item.id)
+        .font(idFont)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .truncationMode(.middle)
+    } else {
+      Text("No selected or ready Todo item")
+        .font(placeholderFont)
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  private var liveBadge: some View {
+    Label("Live", systemImage: "bolt.fill")
+      .font(badgeFont)
+      .foregroundStyle(HarnessMonitorTheme.caution)
+      .harnessControlPillGlass(tint: HarnessMonitorTheme.caution)
+      .help("Manual steps run live against the board")
+      .accessibilityLabel("Live operations")
+      .accessibilityHint("Manual steps run live against the board")
+      .accessibilityIdentifier("harness.task-board.step.live-mode")
   }
 }
 

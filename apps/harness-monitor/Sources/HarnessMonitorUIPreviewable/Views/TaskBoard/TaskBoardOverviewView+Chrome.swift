@@ -37,7 +37,7 @@ extension TaskBoardOverviewView {
           latestEvaluation: evaluationSummary,
           workspace: store.contentUI.dashboard.policyCanvasWorkspace,
           targetItem: currentPresentation.stepRailTargetItem,
-          taskBoardItems: currentPresentation.taskBoardItems,
+          taskBoardItems: taskBoardItems,
           isActionInFlight: isActionInFlight,
           actions: actions
         )
