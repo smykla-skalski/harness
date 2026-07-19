@@ -78,6 +78,11 @@ pub struct TaskBoardWorkflowExecutionArtifacts {
     pub retry: Option<TaskBoardRetrySchedule>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub diagnostics: Vec<TaskBoardExecutionDiagnostic>,
+    /// Known-but-unverified publication evidence retained for recovery and audit.
+    ///
+    /// This evidence never satisfies a completed attempt or successful terminal outcome.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provisional_publication: Option<TaskBoardLifecycleOutcome>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub terminal_outcome: Option<TaskBoardTerminalOutcome>,
 }
@@ -93,6 +98,7 @@ impl Default for TaskBoardWorkflowExecutionArtifacts {
             review_cycles: Vec::new(),
             retry: None,
             diagnostics: Vec::new(),
+            provisional_publication: None,
             terminal_outcome: None,
         }
     }

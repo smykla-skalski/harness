@@ -3,14 +3,18 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
 use super::workflow_execution_rows::{ExecutionAttemptRow, attempt_artifact_json, label};
-use super::workflow_executions::load_execution_in_tx;
+use super::workflow_executions::{
+    cas_mismatch, ensure_terminal_transition_has_no_active_side_effect, load_execution_in_tx,
+    update_execution_in_tx, validate_phase_change,
+};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
     TaskBoardAttemptResultArtifact, TaskBoardAttemptState, TaskBoardExecutionAttemptCas,
     TaskBoardExecutionAttemptCasOutcome, TaskBoardExecutionAttemptCreateOutcome,
     TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase, TaskBoardExecutionState,
-    TaskBoardWorkflowExecutionRecord, validate_task_board_attempt_update,
-    validate_task_board_execution_attempt, validate_task_board_workflow_execution,
+    TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
+    validate_task_board_attempt_update, validate_task_board_execution_attempt,
+    validate_task_board_execution_update, validate_task_board_workflow_execution,
 };
 
 const SELECT_ATTEMPTS: &str = "SELECT * FROM task_board_execution_attempts
@@ -135,6 +139,99 @@ impl AsyncDaemonDb {
             updated.clone(),
         ))
     }
+
+    pub(crate) async fn compare_and_set_task_board_workflow_execution_and_attempt(
+        &self,
+        expected_execution: &TaskBoardWorkflowExecutionCas,
+        updated_execution: &TaskBoardWorkflowExecutionRecord,
+        expected_attempt: &TaskBoardExecutionAttemptCas,
+        updated_attempt: &TaskBoardExecutionAttemptRecord,
+    ) -> Result<Option<TaskBoardWorkflowExecutionRecord>, CliError> {
+        let mut transaction = self
+            .begin_immediate_transaction("task board workflow execution and attempt CAS")
+            .await?;
+        let Some(current) =
+            load_execution_in_tx(&mut transaction, &expected_execution.execution_id).await?
+        else {
+            commit_atomic_cas_noop(transaction, "missing").await?;
+            return Ok(None);
+        };
+        let Some((attempt_index, current_attempt)) = current
+            .attempts
+            .iter()
+            .enumerate()
+            .find(|(_, attempt)| {
+                attempt.action_key == expected_attempt.action_key
+                    && attempt.attempt == expected_attempt.attempt
+            })
+            .map(|(index, attempt)| (index, attempt.clone()))
+        else {
+            commit_atomic_cas_noop(transaction, "missing attempt").await?;
+            return Ok(None);
+        };
+        if cas_mismatch(expected_execution, &current).is_some()
+            || !attempt_cas_matches(expected_attempt, &current_attempt)
+        {
+            commit_atomic_cas_noop(transaction, "stale").await?;
+            return Ok(None);
+        }
+        let mut combined = updated_execution.clone();
+        let attempt = combined
+            .attempts
+            .get_mut(attempt_index)
+            .ok_or_else(|| db_error("atomic execution update removed its expected attempt"))?;
+        *attempt = updated_attempt.clone();
+        if combined == current {
+            commit_atomic_cas_noop(transaction, "unchanged").await?;
+            return Ok(Some(current));
+        }
+        validate_atomic_execution_attempt_update(
+            &current,
+            updated_execution,
+            &current_attempt,
+            updated_attempt,
+            &combined,
+        )?;
+        update_execution_in_tx(&mut transaction, expected_execution, &combined).await?;
+        update_attempt_in_tx(&mut transaction, expected_attempt, updated_attempt).await?;
+        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+        transaction.commit().await.map_err(|error| {
+            db_error(format!(
+                "commit task board workflow execution and attempt CAS: {error}"
+            ))
+        })?;
+        Ok(Some(combined))
+    }
+}
+
+async fn commit_atomic_cas_noop(
+    transaction: Transaction<'_, Sqlite>,
+    reason: &str,
+) -> Result<(), CliError> {
+    transaction.commit().await.map_err(|error| {
+        db_error(format!(
+            "commit {reason} workflow execution and attempt CAS: {error}"
+        ))
+    })
+}
+
+fn validate_atomic_execution_attempt_update(
+    current: &TaskBoardWorkflowExecutionRecord,
+    updated_execution: &TaskBoardWorkflowExecutionRecord,
+    current_attempt: &TaskBoardExecutionAttemptRecord,
+    updated_attempt: &TaskBoardExecutionAttemptRecord,
+    combined: &TaskBoardWorkflowExecutionRecord,
+) -> Result<(), CliError> {
+    ensure_terminal_transition_has_no_active_side_effect(current, updated_execution)?;
+    validate_task_board_execution_update(current, updated_execution)
+        .map_err(|error| db_error(format!("validate atomic workflow execution CAS: {error}")))?;
+    validate_phase_change(current, updated_execution)?;
+    validate_task_board_attempt_update(current_attempt, updated_attempt)
+        .map_err(|error| db_error(format!("validate atomic execution attempt CAS: {error}")))?;
+    validate_attempt_phase(combined, updated_attempt)?;
+    ensure_external_side_effect_uses_atomic_claim(current, current_attempt, updated_attempt)?;
+    validate_task_board_workflow_execution(combined)
+        .map_err(|error| db_error(format!("validate combined workflow execution CAS: {error}")))
 }
 
 pub(super) async fn load_execution_attempts_in_tx(

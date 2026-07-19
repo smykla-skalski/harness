@@ -11,6 +11,8 @@ use super::client::{GitHubCreatePullRequest, GitHubPullRequestHandle};
 use super::config::GitHubProjectConfig;
 
 mod fresh;
+#[cfg(test)]
+mod tests;
 pub(super) use fresh::pull_request_handle_fresh;
 
 const GRAPHQL_PAGE_LIMIT: u32 = 5;
@@ -415,7 +417,7 @@ struct GraphqlPullRequestHandle {
     url: String,
     #[serde(rename = "isDraft")]
     is_draft: bool,
-    state: String,
+    state: Option<String>,
     merged: bool,
     #[serde(rename = "headRefOid")]
     head_ref_oid: String,
@@ -433,7 +435,7 @@ impl GraphqlPullRequestHandle {
             number: self.number,
             html_url: Some(self.url),
             draft: self.is_draft,
-            open: self.state == "OPEN",
+            open: self.state.as_deref() == Some("OPEN"),
             merged: self.merged,
             head_sha: self.head_ref_oid,
             head_repository: self.head_repository.map(|repo| repo.name_with_owner),

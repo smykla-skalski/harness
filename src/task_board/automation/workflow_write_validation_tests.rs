@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use super::workflow_execution_write_validation::validate_write_frozen_contract;
 use super::*;
 use crate::task_board::{
     AgentMode, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardReadOnlyRunContext,
@@ -119,6 +120,59 @@ fn write_evaluation_requires_exact_head_and_revision_cycle() {
         "attempt.artifact.evaluation",
         "other head must fail",
     );
+}
+
+#[test]
+fn provisional_publication_is_write_only_non_authoritative_and_revision_bound() {
+    let mut record = write_execution();
+    record.transition.phase = Some(TaskBoardExecutionPhase::Publish);
+    record.artifacts.provisional_publication = Some(TaskBoardLifecycleOutcome {
+        mutated: true,
+        terminal: false,
+        provider_revision: Some("provider-v3".into()),
+        external_url: Some("https://github.com/example/compass/pull/42".into()),
+    });
+    validate_write_frozen_contract(&record).expect("valid provisional evidence");
+
+    let mut blank_url = record.clone();
+    blank_url
+        .artifacts
+        .provisional_publication
+        .as_mut()
+        .expect("provisional evidence")
+        .external_url = Some("  ".into());
+    assert_invalid_write_contract(&blank_url, "artifacts.provisional_publication.external_url");
+
+    let mut terminal = record.clone();
+    terminal
+        .artifacts
+        .provisional_publication
+        .as_mut()
+        .expect("provisional evidence")
+        .terminal = true;
+    assert_invalid_write_contract(&terminal, "artifacts.provisional_publication");
+
+    let mut provider_drift = record.clone();
+    provider_drift
+        .artifacts
+        .provisional_publication
+        .as_mut()
+        .expect("provisional evidence")
+        .provider_revision = Some("provider-v4".into());
+    assert_invalid_write_contract(
+        &provider_drift,
+        "artifacts.provisional_publication.provider_revision",
+    );
+
+    let mut wrong_phase = record.clone();
+    wrong_phase.transition.phase = Some(TaskBoardExecutionPhase::Evaluate);
+    assert_invalid_write_contract(&wrong_phase, "artifacts.provisional_publication");
+
+    let mut read_only = record;
+    read_only.snapshot.workflow_kind = TaskBoardWorkflowKind::Review;
+    read_only.artifacts.planning_result = None;
+    read_only.artifacts.plan_approval = None;
+    assert_invalid_write_contract(&read_only, "artifacts");
 }
 
 fn write_execution() -> TaskBoardWorkflowExecutionRecord {
@@ -252,6 +306,18 @@ fn assert_invalid_field(
     message: &str,
 ) {
     let error = validate_task_board_workflow_execution(record).expect_err(message);
+    assert!(matches!(
+        error,
+        TaskBoardWorkflowExecutionValidationError::InvalidField { field, .. }
+            if field == expected
+    ));
+}
+
+fn assert_invalid_write_contract(
+    record: &TaskBoardWorkflowExecutionRecord,
+    expected: &'static str,
+) {
+    let error = validate_write_frozen_contract(record).expect_err("invalid write contract");
     assert!(matches!(
         error,
         TaskBoardWorkflowExecutionValidationError::InvalidField { field, .. }

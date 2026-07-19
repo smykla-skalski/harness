@@ -6,13 +6,13 @@ use crate::task_board::{
     TASK_BOARD_SIDE_EFFECT_CLAIM_GRACE_SECONDS, TaskBoardAttemptResultArtifact,
     TaskBoardAttemptState, TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptCasOutcome,
     TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase, TaskBoardExecutionState,
-    TaskBoardFailureClass, TaskBoardLifecycleOutcome, TaskBoardTerminalOutcomeKind,
-    TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
+    TaskBoardLifecycleOutcome, TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionRecord,
+    TaskBoardWorkflowKind,
 };
 
 #[path = "lifecycle/verification_retry.rs"]
 mod verification_retry;
-use verification_retry::schedule_publish_verification_retry;
+use verification_retry::{mark_publish_unknown, schedule_publish_verification_retry};
 
 use super::super::task_board_read_only_runtime::{
     TaskBoardPublishVerification, TaskBoardReadOnlyRuntime,
@@ -197,7 +197,7 @@ where
             .await
         }
         Ok(TaskBoardPublishVerification::Absent) => {
-            mark_publish_unknown(db, execution, attempt, "approval is absent", now).await
+            mark_publish_unknown(db, execution, attempt, "approval is absent", None, now).await
         }
         Err(error)
             if is_write(execution.snapshot.workflow_kind) && error.code() == "WORKFLOW_IO" =>
@@ -212,7 +212,20 @@ where
             )
             .await
         }
-        Err(error) => mark_publish_unknown(db, execution, attempt, &error.to_string(), now).await,
+        Err(error) if is_write(execution.snapshot.workflow_kind) => {
+            mark_publish_unknown(
+                db,
+                execution,
+                attempt,
+                &error.to_string(),
+                Some(&published),
+                now,
+            )
+            .await
+        }
+        Err(error) => {
+            mark_publish_unknown(db, execution, attempt, &error.to_string(), None, now).await
+        }
     }
 }
 
@@ -366,7 +379,7 @@ where
             schedule_publish_verification_retry(db, execution, attempt, detail, None, now).await
         }
         Ok(TaskBoardPublishVerification::Absent) => {
-            mark_publish_unknown(db, execution, attempt, detail, now).await
+            mark_publish_unknown(db, execution, attempt, detail, None, now).await
         }
         Err(error)
             if is_write(execution.snapshot.workflow_kind) && error.code() == "WORKFLOW_IO" =>
@@ -381,7 +394,9 @@ where
             )
             .await
         }
-        Err(error) => mark_publish_unknown(db, execution, attempt, &error.to_string(), now).await,
+        Err(error) => {
+            mark_publish_unknown(db, execution, attempt, &error.to_string(), None, now).await
+        }
     }
 }
 
@@ -407,34 +422,6 @@ async fn complete_lifecycle(
         .phase
         .ok_or_else(|| invalid_transition("lifecycle completion has no durable phase"))?;
     settle_execution_running_in_phase(db, &execution.execution_id, phase, now).await
-}
-
-async fn mark_publish_unknown(
-    db: &AsyncDaemonDb,
-    execution: &TaskBoardWorkflowExecutionRecord,
-    attempt: &TaskBoardExecutionAttemptRecord,
-    detail: &str,
-    now: &str,
-) -> Result<(), CliError> {
-    transition_attempt(
-        db,
-        attempt,
-        TaskBoardAttemptState::Unknown,
-        now,
-        Some(TaskBoardFailureClass::UnknownOutcome),
-        Some(detail),
-        None,
-    )
-    .await?;
-    require_human(
-        db,
-        &execution.execution_id,
-        "publish_outcome_unknown",
-        "workflow publication outcome could not be verified authoritatively",
-        TaskBoardTerminalOutcomeKind::Unknown,
-        now,
-    )
-    .await
 }
 
 async fn publish<R>(

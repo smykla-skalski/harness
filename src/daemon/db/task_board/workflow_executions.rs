@@ -381,7 +381,7 @@ pub(super) fn cas_mismatch(
     }
 }
 
-fn ensure_terminal_transition_has_no_active_side_effect(
+pub(super) fn ensure_terminal_transition_has_no_active_side_effect(
     current: &TaskBoardWorkflowExecutionRecord,
     updated: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<(), CliError> {
@@ -425,7 +425,7 @@ const fn is_stopped(state: TaskBoardExecutionState) -> bool {
     )
 }
 
-fn validate_phase_change(
+pub(super) fn validate_phase_change(
     current: &TaskBoardWorkflowExecutionRecord,
     updated: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<(), CliError> {

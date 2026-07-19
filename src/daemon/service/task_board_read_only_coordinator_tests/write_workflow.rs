@@ -15,6 +15,7 @@ use super::fixture::{Fixture, NOW, insert_committed_admission};
 use runtime::{FakeWriteRuntime, PlannedRun};
 
 mod runtime;
+mod verification_exhaustion;
 
 const BASE_HEAD: &str = "head-base";
 const FIRST_HEAD: &str = "head-first";
@@ -102,6 +103,28 @@ async fn transient_publication_verification_recovers_on_bounded_retry() {
         waiting.transition.execution_state,
         TaskBoardExecutionState::Running
     );
+    assert!(
+        waiting.artifacts.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == "publish_verification_failed"
+                && diagnostic
+                    .message
+                    .contains("GitHub head is not visible yet")
+        }),
+        "{waiting:#?}"
+    );
+    let waiting_publish = waiting
+        .attempts
+        .iter()
+        .find(|attempt| attempt.action_key == "publish")
+        .expect("waiting publish attempt");
+    assert!(waiting_publish.available_at.is_some());
+    assert!(matches!(
+        waiting_publish.artifact.as_ref(),
+        Some(TaskBoardAttemptResultArtifact::Lifecycle(outcome))
+            if outcome.mutated
+                && outcome.external_url.as_deref()
+                    == Some("https://github.com/example/compass/pull/42")
+    ));
 
     for _ in 0..12 {
         tick_at(&fixture, &runtime, RETRY_AT).await;
@@ -149,6 +172,38 @@ async fn ambiguous_write_publication_is_verified_without_a_second_mutation() {
     assert_eq!(
         load_execution(&fixture).await.transition.phase,
         Some(TaskBoardExecutionPhase::Terminal)
+    );
+}
+
+#[tokio::test]
+async fn merged_after_ambiguous_publish_recovers_without_a_second_mutation() {
+    let fixture = seed_write_execution("write-publication-merged-recovery").await;
+    let runtime = FakeWriteRuntime::new([
+        PlannedRun::implementation(1, 1, BASE_HEAD, FIRST_HEAD),
+        PlannedRun::review(1, FIRST_HEAD, TaskBoardPhaseVerdict::Pass),
+        PlannedRun::evaluation(1, FIRST_HEAD),
+    ]);
+    runtime.fail_next_publish_after_mutation("pull request merged before response arrived");
+
+    drive_to_terminal(&fixture, &runtime).await;
+
+    let execution = load_execution(&fixture).await;
+    assert_eq!(runtime.publish_count(), 1);
+    assert_eq!(runtime.verification_count(), 1);
+    assert_eq!(
+        execution.transition.execution_state,
+        TaskBoardExecutionState::Completed
+    );
+    assert!(
+        execution.attempts.iter().any(|attempt| {
+            matches!(
+                attempt.artifact.as_ref(),
+                Some(TaskBoardAttemptResultArtifact::Lifecycle(outcome))
+                    if outcome.external_url.as_deref()
+                            == Some("https://github.com/example/compass/pull/42")
+            )
+        }),
+        "{execution:#?}"
     );
 }
 
@@ -234,15 +289,35 @@ async fn legacy_write_execution_without_task_identity_fails_closed() {
 }
 
 async fn seed_write_execution(label: &str) -> Fixture {
-    seed_write_execution_with_task(label, Some(format!("work-coordinator-{label}"))).await
+    seed_write_execution_configured(label, Some(format!("work-coordinator-{label}")), None).await
 }
 
 async fn seed_write_execution_with_task(label: &str, task_id: Option<String>) -> Fixture {
+    seed_write_execution_configured(label, task_id, None).await
+}
+
+async fn seed_write_execution_with_retry_limit(label: &str, max_attempts: u32) -> Fixture {
+    seed_write_execution_configured(
+        label,
+        Some(format!("work-coordinator-{label}")),
+        Some(max_attempts),
+    )
+    .await
+}
+
+async fn seed_write_execution_configured(
+    label: &str,
+    task_id: Option<String>,
+    max_attempts: Option<u32>,
+) -> Fixture {
     let test = TestDatabase::open().await;
     let item_id = format!("coordinator-{label}");
     let execution_id = format!("execution-{label}");
     let mut settings = crate::task_board::TaskBoardOrchestratorSettings::default();
     settings.policy_version = "policy-v1".into();
+    if let Some(max_attempts) = max_attempts {
+        settings.retry.max_attempts = max_attempts;
+    }
     test.db
         .replace_task_board_orchestrator_settings(&settings)
         .await

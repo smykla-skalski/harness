@@ -3,8 +3,8 @@ use std::fmt::Display;
 use crate::task_board::{
     TaskBoardAttemptResultArtifact, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
     TaskBoardExecutionState, TaskBoardImplementationResult, TaskBoardWorkflowExecutionRecord,
-    TaskBoardWorkflowKind, validate_plan_approval, validate_planning_result,
-    validate_task_board_read_only_run_context,
+    TaskBoardWorkflowKind, normalize_repository_slug, validate_plan_approval,
+    validate_planning_result, validate_task_board_read_only_run_context,
 };
 
 use super::TaskBoardWorkflowExecutionValidationError;
@@ -34,7 +34,58 @@ pub(super) fn validate_write_frozen_contract(
         })?;
     validate_task_board_read_only_run_context(context)
         .map_err(|error| field_error("snapshot.read_only_run_context", error))?;
+    validate_provisional_publication(record)?;
     validate_phase_evidence(record)
+}
+
+fn validate_provisional_publication(
+    record: &TaskBoardWorkflowExecutionRecord,
+) -> Result<(), TaskBoardWorkflowExecutionValidationError> {
+    let Some(evidence) = record.artifacts.provisional_publication.as_ref() else {
+        return Ok(());
+    };
+    if record.transition.phase != Some(TaskBoardExecutionPhase::Publish) {
+        return invalid(
+            "artifacts.provisional_publication",
+            "provisional publication is outside the publish phase",
+        );
+    }
+    let url = evidence.external_url.as_deref().ok_or_else(|| {
+        field_error(
+            "artifacts.provisional_publication.external_url",
+            "provisional publication has no external URL",
+        )
+    })?;
+    validate_publication_url(url)?;
+    if evidence.terminal {
+        return invalid(
+            "artifacts.provisional_publication",
+            "provisional publication cannot claim terminal completion",
+        );
+    }
+    if evidence.provider_revision != record.snapshot.provider_revision {
+        return invalid(
+            "artifacts.provisional_publication.provider_revision",
+            "does not match frozen provider revision",
+        );
+    }
+    Ok(())
+}
+
+fn validate_publication_url(url: &str) -> Result<(), TaskBoardWorkflowExecutionValidationError> {
+    required(url, "artifacts.provisional_publication.external_url")?;
+    let valid = url.strip_prefix("https://github.com/").and_then(|path| {
+        let (repository, number) = path.split_once("/pull/")?;
+        let repository = normalize_repository_slug(Some(repository))?;
+        let number = number.parse::<u64>().ok().filter(|number| *number > 0)?;
+        (url == url.trim() && path == format!("{repository}/pull/{number}")).then_some(())
+    });
+    valid.ok_or_else(|| {
+        field_error(
+            "artifacts.provisional_publication.external_url",
+            "provisional publication URL is not canonical GitHub",
+        )
+    })
 }
 
 pub(super) fn validate_write_attempt_artifact(
@@ -160,6 +211,7 @@ fn validate_read_only_has_no_write_evidence(
     if artifacts.planning_result.is_some()
         || artifacts.plan_approval.is_some()
         || !artifacts.approval_invalidations.is_empty()
+        || artifacts.provisional_publication.is_some()
     {
         return invalid("artifacts", "read-only workflow carries write evidence");
     }

@@ -85,9 +85,14 @@ pub(super) struct FakeWriteRuntime {
     publishes: AtomicUsize,
     published: AtomicBool,
     ambiguous_publish_errors: Mutex<VecDeque<String>>,
-    verification_errors: Mutex<VecDeque<String>>,
+    verification_errors: Mutex<VecDeque<PlannedVerificationError>>,
     verification_urls: Mutex<Vec<Option<String>>>,
     verifications: AtomicUsize,
+}
+
+enum PlannedVerificationError {
+    Transient(String),
+    Permanent(String),
 }
 
 impl FakeWriteRuntime {
@@ -124,7 +129,14 @@ impl FakeWriteRuntime {
         self.verification_errors
             .lock()
             .expect("verification errors lock")
-            .push_back(detail.into());
+            .push_back(PlannedVerificationError::Transient(detail.into()));
+    }
+
+    pub(super) fn reject_next_verification(&self, detail: &str) {
+        self.verification_errors
+            .lock()
+            .expect("verification errors lock")
+            .push_back(PlannedVerificationError::Permanent(detail.into()));
     }
 
     pub(super) fn fail_next_publish_after_mutation(&self, detail: &str) {
@@ -309,13 +321,20 @@ impl TaskBoardReadOnlyRuntime for FakeWriteRuntime {
             .lock()
             .expect("verification URLs lock")
             .push(known_external_url.map(str::to_owned));
-        if let Some(detail) = self
+        if let Some(error) = self
             .verification_errors
             .lock()
             .expect("verification errors lock")
             .pop_front()
         {
-            return Err(CliErrorKind::workflow_io(detail).into());
+            return Err(match error {
+                PlannedVerificationError::Transient(detail) => {
+                    CliErrorKind::workflow_io(detail).into()
+                }
+                PlannedVerificationError::Permanent(detail) => {
+                    CliErrorKind::invalid_transition(detail).into()
+                }
+            });
         }
         if self.published.load(Ordering::SeqCst) {
             Ok(TaskBoardPublishVerification::Applied(publication(

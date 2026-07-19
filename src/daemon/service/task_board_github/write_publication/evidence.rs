@@ -25,9 +25,16 @@ pub(super) fn freeze_pull_request(
 ) -> Result<TaskBoardPullRequestIdentity, CliError> {
     if handle.merged || !handle.open {
         return Err(invalid_transition(
-            "PrFix publication requires an open pull request",
+            "write publication requires an open pull request",
         ));
     }
+    pull_request_identity(repository, handle)
+}
+
+fn pull_request_identity(
+    repository: &str,
+    handle: &GitHubPullRequestHandle,
+) -> Result<TaskBoardPullRequestIdentity, CliError> {
     let head_repository = handle
         .head_repository
         .as_deref()
@@ -67,6 +74,33 @@ pub(super) fn validate_pull_request_target(
     Ok(())
 }
 
+pub(super) fn validate_published_pull_request(
+    handle: &GitHubPullRequestHandle,
+    identity: &TaskBoardPullRequestIdentity,
+    expected_head: &TaskBoardPullRequestHeadIdentity,
+) -> Result<bool, CliError> {
+    let actual = pull_request_identity(&identity.repository, handle)?;
+    let actual_head = required_frozen_head(&actual)?;
+    if actual.number != identity.number
+        || actual.repository != identity.repository
+        || actual_head.repository != expected_head.repository
+        || actual_head.branch != expected_head.branch
+    {
+        return Err(invalid_transition(
+            "pull request changed from its frozen publication target",
+        ));
+    }
+    if handle.merged {
+        return Ok(true);
+    }
+    if !handle.open {
+        return Err(invalid_transition(
+            "write publication requires an open or merged pull request",
+        ));
+    }
+    Ok(false)
+}
+
 pub(super) fn validate_published_evidence(
     handle: &GitHubPullRequestHandle,
     identity: &TaskBoardPullRequestIdentity,
@@ -74,7 +108,9 @@ pub(super) fn validate_published_evidence(
     branch: &GitHubBranchState,
     local: &LocalHeadEvidence,
 ) -> Result<(), CliError> {
-    validate_pull_request_target(handle, identity, expected_head)?;
+    if validate_published_pull_request(handle, identity, expected_head)? {
+        return Ok(());
+    }
     if handle.head_sha != branch.commit_sha {
         return Err(invalid_transition(
             "pull request head does not match its frozen publication branch",
@@ -347,6 +383,49 @@ mod tests {
         let mut draft = pull_request_handle("frozen-source-head");
         draft.draft = true;
         validate_pull_request_target(&draft, &identity, head).expect("open draft target");
+    }
+
+    #[test]
+    fn matching_merged_pull_request_is_authoritative_publication_evidence() {
+        let identity = frozen_identity();
+        let head = required_frozen_head(&identity).expect("frozen head");
+        let mut handle = pull_request_handle("frozen-source-head");
+        handle.open = false;
+        handle.merged = true;
+
+        assert!(
+            validate_published_pull_request(&handle, &identity, head)
+                .expect("matching merged publication")
+        );
+    }
+
+    #[test]
+    fn closed_unmerged_pull_request_fails_closed_with_neutral_error() {
+        let identity = frozen_identity();
+        let head = required_frozen_head(&identity).expect("frozen head");
+        let mut handle = pull_request_handle("frozen-source-head");
+        handle.open = false;
+
+        let error = validate_published_pull_request(&handle, &identity, head)
+            .expect_err("closed unmerged publication must fail closed");
+
+        assert!(error.to_string().contains("write publication"));
+        assert!(!error.to_string().contains("PrFix"));
+    }
+
+    #[test]
+    fn merged_pull_request_must_still_match_frozen_target() {
+        let identity = frozen_identity();
+        let head = required_frozen_head(&identity).expect("frozen head");
+        let mut handle = pull_request_handle("merged-head");
+        handle.open = false;
+        handle.merged = true;
+        handle.head_repository = Some("different/fork".into());
+
+        let error = validate_published_pull_request(&handle, &identity, head)
+            .expect_err("merged publication must retain its frozen identity");
+
+        assert!(error.to_string().contains("frozen publication target"));
     }
 
     #[test]

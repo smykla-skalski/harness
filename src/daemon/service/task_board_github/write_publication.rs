@@ -27,8 +27,8 @@ mod preparation;
 use evidence::{
     LocalHeadEvidence, freeze_pull_request, implementation_base, known_publication_number,
     local_head_evidence, required_branch_state, required_frozen_head,
-    validate_publication_repository, validate_published_evidence, validate_pull_request_target,
-    worktree_path,
+    validate_publication_repository, validate_published_evidence, validate_published_pull_request,
+    validate_pull_request_target, worktree_path,
 };
 #[cfg(test)]
 pub(super) use evidence::{parse_publication_url, reconcile_publication_number};
@@ -330,15 +330,17 @@ async fn verify_published(
     let expected =
         expected_publication_target(execution, &publication.config, number, &handle.head_sha)?;
     let head = required_frozen_head(&expected)?;
-    let head_publication =
-        repository_publication_client(db, &publication.config, &head.repository).await?;
-    let branch = required_branch_state(
-        &head_publication.client,
-        &head_publication.config,
-        &head.branch,
-    )
-    .await?;
-    validate_published_evidence(&handle, &expected, head, &branch, local)?;
+    if !validate_published_pull_request(&handle, &expected, head)? {
+        let head_publication =
+            repository_publication_client(db, &publication.config, &head.repository).await?;
+        let branch = required_branch_state(
+            &head_publication.client,
+            &head_publication.config,
+            &head.branch,
+        )
+        .await?;
+        validate_published_evidence(&handle, &expected, head, &branch, local)?;
+    }
     Ok(TaskBoardLifecycleOutcome {
         mutated: false,
         terminal: false,
