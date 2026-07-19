@@ -7,6 +7,7 @@ struct TaskBoardStepRailView: View {
   let latestEvaluation: TaskBoardEvaluationSummary?
   let workspace: PolicyCanvasWorkspace?
   let targetItem: TaskBoardItem?
+  let taskBoardItems: [TaskBoardItem]
   let isActionInFlight: Bool
   let actions: TaskBoardOverviewActions
 
@@ -16,62 +17,76 @@ struct TaskBoardStepRailView: View {
   var openURL
   @Environment(\.fontScale)
   private var fontScale
+  @Environment(\.accessibilityReduceMotion)
+  private var reduceMotion
   @State private var state = TaskBoardStepRailState()
 
-  var activeItem: TaskBoardItem? {
-    state.delivery?.applied.item ?? state.pickedSelection?.item ?? targetItem
+  var stepRailState: TaskBoardStepRailState { state }
+
+  /// The item the flow follows: the locked item resolved to its live board copy,
+  /// falling back to the current target (top Todo) when nothing is locked.
+  var lockedItem: TaskBoardItem? {
+    if let id = state.lockedItemID, let live = taskBoardItems.first(where: { $0.id == id }) {
+      return live
+    }
+    return targetItem
   }
 
-  private var liveModeFont: Font {
-    HarnessMonitorTextSize.scaledFont(.callout.weight(.semibold), by: fontScale)
-  }
-  private var explanationFont: Font {
-    HarnessMonitorTextSize.scaledFont(.callout, by: fontScale)
+  var activeItem: TaskBoardItem? { lockedItem }
+
+  private var latestRecord: TaskBoardEvaluationRecord? {
+    guard let id = lockedItem?.id else { return nil }
+    return latestEvaluation?.records.first { $0.boardItemId == id }
   }
 
-  var stepRailState: TaskBoardStepRailState {
-    state
+  private var stagePlan: TaskBoardStepStagePlan {
+    TaskBoardStepStageResolver.plan(
+      for: TaskBoardStepStageInputs(
+        item: lockedItem,
+        latestRecord: latestRecord,
+        hasPicked: state.pickedSelection != nil,
+        hasDelivered: state.delivery != nil
+      )
+    )
   }
 
   private var controlsDisabled: Bool {
     isActionInFlight || state.isBusy || store.contentUI.dashboard.connectionState != .online
   }
 
+  private var cardIdentity: String {
+    if let viewing = state.viewingColumn, viewing != stagePlan.column {
+      return "preview-\(viewing.rawValue)"
+    }
+    return "live-\(stagePlan.stage.rawValue)"
+  }
+
+  private var cautionFont: Font {
+    HarnessMonitorTextSize.scaledFont(.callout.weight(.semibold), by: fontScale)
+  }
+  private var primaryButtonFont: Font {
+    HarnessMonitorTextSize.scaledFont(.callout.weight(.semibold), by: fontScale)
+  }
+  private var linkFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+  }
+
   var body: some View {
     TaskBoardSection(title: "Manual Steps") {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-        TaskBoardStepRailTargetView(
-          item: activeItem,
-          isPicked: state.pickedSelection != nil
-        )
+        TaskBoardStepRailTargetView(item: activeItem, isPicked: state.pickedSelection != nil)
         Label("Live manual operations", systemImage: "bolt.shield.fill")
-          .font(liveModeFont)
+          .font(cautionFont)
           .foregroundStyle(HarnessMonitorTheme.caution)
           .accessibilityIdentifier("harness.task-board.step.live-mode")
-        Text("Use these controls one stage at a time; Start is not required while Step Mode is on.")
-          .font(explanationFont)
-          .foregroundStyle(.secondary)
-          .accessibilityIdentifier("harness.task-board.step.manual-mode-explanation")
-        stepControls
-        if let selection = state.pickedSelection {
-          TaskBoardStepPromptPreview(prompt: selection.plan.renderedPrompt)
-        }
-        Divider()
-        TaskBoardApprovalGrantsView(
-          store: store,
-          workspace: workspace,
-          refreshID: approvalGrantRefreshID,
-          isDisabled: controlsDisabled
+        TaskBoardStepProgressRail(
+          current: stagePlan.column,
+          isBlocked: stagePlan.isBlockedColumn,
+          viewing: state.viewingColumn,
+          state: state
         )
-        Divider()
-        HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingXL) {
-          TaskBoardHeldDispatchesView(summary: status.heldDispatches)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-          TaskBoardPolicyGuardsView(
-            workspace: workspace
-          )
-          .frame(maxWidth: .infinity, alignment: .topLeading)
-        }
+        cardArea
+        contextDisclosure
       }
       .padding(HarnessMonitorTheme.spacingMD)
       .background(HarnessMonitorTheme.ink.opacity(0.025), in: .rect(cornerRadius: 12))
@@ -90,98 +105,197 @@ struct TaskBoardStepRailView: View {
       Text(confirmationMessage(confirmation))
     }
     .onChange(of: status.stepMode) {
-      if !status.stepMode {
-        state.reset()
-      }
+      if !status.stepMode { state.reset() }
+    }
+    .onChange(of: stagePlan.stage) { _, newStage in
+      AccessibilityNotification.Announcement("Step Mode stage: \(newStage.title)").post()
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.step-rail")
   }
 
-  private var stepControls: some View {
-    LazyVGrid(
-      columns: [GridItem(.adaptive(minimum: 185), spacing: HarnessMonitorTheme.spacingSM)],
-      alignment: .leading,
-      spacing: HarnessMonitorTheme.spacingSM
+  private var cardArea: some View {
+    Group {
+      if let viewing = state.viewingColumn, viewing != stagePlan.column {
+        previewCard(for: viewing)
+      } else {
+        liveCard(stagePlan)
+      }
+    }
+    .id(cardIdentity)
+    .transition(.opacity)
+    .animation(.easeInOut(duration: reduceMotion ? 0 : 0.2), value: cardIdentity)
+  }
+
+  private func previewCard(for column: TaskBoardStepColumn) -> some View {
+    TaskBoardStepStageCard(
+      stageTitle: column.title,
+      whatHappened: nil,
+      whatNext: column.explanation
     ) {
-      stepControl(
-        1,
-        "External Sync Live",
-        "Pull and apply external sources",
-        "arrow.triangle.2.circlepath"
-      ) {
-        state.confirmation = .externalSync
+      Button {
+        state.viewingColumn = nil
+      } label: {
+        Label("Back to current step", systemImage: "arrow.uturn.backward").font(linkFont)
       }
-      stepControl(
-        2,
-        "Evaluate Live",
-        "Evaluate and apply the current target",
-        "checkmark.seal"
-      ) {
-        state.confirmation = .evaluate(step: 2)
-      }
-      stepControl(3, "Pick Top", "Preview the top Todo prompt", "arrow.up.to.line") {
-        enqueuePick()
-      }
-      stepControl(4, "Deliver Live", "Spawn the picked worker", "paperplane.fill") {
-        state.confirmation = .deliver
-      }
-      stepControl(5, "Watch", "Open the spawned agent", "eye") {
-        openSpawnedAgent()
-      }
-      stepControl(
-        6,
-        "Evaluate Live",
-        "Evaluate and apply the delivered result",
-        "waveform.path.ecg"
-      ) {
-        state.confirmation = .evaluate(step: 6)
-      }
-      stepControl(7, "Review", "Open linked task actions", "person.2.badge.gearshape") {
-        openReview()
-      }
-      stepControl(8, "Complete", "Move the board item to Done", "checkmark.circle.fill") {
-        state.confirmation = .complete
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      .controlSize(.small)
+      .accessibilityIdentifier("harness.task-board.step.back-to-current")
+    }
+  }
+
+  private func liveCard(_ plan: TaskBoardStepStagePlan) -> some View {
+    TaskBoardStepStageCard(
+      stageTitle: plan.stage.title,
+      whatHappened: plan.whatHappened,
+      whatNext: plan.whatNext
+    ) {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+        if plan.stage == .readyToDeliver, let selection = state.pickedSelection {
+          TaskBoardStepPromptPreview(prompt: selection.plan.renderedPrompt)
+        }
+        if let action = plan.primaryAction {
+          primaryButton(action)
+        }
+        if !plan.inlineLinks.isEmpty {
+          inlineLinksRow(plan.inlineLinks)
+        }
+        secondaryRow(plan)
       }
     }
   }
 
-  private func stepControl(
-    _ step: Int,
-    _ title: String,
-    _ detail: String,
-    _ systemImage: String,
-    action: @escaping () -> Void
-  ) -> some View {
-    TaskBoardStepControl(
-      step: step,
-      title: title,
-      detail: detail,
-      systemImage: systemImage,
-      tint: step == 4 || step == 8 ? HarnessMonitorTheme.accent : HarnessMonitorTheme.secondaryInk,
-      isEnabled: isStepEnabled(step),
-      isBusy: state.activeStep == step,
-      isComplete: state.completedSteps.contains(step),
-      action: action
-    )
+  @ViewBuilder
+  private func secondaryRow(_ plan: TaskBoardStepStagePlan) -> some View {
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      if plan.primaryAction != .sync {
+        syncButton
+      }
+      if plan.stage == .done, plan.primaryAction == nil {
+        Button {
+          state.resetFlow()
+        } label: {
+          Label("Start next item", systemImage: "forward.end").font(linkFont)
+        }
+        .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+        .controlSize(.small)
+        .accessibilityIdentifier("harness.task-board.step.start-next")
+      }
+    }
   }
 
-  private func isStepEnabled(_ step: Int) -> Bool {
-    guard !controlsDisabled else { return false }
-    return switch step {
-    case 2:
-      activeItem != nil
-    case 4:
-      state.pickedSelection != nil
-    case 5:
-      state.delivery != nil || activeItem?.hasLinkedSessionTask == true
-    case 6, 8:
-      state.delivery != nil || activeItem?.hasLinkedSessionTask == true
-    case 7:
-      activeItem?.taskBoardGitHubURL != nil || activeItem?.hasLinkedSessionTask == true
-    default:
-      true
+  private func primaryButton(_ action: TaskBoardStepPrimaryAction) -> some View {
+    Button {
+      runPrimary(action)
+    } label: {
+      HStack(spacing: HarnessMonitorTheme.spacingSM) {
+        if state.isBusy {
+          ProgressView().controlSize(.small)
+        } else {
+          Image(systemName: primaryIcon(action))
+        }
+        Text("Next: \(action.buttonTitle)")
+      }
+      .font(primaryButtonFont)
+      .frame(maxWidth: .infinity)
     }
+    .harnessActionButtonStyle(variant: .prominent)
+    .controlSize(.large)
+    .disabled(controlsDisabled)
+    .accessibilityLabel("Next, \(action.buttonTitle)")
+    .accessibilityHint(stagePlan.whatNext)
+    .accessibilityIdentifier("harness.task-board.step.next")
+  }
+
+  private func inlineLinksRow(_ links: [TaskBoardStepInlineLink]) -> some View {
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      ForEach(links) { link in
+        Button {
+          runLink(link)
+        } label: {
+          Label(link.title, systemImage: linkIcon(link)).font(linkFont)
+        }
+        .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+        .controlSize(.small)
+        .accessibilityIdentifier("harness.task-board.step.link.\(link.rawValue)")
+      }
+    }
+  }
+
+  private var syncButton: some View {
+    Button {
+      state.confirmation = .externalSync
+    } label: {
+      Label("Sync external sources", systemImage: "arrow.triangle.2.circlepath").font(linkFont)
+    }
+    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    .controlSize(.small)
+    .disabled(controlsDisabled)
+    .accessibilityIdentifier("harness.task-board.step.sync")
+  }
+
+  private func primaryIcon(_ action: TaskBoardStepPrimaryAction) -> String {
+    switch action {
+    case .sync: "arrow.triangle.2.circlepath"
+    case .pick: "arrow.up.to.line"
+    case .deliver: "paperplane.fill"
+    case .evaluate: "checkmark.seal"
+    case .complete: "checkmark.circle.fill"
+    }
+  }
+
+  private func linkIcon(_ link: TaskBoardStepInlineLink) -> String {
+    switch link {
+    case .watch: "eye"
+    case .openTask: "person.2.badge.gearshape"
+    case .openPullRequest: "arrow.up.forward.square"
+    }
+  }
+
+  func runPrimary(_ action: TaskBoardStepPrimaryAction) {
+    switch action {
+    case .sync: state.confirmation = .externalSync
+    case .pick: enqueuePick()
+    case .deliver: state.confirmation = .deliver
+    case .evaluate: state.confirmation = .evaluate
+    case .complete: state.confirmation = .complete
+    }
+  }
+
+  func runLink(_ link: TaskBoardStepInlineLink) {
+    switch link {
+    case .watch:
+      openSpawnedAgent()
+    case .openTask:
+      openReview()
+    case .openPullRequest:
+      if let raw = lockedItem?.workflow?.prUrl, let url = URL(string: raw) {
+        openURL(url)
+      }
+    }
+  }
+
+  private var contextDisclosure: some View {
+    DisclosureGroup {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+        TaskBoardApprovalGrantsView(
+          store: store,
+          workspace: workspace,
+          refreshID: approvalGrantRefreshID,
+          isDisabled: controlsDisabled
+        )
+        HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingXL) {
+          TaskBoardHeldDispatchesView(summary: status.heldDispatches)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+          TaskBoardPolicyGuardsView(workspace: workspace)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+      }
+      .padding(.top, HarnessMonitorTheme.spacingSM)
+    } label: {
+      Label("Automation context", systemImage: "gearshape.2").font(cautionFont)
+    }
+    .accessibilityIdentifier("harness.task-board.step.context")
   }
 
   private var confirmationPresented: Binding<Bool> {
@@ -193,16 +307,11 @@ struct TaskBoardStepRailView: View {
 
   private var confirmationTitle: String {
     switch state.confirmation {
-    case .externalSync:
-      "Run live external sync?"
-    case .evaluate:
-      "Run live task-board evaluation?"
-    case .deliver:
-      "Deliver and spawn this item?"
-    case .complete:
-      "Complete this board item?"
-    case nil:
-      "Confirm manual step"
+    case .externalSync: "Run live external sync?"
+    case .evaluate: "Run live task-board evaluation?"
+    case .deliver: "Deliver and spawn this item?"
+    case .complete: "Complete this board item?"
+    case nil: "Confirm manual step"
     }
   }
 
@@ -217,10 +326,10 @@ struct TaskBoardStepRailView: View {
         enqueueExternalSync()
       }
       .disabled(controlsDisabled)
-    case .evaluate(let step):
+    case .evaluate:
       Button("Evaluate Live", role: .destructive) {
         state.confirmation = nil
-        enqueueEvaluation(step: step)
+        enqueueEvaluation()
       }
       .disabled(controlsDisabled)
     case .deliver:
@@ -243,13 +352,13 @@ struct TaskBoardStepRailView: View {
     let title = activeItem?.title ?? "the current item"
     return switch confirmation {
     case .externalSync:
-      "This pulls external task sources and applies changes to the live board."
+      "This pulls external task sources and applies changes to the live board"
     case .evaluate:
-      "This evaluates \(title) and applies any resulting board transition."
+      "This evaluates \(title) and applies any resulting board transition"
     case .deliver:
-      "This reserves \(title) in step mode and starts its managed worker."
+      "This reserves \(title) in step mode and starts its managed worker"
     case .complete:
-      "This moves \(title) to Done."
+      "This moves \(title) to Done"
     }
   }
 
