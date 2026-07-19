@@ -160,10 +160,11 @@ fn terminal_wait_then_output_returns_exit_status_and_output() {
     assert_eq!(output.exit_status, Some(wait.exit_status));
 }
 
-// Read a terminal's buffer until `needle` appears, so an assertion never races
-// the background PTY reader. A wall-clock sleep would false-fail under a
-// saturated `test:unit` run; polling the real buffer settles as soon as the
-// reader flushes, and the deadline is only a safety net against a hung reader.
+// Poll a terminal's buffer until `needle` appears, so an assertion never races
+// the background PTY reader. The needle check is the readiness signal, not the
+// clock: a short backoff between polls keeps the loop from hot-spinning and
+// starving the very reader it waits on under a saturated `test:unit` run, and
+// the deadline is only a safety net against a hung reader.
 fn read_terminal_until_contains(client: &HarnessAcpClient, terminal: &TerminalId, needle: &str) {
     let deadline = Instant::now() + Duration::from_secs(10);
     loop {
@@ -180,7 +181,7 @@ fn read_terminal_until_contains(client: &HarnessAcpClient, terminal: &TerminalId
             Instant::now() < deadline,
             "terminal never produced {needle:?}"
         );
-        thread::yield_now();
+        thread::sleep(Duration::from_millis(1));
     }
 }
 
