@@ -1,8 +1,9 @@
 //! ACP agent-side bridge entry point.
 //!
 //! Wires up the `Agent.builder()` from `agent_client_protocol`, registers
-//! handlers for `initialize`, `session/new`, `session/prompt`, and the
-//! `session/cancel` notification, then connects to stdio.
+//! handlers for `initialize`, `session/new`, `session/set_config_option`,
+//! `session/prompt`, and the `session/cancel` notification, then connects
+//! to stdio.
 //!
 //! The handlers share a [`SessionStore`] and an [`OpenRouterClient`] built at
 //! process start. The `session/prompt` turn loop runs in `cx.spawn` so the
@@ -257,8 +258,10 @@ mod tests {
         assert_eq!(snapshot.project_dir, PathBuf::from("/tmp/proj"));
         assert_eq!(snapshot.model, DEFAULT_MODEL_ID);
         let options = response.config_options.expect("config options");
-        let option = options.first().expect("model option");
-        assert_eq!(option.id.0.as_ref(), MODEL_CONFIG_OPTION_ID);
+        let option = options
+            .iter()
+            .find(|option| option.id.0.as_ref() == MODEL_CONFIG_OPTION_ID)
+            .expect("model option");
         assert_eq!(option.category, Some(SessionConfigOptionCategory::Model));
         let (current, choice_count) = model_option_state(option);
         assert_eq!(current, DEFAULT_MODEL_ID);
@@ -286,7 +289,8 @@ mod tests {
         assert_eq!(stored.model, "anthropic/claude-haiku-4-5");
         let option = snapshot_response
             .config_options
-            .first()
+            .iter()
+            .find(|option| option.id.0.as_ref() == MODEL_CONFIG_OPTION_ID)
             .expect("model option");
         let (current, _) = model_option_state(option);
         assert_eq!(current, "anthropic/claude-haiku-4-5");

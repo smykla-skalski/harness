@@ -227,8 +227,10 @@ async fn session_new_returns_session_id_and_models() {
                 .await?;
             assert!(!response.session_id.0.as_ref().is_empty());
             let options = response.config_options.expect("config options");
-            let option = options.first().expect("model option");
-            assert_eq!(option.id.0.as_ref(), "model");
+            let option = options
+                .iter()
+                .find(|option| option.id.0.as_ref() == "model")
+                .expect("model option");
             let SessionConfigKind::Select(select) = &option.kind else {
                 panic!("model option must be a select, got {:?}", option.kind);
             };
