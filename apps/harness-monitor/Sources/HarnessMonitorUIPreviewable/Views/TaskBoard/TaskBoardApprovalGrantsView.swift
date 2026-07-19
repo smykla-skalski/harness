@@ -11,14 +11,26 @@ struct TaskBoardApprovalGrantsView: View {
   @State private var approvalState = TaskBoardApprovalGrantsState()
   @Environment(TaskBoardRelativeTimeClock.self)
   private var relativeTimeClock
+  @Environment(\.fontScale)
+  private var fontScale
 
   var state: TaskBoardApprovalGrantsState { approvalState }
+
+  private var labelFont: Font {
+    HarnessMonitorTextSize.scaledFont(.callout.weight(.semibold), by: fontScale)
+  }
+  private var bodyFont: Font {
+    HarnessMonitorTextSize.scaledFont(.callout, by: fontScale)
+  }
+  private var countFont: Font {
+    HarnessMonitorTextSize.scaledFont(.callout.monospacedDigit(), by: fontScale)
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       HStack(spacing: HarnessMonitorTheme.spacingSM) {
         Label("Policy approvals", systemImage: "person.badge.key.fill")
-          .font(.caption.weight(.semibold))
+          .font(labelFont)
         Spacer(minLength: 0)
         if state.isLoading {
           ProgressView()
@@ -26,13 +38,13 @@ struct TaskBoardApprovalGrantsView: View {
             .accessibilityLabel("Loading policy approvals")
         }
         Text("\(state.grants.count) pending")
-          .font(.caption.monospacedDigit())
+          .font(countFont)
           .foregroundStyle(.secondary)
       }
       policyContext
       if state.grants.isEmpty {
         Text(state.isLoading ? "Loading pending grants…" : "No pending approval grants")
-          .font(.caption)
+          .font(bodyFont)
           .foregroundStyle(.secondary)
       } else {
         LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
@@ -77,7 +89,7 @@ struct TaskBoardApprovalGrantsView: View {
             hasLivePolicy ? HarnessMonitorTheme.accent : HarnessMonitorTheme.caution
           )
       }
-      .font(.caption)
+      .font(bodyFont)
       .accessibilityElement(children: .combine)
       .accessibilityLabel(
         "Active policy \(activeCanvas.title), revision \(activePolicyRevision), "
@@ -85,7 +97,7 @@ struct TaskBoardApprovalGrantsView: View {
       )
     } else {
       Label("Current policy context unavailable", systemImage: "exclamationmark.triangle")
-        .font(.caption)
+        .font(bodyFont)
         .foregroundStyle(HarnessMonitorTheme.caution)
     }
   }
@@ -98,13 +110,13 @@ struct TaskBoardApprovalGrantsView: View {
       HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
         VStack(alignment: .leading, spacing: 2) {
           Text(grant.boardItemId)
-            .font(.caption.weight(.semibold))
+            .font(labelFont)
             .textSelection(.enabled)
           Text(
             "\(grant.action.rawValue.taskBoardPolicyTitle) · "
               + grant.reasonCode.rawValue.taskBoardPolicyTitle
           )
-          .font(.caption2)
+          .font(bodyFont)
           .foregroundStyle(.secondary)
         }
         Spacer(minLength: 0)
@@ -114,7 +126,7 @@ struct TaskBoardApprovalGrantsView: View {
             ? "checkmark.shield"
             : "exclamationmark.arrow.triangle.2.circlepath"
         )
-        .font(.caption2.weight(.semibold))
+        .font(labelFont)
         .foregroundStyle(
           matchesActivePolicy ? HarnessMonitorTheme.accent : HarnessMonitorTheme.caution
         )
@@ -126,7 +138,7 @@ struct TaskBoardApprovalGrantsView: View {
           .textSelection(.enabled)
         expiryLabel(presentation)
       }
-      .font(.caption2)
+      .font(bodyFont)
       .foregroundStyle(isExpired ? HarnessMonitorTheme.danger : .secondary)
       HStack(spacing: HarnessMonitorTheme.spacingSM) {
         Button {

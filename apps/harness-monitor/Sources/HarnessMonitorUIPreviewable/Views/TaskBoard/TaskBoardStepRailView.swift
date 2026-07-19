@@ -14,10 +14,19 @@ struct TaskBoardStepRailView: View {
   var openWindow
   @Environment(\.openURL)
   var openURL
+  @Environment(\.fontScale)
+  private var fontScale
   @State private var state = TaskBoardStepRailState()
 
   var activeItem: TaskBoardItem? {
     state.delivery?.applied.item ?? state.pickedSelection?.item ?? targetItem
+  }
+
+  private var liveModeFont: Font {
+    HarnessMonitorTextSize.scaledFont(.callout.weight(.semibold), by: fontScale)
+  }
+  private var explanationFont: Font {
+    HarnessMonitorTextSize.scaledFont(.callout, by: fontScale)
   }
 
   var stepRailState: TaskBoardStepRailState {
@@ -36,11 +45,11 @@ struct TaskBoardStepRailView: View {
           isPicked: state.pickedSelection != nil
         )
         Label("Live manual operations", systemImage: "bolt.shield.fill")
-          .font(.caption.weight(.semibold))
+          .font(liveModeFont)
           .foregroundStyle(HarnessMonitorTheme.caution)
           .accessibilityIdentifier("harness.task-board.step.live-mode")
         Text("Use these controls one stage at a time; Start is not required while Step Mode is on.")
-          .font(.caption)
+          .font(explanationFont)
           .foregroundStyle(.secondary)
           .accessibilityIdentifier("harness.task-board.step.manual-mode-explanation")
         stepControls
