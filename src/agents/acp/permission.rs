@@ -8,7 +8,7 @@ use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use agent_client_protocol::schema::{
+use agent_client_protocol::schema::v1::{
     CreateTerminalRequest, PermissionOption, PermissionOptionId, PermissionOptionKind,
     RequestPermissionOutcome, RequestPermissionRequest, RequestPermissionResponse,
     SelectedPermissionOutcome, WriteTextFileRequest,
@@ -374,9 +374,9 @@ mod tests {
     fn permission_request() -> RequestPermissionRequest {
         RequestPermissionRequest::new(
             "session-1",
-            agent_client_protocol::schema::ToolCallUpdate::new(
+            agent_client_protocol::schema::v1::ToolCallUpdate::new(
                 "tool-1",
-                agent_client_protocol::schema::ToolCallUpdateFields::new(),
+                agent_client_protocol::schema::v1::ToolCallUpdateFields::new(),
             ),
             standard_permission_options(),
         )

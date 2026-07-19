@@ -16,7 +16,7 @@
 //! This means output sequence numbers may have gaps relative to input. Downstream
 //! consumers must not assume contiguous sequences.
 
-use agent_client_protocol::schema::{ContentBlock, SessionUpdate, ToolCallStatus, ToolKind};
+use agent_client_protocol::schema::v1::{ContentBlock, SessionUpdate, ToolCallStatus, ToolKind};
 use serde_json::Value;
 
 use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
@@ -138,7 +138,7 @@ pub fn materialise_one(
 
 /// Extract text content from a content block.
 fn extract_text_content(block: &ContentBlock) -> String {
-    use agent_client_protocol::schema::EmbeddedResourceResource;
+    use agent_client_protocol::schema::v1::EmbeddedResourceResource;
 
     match block {
         ContentBlock::Text(tc) => tc.text.clone(),
@@ -177,7 +177,7 @@ fn tool_kind_to_str(kind: ToolKind) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use agent_client_protocol::schema::{
+    use agent_client_protocol::schema::v1::{
         ContentChunk, SessionId, SessionNotification, TextContent, ToolCall, ToolCallId,
         ToolCallUpdate, ToolCallUpdateFields, ToolKind,
     };
@@ -309,7 +309,7 @@ mod tests {
     #[test]
     fn materialise_skips_config_updates() {
         let update = SessionUpdate::ConfigOptionUpdate(
-            agent_client_protocol::schema::ConfigOptionUpdate::new(vec![]),
+            agent_client_protocol::schema::v1::ConfigOptionUpdate::new(vec![]),
         );
         let raw = make_raw_update(update);
 

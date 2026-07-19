@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::time::Duration;
 
-use agent_client_protocol::schema::RequestPermissionResponse;
+use agent_client_protocol::schema::v1::RequestPermissionResponse;
 use tokio::runtime::{Builder, Handle, RuntimeFlavor};
 use tokio::sync::oneshot;
 use tokio::task::block_in_place;

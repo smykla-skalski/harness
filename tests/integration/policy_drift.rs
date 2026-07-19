@@ -19,7 +19,7 @@ use std::fs;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 
-use agent_client_protocol::schema::WriteTextFileRequest;
+use agent_client_protocol::schema::v1::WriteTextFileRequest;
 use harness::agents::acp::client::HarnessAcpClient;
 use harness::agents::acp::permission::PermissionMode;
 use harness::agents::policy::{DeniedBinaries, WriteDecision, WriteSurfaceContext, evaluate_write};

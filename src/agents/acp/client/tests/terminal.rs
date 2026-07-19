@@ -5,7 +5,7 @@ use std::sync::{Arc, mpsc};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use agent_client_protocol::schema::{
+use agent_client_protocol::schema::v1::{
     CreateTerminalRequest, KillTerminalRequest, ReleaseTerminalRequest, TerminalId,
     TerminalOutputRequest, WaitForTerminalExitRequest,
 };

@@ -2,7 +2,7 @@ use super::*;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 
-use agent_client_protocol::schema::{
+use agent_client_protocol::schema::v1::{
     AgentCapabilities, InitializeRequest, InitializeResponse, NewSessionRequest,
     NewSessionResponse, PromptResponse, SessionConfigOption, SessionConfigOptionCategory,
     SessionConfigSelectOption, SetSessionConfigOptionRequest, SetSessionConfigOptionResponse,
@@ -161,18 +161,19 @@ async fn run_agent_recording_attach_config_order(
             {
                 let operations = Arc::clone(&operations);
                 async move |request: SetSessionConfigOptionRequest, responder, _connection| {
+                    let value = request
+                        .value
+                        .as_value_id()
+                        .map_or_else(|| "non-select".to_owned(), |id| id.0.to_string());
                     operations
                         .lock()
                         .expect("record attach config")
-                        .push(format!(
-                            "set_config:{}:{}",
-                            request.config_id.0, request.value.0
-                        ));
+                        .push(format!("set_config:{}:{value}", request.config_id.0));
                     responder.respond(SetSessionConfigOptionResponse::new(vec![
                         SessionConfigOption::select(
                             "effort",
                             "Effort",
-                            request.value.clone(),
+                            value.clone(),
                             vec![
                                 SessionConfigSelectOption::new("low", "Low"),
                                 SessionConfigSelectOption::new("high", "High"),

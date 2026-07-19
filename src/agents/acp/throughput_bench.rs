@@ -9,7 +9,7 @@
 
 use std::time::Instant;
 
-use agent_client_protocol::schema::{
+use agent_client_protocol::schema::v1::{
     ContentBlock, ContentChunk, SessionId, SessionNotification, SessionUpdate, TextContent,
     ToolCall, ToolCallId, ToolCallStatus, ToolCallUpdate, ToolCallUpdateFields, ToolKind,
 };

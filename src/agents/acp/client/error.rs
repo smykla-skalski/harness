@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt;
 
-use agent_client_protocol::schema::TerminalId;
+use agent_client_protocol::schema::v1::TerminalId;
 
 /// JSON-RPC error code: write denied by policy.
 pub const WRITE_DENIED: i32 = -32001;

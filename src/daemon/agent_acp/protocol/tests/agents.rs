@@ -1,15 +1,16 @@
 use std::sync::{Arc, Mutex};
 
-use agent_client_protocol::schema::{
+use agent_client_protocol::schema::v1::{
     AgentCapabilities, CancelNotification, ContentBlock, ContentChunk, InitializeRequest,
-    InitializeResponse, ModelInfo, NewSessionRequest, NewSessionResponse, PromptRequest,
-    PromptResponse, SessionConfigKind, SessionConfigOption, SessionConfigOptionCategory,
-    SessionConfigSelect, SessionConfigSelectOption, SessionId, SessionModelState,
-    SessionNotification, SessionUpdate, SetSessionConfigOptionRequest,
-    SetSessionConfigOptionResponse, SetSessionModelRequest, SetSessionModelResponse, StopReason,
-    TextContent,
+    InitializeResponse, NewSessionRequest, NewSessionResponse, PromptRequest, PromptResponse,
+    SessionConfigKind, SessionConfigOption, SessionConfigOptionCategory, SessionConfigSelect,
+    SessionConfigSelectOption, SessionId, SessionNotification, SessionUpdate,
+    SetSessionConfigOptionRequest, SetSessionConfigOptionResponse, StopReason, TextContent,
 };
-use agent_client_protocol::{Agent, Channel};
+use agent_client_protocol::util::internal_error;
+use agent_client_protocol::{Agent, Channel, UntypedMessage};
+
+pub(super) const LEGACY_SET_MODEL_METHOD: &str = "session/set_model";
 
 pub(super) async fn run_cookbook_style_agent(
     transport: Channel,
@@ -111,41 +112,18 @@ pub(super) async fn run_agent_recording_startup_config_order(
         )
         .on_receive_request(
             async move |_request: NewSessionRequest, responder, _connection| {
-                responder.respond(
-                    NewSessionResponse::new("acp-session-1")
-                        .models(SessionModelState::new(
-                            "baseline",
+                responder.respond(NewSessionResponse::new("acp-session-1").config_options(vec![
+                        SessionConfigOption::select(
+                            "effort",
+                            "Effort",
+                            "medium",
                             vec![
-                                ModelInfo::new("baseline", "Baseline"),
-                                ModelInfo::new("model-a", "Model A"),
+                                SessionConfigSelectOption::new("low", "Low"),
+                                SessionConfigSelectOption::new("high", "High"),
                             ],
-                        ))
-                        .config_options(vec![
-                            SessionConfigOption::select(
-                                "effort",
-                                "Effort",
-                                "medium",
-                                vec![
-                                    SessionConfigSelectOption::new("low", "Low"),
-                                    SessionConfigSelectOption::new("high", "High"),
-                                ],
-                            )
-                            .category(SessionConfigOptionCategory::Other("effort".to_string())),
-                        ]),
-                )
-            },
-            agent_client_protocol::on_receive_request!(),
-        )
-        .on_receive_request(
-            {
-                let operations = Arc::clone(&operations);
-                async move |request: SetSessionModelRequest, responder, _connection| {
-                    operations
-                        .lock()
-                        .expect("record startup operation")
-                        .push(format!("set_model:{}", request.model_id.0));
-                    responder.respond(SetSessionModelResponse::new())
-                }
+                        )
+                        .category(SessionConfigOptionCategory::Other("effort".to_string())),
+                    ]))
             },
             agent_client_protocol::on_receive_request!(),
         )
@@ -153,19 +131,20 @@ pub(super) async fn run_agent_recording_startup_config_order(
             {
                 let operations = Arc::clone(&operations);
                 async move |request: SetSessionConfigOptionRequest, responder, _connection| {
+                    let value = request
+                        .value
+                        .as_value_id()
+                        .map_or_else(|| "non-select".to_owned(), |id| id.0.to_string());
                     operations
                         .lock()
                         .expect("record startup operation")
-                        .push(format!(
-                            "set_config:{}:{}",
-                            request.config_id.0, request.value.0
-                        ));
+                        .push(format!("set_config:{}:{value}", request.config_id.0));
                     responder.respond(SetSessionConfigOptionResponse::new(vec![
                         SessionConfigOption::new(
                             "effort",
                             "Effort",
                             SessionConfigKind::Select(SessionConfigSelect::new(
-                                request.value.clone(),
+                                value.clone(),
                                 vec![
                                     SessionConfigSelectOption::new("low", "Low"),
                                     SessionConfigSelectOption::new("high", "High"),
@@ -195,6 +174,27 @@ pub(super) async fn run_agent_recording_startup_config_order(
                         .expect("record prompt operation")
                         .push("prompt".to_string());
                     responder.respond(PromptResponse::new(StopReason::EndTurn))
+                }
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            {
+                let operations = Arc::clone(&operations);
+                async move |request: UntypedMessage, responder, _connection| {
+                    if request.method() == LEGACY_SET_MODEL_METHOD {
+                        let model = request.params()["modelId"].as_str().unwrap_or_default();
+                        operations
+                            .lock()
+                            .expect("record startup operation")
+                            .push(format!("set_model:{model}"));
+                        responder.respond(serde_json::json!({}))
+                    } else {
+                        responder.respond_with_error(internal_error(format!(
+                            "startup-config-agent: method '{}' not handled",
+                            request.method()
+                        )))
+                    }
                 }
             },
             agent_client_protocol::on_receive_request!(),

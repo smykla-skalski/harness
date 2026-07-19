@@ -1,10 +1,11 @@
-use agent_client_protocol::schema::{
+use agent_client_protocol::schema::v1::{
     NewSessionResponse, SessionConfigKind, SessionConfigOption, SessionConfigOptionCategory,
     SessionConfigSelect, SessionConfigSelectGroup, SessionConfigSelectOption,
-    SessionConfigSelectOptions, SessionConfigValueId, SessionId, SessionModelState,
-    SetSessionConfigOptionRequest, SetSessionModelRequest,
+    SessionConfigSelectOptions, SessionConfigValueId, SessionId, SetSessionConfigOptionRequest,
 };
-use agent_client_protocol::{Agent, ConnectionTo, Error as AcpError, Result as AcpResult};
+use agent_client_protocol::{
+    Agent, ConnectionTo, Error as AcpError, Result as AcpResult, UntypedMessage,
+};
 
 use crate::agents::acp::catalog::{
     AcpAgentDescriptor, AcpSessionConfigOptionBinding, AcpSessionConfiguration,
@@ -65,7 +66,6 @@ impl AcpSessionRequestConfig {
 
 #[derive(Clone, Copy)]
 pub(super) struct SessionConfigurationAdvertisement<'a> {
-    models: Option<&'a SessionModelState>,
     config_options: &'a [SessionConfigOption],
 }
 
@@ -74,7 +74,6 @@ pub(super) fn advertised_session_configuration(
     response: &NewSessionResponse,
 ) -> SessionConfigurationAdvertisement<'_> {
     SessionConfigurationAdvertisement {
-        models: response.models.as_ref(),
         config_options: response.config_options.as_deref().unwrap_or(&[]),
     }
 }
@@ -135,21 +134,15 @@ async fn apply_model_configuration(
             .await
         }
         AcpSessionModelTransport::SessionModel => {
-            if !session_config.allow_custom_model
-                && let Some(models) = advertised.models
-            {
-                let available = models
-                    .available_models
-                    .iter()
-                    .any(|candidate| candidate.model_id.0.as_ref() == model);
-                if !available {
-                    return Err(AcpError::new(
-                        -32603,
-                        format!("ACP session model '{model}' is not advertised"),
-                    ));
-                }
-            }
-            send_set_model(supervisor, connection, session_id, model).await
+            apply_session_model_configuration(
+                supervisor,
+                connection,
+                session_id,
+                model,
+                session_config,
+                advertised.config_options,
+            )
+            .await
         }
     }
 }
@@ -290,20 +283,55 @@ async fn send_set_config_option(
     Ok(())
 }
 
-async fn send_set_model(
+/// Apply a model request for descriptors on the legacy `SessionModel` transport.
+///
+/// Prefers a `model`-category config option when the runtime advertises one so
+/// agents on the stable configuration surface get the validated path.
+async fn apply_session_model_configuration(
+    supervisor: &AcpSessionSupervisor,
+    connection: &ConnectionTo<Agent>,
+    session_id: &SessionId,
+    model: &str,
+    session_config: &AcpSessionRequestConfig,
+    config_options: &[SessionConfigOption],
+) -> AcpResult<()> {
+    let selector = AcpSessionConfigOptionBinding::default();
+    if let Some(option) = find_config_option(config_options, &selector, Some("model")) {
+        if let Some(value) = select_config_value(option, model) {
+            return send_set_config_option(supervisor, connection, session_id, option, value)
+                .await;
+        }
+        if !session_config.allow_custom_model {
+            return Err(AcpError::new(
+                -32603,
+                format!(
+                    "ACP session config option '{}' does not accept '{model}'",
+                    option.id
+                ),
+            ));
+        }
+    }
+    send_set_model_legacy(supervisor, connection, session_id, model).await
+}
+
+/// Wire method kept for agents that predate stable model config options
+/// (codex-acp through v0.16.0). Drop once codex-acp advertises a
+/// `model`-category config option.
+const LEGACY_SET_SESSION_MODEL_METHOD: &str = "session/set_model";
+
+async fn send_set_model_legacy(
     supervisor: &AcpSessionSupervisor,
     connection: &ConnectionTo<Agent>,
     session_id: &SessionId,
     model: &str,
 ) -> AcpResult<()> {
-    let _guard = supervisor.enter_pending_request_with_reason(Some("session/set_model"));
-    connection
-        .send_request(SetSessionModelRequest::new(
-            session_id.clone(),
-            model.to_string(),
-        ))
-        .block_task()
-        .await?;
+    let _guard =
+        supervisor.enter_pending_request_with_reason(Some(LEGACY_SET_SESSION_MODEL_METHOD));
+    let request = UntypedMessage::new(
+        LEGACY_SET_SESSION_MODEL_METHOD,
+        serde_json::json!({ "sessionId": session_id, "modelId": model }),
+    )?;
+    connection.send_request(request).block_task().await?;
     Ok(())
 }
 

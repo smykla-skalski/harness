@@ -11,7 +11,7 @@
 
 use std::time::{Duration, Instant};
 
-use agent_client_protocol::schema::{ContentChunk, SessionNotification, SessionUpdate};
+use agent_client_protocol::schema::v1::{ContentChunk, SessionNotification, SessionUpdate};
 
 /// Default maximum updates before flush.
 pub const DEFAULT_MAX_UPDATES: usize = 32;
@@ -216,7 +216,7 @@ fn estimate_notification_size(notification: &SessionNotification) -> usize {
 }
 
 fn estimate_content_chunk_size(chunk: &ContentChunk) -> usize {
-    use agent_client_protocol::schema::{ContentBlock, EmbeddedResourceResource};
+    use agent_client_protocol::schema::v1::{ContentBlock, EmbeddedResourceResource};
 
     match &chunk.content {
         ContentBlock::Text(tc) => 32 + tc.text.len(),
@@ -234,7 +234,7 @@ fn estimate_content_chunk_size(chunk: &ContentChunk) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use agent_client_protocol::schema::{
+    use agent_client_protocol::schema::v1::{
         ContentBlock, ContentChunk, SessionId, SessionUpdate, TextContent,
     };
 

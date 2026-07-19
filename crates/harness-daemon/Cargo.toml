@@ -13,7 +13,7 @@ path = "src/main.rs"
 test = false
 
 [dependencies]
-agent-client-protocol = { version = "=0.12.1", features = ["unstable_session_model"] }
+agent-client-protocol = "=1.2.0"
 arc-swap = "1.9.1"
 async-stream = "0.3.6"
 async-trait = "0.1.83"
