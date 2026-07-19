@@ -101,7 +101,7 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(collapsedLane.contains(titleFontSource))
   }
 
-  @Test("Lane drops use the modern session plan for acceptance and action")
+  @Test("Lane drops derive from the precomputed drop-candidate set")
   func laneDropsUseModernSessionPlanForAcceptanceAndAction() throws {
     let board = try taskBoardSourceFile(named: "TaskBoardOverviewView+Board.swift")
     let laneColumn = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
@@ -109,12 +109,11 @@ extension TaskBoardOverviewBehaviorTests {
       named: "TaskBoardOverviewView+CardInteraction.swift"
     )
 
-    #expect(board.contains("dropPlanForCardIDs: { cardIDs in"))
-    #expect(board.contains("cardDropPlan(cardIDs, to: lane)"))
-    #expect(laneColumn.contains("localSession.draggedItemIDs(for: TaskBoardCardID.self)"))
+    #expect(board.contains("dropCandidateLanesValue.contains(lane)"))
+    #expect(interaction.contains("cardDropPlan(cardIDs, to: $0) != nil"))
+    #expect(laneColumn.contains("isDropEnabled && isDropCandidate"))
     #expect(laneColumn.contains("DropConfiguration(operation: operation)"))
     #expect(laneColumn.contains("? .move : .forbidden"))
-    #expect(laneColumn.contains("dropPlan(for: session) != nil"))
     #expect(laneColumn.contains("TaskBoardCardDropPlan.resolve(payloads, to: lane)"))
     #expect(!laneColumn.contains("_: CGPoint"))
     #expect(interaction.contains("TaskBoardCardDropPlan.resolve(cardDragPayloads(cardIDs)"))
@@ -129,10 +128,11 @@ extension TaskBoardOverviewBehaviorTests {
     let laneColumn = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
     let laneChrome = try taskBoardSourceFile(named: "TaskBoardLaneChrome.swift")
 
-    #expect(board.contains("cardDropPlan(draggedCardIDsValue, to: lane) != nil"))
+    #expect(board.contains("dropCandidateLanesValue.contains(lane)"))
     #expect(interaction.contains("case .initial, .active:"))
     #expect(interaction.contains("updateDraggedCardIDs(draggedIDs)"))
     #expect(interaction.contains("case .ended, .dataTransferCompleted:"))
+    #expect(interaction.contains("dropCandidateLanesValue ="))
     #expect(laneColumn.contains("isDropCandidate: isDropCandidate"))
     #expect(laneChrome.contains("if isDropCandidate"))
     #expect(laneChrome.contains("value: isDropCandidate"))

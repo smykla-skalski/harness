@@ -127,10 +127,10 @@ struct SessionWindowRouteContentMetricsTests {
         "evaluationSummary: store.contentUI.dashboard.taskBoardEvaluationSummary"
       )
     )
-    #expect(hostSource.contains("onOpenTaskBoardItem: openTaskBoardItem"))
-    #expect(hostSource.contains("onOpenDecision: openDecision"))
-    #expect(hostSource.contains("store.supervisorSelectedDecisionID = decision.id"))
-    #expect(hostSource.contains("store.requestSessionRoute("))
+    let actionsSource = try taskBoardSourceFile(named: "TaskBoardOverviewActions.swift")
+    #expect(hostSource.contains("actions: TaskBoardOverviewActions(store: store, scope: scope)"))
+    #expect(actionsSource.contains("store.supervisorSelectedDecisionID = decision.id"))
+    #expect(actionsSource.contains("store.requestSessionRoute("))
     #expect(
       hostSource.contains("contentHorizontalPadding: scope.taskBoardContentHorizontalPadding"))
     #expect(hostSource.contains("case .session:\n      0"))
@@ -179,35 +179,27 @@ struct SessionWindowRouteContentMetricsTests {
       named: "DashboardRouteContent.swift"
     )
     let hostSource = try taskBoardSourceFile(named: "TaskBoardOverviewHost.swift")
+    let actionsSource = try taskBoardSourceFile(named: "TaskBoardOverviewActions.swift")
 
-    for source in [hostSource] {
-      #expect(
-        source.contains(
-          "onStartTaskBoardOrchestrator: scope.isDashboard ? startTaskBoardOrchestrator : nil"
-        )
-      )
-      #expect(
-        source.contains(
-          "onStopTaskBoardOrchestrator: scope.isDashboard ? stopTaskBoardOrchestrator : nil"
-        )
-      )
-      #expect(source.contains("onRunTaskBoardOrchestratorOnce: runTaskBoardOrchestratorOnce"))
-      #expect(source.contains("onMoveTaskBoardItems: moveTaskBoardItems"))
-      #expect(source.contains("onMoveInboxItems: moveInboxItems"))
-      #expect(source.contains("onDeleteTaskBoardTargets: deleteTaskBoardTargets"))
-      #expect(source.contains("HarnessMonitorAsyncWorkQueue.shared.submit("))
-      #expect(source.contains("await store.updateTaskBoardItemStatuses(updates)"))
-      #expect(source.contains("await store.updateTaskBoardInboxStatuses(updates)"))
-      #expect(source.contains("onEvaluateTaskBoardItem: evaluateTaskBoardItem"))
-      #expect(source.contains("onBeginTaskBoardPlan: beginTaskBoardPlan"))
-      #expect(source.contains("onSubmitTaskBoardPlan: submitTaskBoardPlan"))
-      #expect(source.contains("onApproveTaskBoardPlan: approveTaskBoardPlan"))
-    }
+    #expect(hostSource.contains("actions: TaskBoardOverviewActions(store: store, scope: scope)"))
+    #expect(actionsSource.contains("var canStartOrchestrator: Bool { hasStore && isDashboardScope }"))
+    #expect(actionsSource.contains("var canStopOrchestrator: Bool { hasStore && isDashboardScope }"))
+    #expect(actionsSource.contains("var canRefreshBoard: Bool { hasStore && isDashboardScope }"))
+    #expect(actionsSource.contains("func runTaskBoardOrchestratorOnce("))
+    #expect(actionsSource.contains("func moveTaskBoardItems("))
+    #expect(actionsSource.contains("func moveInboxItems("))
+    #expect(actionsSource.contains("func deleteTaskBoardTargets("))
+    #expect(actionsSource.contains("HarnessMonitorAsyncWorkQueue.shared.submit("))
+    #expect(actionsSource.contains("await store.updateTaskBoardItemStatuses(updates)"))
+    #expect(actionsSource.contains("await store.updateTaskBoardInboxStatuses(updates)"))
+    #expect(actionsSource.contains("func evaluateTaskBoardItem("))
+    #expect(actionsSource.contains("func beginTaskBoardPlan("))
+    #expect(actionsSource.contains("func submitTaskBoardPlan("))
+    #expect(actionsSource.contains("func approveTaskBoardPlan("))
 
     #expect(routeContentSource.contains("TaskBoardOverviewHost("))
     #expect(routeContentSource.contains("store.contentUI.dashboard.taskBoardOrchestratorStatus"))
     #expect(routeContentSource.contains("showsOperationsPanel: false"))
-    #expect(hostSource.contains("onRefreshTaskBoard: scope.isDashboard ? refreshTaskBoard : nil"))
     #expect(dashboardSource.contains("TaskBoardOverviewHost("))
     #expect(dashboardSource.contains("dashboardUI.taskBoardOrchestratorStatus"))
   }
@@ -247,8 +239,8 @@ struct SessionWindowRouteContentMetricsTests {
       named: "TaskBoardOverviewLiveOperations.swift"
     )
 
-    #expect(overviewSource.contains("if let onRefreshTaskBoard {"))
-    #expect(overviewSource.contains("onRefreshTaskBoard()"))
+    #expect(overviewSource.contains("if actions.canRefreshBoard {"))
+    #expect(overviewSource.contains("actions.refreshTaskBoard()"))
     #expect(!overviewSource.contains("requestTaskBoardSync()"))
     #expect(
       overviewSource.contains(
