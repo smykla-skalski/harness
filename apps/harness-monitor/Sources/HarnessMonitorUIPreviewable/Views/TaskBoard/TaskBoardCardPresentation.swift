@@ -17,7 +17,7 @@ struct TaskBoardCardPresentation: Equatable, Sendable {
     _ item: TaskBoardItem,
     projectLabelResolver: TaskBoardProjectLabelResolver,
     dateParser: TaskBoardCardDateParser
-  ) -> TaskBoardCardPresentation {
+  ) -> Self {
     let titlePresentation = TaskBoardCardTitlePresentation(item: item)
     let fragments = TaskBoardInlineCodeFormatter.fragments(in: titlePresentation.title)
     let repositoryLabelDefault: String?
@@ -35,7 +35,7 @@ struct TaskBoardCardPresentation: Equatable, Sendable {
       repositoryLabelDefault = nil
       repositoryLabelFullName = nil
     }
-    return TaskBoardCardPresentation(
+    return Self(
       titleFragments: fragments,
       titleLeadingText: titlePresentation.leadingText,
       titleDisplayText: TaskBoardInlineCodeFormatter.displayText(
@@ -52,9 +52,9 @@ struct TaskBoardCardPresentation: Equatable, Sendable {
   static func forInboxItem(
     _ item: TaskBoardInboxItem,
     dateParser: TaskBoardCardDateParser
-  ) -> TaskBoardCardPresentation {
+  ) -> Self {
     let fragments = TaskBoardInlineCodeFormatter.fragments(in: item.task.title)
-    return TaskBoardCardPresentation(
+    return Self(
       titleFragments: fragments,
       titleLeadingText: nil,
       titleDisplayText: TaskBoardInlineCodeFormatter.displayText(for: fragments),
@@ -104,7 +104,8 @@ struct TaskBoardCardDateParser {
 enum TaskBoardCardDateParsing {
   @MainActor private static let parser = TaskBoardCardDateParser()
 
-  @MainActor static func parse(_ value: String) -> Date? {
+  @MainActor
+  static func parse(_ value: String) -> Date? {
     parser.parse(value)
   }
 }

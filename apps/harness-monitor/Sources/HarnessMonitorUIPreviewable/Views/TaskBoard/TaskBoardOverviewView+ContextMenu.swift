@@ -56,7 +56,11 @@ extension TaskBoardOverviewView {
     guard let plan = cardContextMenuMovePlan(cardIDs, to: lane) else {
       return
     }
-    actions.moveCards(plan.items, to: lane)
+    actions.moveCardsOrReportRejection(
+      plan.items,
+      to: lane,
+      liveInboxItems: liveInboxItemsValue
+    )
   }
 
   private func cardContextMenuMovePlan(

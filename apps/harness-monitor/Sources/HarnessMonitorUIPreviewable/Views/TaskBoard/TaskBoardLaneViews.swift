@@ -10,7 +10,7 @@ struct TaskBoardItemRow: View {
   let selectionModel: TaskBoardCardSelectionModel
   let actions: TaskBoardOverviewActions
   /// `var` (not `let`): a `let` with a default is excluded from the memberwise init entirely.
-  var cardPresentation: TaskBoardCardPresentation? = nil
+  var cardPresentation: TaskBoardCardPresentation?
   @Environment(\.fontScale)
   private var fontScale
   @Environment(\.taskBoardLaneAppearance)
@@ -40,7 +40,10 @@ struct TaskBoardItemRow: View {
   }
   private var titleDisplayText: String {
     cardPresentation?.titleDisplayText
-      ?? TaskBoardInlineCodeFormatter.displayText(for: titleFragments, leadingText: titleLeadingText)
+      ?? TaskBoardInlineCodeFormatter.displayText(
+        for: titleFragments,
+        leadingText: titleLeadingText
+      )
   }
   private var updatedAtDate: Date? {
     if let cardPresentation {
@@ -161,7 +164,7 @@ struct TaskBoardInboxItemRow: View {
   let selectionModel: TaskBoardCardSelectionModel
   let actions: TaskBoardOverviewActions
   /// `var` (not `let`): a `let` with a default is excluded from the memberwise init entirely.
-  var cardPresentation: TaskBoardCardPresentation? = nil
+  var cardPresentation: TaskBoardCardPresentation?
   @Environment(\.fontScale)
   private var fontScale
 

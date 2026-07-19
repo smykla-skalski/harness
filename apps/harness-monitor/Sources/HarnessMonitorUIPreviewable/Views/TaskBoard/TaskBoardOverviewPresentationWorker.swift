@@ -36,7 +36,8 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
   let inboxItemsByID: [TaskBoardCardID: TaskBoardInboxItem]
   let orderedCardIDs: [TaskBoardCardID]
   let apiCardPresentationsByLane: [TaskBoardInboxLane: [String: TaskBoardCardPresentation]]
-  let inboxCardPresentationsByLane: [TaskBoardInboxLane: [TaskBoardCardID: TaskBoardCardPresentation]]
+  let inboxCardPresentationsByLane:
+    [TaskBoardInboxLane: [TaskBoardCardID: TaskBoardCardPresentation]]
   let decisionIDsByLane: [TaskBoardInboxLane: [String]]
   let aggregateNeedsYouCount: Int
   let aggregateOpenCount: Int
@@ -196,7 +197,10 @@ actor TaskBoardOverviewPresentationWorker {
       inboxCardPresentationsByLane: inboxItemsByLane.mapValues { items in
         Dictionary(
           uniqueKeysWithValues: items.map {
-            (inboxCardID(for: $0), TaskBoardCardPresentation.forInboxItem($0, dateParser: dateParser))
+            (
+              inboxCardID(for: $0),
+              TaskBoardCardPresentation.forInboxItem($0, dateParser: dateParser)
+            )
           }
         )
       },

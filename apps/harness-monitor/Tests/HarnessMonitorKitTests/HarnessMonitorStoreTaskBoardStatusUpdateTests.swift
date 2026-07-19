@@ -1,10 +1,80 @@
+import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
 
+private actor TaskBoardStatusActionBarrier {
+  private var entered = false
+  private var enteredContinuation: CheckedContinuation<Void, Never>?
+  private var releaseContinuation: CheckedContinuation<Void, Never>?
+
+  func enterAndWait() async {
+    entered = true
+    enteredContinuation?.resume()
+    enteredContinuation = nil
+    await withCheckedContinuation { continuation in
+      releaseContinuation = continuation
+    }
+  }
+
+  func waitUntilEntered() async {
+    guard !entered else { return }
+    await withCheckedContinuation { continuation in
+      enteredContinuation = continuation
+    }
+  }
+
+  func release() {
+    releaseContinuation?.resume()
+    releaseContinuation = nil
+  }
+}
+
 @MainActor
 @Suite("Harness Monitor task-board status updates")
 struct HarnessMonitorStoreTaskBoardStatusUpdateTests {
+  @Test("Mixed card moves share one board action and execute both mutations")
+  func mixedCardMovesExecuteBothMutations() async {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardItems([taskBoardItem(id: "board-1", status: .todo)])
+    let store = await selectedActionStore(client: client)
+    let inboxTask = PreviewFixtures.tasks[0]
+
+    let success = await store.updateTaskBoardCardStatuses(
+      taskBoardUpdates: [
+        TaskBoardItemStatusUpdate(id: "board-1", status: .inProgress)
+      ],
+      inboxUpdates: [
+        TaskBoardInboxStatusUpdate(
+          sessionID: PreviewFixtures.summary.sessionId,
+          taskID: inboxTask.taskId,
+          status: .awaitingReview
+        )
+      ]
+    )
+
+    #expect(success)
+    #expect(
+      client.recordedCalls() == [
+        .updateTaskBoardItem(id: "board-1", status: .inProgress),
+        .updateTask(
+          sessionID: PreviewFixtures.summary.sessionId,
+          taskID: inboxTask.taskId,
+          status: .awaitingReview,
+          note: nil,
+          actor: "harness-app"
+        ),
+      ]
+    )
+    #expect(store.globalTaskBoardItems.first?.status == .inProgress)
+    #expect(
+      store.selectedSession?.tasks.first(where: { $0.taskId == inboxTask.taskId })?.status
+        == .awaitingReview
+    )
+    #expect(store.currentSuccessFeedbackMessage == "Moved task board cards")
+    #expect(store.isTaskBoardBusy == false)
+  }
+
   @Test("Moving task board items batches updates before one dashboard refresh")
   func movingTaskBoardItemsBatchesUpdatesBeforeOneDashboardRefresh() async {
     let client = RecordingHarnessClient()
@@ -80,6 +150,169 @@ struct HarnessMonitorStoreTaskBoardStatusUpdateTests {
     )
     #expect(store.selectedSession?.tasks.allSatisfy { $0.status == .awaitingReview } == true)
     #expect(store.currentSuccessFeedbackMessage == "Moved session tasks")
+  }
+
+  @Test("Inbox move restores an overlapping session action owner")
+  func inboxMoveRestoresOverlappingSessionActionOwner() async {
+    let client = RecordingHarnessClient()
+    let store = await selectedActionStore(client: client)
+    let sessionID = PreviewFixtures.summary.sessionId
+    let existingActionID = ActionID.createTask(sessionID: sessionID).key
+    let barrier = TaskBoardStatusActionBarrier()
+    async let existingAction: Bool = store.mutateSelectedSession(
+      actionName: "Create task",
+      actionID: existingActionID,
+      using: client,
+      sessionID: sessionID,
+      mutation: {
+        await barrier.enterAndWait()
+        return PreviewFixtures.detail
+      }
+    )
+
+    await barrier.waitUntilEntered()
+    let success = await store.updateTaskBoardInboxStatuses([
+      TaskBoardInboxStatusUpdate(
+        sessionID: sessionID,
+        taskID: PreviewFixtures.tasks[0].taskId,
+        status: .awaitingReview
+      )
+    ])
+
+    #expect(success)
+    #expect(store.isSessionActionInFlight)
+    #expect(store.inFlightActionID == existingActionID)
+
+    await barrier.release()
+    _ = await existingAction
+    #expect(store.isSessionActionInFlight == false)
+    #expect(store.inFlightActionID == nil)
+  }
+
+  @Test("Failed optimistic inbox move preserves a newer session snapshot")
+  func failedOptimisticInboxMovePreservesNewerSessionSnapshot() async throws {
+    let client = RecordingHarnessClient()
+    client.configureMutationDelay(.milliseconds(200))
+    client.configureTaskUpdateError(
+      HarnessMonitorAPIError.server(code: 500, message: "move failed")
+    )
+    let store = await selectedActionStore(client: client)
+    store.stopAllStreams()
+    let movedTask = PreviewFixtures.tasks[0]
+    let removedTask = PreviewFixtures.tasks[1]
+
+    let mutation = Task { @MainActor in
+      await store.updateTaskBoardInboxStatuses([
+        TaskBoardInboxStatusUpdate(
+          sessionID: PreviewFixtures.summary.sessionId,
+          taskID: movedTask.taskId,
+          status: .awaitingReview
+        )
+      ])
+    }
+
+    var optimisticDetail: SessionDetail?
+    for _ in 0..<100 {
+      if let detail = store.selectedSession,
+        detail.tasks.first(where: { $0.taskId == movedTask.taskId })?.status == .awaitingReview
+      {
+        optimisticDetail = detail
+        break
+      }
+      await Task.yield()
+    }
+    let currentDetail = try #require(optimisticDetail)
+    let newerAgents = Array(currentDetail.agents.dropLast())
+    let newerDetail = SessionDetail(
+      session: currentDetail.session,
+      agents: newerAgents,
+      tasks: currentDetail.tasks.filter { $0.taskId != removedTask.taskId },
+      signals: [],
+      observer: currentDetail.observer,
+      agentActivity: currentDetail.agentActivity
+    )
+    store.applySelectedSessionSnapshot(
+      sessionID: PreviewFixtures.summary.sessionId,
+      detail: newerDetail,
+      timeline: store.timeline,
+      timelineWindow: store.timelineWindow,
+      clearBurstState: false,
+      showingCachedData: store.isShowingCachedData,
+      cancelPendingTimelineRefresh: false
+    )
+
+    let success = await mutation.value
+
+    #expect(success == false)
+    #expect(
+      store.selectedSession?.tasks.first(where: { $0.taskId == movedTask.taskId })?.status
+        == movedTask.status
+    )
+    #expect(
+      store.selectedSession?.tasks.contains(where: { $0.taskId == removedTask.taskId }) == false
+    )
+    #expect(store.selectedSession?.agents == newerAgents)
+    #expect(store.selectedSession?.signals.isEmpty == true)
+  }
+
+  @Test("Failed optimistic inbox move preserves a newer status for the same task")
+  func failedOptimisticInboxMovePreservesNewerTaskStatus() async throws {
+    let client = RecordingHarnessClient()
+    client.configureMutationDelay(.milliseconds(200))
+    client.configureTaskUpdateError(
+      HarnessMonitorAPIError.server(code: 500, message: "move failed")
+    )
+    let store = await selectedActionStore(client: client)
+    store.stopAllStreams()
+    let movedTask = PreviewFixtures.tasks[0]
+
+    let mutation = Task { @MainActor in
+      await store.updateTaskBoardInboxStatuses([
+        TaskBoardInboxStatusUpdate(
+          sessionID: PreviewFixtures.summary.sessionId,
+          taskID: movedTask.taskId,
+          status: .awaitingReview
+        )
+      ])
+    }
+
+    var optimisticDetail: SessionDetail?
+    for _ in 0..<100 {
+      if let detail = store.selectedSession,
+        detail.tasks.first(where: { $0.taskId == movedTask.taskId })?.status == .awaitingReview
+      {
+        optimisticDetail = detail
+        break
+      }
+      await Task.yield()
+    }
+    let currentDetail = try #require(optimisticDetail)
+    let newerDetail = SessionDetail(
+      session: currentDetail.session,
+      agents: currentDetail.agents,
+      tasks: currentDetail.tasks.map { task in
+        task.taskId == movedTask.taskId ? task.withOptimisticStatus(.done) : task
+      },
+      signals: currentDetail.signals,
+      observer: currentDetail.observer,
+      agentActivity: currentDetail.agentActivity
+    )
+    store.applySelectedSessionSnapshot(
+      sessionID: PreviewFixtures.summary.sessionId,
+      detail: newerDetail,
+      timeline: store.timeline,
+      timelineWindow: store.timelineWindow,
+      clearBurstState: false,
+      showingCachedData: store.isShowingCachedData,
+      cancelPendingTimelineRefresh: false
+    )
+
+    let success = await mutation.value
+
+    #expect(success == false)
+    #expect(
+      store.selectedSession?.tasks.first(where: { $0.taskId == movedTask.taskId })?.status == .done
+    )
   }
 
   @Test("Optimistic move shows the new status before the network call resolves")

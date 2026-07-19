@@ -6,41 +6,20 @@ extension HarnessMonitorStore {
     _ updates: [TaskBoardInboxStatusUpdate],
     actor: String = "harness-app"
   ) async -> Bool {
-    let updates = deduplicatedTaskBoardInboxStatusUpdates(updates)
-    // Scoped to the board's own re-entrancy, not the store-wide
-    // isSessionActionInFlight: that flag is shared with unrelated session
-    // actions (assign, role change, signals, ...), so an enabled board
-    // control must not be silently dropped just because one of those is
-    // mid-flight elsewhere. isSessionActionInFlight is still set below -
-    // its single-owner inFlightActionID discipline is unchanged.
-    guard
-      let client,
-      !updates.isEmpty,
-      !isSessionReadOnly,
-      !isTaskBoardBusy
-    else {
-      return false
-    }
+    await updateTaskBoardCardStatuses(
+      taskBoardUpdates: [],
+      inboxUpdates: updates,
+      actor: actor
+    )
+  }
 
-    let actionID = "task-board/inbox-status-batch"
-    // Flip the in-flight flags before touching any state below, so the
-    // guard above never observes this call's own optimistic write.
-    isSessionActionInFlight = true
-    inFlightActionID = actionID
-    beginTaskBoardAction()
-    defer {
-      isSessionActionInFlight = false
-      if inFlightActionID == actionID {
-        inFlightActionID = nil
-      }
-      endTaskBoardAction()
-    }
-
-    // Only the currently-selected session has locally-held task state to
-    // optimistically mutate; other sessions in the batch have nothing
-    // rendered client-side to move early, same reach as the existing
-    // success-path reconciliation below.
-    let priorSelectedDetail = applyOptimisticTaskBoardInboxStatuses(updates)
+  func performTaskBoardInboxStatusUpdates(
+    _ updates: [TaskBoardInboxStatusUpdate],
+    actor: String,
+    actionID: String,
+    using client: any HarnessMonitorClientProtocol
+  ) async -> Bool {
+    let optimisticRollback = applyOptimisticTaskBoardInboxStatuses(updates)
 
     let actor = controlPlaneActionActor(for: actor)
     var detailsBySessionID: [String: SessionDetail] = [:]
@@ -72,8 +51,7 @@ extension HarnessMonitorStore {
       using: client
     )
     rollbackOptimisticTaskBoardInboxStatusesIfNeeded(
-      updates,
-      priorSelectedDetail: priorSelectedDetail,
+      optimisticRollback,
       reconciledSessionIDs: Set(detailsBySessionID.keys)
     )
     if let firstFailure {
@@ -85,18 +63,13 @@ extension HarnessMonitorStore {
       presentSelectedSessionMutationFailure(firstFailure.error, actionID: actionID)
       return false
     }
-    presentSuccessFeedback(
-      updates.count == 1 ? "Moved session task" : "Moved session tasks"
-    )
     return true
   }
 
-  /// Returns the pre-mutation detail for rollback, or `nil` when nothing
-  /// was optimistically applied.
   @discardableResult
   private func applyOptimisticTaskBoardInboxStatuses(
     _ updates: [TaskBoardInboxStatusUpdate]
-  ) -> SessionDetail? {
+  ) -> TaskBoardInboxStatusRollback? {
     guard let selectedSessionID, let selectedSession else {
       return nil
     }
@@ -105,11 +78,27 @@ extension HarnessMonitorStore {
     guard !relevantUpdates.isEmpty else {
       return nil
     }
-    let optimisticDetail = relevantUpdates.reduce(priorDetail) { detail, update in
-      detail.withOptimisticTaskStatus(taskID: update.taskID, status: update.status)
+
+    var changesByTaskID: [String: TaskBoardInboxStatusRollback.Change] = [:]
+    for update in relevantUpdates {
+      guard let task = priorDetail.tasks.first(where: { $0.taskId == update.taskID }),
+        task.status != update.status
+      else {
+        continue
+      }
+      changesByTaskID[update.taskID] = .init(
+        priorStatus: task.status,
+        optimisticStatus: update.status
+      )
     }
-    guard optimisticDetail != priorDetail else {
+    guard !changesByTaskID.isEmpty else {
       return nil
+    }
+    let optimisticDetail = changesByTaskID.reduce(priorDetail) { detail, change in
+      detail.withOptimisticTaskStatus(
+        taskID: change.key,
+        status: change.value.optimisticStatus
+      )
     }
     applySelectedSessionSnapshot(
       sessionID: selectedSessionID,
@@ -120,30 +109,43 @@ extension HarnessMonitorStore {
       showingCachedData: isShowingCachedData,
       cancelPendingTimelineRefresh: false
     )
-    return priorDetail
+    return TaskBoardInboxStatusRollback(
+      sessionID: selectedSessionID,
+      changesByTaskID: changesByTaskID
+    )
   }
 
-  /// Restores the selected session's pre-mutation detail when none of its
-  /// updates in this batch made it into `detailsBySessionID` - i.e. every
-  /// update targeting it failed, so the authoritative reconciliation above
-  /// never touched it and the optimistic write would otherwise persist.
   private func rollbackOptimisticTaskBoardInboxStatusesIfNeeded(
-    _ updates: [TaskBoardInboxStatusUpdate],
-    priorSelectedDetail: SessionDetail?,
+    _ rollback: TaskBoardInboxStatusRollback?,
     reconciledSessionIDs: Set<String>
   ) {
-    guard let priorSelectedDetail, let selectedSessionID else {
+    guard let rollback,
+      !reconciledSessionIDs.contains(rollback.sessionID),
+      selectedSessionID == rollback.sessionID,
+      let currentDetail = selectedSession,
+      currentDetail.session.sessionId == rollback.sessionID
+    else {
       return
     }
-    guard !reconciledSessionIDs.contains(selectedSessionID) else {
-      return
+
+    let rolledBackDetail = rollback.changesByTaskID.reduce(currentDetail) { detail, change in
+      guard
+        detail.tasks.first(where: { $0.taskId == change.key })?.status
+          == change.value.optimisticStatus
+      else {
+        return detail
+      }
+      return detail.withOptimisticTaskStatus(
+        taskID: change.key,
+        status: change.value.priorStatus
+      )
     }
-    guard updates.contains(where: { $0.sessionID == selectedSessionID }) else {
+    guard rolledBackDetail != currentDetail else {
       return
     }
     applySelectedSessionSnapshot(
-      sessionID: selectedSessionID,
-      detail: priorSelectedDetail,
+      sessionID: rollback.sessionID,
+      detail: rolledBackDetail,
       timeline: timeline,
       timelineWindow: timelineWindow,
       clearBurstState: false,
@@ -182,7 +184,7 @@ extension HarnessMonitorStore {
     }
   }
 
-  private func deduplicatedTaskBoardInboxStatusUpdates(
+  func deduplicatedTaskBoardInboxStatusUpdates(
     _ updates: [TaskBoardInboxStatusUpdate]
   ) -> [TaskBoardInboxStatusUpdate] {
     var seenIDs: Set<TaskBoardCardStatusUpdateID> = []
@@ -199,11 +201,21 @@ private struct TaskBoardCardStatusUpdateID: Hashable {
   let taskID: String
 }
 
+private struct TaskBoardInboxStatusRollback {
+  struct Change {
+    let priorStatus: TaskStatus
+    let optimisticStatus: TaskStatus
+  }
+
+  let sessionID: String
+  let changesByTaskID: [String: Change]
+}
+
 extension SessionDetail {
   /// Locally-applied status used for optimistic UI feedback before the
   /// server confirms the move. Leaves every other task untouched; the
-  /// authoritative reconciliation replaces this whole detail with the
-  /// server response (or the prior detail, on rollback).
+  /// authoritative reconciliation replaces this detail with the server
+  /// response; rollback changes only this same field against current state.
   fileprivate func withOptimisticTaskStatus(
     taskID: String,
     status: TaskStatus
@@ -220,7 +232,7 @@ extension SessionDetail {
 }
 
 extension WorkItem {
-  fileprivate func withOptimisticStatus(_ status: TaskStatus) -> WorkItem {
+  func withOptimisticStatus(_ status: TaskStatus) -> WorkItem {
     WorkItem(
       taskId: taskId,
       title: title,

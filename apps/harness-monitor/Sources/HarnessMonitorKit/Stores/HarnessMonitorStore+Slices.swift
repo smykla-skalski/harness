@@ -6,6 +6,11 @@ extension HarnessMonitorStore {
   @MainActor
   @Observable
   public final class SelectionSlice {
+    private struct SessionActionOwner {
+      let token: UUID
+      var actionID: String?
+    }
+
     public enum Change {
       case selectedSessionID
       case selectedSession
@@ -22,6 +27,7 @@ extension HarnessMonitorStore {
 
     @ObservationIgnored public var onChanged: ((Change) -> Void)?
     @ObservationIgnored private var selectedSessionChangeOverride: Change?
+    @ObservationIgnored private var sessionActionOwners: [SessionActionOwner] = []
     public var selectedSessionID: String? {
       didSet {
         guard oldValue != selectedSessionID else { return }
@@ -102,6 +108,34 @@ extension HarnessMonitorStore {
         return nil
       }
       return selectedSession
+    }
+
+    func registerSessionActionOwner(actionID: String?) -> UUID {
+      let token = UUID()
+      sessionActionOwners.append(SessionActionOwner(token: token, actionID: actionID))
+      return token
+    }
+
+    func removeSessionActionOwner(_ token: UUID) -> Bool {
+      guard let index = sessionActionOwners.firstIndex(where: { $0.token == token }) else {
+        return false
+      }
+      sessionActionOwners.remove(at: index)
+      return true
+    }
+
+    var hasSessionActionOwners: Bool {
+      !sessionActionOwners.isEmpty
+    }
+
+    var currentSessionActionID: String? {
+      sessionActionOwners.reversed().compactMap(\.actionID).first
+    }
+
+    func clearSessionActionOwnerIDs() {
+      for index in sessionActionOwners.indices {
+        sessionActionOwners[index].actionID = nil
+      }
     }
 
     func applySelectedSession(_ detail: SessionDetail?, change: Change) {

@@ -66,6 +66,7 @@ extension TaskBoardOverviewView {
         isDropCandidate: !isActionInFlight && dropCandidateLanesValue.contains(lane),
         selectionModel: selectionModelValue,
         actions: actions,
+        liveInboxItems: liveInboxItemsValue,
         collapseOverridesRawValue: laneCollapsePreferencesRawValueBinding
       )
       .layoutValue(

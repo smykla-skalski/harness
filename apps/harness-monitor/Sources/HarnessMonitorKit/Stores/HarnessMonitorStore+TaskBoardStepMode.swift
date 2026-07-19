@@ -9,6 +9,11 @@ extension HarnessMonitorStore {
     else {
       return false
     }
+    guard
+      !isTaskBoardBusy || taskBoardRuntimeState.stepModeMutation.desiredValue != nil
+    else {
+      return false
+    }
 
     let generation = beginTaskBoardStepModeMutation(
       enabled: enabled,

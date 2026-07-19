@@ -189,6 +189,57 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
     #expect(keychainBundle.ssh.recorded.isEmpty)
   }
 
+  @Test("Settings saves and Step Mode serialize orchestrator settings writes")
+  func settingsSavesAndStepModeSerializeOrchestratorSettingsWrites() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    let snapshot = makeSettingsSnapshot()
+
+    await client.blockNextTaskBoardOrchestratorSettingsMutations()
+    let settingsSave = Task { @MainActor in
+      await store.updateTaskBoardGitSettings(
+        snapshot: snapshot,
+        origin: .settingsSecretsSaveButton
+      )
+    }
+    await client.waitForBlockedTaskBoardOrchestratorSettingsMutations()
+
+    #expect(store.isTaskBoardBusy)
+    #expect(await waitForTaskBoardBusy(true, store: store))
+    #expect(await store.setTaskBoardStepMode(enabled: true) == false)
+
+    await client.releaseNextTaskBoardOrchestratorSettingsMutation()
+    #expect(await settingsSave.value)
+    #expect(!store.isTaskBoardBusy)
+    #expect(await waitForTaskBoardBusy(false, store: store))
+
+    await client.blockNextTaskBoardOrchestratorSettingsMutations()
+    let stepModeToggle = Task { @MainActor in
+      await store.setTaskBoardStepMode(enabled: true)
+    }
+    await client.waitForBlockedTaskBoardOrchestratorSettingsMutations()
+
+    #expect(store.isTaskBoardBusy)
+    #expect(await waitForTaskBoardBusy(true, store: store))
+    #expect(
+      await store.updateTaskBoardGitSettings(
+        snapshot: snapshot,
+        origin: .settingsSecretsSaveButton
+      ) == false
+    )
+
+    await client.releaseNextTaskBoardOrchestratorSettingsMutation()
+    #expect(await stepModeToggle.value)
+    #expect(!store.isTaskBoardBusy)
+    #expect(await waitForTaskBoardBusy(false, store: store))
+
+    let settingsWrites = client.recordedCalls().filter { call in
+      if case .updateTaskBoardOrchestratorSettings = call { return true }
+      return false
+    }
+    #expect(settingsWrites.count == 2)
+  }
+
   @Test("Repeated stored credential sync is skipped after bootstrap")
   func repeatedStoredCredentialSyncIsSkippedAfterBootstrap() async throws {
     let client = RecordingHarnessClient()
@@ -346,5 +397,18 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
       ),
       todoistCredentials: TaskBoardTodoistCredentialSnapshot(token: nil)
     )
+  }
+
+  private func waitForTaskBoardBusy(
+    _ expected: Bool,
+    store: HarnessMonitorStore
+  ) async -> Bool {
+    for _ in 0..<10_000 {
+      if store.contentUI.dashboard.isTaskBoardBusy == expected {
+        return true
+      }
+      await Task.yield()
+    }
+    return false
   }
 }

@@ -112,13 +112,9 @@ extension HarnessMonitorStore {
       )
     #endif
 
-    isSessionActionInFlight = true
-    inFlightActionID = actionID
+    let sessionActionToken = beginSessionAction(actionID: actionID)
     defer {
-      isSessionActionInFlight = false
-      if inFlightActionID == actionID {
-        inFlightActionID = nil
-      }
+      endSessionAction(sessionActionToken)
       #if HARNESS_FEATURE_OTEL
         span.end()
         let elapsed = startedAt.duration(to: ContinuousClock.now)

@@ -116,7 +116,8 @@ struct TaskBoardRouteContentSourceTests {
     let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
     let supportSource = try taskBoardSourceFile(named: "TaskBoardCardSelection.swift")
 
-    #expect(laneSource.contains("selectionModel.select(cardID, modifiers: Self.currentEventModifiers)"))
+    #expect(
+      laneSource.contains("selectionModel.select(cardID, modifiers: Self.currentEventModifiers)"))
     #expect(laneSource.contains("Self.currentClickCount == 2"))
     #expect(!laneSource.contains("TapGesture(count: 2)"))
     #expect(laneSource.contains(".accessibilityAddTraits(isSelected ? .isSelected : [])"))

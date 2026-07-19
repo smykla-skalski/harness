@@ -182,14 +182,17 @@ struct SessionWindowRouteContentMetricsTests {
     let actionsSource = try taskBoardSourceFile(named: "TaskBoardOverviewActions.swift")
 
     #expect(hostSource.contains("actions: TaskBoardOverviewActions(store: store, scope: scope)"))
-    #expect(actionsSource.contains("var canStartOrchestrator: Bool { hasStore && isDashboardScope }"))
-    #expect(actionsSource.contains("var canStopOrchestrator: Bool { hasStore && isDashboardScope }"))
+    #expect(
+      actionsSource.contains("var canStartOrchestrator: Bool { hasStore && isDashboardScope }"))
+    #expect(
+      actionsSource.contains("var canStopOrchestrator: Bool { hasStore && isDashboardScope }"))
     #expect(actionsSource.contains("var canRefreshBoard: Bool { hasStore && isDashboardScope }"))
     #expect(actionsSource.contains("func runTaskBoardOrchestratorOnce("))
     #expect(actionsSource.contains("func moveTaskBoardItems("))
     #expect(actionsSource.contains("func moveInboxItems("))
     #expect(actionsSource.contains("func deleteTaskBoardTargets("))
     #expect(actionsSource.contains("HarnessMonitorAsyncWorkQueue.shared.submit("))
+    #expect(actionsSource.contains("await store.updateTaskBoardCardStatuses("))
     #expect(actionsSource.contains("await store.updateTaskBoardItemStatuses(updates)"))
     #expect(actionsSource.contains("await store.updateTaskBoardInboxStatuses(updates)"))
     #expect(actionsSource.contains("func evaluateTaskBoardItem("))

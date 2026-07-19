@@ -143,6 +143,32 @@ extension HarnessMonitorStore {
     }
   }
 
+  @discardableResult
+  func beginSessionAction(actionID: String? = nil) -> UUID {
+    let token = selection.registerSessionActionOwner(actionID: actionID)
+    synchronizeSessionActionOwnership()
+    return token
+  }
+
+  func endSessionAction(_ token: UUID) {
+    guard selection.removeSessionActionOwner(token) else {
+      return
+    }
+    synchronizeSessionActionOwnership()
+  }
+
+  private func synchronizeSessionActionOwnership() {
+    withUISyncBatch {
+      isSessionActionInFlight = selection.hasSessionActionOwners
+      inFlightActionID = selection.currentSessionActionID
+    }
+  }
+
+  private func clearSessionActionPresentation() {
+    selection.clearSessionActionOwnerIDs()
+    inFlightActionID = nil
+  }
+
   // MARK: - Selection
 
   public func primeSessionSelection(
@@ -162,8 +188,8 @@ extension HarnessMonitorStore {
     withUISyncBatch {
       recordNavigation(to: sessionID)
       cancelSessionPushFallback()
-      if isChangingSelectedSession, inFlightActionID != nil {
-        inFlightActionID = nil
+      if isChangingSelectedSession {
+        clearSessionActionPresentation()
       }
       selection.retainPresentedDetailWhenSelectionClears = retainPresentedDetailWhenSelectionClears
       selectedSessionID = sessionID

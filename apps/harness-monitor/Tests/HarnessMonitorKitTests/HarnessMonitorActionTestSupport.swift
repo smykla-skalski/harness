@@ -294,6 +294,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var taskBoardProjectSummariesStorage: [TaskBoardProjectSummary]?
   var taskBoardMachineSummariesStorage: [TaskBoardMachineSummary]?
   var taskBoardUpdateError: (any Error)?
+  var taskUpdateError: (any Error)?
   var taskBoardRuntimeConfigError: (any Error)?
   var taskBoardOrchestratorSettingsError: (any Error)?
   var taskBoardOrchestratorSettingsResponse: TaskBoardOrchestratorSettings?

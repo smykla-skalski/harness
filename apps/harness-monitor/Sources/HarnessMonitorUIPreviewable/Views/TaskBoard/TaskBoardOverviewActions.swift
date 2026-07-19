@@ -53,8 +53,8 @@ public struct TaskBoardOverviewActions: Equatable {
   var canMoveInboxItems: Bool { hasStore }
   var canMoveTaskBoardItems: Bool { hasStore }
   var canUpdateItem: Bool { hasStore }
-  var canDeleteItem: Bool { hasStore }
-  var canDeleteTargets: Bool { hasStore }
+  @MainActor var canDeleteItem: Bool { store?.canDeleteTaskBoardTargets == true }
+  @MainActor var canDeleteTargets: Bool { store?.canDeleteTaskBoardTargets == true }
   var canEvaluateItem: Bool { hasStore }
   var canBeginPlan: Bool { hasStore }
   var canSubmitPlan: Bool { hasStore }
@@ -136,6 +136,20 @@ public struct TaskBoardOverviewActions: Equatable {
     store?.reportDropRejection(reason)
   }
 
+  @MainActor
+  @discardableResult
+  func moveCardsOrReportRejection(
+    _ items: [TaskBoardCardDragItem],
+    to lane: TaskBoardInboxLane,
+    liveInboxItems: TaskBoardLiveInboxItems
+  ) -> Bool {
+    let moved = moveCards(items, to: lane, liveInboxItems: liveInboxItems)
+    if !moved {
+      reportDropRejection("Cannot move task: the board changed before the move completed")
+    }
+    return moved
+  }
+
   /// Re-validates each item's live status/lane against the drag payload's
   /// captured source before applying: the orchestrator can move items
   /// autonomously between drag-start and drop, and a stale drop must not
@@ -143,7 +157,11 @@ public struct TaskBoardOverviewActions: Equatable {
   /// own `sourceLane != destination` / `accepts(destination:)` semantics.
   @MainActor
   @discardableResult
-  func moveCards(_ items: [TaskBoardCardDragItem], to lane: TaskBoardInboxLane) -> Bool {
+  func moveCards(
+    _ items: [TaskBoardCardDragItem],
+    to lane: TaskBoardInboxLane,
+    liveInboxItems: TaskBoardLiveInboxItems
+  ) -> Bool {
     guard let store else { return false }
     var taskBoardUpdates: [TaskBoardItemStatusUpdate] = []
     var inboxUpdates: [TaskBoardInboxStatusUpdate] = []
@@ -161,10 +179,16 @@ public struct TaskBoardOverviewActions: Equatable {
           TaskBoardItemStatusUpdate(id: itemID, status: lane.taskBoardDropStatus)
         )
       case .inbox(let sessionID, let taskID, let sourceStatus, let sourceLaneRawValue):
-        guard let destinationStatus = lane.taskDropStatus else { return false }
-        // The session detail cache only covers the selected session; when
-        // the source session isn't locally available we accept the payload
-        // as-is and let the server stay authoritative for that case.
+        guard
+          let destinationStatus = lane.taskDropStatus,
+          let currentItem = liveInboxItems.item(sessionID: sessionID, taskID: taskID),
+          currentItem.task.status == sourceStatus,
+          currentItem.lane.rawValue == sourceLaneRawValue
+        else {
+          return false
+        }
+        // The rendered lookup covers every visible session. Preserve the
+        // selected detail as an additional, potentially fresher guard.
         if sessionID == store.selectedSessionID,
           let currentTask = store.selectedSession?.tasks.first(where: { $0.taskId == taskID })
         {
@@ -176,18 +200,32 @@ public struct TaskBoardOverviewActions: Equatable {
           }
         }
         inboxUpdates.append(
-          TaskBoardInboxStatusUpdate(sessionID: sessionID, taskID: taskID, status: destinationStatus)
+          TaskBoardInboxStatusUpdate(
+            sessionID: sessionID,
+            taskID: taskID,
+            status: destinationStatus
+          )
         )
       }
     }
     guard !taskBoardUpdates.isEmpty || !inboxUpdates.isEmpty else { return false }
-    if !taskBoardUpdates.isEmpty {
-      moveTaskBoardItems(taskBoardUpdates)
-    }
-    if !inboxUpdates.isEmpty {
-      moveInboxItems(inboxUpdates)
-    }
+    submitCardMoves(taskBoardUpdates: taskBoardUpdates, inboxUpdates: inboxUpdates)
     return true
+  }
+
+  private func submitCardMoves(
+    taskBoardUpdates: [TaskBoardItemStatusUpdate],
+    inboxUpdates: [TaskBoardInboxStatusUpdate]
+  ) {
+    guard let store else { return }
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Moving task board cards") {
+        await store.updateTaskBoardCardStatuses(
+          taskBoardUpdates: taskBoardUpdates,
+          inboxUpdates: inboxUpdates
+        )
+      }
+    )
   }
 
   func moveTaskBoardItems(_ updates: [TaskBoardItemStatusUpdate]) {

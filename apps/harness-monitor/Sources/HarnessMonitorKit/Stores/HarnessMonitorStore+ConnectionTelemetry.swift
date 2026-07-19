@@ -57,7 +57,7 @@ extension HarnessMonitorStore {
   }
 
   public var isDaemonActionInFlight: Bool {
-    daemonActionCount > 0
+    connection.daemonActionCount > 0
   }
 
   /// Call before starting a daemon-scoped mutation, paired with
@@ -67,18 +67,18 @@ extension HarnessMonitorStore {
   /// `public` because non-`HarnessMonitorKit` conformances (e.g.
   /// `PolicyCanvasEditorRuntime`) drive it through a protocol setter.
   public func beginDaemonAction() {
-    daemonActionCount += 1
-    if daemonActionCount == 1 {
+    connection.daemonActionCount += 1
+    if connection.daemonActionCount == 1 {
       scheduleUISync([.contentToolbar, .contentDashboard])
     }
   }
 
   public func endDaemonAction() {
-    guard daemonActionCount > 0 else {
+    guard connection.daemonActionCount > 0 else {
       return
     }
-    daemonActionCount -= 1
-    if daemonActionCount == 0 {
+    connection.daemonActionCount -= 1
+    if connection.daemonActionCount == 0 {
       scheduleUISync([.contentToolbar, .contentDashboard])
     }
   }
@@ -152,7 +152,7 @@ extension HarnessMonitorStore {
   /// policies, non-board session actions) do not flip this on, so those
   /// actions no longer visually disable the task board.
   public var isTaskBoardBusy: Bool {
-    taskBoardActionCount > 0
+    taskBoardRuntimeState.actionCount > 0
   }
 
   /// Call before starting a task-board mutation, paired with
@@ -160,18 +160,18 @@ extension HarnessMonitorStore {
   /// task-board mutations only flip `isTaskBoardBusy` off once the last one
   /// completes.
   func beginTaskBoardAction() {
-    taskBoardActionCount += 1
-    if taskBoardActionCount == 1 {
+    taskBoardRuntimeState.actionCount += 1
+    if taskBoardRuntimeState.actionCount == 1 {
       scheduleUISync([.contentDashboard])
     }
   }
 
   func endTaskBoardAction() {
-    guard taskBoardActionCount > 0 else {
+    guard taskBoardRuntimeState.actionCount > 0 else {
       return
     }
-    taskBoardActionCount -= 1
-    if taskBoardActionCount == 0 {
+    taskBoardRuntimeState.actionCount -= 1
+    if taskBoardRuntimeState.actionCount == 0 {
       scheduleUISync([.contentDashboard])
     }
   }

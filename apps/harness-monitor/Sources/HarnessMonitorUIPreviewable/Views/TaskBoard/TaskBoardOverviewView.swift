@@ -28,6 +28,7 @@ public struct TaskBoardOverviewView: View {
   @State private var evaluationSummaryFitsHorizontally = true
   @State private var presentationWorker = TaskBoardOverviewPresentationWorker()
   @State private var cachedPresentation = TaskBoardOverviewPresentation.empty
+  @State private var liveInboxItems = TaskBoardLiveInboxItems()
   @State private var presentationGeneration: UInt64 = 0
   @State private var draggedCardIDs: [TaskBoardCardID] = []
   @State private var dropCandidateLanes: Set<TaskBoardInboxLane> = []
@@ -69,6 +70,8 @@ public struct TaskBoardOverviewView: View {
 
   var currentPresentation: TaskBoardOverviewPresentation { cachedPresentation }
 
+  var liveInboxItemsValue: TaskBoardLiveInboxItems { liveInboxItems }
+
   public init(
     snapshot: TaskBoardInboxSnapshot,
     taskBoardItems: [TaskBoardItem] = [],
@@ -106,12 +109,7 @@ public struct TaskBoardOverviewView: View {
   }
 
   public var body: some View {
-    let presentationInput = TaskBoardOverviewPresentationInput(
-      snapshot: snapshot,
-      taskBoardItems: taskBoardItems,
-      decisionItems: decisionItems,
-      scopeSessionID: taskBoardSessionID
-    )
+    let presentationInput = synchronizedPresentationInput
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       boardChrome
       taskBoardDetailRow { boardSection }
@@ -161,6 +159,18 @@ public struct TaskBoardOverviewView: View {
     } message: { operation in
       Text(operation.message)
     }
+  }
+
+  @MainActor private var synchronizedPresentationInput: TaskBoardOverviewPresentationInput {
+    // Event handlers installed by this body must validate against the same
+    // snapshot immediately, before the off-main presentation worker runs.
+    liveInboxItems.replaceIfChanged(with: snapshot.items)
+    return TaskBoardOverviewPresentationInput(
+      snapshot: snapshot,
+      taskBoardItems: taskBoardItems,
+      decisionItems: decisionItems,
+      scopeSessionID: taskBoardSessionID
+    )
   }
 
   var selectionModelValue: TaskBoardCardSelectionModel {
@@ -241,6 +251,7 @@ extension TaskBoardOverviewView {
 
   @MainActor
   func rebuildPresentation(input: TaskBoardOverviewPresentationInput) async {
+    guard !Task.isCancelled else { return }
     presentationGeneration &+= 1
     let generation = presentationGeneration
     let presentation = await presentationWorker.compute(input: input)

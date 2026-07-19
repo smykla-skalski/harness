@@ -199,6 +199,12 @@ extension RecordingHarnessClient {
     }
   }
 
+  func configureTaskUpdateError(_ error: (any Error)?) {
+    lock.withLock {
+      taskUpdateError = error
+    }
+  }
+
   func configureTaskBoardRuntimeConfigError(_ error: (any Error)?) {
     lock.withLock {
       taskBoardRuntimeConfigError = error

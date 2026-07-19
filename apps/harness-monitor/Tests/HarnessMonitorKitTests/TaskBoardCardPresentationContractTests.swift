@@ -198,7 +198,8 @@ struct TaskBoardCardPresentationContractTests {
     let columnSource = try taskBoardSource("TaskBoardLaneUnifiedColumn.swift")
     let decisionSource = try taskBoardSource("TaskBoardNeedsYouLaneViews.swift")
 
-    #expect(columnSource.contains("TaskBoardDecisionRow(") && columnSource.contains("actions: actions"))
+    #expect(
+      columnSource.contains("TaskBoardDecisionRow(") && columnSource.contains("actions: actions"))
     #expect(!columnSource.contains("onOpenDecision:"))
     #expect(!decisionSource.contains("onOpenDecision"))
     #expect(decisionSource.contains("actions.openDecision(decision)"))

@@ -1,7 +1,7 @@
-import HarnessMonitorKit
 import SwiftUI
 import Testing
 
+@testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
 @MainActor
@@ -17,7 +17,13 @@ struct TaskBoardOverviewActionsTests {
     // since moved to `.inProgress` (e.g. the orchestrator advanced it).
     let dragItem = TaskBoardCardDragItem.api(itemID: "item-a", status: .todo)
 
-    #expect(!actions.moveCards([dragItem], to: .inReview))
+    #expect(
+      !actions.moveCards(
+        [dragItem],
+        to: .inReview,
+        liveInboxItems: TaskBoardLiveInboxItems()
+      )
+    )
   }
 
   @Test("Fresh api move submits")
@@ -28,18 +34,23 @@ struct TaskBoardOverviewActionsTests {
 
     let dragItem = TaskBoardCardDragItem.api(itemID: "item-b", status: .todo)
 
-    #expect(actions.moveCards([dragItem], to: .inProgress))
+    #expect(
+      actions.moveCards(
+        [dragItem],
+        to: .inProgress,
+        liveInboxItems: TaskBoardLiveInboxItems()
+      )
+    )
   }
 
   @Test("Stale selected-session inbox move is rejected")
   func staleSelectedSessionInboxMoveRejected() {
     let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .empty)
     store.selectedSessionID = "session-a"
-    store.selectedSession = Self.makeSessionDetail(
-      sessionID: "session-a",
-      tasks: [Self.makeWorkItem(taskId: "task-a", status: .inProgress)]
-    )
+    let currentTask = Self.makeWorkItem(taskId: "task-a", status: .inProgress)
+    store.selectedSession = Self.makeSessionDetail(sessionID: "session-a", tasks: [currentTask])
     let actions = TaskBoardOverviewActions(store: store, scope: .dashboard)
+    let liveInboxItems = Self.makeLiveInboxItems(sessionID: "session-a", task: currentTask)
 
     // Payload captured the task in the backlog lane with `.open` status, but
     // the selected session's live copy has since moved to `.inProgress`.
@@ -50,19 +61,18 @@ struct TaskBoardOverviewActionsTests {
       sourceLaneRawValue: TaskBoardInboxLane.backlog.rawValue
     )
 
-    #expect(!actions.moveCards([dragItem], to: .inReview))
+    #expect(!actions.moveCards([dragItem], to: .inReview, liveInboxItems: liveInboxItems))
   }
 
-  @Test("Non-selected-session inbox move is accepted without local validation")
-  func nonSelectedSessionInboxMoveAccepted() {
+  @Test("Stale non-selected-session inbox status is rejected")
+  func staleNonSelectedSessionInboxStatusRejected() {
     let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .empty)
     store.selectedSessionID = "session-other"
     store.selectedSession = nil
     let actions = TaskBoardOverviewActions(store: store, scope: .dashboard)
+    let currentTask = Self.makeWorkItem(taskId: "task-a", status: .inProgress)
+    let liveInboxItems = Self.makeLiveInboxItems(sessionID: "session-a", task: currentTask)
 
-    // "task-a" belongs to a session that isn't locally selected/cached, so
-    // there is no live copy to re-validate against - the payload is trusted
-    // and the server stays authoritative.
     let dragItem = TaskBoardCardDragItem.inbox(
       sessionID: "session-a",
       taskID: "task-a",
@@ -70,7 +80,100 @@ struct TaskBoardOverviewActionsTests {
       sourceLaneRawValue: TaskBoardInboxLane.backlog.rawValue
     )
 
-    #expect(actions.moveCards([dragItem], to: .inProgress))
+    #expect(!actions.moveCards([dragItem], to: .inReview, liveInboxItems: liveInboxItems))
+  }
+
+  @Test("Stale non-selected-session inbox lane is rejected")
+  func staleNonSelectedSessionInboxLaneRejected() {
+    let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .empty)
+    store.selectedSessionID = "session-other"
+    store.selectedSession = nil
+    let actions = TaskBoardOverviewActions(store: store, scope: .dashboard)
+    let currentTask = Self.makeWorkItem(
+      taskId: "task-a",
+      status: .open,
+      assignedTo: "agent-a"
+    )
+    let liveInboxItems = Self.makeLiveInboxItems(sessionID: "session-a", task: currentTask)
+    let dragItem = TaskBoardCardDragItem.inbox(
+      sessionID: "session-a",
+      taskID: "task-a",
+      status: .open,
+      sourceLaneRawValue: TaskBoardInboxLane.backlog.rawValue
+    )
+
+    #expect(!actions.moveCards([dragItem], to: .inProgress, liveInboxItems: liveInboxItems))
+  }
+
+  @Test("Fresh non-selected-session inbox move submits")
+  func freshNonSelectedSessionInboxMoveSubmits() {
+    let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .empty)
+    store.selectedSessionID = "session-other"
+    store.selectedSession = nil
+    let actions = TaskBoardOverviewActions(store: store, scope: .dashboard)
+    let currentTask = Self.makeWorkItem(taskId: "task-a", status: .open)
+    let liveInboxItems = Self.makeLiveInboxItems(sessionID: "session-a", task: currentTask)
+    let dragItem = TaskBoardCardDragItem.inbox(
+      sessionID: "session-a",
+      taskID: "task-a",
+      status: .open,
+      sourceLaneRawValue: TaskBoardInboxLane.backlog.rawValue
+    )
+
+    #expect(actions.moveCards([dragItem], to: .inProgress, liveInboxItems: liveInboxItems))
+  }
+
+  @Test("Inbox move missing from the rendered lookup is rejected")
+  func missingRenderedInboxMoveRejected() {
+    let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .empty)
+    let actions = TaskBoardOverviewActions(store: store, scope: .dashboard)
+    let dragItem = TaskBoardCardDragItem.inbox(
+      sessionID: "session-a",
+      taskID: "task-a",
+      status: .open,
+      sourceLaneRawValue: TaskBoardInboxLane.backlog.rawValue
+    )
+
+    #expect(
+      !actions.moveCards(
+        [dragItem],
+        to: .inProgress,
+        liveInboxItems: TaskBoardLiveInboxItems()
+      )
+    )
+  }
+
+  @Test("Delete capability mirrors store readiness")
+  func deleteCapabilityMirrorsStoreReadiness() {
+    let readyStore = HarnessMonitorPreviewStoreFactory.makeStore(for: .dashboardLoaded)
+    let readyActions = TaskBoardOverviewActions(store: readyStore, scope: .dashboard)
+
+    #expect(readyActions.canDeleteItem)
+    #expect(readyActions.canDeleteTargets)
+
+    readyStore.beginDaemonAction()
+    #expect(!readyActions.canDeleteItem)
+    #expect(!readyActions.canDeleteTargets)
+    readyStore.endDaemonAction()
+
+    readyStore.isSessionActionInFlight = true
+    #expect(!readyActions.canDeleteItem)
+    #expect(!readyActions.canDeleteTargets)
+    readyStore.isSessionActionInFlight = false
+
+    let readOnlyStore = HarnessMonitorPreviewStoreFactory.makeStore(for: .empty)
+    let readOnlyActions = TaskBoardOverviewActions(store: readOnlyStore, scope: .dashboard)
+    #expect(!readOnlyActions.canDeleteItem)
+    #expect(!readOnlyActions.canDeleteTargets)
+
+    let missingClientStore = HarnessMonitorPreviewStoreFactory.makeStore(for: .dashboardLoaded)
+    missingClientStore.client = nil
+    let missingClientActions = TaskBoardOverviewActions(
+      store: missingClientStore,
+      scope: .dashboard
+    )
+    #expect(!missingClientActions.canDeleteItem)
+    #expect(!missingClientActions.canDeleteTargets)
   }
 
   @Test("Report drop rejection forwards the reason to the store as failure feedback")
@@ -85,6 +188,31 @@ struct TaskBoardOverviewActionsTests {
         == "Cannot move task: an action is already in progress"
     )
     #expect(store.toast.activeFeedback.last?.severity == .failure)
+  }
+
+  @Test("Rejected card move reports that the board changed")
+  func rejectedCardMoveReportsBoardChange() {
+    let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .empty)
+    let actions = TaskBoardOverviewActions(store: store, scope: .dashboard)
+    let dragItem = TaskBoardCardDragItem.inbox(
+      sessionID: "session-a",
+      taskID: "task-a",
+      status: .open,
+      sourceLaneRawValue: TaskBoardInboxLane.backlog.rawValue
+    )
+
+    #expect(
+      !actions.moveCardsOrReportRejection(
+        [dragItem],
+        to: .inProgress,
+        liveInboxItems: TaskBoardLiveInboxItems()
+      )
+    )
+    #expect(store.toast.activeFeedback.last?.severity == .failure)
+    #expect(
+      store.toast.activeFeedback.last?.message
+        == "Cannot move task: the board changed before the move completed"
+    )
   }
 
   @Test("Report drop rejection stays inert with no store")
@@ -117,14 +245,18 @@ struct TaskBoardOverviewActionsTests {
     )
   }
 
-  private static func makeWorkItem(taskId: String, status: TaskStatus) -> WorkItem {
+  private static func makeWorkItem(
+    taskId: String,
+    status: TaskStatus,
+    assignedTo: String? = nil
+  ) -> WorkItem {
     WorkItem(
       taskId: taskId,
       title: "Fixture task",
       context: "fixture",
       severity: .medium,
       status: status,
-      assignedTo: nil,
+      assignedTo: assignedTo,
       createdAt: "2026-05-19T10:10:00Z",
       updatedAt: "2026-05-19T10:11:00Z",
       createdBy: "fixture",
@@ -135,6 +267,21 @@ struct TaskBoardOverviewActionsTests {
       completedAt: nil,
       checkpointSummary: nil
     )
+  }
+
+  private static func makeLiveInboxItems(
+    sessionID: String,
+    task: WorkItem
+  ) -> TaskBoardLiveInboxItems {
+    let detail = makeSessionDetail(sessionID: sessionID, tasks: [task])
+    guard let item = TaskBoardInboxItem(session: detail.session, task: task) else {
+      fatalError("Expected an open task-board inbox fixture")
+    }
+    let liveInboxItems = TaskBoardLiveInboxItems()
+    liveInboxItems.replace(
+      with: [.inbox(sessionID: sessionID, taskID: task.taskId): item]
+    )
+    return liveInboxItems
   }
 
   private static func makeSessionDetail(sessionID: String, tasks: [WorkItem]) -> SessionDetail {

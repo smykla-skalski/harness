@@ -194,6 +194,9 @@ extension RecordingHarnessClient {
         actor: request.actor
       )
     )
+    if let error = configuredTaskUpdateError() {
+      throw error
+    }
     detail = replacingTask(taskID) { task in
       WorkItem(
         taskId: task.taskId,

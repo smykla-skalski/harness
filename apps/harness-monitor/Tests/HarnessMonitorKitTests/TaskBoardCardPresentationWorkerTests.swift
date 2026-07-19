@@ -13,14 +13,16 @@ struct TaskBoardCardPresentationWorkerTests {
   func fragmentScanReturnsPlainFragmentWithoutBackticks() {
     let fragments = TaskBoardInlineCodeFormatter.fragments(in: "plain text, no code spans")
 
-    #expect(fragments == [TaskBoardInlineCodeFragment(text: "plain text, no code spans", isCode: false)])
+    #expect(
+      fragments == [TaskBoardInlineCodeFragment(text: "plain text, no code spans", isCode: false)])
   }
 
   @Test("Fragment scan leaves an unmatched backtick as plain text")
   func fragmentScanLeavesUnmatchedBacktickAsPlainText() {
     let fragments = TaskBoardInlineCodeFormatter.fragments(in: "Investigate `open span")
 
-    #expect(fragments == [TaskBoardInlineCodeFragment(text: "Investigate `open span", isCode: false)])
+    #expect(
+      fragments == [TaskBoardInlineCodeFragment(text: "Investigate `open span", isCode: false)])
   }
 
   @Test("Fragment scan splits adjacent code spans without merging them")
@@ -274,10 +276,12 @@ struct TaskBoardCardPresentationWorkerTests {
     // (in principle) treat these as the same cache entry if their hashes collided; comparing the
     // full string can never do that.
     let firstActions = [
-      SuggestedAction(id: "action-a", title: "Assign to agent", kind: .assignTask, payloadJSON: "{}")
+      SuggestedAction(
+        id: "action-a", title: "Assign to agent", kind: .assignTask, payloadJSON: "{}")
     ]
     let secondActions = [
-      SuggestedAction(id: "action-b", title: "Assign to agent", kind: .assignTask, payloadJSON: "{}")
+      SuggestedAction(
+        id: "action-b", title: "Assign to agent", kind: .assignTask, payloadJSON: "{}")
     ]
 
     let first = TaskBoardDecisionPrimaryActionCache.resolve(

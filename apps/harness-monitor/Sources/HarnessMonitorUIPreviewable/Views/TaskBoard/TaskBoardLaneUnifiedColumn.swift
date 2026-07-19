@@ -41,6 +41,7 @@ struct TaskBoardLaneUnifiedColumn: View {
   let isDropCandidate: Bool
   let selectionModel: TaskBoardCardSelectionModel
   let actions: TaskBoardOverviewActions
+  let liveInboxItems: TaskBoardLiveInboxItems
   @Binding var collapseOverridesRawValue: String
   @Environment(\.fontScale)
   private var fontScale
@@ -282,16 +283,17 @@ struct TaskBoardLaneUnifiedColumn: View {
     case .reject(let reason):
       actions.reportDropRejection(reason)
     case .proceed(let plan):
-      let moved = performDrop(
+      _ = performDrop(
         signature: TaskBoardCardDropSignature(
           cardIDs: plan.items.map(\.id),
           destination: lane
         )
       ) {
-        actions.moveCards(plan.items, to: lane)
-      }
-      if !moved {
-        actions.reportDropRejection("Cannot move task: the board changed before the drop completed")
+        actions.moveCardsOrReportRejection(
+          plan.items,
+          to: lane,
+          liveInboxItems: liveInboxItems
+        )
       }
     }
   }
