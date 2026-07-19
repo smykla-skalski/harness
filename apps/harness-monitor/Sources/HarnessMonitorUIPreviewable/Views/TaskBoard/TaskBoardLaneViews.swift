@@ -7,8 +7,8 @@ struct TaskBoardItemRow: View {
   let titleTypography: TaskBoardCardTitleTypography
   let isHovered: Bool
   let isSelected: Bool
-  let onSelect: (EventModifiers) -> Void
-  let onOpenItem: (TaskBoardItem) -> Void
+  let selectionModel: TaskBoardCardSelectionModel
+  let actions: TaskBoardOverviewActions
   @Environment(\.fontScale)
   private var fontScale
   @Environment(\.taskBoardLaneAppearance)
@@ -27,9 +27,9 @@ struct TaskBoardItemRow: View {
   var body: some View {
     let titlePresentation = TaskBoardCardTitlePresentation(item: item)
     return Button {
-      onSelect(Self.currentEventModifiers)
+      selectionModel.select(cardID, modifiers: Self.currentEventModifiers)
       if Self.currentClickCount == 2 {
-        onOpenItem(item)
+        selectionModel.openAPIItem(item, actions: actions)
       }
     } label: {
       VStack(alignment: .leading, spacing: metrics.laneSpacing) {
@@ -60,7 +60,7 @@ struct TaskBoardItemRow: View {
     .accessibilityHint("Click to select. Double-click to open.")
     .accessibilityAddTraits(isSelected ? .isSelected : [])
     .accessibilityAction(named: Text("Open")) {
-      onOpenItem(item)
+      selectionModel.openAPIItem(item, actions: actions)
     }
     .accessibilityIdentifier("harness.task-board.api-item.\(item.id)")
   }
@@ -119,8 +119,8 @@ struct TaskBoardInboxItemRow: View {
   let titleTypography: TaskBoardCardTitleTypography
   let isHovered: Bool
   let isSelected: Bool
-  let onSelect: (EventModifiers) -> Void
-  let onOpenItem: (TaskBoardInboxItem) -> Void
+  let selectionModel: TaskBoardCardSelectionModel
+  let actions: TaskBoardOverviewActions
   @Environment(\.fontScale)
   private var fontScale
 
@@ -131,9 +131,9 @@ struct TaskBoardInboxItemRow: View {
 
   var body: some View {
     Button {
-      onSelect(Self.currentEventModifiers)
+      selectionModel.select(cardID, modifiers: Self.currentEventModifiers)
       if Self.currentClickCount == 2 {
-        onOpenItem(item)
+        actions.openInboxItem(item)
       }
     } label: {
       VStack(alignment: .leading, spacing: metrics.laneSpacing) {
@@ -163,7 +163,7 @@ struct TaskBoardInboxItemRow: View {
     .accessibilityHint("Click to select. Double-click to open.")
     .accessibilityAddTraits(isSelected ? .isSelected : [])
     .accessibilityAction(named: Text("Open")) {
-      onOpenItem(item)
+      actions.openInboxItem(item)
     }
     .accessibilityIdentifier("harness.task-board.item.\(item.task.taskId)")
   }

@@ -4,7 +4,7 @@ import SwiftUI
 struct TaskBoardLaneHeader: View {
   let lane: TaskBoardInboxLane
   let count: Int
-  let onToggleCollapse: () -> Void
+  @Binding var collapseOverridesRawValue: String
   @Environment(\.fontScale)
   private var fontScale
   @Environment(\.taskBoardLaneAppearance)
@@ -26,7 +26,7 @@ struct TaskBoardLaneHeader: View {
   }
 
   var body: some View {
-    Button(action: onToggleCollapse) {
+    Button(action: toggleCollapse) {
       headerContent
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, metrics.laneInnerPadding)
@@ -42,6 +42,14 @@ struct TaskBoardLaneHeader: View {
     .accessibilityLabel("Collapse \(lane.title) board")
     .accessibilityValue("\(count) items")
     .accessibilityAddTraits(.isHeader)
+  }
+
+  private func toggleCollapse() {
+    collapseOverridesRawValue = TaskBoardLaneCollapsePreferences.toggledRawValue(
+      lane: lane,
+      contentCount: count,
+      rawValue: collapseOverridesRawValue
+    )
   }
 
   private var headerContent: some View {
