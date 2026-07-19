@@ -1,15 +1,16 @@
 ---
 source: src/run/workflow/tests/phase_transitions.rs
+assertion_line: 292
 expression: "serde_json::to_string_pretty(&json).unwrap()"
 ---
 {
-  "last_event": "RunInitialized",
   "state": {
     "phase": "bootstrap",
     "preflight": {
       "status": "pending"
     }
   },
+  "updated_at": "2026-01-01T00:00:00Z",
   "transition_count": 0,
-  "updated_at": "2026-01-01T00:00:00Z"
+  "last_event": "RunInitialized"
 }

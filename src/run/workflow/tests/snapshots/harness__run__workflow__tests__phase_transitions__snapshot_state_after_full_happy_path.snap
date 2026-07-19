@@ -1,42 +1,43 @@
 ---
 source: src/run/workflow/tests/phase_transitions.rs
+assertion_line: 325
 expression: "serde_json::to_string_pretty(&json).unwrap()"
 ---
 {
-  "last_event": "RunCompleted",
   "state": {
-    "history": [
-      {
-        "event": "cluster-prepared",
-        "from": "bootstrap",
-        "timestamp": "REDACTED",
-        "to": "preflight"
-      },
-      {
-        "event": "preflight-captured",
-        "from": "preflight",
-        "timestamp": "REDACTED",
-        "to": "execution"
-      },
-      {
-        "event": "closeout-started",
-        "from": "execution",
-        "timestamp": "REDACTED",
-        "to": "closeout"
-      },
-      {
-        "event": "run-completed",
-        "from": "closeout",
-        "timestamp": "REDACTED",
-        "to": "completed"
-      }
-    ],
     "phase": "completed",
     "preflight": {
       "status": "complete"
     },
+    "history": [
+      {
+        "from": "bootstrap",
+        "to": "preflight",
+        "event": "cluster-prepared",
+        "timestamp": "REDACTED"
+      },
+      {
+        "from": "preflight",
+        "to": "execution",
+        "event": "preflight-captured",
+        "timestamp": "REDACTED"
+      },
+      {
+        "from": "execution",
+        "to": "closeout",
+        "event": "closeout-started",
+        "timestamp": "REDACTED"
+      },
+      {
+        "from": "closeout",
+        "to": "completed",
+        "event": "run-completed",
+        "timestamp": "REDACTED"
+      }
+    ],
     "updated_at": "REDACTED"
   },
+  "updated_at": "REDACTED",
   "transition_count": 4,
-  "updated_at": "REDACTED"
+  "last_event": "RunCompleted"
 }
