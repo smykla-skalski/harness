@@ -13,7 +13,8 @@ use crate::agents::runtime::signal::{
     DeliveryConfig, Signal, SignalPayload, SignalPriority, write_signal_file,
 };
 use crate::daemon::agent_acp::manager::test_support::{
-    seeded_manager, seeded_manager_with_events, write_executable, write_sleeping_acp_agent,
+    ACP_CONDITION_DEADLINE, seeded_manager, seeded_manager_with_events, write_executable,
+    write_sleeping_acp_agent,
 };
 use crate::daemon::agent_acp::permission_bridge::DEFAULT_PERMISSION_CAP;
 use crate::session::types::ManagedAgentRef;
@@ -62,7 +63,7 @@ fn descriptor_with_id(command: &Path, id: &str) -> AcpAgentDescriptor {
 }
 
 fn wait_until_disconnected(manager: &AcpAgentManagerHandle, acp_id: &str) -> AcpAgentSnapshot {
-    let deadline = Instant::now() + Duration::from_secs(2);
+    let deadline = Instant::now() + ACP_CONDITION_DEADLINE;
     loop {
         let Ok(snapshot) = manager.get(acp_id) else {
             unreachable!();
@@ -134,7 +135,7 @@ fn wait_for_runtime_session_id(
     session_id: &str,
     acp_id: &str,
 ) -> String {
-    let deadline = Instant::now() + Duration::from_secs(2);
+    let deadline = Instant::now() + ACP_CONDITION_DEADLINE;
     loop {
         if let Some(agent_session_id) = runtime_session_id(manager, session_id, acp_id) {
             return agent_session_id;
@@ -153,7 +154,7 @@ fn wait_for_runtime_session_id_value(
     acp_id: &str,
     expected: &str,
 ) {
-    let deadline = Instant::now() + Duration::from_secs(2);
+    let deadline = Instant::now() + ACP_CONDITION_DEADLINE;
     loop {
         if runtime_session_id(manager, session_id, acp_id).as_deref() == Some(expected) {
             return;
@@ -170,7 +171,7 @@ fn wait_for_signal_ack(
     signal_dir: &Path,
     signal_id: &str,
 ) -> crate::agents::runtime::signal::SignalAck {
-    let deadline = Instant::now() + Duration::from_secs(2);
+    let deadline = Instant::now() + ACP_CONDITION_DEADLINE;
     loop {
         let Ok(acks) = read_signal_acknowledgments(signal_dir) else {
             unreachable!();
@@ -368,7 +369,7 @@ async fn list_syncs_paused_acp_sessions_to_idle_status() {
             unreachable!();
         };
 
-        let deadline = Instant::now() + Duration::from_secs(2);
+        let deadline = Instant::now() + ACP_CONDITION_DEADLINE;
         loop {
             let Ok(listed) = manager.list("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc") else {
                 unreachable!();
@@ -423,7 +424,7 @@ async fn abnormal_exit_populates_disconnect_reason_and_stderr_tail() {
             unreachable!();
         };
 
-        let deadline = Instant::now() + Duration::from_secs(2);
+        let deadline = Instant::now() + ACP_CONDITION_DEADLINE;
         let refreshed = loop {
             let Ok(refreshed) = manager.get(&snapshot.acp_id) else {
                 unreachable!();

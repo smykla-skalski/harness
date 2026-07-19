@@ -4,7 +4,9 @@ use tempfile::TempDir;
 
 use super::*;
 use crate::agents::acp::catalog::{self, AcpAgentDescriptor};
-use crate::daemon::agent_acp::manager::test_support::{seeded_manager, write_sleeping_acp_agent};
+use crate::daemon::agent_acp::manager::test_support::{
+    ACP_CONDITION_DEADLINE, seeded_manager, write_sleeping_acp_agent,
+};
 use crate::feature_flags;
 
 fn manager() -> AcpAgentManagerHandle {
@@ -34,7 +36,7 @@ fn descriptor(command: &Path) -> AcpAgentDescriptor {
 }
 
 fn wait_until_disconnected(manager: &AcpAgentManagerHandle, acp_id: &str) -> AcpAgentSnapshot {
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    let deadline = std::time::Instant::now() + ACP_CONDITION_DEADLINE;
     loop {
         let Ok(snapshot) = manager.get(acp_id) else {
             unreachable!("refresh");

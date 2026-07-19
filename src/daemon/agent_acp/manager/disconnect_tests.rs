@@ -8,7 +8,7 @@ use tokio::sync::broadcast;
 use super::*;
 use crate::agents::acp::catalog::{self, AcpAgentDescriptor};
 use crate::daemon::agent_acp::manager::test_support::{
-    seeded_manager_with_events, write_sleeping_acp_agent,
+    ACP_CONDITION_DEADLINE, seeded_manager_with_events, write_sleeping_acp_agent,
 };
 use crate::feature_flags;
 
@@ -42,7 +42,7 @@ fn descriptor(command: &Path) -> AcpAgentDescriptor {
 }
 
 fn wait_until_disconnected(manager: &AcpAgentManagerHandle, acp_id: &str) -> AcpAgentSnapshot {
-    let deadline = Instant::now() + Duration::from_secs(2);
+    let deadline = Instant::now() + ACP_CONDITION_DEADLINE;
     loop {
         let Ok(snapshot) = manager.get(acp_id) else {
             unreachable!("refresh");

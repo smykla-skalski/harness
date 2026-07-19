@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
+use std::time::Duration;
 
 use tokio::sync::broadcast;
 
@@ -14,6 +15,14 @@ use crate::session::types::{
     AgentRegistration, AgentStatus, CURRENT_VERSION, SessionMetrics, SessionRole, SessionState,
     SessionStatus,
 };
+
+/// Deadlock guard for polls that wait on a real spawned ACP subprocess to reach
+/// a lifecycle state (disconnect, runtime-session binding, signal ack). These
+/// outcomes are asynchronous and depend on OS scheduling, so a tight budget
+/// false-fails when the suite saturates the CPU. The condition check is the
+/// oracle; this only bounds a genuine hang, so it is generous on purpose and the
+/// happy path returns as soon as the state is observed.
+pub(super) const ACP_CONDITION_DEADLINE: Duration = Duration::from_secs(30);
 
 #[track_caller]
 pub(super) fn assert_ok<T, E: std::fmt::Debug>(result: Result<T, E>, context: &str) -> T {

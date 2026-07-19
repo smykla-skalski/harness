@@ -7,7 +7,8 @@ use tokio::sync::broadcast;
 use super::*;
 use crate::agents::acp::catalog::{self, AcpAgentDescriptor};
 use crate::daemon::agent_acp::manager::test_support::{
-    assert_ok, assert_some, seeded_manager_with_events, write_exiting_acp_agent,
+    ACP_CONDITION_DEADLINE, assert_ok, assert_some, seeded_manager_with_events,
+    write_exiting_acp_agent,
 };
 use crate::feature_flags;
 use crate::session::types::ManagedAgentRef;
@@ -217,7 +218,7 @@ fn session_managed_agent(
 }
 
 fn wait_until_disconnected(manager: &AcpAgentManagerHandle, acp_id: &str) -> AcpAgentSnapshot {
-    let deadline = Instant::now() + Duration::from_secs(2);
+    let deadline = Instant::now() + ACP_CONDITION_DEADLINE;
     loop {
         let snapshot = assert_ok(manager.get(acp_id), "refresh");
         if snapshot.status.is_disconnected() {
@@ -244,7 +245,7 @@ fn next_process_incidents(
     events: &mut broadcast::Receiver<crate::daemon::protocol::StreamEvent>,
     expected_count: usize,
 ) -> Vec<crate::daemon::protocol::StreamEvent> {
-    let deadline = Instant::now() + Duration::from_secs(2);
+    let deadline = Instant::now() + ACP_CONDITION_DEADLINE;
     let mut incidents = Vec::new();
     loop {
         if let Ok(event) = events.try_recv()
