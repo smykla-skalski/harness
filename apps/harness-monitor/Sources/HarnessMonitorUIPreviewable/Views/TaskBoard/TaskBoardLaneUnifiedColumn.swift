@@ -17,7 +17,6 @@ struct TaskBoardLaneUnifiedColumn: View {
   let isDropCandidate: Bool
   let selectionModel: TaskBoardCardSelectionModel
   let actions: TaskBoardOverviewActions
-  let contextMenuActions: TaskBoardCardContextMenuActions
   @Binding var collapseOverridesRawValue: String
   @Environment(\.fontScale)
   private var fontScale
@@ -161,7 +160,7 @@ struct TaskBoardLaneUnifiedColumn: View {
         )
         .taskBoardCardFrame(id: hoverID, in: cardHoverCoordinateSpace)
         .contextMenu {
-          TaskBoardCardContextMenu(cardID: cardID, actions: contextMenuActions)
+          TaskBoardCardContextMenu(cardID: cardID)
         }
       }
       ForEach(inboxItems) { item in
@@ -184,7 +183,7 @@ struct TaskBoardLaneUnifiedColumn: View {
         )
         .taskBoardCardFrame(id: hoverID, in: cardHoverCoordinateSpace)
         .contextMenu {
-          TaskBoardCardContextMenu(cardID: cardID, actions: contextMenuActions)
+          TaskBoardCardContextMenu(cardID: cardID)
         }
       }
     }

@@ -5,6 +5,7 @@ extension TaskBoardOverviewView {
   @ViewBuilder var boardContent: some View {
     if hasBoardContent {
       taskBoardColumns
+        .environment(\.taskBoardCardContextMenuActions, taskBoardCardContextMenuActions)
     } else {
       emptyState
     }
@@ -66,7 +67,6 @@ extension TaskBoardOverviewView {
         isDropCandidate: !isActionInFlight && dropCandidateLanesValue.contains(lane),
         selectionModel: selectionModelValue,
         actions: actions,
-        contextMenuActions: taskBoardCardContextMenuActions,
         collapseOverridesRawValue: laneCollapsePreferencesRawValueBinding
       )
       .layoutValue(
