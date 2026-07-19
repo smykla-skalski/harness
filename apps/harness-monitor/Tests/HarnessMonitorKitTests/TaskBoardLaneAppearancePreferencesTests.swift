@@ -6,6 +6,7 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 @Suite("Task board lane appearance preferences")
+@MainActor
 struct TaskBoardLaneAppearancePreferencesTests {
   @Test("Defaults use lane chrome when there are no overrides")
   func defaultsUseLaneChromeWhenThereAreNoOverrides() {
@@ -68,6 +69,60 @@ struct TaskBoardLaneAppearancePreferencesTests {
     #expect(overrides[.backlog]?.symbolName == "archivebox")
     #expect(canonicalRawValue.contains(#""backlog""#))
     #expect(!canonicalRawValue.contains("umbrella"))
+  }
+
+  @Test("Repeated parses of the same raw value return equal results")
+  func repeatedParsesOfSameRawValueReturnEqualResults() {
+    let rawValue = TaskBoardLaneAppearancePreferences.settingColorToken(
+      .teal,
+      for: .inProgress,
+      rawValue: TaskBoardLaneAppearancePreferences.emptyRawValue
+    )
+
+    let first = TaskBoardLaneAppearancePreferences.overrides(from: rawValue)
+    let second = TaskBoardLaneAppearancePreferences.overrides(from: rawValue)
+
+    #expect(first == second)
+  }
+
+  @Test("Repeated raw value does not re-invoke the decoder")
+  func repeatedRawValueDoesNotReinvokeDecoder() {
+    let rawValue = TaskBoardLaneAppearancePreferences.settingColorToken(
+      .mint,
+      for: .todo,
+      rawValue: TaskBoardLaneAppearancePreferences.emptyRawValue
+    )
+
+    _ = TaskBoardLaneAppearancePreferences.overrides(from: rawValue)
+    let countAfterFirstParse = TaskBoardLaneAppearancePreferences.decodeCount
+
+    _ = TaskBoardLaneAppearancePreferences.overrides(from: rawValue)
+    let countAfterSecondParse = TaskBoardLaneAppearancePreferences.decodeCount
+
+    #expect(countAfterSecondParse == countAfterFirstParse)
+  }
+
+  @Test("A changed raw value invalidates the memo and re-decodes")
+  func changedRawValueInvalidatesMemoAndReDecodes() {
+    let firstRawValue = TaskBoardLaneAppearancePreferences.settingColorToken(
+      .blue,
+      for: .failed,
+      rawValue: TaskBoardLaneAppearancePreferences.emptyRawValue
+    )
+    let secondRawValue = TaskBoardLaneAppearancePreferences.settingColorToken(
+      .pink,
+      for: .failed,
+      rawValue: TaskBoardLaneAppearancePreferences.emptyRawValue
+    )
+
+    _ = TaskBoardLaneAppearancePreferences.overrides(from: firstRawValue)
+    let countAfterFirstParse = TaskBoardLaneAppearancePreferences.decodeCount
+
+    let secondResult = TaskBoardLaneAppearancePreferences.overrides(from: secondRawValue)
+    let countAfterSecondParse = TaskBoardLaneAppearancePreferences.decodeCount
+
+    #expect(countAfterSecondParse == countAfterFirstParse + 1)
+    #expect(secondResult[.failed]?.colorToken == .pink)
   }
 
   @Test("Hidden symbols persist through UserDefaults")

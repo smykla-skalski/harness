@@ -125,7 +125,12 @@ struct TaskBoardLaneAppearanceOverride: Codable, Equatable, Sendable {
 struct TaskBoardLaneAppearance: Equatable {
   let overrides: [TaskBoardInboxLane: TaskBoardLaneAppearanceOverride]
 
-  init(rawValue: String = TaskBoardLaneAppearancePreferences.emptyRawValue) {
+  init() {
+    overrides = [:]
+  }
+
+  @MainActor
+  init(rawValue: String) {
     overrides = TaskBoardLaneAppearancePreferences.overrides(from: rawValue)
   }
 
@@ -172,9 +177,31 @@ enum TaskBoardLaneAppearancePreferences {
   static let storageKey = "harness.task-board.lane-appearance-overrides.v1"
   static let emptyRawValue = "{}"
 
+  /// Advances only on a memo miss, so tests can assert a repeat raw value skips the decoder.
+  @MainActor private(set) static var decodeCount = 0
+
+  @MainActor private static var memoizedRawValue: String?
+  @MainActor private static var memoizedOverrides:
+    [TaskBoardInboxLane: TaskBoardLaneAppearanceOverride] = [:]
+
+  @MainActor
   static func overrides(
     from rawValue: String
   ) -> [TaskBoardInboxLane: TaskBoardLaneAppearanceOverride] {
+    if let memoizedRawValue, memoizedRawValue == rawValue {
+      return memoizedOverrides
+    }
+    let decoded = decodeOverrides(from: rawValue)
+    memoizedRawValue = rawValue
+    memoizedOverrides = decoded
+    return decoded
+  }
+
+  @MainActor
+  private static func decodeOverrides(
+    from rawValue: String
+  ) -> [TaskBoardInboxLane: TaskBoardLaneAppearanceOverride] {
+    decodeCount += 1
     guard let data = rawValue.data(using: .utf8) else {
       return [:]
     }
@@ -219,6 +246,7 @@ enum TaskBoardLaneAppearancePreferences {
     return rawValue
   }
 
+  @MainActor
   static func load(
     from userDefaults: UserDefaults = .standard
   ) -> [TaskBoardInboxLane: TaskBoardLaneAppearanceOverride] {
@@ -232,6 +260,7 @@ enum TaskBoardLaneAppearancePreferences {
     userDefaults.set(rawValue(for: overrides), forKey: storageKey)
   }
 
+  @MainActor
   static func settingColorToken(
     _ colorToken: TaskBoardLaneColorToken,
     for lane: TaskBoardInboxLane,
@@ -245,6 +274,7 @@ enum TaskBoardLaneAppearancePreferences {
     return Self.rawValue(for: overrides)
   }
 
+  @MainActor
   static func settingCustomColor(
     _ color: Color,
     for lane: TaskBoardInboxLane,
@@ -261,6 +291,7 @@ enum TaskBoardLaneAppearancePreferences {
     return Self.rawValue(for: overrides)
   }
 
+  @MainActor
   static func settingSymbolName(
     _ symbolName: String,
     for lane: TaskBoardInboxLane,
@@ -276,6 +307,7 @@ enum TaskBoardLaneAppearancePreferences {
     return Self.rawValue(for: overrides)
   }
 
+  @MainActor
   static func settingSymbolVisibility(
     _ isVisible: Bool,
     for lane: TaskBoardInboxLane,
@@ -291,6 +323,7 @@ enum TaskBoardLaneAppearancePreferences {
     return Self.rawValue(for: overrides)
   }
 
+  @MainActor
   static func resetColorRawValue(
     for lane: TaskBoardInboxLane,
     rawValue: String
@@ -303,6 +336,7 @@ enum TaskBoardLaneAppearancePreferences {
     return Self.rawValue(for: overrides)
   }
 
+  @MainActor
   static func resetSymbolRawValue(
     for lane: TaskBoardInboxLane,
     rawValue: String
@@ -315,6 +349,7 @@ enum TaskBoardLaneAppearancePreferences {
     return Self.rawValue(for: overrides)
   }
 
+  @MainActor
   static func resetRawValue(
     for lane: TaskBoardInboxLane,
     rawValue: String
@@ -324,6 +359,7 @@ enum TaskBoardLaneAppearancePreferences {
     return Self.rawValue(for: overrides)
   }
 
+  @MainActor
   static func hasOverride(
     for lane: TaskBoardInboxLane,
     rawValue: String
