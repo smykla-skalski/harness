@@ -1,7 +1,6 @@
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionPhase, TaskBoardExecutionState,
-    TaskBoardReviewRoundDecision, TaskBoardStatus, TaskBoardWorkflowKind,
-    TaskBoardWorkflowStatus,
+    TaskBoardReviewRoundDecision, TaskBoardStatus, TaskBoardWorkflowKind, TaskBoardWorkflowStatus,
 };
 
 use super::fixture::{NOW, seed_execution_with_reviewers};
@@ -36,7 +35,10 @@ async fn local_review_waits_for_two_reviewer_quorum_before_evaluation() {
     }
 
     let awaiting = super::load_execution(&fixture).await;
-    assert_eq!(awaiting.transition.phase, Some(TaskBoardExecutionPhase::Review));
+    assert_eq!(
+        awaiting.transition.phase,
+        Some(TaskBoardExecutionPhase::Review)
+    );
     assert_eq!(
         awaiting.transition.execution_state,
         TaskBoardExecutionState::Pending
@@ -79,7 +81,11 @@ async fn local_review_waits_for_two_reviewer_quorum_before_evaluation() {
     assert_eq!(cycle.outcomes[0].profile_id, "reviewer-amber");
     assert_eq!(cycle.outcomes[1].profile_id, "reviewer-indigo");
     assert_eq!(cycle.decision, Some(TaskBoardReviewRoundDecision::Approved));
-    for action in ["review:reviewer-amber", "review:reviewer-indigo", "evaluate"] {
+    for action in [
+        "review:reviewer-amber",
+        "review:reviewer-indigo",
+        "evaluate",
+    ] {
         let attempt = completed
             .attempts
             .iter()
