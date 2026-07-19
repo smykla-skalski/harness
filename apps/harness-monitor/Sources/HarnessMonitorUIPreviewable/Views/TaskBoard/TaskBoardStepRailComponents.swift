@@ -69,13 +69,21 @@ struct TaskBoardStepControl: View {
   private var detailFont: Font {
     HarnessMonitorTextSize.scaledFont(.callout, by: fontScale)
   }
+  private var badgeSide: CGFloat {
+    let scale = SessionWindowFontScale.metricsScale(for: fontScale)
+    return max(24, 24 * min(scale, 1.4))
+  }
+  private var rowMinHeight: CGFloat {
+    let scale = SessionWindowFontScale.metricsScale(for: fontScale)
+    return max(52, 52 * min(scale, 1.4))
+  }
 
   var body: some View {
     Button(action: action) {
       HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
         Text("\(step)")
           .font(numberFont)
-          .frame(width: 24, height: 24)
+          .frame(width: badgeSide, height: badgeSide)
           .background(tint.opacity(0.16), in: .circle)
         VStack(alignment: .leading, spacing: 2) {
           Label(title, systemImage: systemImage)
@@ -97,7 +105,7 @@ struct TaskBoardStepControl: View {
             .accessibilityLabel("Complete")
         }
       }
-      .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+      .frame(maxWidth: .infinity, minHeight: rowMinHeight, alignment: .leading)
       .contentShape(.rect)
     }
     .harnessActionButtonStyle(variant: .bordered, tint: tint)
