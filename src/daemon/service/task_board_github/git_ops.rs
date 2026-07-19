@@ -36,9 +36,11 @@ pub(in crate::daemon::service::task_board_github) async fn branch_publication_as
             .or(remote_default_branch.as_ref())
             .map(|state| state.commit_sha.as_str());
         if observed_parent != Some(expected_parent) {
-            return Err(CliErrorKind::invalid_transition(
-                "task-board GitHub publication parent changed after preflight",
-            )
+            let observed_parent = observed_parent.unwrap_or("<missing>");
+            return Err(CliErrorKind::invalid_transition(format!(
+                "task-board GitHub publication parent changed after preflight: expected \
+                 '{expected_parent}', observed '{observed_parent}'"
+            ))
             .into());
         }
     }

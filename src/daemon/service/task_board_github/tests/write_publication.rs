@@ -132,12 +132,10 @@ async fn default_publication_rejects_same_tree_parent_drift_before_noop() {
     })
     .await;
 
-    assert!(
-        workflow
-            .last_error
-            .as_deref()
-            .is_some_and(|error| error.contains("publication parent changed"))
-    );
+    let error = workflow.last_error.as_deref().expect("parent drift error");
+    assert!(error.contains("publication parent changed"), "{error}");
+    assert!(error.contains(&fixture.base), "{error}");
+    assert!(error.contains(&interloper), "{error}");
     assert_eq!(*client.publish_calls.lock().expect("publish calls"), 0);
 }
 

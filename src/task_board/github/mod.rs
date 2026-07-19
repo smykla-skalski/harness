@@ -60,6 +60,9 @@ pub trait GitHubAutomationClient: Send + Sync {
 
     /// Publish HEAD only if `expected_parent` still matches the fresh remote parent.
     ///
+    /// Guarded publishers must override this method. The default implementation delegates only
+    /// when no expected parent is supplied and otherwise reports compare-and-publish as unsupported.
+    ///
     /// # Errors
     /// Returns provider, transport, or unsupported compare-and-publish errors.
     async fn publish_branch_from_worktree_at_parent(

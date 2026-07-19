@@ -46,3 +46,13 @@ async fn cancelled_waiter_leaves_native_mutation_owned_by_worker() {
         "mutation published more than once"
     );
 }
+
+#[test]
+fn parent_mismatch_reports_expected_and_observed_revisions() {
+    let error = super::validate_publication_parent(Some("expected-parent"), "observed-parent")
+        .expect_err("parent mismatch must fail");
+    let message = error.to_string();
+
+    assert!(message.contains("expected 'expected-parent'"), "{message}");
+    assert!(message.contains("observed 'observed-parent'"), "{message}");
+}

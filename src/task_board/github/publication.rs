@@ -195,12 +195,16 @@ fn validate_publication_parent(
     expected_parent: Option<&str>,
     observed_parent: &str,
 ) -> Result<(), CliError> {
-    if expected_parent.is_none_or(|expected| expected == observed_parent) {
+    let Some(expected_parent) = expected_parent else {
+        return Ok(());
+    };
+    if expected_parent == observed_parent {
         return Ok(());
     }
-    Err(CliErrorKind::invalid_transition(
-        "task-board GitHub publication parent changed after preflight",
-    )
+    Err(CliErrorKind::invalid_transition(format!(
+        "task-board GitHub publication parent changed after preflight: expected \
+         '{expected_parent}', observed '{observed_parent}'"
+    ))
     .into())
 }
 
