@@ -52,6 +52,74 @@ HARNESS_RELEASE_ALL_BINARIES=("${HARNESS_RELEASE_BINARIES[@]}" aff)
 # shellcheck disable=SC2034
 HARNESS_RELEASE_ALL_BUILD_LEAVES=("${HARNESS_RELEASE_BUILD_LEAVES[@]}" aff)
 
+# Populated by release_set_resolve_selectors.
+# shellcheck disable=SC2034
+RELEASE_SET_SELECTED_LEAVES=()
+# shellcheck disable=SC2034
+RELEASE_SET_SELECTED_BINARIES=()
+
+release_set_add_leaf() {
+  local name="$1" binary="$2" existing
+  # bash 3.2 (macOS /bin/bash, still the target here) treats expanding an
+  # empty array under `set -u` as an unbound-variable error, so guard the
+  # length before the first entry is added.
+  if (( ${#RELEASE_SET_SELECTED_LEAVES[@]} > 0 )); then
+    for existing in "${RELEASE_SET_SELECTED_LEAVES[@]}"; do
+      [[ "$existing" == "$name" ]] && return 0
+    done
+  fi
+  RELEASE_SET_SELECTED_LEAVES+=("$name")
+  RELEASE_SET_SELECTED_BINARIES+=("$binary")
+}
+
+release_set_add_leaf_by_name() {
+  local requested="$1" index
+  for index in "${!HARNESS_RELEASE_BUILD_LEAVES[@]}"; do
+    if [[ "${HARNESS_RELEASE_BUILD_LEAVES[index]}" == "$requested" ]]; then
+      release_set_add_leaf "$requested" "${HARNESS_RELEASE_BINARIES[index]}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# "harness-cli" is the standalone alias for the "harness" leaf, kept
+# distinct from the "harness" group selector (the whole release set).
+# Returns non-zero on an unrecognized selector so callers print their own
+# usage message.
+release_set_resolve_selectors() {
+  local selector index
+  RELEASE_SET_SELECTED_LEAVES=()
+  RELEASE_SET_SELECTED_BINARIES=()
+  for selector in "$@"; do
+    case "$selector" in
+      all)
+        for index in "${!HARNESS_RELEASE_ALL_BUILD_LEAVES[@]}"; do
+          release_set_add_leaf \
+            "${HARNESS_RELEASE_ALL_BUILD_LEAVES[index]}" \
+            "${HARNESS_RELEASE_ALL_BINARIES[index]}"
+        done
+        ;;
+      harness)
+        for index in "${!HARNESS_RELEASE_BUILD_LEAVES[@]}"; do
+          release_set_add_leaf \
+            "${HARNESS_RELEASE_BUILD_LEAVES[index]}" \
+            "${HARNESS_RELEASE_BINARIES[index]}"
+        done
+        ;;
+      aff)
+        release_set_add_leaf aff aff
+        ;;
+      harness-cli)
+        release_set_add_leaf_by_name harness || return 1
+        ;;
+      *)
+        release_set_add_leaf_by_name "$selector" || return 1
+        ;;
+    esac
+  done
+}
+
 release_probe_identity() {
   case "$1" in
     harness-codex-acp|harness-openrouter-agent)
