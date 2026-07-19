@@ -9,6 +9,9 @@ struct TaskBoardItemRow: View {
   let isSelected: Bool
   let selectionModel: TaskBoardCardSelectionModel
   let actions: TaskBoardOverviewActions
+  /// `nil` until the lane column wires the presentation lookup through; falls back to on-the-fly
+  /// computation below so behavior is identical either way.
+  let cardPresentation: TaskBoardCardPresentation? = nil
   @Environment(\.fontScale)
   private var fontScale
   @Environment(\.taskBoardLaneAppearance)
@@ -24,9 +27,31 @@ struct TaskBoardItemRow: View {
 
   private var cardID: TaskBoardCardID { .api(item.id) }
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
+
+  /// On-the-fly fallback used only when `cardPresentation` has not been wired in yet.
+  private var fallbackTitlePresentation: TaskBoardCardTitlePresentation {
+    TaskBoardCardTitlePresentation(item: item)
+  }
+  private var titleFragments: [TaskBoardInlineCodeFragment] {
+    cardPresentation?.titleFragments
+      ?? TaskBoardInlineCodeFormatter.fragments(in: fallbackTitlePresentation.title)
+  }
+  private var titleLeadingText: String? {
+    cardPresentation?.titleLeadingText ?? fallbackTitlePresentation.leadingText
+  }
+  private var titleDisplayText: String {
+    cardPresentation?.titleDisplayText
+      ?? TaskBoardInlineCodeFormatter.displayText(for: titleFragments, leadingText: titleLeadingText)
+  }
+  private var updatedAtDate: Date? {
+    if let cardPresentation {
+      return cardPresentation.updatedAt
+    }
+    return TaskBoardCardDateParsing.parse(item.updatedAt)
+  }
+
   var body: some View {
-    let titlePresentation = TaskBoardCardTitlePresentation(item: item)
-    return Button {
+    Button {
       selectionModel.select(cardID, modifiers: Self.currentEventModifiers)
       if Self.currentClickCount == 2 {
         selectionModel.openAPIItem(item, actions: actions)
@@ -35,15 +60,16 @@ struct TaskBoardItemRow: View {
       VStack(alignment: .leading, spacing: metrics.laneSpacing) {
         VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
           TaskBoardInlineCodeText(
-            titlePresentation.title,
+            fragments: titleFragments,
+            displayText: titleDisplayText,
             font: titleTypography.font,
             codeFont: titleTypography.codeFont,
-            leadingText: titlePresentation.leadingText,
+            leadingText: titleLeadingText,
             foregroundStyle: HarnessMonitorTheme.ink,
             lineLimit: 2
           )
         }
-        TaskBoardCardFooter(repository: repositoryLabel, updatedAt: item.updatedAt) {
+        TaskBoardCardFooter(repository: repositoryLabel, updatedAt: updatedAtDate) {
           badgeContent
         }
       }
@@ -71,6 +97,15 @@ struct TaskBoardItemRow: View {
     guard let projectID = item.projectId else {
       return item.agentMode.title
     }
+    if let cardPresentation {
+      let precomputed =
+        alwaysShowsFullRepositoryNames
+        ? cardPresentation.repositoryLabelFullName
+        : cardPresentation.repositoryLabelDefault
+      if let precomputed {
+        return precomputed
+      }
+    }
     return projectLabelResolver.label(
       for: projectID,
       alwaysShowFullName: alwaysShowsFullRepositoryNames
@@ -78,8 +113,13 @@ struct TaskBoardItemRow: View {
   }
 
   private var cardGlyph: TaskBoardCardGlyph {
-    TaskBoardGitHubCardGlyph.resolve(for: item)
-      ?? TaskBoardCardGlyph(systemImage: statusSymbol, tint: statusTint)
+    let resolvedGlyph: TaskBoardCardGlyph? =
+      if let cardPresentation {
+        cardPresentation.glyph
+      } else {
+        TaskBoardGitHubCardGlyph.resolve(for: item)
+      }
+    return resolvedGlyph ?? TaskBoardCardGlyph(systemImage: statusSymbol, tint: statusTint)
   }
 
   private var statusSymbol: String? {
@@ -121,12 +161,29 @@ struct TaskBoardInboxItemRow: View {
   let isSelected: Bool
   let selectionModel: TaskBoardCardSelectionModel
   let actions: TaskBoardOverviewActions
+  /// `nil` until the lane column wires the presentation lookup through; falls back to on-the-fly
+  /// computation below so behavior is identical either way.
+  let cardPresentation: TaskBoardCardPresentation? = nil
   @Environment(\.fontScale)
   private var fontScale
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
   private var cardID: TaskBoardCardID {
     .inbox(sessionID: item.session.sessionId, taskID: item.task.taskId)
+  }
+
+  private var titleFragments: [TaskBoardInlineCodeFragment] {
+    cardPresentation?.titleFragments ?? TaskBoardInlineCodeFormatter.fragments(in: item.task.title)
+  }
+  private var titleDisplayText: String {
+    cardPresentation?.titleDisplayText
+      ?? TaskBoardInlineCodeFormatter.displayText(for: titleFragments)
+  }
+  private var updatedAtDate: Date? {
+    if let cardPresentation {
+      return cardPresentation.updatedAt
+    }
+    return TaskBoardCardDateParsing.parse(item.task.updatedAt)
   }
 
   var body: some View {
@@ -139,14 +196,15 @@ struct TaskBoardInboxItemRow: View {
       VStack(alignment: .leading, spacing: metrics.laneSpacing) {
         VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
           TaskBoardInlineCodeText(
-            item.task.title,
+            fragments: titleFragments,
+            displayText: titleDisplayText,
             font: titleTypography.font,
             codeFont: titleTypography.codeFont,
             foregroundStyle: HarnessMonitorTheme.ink,
             lineLimit: 2
           )
         }
-        TaskBoardCardFooter(repository: item.subtitle, updatedAt: item.task.updatedAt) {
+        TaskBoardCardFooter(repository: item.subtitle, updatedAt: updatedAtDate) {
           badgeContent
         }
       }
