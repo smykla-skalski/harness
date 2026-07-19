@@ -76,12 +76,8 @@ struct TaskBoardStepRailView: View {
 
   var body: some View {
     TaskBoardSection(title: "Manual Steps") {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
         TaskBoardStepRailTargetView(item: activeItem, isPicked: state.pickedSelection != nil)
-        Label("Live manual operations", systemImage: "bolt.shield.fill")
-          .font(cautionFont)
-          .foregroundStyle(HarnessMonitorTheme.caution)
-          .accessibilityIdentifier("harness.task-board.step.live-mode")
         TaskBoardStepProgressRail(
           current: stagePlan.column,
           isBlocked: stagePlan.isBlockedColumn,
@@ -91,11 +87,14 @@ struct TaskBoardStepRailView: View {
         cardArea
         contextDisclosure
       }
-      .padding(HarnessMonitorTheme.spacingMD)
-      .background(HarnessMonitorTheme.ink.opacity(0.025), in: .rect(cornerRadius: 12))
+      .padding(HarnessMonitorTheme.spacingLG)
+      .background(
+        HarnessMonitorTheme.ink.opacity(0.025),
+        in: .rect(cornerRadius: HarnessMonitorTheme.cornerRadiusMD)
+      )
       .overlay {
-        RoundedRectangle(cornerRadius: 12)
-          .strokeBorder(HarnessMonitorTheme.ink.opacity(0.12))
+        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD)
+          .strokeBorder(HarnessMonitorTheme.ink.opacity(0.10))
       }
     }
     .confirmationDialog(
@@ -146,6 +145,7 @@ struct TaskBoardStepRailView: View {
       .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
       .disabled(controlsDisabled)
     }
+    .frame(maxWidth: .infinity)
     .accessibilityIdentifier("harness.task-board.step.empty")
   }
 
@@ -155,6 +155,8 @@ struct TaskBoardStepRailView: View {
       whatHappened: nil,
       whatNext: column.explanation
     ) {
+      EmptyView()
+    } actions: {
       Button {
         state.viewingColumn = nil
       } label: {
@@ -172,12 +174,13 @@ struct TaskBoardStepRailView: View {
       whatHappened: plan.whatHappened,
       whatNext: plan.whatNext
     ) {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      if let action = plan.primaryAction {
+        primaryButton(action)
+      }
+    } actions: {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
         if plan.stage == .readyToDeliver, let selection = state.pickedSelection {
           TaskBoardStepPromptPreview(prompt: selection.plan.renderedPrompt)
-        }
-        if let action = plan.primaryAction {
-          primaryButton(action)
         }
         if !plan.inlineLinks.isEmpty {
           inlineLinksRow(plan.inlineLinks)
@@ -219,7 +222,6 @@ struct TaskBoardStepRailView: View {
         Text("Next: \(action.buttonTitle)")
       }
       .font(primaryButtonFont)
-      .frame(maxWidth: .infinity)
     }
     .harnessActionButtonStyle(variant: .prominent)
     .controlSize(.large)
@@ -269,7 +271,7 @@ struct TaskBoardStepRailView: View {
   private func linkIcon(_ link: TaskBoardStepInlineLink) -> String {
     switch link {
     case .watch: "eye"
-    case .openTask: "person.2.badge.gearshape"
+    case .openTask: "list.bullet.rectangle"
     case .openPullRequest: "arrow.up.forward.square"
     }
   }
@@ -315,7 +317,7 @@ struct TaskBoardStepRailView: View {
       }
       .padding(.top, HarnessMonitorTheme.spacingSM)
     } label: {
-      Label("Automation context", systemImage: "gearshape.2").font(cautionFont)
+      Label("Automation context", systemImage: "gearshape").font(cautionFont)
     }
     .accessibilityIdentifier("harness.task-board.step.context")
   }

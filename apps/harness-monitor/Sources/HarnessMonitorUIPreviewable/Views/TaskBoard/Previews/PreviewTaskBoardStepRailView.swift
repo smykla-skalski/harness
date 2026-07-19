@@ -1,6 +1,10 @@
 import HarnessMonitorKit
 import SwiftUI
 
+#Preview("Step Mode - no ready item") {
+  TaskBoardStepRailPreviewFixtures.panel(item: nil, record: nil)
+}
+
 #Preview("Step Mode - ready to pick") {
   TaskBoardStepRailPreviewFixtures.panel(
     item: TaskBoardStepRailPreviewFixtures.item(status: .todo),
@@ -106,18 +110,18 @@ private enum TaskBoardStepRailPreviewFixtures {
     )
   }
 
-  static func panel(item: TaskBoardItem, record: TaskBoardEvaluationRecord?) -> some View {
+  static func panel(item: TaskBoardItem?, record: TaskBoardEvaluationRecord?) -> some View {
     TaskBoardStepRailView(
       store: store,
       status: status,
       latestEvaluation: record.map { TaskBoardEvaluationSummary(records: [$0]) },
       workspace: nil,
       targetItem: item,
-      taskBoardItems: [item],
+      taskBoardItems: item.map { [$0] } ?? [],
       isActionInFlight: false,
       actions: TaskBoardOverviewActions(store: store, scope: .dashboard)
     )
     .padding(24)
-    .frame(width: 460)
+    .frame(width: 900)
   }
 }
