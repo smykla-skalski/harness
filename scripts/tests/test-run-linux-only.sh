@@ -84,6 +84,7 @@ import sys
 
 mise_path = pathlib.Path(sys.argv[1])
 workflow_path = pathlib.Path(sys.argv[2])
+repo_root = mise_path.parent
 expected_tasks = {
     "test:unit",
     "test:integration",
@@ -98,14 +99,12 @@ wrapper = "./scripts/run-linux-only.sh"
 cargo = "./scripts/cargo-local.sh"
 covered_tasks = set()
 task_name = None
+script_run_pattern = re.compile(r'run\s*=\s*"(\./scripts/[\w.-]+\.sh)"')
 
-for line in mise_path.read_text().splitlines():
-    task_header = re.fullmatch(r'\[tasks\."([^"]+)"\]', line)
-    if task_header:
-        task_name = task_header.group(1)
-        continue
+
+def scan_line(line, task_name, source):
     if "-p harness-systemd" not in line:
-        continue
+        return
     command = line.strip().rstrip(",")
     if command.startswith('"') and command.endswith('"'):
         command = command[1:-1]
@@ -115,14 +114,29 @@ for line in mise_path.read_text().splitlines():
         for index in range(len(arguments) - 1)
     )
     if not selects_systemd:
-        continue
+        return
     if task_name is None:
         raise SystemExit(f"harness-systemd selection has no task: {line}")
     covered_tasks.add(task_name)
     if arguments[:2] != [wrapper, cargo]:
         raise SystemExit(
-            f"{task_name} selects harness-systemd without the Linux-only wrapper: {command}"
+            f"{task_name} selects harness-systemd without the Linux-only wrapper: "
+            f"{command} ({source})"
         )
+
+
+for line in mise_path.read_text().splitlines():
+    task_header = re.fullmatch(r'\[tasks\."([^"]+)"\]', line)
+    if task_header:
+        task_name = task_header.group(1)
+        continue
+    script_match = script_run_pattern.search(line)
+    if script_match:
+        script_path = repo_root / script_match.group(1)
+        for script_line in script_path.read_text().splitlines():
+            scan_line(script_line, task_name, script_path.name)
+        continue
+    scan_line(line, task_name, mise_path.name)
 
 if covered_tasks != expected_tasks:
     missing = sorted(expected_tasks - covered_tasks)

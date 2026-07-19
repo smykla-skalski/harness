@@ -152,12 +152,8 @@ description = "Run the release build coordinator and atomic installer shell test
 run = "./scripts/tests/test-release-install.sh"
 
 [tasks."test:unit"]
-description = "Run unit tests"
-run = [
-  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime",
-  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-protocol -p harness-systemd-protocol -p harness-telemetry -p harness-testkit",
-  "./scripts/run-linux-only.sh ./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd",
-]
+description = "Run unit tests (pass nextest args after -- to forward them to every package group, e.g. -E 'test(=path::to::test)')"
+run = "./scripts/run-unit-tests.sh"
 
 [tasks."test:integration"]
 description = "Run fast integration tests in parallel with process isolation"

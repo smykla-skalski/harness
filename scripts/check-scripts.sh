@@ -209,6 +209,7 @@ fi
 if [[ "$mode" != "--lint" ]]; then
   run_quiet_step "check-scripts shell tests" "$ROOT/scripts/tests/test-check-scripts.sh"
   run_quiet_step "cargo-local shell tests" "$ROOT/scripts/tests/test-cargo-local.sh"
+  run_quiet_step "run-unit-tests shell tests" "$ROOT/scripts/tests/test-run-unit-tests.sh"
   run_quiet_step "Linux-only command shell tests" "$ROOT/scripts/tests/test-run-linux-only.sh"
   run_quiet_step "run-step shell tests" "$ROOT/scripts/tests/test-run-step.sh"
   run_quiet_step "release install shell tests" "$ROOT/scripts/tests/test-release-install.sh"
