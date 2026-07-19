@@ -39,7 +39,9 @@ pub fn curated_models() -> Vec<SessionConfigSelectOption> {
 /// Fetch the per-key model list and merge it with the curated defaults. The
 /// curated list always appears first; live entries with the same id are
 /// skipped. Errors fall back to the curated list with a trace warning so a
-/// temporary outage never breaks `session/new`.
+/// temporary outage never breaks `session/new`. The selected model is
+/// appended when absent (custom models, fetch fallback) so `current_value`
+/// always names an advertised choice.
 pub async fn build_model_config_option(
     client: &OpenRouterClient,
     selected_model: &str,
@@ -58,6 +60,12 @@ pub async fn build_model_config_option(
             tracing::warn!(%error, "failed to fetch live OpenRouter model list; using curated fallback");
         }
     }
+    if !options.iter().any(|m| m.value.0.as_ref() == selected_model) {
+        options.push(SessionConfigSelectOption::new(
+            selected_model.to_owned(),
+            selected_model.to_owned(),
+        ));
+    }
     SessionConfigOption::select(
         MODEL_CONFIG_OPTION_ID,
         "Model",
@@ -75,6 +83,30 @@ fn select_option_from_entry(entry: ModelEntry) -> SessionConfigSelectOption {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use agent_client_protocol::schema::v1::SessionConfigKind;
+
+    #[tokio::test]
+    async fn selected_model_always_present_in_options() {
+        // base_url:0 fails the live fetch fast, leaving the curated fallback.
+        let client = OpenRouterClient::new("http://127.0.0.1:0/api/v1", "sk-test", "ref", "title")
+            .expect("client");
+        let option = build_model_config_option(&client, "custom/model-not-in-catalog").await;
+        let SessionConfigKind::Select(select) = &option.kind else {
+            panic!("model option must be a select, got {:?}", option.kind);
+        };
+        assert_eq!(
+            select.current_value.0.as_ref(),
+            "custom/model-not-in-catalog"
+        );
+        let SessionConfigSelectOptions::Ungrouped(choices) = &select.options else {
+            panic!("model options must be ungrouped");
+        };
+        assert!(
+            choices
+                .iter()
+                .any(|m| m.value.0.as_ref() == "custom/model-not-in-catalog")
+        );
+    }
 
     #[test]
     fn curated_list_includes_default_model() {
