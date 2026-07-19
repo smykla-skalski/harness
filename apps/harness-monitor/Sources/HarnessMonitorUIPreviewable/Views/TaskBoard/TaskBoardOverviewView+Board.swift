@@ -20,12 +20,16 @@ extension TaskBoardOverviewView {
       }
       .scrollClipDisabled()
     }
-    .taskBoardCardDragContainer(
-      isEnabled: !isActionInFlight,
-      selectedIDs: orderedSelectedCardIDs,
-      payloads: cardDragPayloads,
-      onSessionUpdated: updateCardDragSession
-    )
+    .dragContainer(for: TaskBoardCardDragPayload.self, itemID: \.id) { cardIDs in
+      isActionInFlight ? [] : cardDragPayloads(cardIDs)
+    }
+    .dragContainerSelection(isActionInFlight ? [] : orderedSelectedCardIDs)
+    .dragConfiguration(.init(allowMove: !isActionInFlight))
+    .dragPreviewsFormation(.pile)
+    .onDragSessionUpdated { session in
+      guard !isActionInFlight else { return }
+      updateCardDragSession(session)
+    }
   }
 
   func taskBoardLaneStrip(
@@ -57,21 +61,11 @@ extension TaskBoardOverviewView {
         titleTypography: titleTypography,
         isCollapsed: isCollapsed,
         isDropEnabled: !isActionInFlight,
-        isDropCandidate:
-          !isActionInFlight && cardDropPlan(draggedCardIDsValue, to: lane) != nil,
-        selectedCardIDs: cardSelectionValue.selectedIDs,
-        onOpenAPIItem: openTaskBoardItem,
-        onOpenInboxItem: onOpenItem,
-        onOpenDecision: onOpenDecision,
-        onToggleCollapse: {
-          toggleLaneCollapse(lane, contentCount: contentCount)
-        },
-        onSelectCard: selectCard,
+        isDropCandidate: !isActionInFlight && dropCandidateLanesValue.contains(lane),
+        selectionModel: selectionModelValue,
+        actions: actions,
         contextMenuActions: taskBoardCardContextMenuActions,
-        dropPlanForCardIDs: { cardIDs in
-          cardDropPlan(cardIDs, to: lane)
-        },
-        onMoveCards: moveCards
+        collapseOverridesRawValue: laneCollapsePreferencesRawValueBinding
       )
       .layoutValue(
         key: TaskBoardLanePreferredWidthKey.self,

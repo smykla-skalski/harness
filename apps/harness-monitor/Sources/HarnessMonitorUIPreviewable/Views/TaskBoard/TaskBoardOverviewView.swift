@@ -17,40 +17,20 @@ public struct TaskBoardOverviewView: View {
   let decisionsByID: [String: Decision]
   let decisionItems: [DecisionPresentationItem]
   let isActionInFlight: Bool
-  let onOpenItem: (TaskBoardInboxItem) -> Void
-  let onOpenTaskBoardItem: (TaskBoardItem) -> Void
-  let onMoveInboxItems: (([TaskBoardInboxStatusUpdate]) -> Void)?
-  let onMoveTaskBoardItems: (([TaskBoardItemStatusUpdate]) -> Void)?
-  let onOpenDecision: (Decision) -> Void
-  let onCreateTaskBoardItem: ((TaskBoardCreateItemRequest, TaskBoardStatus) -> Void)?
-  let onUpdateTaskBoardItem: ((String, TaskBoardUpdateItemRequest) -> Void)?
-  let onDeleteTaskBoardItem: ((TaskBoardItem) -> Void)?
-  let onDeleteTaskBoardTargets: (([TaskBoardDeletionTarget]) -> Void)?
-  let onEvaluateTaskBoard: (() -> Void)?
-  let onEvaluateTaskBoardItem: ((TaskBoardItem) -> Void)?
-  let onBeginTaskBoardPlan: ((TaskBoardItem) -> Void)?
-  let onSubmitTaskBoardPlan: ((TaskBoardItem, String) -> Void)?
-  let onApproveTaskBoardPlan: ((TaskBoardItem, String, String?) -> Void)?
-  let onRevokeTaskBoardPlan: ((TaskBoardItem) -> Void)?
-  let onRefreshTaskBoard: (() -> Void)?
-  let onStartTaskBoardOrchestrator: (() -> Void)?
-  let onStopTaskBoardOrchestrator: (() -> Void)?
-  let onRunTaskBoardOrchestratorOnce: ((TaskBoardOrchestratorRunOnceRequest) -> Void)?
-  let onSetTaskBoardStepMode: (@MainActor @Sendable (Bool) -> Void)?
+  let actions: TaskBoardOverviewActions
   @Environment(\.fontScale)
   var fontScale
   @Environment(\.openURL)
   var openURL
   @Environment(\.openWindow)
   var openWindow
-  @State private var selectedTaskBoardItemID: String?
-  @State private var isCreatingTaskBoardItem = false
+  @State private var selectionModel = TaskBoardCardSelectionModel()
   @State private var evaluationSummaryFitsHorizontally = true
   @State private var presentationWorker = TaskBoardOverviewPresentationWorker()
   @State private var cachedPresentation = TaskBoardOverviewPresentation.empty
   @State private var presentationGeneration: UInt64 = 0
-  @State private var cardSelection = TaskBoardCardSelectionState()
   @State private var draggedCardIDs: [TaskBoardCardID] = []
+  @State private var dropCandidateLanes: Set<TaskBoardInboxLane> = []
   @State private var taskBoardSelectionDispatcher = TaskBoardSelectionDispatcher()
   @State private var relativeTimeClock = TaskBoardRelativeTimeClock()
   @State private var localHostRoutingState = TaskBoardLocalHostRoutingState()
@@ -87,15 +67,6 @@ public struct TaskBoardOverviewView: View {
     )
   }
 
-  var presentationInput: TaskBoardOverviewPresentationInput {
-    TaskBoardOverviewPresentationInput(
-      snapshot: snapshot,
-      taskBoardItems: taskBoardItems,
-      decisionItems: decisionItems,
-      scopeSessionID: taskBoardSessionID
-    )
-  }
-
   var currentPresentation: TaskBoardOverviewPresentation { cachedPresentation }
 
   public init(
@@ -112,28 +83,9 @@ public struct TaskBoardOverviewView: View {
     operationsInspectorFocus: TaskBoardOperationsInspectorFocus? = nil,
     decisions: [Decision] = [],
     isActionInFlight: Bool = false,
-    onOpenItem: @escaping (TaskBoardInboxItem) -> Void = { _ in },
-    onOpenTaskBoardItem: @escaping (TaskBoardItem) -> Void = { _ in },
-    onMoveInboxItems: (([TaskBoardInboxStatusUpdate]) -> Void)? = nil,
-    onMoveTaskBoardItems: (([TaskBoardItemStatusUpdate]) -> Void)? = nil,
-    onOpenDecision: @escaping (Decision) -> Void = { _ in },
-    onCreateTaskBoardItem: ((TaskBoardCreateItemRequest, TaskBoardStatus) -> Void)? = nil,
-    onUpdateTaskBoardItem: ((String, TaskBoardUpdateItemRequest) -> Void)? = nil,
-    onDeleteTaskBoardItem: ((TaskBoardItem) -> Void)? = nil,
-    onDeleteTaskBoardTargets: (([TaskBoardDeletionTarget]) -> Void)? = nil,
-    onEvaluateTaskBoard: (() -> Void)? = nil,
-    onEvaluateTaskBoardItem: ((TaskBoardItem) -> Void)? = nil,
-    onBeginTaskBoardPlan: ((TaskBoardItem) -> Void)? = nil,
-    onSubmitTaskBoardPlan: ((TaskBoardItem, String) -> Void)? = nil,
-    onApproveTaskBoardPlan: ((TaskBoardItem, String, String?) -> Void)? = nil,
-    onRevokeTaskBoardPlan: ((TaskBoardItem) -> Void)? = nil,
-    onRefreshTaskBoard: (() -> Void)? = nil,
-    onStartTaskBoardOrchestrator: (() -> Void)? = nil,
-    onStopTaskBoardOrchestrator: (() -> Void)? = nil,
-    onRunTaskBoardOrchestratorOnce: ((TaskBoardOrchestratorRunOnceRequest) -> Void)? = nil,
-    onSetTaskBoardStepMode: (@MainActor @Sendable (Bool) -> Void)? = nil,
-    decisionItems: [DecisionPresentationSnapshot]? = nil,
-    decisionsByID: [String: Decision]? = nil
+    actions: TaskBoardOverviewActions = TaskBoardOverviewActions(store: nil, scope: .dashboard),
+    decisionItems: [DecisionPresentationSnapshot],
+    decisionsByID: [String: Decision]
   ) {
     self.snapshot = snapshot
     self.taskBoardItems = taskBoardItems
@@ -147,33 +99,19 @@ public struct TaskBoardOverviewView: View {
     self.isCommandFocusActive = isCommandFocusActive
     self.operationsInspectorFocus = operationsInspectorFocus
     self.decisions = decisions
-    self.decisionsByID =
-      decisionsByID ?? Dictionary(uniqueKeysWithValues: decisions.map { ($0.id, $0) })
-    self.decisionItems = decisionItems ?? decisions.map(DecisionPresentationItem.init)
+    self.decisionsByID = decisionsByID
+    self.decisionItems = decisionItems
     self.isActionInFlight = isActionInFlight
-    self.onOpenItem = onOpenItem
-    self.onOpenTaskBoardItem = onOpenTaskBoardItem
-    self.onMoveInboxItems = onMoveInboxItems
-    self.onMoveTaskBoardItems = onMoveTaskBoardItems
-    self.onOpenDecision = onOpenDecision
-    self.onCreateTaskBoardItem = onCreateTaskBoardItem
-    self.onUpdateTaskBoardItem = onUpdateTaskBoardItem
-    self.onDeleteTaskBoardItem = onDeleteTaskBoardItem
-    self.onDeleteTaskBoardTargets = onDeleteTaskBoardTargets
-    self.onEvaluateTaskBoard = onEvaluateTaskBoard
-    self.onEvaluateTaskBoardItem = onEvaluateTaskBoardItem
-    self.onBeginTaskBoardPlan = onBeginTaskBoardPlan
-    self.onSubmitTaskBoardPlan = onSubmitTaskBoardPlan
-    self.onApproveTaskBoardPlan = onApproveTaskBoardPlan
-    self.onRevokeTaskBoardPlan = onRevokeTaskBoardPlan
-    self.onRefreshTaskBoard = onRefreshTaskBoard
-    self.onStartTaskBoardOrchestrator = onStartTaskBoardOrchestrator
-    self.onStopTaskBoardOrchestrator = onStopTaskBoardOrchestrator
-    self.onRunTaskBoardOrchestratorOnce = onRunTaskBoardOrchestratorOnce
-    self.onSetTaskBoardStepMode = onSetTaskBoardStepMode
+    self.actions = actions
   }
 
   public var body: some View {
+    let presentationInput = TaskBoardOverviewPresentationInput(
+      snapshot: snapshot,
+      taskBoardItems: taskBoardItems,
+      decisionItems: decisionItems,
+      scopeSessionID: taskBoardSessionID
+    )
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       boardChrome
       taskBoardDetailRow { boardSection }
@@ -225,24 +163,18 @@ public struct TaskBoardOverviewView: View {
     }
   }
 
-  var selectedTaskBoardItemIDValue: String? {
-    get { selectedTaskBoardItemID }
-    nonmutating set { selectedTaskBoardItemID = newValue }
-  }
-
-  var isCreatingTaskBoardItemValue: Bool {
-    get { isCreatingTaskBoardItem }
-    nonmutating set { isCreatingTaskBoardItem = newValue }
-  }
-
-  var cardSelectionValue: TaskBoardCardSelectionState {
-    get { cardSelection }
-    nonmutating set { cardSelection = newValue }
+  var selectionModelValue: TaskBoardCardSelectionModel {
+    selectionModel
   }
 
   var draggedCardIDsValue: [TaskBoardCardID] {
     get { draggedCardIDs }
     nonmutating set { draggedCardIDs = newValue }
+  }
+
+  var dropCandidateLanesValue: Set<TaskBoardInboxLane> {
+    get { dropCandidateLanes }
+    nonmutating set { dropCandidateLanes = newValue }
   }
 
   var taskBoardSelectionDispatcherValue: TaskBoardSelectionDispatcher {
@@ -265,6 +197,20 @@ public struct TaskBoardOverviewView: View {
   var pendingLiveOperationValue: TaskBoardOverviewLiveOperation? {
     get { pendingLiveOperation }
     nonmutating set { pendingLiveOperation = newValue }
+  }
+
+  var pendingLiveOperationBinding: Binding<TaskBoardOverviewLiveOperation?> {
+    Binding(
+      get: { pendingLiveOperationValue },
+      set: { pendingLiveOperationValue = $0 }
+    )
+  }
+
+  var laneCollapsePreferencesRawValueBinding: Binding<String> {
+    Binding(
+      get: { laneCollapsePreferencesRawValue },
+      set: { laneCollapsePreferencesRawValue = $0 }
+    )
   }
 }
 
@@ -303,9 +249,7 @@ extension TaskBoardOverviewView {
     }
     if cachedPresentation != presentation {
       cachedPresentation = presentation
-      cardSelection = cardSelection.pruning(
-        orderedVisibleIDs: presentation.orderedCardIDs
-      )
+      selectionModel.updateVisibleIDs(presentation.orderedCardIDs)
     }
   }
 }
