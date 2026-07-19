@@ -131,22 +131,45 @@ public struct TaskBoardOverviewActions: Equatable {
 
   // MARK: - Card moves
 
-  /// Items come pre-validated from `TaskBoardCardDropPlan.resolve`, so this
-  /// needs no fresh `TaskBoardOverviewPresentation` lookup.
+  /// Re-validates each item's live status/lane against the drag payload's
+  /// captured source before applying: the orchestrator can move items
+  /// autonomously between drag-start and drop, and a stale drop must not
+  /// overwrite a concurrent transition. All-or-nothing, matching the plan's
+  /// own `sourceLane != destination` / `accepts(destination:)` semantics.
+  @MainActor
   @discardableResult
   func moveCards(_ items: [TaskBoardCardDragItem], to lane: TaskBoardInboxLane) -> Bool {
-    guard hasStore else { return false }
+    guard let store else { return false }
     var taskBoardUpdates: [TaskBoardItemStatusUpdate] = []
     var inboxUpdates: [TaskBoardInboxStatusUpdate] = []
     for item in items {
       guard item.accepts(destination: lane) else { return false }
       switch item {
-      case .api(let itemID, _):
+      case .api(let itemID, let sourceStatus):
+        guard
+          let current = store.globalTaskBoardItems.first(where: { $0.id == itemID }),
+          current.status == sourceStatus
+        else {
+          return false
+        }
         taskBoardUpdates.append(
           TaskBoardItemStatusUpdate(id: itemID, status: lane.taskBoardDropStatus)
         )
-      case .inbox(let sessionID, let taskID, _, _):
+      case .inbox(let sessionID, let taskID, let sourceStatus, let sourceLaneRawValue):
         guard let destinationStatus = lane.taskDropStatus else { return false }
+        // The session detail cache only covers the selected session; when
+        // the source session isn't locally available we accept the payload
+        // as-is and let the server stay authoritative for that case.
+        if sessionID == store.selectedSessionID,
+          let currentTask = store.selectedSession?.tasks.first(where: { $0.taskId == taskID })
+        {
+          guard
+            currentTask.status == sourceStatus,
+            TaskBoardInboxLane(task: currentTask)?.rawValue == sourceLaneRawValue
+          else {
+            return false
+          }
+        }
         inboxUpdates.append(
           TaskBoardInboxStatusUpdate(sessionID: sessionID, taskID: taskID, status: destinationStatus)
         )
