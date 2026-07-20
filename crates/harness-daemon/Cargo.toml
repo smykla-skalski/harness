@@ -14,6 +14,7 @@ test = false
 
 [dependencies]
 agent-client-protocol = "=1.2.0"
+agent-client-protocol-http = { version = "=1.2.0", default-features = false, features = ["client"], optional = true }
 arc-swap = "1.9.1"
 async-stream = "0.3.6"
 async-trait = "0.1.83"
@@ -91,7 +92,7 @@ tempfile = "=3.27.0"
 [features]
 default = ["daemon-runtime", "standalone-daemon", "standalone-worker"]
 bridge-runtime = []
-daemon-runtime = ["bridge-runtime", "dep:harness-systemd-protocol"]
+daemon-runtime = ["bridge-runtime", "dep:harness-systemd-protocol", "dep:agent-client-protocol-http"]
 standalone-daemon = []
 standalone-worker = []
 tokio-console = ["harness-telemetry/tokio-console"]
