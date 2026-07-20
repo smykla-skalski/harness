@@ -52,7 +52,7 @@ When a feature is expected to exceed about 5,000 Copilot-reviewable changed line
 4. Use a foundation slice only when it establishes a stable, tested, independently useful boundary. Forbid dormant scaffolding, placeholders, half-exposed behavior, temporary review-only adapters, deferred known fixes, and other work planned for replacement.
 5. Let later slices consume or extend a stable earlier contract, but never knowingly repair, replace, rename, remove, or substantially redesign it. Combine, reorder, or redesign the boundary before publication when the plan predicts such rework. Judge overlap by behavior rather than filenames: small additive integration in the same file is valid, but each behavior, migration, and schema transition needs one owning PR.
 6. Obtain explicit user approval for an operationally necessary staged transition such as expand, migrate, and contract. Record every production-safe intermediate state and planned removal before implementation; staged rollout needs do not justify ordinary implementation churn.
-7. Deliver dependent or semantically overlapping slices serially. Complete exact-head Copilot review, user merge, and normal closeout before implementing the next slice from current `upstream/main`; read-only planning may continue while waiting.
+7. Deliver dependent or semantically overlapping slices serially. Complete current-tree Copilot review, user merge, and normal closeout before implementing the next slice from current `upstream/main`; read-only planning may continue while waiting.
 8. Run slices in parallel only as separate agent sessions, each with its own worktree and lane, and only when they share no code contract, migration, runtime dependency, or semantic ownership and remain correct and mergeable in either order.
 9. Give every slice its own dedicated branch, complete PR review loop, and terminal state. Within one session, reuse that session's worktree and build, test, and runtime lane across serial slices.
 10. Recalculate the review budget before publication and the first Copilot request. Reslice when a sound boundary exists; when the smallest self-contained slice still exceeds the budget, stop for explicit user approval and record why an artificial split would be worse. Do not add an automated size gate.
@@ -89,16 +89,16 @@ Immediately request Copilot review, and use the same command for every re-reques
 gh api --method POST repos/smykla-skalski/harness/pulls/<PR_NUMBER>/requested_reviewers -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
 ```
 
-1. Wait for a Copilot review whose reviewed commit is the exact current head; a review of an older head does not count.
+1. Wait for a Copilot review whose reviewed commit carries the current tree; a review of an older tree does not count. A review still counts when the head SHA moved but the tree did not, as after a rebase or a commit-message or sign-off rewrite; confirm with `git rev-parse <reviewed-sha>^{tree}` against `git rev-parse <head-sha>^{tree}`.
 2. Inspect every remark and unresolved conversation. Implement valid fixes, run affected validation, commit the explicit paths with signing and sign-off, and push.
 3. After each fix push, resolve only the conversations that push addressed. A fix needs no reply.
 4. Answer an incorrect finding before resuming other work, then resolve the thread. Give the evidence, not the verdict: the command that proves it and the mechanism behind it. Write one or two plain sentences, and drop the polite filler, bullets, and trailing period. Never silently resolve a wrong finding, because a silent resolve reads as a real defect quietly ignored and leaves the next reader no record of why nothing changed.
-5. Re-request Copilot and repeat without a fixed round limit until it reviews the exact current head and reports no new comments.
-6. If the head, PR body, feedback, or required checks change, invalidate the prior result and resume the loop. Escalate only a genuine impasse, a recurring already-addressed finding, or persistent Copilot or API failure; keep the PR draft while blocked.
+5. Re-request Copilot and repeat without a fixed round limit until it reviews the current tree and reports no new comments.
+6. If the tree, feedback, or required checks change, invalidate the prior result and resume the loop. Editing the PR title or body never invalidates a review, because the review covers the code change and not the metadata around it. Escalate only a genuine impasse, a recurring already-addressed finding, or persistent Copilot or API failure; keep the PR draft while blocked.
 
 ### Ready and merge
 
-1. Require an accurate two-section PR body, an exact-head Copilot review with no new comments, zero unresolved conversations, and green required checks.
+1. Require an accurate two-section PR body, a current-tree Copilot review with no new comments, zero unresolved conversations, and green required checks.
 2. Mark the PR ready for review only after every gate passes, notify the user, and monitor until the user merges or closes it. Never merge the PR as the agent.
 
 ### Close out
