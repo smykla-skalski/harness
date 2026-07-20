@@ -160,6 +160,33 @@ fn conversation_entry_emits_assistant_text_rows() {
 }
 
 #[test]
+fn conversation_entry_calls_out_refusal_turns() {
+    let event = ConversationEvent {
+        timestamp: Some("2026-03-28T14:07:00Z".into()),
+        sequence: 6,
+        kind: ConversationEventKind::TurnEnded {
+            stop_reason: "refusal".into(),
+        },
+        agent: "codex-worker".into(),
+        session_id: "sess-conversation".into(),
+    };
+
+    let entry = conversation_entry(
+        "sess-conversation",
+        "codex-worker",
+        "codex",
+        &event,
+        TimelinePayloadScope::Full,
+    )
+    .expect("conversation entry converts")
+    .expect("turn ended emitted");
+
+    assert_eq!(entry.kind, "agent_turn_ended");
+    assert_eq!(entry.summary, "codex-worker refused to continue the turn");
+    assert_eq!(entry.payload["event"]["type"], "turn_ended");
+}
+
+#[test]
 fn conversation_entry_emits_context_usage_rows() {
     let event = ConversationEvent {
         timestamp: Some("2026-03-28T14:06:00Z".into()),

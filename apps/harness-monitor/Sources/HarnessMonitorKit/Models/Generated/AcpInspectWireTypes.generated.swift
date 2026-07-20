@@ -71,13 +71,15 @@ public struct AcpAgentSessionState: Codable, Equatable, Sendable {
   public var availableCommands: [String]
   public var title: String?
   public var updatedAt: String?
+  public var lastStopReason: String?
 
-  public init(configOptions: [AcpSessionConfigOptionState] = [], currentModeId: String? = nil, availableCommands: [String] = [], title: String? = nil, updatedAt: String? = nil) {
+  public init(configOptions: [AcpSessionConfigOptionState] = [], currentModeId: String? = nil, availableCommands: [String] = [], title: String? = nil, updatedAt: String? = nil, lastStopReason: String? = nil) {
     self.configOptions = configOptions
     self.currentModeId = currentModeId
     self.availableCommands = availableCommands
     self.title = title
     self.updatedAt = updatedAt
+    self.lastStopReason = lastStopReason
   }
 
   public init(from decoder: Decoder) throws {
@@ -87,6 +89,7 @@ public struct AcpAgentSessionState: Codable, Equatable, Sendable {
     availableCommands = try container.decodeIfPresent([String].self, forKey: .availableCommands) ?? []
     title = try container.decodeIfPresent(String.self, forKey: .title)
     updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
+    lastStopReason = try container.decodeIfPresent(String.self, forKey: .lastStopReason)
   }
 
   enum CodingKeys: String, CodingKey {
@@ -95,6 +98,7 @@ public struct AcpAgentSessionState: Codable, Equatable, Sendable {
     case availableCommands = "available_commands"
     case title
     case updatedAt = "updated_at"
+    case lastStopReason = "last_stop_reason"
   }
 }
 

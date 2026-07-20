@@ -66,6 +66,9 @@ pub enum ConversationEventKind {
     },
     /// Agent state transition.
     StateChange { from: String, to: String },
+    /// A prompt turn finished; carries the agent's reported stop reason
+    /// (`end_turn`, `max_tokens`, `max_turn_requests`, `refusal`, `cancelled`).
+    TurnEnded { stop_reason: String },
     /// Context-window and cost telemetry reported during a prompt turn.
     ContextUsage {
         used_tokens: u64,

@@ -3,8 +3,8 @@
 
 use agent_client_protocol::schema::MaybeUndefined;
 use agent_client_protocol::schema::v1::{
-    NewSessionResponse, SessionConfigKind, SessionConfigOption, SessionUpdate,
-    SetSessionConfigOptionResponse,
+    NewSessionResponse, PromptResponse, SessionConfigKind, SessionConfigOption, SessionUpdate,
+    SetSessionConfigOptionResponse, StopReason,
 };
 
 use crate::agents::acp::supervision::AcpSessionSupervisor;
@@ -41,6 +41,29 @@ pub(super) fn record_config_snapshot(
     supervisor.mutate_session_state(|state| {
         state.config_options = config_option_states(&response.config_options);
     });
+}
+
+/// Record why a prompt turn stopped, both on the inspectable session state and
+/// as a timeline event so a refusal is visible without reading the daemon log.
+pub(super) fn record_stop_reason(supervisor: &AcpSessionSupervisor, response: &PromptResponse) {
+    let label = stop_reason_label(&response.stop_reason);
+    supervisor.mutate_session_state(|state| {
+        state.last_stop_reason = Some(label.to_owned());
+    });
+    if let Some(emitter) = supervisor.event_emitter() {
+        emitter.emit_turn_ended(label.to_owned());
+    }
+}
+
+fn stop_reason_label(stop_reason: &StopReason) -> &'static str {
+    match stop_reason {
+        StopReason::EndTurn => "end_turn",
+        StopReason::MaxTokens => "max_tokens",
+        StopReason::MaxTurnRequests => "max_turn_requests",
+        StopReason::Refusal => "refusal",
+        StopReason::Cancelled => "cancelled",
+        _ => "unknown",
+    }
 }
 
 pub(super) fn apply_session_update(supervisor: &AcpSessionSupervisor, update: &SessionUpdate) {

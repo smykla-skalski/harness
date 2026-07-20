@@ -302,6 +302,9 @@ pub struct AcpAgentSessionState {
     pub title: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<String>,
+    /// Why the most recent prompt turn stopped, as reported by the agent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_stop_reason: Option<String>,
 }
 
 /// Compact view of one advertised session config option and its value.

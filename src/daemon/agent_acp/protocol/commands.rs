@@ -382,12 +382,13 @@ async fn send_prompt(
         session_id,
         vec![ContentBlock::Text(TextContent::new(prompt))],
     );
-    timeout(
+    let response = timeout(
         prompt_timeout,
         connection.send_request(request).block_task(),
     )
     .await
     .map_err(|_| super::deadline_error("session/prompt", prompt_timeout))??;
+    super::session_state::record_stop_reason(supervisor, &response);
     Ok(())
 }
 

@@ -88,6 +88,16 @@ impl SupervisorEventSink {
         );
     }
 
+    /// Emit a synthetic `TurnEnded` event into the per-session channel.
+    ///
+    /// Producer site: `daemon::agent_acp::protocol::session_state` calls this
+    /// when a `session/prompt` response lands, so the timeline shows why the
+    /// turn stopped (notably a refusal). Never terminal: the session stays
+    /// alive for the next prompt.
+    pub fn emit_turn_ended(&self, stop_reason: String) {
+        self.emit(ConversationEventKind::TurnEnded { stop_reason }, false);
+    }
+
     fn emit(&self, kind: ConversationEventKind, terminal: bool) {
         let batch = self.synthetic_batch(kind);
         self.try_emit_batch(batch, terminal);
@@ -153,5 +163,9 @@ impl WatchdogEventEmitter for SupervisorEventSink {
 
     fn emit_context_injected(&self, actor: String, summary: Option<String>) {
         Self::emit_context_injected(self, actor, summary);
+    }
+
+    fn emit_turn_ended(&self, stop_reason: String) {
+        Self::emit_turn_ended(self, stop_reason);
     }
 }

@@ -132,6 +132,10 @@ pub(crate) fn conversation_entry(
             "agent_context_injected",
             format!("{agent_id} accepted context from {actor}"),
         ),
+        ConversationEventKind::TurnEnded { stop_reason } => (
+            "agent_turn_ended",
+            turn_ended_summary(agent_id, stop_reason),
+        ),
         ConversationEventKind::ContextUsage {
             used_tokens,
             context_window_tokens,
@@ -171,6 +175,16 @@ pub(crate) fn conversation_entry(
         summary,
         payload,
     }))
+}
+
+fn turn_ended_summary(agent_id: &str, stop_reason: &str) -> String {
+    match stop_reason {
+        "refusal" => format!("{agent_id} refused to continue the turn"),
+        "cancelled" => format!("{agent_id} turn cancelled"),
+        "max_tokens" => format!("{agent_id} turn hit the token limit"),
+        "max_turn_requests" => format!("{agent_id} turn hit the request limit"),
+        other => format!("{agent_id} turn ended ({other})"),
+    }
 }
 
 fn context_usage_summary(

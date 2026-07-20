@@ -481,14 +481,16 @@ async fn send_prompt_or_cancel(
     let mut prompt = Box::pin(connection.send_request(request).block_task());
     tokio::select! {
         result = timeout(prompt_timeout, &mut prompt) => {
-            result.map_err(|_| deadline_error("session/prompt", prompt_timeout))??;
+            let response = result.map_err(|_| deadline_error("session/prompt", prompt_timeout))??;
+            session_state::record_stop_reason(supervisor, &response);
             Ok(false)
         }
         Some(()) = cancel_rx.recv() => {
             send_cancel_notification(connection, session_id)?;
-            timeout(prompt_timeout, prompt)
+            let response = timeout(prompt_timeout, prompt)
                 .await
                 .map_err(|_| deadline_error("session/prompt", prompt_timeout))??;
+            session_state::record_stop_reason(supervisor, &response);
             Ok(true)
         }
     }
