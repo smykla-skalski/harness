@@ -126,7 +126,7 @@ fn resume_target<'a>(
     supervisor: &AcpSessionSupervisor,
     resume_session_id: Option<&'a str>,
 ) -> Option<&'a str> {
-    let resume_session_id = resume_session_id.filter(|id| !id.trim().is_empty())?;
+    let resume_session_id = resume_session_id.map(str::trim).filter(|id| !id.is_empty())?;
     supervisor
         .handshake()
         .is_some_and(|handshake| handshake.supports_session_resume)
