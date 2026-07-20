@@ -20,6 +20,14 @@ use crate::daemon::agent_acp::protocol::session_guard::RouteTarget;
 /// Extra time a reply may take beyond the command's own wire deadline.
 const RESPONSE_GRACE: Duration = Duration::from_secs(5);
 
+/// Scheduling slack on top of a sweep's own budget.
+///
+/// A sweep already bounds itself by the budget its caller chose, so the reply
+/// only has to travel back over the channel. Far smaller than
+/// [`RESPONSE_GRACE`] because daemon shutdown waits on this, and the budget is
+/// meant to be the bound the caller actually gets.
+const SWEEP_RESPONSE_GRACE: Duration = Duration::from_millis(500);
+
 /// How long a caller waits for a reply, given the loop's per-request budget.
 ///
 /// A reply that misses this is a loop that stopped running rather than a slow
@@ -169,7 +177,7 @@ impl AcpProtocolHandle {
             budget,
             response_tx,
         })?;
-        receive_response(&response_rx, budget.saturating_add(RESPONSE_GRACE))
+        receive_response(&response_rx, budget.saturating_add(SWEEP_RESPONSE_GRACE))
     }
 
     fn dispatch(&self, command: ProtocolCommand) -> ProtocolCommandResult<()> {
