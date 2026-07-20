@@ -27,7 +27,7 @@ struct TaskBoardStepRailTargetView: View {
   var body: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
       HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-        Label(isPicked ? "Picked item" : "Current target", systemImage: "scope")
+        Label(isPicked ? "Picked item:" : "Current target:", systemImage: "scope")
           .font(labelFont)
           .foregroundStyle(.secondary)
         identity
@@ -74,8 +74,31 @@ struct TaskBoardStepRailTargetView: View {
 /// `DisclosureGroup` only hit-tests its triangle on macOS, so the label carries
 /// its own full-width button - otherwise the row reads as static text and the
 /// only way in is a 12pt chevron. A real button rather than a tap gesture so
-/// the row stays tab-reachable and keyboard-activatable, wearing the shared
-/// row chrome for its hover and press feedback.
+/// the row stays tab-reachable and keyboard-activatable.
+/// Feedback for the automation-context row. The row sits directly on the
+/// manual-steps card, so it rests fully transparent and only tints while the
+/// pointer is over it or it is held down.
+private struct TaskBoardStepContextRowButtonStyle: ButtonStyle {
+  let isHovered: Bool
+
+  @Environment(\.isEnabled)
+  private var isEnabled
+
+  private var shape: RoundedRectangle {
+    RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
+  }
+
+  func makeBody(configuration: Configuration) -> some View {
+    let fillOpacity = configuration.isPressed ? 0.10 : isHovered ? 0.06 : 0
+    return
+      configuration.label
+      .background { shape.fill(HarnessMonitorTheme.ink.opacity(fillOpacity)) }
+      .contentShape(shape)
+      .opacity(isEnabled ? 1 : 0.4)
+      .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+  }
+}
+
 struct TaskBoardStepContextDisclosure: View {
   let store: HarnessMonitorStore
   let workspace: PolicyCanvasWorkspace?
@@ -88,6 +111,7 @@ struct TaskBoardStepContextDisclosure: View {
   private var fontScale
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
+  @State private var isHovered = false
 
   private var labelFont: Font {
     HarnessMonitorTextSize.scaledFont(.callout.weight(.semibold), by: fontScale)
@@ -122,7 +146,12 @@ struct TaskBoardStepContextDisclosure: View {
           .padding(.vertical, HarnessMonitorTheme.spacingXS)
           .padding(.horizontal, HarnessMonitorTheme.spacingSM)
       }
-      .harnessSidebarRowButtonStyle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
+      .buttonStyle(TaskBoardStepContextRowButtonStyle(isHovered: isHovered))
+      .onHover { hovering in
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) {
+          isHovered = hovering
+        }
+      }
       // Standing in for the DisclosureGroup label costs VoiceOver the
       // expanded state, so the button carries it.
       .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
