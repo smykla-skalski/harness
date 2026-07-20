@@ -41,6 +41,90 @@ fn descriptor_with_session_configuration(
     }
 }
 
+/// A prompt is spawned, not awaited, so its caller waits for the `session/new`
+/// in front of it and never for the model. This is what lets one response
+/// budget serve every command even though a prompt may run for minutes; an
+/// `.await` added here would strand callers behind the prompt timeout.
+#[tokio::test]
+#[cfg(unix)]
+async fn attach_prompt_session_returns_before_the_prompt_completes() {
+    let mut supervisor_child = Command::new("sleep")
+        .arg("60")
+        .spawn()
+        .expect("spawn supervisor child");
+    let supervisor = Arc::new(AcpSessionSupervisor::new(
+        &supervisor_child,
+        SupervisionConfig {
+            initialize_timeout: Duration::from_secs(1),
+            // Long on purpose: awaiting the prompt would show up as a wait of
+            // this size instead of the milliseconds the attach itself takes.
+            prompt_timeout: Duration::from_secs(30),
+            ..SupervisionConfig::default()
+        },
+    ));
+    let (client_transport, agent_transport) = Channel::duplex();
+    let agent_task = tokio::spawn(run_agent_never_answering_prompt(agent_transport));
+    let session_guard = SessionRouteGuard::default();
+    let session_config = AcpSessionRequestConfig::from_request(
+        &crate::daemon::agent_acp::manager::AcpAgentStartRequest::default(),
+        &descriptor_with_session_configuration(AcpSessionConfiguration::default()),
+    );
+    let elapsed = Arc::new(Mutex::new(None::<Duration>));
+    let recorded = Arc::clone(&elapsed);
+
+    let protocol_task = tokio::spawn(async move {
+        Client
+            .builder()
+            .name("harness-test")
+            .connect_with(client_transport, async move |connection| {
+                let started = std::time::Instant::now();
+                let session_id = attach_prompt_session(
+                    Arc::clone(&supervisor),
+                    &connection,
+                    &session_guard,
+                    Duration::from_secs(30),
+                    AttachPromptInput {
+                        acp_id: "agent-acp-1".to_string(),
+                        session_id: "orchestration-1".to_string(),
+                        project_dir: PathBuf::from("/tmp/harness"),
+                        session_config,
+                        prompt: "resume work".to_string(),
+                        prompt_lease: PromptGate::default()
+                            .acquire(PromptOwner::new("agent-acp-1", "orchestration-1"))
+                            .expect("acquire prompt lease"),
+                    },
+                )
+                .await
+                .expect("attach prompt session");
+                *recorded.lock().expect("record elapsed") = Some(started.elapsed());
+                send_cancel_notification(&connection, session_id)
+            })
+            .await
+    });
+
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    let attach_elapsed = loop {
+        if let Some(value) = *elapsed.lock().expect("read elapsed") {
+            break value;
+        }
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "attach should return while the prompt is still unanswered"
+        );
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    };
+
+    assert!(
+        attach_elapsed < Duration::from_secs(5),
+        "attach waited {attach_elapsed:?}, so it is waiting on the prompt"
+    );
+
+    protocol_task.abort();
+    agent_task.abort();
+    let _ = supervisor_child.kill();
+    let _ = supervisor_child.wait();
+}
+
 #[tokio::test]
 #[cfg(unix)]
 async fn attach_prompt_session_reapplies_session_config_before_prompt() {
@@ -198,6 +282,44 @@ async fn run_agent_recording_attach_config_order(
                         .push("prompt".to_string());
                     responder.respond(PromptResponse::new(StopReason::EndTurn))
                 }
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_notification(
+            async move |_cancel: CancelNotification, _connection| Ok(()),
+            agent_client_protocol::on_receive_notification!(),
+        )
+        .connect_to(transport)
+        .await
+}
+
+/// Answers everything needed to open a session, then leaves `session/prompt`
+/// hanging so a caller that awaited it would visibly stall.
+async fn run_agent_never_answering_prompt(
+    transport: Channel,
+) -> agent_client_protocol::Result<()> {
+    Agent
+        .builder()
+        .name("silent-prompt-agent")
+        .on_receive_request(
+            async move |initialize: InitializeRequest, responder, _connection| {
+                responder.respond(
+                    InitializeResponse::new(initialize.protocol_version)
+                        .agent_capabilities(AgentCapabilities::new()),
+                )
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |_request: NewSessionRequest, responder, _connection| {
+                responder.respond(NewSessionResponse::new("acp-session-1"))
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |_request: PromptRequest, _responder, _connection| {
+                std::future::pending::<()>().await;
+                Ok(())
             },
             agent_client_protocol::on_receive_request!(),
         )

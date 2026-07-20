@@ -161,6 +161,10 @@ pub(super) fn spawn_protocol_task(
         disconnects,
         protocol: protocol_task,
         batcher: batcher.task,
+        // One budget covers every command, including the prompt one: a prompt
+        // is spawned rather than awaited, so its caller waits for the
+        // `session/new` ahead of it and not for the model. The prompt's own
+        // 10-minute budget applies inside that spawned task.
         handle: AcpProtocolHandle::new(
             cancel_tx,
             command_tx,
