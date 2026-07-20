@@ -157,7 +157,11 @@ pub(super) fn spawn_protocol_task(
         disconnects,
         protocol: protocol_task,
         batcher: batcher.task,
-        handle: AcpProtocolHandle::new(cancel_tx, command_tx),
+        handle: AcpProtocolHandle::new(
+            cancel_tx,
+            command_tx,
+            commands::response_timeout_for(supervisor.config().lifecycle_timeout),
+        ),
         start: start_tx,
     })
 }
@@ -367,7 +371,10 @@ async fn send_new_session(
     let _guard = supervisor.enter_pending_request_with_reason(Some("session/new"));
     let request =
         session_inputs::new_session_request(project_dir, session_config, supervisor.handshake());
-    connection.send_request(request).block_task().await
+    let budget = supervisor.config().lifecycle_timeout;
+    timeout(budget, connection.send_request(request).block_task())
+        .await
+        .map_err(|_| deadline_error("session/new", budget))?
 }
 
 async fn send_prompt_or_cancel(
