@@ -22,8 +22,8 @@ use crate::session::types::{ManagedAgentRef, SessionRole};
 mod agents;
 
 use agents::{
-    run_agent_recording_startup_config_order, run_agent_with_stale_notification,
-    run_cookbook_style_agent,
+    run_agent_recording_initialize_contract, run_agent_recording_startup_config_order,
+    run_agent_with_stale_notification, run_cookbook_style_agent,
 };
 
 #[track_caller]
@@ -293,6 +293,88 @@ async fn protocol_rejects_notification_with_unknown_session_id() {
     ok(
         protocol_result,
         "protocol should remain healthy after stale notification",
+    );
+
+    let _ = supervisor_child.kill();
+    let _ = supervisor_child.wait();
+    agent_task.abort();
+    let _ = agent_task.await;
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn run_connection_sends_client_capabilities_and_client_info() {
+    let project = ok(tempfile::tempdir(), "project tempdir");
+    let mut supervisor_child = ok(
+        Command::new("sleep").arg("60").spawn(),
+        "spawn supervisor child",
+    );
+    let supervisor = Arc::new(AcpSessionSupervisor::new(
+        &supervisor_child,
+        SupervisionConfig {
+            initialize_timeout: Duration::from_secs(1),
+            prompt_timeout: Duration::from_secs(1),
+            ..SupervisionConfig::default()
+        },
+    ));
+    let operations = Arc::new(Mutex::new(Vec::<String>::new()));
+    let (client_transport, agent_transport) = Channel::duplex();
+    let agent_task = tokio::spawn(run_agent_recording_initialize_contract(
+        agent_transport,
+        Arc::clone(&operations),
+    ));
+    let (cancel_tx, cancel_rx) = mpsc::unbounded_channel();
+    let (_command_tx, command_rx) = mpsc::unbounded_channel();
+    let project_dir = project.path().to_path_buf();
+    let protocol_supervisor = Arc::clone(&supervisor);
+    let manager = protocol_manager(
+        "fake",
+        "agent-acp-1",
+        "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e",
+    );
+
+    let protocol_task = tokio::spawn(async move {
+        Client
+            .builder()
+            .name("harness-test")
+            .connect_with(client_transport, async move |connection| {
+                run_connection(RunConnectionArgs {
+                    connection,
+                    project_dir,
+                    prompt: None,
+                    session_config: disabled_session_config(),
+                    acp_id: "agent-acp-1".to_string(),
+                    session_id: "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e".to_string(),
+                    runtime_name: "fake".to_string(),
+                    supervisor: protocol_supervisor,
+                    initial_prompt_lease: None,
+                    cancel_rx,
+                    command_rx,
+                    session_guard: Arc::new(SessionRouteGuard::default()),
+                    manager,
+                    credential: None,
+                })
+                .await
+            })
+            .await
+    });
+
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(cancel_tx.send(()).is_ok());
+    let protocol_result = ok(
+        ok(
+            tokio::time::timeout(Duration::from_secs(2), protocol_task).await,
+            "protocol should stop after cancel",
+        ),
+        "protocol task should not panic",
+    );
+    ok(protocol_result, "protocol should complete cleanly");
+    assert_eq!(
+        operations.lock().expect("recorded operations").clone(),
+        vec![format!(
+            "initialize:read=true,write=true,terminal=true,boolean=true,client=harness@{}",
+            env!("CARGO_PKG_VERSION"),
+        )]
     );
 
     let _ = supervisor_child.kill();

@@ -94,6 +94,54 @@ pub(super) async fn run_agent_with_stale_notification(
         .await
 }
 
+pub(super) async fn run_agent_recording_initialize_contract(
+    transport: Channel,
+    operations: Arc<Mutex<Vec<String>>>,
+) -> agent_client_protocol::Result<()> {
+    Agent
+        .builder()
+        .name("initialize-contract-agent")
+        .on_receive_request(
+            async move |initialize: InitializeRequest, responder, _connection| {
+                let capabilities = &initialize.client_capabilities;
+                let boolean = capabilities
+                    .session
+                    .as_ref()
+                    .and_then(|session| session.config_options.as_ref())
+                    .is_some_and(|options| options.boolean.is_some());
+                let client = initialize
+                    .client_info
+                    .as_ref()
+                    .map_or_else(|| "none".to_owned(), |info| {
+                        format!("{}@{}", info.name, info.version)
+                    });
+                operations.lock().expect("record initialize").push(format!(
+                    "initialize:read={},write={},terminal={},boolean={boolean},client={client}",
+                    capabilities.fs.read_text_file,
+                    capabilities.fs.write_text_file,
+                    capabilities.terminal,
+                ));
+                responder.respond(
+                    InitializeResponse::new(initialize.protocol_version)
+                        .agent_capabilities(AgentCapabilities::new()),
+                )
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |_request: NewSessionRequest, responder, _connection| {
+                responder.respond(NewSessionResponse::new("acp-session-1"))
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_notification(
+            async move |_cancel: CancelNotification, _connection| Ok(()),
+            agent_client_protocol::on_receive_notification!(),
+        )
+        .connect_to(transport)
+        .await
+}
+
 pub(super) async fn run_agent_recording_startup_config_order(
     transport: Channel,
     operations: Arc<Mutex<Vec<String>>>,

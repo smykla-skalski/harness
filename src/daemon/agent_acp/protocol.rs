@@ -6,11 +6,12 @@ use std::time::Duration;
 
 use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::schema::v1::{
-    CancelNotification, ContentBlock, CreateTerminalRequest, InitializeRequest,
-    KillTerminalRequest, NewSessionRequest, NewSessionResponse, PromptRequest,
-    ReadTextFileRequest, ReleaseTerminalRequest, RequestPermissionRequest, SessionId,
-    SessionNotification, TerminalOutputRequest, TextContent, WaitForTerminalExitRequest,
-    WriteTextFileRequest,
+    BooleanConfigOptionCapabilities, CancelNotification, ClientCapabilities,
+    ClientSessionCapabilities, ContentBlock, CreateTerminalRequest, FileSystemCapabilities,
+    Implementation, InitializeRequest, InitializeResponse, KillTerminalRequest, NewSessionRequest,
+    NewSessionResponse, PromptRequest, ReadTextFileRequest, ReleaseTerminalRequest,
+    RequestPermissionRequest, SessionConfigOptionsCapabilities, SessionId, SessionNotification,
+    TerminalOutputRequest, TextContent, WaitForTerminalExitRequest, WriteTextFileRequest,
 };
 use agent_client_protocol::{
     Agent, ByteStreams, Client, ConnectionTo, Error as AcpError, ErrorCode, Result as AcpResult,
@@ -426,21 +427,35 @@ struct RunConnectionArgs {
     credential: Option<SpawnCredential>,
 }
 
+fn harness_client_capabilities() -> ClientCapabilities {
+    ClientCapabilities::new()
+        .fs(FileSystemCapabilities::new()
+            .read_text_file(true)
+            .write_text_file(true))
+        .terminal(true)
+        .session(
+            ClientSessionCapabilities::new().config_options(
+                SessionConfigOptionsCapabilities::new()
+                    .boolean(BooleanConfigOptionCapabilities::new()),
+            ),
+        )
+}
+
 async fn send_initialize(
     supervisor: &AcpSessionSupervisor,
     connection: &ConnectionTo<Agent>,
     initialize_timeout: Duration,
-) -> AcpResult<()> {
+) -> AcpResult<InitializeResponse> {
     let _guard = supervisor.enter_pending_request_with_reason(Some("session/initialize"));
+    let request = InitializeRequest::new(ProtocolVersion::V1)
+        .client_capabilities(harness_client_capabilities())
+        .client_info(Implementation::new("harness", env!("CARGO_PKG_VERSION")));
     timeout(
         initialize_timeout,
-        connection
-            .send_request(InitializeRequest::new(ProtocolVersion::V1))
-            .block_task(),
+        connection.send_request(request).block_task(),
     )
     .await
-    .map_err(|_| deadline_error("session/initialize", initialize_timeout))??;
-    Ok(())
+    .map_err(|_| deadline_error("session/initialize", initialize_timeout))?
 }
 
 async fn send_new_session(
