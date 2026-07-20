@@ -243,6 +243,16 @@ public struct DaemonController: DaemonControlling {
 
       let outcome = await group.next() ?? .unavailable
       group.cancelAll()
+      // Cancellation cannot unwind a WebSocket connect that already resumed, so
+      // the losing branch can still land a connected client. Drop it on the
+      // floor and it keeps a socket and heartbeat alive for the whole session.
+      if case .timedOut = outcome {
+        for await pending in group {
+          if case .upgraded(let webSocketClient) = pending {
+            await webSocketClient.shutdown()
+          }
+        }
+      }
       return outcome
     }
   }
