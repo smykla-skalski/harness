@@ -360,6 +360,7 @@ async fn run_connection_applies_session_configuration_before_first_prompt() {
                 category: Some("effort".to_string()),
             },
         },
+        ..Default::default()
     });
     let request = AcpAgentStartRequest {
         prompt: Some("configure then prompt".to_string()),

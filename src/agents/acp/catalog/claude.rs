@@ -67,6 +67,7 @@ pub fn descriptor() -> AcpAgentDescriptor {
             effort: AcpSessionEffortTransport::ConfigOption {
                 selector: AcpSessionConfigOptionBinding::default(),
             },
+            ..Default::default()
         },
         doctor_probe: DoctorProbe {
             command: "claude-agent-acp".to_owned(),

@@ -41,6 +41,7 @@ mod lifecycle;
 mod runtime_helpers;
 mod session_config;
 mod session_guard;
+mod session_inputs;
 mod session_start;
 mod session_state;
 pub(super) use commands::AcpProtocolHandle;

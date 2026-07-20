@@ -71,6 +71,7 @@ async fn attach_prompt_session_reapplies_session_config_before_prompt() {
                 category: Some("effort".to_string()),
             },
         },
+        ..Default::default()
     });
     let request = crate::daemon::agent_acp::manager::AcpAgentStartRequest {
         effort: Some("high".to_string()),

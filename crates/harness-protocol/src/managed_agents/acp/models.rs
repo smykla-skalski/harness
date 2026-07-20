@@ -119,13 +119,66 @@ pub struct AcpSessionConfiguration {
     pub model: AcpSessionModelTransport,
     #[serde(default)]
     pub effort: AcpSessionEffortTransport,
+    /// MCP servers offered to the agent on `session/new`.
+    ///
+    /// Http and Sse entries are dropped for agents that do not advertise the
+    /// matching MCP capability, so a descriptor can list them unconditionally.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mcp_servers: Vec<AcpMcpServer>,
+    /// Roots beyond the project directory the agent may work in, sent on
+    /// `session/new` only when the agent advertises `additionalDirectories`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub additional_directories: Vec<String>,
 }
 
 impl AcpSessionConfiguration {
     fn is_empty(&self) -> bool {
         matches!(self.model, AcpSessionModelTransport::Disabled)
             && matches!(self.effort, AcpSessionEffortTransport::Disabled)
+            && self.mcp_servers.is_empty()
+            && self.additional_directories.is_empty()
     }
+}
+
+/// One MCP server a descriptor offers to its agent.
+///
+/// Mirrors the ACP `McpServer` shape without depending on the SDK, so the
+/// catalog and daemon wire format stay independent of the protocol crate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "transport", rename_all = "snake_case")]
+pub enum AcpMcpServer {
+    Stdio {
+        name: String,
+        command: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        args: Vec<String>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        env: Vec<AcpMcpEnvVariable>,
+    },
+    Http {
+        name: String,
+        url: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        headers: Vec<AcpMcpHttpHeader>,
+    },
+    Sse {
+        name: String,
+        url: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        headers: Vec<AcpMcpHttpHeader>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AcpMcpEnvVariable {
+    pub name: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AcpMcpHttpHeader {
+    pub name: String,
+    pub value: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -285,6 +338,10 @@ pub struct AcpAgentHandshake {
     pub supports_session_delete: bool,
     #[serde(default)]
     pub supports_additional_directories: bool,
+    #[serde(default)]
+    pub supports_mcp_http: bool,
+    #[serde(default)]
+    pub supports_mcp_sse: bool,
     #[serde(default)]
     pub supports_logout: bool,
 }

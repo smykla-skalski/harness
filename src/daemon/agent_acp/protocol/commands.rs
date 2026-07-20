@@ -5,8 +5,8 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use agent_client_protocol::schema::v1::{
-    CancelNotification, ContentBlock, ListSessionsRequest, LogoutRequest, NewSessionRequest,
-    PromptRequest, SessionId, TextContent,
+    CancelNotification, ContentBlock, ListSessionsRequest, LogoutRequest, PromptRequest, SessionId,
+    TextContent,
 };
 use agent_client_protocol::{Agent, ConnectionTo, Result as AcpResult};
 use tokio::sync::mpsc as tokio_mpsc;
@@ -352,10 +352,15 @@ async fn attach_protocol_session(
     project_dir: PathBuf,
     session_config: &AcpSessionRequestConfig,
 ) -> ProtocolCommandResult<SessionId> {
+    let request = super::session_inputs::new_session_request(
+        project_dir,
+        session_config,
+        supervisor.handshake().as_deref(),
+    );
     let response = {
         let _guard = supervisor.enter_pending_request_with_reason(Some("session/new"));
         connection
-            .send_request(NewSessionRequest::new(project_dir))
+            .send_request(request)
             .block_task()
             .await
             .map_err(|error| error.to_string())?
