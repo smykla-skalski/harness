@@ -6,6 +6,7 @@ use crate::errors::CliError;
 mod acp_sessions;
 mod attach;
 mod codex;
+mod inspect;
 mod start;
 mod terminal;
 
