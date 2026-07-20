@@ -247,22 +247,6 @@ enum TaskBoardLaneCardHoverID: Hashable {
   case decision(String)
 }
 
-struct TaskBoardLaneCardFrame: Equatable {
-  let id: TaskBoardLaneCardHoverID
-  let frame: CGRect
-}
-
-struct TaskBoardLaneCardFramePreferenceKey: PreferenceKey {
-  static let defaultValue: [TaskBoardLaneCardFrame] = []
-
-  static func reduce(
-    value: inout [TaskBoardLaneCardFrame],
-    nextValue: () -> [TaskBoardLaneCardFrame]
-  ) {
-    value.append(contentsOf: nextValue())
-  }
-}
-
 private struct TaskBoardCardChrome: ViewModifier {
   let tint: Color
   let isHovered: Bool
@@ -352,22 +336,31 @@ extension View {
     )
   }
 
+  /// Each card reports its own frame straight into the lane's hover model.
+  /// Deliberately not a shared preference reduced across the `LazyVStack` - that
+  /// aggregate faulted as "bound preference ... tried to update multiple times
+  /// per frame" while lazy children measured in. Frame recording stays
+  /// unconditional so the model is current the instant the pointer arrives, but
+  /// re-resolving the hovered card is gated: every visible card's frame changes
+  /// each scroll frame, yet only the card now under the pointer, or the one
+  /// sliding off it, can change the hit. `isHovered` is that second case.
   func taskBoardCardFrame(
     id: TaskBoardLaneCardHoverID,
-    in coordinateSpace: String
+    in coordinateSpace: String,
+    tracking: TaskBoardLaneHoverTracking,
+    isHovered: Bool,
+    onChange: @escaping () -> Void
   ) -> some View {
-    background {
-      GeometryReader { proxy in
-        Color.clear.preference(
-          key: TaskBoardLaneCardFramePreferenceKey.self,
-          value: [
-            TaskBoardLaneCardFrame(
-              id: id,
-              frame: proxy.frame(in: .named(coordinateSpace))
-            )
-          ]
-        )
-      }
+    onGeometryChange(for: CGRect.self) { proxy in
+      proxy.frame(in: .named(coordinateSpace))
+    } action: { frame in
+      tracking.setFrame(frame, for: id)
+      guard let location = tracking.location else { return }
+      if isHovered || frame.contains(location) { onChange() }
+    }
+    .onDisappear {
+      tracking.removeFrame(for: id)
+      if isHovered { onChange() }
     }
   }
 }

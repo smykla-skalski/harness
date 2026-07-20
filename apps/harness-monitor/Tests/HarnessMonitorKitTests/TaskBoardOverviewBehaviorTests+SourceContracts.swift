@@ -22,6 +22,25 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(!needsYouRows.contains(".onHover {"))
   }
 
+  @Test("Lane card frames report per card, not through a bound preference")
+  func laneCardFramesAvoidBoundPreferenceAggregation() throws {
+    let support = try taskBoardSourceFile(named: "TaskBoardLaneSupport.swift")
+    let laneColumn = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
+
+    // The old aggregation reduced one PreferenceKey across every card in the
+    // LazyVStack; it updated several times per frame as lazy children measured
+    // in, which SwiftUI faults as "bound preference ... tried to update multiple
+    // times per frame". Target that specific pattern - the key and its frame-pair
+    // struct - not the whole PreferenceKey API, which unrelated future code in
+    // these files may legitimately use. The positive checks are the real guard:
+    // the card-frame modifier must keep reporting per card.
+    #expect(!support.contains("TaskBoardLaneCardFramePreferenceKey"))
+    #expect(!support.contains("TaskBoardLaneCardFrame("))
+    #expect(!laneColumn.contains("TaskBoardLaneCardFramePreferenceKey"))
+    #expect(support.contains("onGeometryChange(for: CGRect.self)"))
+    #expect(support.contains("tracking.setFrame(frame, for: id)"))
+  }
+
   @Test("Expanded lane scroll content owns its padding")
   func expandedLaneScrollContentOwnsItsPadding() throws {
     let laneColumn = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")

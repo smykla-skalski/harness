@@ -183,7 +183,13 @@ struct TaskBoardLaneUnifiedColumn: View {
           actions: actions,
           cardPresentation: apiCardPresentations[item.id]
         )
-        .taskBoardCardFrame(id: hoverID, in: cardHoverCoordinateSpace)
+        .taskBoardCardFrame(
+          id: hoverID,
+          in: cardHoverCoordinateSpace,
+          tracking: hoverTracking,
+          isHovered: hoveredCardID == hoverID,
+          onChange: resolveHoveredCard
+        )
         .contextMenu {
           TaskBoardCardContextMenu(cardID: cardID)
         }
@@ -206,7 +212,13 @@ struct TaskBoardLaneUnifiedColumn: View {
           actions: actions,
           cardPresentation: inboxCardPresentations[cardID]
         )
-        .taskBoardCardFrame(id: hoverID, in: cardHoverCoordinateSpace)
+        .taskBoardCardFrame(
+          id: hoverID,
+          in: cardHoverCoordinateSpace,
+          tracking: hoverTracking,
+          isHovered: hoveredCardID == hoverID,
+          onChange: resolveHoveredCard
+        )
         .contextMenu {
           TaskBoardCardContextMenu(cardID: cardID)
         }
@@ -216,13 +228,6 @@ struct TaskBoardLaneUnifiedColumn: View {
     .coordinateSpace(.named(cardHoverCoordinateSpace))
     .onContinuousHover(coordinateSpace: .named(cardHoverCoordinateSpace)) { phase in
       updateHoveredCard(phase: phase)
-    }
-    .onPreferenceChange(TaskBoardLaneCardFramePreferenceKey.self) { frames in
-      guard hoverTracking.frames != frames else {
-        return
-      }
-      hoverTracking.frames = frames
-      updateHoveredCard(location: hoverTracking.location, frames: frames)
     }
   }
 
@@ -236,7 +241,13 @@ struct TaskBoardLaneUnifiedColumn: View {
           isHovered: hoveredCardID == cardID,
           actions: actions
         )
-        .taskBoardCardFrame(id: cardID, in: cardHoverCoordinateSpace)
+        .taskBoardCardFrame(
+          id: cardID,
+          in: cardHoverCoordinateSpace,
+          tracking: hoverTracking,
+          isHovered: hoveredCardID == cardID,
+          onChange: resolveHoveredCard
+        )
       }
     }
   }
@@ -245,24 +256,22 @@ struct TaskBoardLaneUnifiedColumn: View {
     switch phase {
     case .active(let location):
       hoverTracking.location = location
-      updateHoveredCard(location: location, frames: hoverTracking.frames)
+      resolveHoveredCard()
     case .ended:
       hoverTracking.location = nil
       updateHoveredCard(id: nil)
     }
   }
 
-  private func updateHoveredCard(
-    location: CGPoint?,
-    frames: [TaskBoardLaneCardFrame]
-  ) {
-    guard let location else {
+  /// Re-picks the hovered card from the last pointer location. Called on pointer
+  /// move and whenever a card's frame settles or leaves, so the highlight tracks
+  /// content that scrolls under a stationary pointer.
+  private func resolveHoveredCard() {
+    guard let location = hoverTracking.location else {
       updateHoveredCard(id: nil)
       return
     }
-    updateHoveredCard(
-      id: frames.first { $0.frame.contains(location) }?.id
-    )
+    updateHoveredCard(id: hoverTracking.cardID(at: location))
   }
 
   private func updateHoveredCard(id: TaskBoardLaneCardHoverID?) {
