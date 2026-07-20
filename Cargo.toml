@@ -18,7 +18,7 @@ members = [
 
 [package]
 name = "harness"
-version = "49.2.0"
+version = "49.3.0"
 edition = "2024"
 rust-version = "1.94"
 autoexamples = false
@@ -38,11 +38,11 @@ include = [
 ]
 
 [dependencies]
-harness-command = { path = "crates/harness-command", version = "49.2.0" }
-harness-mcp = { path = "crates/harness-mcp", version = "49.2.0", optional = true }
-harness-protocol = { path = "crates/harness-protocol", version = "49.2.0" }
-harness-systemd-protocol = { path = "crates/harness-systemd-protocol", version = "49.2.0", optional = true }
-harness-telemetry = { path = "crates/harness-telemetry", version = "49.2.0" }
+harness-command = { path = "crates/harness-command", version = "49.3.0" }
+harness-mcp = { path = "crates/harness-mcp", version = "49.3.0", optional = true }
+harness-protocol = { path = "crates/harness-protocol", version = "49.3.0" }
+harness-systemd-protocol = { path = "crates/harness-systemd-protocol", version = "49.3.0", optional = true }
+harness-telemetry = { path = "crates/harness-telemetry", version = "49.3.0" }
 arc-swap = "1.9.1"
 bollard = "0.21.0"
 bytes = "1.10.1"
