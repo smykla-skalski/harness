@@ -45,16 +45,7 @@ pub(super) async fn get_acp_sessions(
             let cwd = query.cwd.map(PathBuf::from);
             let cursor = query.cursor;
             run_acp_agent_blocking(&state, "session-list", move |manager| {
-                manager
-                    .list_agent_sessions(&list_agent_id, cwd, cursor)
-                    .and_then(|page| {
-                        serde_json::to_value(page).map_err(|error| {
-                            crate::errors::CliErrorKind::workflow_io(format!(
-                                "serialize ACP session list: {error}"
-                            ))
-                            .into()
-                        })
-                    })
+                manager.list_agent_sessions(&list_agent_id, cwd, cursor)
             })
             .await
         }
