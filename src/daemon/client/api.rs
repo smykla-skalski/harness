@@ -1,6 +1,6 @@
 #[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 use crate::agents::acp::probe::AcpRuntimeProbeResponse;
-use crate::daemon::agent_acp::{AcpAgentInspectResponse, AcpAgentStartRequest};
+use crate::daemon::agent_acp::{AcpAgentInspectResponse, AcpAgentStartRequest, AcpSessionListPage};
 use crate::daemon::agent_tui::{AgentTuiInputRequest, AgentTuiResizeRequest, AgentTuiStartRequest};
 use crate::daemon::protocol::{
     AdoptSessionRequest, AgentRemoveRequest, AgentRuntimeSessionRegistrationRequest,
@@ -396,6 +396,46 @@ impl DaemonClient {
     pub fn logout_acp_managed_agent(&self, agent_id: &str) -> Result<serde_json::Value, CliError> {
         let body = serde_json::json!({});
         self.post(&format!("/v1/managed-agents/{agent_id}/logout"), &body)
+    }
+
+    pub fn list_acp_agent_sessions(
+        &self,
+        agent_id: &str,
+        cwd: Option<&str>,
+        cursor: Option<&str>,
+    ) -> Result<AcpSessionListPage, CliError> {
+        let path = format!("/v1/managed-agents/{agent_id}/sessions");
+        let query: Vec<(&str, &str)> = [("cwd", cwd), ("cursor", cursor)]
+            .into_iter()
+            .filter_map(|(key, value)| value.map(|value| (key, value)))
+            .collect();
+        if query.is_empty() {
+            self.get(&path)
+        } else {
+            self.get_with_query(&path, &query)
+        }
+    }
+
+    pub fn close_acp_agent_session(
+        &self,
+        agent_id: &str,
+        agent_session_id: &str,
+    ) -> Result<serde_json::Value, CliError> {
+        let body = serde_json::json!({});
+        self.post(
+            &format!("/v1/managed-agents/{agent_id}/sessions/{agent_session_id}/close"),
+            &body,
+        )
+    }
+
+    pub fn delete_acp_agent_session(
+        &self,
+        agent_id: &str,
+        agent_session_id: &str,
+    ) -> Result<serde_json::Value, CliError> {
+        self.delete(&format!(
+            "/v1/managed-agents/{agent_id}/sessions/{agent_session_id}"
+        ))
     }
 
     pub fn inspect_acp_managed_agents(

@@ -259,6 +259,30 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Get,
+        path: http_paths::MANAGED_AGENT_ACP_SESSIONS,
+        parity: HttpRouteParity::Exempt {
+            reason: "CLI-only view of agent-owned sessions; no Monitor surface consumes it yet",
+        },
+        swift_client_exposed: false,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Delete,
+        path: http_paths::MANAGED_AGENT_ACP_SESSION_DELETE,
+        parity: HttpRouteParity::Exempt {
+            reason: "CLI-only ACP session lifecycle action; no Monitor surface consumes it yet",
+        },
+        swift_client_exposed: false,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::MANAGED_AGENT_ACP_SESSION_CLOSE,
+        parity: HttpRouteParity::Exempt {
+            reason: "CLI-only ACP session lifecycle action; no Monitor surface consumes it yet",
+        },
+        swift_client_exposed: false,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
         path: http_paths::MANAGED_AGENTS_CODEX_INSPECT,
         parity: HttpRouteParity::Rpc {
             ws_method: ws_methods::MANAGED_AGENTS_CODEX_INSPECT,

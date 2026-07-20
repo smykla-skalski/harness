@@ -20,7 +20,7 @@ fn every_non_exempt_http_route_has_a_ws_mapping() {
 #[test]
 fn explicit_non_rpc_exemptions_are_documented_and_stable() {
     let exemptions = explicit_exemptions();
-    assert_eq!(exemptions.len(), 12, "unexpected exemption count");
+    assert_eq!(exemptions.len(), 15, "unexpected exemption count");
     let exempt_paths: BTreeSet<_> = exemptions.iter().map(|route| route.path).collect();
     assert_eq!(
         exempt_paths,
@@ -37,6 +37,9 @@ fn explicit_non_rpc_exemptions_are_documented_and_stable() {
             http_paths::READY,
             http_paths::MANAGED_AGENT_ATTACH,
             http_paths::MANAGED_AGENT_ACP_LOGOUT,
+            http_paths::MANAGED_AGENT_ACP_SESSIONS,
+            http_paths::MANAGED_AGENT_ACP_SESSION_DELETE,
+            http_paths::MANAGED_AGENT_ACP_SESSION_CLOSE,
         ])
     );
     assert!(exemptions.iter().all(|route| {

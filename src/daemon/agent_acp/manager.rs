@@ -7,6 +7,7 @@ use std::time::Duration;
 
 pub(crate) use harness_protocol::managed_agents::acp::{
     AcpAgentInspectResponse, AcpAgentInspectSnapshot, AcpAgentSnapshot, AcpAgentStartRequest,
+    AcpSessionListPage,
 };
 use tokio::sync::broadcast;
 use tokio::time::Instant;
@@ -25,6 +26,7 @@ use crate::workspace::utc_now;
 pub(super) const PERMISSION_RESPONSE_DEADLINE: Duration = Duration::from_mins(5);
 const PROCESS_KEY_BACKOFF: Duration = Duration::from_secs(1);
 
+mod agent_sessions;
 mod locks;
 #[cfg(feature = "daemon-runtime")]
 mod orchestration;

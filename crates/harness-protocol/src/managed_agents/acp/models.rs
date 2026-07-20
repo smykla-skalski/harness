@@ -119,12 +119,98 @@ pub struct AcpSessionConfiguration {
     pub model: AcpSessionModelTransport,
     #[serde(default)]
     pub effort: AcpSessionEffortTransport,
+    /// MCP servers offered to the agent on `session/new`.
+    ///
+    /// Http and Sse entries are dropped for agents that do not advertise the
+    /// matching MCP capability, so a descriptor can list them unconditionally.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mcp_servers: Vec<AcpMcpServer>,
+    /// Roots beyond the project directory the agent may work in, sent on
+    /// `session/new` only when the agent advertises `additionalDirectories`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub additional_directories: Vec<String>,
 }
 
 impl AcpSessionConfiguration {
     fn is_empty(&self) -> bool {
         matches!(self.model, AcpSessionModelTransport::Disabled)
             && matches!(self.effort, AcpSessionEffortTransport::Disabled)
+            && self.mcp_servers.is_empty()
+            && self.additional_directories.is_empty()
+    }
+}
+
+/// One MCP server a descriptor offers to its agent.
+///
+/// Mirrors the ACP `McpServer` shape without depending on the SDK, so the
+/// catalog and daemon wire format stay independent of the protocol crate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "transport", rename_all = "snake_case")]
+pub enum AcpMcpServer {
+    Stdio {
+        name: String,
+        command: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        args: Vec<String>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        env: Vec<AcpMcpEnvVariable>,
+    },
+    Http {
+        name: String,
+        url: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        headers: Vec<AcpMcpHttpHeader>,
+    },
+    Sse {
+        name: String,
+        url: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        headers: Vec<AcpMcpHttpHeader>,
+    },
+}
+
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AcpMcpEnvVariable {
+    pub name: String,
+    /// Never serialized. See [`AcpMcpHttpHeader::value`] for why.
+    #[serde(default, skip_serializing)]
+    pub value: String,
+}
+
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AcpMcpHttpHeader {
+    pub name: String,
+    /// Read from configuration but never written back out.
+    ///
+    /// Descriptors are pushed wholesale to every websocket client through
+    /// `WsConfigPayload::acp_agents`, including remote ones, so a serializable
+    /// header value would hand out whatever `Authorization` the descriptor
+    /// carries. Skipping it on serialize closes that at every boundary rather
+    /// than relying on each one to remember to redact. In-process use is
+    /// unaffected: the value still reaches `session/new`.
+    #[serde(default, skip_serializing)]
+    pub value: String,
+}
+
+/// Redacted so a `tracing` line or a panic message cannot spill the secret,
+/// matching the hand-written `Debug` on [`BridgeAcpStartRequest`].
+impl fmt::Debug for AcpMcpEnvVariable {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("AcpMcpEnvVariable")
+            .field("name", &self.name)
+            .field("value", &"[REDACTED]")
+            .finish()
+    }
+}
+
+impl fmt::Debug for AcpMcpHttpHeader {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("AcpMcpHttpHeader")
+            .field("name", &self.name)
+            .field("value", &"[REDACTED]")
+            .finish()
     }
 }
 
@@ -286,6 +372,10 @@ pub struct AcpAgentHandshake {
     #[serde(default)]
     pub supports_additional_directories: bool,
     #[serde(default)]
+    pub supports_mcp_http: bool,
+    #[serde(default)]
+    pub supports_mcp_sse: bool,
+    #[serde(default)]
     pub supports_logout: bool,
 }
 
@@ -305,6 +395,32 @@ pub struct AcpAgentSessionState {
     /// Why the most recent prompt turn stopped, as reported by the agent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_stop_reason: Option<String>,
+}
+
+/// One session an agent reports from `session/list`.
+///
+/// Distinct from a harness session: the agent owns these ids and may report
+/// sessions harness never started, so callers treat the list as display data
+/// rather than a source of harness session state.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AcpSessionSummary {
+    pub session_id: String,
+    pub cwd: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub additional_directories: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+}
+
+/// One page of `session/list` results, carrying the agent's opaque cursor.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AcpSessionListPage {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sessions: Vec<AcpSessionSummary>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<String>,
 }
 
 /// Compact view of one advertised session config option and its value.

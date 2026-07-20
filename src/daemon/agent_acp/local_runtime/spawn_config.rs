@@ -208,6 +208,7 @@ mod tests {
                 effort: AcpSessionEffortTransport::ConfigOption {
                     selector: AcpSessionConfigOptionBinding::default(),
                 },
+                ..Default::default()
             },
             ..descriptor("claude")
         };

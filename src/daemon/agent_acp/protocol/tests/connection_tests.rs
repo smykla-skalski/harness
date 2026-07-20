@@ -349,6 +349,7 @@ async fn run_connection_applies_boolean_config_option() {
                 category: None,
             },
         },
+        ..Default::default()
     });
     let request = AcpAgentStartRequest {
         effort: Some("true".to_string()),

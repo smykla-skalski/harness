@@ -8,10 +8,11 @@ mod wire;
 
 pub use models::{
     AcpAgentDescriptor, AcpAgentHandshake, AcpAgentInspectResponse, AcpAgentInspectSnapshot,
-    AcpAgentSessionState, AcpAgentSnapshot, AcpAgentStartRequest, AcpAuthState, AcpPermissionBatch,
+    AcpAgentSessionState, AcpAgentSnapshot, AcpAgentStartRequest, AcpAuthState, AcpMcpEnvVariable,
+    AcpMcpHttpHeader, AcpMcpServer, AcpPermissionBatch,
     AcpPermissionDecision, AcpPermissionItem, AcpPermissionOption, AcpPermissionOptionKind,
     AcpRuntimeProbe, AcpRuntimeProbeResponse, AcpSessionConfigOptionBinding,
     AcpSessionConfigOptionState, AcpSessionConfiguration, AcpSessionEffortTransport,
-    AcpSessionModelTransport, AcpSpawnConfiguration, BridgeAcpStartRequest, CapabilityTag,
-    DoctorProbe,
+    AcpSessionListPage, AcpSessionModelTransport, AcpSessionSummary, AcpSpawnConfiguration,
+    BridgeAcpStartRequest, CapabilityTag, DoctorProbe,
 };

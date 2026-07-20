@@ -30,19 +30,6 @@ struct HandlerHarness {
     _supervisor_child: ChildGuard,
 }
 
-/// `std::process::Child` has no `Drop`, so the placeholder supervisor process
-/// would outlive a test that returns early or panics. The guard lives on
-/// `HandlerHarness` rather than the harness owning a `Drop` impl itself,
-/// because both tests move `handlers` out of the harness.
-struct ChildGuard(std::process::Child);
-
-impl Drop for ChildGuard {
-    fn drop(&mut self) {
-        let _ = self.0.kill();
-        let _ = self.0.wait();
-    }
-}
-
 /// Build the real harness client handler set over a permission bridge that
 /// nobody answers, so a permission request stays outstanding for the whole
 /// test unless cancellation releases it.

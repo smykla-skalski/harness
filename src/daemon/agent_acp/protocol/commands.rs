@@ -5,12 +5,15 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use agent_client_protocol::schema::v1::{
-    CancelNotification, ContentBlock, LogoutRequest, NewSessionRequest, PromptRequest, SessionId,
+    CancelNotification, ContentBlock, ListSessionsRequest, LogoutRequest, PromptRequest, SessionId,
     TextContent,
 };
 use agent_client_protocol::{Agent, ConnectionTo, Result as AcpResult};
 use tokio::sync::mpsc as tokio_mpsc;
 use tokio::time::timeout;
+
+use super::lifecycle;
+use crate::daemon::agent_acp::AcpSessionListPage;
 
 use super::session_config::{
     AcpSessionRequestConfig, advertised_session_configuration,
@@ -50,6 +53,18 @@ pub(super) enum ProtocolCommand {
         response_tx: mpsc::SyncSender<ProtocolCommandResult<()>>,
     },
     Logout {
+        response_tx: mpsc::SyncSender<ProtocolCommandResult<()>>,
+    },
+    ListSessions {
+        request: ListSessionsRequest,
+        response_tx: mpsc::SyncSender<ProtocolCommandResult<AcpSessionListPage>>,
+    },
+    CloseSession {
+        session_id: SessionId,
+        response_tx: mpsc::SyncSender<ProtocolCommandResult<()>>,
+    },
+    DeleteSession {
+        session_id: SessionId,
         response_tx: mpsc::SyncSender<ProtocolCommandResult<()>>,
     },
 }
@@ -135,6 +150,50 @@ impl AcpProtocolHandle {
         let (response_tx, response_rx) = mpsc::sync_channel(1);
         self.command_tx
             .send(ProtocolCommand::Logout { response_tx })
+            .map_err(|_| "ACP protocol command channel is closed".to_string())?;
+        receive_response(&response_rx)
+    }
+
+    pub(in crate::daemon::agent_acp) fn list_sessions(
+        &self,
+        cwd: Option<PathBuf>,
+        cursor: Option<String>,
+    ) -> ProtocolCommandResult<AcpSessionListPage> {
+        let (response_tx, response_rx) = mpsc::sync_channel(1);
+        let request = ListSessionsRequest::new().cwd(cwd).cursor(cursor);
+        self.command_tx
+            .send(ProtocolCommand::ListSessions {
+                request,
+                response_tx,
+            })
+            .map_err(|_| "ACP protocol command channel is closed".to_string())?;
+        receive_response(&response_rx)
+    }
+
+    pub(in crate::daemon::agent_acp) fn close_session(
+        &self,
+        session_id: &str,
+    ) -> ProtocolCommandResult<()> {
+        let (response_tx, response_rx) = mpsc::sync_channel(1);
+        self.command_tx
+            .send(ProtocolCommand::CloseSession {
+                session_id: SessionId::new(session_id.to_string()),
+                response_tx,
+            })
+            .map_err(|_| "ACP protocol command channel is closed".to_string())?;
+        receive_response(&response_rx)
+    }
+
+    pub(in crate::daemon::agent_acp) fn delete_session(
+        &self,
+        session_id: &str,
+    ) -> ProtocolCommandResult<()> {
+        let (response_tx, response_rx) = mpsc::sync_channel(1);
+        self.command_tx
+            .send(ProtocolCommand::DeleteSession {
+                session_id: SessionId::new(session_id.to_string()),
+                response_tx,
+            })
             .map_err(|_| "ACP protocol command channel is closed".to_string())?;
         receive_response(&response_rx)
     }
@@ -241,6 +300,27 @@ async fn handle_protocol_command(
             let result = send_logout(&supervisor, connection).await;
             let _ = response_tx.send(result);
         }
+        ProtocolCommand::ListSessions {
+            request,
+            response_tx,
+        } => {
+            let result = lifecycle::list_sessions(&supervisor, connection, request).await;
+            let _ = response_tx.send(result);
+        }
+        ProtocolCommand::CloseSession {
+            session_id,
+            response_tx,
+        } => {
+            let result = lifecycle::close_session(&supervisor, connection, session_id).await;
+            let _ = response_tx.send(result);
+        }
+        ProtocolCommand::DeleteSession {
+            session_id,
+            response_tx,
+        } => {
+            let result = lifecycle::delete_session(&supervisor, connection, session_id).await;
+            let _ = response_tx.send(result);
+        }
     }
 }
 
@@ -272,10 +352,12 @@ async fn attach_protocol_session(
     project_dir: PathBuf,
     session_config: &AcpSessionRequestConfig,
 ) -> ProtocolCommandResult<SessionId> {
+    let request =
+        super::session_inputs::new_session_request(project_dir, session_config, supervisor.handshake());
     let response = {
         let _guard = supervisor.enter_pending_request_with_reason(Some("session/new"));
         connection
-            .send_request(NewSessionRequest::new(project_dir))
+            .send_request(request)
             .block_task()
             .await
             .map_err(|error| error.to_string())?

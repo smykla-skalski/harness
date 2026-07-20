@@ -44,6 +44,8 @@ pub(super) fn handshake_from_initialize(response: &InitializeResponse) -> AcpAge
         supports_session_close: session.close.is_some(),
         supports_session_delete: session.delete.is_some(),
         supports_additional_directories: session.additional_directories.is_some(),
+        supports_mcp_http: capabilities.mcp_capabilities.http,
+        supports_mcp_sse: capabilities.mcp_capabilities.sse,
         supports_logout: capabilities.auth.logout.is_some(),
     }
 }
@@ -53,7 +55,7 @@ mod tests {
     use agent_client_protocol::schema::ProtocolVersion;
     use agent_client_protocol::schema::v1::{
         AgentAuthCapabilities, AgentCapabilities, AuthMethod, AuthMethodAgent, Implementation,
-        LogoutCapabilities, SessionCapabilities, SessionCloseCapabilities,
+        LogoutCapabilities, McpCapabilities, SessionCapabilities, SessionCloseCapabilities,
         SessionDeleteCapabilities, SessionListCapabilities, SessionResumeCapabilities,
     };
 
@@ -95,6 +97,18 @@ mod tests {
         assert!(handshake.supports_session_delete);
         assert!(!handshake.supports_additional_directories);
         assert!(handshake.supports_logout);
+    }
+
+    #[test]
+    fn handshake_captures_mcp_transport_capabilities() {
+        let response = InitializeResponse::new(ProtocolVersion::V1).agent_capabilities(
+            AgentCapabilities::new().mcp_capabilities(McpCapabilities::new().http(true)),
+        );
+
+        let handshake = handshake_from_initialize(&response);
+
+        assert!(handshake.supports_mcp_http);
+        assert!(!handshake.supports_mcp_sse);
     }
 
     #[test]

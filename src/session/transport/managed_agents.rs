@@ -3,6 +3,7 @@ use clap::Args;
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::CliError;
 
+mod acp_sessions;
 mod attach;
 mod codex;
 mod start;
@@ -10,6 +11,8 @@ mod terminal;
 
 pub use attach::ManagedAgentAttachArgs;
 pub use codex::{CodexAgentApprovalArgs, CodexAgentInterruptArgs, CodexAgentSteerArgs};
+#[allow(unused_imports)]
+pub use acp_sessions::{AcpCloseSessionArgs, AcpDeleteSessionArgs, AcpSessionsArgs};
 #[allow(unused_imports)]
 pub use start::{
     AcpAgentCommand, AcpAgentStartArgs, AcpInspectArgs, CodexAgentStartArgs,

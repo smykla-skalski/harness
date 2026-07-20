@@ -12,6 +12,8 @@ use crate::session::transport::support::{
     agent_to_str, capability_args, daemon_client, print_json, resolve_project_dir,
 };
 
+use super::acp_sessions::{AcpCloseSessionArgs, AcpDeleteSessionArgs, AcpSessionsArgs};
+
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]
 pub enum SessionAgentsCommand {
@@ -91,6 +93,12 @@ pub enum AcpAgentCommand {
     Inspect(AcpInspectArgs),
     /// Ask an ACP agent to log out (requires the auth.logout capability).
     Logout(AcpLogoutArgs),
+    /// List the sessions an ACP agent itself knows about.
+    Sessions(AcpSessionsArgs),
+    /// Ask an ACP agent to close one of its sessions.
+    CloseSession(AcpCloseSessionArgs),
+    /// Ask an ACP agent to delete one of its sessions.
+    DeleteSession(AcpDeleteSessionArgs),
 }
 
 impl Execute for AcpAgentCommand {
@@ -98,6 +106,9 @@ impl Execute for AcpAgentCommand {
         match self {
             Self::Inspect(args) => args.execute(context),
             Self::Logout(args) => args.execute(context),
+            Self::Sessions(args) => args.execute(context),
+            Self::CloseSession(args) => args.execute(context),
+            Self::DeleteSession(args) => args.execute(context),
         }
     }
 }

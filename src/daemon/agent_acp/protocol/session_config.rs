@@ -12,6 +12,7 @@ use crate::agents::acp::catalog::{
     AcpAgentDescriptor, AcpSessionConfigOptionBinding, AcpSessionConfiguration,
     AcpSessionEffortTransport, AcpSessionModelTransport,
 };
+use crate::daemon::agent_acp::AcpMcpServer;
 use crate::agents::acp::supervision::AcpSessionSupervisor;
 use crate::daemon::agent_acp::manager::AcpAgentStartRequest;
 
@@ -39,6 +40,16 @@ impl AcpSessionRequestConfig {
     #[must_use]
     pub(in crate::daemon::agent_acp) fn requested_model(&self) -> Option<&str> {
         self.model.as_deref()
+    }
+
+    #[must_use]
+    pub(in crate::daemon::agent_acp) fn mcp_servers(&self) -> &[AcpMcpServer] {
+        &self.session_configuration.mcp_servers
+    }
+
+    #[must_use]
+    pub(in crate::daemon::agent_acp) fn additional_directories(&self) -> &[String] {
+        &self.session_configuration.additional_directories
     }
 
     #[must_use]
