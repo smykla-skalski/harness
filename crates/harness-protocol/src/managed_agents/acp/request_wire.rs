@@ -1,7 +1,8 @@
 use serde::de::Error as DeError;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::models::{AcpAgentStartRequest, AcpMcpServer, default_acp_role};
+use super::mcp::AcpMcpServer;
+use super::models::{AcpAgentStartRequest, default_acp_role};
 use crate::session::SessionRole;
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
