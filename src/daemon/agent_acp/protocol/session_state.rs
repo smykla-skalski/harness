@@ -58,7 +58,7 @@ pub(super) fn apply_session_update(supervisor: &AcpSessionSupervisor, update: &S
                     .iter()
                     .map(|command| command.name.clone())
                     .collect();
-            })
+            });
         }
         SessionUpdate::SessionInfoUpdate(update) => supervisor.mutate_session_state(|state| {
             apply_maybe(&update.title, &mut state.title);
