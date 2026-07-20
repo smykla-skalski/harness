@@ -26,6 +26,7 @@ mod cancellation_tests;
 mod connection_tests;
 mod lifecycle_agents;
 mod lifecycle_tests;
+mod remote_transport_tests;
 mod telemetry_tests;
 
 use agents::{
