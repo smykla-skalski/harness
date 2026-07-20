@@ -177,7 +177,9 @@ struct DaemonControllerTests {
     #expect(elapsed < .milliseconds(300))
     #expect(httpClient.readCallCount(.health) == 1)
     #expect(httpClient.shutdownCallCount() == 0)
-    #expect(webSocketClient.shutdownCallCount() == 0)
+    // The losing WebSocket client still connects; dropping it would leave a live
+    // socket with a running heartbeat behind the adopted HTTP client.
+    #expect(webSocketClient.shutdownCallCount() == 1)
   }
 
   @Test("bootstrapClient recovers a newer daemon endpoint from events when manifest is stale")
