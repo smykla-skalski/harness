@@ -176,7 +176,8 @@ pub struct AcpAgentStartArgs {
     pub endpoint: Option<String>,
     /// Header for the remote connection as `Name=ENV_VAR`. The daemon reads the
     /// value from that environment variable at connect time, so the secret
-    /// never rides the request. Repeatable; requires `--endpoint`.
+    /// never rides the request. Only http/https endpoints accept headers; ws/wss
+    /// cannot carry them. Repeatable; requires `--endpoint`.
     #[arg(long = "header-env", requires = "endpoint")]
     pub header_env: Vec<String>,
 }

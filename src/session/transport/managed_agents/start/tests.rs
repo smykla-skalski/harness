@@ -143,14 +143,17 @@ fn acp_start_cli_parses_endpoint_and_header_env() {
         "--session-id",
         "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
         "--endpoint",
-        "wss://acp.example.test",
+        "https://acp.example.test",
         "--header-env",
         "Authorization=REMOTE_ACP_TOKEN",
         "--header-env",
         "X-Trace=TRACE_ID",
     ])
     .expect("parse");
-    assert_eq!(parsed.args.endpoint.as_deref(), Some("wss://acp.example.test"));
+    assert_eq!(
+        parsed.args.endpoint.as_deref(),
+        Some("https://acp.example.test")
+    );
     assert_eq!(
         parsed.args.header_env,
         vec![
@@ -178,11 +181,11 @@ fn acp_start_cli_rejects_header_env_without_endpoint() {
 #[test]
 fn build_endpoint_maps_header_names_to_env_vars() {
     let endpoint = build_endpoint(
-        "wss://acp.example.test",
+        "https://acp.example.test",
         &["Authorization=REMOTE_ACP_TOKEN".to_string()],
     )
     .expect("build endpoint");
-    assert_eq!(endpoint.url, "wss://acp.example.test");
+    assert_eq!(endpoint.url, "https://acp.example.test");
     assert_eq!(
         endpoint.headers_env.get("Authorization").map(String::as_str),
         Some("REMOTE_ACP_TOKEN"),
