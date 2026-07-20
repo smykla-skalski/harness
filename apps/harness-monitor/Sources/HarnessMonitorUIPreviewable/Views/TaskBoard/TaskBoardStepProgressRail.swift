@@ -84,8 +84,8 @@ struct TaskBoardStepProgressRail: View {
   /// The track carrying down to the next badge. It rides in a background rather
   /// than beside the badge in a stack: a Capsule is flexible in both axes, and
   /// as a stack sibling it made the whole rail vertically greedy, so the panel
-  /// stretched to whatever height the window offered. A background is proposed
-  /// the row's own resolved size and cannot feed back into it.
+  /// stretched to whatever height the window offered. SwiftUI hands a background
+  /// the row's already-resolved size, so it cannot feed back into that size.
   @ViewBuilder
   private func segment(_ column: TaskBoardStepColumn) -> some View {
     if column.order != lastOrder {

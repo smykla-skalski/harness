@@ -114,7 +114,7 @@ private struct TaskBoardStepStageBlock: View {
     // The rule rides in an overlay rather than beside the text in an HStack: a
     // Capsule is flexible in both axes, so as an HStack sibling it soaked up
     // whatever height the card was offered and left the block stretched far
-    // below its own text. An overlay is proposed the content's size instead.
+    // below its own text. SwiftUI hands an overlay the content's size instead.
     .overlay(alignment: .leading) {
       if emphasized {
         Capsule().fill(tint.opacity(0.55)).frame(width: Self.ruleWidth)
