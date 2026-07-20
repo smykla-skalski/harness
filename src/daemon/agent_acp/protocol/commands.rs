@@ -27,6 +27,13 @@ use crate::daemon::agent_acp::prompt_gate::PromptLease;
 
 pub(super) type ProtocolCommandResult<T> = Result<T, String>;
 
+/// How long a detach waits for the agent to confirm the session is closed.
+///
+/// Short because someone is stopping one agent and waiting on the reply, and
+/// the process-lifecycle lock is held for the whole call. The lifecycle budget
+/// would bound it too, but at a latency nobody wants on an interactive stop.
+const DETACH_CLOSE_BUDGET: Duration = Duration::from_secs(2);
+
 mod handle;
 
 pub(in crate::daemon::agent_acp) use handle::AcpProtocolHandle;
@@ -375,6 +382,10 @@ async fn detach_protocol_session(
 /// moved on, so a refusing or unreachable agent must not fail the detach. It
 /// matters because a closed session is one the agent may persist and hand back
 /// later, while a killed one is not.
+///
+/// Bounded well under the lifecycle budget because a detach comes from someone
+/// stopping one agent and waiting on the answer, with the process-lifecycle
+/// lock held for the whole call.
 #[expect(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
@@ -384,17 +395,36 @@ async fn close_detached_session(
     connection: &ConnectionTo<Agent>,
     protocol_session_id: SessionId,
 ) {
-    if !supervisor
-        .handshake()
-        .is_some_and(|handshake| handshake.supports_session_close)
-    {
+    if !close_supported(supervisor) {
         return;
     }
-    if let Err(error) =
-        lifecycle::close_session(supervisor, connection, protocol_session_id.clone()).await
+    if !close_session_within(
+        supervisor,
+        connection,
+        protocol_session_id.clone(),
+        DETACH_CLOSE_BUDGET,
+    )
+    .await
     {
-        tracing::warn!(%error, session = %protocol_session_id, "failed to close detached ACP session");
+        tracing::warn!(session = %protocol_session_id, "could not close detached ACP session");
     }
+}
+
+fn close_supported(supervisor: &AcpSessionSupervisor) -> bool {
+    supervisor
+        .handshake()
+        .is_some_and(|handshake| handshake.supports_session_close)
+}
+
+/// Close one session within `budget`, reporting whether the agent confirmed it.
+async fn close_session_within(
+    supervisor: &AcpSessionSupervisor,
+    connection: &ConnectionTo<Agent>,
+    session_id: SessionId,
+    budget: Duration,
+) -> bool {
+    let close = lifecycle::close_session(supervisor, connection, session_id);
+    matches!(timeout(budget, close).await, Ok(Ok(())))
 }
 
 /// Close every session this connection still routes, within one shared budget.
@@ -409,10 +439,7 @@ async fn close_routed_sessions(
     session_guard: &SessionRouteGuard,
     budget: Duration,
 ) -> ProtocolCommandResult<usize> {
-    if !supervisor
-        .handshake()
-        .is_some_and(|handshake| handshake.supports_session_close)
-    {
+    if !close_supported(supervisor) {
         return Ok(0);
     }
     let deadline = Instant::now() + budget;
@@ -421,8 +448,7 @@ async fn close_routed_sessions(
         let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
             break;
         };
-        let close = lifecycle::close_session(supervisor, connection, session_id);
-        if matches!(timeout(remaining, close).await, Ok(Ok(()))) {
+        if close_session_within(supervisor, connection, session_id, remaining).await {
             closed += 1;
         }
     }
