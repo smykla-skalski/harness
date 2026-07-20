@@ -1,6 +1,6 @@
 [package]
 name = "harness-systemd-protocol"
-version = "49.2.0"
+version = "49.3.0"
 edition = "2024"
 rust-version = "1.94"
 publish = false

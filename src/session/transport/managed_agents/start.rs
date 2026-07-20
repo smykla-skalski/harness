@@ -257,12 +257,19 @@ pub struct AcpInspectArgs {
     /// Optional session ID filter. Omit to inspect every live ACP session.
     #[arg(long)]
     pub session_id: Option<String>,
+    /// Emit the raw daemon snapshot as JSON instead of the doctor view.
+    #[arg(long)]
+    pub json: bool,
 }
 
 impl Execute for AcpInspectArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let response = daemon_client()?.inspect_acp_managed_agents(self.session_id.as_deref())?;
-        print_json(&response)?;
+        if self.json {
+            print_json(&response)?;
+        } else {
+            println!("{}", super::inspect::render_inspect(&response));
+        }
         Ok(0)
     }
 }

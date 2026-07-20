@@ -260,9 +260,12 @@ harness session agents start acp --session-id <session-id> --agent <descriptor> 
 ```
 
 Managed agent controls include `list`, `show`, terminal `input`/`resize`/`stop`,
-Codex `steer`/`interrupt`/`approve`, and ACP `inspect`. Start commands can carry
-role, fallback role, capability tags, display name, persona, model, effort, and
-project directory where the runtime supports them. ACP starts also take
+Codex `steer`/`interrupt`/`approve`, and the ACP verbs `inspect`, `logout`,
+`sessions`, `close-session`, and `delete-session`. `acp inspect` prints a
+per-agent doctor view (negotiated protocol version, agentInfo, and freshness
+notes) by default, or `--json` for the raw daemon snapshot. Start commands can
+carry role, fallback role, capability tags, display name, persona, model,
+effort, and project directory where the runtime supports them. ACP starts also take
 repeated `--additional-directory` roots; MCP servers are structured, so they go
 over the HTTP start route instead of a flag. A remote ACP agent is reachable
 without spawning a local process: `--endpoint <url>` connects over HTTP
