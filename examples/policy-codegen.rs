@@ -2659,6 +2659,8 @@ const ACP_INSPECT_EMIT_ONLY: &[&str] = &[
     "AcpAgentInspectResponse",
     "AcpAgentInspectSnapshotDecode",
     "AcpAgentHandshake",
+    "AcpAgentSessionState",
+    "AcpSessionConfigOptionState",
 ];
 const ACP_PERMISSION_ITEM_SOURCE: &str = ACP_MODELS_SOURCE;
 const ACP_PERMISSION_WIRE_SOURCE: &str =

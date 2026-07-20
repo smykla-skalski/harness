@@ -67,6 +67,7 @@ fn inspect_snapshot() -> AcpAgentInspectSnapshot {
         terminal_count: 0,
         prompt_deadline_remaining_ms: 10_000,
         handshake: None,
+        session_state: None,
     }
 }
 

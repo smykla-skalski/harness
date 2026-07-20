@@ -65,6 +65,60 @@ public struct AcpAgentHandshake: Codable, Equatable, Sendable {
   }
 }
 
+public struct AcpAgentSessionState: Codable, Equatable, Sendable {
+  public var configOptions: [AcpSessionConfigOptionState]
+  public var currentModeId: String?
+  public var availableCommands: [String]
+  public var title: String?
+  public var updatedAt: String?
+
+  public init(configOptions: [AcpSessionConfigOptionState] = [], currentModeId: String? = nil, availableCommands: [String] = [], title: String? = nil, updatedAt: String? = nil) {
+    self.configOptions = configOptions
+    self.currentModeId = currentModeId
+    self.availableCommands = availableCommands
+    self.title = title
+    self.updatedAt = updatedAt
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    configOptions = try container.decodeIfPresent([AcpSessionConfigOptionState].self, forKey: .configOptions) ?? []
+    currentModeId = try container.decodeIfPresent(String.self, forKey: .currentModeId)
+    availableCommands = try container.decodeIfPresent([String].self, forKey: .availableCommands) ?? []
+    title = try container.decodeIfPresent(String.self, forKey: .title)
+    updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case configOptions = "config_options"
+    case currentModeId = "current_mode_id"
+    case availableCommands = "available_commands"
+    case title
+    case updatedAt = "updated_at"
+  }
+}
+
+public struct AcpSessionConfigOptionState: Codable, Equatable, Sendable {
+  public var id: String
+  public var name: String
+  public var category: String?
+  public var currentValue: String
+
+  public init(id: String, name: String, category: String? = nil, currentValue: String) {
+    self.id = id
+    self.name = name
+    self.category = category
+    self.currentValue = currentValue
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case id
+    case name
+    case category
+    case currentValue = "current_value"
+  }
+}
+
 public struct AcpAgentInspectResponseWire: Codable, Equatable, Sendable {
   public var agents: [AcpAgentInspectSnapshotWire]
   public var daemonPerceivedNow: String?
@@ -113,8 +167,9 @@ public struct AcpAgentInspectSnapshotWire: Codable, Equatable, Sendable {
   public var terminalCount: UInt
   public var promptDeadlineRemainingMs: UInt64
   public var handshake: AcpAgentHandshake?
+  public var sessionState: AcpAgentSessionState?
 
-  public init(managedAgentId: String, sessionId: String, sessionAgentId: String, displayName: String, pid: UInt32, pgid: Int32, processKey: String = "", uptimeMs: UInt64, lastUpdateAt: String, lastClientCallAt: String? = nil, watchdogState: String, permissionMode: String = "", permissionLogPath: String? = nil, pendingPermissions: UInt, permissionQueueDepth: UInt = 0, terminalCount: UInt, promptDeadlineRemainingMs: UInt64, handshake: AcpAgentHandshake? = nil) {
+  public init(managedAgentId: String, sessionId: String, sessionAgentId: String, displayName: String, pid: UInt32, pgid: Int32, processKey: String = "", uptimeMs: UInt64, lastUpdateAt: String, lastClientCallAt: String? = nil, watchdogState: String, permissionMode: String = "", permissionLogPath: String? = nil, pendingPermissions: UInt, permissionQueueDepth: UInt = 0, terminalCount: UInt, promptDeadlineRemainingMs: UInt64, handshake: AcpAgentHandshake? = nil, sessionState: AcpAgentSessionState? = nil) {
     self.managedAgentId = managedAgentId
     self.sessionId = sessionId
     self.sessionAgentId = sessionAgentId
@@ -133,6 +188,7 @@ public struct AcpAgentInspectSnapshotWire: Codable, Equatable, Sendable {
     self.terminalCount = terminalCount
     self.promptDeadlineRemainingMs = promptDeadlineRemainingMs
     self.handshake = handshake
+    self.sessionState = sessionState
   }
 
   public init(from decoder: Decoder) throws {
@@ -155,6 +211,7 @@ public struct AcpAgentInspectSnapshotWire: Codable, Equatable, Sendable {
     terminalCount = try container.decode(UInt.self, forKey: .terminalCount)
     promptDeadlineRemainingMs = try container.decode(UInt64.self, forKey: .promptDeadlineRemainingMs)
     handshake = try container.decodeIfPresent(AcpAgentHandshake.self, forKey: .handshake)
+    sessionState = try container.decodeIfPresent(AcpAgentSessionState.self, forKey: .sessionState)
   }
 
   enum CodingKeys: String, CodingKey {
@@ -176,5 +233,6 @@ public struct AcpAgentInspectSnapshotWire: Codable, Equatable, Sendable {
     case terminalCount = "terminal_count"
     case promptDeadlineRemainingMs = "prompt_deadline_remaining_ms"
     case handshake
+    case sessionState = "session_state"
   }
 }

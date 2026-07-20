@@ -261,7 +261,7 @@ fn grouped_options(
     group.options.iter()
 }
 
-fn session_config_category_name(category: &SessionConfigOptionCategory) -> &str {
+pub(super) fn session_config_category_name(category: &SessionConfigOptionCategory) -> &str {
     match category {
         SessionConfigOptionCategory::Mode => "mode",
         SessionConfigOptionCategory::Model => "model",
@@ -279,7 +279,7 @@ async fn send_set_config_option(
     value: SessionConfigOptionValue,
 ) -> AcpResult<()> {
     let _guard = supervisor.enter_pending_request_with_reason(Some("session/set_config_option"));
-    connection
+    let response = connection
         .send_request(SetSessionConfigOptionRequest::new(
             session_id.clone(),
             option.id.clone(),
@@ -287,6 +287,7 @@ async fn send_set_config_option(
         ))
         .block_task()
         .await?;
+    super::session_state::record_config_snapshot(supervisor, &response);
     Ok(())
 }
 

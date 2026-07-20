@@ -440,11 +440,27 @@ async fn run_connection_applies_boolean_config_option() {
         effort: Some("true".to_string()),
         ..AcpAgentStartRequest::default()
     };
+    let session_guard = Arc::new(SessionRouteGuard::default());
+    let notification_guard = Arc::clone(&session_guard);
+    let notification_supervisor = Arc::clone(&supervisor);
+    let (routed_tx, _routed_rx) = mpsc::channel(8);
 
     let protocol_task = tokio::spawn(async move {
         Client
             .builder()
             .name("harness-test")
+            .on_receive_notification(
+                async move |notification: SessionNotification, _connection| {
+                    route_session_notification(
+                        &notification_guard,
+                        &notification_supervisor,
+                        &routed_tx,
+                        notification,
+                    )
+                    .await
+                },
+                agent_client_protocol::on_receive_notification!(),
+            )
             .connect_with(client_transport, async move |connection| {
                 run_connection(RunConnectionArgs {
                     connection,
@@ -458,7 +474,7 @@ async fn run_connection_applies_boolean_config_option() {
                     initial_prompt_lease: None,
                     cancel_rx,
                     command_rx,
-                    session_guard: Arc::new(SessionRouteGuard::default()),
+                    session_guard,
                     manager,
                     credential: None,
                 })
@@ -481,6 +497,23 @@ async fn run_connection_applies_boolean_config_option() {
         operations.lock().expect("recorded operations").clone(),
         vec!["set_config:web_search:bool:true".to_string()]
     );
+    let state = some(
+        supervisor.session_state(),
+        "session state should be recorded on the supervisor",
+    );
+    let options: Vec<(String, String)> = state
+        .config_options
+        .iter()
+        .map(|option| (option.id.clone(), option.current_value.clone()))
+        .collect();
+    assert_eq!(
+        options,
+        vec![("web_search".to_string(), "true".to_string())]
+    );
+    assert_eq!(state.current_mode_id.as_deref(), Some("focus"));
+    assert_eq!(state.available_commands, vec!["review".to_string()]);
+    assert_eq!(state.title.as_deref(), Some("Renamed"));
+    assert_eq!(state.updated_at.as_deref(), Some("2026-07-20T00:00:00Z"));
 
     let _ = supervisor_child.kill();
     let _ = supervisor_child.wait();

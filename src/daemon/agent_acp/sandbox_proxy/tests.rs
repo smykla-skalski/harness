@@ -189,6 +189,7 @@ fn reconcile_sessions_uses_known_and_inspect_sets() {
             terminal_count: 0,
             prompt_deadline_remaining_ms: 0,
             handshake: None,
+            session_state: None,
         }],
         daemon_perceived_now: None,
         available: true,
@@ -447,6 +448,7 @@ fn inspect_snapshot(session_id: &str, process_key: &str) -> AcpAgentInspectSnaps
         terminal_count: 0,
         prompt_deadline_remaining_ms: 0,
         handshake: None,
+        session_state: None,
     }
 }
 

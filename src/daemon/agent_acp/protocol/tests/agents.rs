@@ -1,12 +1,13 @@
 use std::sync::{Arc, Mutex};
 
 use agent_client_protocol::schema::v1::{
-    AgentCapabilities, CancelNotification, ContentBlock, ContentChunk, Implementation,
-    InitializeRequest, InitializeResponse, NewSessionRequest, NewSessionResponse, PromptRequest,
-    PromptResponse, SessionConfigBoolean, SessionConfigKind, SessionConfigOption,
-    SessionConfigOptionCategory, SessionConfigOptionValue, SessionConfigSelect,
-    SessionConfigSelectOption, SessionId, SessionNotification, SessionUpdate,
-    SetSessionConfigOptionRequest, SetSessionConfigOptionResponse, StopReason, TextContent,
+    AgentCapabilities, AvailableCommand, AvailableCommandsUpdate, CancelNotification, ContentBlock,
+    ContentChunk, CurrentModeUpdate, Implementation, InitializeRequest, InitializeResponse,
+    NewSessionRequest, NewSessionResponse, PromptRequest, PromptResponse, SessionConfigBoolean,
+    SessionConfigKind, SessionConfigOption, SessionConfigOptionCategory, SessionConfigOptionValue,
+    SessionConfigSelect, SessionConfigSelectOption, SessionId, SessionInfoUpdate, SessionMode,
+    SessionModeState, SessionNotification, SessionUpdate, SetSessionConfigOptionRequest,
+    SetSessionConfigOptionResponse, StopReason, TextContent,
 };
 use agent_client_protocol::util::internal_error;
 use agent_client_protocol::{Agent, Channel, UntypedMessage};
@@ -173,13 +174,20 @@ pub(super) async fn run_agent_recording_boolean_config(
             async move |_request: NewSessionRequest, responder, _connection| {
                 responder.respond(
                     NewSessionResponse::new("acp-session-1")
+                        .modes(SessionModeState::new(
+                            "plan",
+                            vec![
+                                SessionMode::new("plan", "Plan"),
+                                SessionMode::new("focus", "Focus"),
+                            ],
+                        ))
                         .config_options(vec![boolean_config_option(false)]),
                 )
             },
             agent_client_protocol::on_receive_request!(),
         )
         .on_receive_request(
-            async move |request: SetSessionConfigOptionRequest, responder, _connection| {
+            async move |request: SetSessionConfigOptionRequest, responder, connection| {
                 let value = match request.value {
                     SessionConfigOptionValue::Boolean { value } => format!("bool:{value}"),
                     _ => "non-boolean".to_owned(),
@@ -188,6 +196,25 @@ pub(super) async fn run_agent_recording_boolean_config(
                     .lock()
                     .expect("record boolean set_config")
                     .push(format!("set_config:{}:{value}", request.config_id.0));
+                let session_id = SessionId::new("acp-session-1");
+                connection.send_notification(SessionNotification::new(
+                    session_id.clone(),
+                    SessionUpdate::CurrentModeUpdate(CurrentModeUpdate::new("focus")),
+                ))?;
+                connection.send_notification(SessionNotification::new(
+                    session_id.clone(),
+                    SessionUpdate::AvailableCommandsUpdate(AvailableCommandsUpdate::new(vec![
+                        AvailableCommand::new("review", "Review the diff"),
+                    ])),
+                ))?;
+                connection.send_notification(SessionNotification::new(
+                    session_id,
+                    SessionUpdate::SessionInfoUpdate(
+                        SessionInfoUpdate::new()
+                            .title("Renamed".to_owned())
+                            .updated_at("2026-07-20T00:00:00Z".to_owned()),
+                    ),
+                ))?;
                 responder.respond(SetSessionConfigOptionResponse::new(vec![
                     boolean_config_option(true),
                 ]))

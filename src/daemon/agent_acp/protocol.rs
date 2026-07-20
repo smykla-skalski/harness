@@ -42,6 +42,7 @@ mod runtime_helpers;
 mod session_config;
 mod session_guard;
 mod session_start;
+mod session_state;
 pub(super) use commands::AcpProtocolHandle;
 use commands::{ProtocolCommand, run_protocol_command_loop};
 use context::{ProtocolContext, handle_permission_request, respond_client_result};
@@ -213,6 +214,7 @@ async fn run_protocol(args: RunProtocolArgs) {
     let session_guard = Arc::new(SessionRouteGuard::default());
     let context = ProtocolContext::new(client, Arc::clone(&supervisor), Arc::clone(&session_guard));
     let notification_guard = Arc::clone(&session_guard);
+    let notification_supervisor = Arc::clone(&supervisor);
     let read_context = context.clone();
     let write_context = context.clone();
     let create_terminal_context = context.clone();
@@ -226,7 +228,13 @@ async fn run_protocol(args: RunProtocolArgs) {
         .name("harness")
         .on_receive_notification(
             async move |notification: SessionNotification, _connection| {
-                route_session_notification(&notification_guard, &notifications, notification).await
+                route_session_notification(
+                    &notification_guard,
+                    &notification_supervisor,
+                    &notifications,
+                    notification,
+                )
+                .await
             },
             agent_client_protocol::on_receive_notification!(),
         )

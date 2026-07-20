@@ -28,7 +28,7 @@ use tokio::time::Instant;
 use tokio::sync::Notify;
 use tracing::warn;
 
-use harness_protocol::managed_agents::acp::AcpAgentHandshake;
+use harness_protocol::managed_agents::acp::{AcpAgentHandshake, AcpAgentSessionState};
 
 use crate::agents::kind::DisconnectReason;
 use crate::workspace::utc_now;
@@ -164,6 +164,7 @@ pub struct AcpSessionSupervisor {
     /// would have crashed the supervisor on a poisoned lock.
     event_emitter: OnceLock<Arc<dyn WatchdogEventEmitter>>,
     handshake: OnceLock<AcpAgentHandshake>,
+    session_state: Mutex<Option<AcpAgentSessionState>>,
 }
 
 impl AcpSessionSupervisor {
@@ -191,6 +192,7 @@ impl AcpSessionSupervisor {
             watchdog_notify: Notify::new(),
             event_emitter: OnceLock::new(),
             handshake: OnceLock::new(),
+            session_state: Mutex::new(None),
         }
     }
 
@@ -204,6 +206,27 @@ impl AcpSessionSupervisor {
     #[must_use]
     pub fn handshake(&self) -> Option<&AcpAgentHandshake> {
         self.handshake.get()
+    }
+
+    /// Mutate the live session state, initialising it on first use. The
+    /// protocol layer owns the ACP-notification semantics; this only
+    /// serialises access.
+    ///
+    /// # Panics
+    /// Panics if the state mutex is poisoned.
+    pub fn mutate_session_state(&self, mutate: impl FnOnce(&mut AcpAgentSessionState)) {
+        let mut guard = self.session_state.lock().expect("session state lock");
+        mutate(guard.get_or_insert_with(AcpAgentSessionState::default));
+    }
+
+    /// # Panics
+    /// Panics if the state mutex is poisoned.
+    #[must_use]
+    pub fn session_state(&self) -> Option<AcpAgentSessionState> {
+        self.session_state
+            .lock()
+            .expect("session state lock")
+            .clone()
     }
 
     /// Attach a sink that receives watchdog state transitions.

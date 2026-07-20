@@ -60,6 +60,7 @@ async fn initialize_runtime_session(
     let initialize_response = send_initialize(supervisor, connection, initialize_timeout).await?;
     supervisor.record_handshake(handshake_from_initialize(&initialize_response));
     let response = send_new_session(supervisor, connection, project_dir).await?;
+    super::session_state::seed_from_new_session(supervisor, &response);
     Ok(InitializedRuntimeSession {
         session_id: response.session_id.clone(),
         response,

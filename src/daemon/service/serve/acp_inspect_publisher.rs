@@ -320,6 +320,7 @@ mod tests {
             terminal_count: 0,
             prompt_deadline_remaining_ms: 0,
             handshake: None,
+            session_state: None,
         }
     }
 }
