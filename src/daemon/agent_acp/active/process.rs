@@ -73,6 +73,9 @@ impl ActiveAcpProcess {
     /// to wait on or reap; disconnect is observed through the protocol channel
     /// rather than `try_wait`, and the reaper's `Some(child)` guard makes
     /// shutdown a no-op on the process.
+    // Gated like its only caller (remote.rs); without it the daemon-runtime-free
+    // bridge build flags this constructor as dead code.
+    #[cfg(feature = "daemon-runtime")]
     #[must_use]
     pub(in crate::daemon::agent_acp) fn new_remote(
         supervisor: Arc<AcpSessionSupervisor>,
