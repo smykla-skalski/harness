@@ -77,9 +77,13 @@ Use only this PR-body shape:
 
 ## Implementation
 - <Three to six outcome-oriented one-sentence bullets, with material validation in the final bullet.>
+
+<Optional final line: `Closes #<issue>`.>
 ```
 
 Use a factual technical tone and describe outcomes, not files or chronology. Add no other sections, checklists, or boilerplate, and keep each paragraph or bullet on one physical line.
+
+Add the `Closes #<issue>` line only when the task actually worked on a real issue that this PR finishes. Confirm the issue exists and matches the change with `gh issue view <issue>` before writing the line, and never guess or invent a number. Omit it when no such issue exists, and mention an issue this PR only advances as plain `#<issue>` text inside a bullet so the merge leaves it open.
 
 ### Copilot review loop
 
