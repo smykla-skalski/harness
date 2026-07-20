@@ -104,7 +104,7 @@ fn require_capability(
 ) -> ProtocolCommandResult<()> {
     if supervisor
         .handshake()
-        .is_some_and(|handshake| supported(handshake))
+        .is_some_and(supported)
     {
         return Ok(());
     }

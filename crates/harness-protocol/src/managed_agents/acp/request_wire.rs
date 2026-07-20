@@ -286,6 +286,8 @@ mod tests {
             record_permissions: true,
             mcp_servers: Vec::new(),
             additional_directories: Vec::new(),
+            resume_session_id: None,
+            resume_disabled: false,
         };
 
         let value = serde_json::to_value(&request).expect("serialize request");

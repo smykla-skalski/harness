@@ -92,19 +92,21 @@ async fn initialize_runtime_session(
     // The session inputs are capability-gated, so the handshake has to be
     // recorded before either request is built.
     supervisor.record_handshake(handshake_from_initialize(&initialize_response));
-    let started = match resume_target(supervisor, resume_session_id) {
-        Some(resume_session_id) => {
-            resume_runtime_session(supervisor, connection, project_dir, session_config, resume_session_id)
-                .await?
-        }
-        None => {
-            let response =
-                send_new_session(supervisor, connection, project_dir, session_config).await?;
-            InitializedRuntimeSession {
-                session_id: response.session_id,
-                config_options: response.config_options,
-                modes: response.modes,
-            }
+    let started = if let Some(resume_session_id) = resume_target(supervisor, resume_session_id) {
+        resume_runtime_session(
+            supervisor,
+            connection,
+            project_dir,
+            session_config,
+            resume_session_id,
+        )
+        .await?
+    } else {
+        let response = send_new_session(supervisor, connection, project_dir, session_config).await?;
+        InitializedRuntimeSession {
+            session_id: response.session_id,
+            config_options: response.config_options,
+            modes: response.modes,
         }
     };
     super::session_state::seed_from_session_start(
