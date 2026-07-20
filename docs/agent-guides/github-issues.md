@@ -12,7 +12,7 @@ Umbrella issues prefix the title with `☂️ `, for example `☂️ feat(monito
 
 ## Body
 
-Three sections at most.
+Three sections at most for an ordinary issue. Bug reports swap the second section for three of their own, and umbrellas add a closing checklist; both variants are set out below.
 
 `## Problem` comes first: two to four sentences of prose, active voice, present tense. State the user-visible impact and why it matters. No solution belongs in this section. If the reader cannot tell what goes wrong today, the issue is not ready.
 
