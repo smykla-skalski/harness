@@ -102,7 +102,7 @@ gh api --method POST repos/smykla-skalski/harness/pulls/<PR_NUMBER>/requested_re
 
 ### Ready and merge
 
-1. Require an accurate two-section PR body, a current-tree Copilot review with no new comments, zero unresolved conversations, and green required checks.
+1. Require an accurate PR body in the shape above, a current-tree Copilot review with no new comments, zero unresolved conversations, and green required checks.
 2. Mark the PR ready for review only after every gate passes, notify the user, and monitor until the user merges or closes it. Never merge the PR as the agent.
 
 ### Close out
