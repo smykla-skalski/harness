@@ -1,5 +1,6 @@
 use super::*;
 use std::fs;
+use std::os::unix::fs::symlink;
 use tempfile::TempDir;
 
 fn write_valid_session(root: &Path, sid: &str, origin: &str) {
@@ -138,6 +139,36 @@ fn register_internal_session_has_no_external_origin() {
 
     let probed = SessionAdopter::probe(&session).expect("probe");
     let outcome = SessionAdopter::register(probed, &sessions_root).expect("register");
+    assert!(outcome.external_origin.is_none());
+    assert!(outcome.state.external_origin.is_none());
+}
+
+#[test]
+fn register_internal_session_resolves_symlinked_data_root() {
+    let tmp = TempDir::new().unwrap();
+    // The daemon reaches its data root through a symlink while the adopt request
+    // arrives already canonicalized - the shape macOS produces for every session,
+    // because /var is a symlink to /private/var and the sandbox resolver calls
+    // fs::canonicalize on the incoming path.
+    let real_root = tmp.path().join("private/harness-data");
+    let session = real_root
+        .join("sessions")
+        .join("demo/f0a1e5d2-7c48-5b39-9e6a-2d4b8c1f3a70");
+    fs::create_dir_all(&session).unwrap();
+    let origin = tmp.path().join("src/demo");
+    fs::create_dir_all(&origin).unwrap();
+    write_valid_session(
+        &session,
+        "f0a1e5d2-7c48-5b39-9e6a-2d4b8c1f3a70",
+        origin.to_str().unwrap(),
+    );
+
+    let linked_root = tmp.path().join("harness-data");
+    symlink(&real_root, &linked_root).unwrap();
+
+    let probed = SessionAdopter::probe(&session).expect("probe");
+    let outcome =
+        SessionAdopter::register(probed, &linked_root.join("sessions")).expect("register");
     assert!(outcome.external_origin.is_none());
     assert!(outcome.state.external_origin.is_none());
 }
