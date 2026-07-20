@@ -87,9 +87,11 @@ impl AcpAgentManagerHandle {
         let acp_id = format!("agent-acp-{}", Uuid::new_v4());
         let session_config = AcpSessionRequestConfig::from_request(request, descriptor);
         if let Some(endpoint) = request.endpoint.as_ref() {
-            // A remote agent is never pooled or reused: no spawn inputs to key
-            // on, and the connection is this start's alone.
-            let process_key = format!("remote:{}:{acp_id}", endpoint.url);
+            // A remote agent is never pooled or reused: the per-start acp_id
+            // already makes the key unique. The endpoint URL is kept out of it
+            // on purpose - process_key rides in snapshots and events, and a
+            // ws/wss URL may carry a credential in its userinfo or query.
+            let process_key = format!("remote:{acp_id}");
             let input = DescriptorStartInput {
                 acp_id: &acp_id,
                 session_id,
