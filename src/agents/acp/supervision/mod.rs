@@ -35,6 +35,7 @@ use crate::workspace::utc_now;
 
 mod config;
 mod guards;
+mod process;
 mod shutdown;
 mod watchdog;
 
@@ -44,6 +45,7 @@ pub use config::{
     WatchdogState,
 };
 pub use guards::{ClientCallGuard, PendingRequestGuard};
+pub use process::SupervisedProcess;
 pub use shutdown::{DaemonShutdownError, kill_process_group};
 pub use watchdog::watchdog_loop;
 
@@ -77,8 +79,7 @@ pub trait WatchdogEventEmitter: Send + Sync {
 /// Tracks process group, watchdog state, in-flight agent-to-daemon calls, and
 /// daemon-to-agent pending requests.
 pub struct AcpSessionSupervisor {
-    pgid: i32,
-    pid: u32,
+    process: SupervisedProcess,
     config: SupervisionConfig,
     state: AtomicU64,
     in_flight_calls: AtomicU64,
@@ -102,14 +103,18 @@ impl AcpSessionSupervisor {
     /// awaiting a response is healthy, not a kill candidate.
     #[must_use]
     pub fn new(child: &Child, config: SupervisionConfig) -> Self {
-        #[cfg(unix)]
-        let pgid = child.id().cast_signed();
-        #[cfg(not(unix))]
-        let pgid = child.id() as i32;
+        Self::with_process(SupervisedProcess::from_child(child), config)
+    }
 
+    /// Create a supervisor for a process the daemon may not have spawned.
+    ///
+    /// The watchdog, deadlines, and request accounting are indifferent to how
+    /// the agent runs; only reaping and pid reporting read the process, so a
+    /// remote transport can supply one it never owned.
+    #[must_use]
+    pub fn with_process(process: SupervisedProcess, config: SupervisionConfig) -> Self {
         Self {
-            pgid,
-            pid: child.id(),
+            process,
             config,
             state: AtomicU64::new(state_to_u64(WatchdogState::Paused)),
             in_flight_calls: AtomicU64::new(0),
@@ -368,13 +373,13 @@ impl AcpSessionSupervisor {
     /// Process group id.
     #[must_use]
     pub const fn pgid(&self) -> i32 {
-        self.pgid
+        self.process.process_group()
     }
 
     /// Process id.
     #[must_use]
     pub const fn pid(&self) -> u32 {
-        self.pid
+        self.process.pid()
     }
 
     /// Elapsed time since last event.
