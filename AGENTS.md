@@ -13,6 +13,7 @@ This is the repo-level contract for agents working in `harness`. Direct system, 
 | Work area | Start here |
 | --- | --- |
 | Delivery selection, replay, PR review, and closeout | `docs/agent-guides/delivery-workflows.md` |
+| Writing and filing GitHub issues | `docs/agent-guides/github-issues.md` |
 | Rust CLI, hooks, orchestration, runtime bootstrap | This file, then `docs/agent-guides/root-reference.md` when details are needed |
 | Harness Monitor macOS app | `apps/harness-monitor/AGENTS.md` |
 | Monitor previewable SwiftUI layer | `apps/harness-monitor/Sources/HarnessMonitorUIPreviewable/AGENTS.md` |
@@ -133,7 +134,7 @@ Hook landing rule: a new hook lands with observable handler behavior, or behind 
 - Diagnostic output uses `tracing` macros. Default filter: `RUST_LOG=harness=info`. Do not add `eprintln!` diagnostics.
 - Comment only what the code cannot say: a non-obvious reason, a surprising constraint, a trap the next reader would otherwise walk into. Restating what the line already does, narrating control flow, or listing parameters adds noise the reader has to skip, so write those comments as nothing at all. Keep the ones that survive short and plainly worded, in the voice of one engineer warning another.
 - Keep Rust files under 520 lines and functions under 100 lines.
-- Commit messages: `{type}({scope}): {message}` with `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, or `perf`. PRs squash-merge, so the PR title uses the same format and becomes the commit title on `main`.
+- Commit messages: `{type}({scope}): {message}` with `feat`, `fix`, `refactor`, `chore`, `docs`, `style`, `test`, or `perf`. PRs squash-merge, so the PR title uses the same format and becomes the commit title on `main`.
 - Never create merge commits or rewrite local `main`. In `replay`, perform the final rebase onto local `main` in the worktree and integrate only by fast-forward. In `pr`, base the branch on `upstream/main`; after publication, prefer additive commits and use `--force-with-lease` only for an unavoidable rewrite of the dedicated session branch. Never plain-force or rewrite a shared branch.
 
 ## Commit signing
