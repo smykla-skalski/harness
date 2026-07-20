@@ -18,6 +18,7 @@ struct RouteState {
     routes: BTreeMap<String, RouteTarget>,
     ended: BTreeSet<String>,
     ended_order: VecDeque<String>,
+    replaying: BTreeSet<String>,
     initialized_once: bool,
 }
 
@@ -69,9 +70,30 @@ impl SessionRouteGuard {
     pub(super) fn stop_session(&self, session_id: &SessionId) {
         let mut state = self.state.lock().expect("session route guard lock");
         let session_id = session_id.to_string();
+        state.replaying.remove(&session_id);
         if state.routes.remove(&session_id).is_some() {
             state.remember_ended(session_id);
         }
+    }
+
+    /// Mark a session as replaying history, for the span of a `session/load`.
+    ///
+    /// The route has to exist before the load is sent, or the replay arrives
+    /// unroutable; marking it says the notifications in that window are the
+    /// agent re-reading a conversation harness already stored, not new turns.
+    pub(super) fn begin_replay(&self, session_id: &SessionId) {
+        let mut state = self.state.lock().expect("session route guard lock");
+        state.replaying.insert(session_id.to_string());
+    }
+
+    pub(super) fn end_replay(&self, session_id: &SessionId) {
+        let mut state = self.state.lock().expect("session route guard lock");
+        state.replaying.remove(&session_id.to_string());
+    }
+
+    pub(super) fn is_replaying(&self, session_id: &SessionId) -> bool {
+        let state = self.state.lock().expect("session route guard lock");
+        state.replaying.contains(&session_id.to_string())
     }
 
     /// Every protocol session still routed, for teardown to close.

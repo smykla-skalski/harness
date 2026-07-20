@@ -8,10 +8,33 @@ use super::handshake::handshake_from_initialize;
 use super::session_config::AcpSessionRequestConfig;
 use super::session_guard::{RouteTarget, SessionRouteGuard};
 use super::{
-    AcpAgentManagerHandle, AcpSessionSupervisor, send_initialize, send_new_session,
-    send_resume_session,
+    AcpAgentManagerHandle, AcpSessionSupervisor, send_initialize, send_load_session,
+    send_new_session, send_resume_session,
 };
 use crate::errors::CliError;
+
+/// Where a session route points, for the two places that register it.
+///
+/// `session/load` has to be routed before it is sent, because the agent
+/// replays the conversation ahead of its response; `session/new` can only be
+/// routed after, because that is when its id exists.
+struct RouteRegistration<'a> {
+    guard: &'a SessionRouteGuard,
+    acp_id: &'a str,
+    session_id: &'a str,
+}
+
+impl RouteRegistration<'_> {
+    fn register(&self, acp_session_id: &SessionId) {
+        self.guard.start_session(
+            acp_session_id,
+            RouteTarget {
+                acp_id: self.acp_id.to_string(),
+                session_id: self.session_id.to_string(),
+            },
+        );
+    }
+}
 
 /// What opening a session told us, from either `session/new` or
 /// `session/resume`. Both report the same two things.
@@ -50,12 +73,18 @@ pub(super) async fn initialize_and_bind_runtime_session(
         runtime_name,
         session_guard,
     } = input;
+    let route = RouteRegistration {
+        guard: session_guard,
+        acp_id,
+        session_id,
+    };
     let started_session = initialize_runtime_session(
         supervisor,
         connection,
         project_dir,
         session_config,
         resume_session_id,
+        &route,
     )
     .await?;
     let acp_session_id = started_session.session_id.clone();
@@ -63,14 +92,8 @@ pub(super) async fn initialize_and_bind_runtime_session(
     // can fire `session/update` notifications immediately after `new_session` returns,
     // so any gap before `bind_runtime_session` finishes would silently drop them with
     // `routing_not_initialized` (e.g. gemini's available_commands_update arrives while
-    // the orchestration bind is still in flight).
-    session_guard.start_session(
-        &acp_session_id,
-        RouteTarget {
-            acp_id: acp_id.to_string(),
-            session_id: session_id.to_string(),
-        },
-    );
+    // the orchestration bind is still in flight). A load has already registered it.
+    route.register(&acp_session_id);
     if let Err(error) =
         bind_runtime_session(manager, session_id, acp_id, runtime_name, &acp_session_id).await
     {
@@ -86,27 +109,43 @@ async fn initialize_runtime_session(
     project_dir: PathBuf,
     session_config: &AcpSessionRequestConfig,
     resume_session_id: Option<&str>,
+    route: &RouteRegistration<'_>,
 ) -> AcpResult<InitializedRuntimeSession> {
     let initialize_timeout = supervisor.config().initialize_timeout;
     let initialize_response = send_initialize(supervisor, connection, initialize_timeout).await?;
     // The session inputs are capability-gated, so the handshake has to be
     // recorded before either request is built.
     supervisor.record_handshake(handshake_from_initialize(&initialize_response));
-    let started = if let Some(resume_session_id) = resume_target(supervisor, resume_session_id) {
-        resume_runtime_session(
-            supervisor,
-            connection,
-            project_dir,
-            session_config,
-            resume_session_id,
-        )
-        .await?
-    } else {
-        let response = send_new_session(supervisor, connection, project_dir, session_config).await?;
-        InitializedRuntimeSession {
-            session_id: response.session_id,
-            config_options: response.config_options,
-            modes: response.modes,
+    let started = match pickup_target(supervisor, resume_session_id) {
+        Some((SessionPickup::Resume, prior_session_id)) => {
+            resume_runtime_session(
+                supervisor,
+                connection,
+                project_dir,
+                session_config,
+                prior_session_id,
+            )
+            .await?
+        }
+        Some((SessionPickup::Load, prior_session_id)) => {
+            load_runtime_session(
+                supervisor,
+                connection,
+                project_dir,
+                session_config,
+                prior_session_id,
+                route,
+            )
+            .await?
+        }
+        None => {
+            let response =
+                send_new_session(supervisor, connection, project_dir, session_config).await?;
+            InitializedRuntimeSession {
+                session_id: response.session_id,
+                config_options: response.config_options,
+                modes: response.modes,
+            }
         }
     };
     super::session_state::seed_from_session_start(
@@ -117,20 +156,87 @@ async fn initialize_runtime_session(
     Ok(started)
 }
 
-/// The session to resume, or `None` to open a fresh one.
+/// How this agent can pick a prior session back up.
+#[derive(Clone, Copy)]
+enum SessionPickup {
+    Resume,
+    Load,
+}
+
+/// How to pick up the stored session, or `None` to open a fresh one.
 ///
-/// An agent that never advertised `session/resume` would answer it with
-/// method-not-found, so a stored id is worth nothing without the capability
-/// and the caller silently gets a new session instead.
-fn resume_target<'a>(
+/// An agent that never advertised either method would answer it with
+/// method-not-found, so a stored id is worth nothing without a capability to
+/// back it and the caller silently gets a new session instead. Resume wins
+/// when both are on offer: it restores the same context without making the
+/// agent replay a conversation harness already has.
+fn pickup_target<'a>(
     supervisor: &AcpSessionSupervisor,
     resume_session_id: Option<&'a str>,
-) -> Option<&'a str> {
-    let resume_session_id = resume_session_id.map(str::trim).filter(|id| !id.is_empty())?;
-    supervisor
-        .handshake()
-        .is_some_and(|handshake| handshake.supports_session_resume)
-        .then_some(resume_session_id)
+) -> Option<(SessionPickup, &'a str)> {
+    let prior_session_id = resume_session_id.map(str::trim).filter(|id| !id.is_empty())?;
+    let handshake = supervisor.handshake()?;
+    if handshake.supports_session_resume {
+        return Some((SessionPickup::Resume, prior_session_id));
+    }
+    handshake
+        .supports_load_session
+        .then_some((SessionPickup::Load, prior_session_id))
+}
+
+/// Load the stored session, routing it before the request goes out.
+///
+/// The agent replays the whole conversation as notifications before it
+/// answers, so the route has to exist by then or every replayed turn is
+/// dropped as unroutable, and it has to be marked replaying or every turn is
+/// persisted a second time.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+async fn load_runtime_session(
+    supervisor: &Arc<AcpSessionSupervisor>,
+    connection: &ConnectionTo<Agent>,
+    project_dir: PathBuf,
+    session_config: &AcpSessionRequestConfig,
+    load_session_id: &str,
+    route: &RouteRegistration<'_>,
+) -> AcpResult<InitializedRuntimeSession> {
+    let acp_session_id = SessionId::new(load_session_id.to_string());
+    route.register(&acp_session_id);
+    route.guard.begin_replay(&acp_session_id);
+    let loaded = send_load_session(
+        supervisor,
+        connection,
+        project_dir.clone(),
+        session_config,
+        load_session_id,
+    )
+    .await;
+    route.guard.end_replay(&acp_session_id);
+    match loaded {
+        Ok(response) => {
+            tracing::info!(load_session_id, "loaded ACP agent session");
+            Ok(InitializedRuntimeSession {
+                session_id: acp_session_id,
+                config_options: response.config_options,
+                modes: response.modes,
+            })
+        }
+        Err(error) => {
+            // The route points at a session the agent would not give us, so it
+            // has to go before the fallback registers the one it does.
+            route.guard.stop_session(&acp_session_id);
+            tracing::warn!(%error, load_session_id, "ACP session load failed; starting a new session");
+            let response =
+                send_new_session(supervisor, connection, project_dir, session_config).await?;
+            Ok(InitializedRuntimeSession {
+                session_id: response.session_id,
+                config_options: response.config_options,
+                modes: response.modes,
+            })
+        }
+    }
 }
 
 /// Resume falls back to a new session rather than failing the start: the id

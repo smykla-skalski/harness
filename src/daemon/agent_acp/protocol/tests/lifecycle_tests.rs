@@ -13,11 +13,13 @@ use super::agents::{
     run_agent_recording_initialize_contract, run_agent_recording_session_lifecycle,
 };
 use super::lifecycle_agents::{
-    run_agent_never_answering_close, run_agent_recording_session_inputs,
-    run_agent_recording_session_resume,
+    run_agent_advertising_resume_and_load, run_agent_never_answering_close,
+    run_agent_recording_session_inputs, run_agent_recording_session_resume,
+    run_agent_refusing_session_load, run_agent_replaying_session_load,
 };
 use super::*;
 
+mod load_tests;
 mod teardown_tests;
 
 type AgentResult = agent_client_protocol::Result<()>;
