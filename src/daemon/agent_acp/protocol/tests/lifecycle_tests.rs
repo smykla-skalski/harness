@@ -11,7 +11,9 @@ use super::super::commands::ProtocolCommandResult;
 use super::agents::{
     run_agent_recording_initialize_contract, run_agent_recording_session_lifecycle,
 };
-use super::lifecycle_agents::run_agent_recording_session_inputs;
+use super::lifecycle_agents::{
+    run_agent_never_answering_close, run_agent_recording_session_inputs,
+};
 use super::*;
 
 type AgentResult = agent_client_protocol::Result<()>;
@@ -55,6 +57,7 @@ where
         SupervisionConfig {
             initialize_timeout: Duration::from_secs(1),
             prompt_timeout: Duration::from_secs(1),
+            lifecycle_timeout: Duration::from_millis(500),
             ..SupervisionConfig::default()
         },
     ));
@@ -204,6 +207,37 @@ async fn primary_session_new_carries_declared_mcp_servers_and_directories() {
     assert_eq!(
         record, "new:mcp=descriptor-server,start-server:dirs=/work/descriptor,/work/start",
         "the first session on a process must carry the same inputs a later attach does"
+    );
+
+    harness.shutdown().await;
+}
+
+/// A wedged agent must surface a deadline, not park the caller. Without a
+/// bound this call never returns, and on the teardown path it takes the
+/// process-lifecycle lock and the daemon shutdown down with it.
+#[tokio::test]
+#[cfg(unix)]
+async fn lifecycle_call_against_a_wedged_agent_fails_on_its_deadline() {
+    let harness = lifecycle_harness(run_agent_never_answering_close);
+
+    let result = harness
+        .dispatch(|response_tx| ProtocolCommand::CloseSession {
+            session_id: SessionId::new("acp-session-7"),
+            response_tx,
+        })
+        .await;
+
+    let Err(message) = result else {
+        unreachable!("close must not succeed against an agent that never answers");
+    };
+    assert!(
+        message.contains("timed out"),
+        "error should report the deadline; got {message}"
+    );
+    assert!(
+        harness.recorded().contains(&"close:acp-session-7".to_string()),
+        "the agent should have received the close before we gave up; got {:?}",
+        harness.recorded()
     );
 
     harness.shutdown().await;

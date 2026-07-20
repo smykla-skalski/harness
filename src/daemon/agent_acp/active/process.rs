@@ -20,6 +20,13 @@ use crate::daemon::agent_acp::protocol::{AcpProtocolHandle, AcpSessionRequestCon
 const PROTOCOL_CANCEL_FLUSH_GRACE: Duration = Duration::from_millis(25);
 const PERMISSION_SHUTDOWN_FLUSH_GRACE: Duration = Duration::from_millis(25);
 
+/// Whole-process budget for closing sessions during teardown.
+///
+/// Daemon shutdown waits on this, so it is short by design: closing lets the
+/// agent persist a session it can hand back later, but the child is killed
+/// either way, and one wedged agent must not hold up the shutdown.
+const TEARDOWN_CLOSE_BUDGET: Duration = Duration::from_secs(2);
+
 pub(in crate::daemon::agent_acp) struct ActiveAcpProcess {
     child: Mutex<Option<Child>>,
     pub(super) supervisor: Arc<AcpSessionSupervisor>,
@@ -154,6 +161,7 @@ impl ActiveAcpProcess {
 
     pub(super) fn shutdown(&self, pending_permissions: usize) {
         if self.logical_session_count() > 0 {
+            self.close_routed_sessions();
             self.request_cancel();
         }
         self.abort_tasks();
@@ -161,6 +169,29 @@ impl ActiveAcpProcess {
         self.stderr_tail.shutdown();
     }
 
+    /// Close still-routed sessions before anything tears the loop down.
+    ///
+    /// Both steps that follow end the command loop that carries these
+    /// requests: cancel makes it return, abort kills its task. Sessions closed
+    /// here are ones the agent may keep and offer back later.
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+    )]
+    fn close_routed_sessions(&self) {
+        match self
+            .protocol_handle
+            .close_routed_sessions(TEARDOWN_CLOSE_BUDGET)
+        {
+            Ok(0) => {}
+            Ok(closed) => tracing::debug!(closed, "closed ACP sessions before teardown"),
+            Err(error) => tracing::debug!(%error, "could not close ACP sessions before teardown"),
+        }
+    }
+
+    /// Drop's fallback path. Deliberately skips the session close: a `Drop` can
+    /// run on any thread including inside the async runtime, and this exists
+    /// for leaked sessions where nothing is waiting on a clean handover.
     pub(super) fn shutdown_immediate(&self) {
         if self.logical_session_count() > 0 {
             self.protocol_handle.cancel();

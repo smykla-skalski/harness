@@ -8,6 +8,14 @@ pub const DEFAULT_INITIALIZE_TIMEOUT: Duration = Duration::from_secs(30);
 /// Default timeout for a single `session/prompt` call.
 pub const DEFAULT_PROMPT_TIMEOUT: Duration = Duration::from_mins(10);
 
+/// Default timeout for a session lifecycle call such as `session/new` or
+/// `session/close`.
+///
+/// These carry no model work, so they get the startup budget rather than the
+/// prompt budget. An agent that stops answering one of them would otherwise
+/// block its caller thread with no way out.
+pub const DEFAULT_LIFECYCLE_TIMEOUT: Duration = Duration::from_secs(30);
+
 /// Default watchdog timeout (no events from agent).
 pub const DEFAULT_WATCHDOG_TIMEOUT: Duration = Duration::from_mins(5);
 
@@ -27,6 +35,8 @@ pub struct SupervisionConfig {
     pub initialize_timeout: Duration,
     /// Maximum time for a single `session/prompt`.
     pub prompt_timeout: Duration,
+    /// Maximum time for a session lifecycle call.
+    pub lifecycle_timeout: Duration,
     /// Watchdog timeout (no events from agent).
     pub watchdog_timeout: Duration,
     /// Maximum terminals per session.
@@ -40,6 +50,7 @@ impl Default for SupervisionConfig {
         Self {
             initialize_timeout: DEFAULT_INITIALIZE_TIMEOUT,
             prompt_timeout: DEFAULT_PROMPT_TIMEOUT,
+            lifecycle_timeout: DEFAULT_LIFECYCLE_TIMEOUT,
             watchdog_timeout: DEFAULT_WATCHDOG_TIMEOUT,
             terminal_cap: MAX_TERMINALS_PER_SESSION,
             terminal_wall_clock: MAX_TERMINAL_WALL_CLOCK,

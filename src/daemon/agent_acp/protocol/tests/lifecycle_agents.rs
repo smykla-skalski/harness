@@ -8,9 +8,9 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use agent_client_protocol::schema::v1::{
-    AgentCapabilities, CancelNotification, InitializeRequest, InitializeResponse, McpServer,
-    NewSessionRequest, NewSessionResponse, SessionAdditionalDirectoriesCapabilities,
-    SessionCapabilities,
+    AgentCapabilities, CancelNotification, CloseSessionRequest, InitializeRequest,
+    InitializeResponse, McpServer, NewSessionRequest, NewSessionResponse,
+    SessionAdditionalDirectoriesCapabilities, SessionCapabilities, SessionCloseCapabilities,
 };
 use agent_client_protocol::{Agent, Channel};
 
@@ -46,6 +46,55 @@ pub(super) async fn run_agent_recording_session_inputs(
                     .expect("record new session")
                     .push(session_inputs_record("new", &request.mcp_servers, &request.additional_directories));
                 responder.respond(NewSessionResponse::new("acp-session-1"))
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_notification(
+            async move |_cancel: CancelNotification, _connection| Ok(()),
+            agent_client_protocol::on_receive_notification!(),
+        )
+        .connect_to(transport)
+        .await
+}
+
+/// Accepts `session/close` and never answers it.
+///
+/// Stands in for an agent that is alive on the wire but wedged: the child is
+/// running, so nothing kills it, and without a deadline the command loop waits
+/// on that response for as long as the process lives.
+pub(super) async fn run_agent_never_answering_close(
+    transport: Channel,
+    operations: Arc<Mutex<Vec<String>>>,
+) -> agent_client_protocol::Result<()> {
+    Agent
+        .builder()
+        .name("wedged-close-agent")
+        .on_receive_request(
+            async move |initialize: InitializeRequest, responder, _connection| {
+                responder.respond(
+                    InitializeResponse::new(initialize.protocol_version).agent_capabilities(
+                        AgentCapabilities::new().session_capabilities(
+                            SessionCapabilities::new().close(SessionCloseCapabilities::new()),
+                        ),
+                    ),
+                )
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |_request: NewSessionRequest, responder, _connection| {
+                responder.respond(NewSessionResponse::new("acp-session-1"))
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: CloseSessionRequest, _responder, _connection| {
+                operations
+                    .lock()
+                    .expect("record close")
+                    .push(format!("close:{}", request.session_id.0));
+                std::future::pending::<()>().await;
+                Ok(())
             },
             agent_client_protocol::on_receive_request!(),
         )

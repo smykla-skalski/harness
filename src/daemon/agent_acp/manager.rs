@@ -355,6 +355,26 @@ impl AcpAgentManagerHandle {
         Ok(())
     }
 
+    /// [`Self::shutdown_all`] for callers already on the async runtime.
+    ///
+    /// The sync version blocks its thread for the whole drain: it takes the
+    /// process-lifecycle lock, closes each session over the wire, and waits on
+    /// child termination. Called straight from a request handler that stalls a
+    /// runtime worker, and the daemon still has a shutdown response to send.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the drain fails or its thread panics.
+    pub async fn shutdown_all_async(&self) -> Result<(), CliError> {
+        let manager = self.clone();
+        tokio::task::spawn_blocking(move || manager.shutdown_all())
+            .await
+            .map_err(|error| {
+                CliError::from(CliErrorKind::workflow_io(format!(
+                    "ACP shutdown task failed: {error}"
+                )))
+            })?
+    }
+
     pub(in crate::daemon::agent_acp) fn start_requested_after_shutdown(&self) -> bool {
         self.state.shutdown_requested.load(Ordering::SeqCst)
     }

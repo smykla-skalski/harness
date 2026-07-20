@@ -4,6 +4,8 @@ use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::Duration;
 
+use tokio::time::Instant;
+
 use agent_client_protocol::schema::v1::{
     CancelNotification, ContentBlock, ListSessionsRequest, LogoutRequest, PromptRequest, SessionId,
     TextContent,
@@ -25,11 +27,10 @@ use crate::daemon::agent_acp::prompt_gate::PromptLease;
 
 pub(super) type ProtocolCommandResult<T> = Result<T, String>;
 
-#[derive(Clone)]
-pub(in crate::daemon::agent_acp) struct AcpProtocolHandle {
-    cancel_tx: tokio_mpsc::UnboundedSender<()>,
-    command_tx: tokio_mpsc::UnboundedSender<ProtocolCommand>,
-}
+mod handle;
+
+pub(in crate::daemon::agent_acp) use handle::AcpProtocolHandle;
+pub(super) use handle::response_timeout_for;
 
 pub(super) enum ProtocolCommand {
     AttachSession {
@@ -67,144 +68,10 @@ pub(super) enum ProtocolCommand {
         session_id: SessionId,
         response_tx: mpsc::SyncSender<ProtocolCommandResult<()>>,
     },
-}
-
-impl AcpProtocolHandle {
-    pub(super) fn new(
-        cancel_tx: tokio_mpsc::UnboundedSender<()>,
-        command_tx: tokio_mpsc::UnboundedSender<ProtocolCommand>,
-    ) -> Self {
-        Self {
-            cancel_tx,
-            command_tx,
-        }
-    }
-
-    pub(in crate::daemon::agent_acp) fn cancel(&self) {
-        let _ = self.cancel_tx.send(());
-    }
-
-    pub(in crate::daemon::agent_acp) fn attach_session(
-        &self,
-        acp_id: &str,
-        session_id: &str,
-        project_dir: PathBuf,
-        session_config: AcpSessionRequestConfig,
-    ) -> ProtocolCommandResult<SessionId> {
-        let (response_tx, response_rx) = mpsc::sync_channel(1);
-        self.command_tx
-            .send(ProtocolCommand::AttachSession {
-                acp_id: acp_id.to_string(),
-                session_id: session_id.to_string(),
-                project_dir,
-                session_config,
-                response_tx,
-            })
-            .map_err(|_| "ACP protocol command channel is closed".to_string())?;
-        receive_response(&response_rx)
-    }
-
-    pub(in crate::daemon::agent_acp) fn prompt_session(
-        &self,
-        acp_id: &str,
-        session_id: &str,
-        project_dir: PathBuf,
-        session_config: AcpSessionRequestConfig,
-        prompt: String,
-        prompt_lease: PromptLease,
-    ) -> ProtocolCommandResult<SessionId> {
-        let (response_tx, response_rx) = mpsc::sync_channel(1);
-        self.command_tx
-            .send(ProtocolCommand::PromptSession {
-                acp_id: acp_id.to_string(),
-                session_id: session_id.to_string(),
-                project_dir,
-                session_config,
-                prompt,
-                prompt_lease,
-                response_tx,
-            })
-            .map_err(|_| "ACP protocol command channel is closed".to_string())?;
-        receive_response(&response_rx)
-    }
-
-    pub(in crate::daemon::agent_acp) fn detach_session(
-        &self,
-        acp_id: &str,
-        session_id: &str,
-    ) -> ProtocolCommandResult<()> {
-        let (response_tx, response_rx) = mpsc::sync_channel(1);
-        self.command_tx
-            .send(ProtocolCommand::DetachTarget {
-                target: RouteTarget {
-                    acp_id: acp_id.to_string(),
-                    session_id: session_id.to_string(),
-                },
-                response_tx,
-            })
-            .map_err(|_| "ACP protocol command channel is closed".to_string())?;
-        receive_response(&response_rx)
-    }
-
-    pub(in crate::daemon::agent_acp) fn logout(&self) -> ProtocolCommandResult<()> {
-        let (response_tx, response_rx) = mpsc::sync_channel(1);
-        self.command_tx
-            .send(ProtocolCommand::Logout { response_tx })
-            .map_err(|_| "ACP protocol command channel is closed".to_string())?;
-        receive_response(&response_rx)
-    }
-
-    pub(in crate::daemon::agent_acp) fn list_sessions(
-        &self,
-        cwd: Option<PathBuf>,
-        cursor: Option<String>,
-    ) -> ProtocolCommandResult<AcpSessionListPage> {
-        let (response_tx, response_rx) = mpsc::sync_channel(1);
-        let request = ListSessionsRequest::new().cwd(cwd).cursor(cursor);
-        self.command_tx
-            .send(ProtocolCommand::ListSessions {
-                request,
-                response_tx,
-            })
-            .map_err(|_| "ACP protocol command channel is closed".to_string())?;
-        receive_response(&response_rx)
-    }
-
-    pub(in crate::daemon::agent_acp) fn close_session(
-        &self,
-        session_id: &str,
-    ) -> ProtocolCommandResult<()> {
-        let (response_tx, response_rx) = mpsc::sync_channel(1);
-        self.command_tx
-            .send(ProtocolCommand::CloseSession {
-                session_id: SessionId::new(session_id.to_string()),
-                response_tx,
-            })
-            .map_err(|_| "ACP protocol command channel is closed".to_string())?;
-        receive_response(&response_rx)
-    }
-
-    pub(in crate::daemon::agent_acp) fn delete_session(
-        &self,
-        session_id: &str,
-    ) -> ProtocolCommandResult<()> {
-        let (response_tx, response_rx) = mpsc::sync_channel(1);
-        self.command_tx
-            .send(ProtocolCommand::DeleteSession {
-                session_id: SessionId::new(session_id.to_string()),
-                response_tx,
-            })
-            .map_err(|_| "ACP protocol command channel is closed".to_string())?;
-        receive_response(&response_rx)
-    }
-}
-
-fn receive_response<T>(
-    response_rx: &mpsc::Receiver<ProtocolCommandResult<T>>,
-) -> ProtocolCommandResult<T> {
-    response_rx
-        .recv()
-        .map_err(|_| "ACP protocol command response channel is closed".to_string())?
+    CloseRoutedSessions {
+        budget: Duration,
+        response_tx: mpsc::SyncSender<ProtocolCommandResult<usize>>,
+    },
 }
 
 pub(super) async fn run_protocol_command_loop(
@@ -293,7 +160,16 @@ async fn handle_protocol_command(
             target,
             response_tx,
         } => {
-            let result = detach_protocol_session(connection, session_guard, &target);
+            let result =
+                detach_protocol_session(&supervisor, connection, session_guard, &target).await;
+            let _ = response_tx.send(result);
+        }
+        ProtocolCommand::CloseRoutedSessions {
+            budget,
+            response_tx,
+        } => {
+            let result =
+                close_routed_sessions(&supervisor, connection, session_guard, budget).await;
             let _ = response_tx.send(result);
         }
         ProtocolCommand::Logout { response_tx } => {
@@ -335,11 +211,12 @@ async fn send_logout(
         return Err("agent does not advertise the auth.logout capability".to_string());
     }
     let _guard = supervisor.enter_pending_request_with_reason(Some("logout"));
-    connection
-        .send_request(LogoutRequest::new())
-        .block_task()
-        .await
-        .map_err(|error| error.to_string())?;
+    lifecycle::with_deadline(
+        supervisor,
+        "logout",
+        connection.send_request(LogoutRequest::new()).block_task(),
+    )
+    .await?;
     Ok(())
 }
 
@@ -356,11 +233,12 @@ async fn attach_protocol_session(
         super::session_inputs::new_session_request(project_dir, session_config, supervisor.handshake());
     let response = {
         let _guard = supervisor.enter_pending_request_with_reason(Some("session/new"));
-        connection
-            .send_request(request)
-            .block_task()
-            .await
-            .map_err(|error| error.to_string())?
+        lifecycle::with_deadline(
+            supervisor,
+            "session/new",
+            connection.send_request(request).block_task(),
+        )
+        .await?
     };
     let protocol_session_id = response.session_id.clone();
     session_guard.start_session(&protocol_session_id, RouteTarget { acp_id, session_id });
@@ -474,7 +352,8 @@ async fn send_prompt(
     Ok(())
 }
 
-fn detach_protocol_session(
+async fn detach_protocol_session(
+    supervisor: &AcpSessionSupervisor,
     connection: &ConnectionTo<Agent>,
     session_guard: &SessionRouteGuard,
     target: &RouteTarget,
@@ -482,13 +361,72 @@ fn detach_protocol_session(
     let Some(protocol_session_id) = session_guard.stop_target(target) else {
         return Ok(());
     };
-    match send_cancel_notification(connection, protocol_session_id.clone()) {
-        Ok(()) => Ok(()),
-        Err(error) => {
-            session_guard.start_session(&protocol_session_id, target.clone());
-            Err(error.to_string())
+    if let Err(error) = send_cancel_notification(connection, protocol_session_id.clone()) {
+        session_guard.start_session(&protocol_session_id, target.clone());
+        return Err(error.to_string());
+    }
+    close_detached_session(supervisor, connection, protocol_session_id).await;
+    Ok(())
+}
+
+/// Tell the agent the session is finished once the route is gone.
+///
+/// Best effort on purpose: the route is already detached and the caller has
+/// moved on, so a refusing or unreachable agent must not fail the detach. It
+/// matters because a closed session is one the agent may persist and hand back
+/// later, while a killed one is not.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+async fn close_detached_session(
+    supervisor: &AcpSessionSupervisor,
+    connection: &ConnectionTo<Agent>,
+    protocol_session_id: SessionId,
+) {
+    if !supervisor
+        .handshake()
+        .is_some_and(|handshake| handshake.supports_session_close)
+    {
+        return;
+    }
+    if let Err(error) =
+        lifecycle::close_session(supervisor, connection, protocol_session_id.clone()).await
+    {
+        tracing::warn!(%error, session = %protocol_session_id, "failed to close detached ACP session");
+    }
+}
+
+/// Close every session this connection still routes, within one shared budget.
+///
+/// Teardown calls this before the tasks are aborted, because the command loop
+/// that carries these requests dies with them. The budget covers the whole
+/// sweep rather than each session, so one wedged agent cannot stretch shutdown
+/// by the number of sessions it happens to hold.
+async fn close_routed_sessions(
+    supervisor: &AcpSessionSupervisor,
+    connection: &ConnectionTo<Agent>,
+    session_guard: &SessionRouteGuard,
+    budget: Duration,
+) -> ProtocolCommandResult<usize> {
+    if !supervisor
+        .handshake()
+        .is_some_and(|handshake| handshake.supports_session_close)
+    {
+        return Ok(0);
+    }
+    let deadline = Instant::now() + budget;
+    let mut closed = 0;
+    for session_id in session_guard.active_sessions() {
+        let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
+            break;
+        };
+        let close = lifecycle::close_session(supervisor, connection, session_id);
+        if matches!(timeout(remaining, close).await, Ok(Ok(()))) {
+            closed += 1;
         }
     }
+    Ok(closed)
 }
 
 fn send_cancel_notification(
