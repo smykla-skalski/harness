@@ -144,6 +144,10 @@ struct TaskBoardStepRailView: View {
       .fill(HarnessMonitorTheme.ink.opacity(0.10))
       .frame(width: 1)
       .padding(.leading, railWidth + splitGutter)
+      // Decorative: it rides above both columns, so leave clicks and VoiceOver
+      // to the controls underneath.
+      .allowsHitTesting(false)
+      .accessibilityHidden(true)
   }
 
   private var cardArea: some View {
@@ -161,8 +165,8 @@ struct TaskBoardStepRailView: View {
     .transition(.opacity)
     .animation(.easeInOut(duration: reduceMotion ? 0 : 0.2), value: cardIdentity)
     // Fills the split both ways: the width so copy uses the column, the height
-    // so the stage card's Spacer has slack to push its actions onto the rail's
-    // bottom edge. Height only fills what the split resolved to, never more.
+    // so the stage detail's Spacer has slack to push its actions onto the
+    // rail's bottom edge. Height only fills what the split resolved to.
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
@@ -187,7 +191,7 @@ struct TaskBoardStepRailView: View {
   }
 
   private func previewCard(for column: TaskBoardStepColumn) -> some View {
-    TaskBoardStepStageCard(
+    TaskBoardStepStageDetail(
       stageTitle: column.title,
       whatHappened: nil,
       whatNext: column.explanation
@@ -204,7 +208,7 @@ struct TaskBoardStepRailView: View {
   }
 
   private func liveCard(_ plan: TaskBoardStepStagePlan) -> some View {
-    TaskBoardStepStageCard(
+    TaskBoardStepStageDetail(
       stageTitle: plan.stage.title,
       whatHappened: plan.whatHappened,
       whatNext: plan.whatNext
@@ -213,9 +217,19 @@ struct TaskBoardStepRailView: View {
         if plan.stage == .readyToDeliver, let selection = activeSelection {
           TaskBoardStepPromptPreview(prompt: selection.plan.renderedPrompt)
         }
-        actionRow(plan)
+        if offersActions(plan) {
+          actionRow(plan)
+        }
       }
     }
+  }
+
+  /// Whether the stage offers any control at all. Without the guard the row
+  /// still renders as a lone Spacer and the stack spends a gap on it, which
+  /// shows up at `.readyToDeliver` when a held delivery cannot be retried:
+  /// no primary action, and this stage carries no inline links.
+  private func offersActions(_ plan: TaskBoardStepStagePlan) -> Bool {
+    plan.primaryAction != nil || !plan.inlineLinks.isEmpty || plan.stage == .done
   }
 
   /// Closing row of the detail column: navigation links on the leading edge,

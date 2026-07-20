@@ -2,14 +2,15 @@ import SwiftUI
 
 /// The focused stage detail: the stage title, what just happened, what Next
 /// will do, and a closing slot for whatever controls the stage offers.
-/// Arranging that slot is the caller's job; the card only stacks it last.
+/// Arranging that slot is the caller's job; this view only stacks it last.
 /// Presentational only - the parent supplies the buttons so this view stores no
 /// action closures.
 ///
-/// Carries no surface of its own. It is the detail column of the manual-steps
-/// panel, separated from the progress rail by that panel's divider, and a
-/// second nested card inside the panel only muddied the hierarchy.
-struct TaskBoardStepStageCard<Actions: View>: View {
+/// Carries no surface of its own - hence "detail" rather than "card". It is
+/// the detail column of the manual-steps panel, separated from the progress
+/// rail by that panel's separator, and a second nested card inside the panel
+/// only muddied the hierarchy.
+struct TaskBoardStepStageDetail<Actions: View>: View {
   let stageTitle: String
   let whatHappened: String?
   let whatNext: String
@@ -66,7 +67,7 @@ struct TaskBoardStepStageCard<Actions: View>: View {
       actions
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .accessibilityIdentifier("harness.task-board.step.stage-card")
+    .accessibilityIdentifier("harness.task-board.step.stage-detail")
   }
 
   private var titleText: some View {
