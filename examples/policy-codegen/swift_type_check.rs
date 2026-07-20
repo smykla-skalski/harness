@@ -94,11 +94,13 @@ fn declared_on_line(line: &str) -> Option<&str> {
     None
 }
 
-/// Names a generated module references from a field or an associated value.
+/// Names a generated module references: stored properties, tagged-enum
+/// payloads, and initializer parameters.
 ///
-/// Every emitted field appears as a `public var` and every tagged-enum payload
-/// as a `case` associated value, so those two positions cover the type names
-/// the Swift compiler has to resolve.
+/// A memberwise initializer mirrors its struct's fields today, so scanning it
+/// finds nothing new. It is scanned anyway so the guard does not depend on that
+/// staying true - a parameter the emitter stops pairing with a `public var`
+/// would otherwise become invisible here.
 pub(crate) fn referenced_types(generated: &str) -> BTreeSet<String> {
     let mut names = BTreeSet::new();
     for line in generated.lines() {
@@ -106,7 +108,9 @@ pub(crate) fn referenced_types(generated: &str) -> BTreeSet<String> {
         if let Some(rest) = trimmed.strip_prefix("public var ") {
             collect_property_type(rest, &mut names);
         } else if let Some(rest) = trimmed.strip_prefix("case ") {
-            collect_case_types(rest, &mut names);
+            collect_parameter_types(rest, &mut names);
+        } else if trimmed.starts_with("public init(") {
+            collect_parameter_types(trimmed, &mut names);
         }
     }
     names
@@ -121,7 +125,9 @@ fn collect_property_type(rest: &str, names: &mut BTreeSet<String>) {
     collect_type_identifiers(type_expr, names);
 }
 
-fn collect_case_types(rest: &str, names: &mut BTreeSet<String>) {
+/// Read the types out of a parenthesised parameter list, as written by an
+/// enum case payload or an initializer signature.
+fn collect_parameter_types(rest: &str, names: &mut BTreeSet<String>) {
     let Some(start) = rest.find('(') else {
         return;
     };
@@ -130,6 +136,10 @@ fn collect_case_types(rest: &str, names: &mut BTreeSet<String>) {
     };
     for argument in rest[start + 1..end].split(", ") {
         let type_expr = argument.split_once(": ").map_or(argument, |(_, ty)| ty);
+        // `capabilities: [String] = []` - the default is not part of the type.
+        let type_expr = type_expr
+            .split_once(" = ")
+            .map_or(type_expr, |(ty, _)| ty);
         collect_type_identifiers(type_expr, names);
     }
 }
@@ -206,6 +216,17 @@ mod tests {
         assert_eq!(
             referenced_types(generated),
             declared_set(&["AcpMcpHttpHeader", "AcpMcpServer", "String"])
+        );
+    }
+
+    #[test]
+    fn reads_initializer_parameters_and_ignores_their_defaults() {
+        let generated =
+            "  public init(catalog: RuntimeModelCatalogWire? = nil, capabilities: [String] = [], probe: DoctorProbeWire) {\n";
+
+        assert_eq!(
+            referenced_types(generated),
+            declared_set(&["DoctorProbeWire", "RuntimeModelCatalogWire", "String"])
         );
     }
 
