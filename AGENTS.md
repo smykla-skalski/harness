@@ -114,6 +114,8 @@ Detailed module and data-directory notes live in `docs/agent-guides/root-referen
 
 Keep agent guides short, scoped, and actionable. Put hard rules, routing, and copy-paste commands in `AGENTS.md`; move background, long rationale, and subsystem internals to `docs/agent-guides/`.
 
+A copy-paste command block must state what it assumes - branch, cleanliness, prior state - and stay safe to rerun. Compressing prose into commands silently drops the preconditions the prose carried, and a block fails outright where prose would have degraded into a readable edge case.
+
 ## Hooks
 
 The active unified tool lifecycle is `tool-guard`, `tool-result`, and optional `tool-failure`. Suite-lifecycle hooks (`guard-stop`, `context-agent`, `validate-agent`, `tool-failure`) are off by default unless enabled with `HARNESS_FEATURE_SUITE_HOOKS=1` or the matching setup flag.
