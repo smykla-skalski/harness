@@ -72,8 +72,9 @@ struct TaskBoardStepRailTargetView: View {
 /// The automation-context footer of the manual-steps card.
 ///
 /// `DisclosureGroup` only hit-tests its triangle on macOS, so the label carries
-/// its own full-width tap target and hover highlight - otherwise the row reads
-/// as static text and the only way in is a 12pt chevron.
+/// its own full-width button and hover highlight - otherwise the row reads as
+/// static text and the only way in is a 12pt chevron. A button rather than a
+/// tap gesture so the row stays tab-reachable and keyboard-activatable.
 struct TaskBoardStepContextDisclosure: View {
   let store: HarnessMonitorStore
   let workspace: PolicyCanvasWorkspace?
@@ -110,23 +111,24 @@ struct TaskBoardStepContextDisclosure: View {
       }
       .padding(.top, HarnessMonitorTheme.spacingSM)
     } label: {
-      Label("Automation context", systemImage: "gearshape")
-        .font(labelFont)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, HarnessMonitorTheme.spacingXS)
-        .padding(.horizontal, HarnessMonitorTheme.spacingSM)
-        .background(
-          HarnessMonitorTheme.accent.opacity(isHovered ? 0.08 : 0),
-          in: .rect(cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
-        )
-        .contentShape(.rect)
-        .onHover { isHovered = $0 }
-        .onTapGesture {
-          withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
-            isExpanded.toggle()
-          }
+      Button {
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+          isExpanded.toggle()
         }
-        .accessibilityAddTraits(.isButton)
+      } label: {
+        Label("Automation context", systemImage: "gearshape")
+          .font(labelFont)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.vertical, HarnessMonitorTheme.spacingXS)
+          .padding(.horizontal, HarnessMonitorTheme.spacingSM)
+          .background(
+            HarnessMonitorTheme.accent.opacity(isHovered ? 0.08 : 0),
+            in: .rect(cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
+          )
+          .contentShape(.rect)
+      }
+      .buttonStyle(.plain)
+      .onHover { isHovered = $0 }
     }
     .accessibilityIdentifier("harness.task-board.step.context")
   }

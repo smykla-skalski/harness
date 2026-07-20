@@ -101,5 +101,6 @@ final class TaskBoardStepRailState {
     approvalRefreshGeneration = 0
     lockedItemID = nil
     viewingColumn = nil
+    isAutomationContextExpanded = false
   }
 }
