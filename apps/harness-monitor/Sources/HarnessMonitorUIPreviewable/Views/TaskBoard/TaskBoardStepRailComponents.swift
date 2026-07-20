@@ -14,9 +14,6 @@ struct TaskBoardStepRailTargetView: View {
   private var titleFont: Font {
     HarnessMonitorTextSize.scaledFont(.body.weight(.semibold), by: fontScale)
   }
-  private var idFont: Font {
-    HarnessMonitorTextSize.scaledFont(.callout.monospaced(), by: fontScale)
-  }
   private var placeholderFont: Font {
     HarnessMonitorTextSize.scaledFont(.body, by: fontScale)
   }
@@ -43,11 +40,6 @@ struct TaskBoardStepRailTargetView: View {
       Text(item.title)
         .font(titleFont)
         .lineLimit(1)
-      Text(item.id)
-        .font(idFont)
-        .foregroundStyle(.secondary)
-        .lineLimit(1)
-        .truncationMode(.middle)
     } else {
       Text("No selected or ready Todo item")
         .font(placeholderFont)
