@@ -16,9 +16,11 @@ public struct AcpAgentHandshake: Codable, Equatable, Sendable {
   public var supportsSessionClose: Bool
   public var supportsSessionDelete: Bool
   public var supportsAdditionalDirectories: Bool
+  public var supportsMcpHttp: Bool
+  public var supportsMcpSse: Bool
   public var supportsLogout: Bool
 
-  public init(protocolVersion: UInt16 = 0, agentName: String? = nil, agentVersion: String? = nil, agentTitle: String? = nil, authMethodIds: [String] = [], supportsLoadSession: Bool = false, supportsSessionList: Bool = false, supportsSessionResume: Bool = false, supportsSessionClose: Bool = false, supportsSessionDelete: Bool = false, supportsAdditionalDirectories: Bool = false, supportsLogout: Bool = false) {
+  public init(protocolVersion: UInt16 = 0, agentName: String? = nil, agentVersion: String? = nil, agentTitle: String? = nil, authMethodIds: [String] = [], supportsLoadSession: Bool = false, supportsSessionList: Bool = false, supportsSessionResume: Bool = false, supportsSessionClose: Bool = false, supportsSessionDelete: Bool = false, supportsAdditionalDirectories: Bool = false, supportsMcpHttp: Bool = false, supportsMcpSse: Bool = false, supportsLogout: Bool = false) {
     self.protocolVersion = protocolVersion
     self.agentName = agentName
     self.agentVersion = agentVersion
@@ -30,6 +32,8 @@ public struct AcpAgentHandshake: Codable, Equatable, Sendable {
     self.supportsSessionClose = supportsSessionClose
     self.supportsSessionDelete = supportsSessionDelete
     self.supportsAdditionalDirectories = supportsAdditionalDirectories
+    self.supportsMcpHttp = supportsMcpHttp
+    self.supportsMcpSse = supportsMcpSse
     self.supportsLogout = supportsLogout
   }
 
@@ -46,6 +50,8 @@ public struct AcpAgentHandshake: Codable, Equatable, Sendable {
     supportsSessionClose = try container.decodeIfPresent(Bool.self, forKey: .supportsSessionClose) ?? false
     supportsSessionDelete = try container.decodeIfPresent(Bool.self, forKey: .supportsSessionDelete) ?? false
     supportsAdditionalDirectories = try container.decodeIfPresent(Bool.self, forKey: .supportsAdditionalDirectories) ?? false
+    supportsMcpHttp = try container.decodeIfPresent(Bool.self, forKey: .supportsMcpHttp) ?? false
+    supportsMcpSse = try container.decodeIfPresent(Bool.self, forKey: .supportsMcpSse) ?? false
     supportsLogout = try container.decodeIfPresent(Bool.self, forKey: .supportsLogout) ?? false
   }
 
@@ -61,6 +67,8 @@ public struct AcpAgentHandshake: Codable, Equatable, Sendable {
     case supportsSessionClose = "supports_session_close"
     case supportsSessionDelete = "supports_session_delete"
     case supportsAdditionalDirectories = "supports_additional_directories"
+    case supportsMcpHttp = "supports_mcp_http"
+    case supportsMcpSse = "supports_mcp_sse"
     case supportsLogout = "supports_logout"
   }
 }

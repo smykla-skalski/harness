@@ -105,6 +105,62 @@ mod tests {
     }
 
     #[test]
+    fn config_payload_never_carries_mcp_secrets_to_clients() {
+        use harness_protocol::managed_agents::acp::{
+            AcpMcpEnvVariable, AcpMcpHttpHeader, AcpMcpServer,
+        };
+
+        // This payload reaches every websocket client, remote ones included, so
+        // a descriptor carrying an Authorization header must not hand it out.
+        let mut payload = build_config_payload();
+        let descriptor = payload
+            .acp_agents
+            .first_mut()
+            .expect("at least one ACP descriptor");
+        descriptor.session_configuration.mcp_servers = vec![
+            AcpMcpServer::Http {
+                name: "remote".to_owned(),
+                url: "https://example.test/mcp".to_owned(),
+                headers: vec![AcpMcpHttpHeader {
+                    name: "Authorization".to_owned(),
+                    value: "Bearer super-secret".to_owned(),
+                }],
+            },
+            AcpMcpServer::Stdio {
+                name: "local".to_owned(),
+                command: "/usr/bin/mcp".to_owned(),
+                args: Vec::new(),
+                env: vec![AcpMcpEnvVariable {
+                    name: "TOKEN".to_owned(),
+                    value: "super-secret".to_owned(),
+                }],
+            },
+        ];
+
+        let encoded = serde_json::to_string(&payload).expect("serialize config payload");
+
+        assert!(
+            !encoded.contains("super-secret"),
+            "config payload must not serialize MCP credentials"
+        );
+        assert!(
+            encoded.contains("Authorization"),
+            "header and variable names stay visible; only values are withheld"
+        );
+        let debugged = format!(
+            "{:?}",
+            AcpMcpHttpHeader {
+                name: "Authorization".to_owned(),
+                value: "Bearer super-secret".to_owned(),
+            }
+        );
+        assert!(
+            !debugged.contains("super-secret"),
+            "Debug must redact the value too; got {debugged}"
+        );
+    }
+
+    #[test]
     fn build_config_push_frame_serializes_with_config_event_and_seq_zero() {
         let _guard = lock_probe_cache_for_tests();
         replace_probe_cache_for_tests(

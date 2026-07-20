@@ -169,16 +169,49 @@ pub enum AcpMcpServer {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AcpMcpEnvVariable {
     pub name: String,
+    /// Never serialized. See [`AcpMcpHttpHeader::value`] for why.
+    #[serde(default, skip_serializing)]
     pub value: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AcpMcpHttpHeader {
     pub name: String,
+    /// Read from configuration but never written back out.
+    ///
+    /// Descriptors are pushed wholesale to every websocket client through
+    /// `WsConfigPayload::acp_agents`, including remote ones, so a serializable
+    /// header value would hand out whatever `Authorization` the descriptor
+    /// carries. Skipping it on serialize closes that at every boundary rather
+    /// than relying on each one to remember to redact. In-process use is
+    /// unaffected: the value still reaches `session/new`.
+    #[serde(default, skip_serializing)]
     pub value: String,
+}
+
+/// Redacted so a `tracing` line or a panic message cannot spill the secret,
+/// matching the hand-written `Debug` on [`BridgeAcpStartRequest`].
+impl fmt::Debug for AcpMcpEnvVariable {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("AcpMcpEnvVariable")
+            .field("name", &self.name)
+            .field("value", &"[REDACTED]")
+            .finish()
+    }
+}
+
+impl fmt::Debug for AcpMcpHttpHeader {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("AcpMcpHttpHeader")
+            .field("name", &self.name)
+            .field("value", &"[REDACTED]")
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
