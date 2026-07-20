@@ -228,7 +228,6 @@ extension HarnessMonitorStore {
   }
 
   private static let maxLatencySamples = 12
-  private static let trafficWindow: TimeInterval = 30
 
   func resetConnectionMetrics(for transport: TransportKind) {
     guard maintainsLiveDaemonObservation else {
@@ -244,7 +243,7 @@ extension HarnessMonitorStore {
     }
     transportLatencySamplesMs.removeAll(keepingCapacity: true)
     requestLatencySamplesMs.removeAll(keepingCapacity: true)
-    trafficSampleTimes.removeAll(keepingCapacity: true)
+    trafficRateMeter.reset()
   }
 
   func markConnectionOnline(recordedAt: Date = .now) {
@@ -304,16 +303,19 @@ extension HarnessMonitorStore {
     guard maintainsLiveDaemonObservation else {
       return
     }
+    // One assignment per call. Mutating `connectionMetrics` field by field
+    // fires its `didSet` - and a whole sidebar resync - on every field.
+    var metrics = connectionMetrics
     if let latencyMs, let latencySource {
-      updateLatency(latencyMs, source: latencySource)
+      applyLatency(latencyMs, source: latencySource, to: &metrics)
     }
-    guard countsTowardsTraffic else {
-      return
+    if countsTowardsTraffic {
+      metrics.messagesSent += 1
+      metrics.messagesReceived += 1
+      metrics.lastMessageAt = recordedAt
+      metrics.messagesPerSecond = trafficRateMeter.record(count: 2, at: recordedAt)
     }
-    connectionMetrics.messagesSent += 1
-    connectionMetrics.messagesReceived += 1
-    connectionMetrics.lastMessageAt = recordedAt
-    appendTrafficSamples(count: 2, at: recordedAt)
+    connectionMetrics = metrics
   }
 
   func recordStreamEvent(
@@ -323,12 +325,13 @@ extension HarnessMonitorStore {
     guard maintainsLiveDaemonObservation else {
       return
     }
-    connectionMetrics.lastMessageAt = recordedAt
-    guard countedInTraffic else {
-      return
+    var metrics = connectionMetrics
+    metrics.lastMessageAt = recordedAt
+    if countedInTraffic {
+      metrics.messagesReceived += 1
+      metrics.messagesPerSecond = trafficRateMeter.record(count: 1, at: recordedAt)
     }
-    connectionMetrics.messagesReceived += 1
-    appendTrafficSamples(count: 1, at: recordedAt)
+    connectionMetrics = metrics
   }
 
   func recordReconnectAttempt(scope: String, nextAttempt: Int, error: any Error) {
@@ -363,20 +366,21 @@ extension HarnessMonitorStore {
     appendConnectionEvent(kind: .connected, detail: detail)
   }
 
-  private func updateLatency(
+  private func applyLatency(
     _ latencyMs: Int,
-    source: ConnectionLatencySource
+    source: ConnectionLatencySource,
+    to metrics: inout ConnectionMetrics
   ) {
     switch source {
     case .transport:
-      connectionMetrics.transportLatencyMs = latencyMs
-      connectionMetrics.averageTransportLatencyMs = appendLatencySample(
+      metrics.transportLatencyMs = latencyMs
+      metrics.averageTransportLatencyMs = appendLatencySample(
         latencyMs,
         to: &transportLatencySamplesMs
       )
     case .request:
-      connectionMetrics.requestLatencyMs = latencyMs
-      connectionMetrics.averageRequestLatencyMs = appendLatencySample(
+      metrics.requestLatencyMs = latencyMs
+      metrics.averageRequestLatencyMs = appendLatencySample(
         latencyMs,
         to: &requestLatencySamplesMs
       )
@@ -393,14 +397,5 @@ extension HarnessMonitorStore {
     }
     let total = samples.reduce(0, +)
     return total / max(samples.count, 1)
-  }
-
-  private func appendTrafficSamples(count: Int, at timestamp: Date) {
-    for _ in 0..<count {
-      trafficSampleTimes.append(timestamp)
-    }
-    let threshold = timestamp.addingTimeInterval(-Self.trafficWindow)
-    trafficSampleTimes.removeAll { $0 < threshold }
-    connectionMetrics.messagesPerSecond = Double(trafficSampleTimes.count) / Self.trafficWindow
   }
 }
