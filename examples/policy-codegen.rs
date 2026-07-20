@@ -1949,10 +1949,11 @@ const OMITTED_WIRE_FIELDS: &[(&str, &str)] = &[
     ("ExternalSyncOperation", "changed_fields"),
     ("ExternalSyncOperation", "unsupported_fields"),
     // task-board automation: the current Monitor hand models do not surface the daemon's v36
-    // workflow identity, automation settings, or compact status snapshot yet. Keep their wire
+    // workflow-kind, automation settings, or compact status snapshot yet. Keep their wire
     // adapters on the existing app shape; JSONDecoder safely ignores these response keys.
+    // execution_repository is surfaced: GitHub imports leave project_id empty and carry the
+    // repository here, so the card needs it to label the source repo instead of the agent mode.
     ("TaskBoardItem", "workflow_kind"),
-    ("TaskBoardItem", "execution_repository"),
     ("TaskBoardOrchestratorSettings", "scheduling"),
     ("TaskBoardOrchestratorSettings", "retry"),
     ("TaskBoardOrchestratorSettings", "reviewers"),

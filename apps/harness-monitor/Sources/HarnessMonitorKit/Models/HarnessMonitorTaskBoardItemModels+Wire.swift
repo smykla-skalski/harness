@@ -84,6 +84,7 @@ extension TaskBoardItem {
       priority: wire.priority,
       tags: wire.tags,
       projectId: wire.projectId,
+      executionRepository: wire.executionRepository,
       targetProjectTypes: wire.targetProjectTypes,
       agentMode: wire.agentMode,
       externalRefs: wire.externalRefs.map(TaskBoardExternalRef.init(wire:)),

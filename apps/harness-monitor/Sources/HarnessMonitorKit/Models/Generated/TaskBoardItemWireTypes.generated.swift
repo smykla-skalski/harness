@@ -15,6 +15,7 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
   public var projectId: String?
   public var targetProjectTypes: [String]
   public var agentMode: TaskBoardAgentMode
+  public var executionRepository: String?
   public var estimatedTokens: UInt64?
   public var estimatedCostMicrousd: UInt64?
   public var externalRefs: [ExternalRefWire]
@@ -28,7 +29,7 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
   public var updatedAt: String
   public var deletedAt: String?
 
-  public init(schemaVersion: UInt32, id: String, title: String, body: String = "", status: TaskBoardStatus = .todo, priority: TaskBoardPriority = .medium, tags: [String] = [], projectId: String? = nil, targetProjectTypes: [String] = [], agentMode: TaskBoardAgentMode = .headless, estimatedTokens: UInt64? = nil, estimatedCostMicrousd: UInt64? = nil, externalRefs: [ExternalRefWire] = [], importedFromProvider: ExternalRefProviderWire? = nil, planning: PlanningStateWire = PlanningStateWire(), workflow: TaskBoardWorkflowStateWire? = nil, sessionId: String? = nil, workItemId: String? = nil, usage: TaskUsageWire = TaskUsageWire(), createdAt: String, updatedAt: String, deletedAt: String? = nil) {
+  public init(schemaVersion: UInt32, id: String, title: String, body: String = "", status: TaskBoardStatus = .todo, priority: TaskBoardPriority = .medium, tags: [String] = [], projectId: String? = nil, targetProjectTypes: [String] = [], agentMode: TaskBoardAgentMode = .headless, executionRepository: String? = nil, estimatedTokens: UInt64? = nil, estimatedCostMicrousd: UInt64? = nil, externalRefs: [ExternalRefWire] = [], importedFromProvider: ExternalRefProviderWire? = nil, planning: PlanningStateWire = PlanningStateWire(), workflow: TaskBoardWorkflowStateWire? = nil, sessionId: String? = nil, workItemId: String? = nil, usage: TaskUsageWire = TaskUsageWire(), createdAt: String, updatedAt: String, deletedAt: String? = nil) {
     self.schemaVersion = schemaVersion
     self.id = id
     self.title = title
@@ -39,6 +40,7 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
     self.projectId = projectId
     self.targetProjectTypes = targetProjectTypes
     self.agentMode = agentMode
+    self.executionRepository = executionRepository
     self.estimatedTokens = estimatedTokens
     self.estimatedCostMicrousd = estimatedCostMicrousd
     self.externalRefs = externalRefs
@@ -65,6 +67,7 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
     projectId = try container.decodeIfPresent(String.self, forKey: .projectId)
     targetProjectTypes = try container.decodeIfPresent([String].self, forKey: .targetProjectTypes) ?? []
     agentMode = try container.decodeIfPresent(TaskBoardAgentMode.self, forKey: .agentMode) ?? .headless
+    executionRepository = try container.decodeIfPresent(String.self, forKey: .executionRepository)
     estimatedTokens = try container.decodeIfPresent(UInt64.self, forKey: .estimatedTokens)
     estimatedCostMicrousd = try container.decodeIfPresent(UInt64.self, forKey: .estimatedCostMicrousd)
     externalRefs = try container.decodeIfPresent([ExternalRefWire].self, forKey: .externalRefs) ?? []
@@ -90,6 +93,7 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
     case projectId = "project_id"
     case targetProjectTypes = "target_project_types"
     case agentMode = "agent_mode"
+    case executionRepository = "execution_repository"
     case estimatedTokens = "estimated_tokens"
     case estimatedCostMicrousd = "estimated_cost_microusd"
     case externalRefs = "external_refs"

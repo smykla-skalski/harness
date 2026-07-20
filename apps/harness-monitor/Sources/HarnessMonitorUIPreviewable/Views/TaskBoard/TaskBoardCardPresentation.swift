@@ -22,13 +22,13 @@ struct TaskBoardCardPresentation: Equatable, Sendable {
     let fragments = TaskBoardInlineCodeFormatter.fragments(in: titlePresentation.title)
     let repositoryLabelDefault: String?
     let repositoryLabelFullName: String?
-    if let projectID = item.projectId {
+    if let repositoryID = item.taskBoardRepositoryIdentity {
       repositoryLabelDefault = projectLabelResolver.label(
-        for: projectID,
+        for: repositoryID,
         alwaysShowFullName: false
       )
       repositoryLabelFullName = projectLabelResolver.label(
-        for: projectID,
+        for: repositoryID,
         alwaysShowFullName: true
       )
     } else {

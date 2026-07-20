@@ -172,7 +172,7 @@ actor TaskBoardOverviewPresentationWorker {
     }
     let taskBoardOpenCount = taskBoardItems.count
     let projectLabelResolver = TaskBoardProjectLabelResolver(
-      projectIDs: taskBoardItems.compactMap(\.projectId)
+      projectIDs: taskBoardItems.compactMap(\.taskBoardRepositoryIdentity)
     )
     // One parser (and its 3 formatters) for the whole snapshot, not one per card.
     let dateParser = TaskBoardCardDateParser()

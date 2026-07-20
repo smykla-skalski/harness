@@ -114,6 +114,19 @@ extension TaskBoardItem {
     }
     return githubExternalRefs.lazy.compactMap(\.repositoryOwner).first
   }
+
+  /// The source repository the card should name: the board project when set, else the GitHub
+  /// execution repository (imports leave `projectId` empty and carry the repo there), else the
+  /// repo parsed off a GitHub external ref. Nil when the item has no repository identity at all.
+  var taskBoardRepositoryIdentity: String? {
+    if let projectId, !projectId.isEmpty {
+      return projectId
+    }
+    if let executionRepository, !executionRepository.isEmpty {
+      return executionRepository
+    }
+    return githubExternalRefs.lazy.compactMap(\.repositorySlug).first
+  }
 }
 
 private enum TaskBoardGitHubURL {
@@ -153,6 +166,11 @@ extension TaskBoardExternalRef {
       return owner
     }
     return TaskBoardGitHubRepositoryIdentity.owner(fromPathLike: externalId)
+  }
+
+  fileprivate var repositorySlug: String? {
+    TaskBoardGitHubRepositoryIdentity.repositorySlug(fromURLString: url)
+      ?? TaskBoardGitHubRepositoryIdentity.repositorySlug(fromPathLike: externalId)
   }
 
   fileprivate var isPullRequestURL: Bool {
@@ -209,6 +227,44 @@ private enum TaskBoardGitHubRepositoryIdentity {
       return nil
     }
     return String(components[0])
+  }
+
+  static func repositorySlug(fromURLString urlString: String?) -> String? {
+    guard let urlString else {
+      return nil
+    }
+    let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard
+      let url = URL(string: trimmed),
+      TaskBoardGitHubURL.isGitHubHost(url.host)
+    else {
+      return nil
+    }
+    let components = url.path.split(separator: "/")
+    guard components.count >= 2 else {
+      return nil
+    }
+    return "\(components[0])/\(components[1])"
+  }
+
+  static func repositorySlug(fromPathLike rawValue: String?) -> String? {
+    guard let rawValue else {
+      return nil
+    }
+    let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard trimmed.isEmpty == false else {
+      return nil
+    }
+    if let slug = repositorySlug(fromURLString: trimmed) {
+      return slug
+    }
+    // External-ref ids arrive as "owner/repo#123"; drop the issue/PR suffix before splitting.
+    let withoutReference = trimmed.split(separator: "#", maxSplits: 1).first.map(String.init) ?? trimmed
+    let components = withoutReference.split(separator: "/")
+    guard components.count >= 2 else {
+      return nil
+    }
+    return "\(components[0])/\(components[1])"
   }
 }
 
