@@ -96,7 +96,7 @@ struct TaskBoardItemRow: View {
   private var statusTint: Color { taskBoardStatusColor(for: item.status) }
 
   private var repositoryLabel: String {
-    guard let projectID = item.projectId else {
+    guard let repositoryID = item.taskBoardRepositoryIdentity else {
       return item.agentMode.title
     }
     if let cardPresentation {
@@ -109,7 +109,7 @@ struct TaskBoardItemRow: View {
       }
     }
     return projectLabelResolver.label(
-      for: projectID,
+      for: repositoryID,
       alwaysShowFullName: alwaysShowsFullRepositoryNames
     )
   }

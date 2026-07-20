@@ -278,6 +278,8 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
   public let priority: TaskBoardPriority
   public let tags: [String]
   public let projectId: String?
+  /// GitHub-imported items leave `projectId` empty and carry their source repository here.
+  public let executionRepository: String?
   public let targetProjectTypes: [String]
   public let agentMode: TaskBoardAgentMode
   public let externalRefs: [TaskBoardExternalRef]
@@ -300,6 +302,7 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
     priority: TaskBoardPriority,
     tags: [String],
     projectId: String?,
+    executionRepository: String? = nil,
     targetProjectTypes: [String] = [],
     agentMode: TaskBoardAgentMode,
     externalRefs: [TaskBoardExternalRef],
@@ -321,6 +324,7 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
     self.priority = priority
     self.tags = tags
     self.projectId = projectId
+    self.executionRepository = executionRepository
     self.targetProjectTypes = targetProjectTypes
     self.agentMode = agentMode
     self.externalRefs = externalRefs
@@ -346,6 +350,7 @@ extension TaskBoardItem {
     case priority
     case tags
     case projectId
+    case executionRepository
     case targetProjectTypes
     case agentMode
     case externalRefs
@@ -370,6 +375,8 @@ extension TaskBoardItem {
     self.priority = try container.decode(TaskBoardPriority.self, forKey: .priority)
     self.tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
     self.projectId = try container.decodeIfPresent(String.self, forKey: .projectId)
+    self.executionRepository =
+      try container.decodeIfPresent(String.self, forKey: .executionRepository)
     self.targetProjectTypes =
       try container.decodeIfPresent([String].self, forKey: .targetProjectTypes) ?? []
     self.agentMode = try container.decode(TaskBoardAgentMode.self, forKey: .agentMode)
