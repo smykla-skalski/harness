@@ -54,6 +54,7 @@ extension HarnessMonitorStore {
     stopRemoteDaemonReconnect()
     stopAllStreams()
     stopManifestWatcher()
+    cancelChromeDataAvailabilityGateTask()
     #if HARNESS_FEATURE_OTEL
       stopResourceMetricsSampling()
     #endif

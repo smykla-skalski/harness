@@ -266,6 +266,7 @@ public final class HarnessMonitorStore {
   var appInactivitySuspendDelay: Duration = .seconds(5)
   var externalManifestDiscoveryInterval: Duration = .seconds(1)
   var timelineMinimumLoadingDuration: Duration = .milliseconds(500)
+  var chromeDataAvailabilityGracePeriod: Duration = .seconds(3)
   @ObservationIgnored var timelineLoadingGateClock: any TimelineLoadingGateClock =
     LiveContinuousClockSource()
 
