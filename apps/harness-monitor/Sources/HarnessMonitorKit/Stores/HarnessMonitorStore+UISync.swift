@@ -201,7 +201,7 @@ extension HarnessMonitorStore {
     contentUI.chrome.apply(
       ContentChromeState(
         persistenceError: persistenceError,
-        sessionDataAvailability: sessionDataAvailability,
+        sessionDataAvailability: resolveChromeDataAvailability(),
         sessionStatus: selectedDetail?.session.status,
         acpBridgeBanner: acpBridgeBannerState,
         mcpStatus: mcpStatus
