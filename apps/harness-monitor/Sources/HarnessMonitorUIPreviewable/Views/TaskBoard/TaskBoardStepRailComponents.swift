@@ -72,9 +72,10 @@ struct TaskBoardStepRailTargetView: View {
 /// The automation-context footer of the manual-steps card.
 ///
 /// `DisclosureGroup` only hit-tests its triangle on macOS, so the label carries
-/// its own full-width button and hover highlight - otherwise the row reads as
-/// static text and the only way in is a 12pt chevron. A button rather than a
-/// tap gesture so the row stays tab-reachable and keyboard-activatable.
+/// its own full-width button - otherwise the row reads as static text and the
+/// only way in is a 12pt chevron. A real button rather than a tap gesture so
+/// the row stays tab-reachable and keyboard-activatable, wearing the shared
+/// row chrome for its hover and press feedback.
 struct TaskBoardStepContextDisclosure: View {
   let store: HarnessMonitorStore
   let workspace: PolicyCanvasWorkspace?
@@ -87,7 +88,6 @@ struct TaskBoardStepContextDisclosure: View {
   private var fontScale
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
-  @State private var isHovered = false
 
   private var labelFont: Font {
     HarnessMonitorTextSize.scaledFont(.callout.weight(.semibold), by: fontScale)
@@ -121,14 +121,8 @@ struct TaskBoardStepContextDisclosure: View {
           .frame(maxWidth: .infinity, alignment: .leading)
           .padding(.vertical, HarnessMonitorTheme.spacingXS)
           .padding(.horizontal, HarnessMonitorTheme.spacingSM)
-          .background(
-            HarnessMonitorTheme.accent.opacity(isHovered ? 0.08 : 0),
-            in: .rect(cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
-          )
-          .contentShape(.rect)
       }
-      .buttonStyle(.plain)
-      .onHover { isHovered = $0 }
+      .harnessSidebarRowButtonStyle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
     }
     .accessibilityIdentifier("harness.task-board.step.context")
   }
