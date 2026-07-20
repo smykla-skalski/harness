@@ -5,7 +5,8 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use agent_client_protocol::schema::v1::{
-    CancelNotification, ContentBlock, NewSessionRequest, PromptRequest, SessionId, TextContent,
+    CancelNotification, ContentBlock, LogoutRequest, NewSessionRequest, PromptRequest, SessionId,
+    TextContent,
 };
 use agent_client_protocol::{Agent, ConnectionTo, Result as AcpResult};
 use tokio::sync::mpsc as tokio_mpsc;
@@ -46,6 +47,9 @@ pub(super) enum ProtocolCommand {
     },
     DetachTarget {
         target: RouteTarget,
+        response_tx: mpsc::SyncSender<ProtocolCommandResult<()>>,
+    },
+    Logout {
         response_tx: mpsc::SyncSender<ProtocolCommandResult<()>>,
     },
 }
@@ -123,6 +127,14 @@ impl AcpProtocolHandle {
                 },
                 response_tx,
             })
+            .map_err(|_| "ACP protocol command channel is closed".to_string())?;
+        receive_response(&response_rx)
+    }
+
+    pub(in crate::daemon::agent_acp) fn logout(&self) -> ProtocolCommandResult<()> {
+        let (response_tx, response_rx) = mpsc::sync_channel(1);
+        self.command_tx
+            .send(ProtocolCommand::Logout { response_tx })
             .map_err(|_| "ACP protocol command channel is closed".to_string())?;
         receive_response(&response_rx)
     }
@@ -225,7 +237,30 @@ async fn handle_protocol_command(
             let result = detach_protocol_session(connection, session_guard, &target);
             let _ = response_tx.send(result);
         }
+        ProtocolCommand::Logout { response_tx } => {
+            let result = send_logout(&supervisor, connection).await;
+            let _ = response_tx.send(result);
+        }
     }
+}
+
+async fn send_logout(
+    supervisor: &AcpSessionSupervisor,
+    connection: &ConnectionTo<Agent>,
+) -> ProtocolCommandResult<()> {
+    let supported = supervisor
+        .handshake()
+        .is_some_and(|handshake| handshake.supports_logout);
+    if !supported {
+        return Err("agent does not advertise the auth.logout capability".to_string());
+    }
+    let _guard = supervisor.enter_pending_request_with_reason(Some("logout"));
+    connection
+        .send_request(LogoutRequest::new())
+        .block_task()
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(())
 }
 
 async fn attach_protocol_session(

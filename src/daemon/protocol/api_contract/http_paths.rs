@@ -166,6 +166,7 @@ pub const MANAGED_AGENT_ACP_PERMISSION: &str =
     "/v1/managed-agents/{managed_agent_id}/permission-batches/{batch_id}";
 pub const MANAGED_AGENT_DELETE: &str = "/v1/managed-agents/{managed_agent_id}";
 pub const MANAGED_AGENT_ACP_PROMPT: &str = "/v1/managed-agents/{managed_agent_id}/prompt";
+pub const MANAGED_AGENT_ACP_LOGOUT: &str = "/v1/managed-agents/{managed_agent_id}/logout";
 pub const MANAGED_AGENTS_CODEX_INSPECT: &str = "/v1/managed-agents/codex/inspect";
 pub const MANAGED_AGENTS_CODEX_TRANSCRIPT: &str = "/v1/managed-agents/codex/transcript";
 pub const MANAGED_AGENTS_ACP_INSPECT: &str = "/v1/managed-agents/acp/inspect";

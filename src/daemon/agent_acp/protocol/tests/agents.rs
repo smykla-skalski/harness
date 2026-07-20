@@ -1,8 +1,9 @@
 use std::sync::{Arc, Mutex};
 
 use agent_client_protocol::schema::v1::{
-    AgentCapabilities, AvailableCommand, AvailableCommandsUpdate, CancelNotification, ContentBlock,
-    ContentChunk, CurrentModeUpdate, Implementation, InitializeRequest, InitializeResponse,
+    AgentAuthCapabilities, AgentCapabilities, AvailableCommand, AvailableCommandsUpdate,
+    CancelNotification, ContentBlock, ContentChunk, CurrentModeUpdate, Implementation,
+    InitializeRequest, InitializeResponse, LogoutCapabilities, LogoutRequest, LogoutResponse,
     NewSessionRequest, NewSessionResponse, PromptRequest, PromptResponse, SessionConfigBoolean,
     SessionConfigKind, SessionConfigOption, SessionConfigOptionCategory, SessionConfigOptionValue,
     SessionConfigSelect, SessionConfigSelectOption, SessionId, SessionInfoUpdate, SessionMode,
@@ -100,6 +101,7 @@ pub(super) async fn run_agent_recording_initialize_contract(
     transport: Channel,
     operations: Arc<Mutex<Vec<String>>>,
 ) -> agent_client_protocol::Result<()> {
+    let logout_operations = Arc::clone(&operations);
     Agent
         .builder()
         .name("initialize-contract-agent")
@@ -127,7 +129,11 @@ pub(super) async fn run_agent_recording_initialize_contract(
                             "initialize-contract-agent",
                             "1.2.3",
                         )))
-                        .agent_capabilities(AgentCapabilities::new().load_session(true)),
+                        .agent_capabilities(
+                            AgentCapabilities::new().load_session(true).auth(
+                                AgentAuthCapabilities::new().logout(LogoutCapabilities::new()),
+                            ),
+                        ),
                 )
             },
             agent_client_protocol::on_receive_request!(),
@@ -135,6 +141,16 @@ pub(super) async fn run_agent_recording_initialize_contract(
         .on_receive_request(
             async move |_request: NewSessionRequest, responder, _connection| {
                 responder.respond(NewSessionResponse::new("acp-session-1"))
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |_request: LogoutRequest, responder, _connection| {
+                logout_operations
+                    .lock()
+                    .expect("record logout")
+                    .push("logout".to_string());
+                responder.respond(LogoutResponse::new())
             },
             agent_client_protocol::on_receive_request!(),
         )

@@ -89,12 +89,15 @@ impl Execute for SessionAgentStartCommand {
 pub enum AcpAgentCommand {
     /// Inspect live ACP sessions.
     Inspect(AcpInspectArgs),
+    /// Ask an ACP agent to log out (requires the auth.logout capability).
+    Logout(AcpLogoutArgs),
 }
 
 impl Execute for AcpAgentCommand {
     fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
         match self {
             Self::Inspect(args) => args.execute(context),
+            Self::Logout(args) => args.execute(context),
         }
     }
 }
@@ -180,6 +183,20 @@ pub struct AcpInspectArgs {
 impl Execute for AcpInspectArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let response = daemon_client()?.inspect_acp_managed_agents(self.session_id.as_deref())?;
+        print_json(&response)?;
+        Ok(0)
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct AcpLogoutArgs {
+    /// Managed ACP agent ID.
+    pub acp_id: String,
+}
+
+impl Execute for AcpLogoutArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let response = daemon_client()?.logout_acp_managed_agent(&self.acp_id)?;
         print_json(&response)?;
         Ok(0)
     }

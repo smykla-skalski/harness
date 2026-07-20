@@ -148,6 +148,10 @@ impl ActiveAcpSession {
         snapshot.clone()
     }
 
+    pub(in crate::daemon::agent_acp) fn logout(&self) -> Result<(), String> {
+        self.process.logout()
+    }
+
     pub(in crate::daemon::agent_acp) fn inspect_snapshot_for(
         &self,
         snapshot: &AcpAgentSnapshot,

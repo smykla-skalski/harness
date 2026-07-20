@@ -71,6 +71,7 @@ pub fn remote_http_scopes(route: &HttpApiRouteContract) -> Option<&'static [Remo
         | http_paths::POLICIES_DUMP => Some(READ_SCOPES),
         http_paths::DAEMON_TELEMETRY
         | http_paths::MANAGED_AGENT_ATTACH
+        | http_paths::MANAGED_AGENT_ACP_LOGOUT
         | http_paths::POLICIES_IMPORT => Some(WRITE_SCOPES),
         _ => route.parity.ws_method().and_then(remote_ws_scopes),
     }

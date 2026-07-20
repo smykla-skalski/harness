@@ -212,6 +212,10 @@ impl ActiveAcpProcess {
     ) -> Result<(), String> {
         self.protocol_handle.detach_session(acp_id, session_id)
     }
+
+    pub(super) fn logout(&self) -> Result<(), String> {
+        self.protocol_handle.logout()
+    }
 }
 
 impl Drop for ActiveAcpProcess {
