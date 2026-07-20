@@ -12,14 +12,22 @@
 //! `mise run codegen`.
 //!
 //! Memory discipline: every emitter appends into one caller-owned `String`
-//! buffer via `write!` (no per-item temporaries), the case helpers pre-size
-//! their single allocation, and the driver streams one source file at a time so
-//! only the current file's AST and one type live at once.
+//! buffer via `write!` (no per-item temporaries) and the case helpers pre-size
+//! their single allocation. Each module still parses one source file at a time,
+//! so only that file's AST is ever live, but the driver holds every rendered
+//! module at once: a type one module references may be emitted by another, and
+//! [`swift_type_check`] can only tell a dangling name from a cross-module one
+//! after all of them exist.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
+
+// The crate root sits in `examples/`, so a bare `mod` would land beside it and
+// look like another example target. Keep the file in this bin's own directory.
+#[path = "policy-codegen/swift_type_check.rs"]
+mod swift_type_check;
 
 use syn::{
     Attribute, Expr, Fields, FieldsNamed, GenericArgument, Item, ItemEnum, ItemStruct, Lit,
@@ -2612,6 +2620,11 @@ const POLICY_CANVAS_EMIT_ONLY: &[&str] = &[
 ];
 const ACP_MODELS_SOURCE: &str =
     include_str!("../crates/harness-protocol/src/managed_agents/acp/models.rs");
+// The MCP server types a start request carries. They live beside models.rs
+// rather than in it, so every module that emits a type referencing them has to
+// list this source too or the reference resolves to nothing.
+const ACP_MCP_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/managed_agents/acp/mcp.rs");
 const ACP_PROBE_SOURCE: &str = ACP_MODELS_SOURCE;
 const ACP_PROBE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AcpProbeWireTypes.generated.swift";
 // The runtime-doctor probe response (probe.rs) backing /v1/runtimes/probe and the
@@ -2691,7 +2704,12 @@ const ACP_START_REQUEST_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMoni
 // (hand Serialize/Deserialize via proxy structs); its owned AcpAgentStartRequestDecode carries
 // the derive and emits as AcpAgentStartRequestWire. descriptor_id maps to the hand `agent` field;
 // role defaults via default_acp_role (resolved from models.rs).
-const ACP_START_REQUEST_EMIT_ONLY: &[&str] = &["AcpAgentStartRequestDecode"];
+const ACP_START_REQUEST_EMIT_ONLY: &[&str] = &[
+    "AcpAgentStartRequestDecode",
+    "AcpMcpServer",
+    "AcpMcpEnvVariable",
+    "AcpMcpHttpHeader",
+];
 const MANAGED_AGENTS_SOURCE: &str = include_str!("../src/daemon/protocol/managed_agents.rs");
 const MANAGED_AGENTS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ManagedAgentSnapshotWireTypes.generated.swift";
 // The managed-agent snapshot umbrella + its list response. ManagedAgentSnapshot is adjacently
@@ -3123,7 +3141,7 @@ fn modules() -> Vec<GeneratedModule> {
             output: ACP_START_REQUEST_OUTPUT,
             description: "the Rust acp managed-agent start request from its owned decode struct",
             defaults: &[ACP_MODELS_SOURCE],
-            sources: &[ACP_START_REQUEST_SOURCE, ACP_MODELS_SOURCE],
+            sources: &[ACP_START_REQUEST_SOURCE, ACP_MODELS_SOURCE, ACP_MCP_SOURCE],
         },
         GeneratedModule {
             output: MANAGED_AGENTS_OUTPUT,
@@ -3301,13 +3319,30 @@ fn repository_root() -> &'static Path {
 fn main() {
     let check = std::env::args().any(|arg| arg == "--check");
     let root = repository_root();
+    let rendered: Vec<(GeneratedModule, String)> = modules()
+        .into_iter()
+        .map(|module| {
+            let generated = generate_module(&module);
+            (module, generated)
+        })
+        .collect();
+    // Types resolve across modules, so the whole set has to exist before any
+    // one of them can be checked for a name nothing defines.
+    let declared: BTreeSet<String> = rendered
+        .iter()
+        .flat_map(|(_, generated)| swift_type_check::declared_types(generated))
+        .collect();
+    let mut undefined: Vec<(&str, BTreeSet<String>)> = Vec::new();
     let mut drifted: Vec<&str> = Vec::new();
-    for module in modules() {
-        let generated = generate_module(&module);
+    for (module, generated) in &rendered {
+        let missing = swift_type_check::undefined_types(generated, &declared);
+        if !missing.is_empty() {
+            undefined.push((module.output, missing));
+        }
         let path = root.join(module.output);
         if check {
             let committed = fs::read_to_string(&path).unwrap_or_default();
-            if committed != generated {
+            if committed != *generated {
                 drifted.push(module.output);
             }
         } else {
@@ -3316,6 +3351,18 @@ fn main() {
             }
             fs::write(&path, generated).expect("write generated Swift module");
         }
+    }
+    if !undefined.is_empty() {
+        for (output, missing) in &undefined {
+            for name in missing {
+                eprintln!(
+                    "undefined type: {output} references `{name}`, which no generated module \
+                     defines - add its Rust source to that module's `sources` (and the name to \
+                     its emit list), or declare it in EXTERNAL_SWIFT_TYPES if Swift owns it"
+                );
+            }
+        }
+        std::process::exit(1);
     }
     if check && !drifted.is_empty() {
         for output in &drifted {

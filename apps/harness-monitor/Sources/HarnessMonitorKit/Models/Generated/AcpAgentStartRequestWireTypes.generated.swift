@@ -84,3 +84,98 @@ public struct AcpAgentStartRequestWire: Codable, Equatable, Sendable {
     case additionalDirectories = "additional_directories"
   }
 }
+
+public enum AcpMcpServer: Codable, Equatable, Sendable {
+  case stdio(name: String, command: String, args: [String], env: [AcpMcpEnvVariable])
+  case http(name: String, url: String, headers: [AcpMcpHttpHeader])
+  case sse(name: String, url: String, headers: [AcpMcpHttpHeader])
+
+  enum CodingKeys: String, CodingKey {
+    case transport
+    case name
+    case command
+    case args
+    case env
+    case url
+    case headers
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let transport = try container.decode(String.self, forKey: .transport)
+    switch transport {
+    case "stdio":
+      self = .stdio(name: try container.decode(String.self, forKey: .name), command: try container.decode(String.self, forKey: .command), args: try container.decodeIfPresent([String].self, forKey: .args) ?? [], env: try container.decodeIfPresent([AcpMcpEnvVariable].self, forKey: .env) ?? [])
+    case "http":
+      self = .http(name: try container.decode(String.self, forKey: .name), url: try container.decode(String.self, forKey: .url), headers: try container.decodeIfPresent([AcpMcpHttpHeader].self, forKey: .headers) ?? [])
+    case "sse":
+      self = .sse(name: try container.decode(String.self, forKey: .name), url: try container.decode(String.self, forKey: .url), headers: try container.decodeIfPresent([AcpMcpHttpHeader].self, forKey: .headers) ?? [])
+    default:
+      throw DecodingError.dataCorruptedError(forKey: .transport, in: container, debugDescription: "unknown AcpMcpServer transport \(transport)")
+    }
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    switch self {
+    case .stdio(let name, let command, let args, let env):
+      try container.encode("stdio", forKey: .transport)
+      try container.encode(name, forKey: .name)
+      try container.encode(command, forKey: .command)
+      try container.encode(args, forKey: .args)
+      try container.encode(env, forKey: .env)
+    case .http(let name, let url, let headers):
+      try container.encode("http", forKey: .transport)
+      try container.encode(name, forKey: .name)
+      try container.encode(url, forKey: .url)
+      try container.encode(headers, forKey: .headers)
+    case .sse(let name, let url, let headers):
+      try container.encode("sse", forKey: .transport)
+      try container.encode(name, forKey: .name)
+      try container.encode(url, forKey: .url)
+      try container.encode(headers, forKey: .headers)
+    }
+  }
+}
+
+public struct AcpMcpEnvVariable: Codable, Equatable, Sendable {
+  public var name: String
+  public var value: String
+
+  public init(name: String, value: String = "") {
+    self.name = name
+    self.value = value
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    name = try container.decode(String.self, forKey: .name)
+    value = try container.decodeIfPresent(String.self, forKey: .value) ?? ""
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case name
+    case value
+  }
+}
+
+public struct AcpMcpHttpHeader: Codable, Equatable, Sendable {
+  public var name: String
+  public var value: String
+
+  public init(name: String, value: String = "") {
+    self.name = name
+    self.value = value
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    name = try container.decode(String.self, forKey: .name)
+    value = try container.decodeIfPresent(String.self, forKey: .value) ?? ""
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case name
+    case value
+  }
+}
