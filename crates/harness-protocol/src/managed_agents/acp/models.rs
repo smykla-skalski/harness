@@ -29,6 +29,13 @@ pub struct AcpAgentStartRequest {
     pub mcp_servers: Vec<AcpMcpServer>,
     /// Added to the descriptor's own roots.
     pub additional_directories: Vec<String>,
+    /// Pick up this agent session instead of opening a new one.
+    ///
+    /// Overrides the session the daemon would have resumed on its own. Ignored
+    /// by agents that do not advertise `session/resume`.
+    pub resume_session_id: Option<String>,
+    /// Always open a new session, even when a previous one could be resumed.
+    pub resume_disabled: bool,
 }
 
 impl Default for AcpAgentStartRequest {
@@ -51,6 +58,8 @@ impl Default for AcpAgentStartRequest {
             record_permissions: false,
             mcp_servers: Vec::new(),
             additional_directories: Vec::new(),
+            resume_session_id: None,
+            resume_disabled: false,
         }
     }
 }
@@ -441,7 +450,7 @@ pub(super) const fn default_acp_inspect_available() -> bool {
     clippy::trivially_copy_pass_by_ref,
     reason = "serde skip_serializing_if callbacks receive field references"
 )]
-fn is_false(value: &bool) -> bool {
+pub(super) fn is_false(value: &bool) -> bool {
     !*value
 }
 

@@ -7,7 +7,7 @@ use std::time::Duration;
 use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::schema::v1::{
     CancelNotification, ContentBlock, Implementation, InitializeRequest, InitializeResponse,
-    NewSessionResponse, PromptRequest, SessionId, TextContent,
+    NewSessionResponse, PromptRequest, ResumeSessionResponse, SessionId, TextContent,
 };
 use agent_client_protocol::{
     Agent, ByteStreams, ConnectionTo, Error as AcpError, ErrorCode, Result as AcpResult,
@@ -65,6 +65,8 @@ pub(super) struct SpawnedAcpProtocol {
 pub(super) struct SpawnProtocolInput<'a> {
     pub request: &'a AcpAgentStartRequest,
     pub session_config: AcpSessionRequestConfig,
+    /// A prior agent session to pick up instead of opening a new one.
+    pub resume_session_id: Option<String>,
     pub acp_id: &'a str,
     pub session_id: &'a str,
     pub agent_name: String,
@@ -84,6 +86,7 @@ pub(super) fn spawn_protocol_task(
     let SpawnProtocolInput {
         request,
         session_config,
+        resume_session_id,
         acp_id,
         session_id,
         agent_name,
@@ -138,6 +141,7 @@ pub(super) fn spawn_protocol_task(
         project_dir,
         prompt: request.prompt.clone(),
         session_config,
+        resume_session_id,
         acp_id: acp_id.to_string(),
         session_id: session_id.to_string(),
         runtime_name,
@@ -172,6 +176,7 @@ struct RunProtocolArgs {
     project_dir: PathBuf,
     prompt: Option<String>,
     session_config: AcpSessionRequestConfig,
+    resume_session_id: Option<String>,
     acp_id: String,
     session_id: String,
     runtime_name: String,
@@ -194,6 +199,7 @@ async fn run_protocol(args: RunProtocolArgs) {
         project_dir,
         prompt,
         session_config,
+        resume_session_id,
         acp_id,
         session_id,
         runtime_name,
@@ -227,6 +233,7 @@ async fn run_protocol(args: RunProtocolArgs) {
             project_dir,
             prompt,
             session_config,
+            resume_session_id,
             acp_id,
             session_id,
             runtime_name,
@@ -250,6 +257,7 @@ async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
         project_dir,
         prompt,
         session_config,
+        resume_session_id,
         acp_id,
         session_id,
         runtime_name,
@@ -272,6 +280,7 @@ async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
         connection: &connection,
         project_dir,
         session_config: &session_config,
+        resume_session_id: resume_session_id.as_deref(),
         session_id: &session_id,
         acp_id: &acp_id,
         runtime_name: &runtime_name,
@@ -286,7 +295,7 @@ async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
             &connection,
             &acp_session_id,
             &session_config,
-            advertised_session_configuration(&started_session.response),
+            advertised_session_configuration(started_session.config_options.as_deref()),
         )
         .await?;
         if let Some(prompt) = prompt.filter(|value| !value.trim().is_empty()) {
@@ -333,6 +342,7 @@ struct RunConnectionArgs {
     project_dir: PathBuf,
     prompt: Option<String>,
     session_config: AcpSessionRequestConfig,
+    resume_session_id: Option<String>,
     acp_id: String,
     session_id: String,
     runtime_name: String,
@@ -375,6 +385,26 @@ async fn send_new_session(
     timeout(budget, connection.send_request(request).block_task())
         .await
         .map_err(|_| deadline_error("session/new", budget))?
+}
+
+async fn send_resume_session(
+    supervisor: &AcpSessionSupervisor,
+    connection: &ConnectionTo<Agent>,
+    project_dir: PathBuf,
+    session_config: &AcpSessionRequestConfig,
+    resume_session_id: &str,
+) -> AcpResult<ResumeSessionResponse> {
+    let _guard = supervisor.enter_pending_request_with_reason(Some("session/resume"));
+    let request = session_inputs::resume_session_request(
+        SessionId::new(resume_session_id.to_string()),
+        project_dir,
+        session_config,
+        supervisor.handshake(),
+    );
+    let budget = supervisor.config().lifecycle_timeout;
+    timeout(budget, connection.send_request(request).block_task())
+        .await
+        .map_err(|_| deadline_error("session/resume", budget))?
 }
 
 async fn send_prompt_or_cancel(

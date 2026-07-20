@@ -247,7 +247,7 @@ async fn attach_protocol_session(
         connection,
         &protocol_session_id,
         session_config,
-        advertised_session_configuration(&response),
+        advertised_session_configuration(response.config_options.as_deref()),
     )
     .await
     {

@@ -272,6 +272,35 @@ impl AcpManagerPort for DaemonAcpManagerPort {
         Self::lock_db(db)?.project_dir_for_session(session_id)
     }
 
+    /// Picks the most recently updated agent on this session that ran the same
+    /// runtime and recorded a session id. Every start mints a new agent id, so
+    /// the previous run is a different agent row and only the runtime and the
+    /// owning session tie them together.
+    fn last_runtime_session_id(
+        &self,
+        session_id: &str,
+        runtime_name: &str,
+    ) -> Result<Option<String>, CliError> {
+        let Some(db) = self.db.get() else {
+            return Ok(None);
+        };
+        let Some(state) = Self::lock_db(db)?.load_session_state(session_id)? else {
+            return Ok(None);
+        };
+        Ok(state
+            .agents
+            .values()
+            .filter(|agent| agent.runtime.runtime_name() == runtime_name)
+            .filter_map(|agent| {
+                agent
+                    .agent_session_id
+                    .as_ref()
+                    .map(|id| (&agent.updated_at, id))
+            })
+            .max_by(|left, right| left.0.cmp(right.0))
+            .map(|(_, id)| id.clone()))
+    }
+
     fn persist_conversation_events(
         &self,
         session_id: &str,

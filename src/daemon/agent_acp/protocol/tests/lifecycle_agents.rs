@@ -9,8 +9,9 @@ use std::sync::{Arc, Mutex};
 
 use agent_client_protocol::schema::v1::{
     AgentCapabilities, CancelNotification, CloseSessionRequest, InitializeRequest,
-    InitializeResponse, McpServer, NewSessionRequest, NewSessionResponse,
-    SessionAdditionalDirectoriesCapabilities, SessionCapabilities, SessionCloseCapabilities,
+    InitializeResponse, McpServer, NewSessionRequest, NewSessionResponse, ResumeSessionRequest,
+    ResumeSessionResponse, SessionAdditionalDirectoriesCapabilities, SessionCapabilities,
+    SessionCloseCapabilities, SessionResumeCapabilities,
 };
 use agent_client_protocol::{Agent, Channel};
 
@@ -46,6 +47,62 @@ pub(super) async fn run_agent_recording_session_inputs(
                     .expect("record new session")
                     .push(session_inputs_record("new", &request.mcp_servers, &request.additional_directories));
                 responder.respond(NewSessionResponse::new("acp-session-1"))
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_notification(
+            async move |_cancel: CancelNotification, _connection| Ok(()),
+            agent_client_protocol::on_receive_notification!(),
+        )
+        .connect_to(transport)
+        .await
+}
+
+/// Records whether the client opened the session with `session/resume` or
+/// `session/new`, and what inputs each carried.
+pub(super) async fn run_agent_recording_session_resume(
+    transport: Channel,
+    operations: Arc<Mutex<Vec<String>>>,
+) -> agent_client_protocol::Result<()> {
+    let new_operations = Arc::clone(&operations);
+    Agent
+        .builder()
+        .name("session-resume-agent")
+        .on_receive_request(
+            async move |initialize: InitializeRequest, responder, _connection| {
+                responder.respond(
+                    InitializeResponse::new(initialize.protocol_version).agent_capabilities(
+                        AgentCapabilities::new().session_capabilities(
+                            SessionCapabilities::new().resume(SessionResumeCapabilities::new()),
+                        ),
+                    ),
+                )
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: NewSessionRequest, responder, _connection| {
+                new_operations.lock().expect("record new").push(session_inputs_record(
+                    "new",
+                    &request.mcp_servers,
+                    &request.additional_directories,
+                ));
+                responder.respond(NewSessionResponse::new("acp-session-fresh"))
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: ResumeSessionRequest, responder, _connection| {
+                operations.lock().expect("record resume").push(format!(
+                    "resume:{}:{}",
+                    request.session_id.0,
+                    session_inputs_record(
+                        "inputs",
+                        &request.mcp_servers,
+                        &request.additional_directories
+                    )
+                ));
+                responder.respond(ResumeSessionResponse::new())
             },
             agent_client_protocol::on_receive_request!(),
         )

@@ -124,6 +124,42 @@ impl AcpAgentManagerHandle {
         self.start_new_process_session(input, &spawn, credential)
     }
 
+    /// The agent session this start should pick up, if any.
+    ///
+    /// An explicit id wins, `resume_disabled` forces a fresh session, and
+    /// otherwise the last session this runtime recorded on this harness session
+    /// is resumed. Looking it up is best effort: failing to read the store is a
+    /// reason to start clean, never to fail the start.
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+    )]
+    fn resume_target(
+        &self,
+        request: &AcpAgentStartRequest,
+        session_id: &str,
+        runtime_name: &str,
+    ) -> Option<String> {
+        if request.resume_disabled {
+            return None;
+        }
+        if let Some(explicit) = request
+            .resume_session_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|id| !id.is_empty())
+        {
+            return Some(explicit.to_string());
+        }
+        match self.state.port.last_runtime_session_id(session_id, runtime_name) {
+            Ok(found) => found,
+            Err(error) => {
+                tracing::warn!(%error, session_id, runtime_name, "could not read a prior ACP session to resume");
+                None
+            }
+        }
+    }
+
     fn start_new_process_session(
         &self,
         input: DescriptorStartInput<'_>,
@@ -280,6 +316,7 @@ impl AcpAgentManagerHandle {
                     input.request,
                     input.descriptor,
                 ),
+                resume_session_id: self.resume_target(input.request, input.session_id, &input.descriptor.id),
                 acp_id: input.acp_id,
                 session_id: input.session_id,
                 agent_name: context.display_name.clone(),

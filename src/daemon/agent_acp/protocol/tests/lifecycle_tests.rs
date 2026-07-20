@@ -14,6 +14,7 @@ use super::agents::{
 };
 use super::lifecycle_agents::{
     run_agent_never_answering_close, run_agent_recording_session_inputs,
+    run_agent_recording_session_resume,
 };
 use super::*;
 
@@ -43,6 +44,18 @@ where
 fn lifecycle_harness_with_config<F, Fut>(
     spawn_agent: F,
     session_config: AcpSessionRequestConfig,
+) -> LifecycleHarness
+where
+    F: FnOnce(Channel, Arc<Mutex<Vec<String>>>) -> Fut,
+    Fut: Future<Output = AgentResult> + Send + 'static,
+{
+    lifecycle_harness_resuming(spawn_agent, session_config, None)
+}
+
+fn lifecycle_harness_resuming<F, Fut>(
+    spawn_agent: F,
+    session_config: AcpSessionRequestConfig,
+    resume_session_id: Option<String>,
 ) -> LifecycleHarness
 where
     F: FnOnce(Channel, Arc<Mutex<Vec<String>>>) -> Fut,
@@ -85,6 +98,7 @@ where
                     project_dir,
                     prompt: None,
                     session_config,
+                    resume_session_id,
                     acp_id: "agent-acp-1".to_string(),
                     session_id: "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e".to_string(),
                     runtime_name: "fake".to_string(),
@@ -239,6 +253,55 @@ async fn lifecycle_call_against_a_wedged_agent_fails_on_its_deadline() {
         harness.recorded().contains(&"close:acp-session-7".to_string()),
         "the agent should have received the close before we gave up; got {:?}",
         harness.recorded()
+    );
+
+    harness.shutdown().await;
+}
+
+/// A restart picks the conversation back up rather than starting over.
+#[tokio::test]
+#[cfg(unix)]
+async fn a_resume_target_opens_the_prior_session_with_its_inputs() {
+    let harness = lifecycle_harness_resuming(
+        run_agent_recording_session_resume,
+        session_config_with_inputs(),
+        Some("acp-session-prior".to_string()),
+    );
+
+    let record = harness.await_recorded("resume:").await;
+
+    assert_eq!(
+        record,
+        "resume:acp-session-prior:inputs:mcp=descriptor-server,start-server:dirs="
+    );
+    assert!(
+        !harness
+            .recorded()
+            .iter()
+            .any(|operation| operation.starts_with("new:")),
+        "a resumed start must not also open a new session; got {:?}",
+        harness.recorded()
+    );
+
+    harness.shutdown().await;
+}
+
+/// The stored id came from a past run, so an agent that cannot resume must
+/// still yield a working session rather than failing the start.
+#[tokio::test]
+#[cfg(unix)]
+async fn a_resume_target_falls_back_to_a_new_session_without_the_capability() {
+    let harness = lifecycle_harness_resuming(
+        run_agent_recording_session_inputs,
+        session_config_with_inputs(),
+        Some("acp-session-prior".to_string()),
+    );
+
+    let record = harness.await_recorded("new:").await;
+
+    assert_eq!(
+        record, "new:mcp=descriptor-server,start-server:dirs=/work/descriptor,/work/start",
+        "the fallback session still carries the declared inputs"
     );
 
     harness.shutdown().await;

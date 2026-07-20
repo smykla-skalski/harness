@@ -103,6 +103,14 @@ pub(in crate::daemon::agent_acp) trait AcpManagerPort:
 
     fn project_dir_for_session(&self, session_id: &str) -> Result<Option<String>, CliError>;
 
+    /// The agent session id a previous run on this harness session left behind
+    /// for this runtime, so a restart can resume it rather than start over.
+    fn last_runtime_session_id(
+        &self,
+        session_id: &str,
+        runtime_name: &str,
+    ) -> Result<Option<String>, CliError>;
+
     fn persist_conversation_events(
         &self,
         session_id: &str,
@@ -220,6 +228,16 @@ impl AcpManagerPort for BridgeAcpManagerPort {
     }
 
     fn project_dir_for_session(&self, _session_id: &str) -> Result<Option<String>, CliError> {
+        Ok(None)
+    }
+
+    /// The sandboxed bridge has no session store to read, so a start through it
+    /// never resumes on its own. An explicit resume id still works.
+    fn last_runtime_session_id(
+        &self,
+        _session_id: &str,
+        _runtime_name: &str,
+    ) -> Result<Option<String>, CliError> {
         Ok(None)
     }
 

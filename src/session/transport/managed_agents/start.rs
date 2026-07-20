@@ -158,6 +158,13 @@ pub struct AcpAgentStartArgs {
     /// repeated. Ignored by agents that do not advertise `additionalDirectories`.
     #[arg(long = "additional-directory")]
     pub additional_directories: Vec<String>,
+    /// Pick up this agent session instead of opening a new one. Overrides the
+    /// session the daemon would have resumed on its own.
+    #[arg(long = "resume-session", conflicts_with = "no_resume")]
+    pub resume_session_id: Option<String>,
+    /// Always open a new session, even when a previous one could be resumed.
+    #[arg(long = "no-resume")]
+    pub no_resume: bool,
 }
 
 impl Execute for AcpAgentStartArgs {
@@ -184,6 +191,8 @@ impl Execute for AcpAgentStartArgs {
             // Too structured for a flag; set these over the HTTP start route.
             mcp_servers: Vec::new(),
             additional_directories: self.additional_directories.clone(),
+            resume_session_id: self.resume_session_id.clone(),
+            resume_disabled: self.no_resume,
         };
         let snapshot = daemon_client()?.start_acp_managed_agent(&self.session_id, &request)?;
         print_json(&snapshot)?;
