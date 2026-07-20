@@ -128,7 +128,19 @@ pub(super) fn run_bridge_server(config: &ResolvedBridgeConfig) -> Result<i32, Cl
 
     while !server.shutdown_requested() {
         match listener.accept() {
-            Ok((stream, _addr)) => spawn_bridge_connection_handler(&server, stream)?,
+            Ok((stream, _addr)) => {
+                // macOS inherits the listener's O_NONBLOCK on accept while Linux does
+                // not, and every handler below this point expects blocking reads. Left
+                // nonblocking, an attach connection tears itself down: its input proxy
+                // reads WouldBlock before the user types, treats it as fatal, and shuts
+                // down the socket that carries the agent's output.
+                stream.set_nonblocking(false).map_err(|error| {
+                    CliErrorKind::workflow_io(format!(
+                        "configure bridge connection blocking: {error}"
+                    ))
+                })?;
+                spawn_bridge_connection_handler(&server, stream)?;
+            }
             Err(error) if error.kind() == ErrorKind::WouldBlock => {
                 thread::sleep(BRIDGE_ACCEPT_POLL_INTERVAL);
             }
