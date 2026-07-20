@@ -8,6 +8,16 @@ extension HarnessMonitorStore {
     if let mobileRelayBackgroundClient {
       return mobileRelayBackgroundClient
     }
+    // The relay poll loop starts from `HarnessMonitorApp.init` and ticks before
+    // the first scene runs `bootstrapIfNeeded`, so without joining startup here
+    // the relay opens a second daemon connection alongside the one the app is
+    // about to make: two health probes, two sockets, two of every event.
+    if !shouldAbandonConnectionAttempt {
+      await bootstrapIfNeeded()
+      if let client {
+        return client
+      }
+    }
 
     let client = try await makeMobileRelayBackgroundClient()
     mobileRelayBackgroundClient = client
