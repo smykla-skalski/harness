@@ -42,13 +42,6 @@ struct TaskBoardStepRailView: View {
       : TaskBoardStepProgressRail.badgeSide(for: fontScale)
   }
 
-  /// The panel stops growing well before the board column does. Left to fill an
-  /// ultra-wide display it ran body copy past a hundred characters a line and
-  /// stranded the primary button an arm's length from the text it acts on.
-  private var panelMaxWidth: CGFloat {
-    840 * min(SessionWindowFontScale.metricsScale(for: fontScale), 1.5)
-  }
-
   private var primaryButtonFont: Font {
     HarnessMonitorTextSize.scaledFont(.callout.weight(.semibold), by: fontScale)
   }
@@ -74,9 +67,9 @@ struct TaskBoardStepRailView: View {
         RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD)
           .strokeBorder(HarnessMonitorTheme.ink.opacity(0.10))
       }
-      .frame(maxWidth: panelMaxWidth, alignment: .leading)
-      // The cap only bounds the panel; this pins the bounded panel to the
-      // leading edge instead of letting the container centre it.
+      // Fills the board column. Keeps an explicit leading alignment so a stage
+      // whose content is narrow still paints its surface across the column
+      // rather than shrinking to the copy and floating centred.
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .confirmationDialog(
