@@ -37,6 +37,7 @@ use super::protocol::{
 use super::spawn_credential::SpawnCredential;
 
 mod activation;
+#[cfg(feature = "daemon-runtime")]
 mod remote;
 mod resume;
 mod reused_session;
@@ -86,6 +87,10 @@ impl AcpAgentManagerHandle {
         let project_dir = self.resolve_project_dir(session_id, request.project_dir.as_deref())?;
         let acp_id = format!("agent-acp-{}", Uuid::new_v4());
         let session_config = AcpSessionRequestConfig::from_request(request, descriptor);
+        // The HTTP transport crate only links under daemon-runtime, so the
+        // remote-connect path is compiled there; bridge-runtime rejects an
+        // endpoint rather than silently spawning the descriptor's command.
+        #[cfg(feature = "daemon-runtime")]
         if let Some(endpoint) = request.endpoint.as_ref() {
             // A remote agent is never pooled or reused: the per-start acp_id
             // already makes the key unique. The endpoint URL is kept out of it
@@ -108,6 +113,13 @@ impl AcpAgentManagerHandle {
                 .into());
             }
             return self.start_remote_connect_session(input, endpoint);
+        }
+        #[cfg(not(feature = "daemon-runtime"))]
+        if request.endpoint.is_some() {
+            return Err(CliErrorKind::workflow_io(
+                "remote ACP endpoints require the daemon runtime".to_string(),
+            )
+            .into());
         }
         let mut spawn =
             build_spawn_config(descriptor, &session_config, &project_dir, openrouter_token)?;
