@@ -229,57 +229,19 @@ extension AcpConversationEvent {
         "agent_context_injected",
         contextSummary(prefix: identity.summaryActor, event: event)
       )
+    case "turn_ended":
+      return (
+        "agent_turn_ended",
+        turnEndedSummary(prefix: identity.summaryActor, event: event)
+      )
+    case "context_usage":
+      return (
+        "agent_context_usage",
+        contextUsageSummary(prefix: identity.summaryActor, event: event)
+      )
     default:
       return nil
     }
-  }
-
-  private static func stateChangeSummary(prefix: String, event: [String: JSONValue]) -> String {
-    let from = event.stringValue(for: "from") ?? "unknown"
-    let to = event.stringValue(for: "to") ?? "unknown"
-    return "\(prefix) state changed \(from) -> \(to)"
-  }
-
-  private static func fileModificationSummary(
-    prefix: String,
-    event: [String: JSONValue]
-  ) -> String {
-    let operation = event.stringValue(for: "operation") ?? "modified"
-    let path = event.stringValue(for: "path") ?? "file"
-    return "\(prefix) \(operation) \(path)"
-  }
-
-  private static func watchdogSummary(prefix: String, event: [String: JSONValue]) -> String {
-    let from = event.stringValue(for: "from") ?? "unknown"
-    let to = event.stringValue(for: "to") ?? "unknown"
-    let base = "\(prefix) watchdog \(from) -> \(to)"
-    guard
-      let reason = event.stringValue(for: "reason")?.trimmingCharacters(
-        in: .whitespacesAndNewlines
-      ),
-      !reason.isEmpty
-    else {
-      return base
-    }
-    return "\(base) (\(reason))"
-  }
-
-  private static func permissionSummary(prefix: String, event: [String: JSONValue]) -> String {
-    let tool = event.stringValue(for: "tool") ?? "tool"
-    let scope = event.stringValue(for: "scope") ?? ""
-    guard !scope.isEmpty else {
-      return "\(prefix) asked for permission on \(tool)"
-    }
-    return "\(prefix) asked for permission on \(tool) (\(scope))"
-  }
-
-  private static func contextSummary(prefix: String, event: [String: JSONValue]) -> String {
-    let actor = event.stringValue(for: "actor") ?? "system"
-    let detail = event.stringValue(for: "summary") ?? ""
-    guard !detail.isEmpty else {
-      return "\(prefix) received context from \(actor)"
-    }
-    return "\(prefix) received context from \(actor): \(detail)"
   }
 
   private static func toolEntryKind(

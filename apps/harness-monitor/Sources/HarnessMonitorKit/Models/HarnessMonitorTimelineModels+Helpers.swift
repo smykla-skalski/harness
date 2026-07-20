@@ -15,6 +15,8 @@ extension TimelineEntry {
     "agent_watchdog_state",
     "agent_permission_asked",
     "agent_context_injected",
+    "agent_turn_ended",
+    "agent_context_usage",
   ]
 
   public var isAcpTranscriptEntry: Bool {

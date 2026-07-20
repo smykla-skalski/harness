@@ -48,6 +48,10 @@ pub(super) struct ClientHandlers {
 
 /// Build the harness ACP client, register every handler, and run `main_fn`
 /// against the connected agent.
+#[expect(
+    clippy::too_many_lines,
+    reason = "ACP request routing is one registration table; splitting it would hide which handlers spawn"
+)]
 pub(super) async fn connect_with_client_handlers<R>(
     transport: impl ConnectTo<Client> + 'static,
     handlers: ClientHandlers,
