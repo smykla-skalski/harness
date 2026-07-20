@@ -227,7 +227,7 @@ mod tests {
         let request = AcpAgentStartRequest {
             agent: "copilot".into(),
             endpoint: Some(AcpEndpoint {
-                url: "wss://acp.example.test".into(),
+                url: "https://acp.example.test".into(),
                 headers_env: BTreeMap::from([(
                     "Authorization".to_string(),
                     "REMOTE_ACP_TOKEN".to_string(),
@@ -237,7 +237,7 @@ mod tests {
         };
 
         let value = serde_json::to_value(&request).expect("serialize request");
-        assert_eq!(value["endpoint"]["url"], "wss://acp.example.test");
+        assert_eq!(value["endpoint"]["url"], "https://acp.example.test");
         assert_eq!(
             value["endpoint"]["headers_env"]["Authorization"],
             "REMOTE_ACP_TOKEN",

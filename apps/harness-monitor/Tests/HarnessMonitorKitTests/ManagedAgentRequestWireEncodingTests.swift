@@ -136,13 +136,13 @@ struct ManagedAgentRequestWireEncodingTests {
     let wire = AcpAgentStartRequestWire(
       descriptorId: "copilot",
       endpoint: AcpEndpoint(
-        url: "wss://acp.example.test",
+        url: "https://acp.example.test",
         headersEnv: ["Authorization": "REMOTE_ACP_TOKEN"]
       )
     )
     let json = try object(wire)
     let endpoint = try #require(json["endpoint"] as? [String: Any])
-    #expect(endpoint["url"] as? String == "wss://acp.example.test")
+    #expect(endpoint["url"] as? String == "https://acp.example.test")
     let headers = try #require(endpoint["headers_env"] as? [String: Any])
     // The env var name crosses the wire, never the token value.
     #expect(headers["Authorization"] as? String == "REMOTE_ACP_TOKEN")

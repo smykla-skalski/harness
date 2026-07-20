@@ -47,7 +47,9 @@ pub struct AcpAgentStartRequest {
 /// The URL scheme selects the transport: `ws`/`wss` uses WebSocket, `http`/
 /// `https` uses SSE with POST. Only header names and the environment variables
 /// holding their values cross the wire; the daemon resolves the values at
-/// connect time so a token never rides the request.
+/// connect time so a token never rides the request. `headers_env` applies only
+/// to `http`/`https` endpoints - the WebSocket transport drops request headers,
+/// so the daemon rejects headers set on a `ws`/`wss` endpoint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct AcpEndpoint {
     pub url: String,

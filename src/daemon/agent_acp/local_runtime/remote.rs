@@ -172,6 +172,15 @@ fn build_http_client(endpoint: &AcpEndpoint) -> Result<HttpClient, CliError> {
             CliErrorKind::workflow_io(format!("header '{name}' has an invalid value: {error}"))
         })?;
         header_value.set_sensitive(true);
+        // The CLI already rejects case-insensitive duplicates, but a request
+        // built any other way (Monitor, HTTP start route) has not, and the
+        // normalized HeaderName collapses casing - so guard here too.
+        if headers.contains_key(&header_name) {
+            return Err(CliErrorKind::workflow_io(format!(
+                "header '{name}' is set more than once"
+            ))
+            .into());
+        }
         headers.insert(header_name, header_value);
     }
     let http = reqwest::Client::builder()
@@ -254,5 +263,26 @@ mod tests {
     fn websocket_endpoint_without_headers_builds() {
         build_http_client(&endpoint("wss://acp.example.test", &[]))
             .expect("ws with no headers builds");
+    }
+
+    #[test]
+    fn duplicate_header_names_are_rejected_after_normalization() {
+        temp_env::with_vars(
+            [
+                ("HARNESS_TEST_ACP_A", Some("a")),
+                ("HARNESS_TEST_ACP_B", Some("b")),
+            ],
+            || {
+                let error = build_http_client(&endpoint(
+                    "https://acp.example.test",
+                    &[
+                        ("Authorization", "HARNESS_TEST_ACP_A"),
+                        ("authorization", "HARNESS_TEST_ACP_B"),
+                    ],
+                ))
+                .expect_err("case-insensitive duplicate rejected after normalization");
+                assert!(error.to_string().contains("more than once"));
+            },
+        );
     }
 }
