@@ -54,6 +54,71 @@ hooks.
 - `agents/runtime/` - runtime adapters, conversation events, signal protocol,
   and liveness detection.
 
+## Managed ACP agents
+
+Harness speaks the Agent Client Protocol (ACP, wire protocol v1) to agents it
+manages for a session. The client half lives in `src/agents/acp/` (connection,
+streaming events, permission bridge, supervision); the daemon half in
+`src/daemon/agent_acp/` (protocol loop, session lifecycle, per-agent state, and
+the HTTP routes the CLI and Monitor call). Wire types shared with the Monitor
+live in `crates/harness-protocol/src/managed_agents/acp/`.
+
+Bundled adapters are version-pinned by harness: `codex-acp`
+(`crates/harness-codex-acp/`) and the OpenRouter agent
+(`crates/harness-openrouter-agent/`). External adapters such as
+`claude-agent-acp` and `copilot --acp` are user-installed; harness does not pin
+them and surfaces their reported version through inspect instead of managing it.
+
+### Handshake and capabilities
+
+On `session/initialize` harness advertises fixed client capabilities
+(`fs.readTextFile`/`writeTextFile`, terminal, and boolean session config
+options) and records the agent's response as an `AcpAgentHandshake`: the
+negotiated protocol version, agentInfo (name, version, title), auth methods, and
+one flag per stable-v1 capability (load, list, resume, close, and delete
+session, additionalDirectories, MCP http/sse, and logout). Every lifecycle call
+is gated on the matching capability and falls back cleanly when the agent does
+not advertise it.
+
+### Session lifecycle
+
+`session/new` carries `additionalDirectories` and `mcpServers`, both defaulting
+to empty; MCP http/sse entries are dropped for agents that do not advertise the
+transport. When a pooled agent process dies, harness prefers `session/resume` on
+the fresh process, then `session/load` with replay-safe persistence, then a new
+session. `session/close` fires on teardown for agents that support it. The ids
+`session/list` reports belong to the agent, so harness treats them as display
+data distinct from its own session ids.
+
+### Telemetry
+
+Prompt-turn usage, message ids, and stop reasons (refusal included) flow into
+`ConversationEvent` payloads without changing the event's own wire shape, so the
+Monitor decodes them without codegen churn. The `config_option_update`,
+`current_mode_update`, `available_commands_update`, and `session_info_update`
+notifications mutate the per-session `AcpAgentSessionState` surfaced through
+inspect.
+
+### Remote transport
+
+A start can replace the descriptor's command with a remote endpoint:
+`--endpoint` with a `ws`/`wss` URL connects over WebSocket, an `http`/`https`
+URL over SSE with POST. `--header-env Name=ENV_VAR` resolves each header value
+from the daemon's environment at connect time, so no secret rides the request;
+WebSocket connects drop request headers, so `--header-env` needs an http/https
+endpoint. Remote agents run the same protocol loop behind a childless supervisor
+with no pid or stderr tail. The transport lives behind
+`agent-client-protocol-http`, gated on the `daemon-runtime` feature.
+
+### CLI
+
+`harness session agents start acp` launches a descriptor or, with `--endpoint`,
+connects to a remote one. `harness session agents acp` groups the live-agent
+verbs: `inspect` (a per-agent doctor view of protocol version, agentInfo, and
+freshness notes, or `--json` for the raw daemon snapshot), `logout`, `sessions`,
+`close-session`, and `delete-session`. See
+`docs/agent-guides/task-board-workflow.md` for the operator summary.
+
 ## Data directories
 
 - `$XDG_DATA_HOME/harness/suites/` - suite library.
