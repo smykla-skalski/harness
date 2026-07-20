@@ -4,7 +4,6 @@ use std::sync::Arc;
 
 use serde::Serialize;
 use tokio::sync::broadcast;
-use tokio::sync::mpsc;
 use uuid::Uuid;
 
 use self::rollback::rollback_registration_best_effort;
@@ -15,7 +14,6 @@ use crate::agents::acp::catalog::AcpAgentDescriptor;
 use crate::agents::acp::connection::SpawnConfig;
 use crate::agents::acp::permission::{PermissionMode, recording_log_path_for_session};
 use crate::agents::acp::supervision::{AcpSessionSupervisor, SupervisionConfig};
-use crate::agents::kind::DisconnectReason;
 #[cfg(feature = "daemon-runtime")]
 use crate::daemon::index;
 use crate::daemon::protocol::StreamEvent;
@@ -23,7 +21,7 @@ use crate::errors::{CliError, CliErrorKind};
 
 use super::active::{
     ActiveAcpProcess, ActiveAcpSession, ActiveAcpTasks, LiveEventPersistence, SharedStderrTail,
-    spawn_event_forwarder, spawn_protocol_disconnect_forwarder, spawn_watchdog_forwarder,
+    spawn_event_forwarder,
 };
 use super::manager::{
     AcpAgentManagerHandle, AcpAgentSnapshot, AcpAgentStartRequest, AcpOrchestrationRegistration,
@@ -33,10 +31,14 @@ use super::permission_bridge::PermissionBridgeHandle;
 use super::pool_key::AcpProcessPoolKey;
 use super::prompt_gate::{PromptGate, PromptOwner, prompt_text};
 use super::protocol::{
-    AcpSessionRequestConfig, SpawnProtocolInput, SpawnedAcpProtocol, spawn_protocol_task,
+    AcpSessionRequestConfig, AcpTransport, SpawnProtocolInput, SpawnedAcpProtocol,
+    spawn_protocol_task,
 };
 use super::spawn_credential::SpawnCredential;
 
+mod activation;
+#[cfg(feature = "daemon-runtime")]
+mod remote;
 mod resume;
 mod reused_session;
 mod rollback;
@@ -85,6 +87,40 @@ impl AcpAgentManagerHandle {
         let project_dir = self.resolve_project_dir(session_id, request.project_dir.as_deref())?;
         let acp_id = format!("agent-acp-{}", Uuid::new_v4());
         let session_config = AcpSessionRequestConfig::from_request(request, descriptor);
+        // The HTTP transport crate only links under daemon-runtime, so the
+        // remote-connect path is compiled there; bridge-runtime rejects an
+        // endpoint rather than silently spawning the descriptor's command.
+        #[cfg(feature = "daemon-runtime")]
+        if let Some(endpoint) = request.endpoint.as_ref() {
+            // A remote agent is never pooled or reused: the per-start acp_id
+            // already makes the key unique. The endpoint URL is kept out of it
+            // on purpose - process_key rides in snapshots and events, and a
+            // ws/wss URL may carry a credential in its userinfo or query.
+            let process_key = format!("remote:{acp_id}");
+            let input = DescriptorStartInput {
+                acp_id: &acp_id,
+                session_id,
+                request,
+                descriptor,
+                project_dir: &project_dir,
+                process_key: &process_key,
+            };
+            let _lifecycle = self.process_lifecycle_guard()?;
+            if self.start_requested_after_shutdown() {
+                return Err(CliErrorKind::workflow_io(
+                    "ACP manager is shutting down; new ACP agents are blocked".to_string(),
+                )
+                .into());
+            }
+            return self.start_remote_connect_session(input, endpoint);
+        }
+        #[cfg(not(feature = "daemon-runtime"))]
+        if request.endpoint.is_some() {
+            return Err(CliErrorKind::workflow_io(
+                "remote ACP endpoints require the daemon runtime".to_string(),
+            )
+            .into());
+        }
         let mut spawn =
             build_spawn_config(descriptor, &session_config, &project_dir, openrouter_token)?;
         let process_key = AcpProcessPoolKey::from_spawn_inputs(
@@ -138,13 +174,19 @@ impl AcpAgentManagerHandle {
             ))
         })?;
         let context = self.build_started_process_context(input, &mut child);
+        let transport = AcpTransport::from_child(&mut child).map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "attach ACP protocol for '{}': {error}",
+                input.descriptor.id
+            )))
+        })?;
         let protocol =
-            self.attach_protocol_for_started_process(input, &context, &mut child, credential)?;
+            self.attach_protocol_for_started_process(input, &context, transport, credential)?;
         let registration = self.register_started_orchestration_agent(
             input,
             input.descriptor.id.as_str(),
             &context.display_name,
-            &mut child,
+            Some(&mut child),
             &protocol,
         )?;
         let event_task = spawn_event_forwarder(
@@ -258,7 +300,7 @@ impl AcpAgentManagerHandle {
         &self,
         input: DescriptorStartInput<'_>,
         context: &StartedProcessContext,
-        child: &mut Child,
+        transport: AcpTransport,
         credential: Option<SpawnCredential>,
     ) -> Result<SpawnedAcpProtocol, CliError> {
         let initial_prompt_lease = prompt_text(input.request.prompt.as_deref())
@@ -274,7 +316,7 @@ impl AcpAgentManagerHandle {
             |log_path| PermissionMode::Recording { log_path },
         );
         spawn_protocol_task(
-            child,
+            transport,
             SpawnProtocolInput {
                 request: input.request,
                 session_config: AcpSessionRequestConfig::from_request(
@@ -308,7 +350,7 @@ impl AcpAgentManagerHandle {
         input: DescriptorStartInput<'_>,
         descriptor_id: &str,
         display_name: &str,
-        child: &mut Child,
+        child: Option<&mut Child>,
         protocol: &SpawnedAcpProtocol,
     ) -> Result<AcpOrchestrationRegistration, CliError> {
         self.register_orchestration_agent(
@@ -322,7 +364,9 @@ impl AcpAgentManagerHandle {
         .inspect_err(|_| {
             protocol.protocol.abort();
             protocol.batcher.abort();
-            let _ = child.kill();
+            if let Some(child) = child {
+                let _ = child.kill();
+            }
         })
         .map_err(|error| {
             CliErrorKind::workflow_io(format!(
@@ -330,79 +374,6 @@ impl AcpAgentManagerHandle {
             ))
             .into()
         })
-    }
-
-    fn activate_started_session(
-        &self,
-        input: DescriptorStartInput<'_>,
-        snapshot: AcpAgentSnapshot,
-        permissions: PermissionBridgeHandle,
-        process: Arc<ActiveAcpProcess>,
-        disconnects: mpsc::Receiver<DisconnectReason>,
-        supervisor: Arc<AcpSessionSupervisor>,
-    ) -> Result<(), CliError> {
-        let active = self.build_started_session(
-            snapshot,
-            permissions,
-            Arc::clone(&process),
-            AcpSessionRequestConfig::from_request(input.request, input.descriptor),
-            disconnects,
-            supervisor,
-        );
-        self.sessions_guard()?
-            .insert(input.acp_id.to_string(), Arc::clone(&active));
-        if let Err(error) = self.insert_process(input.process_key.to_string(), process) {
-            self.rollback_started_session_after_process_insert_error(input);
-            drop(active);
-            return Err(error);
-        }
-        Ok(())
-    }
-
-    fn build_started_session(
-        &self,
-        snapshot: AcpAgentSnapshot,
-        permissions: PermissionBridgeHandle,
-        process: Arc<ActiveAcpProcess>,
-        session_config: AcpSessionRequestConfig,
-        disconnects: mpsc::Receiver<DisconnectReason>,
-        supervisor: Arc<AcpSessionSupervisor>,
-    ) -> Arc<ActiveAcpSession> {
-        let active = Arc::new(ActiveAcpSession::new(
-            snapshot,
-            permissions,
-            process,
-            session_config,
-        ));
-        active.set_protocol_disconnect_task(spawn_protocol_disconnect_forwarder(
-            self.clone(),
-            Arc::downgrade(&active),
-            disconnects,
-        ));
-        active.set_watchdog_task(spawn_watchdog_forwarder(
-            self.clone(),
-            Arc::downgrade(&active),
-            supervisor,
-        ));
-        active
-    }
-
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-    )]
-    fn rollback_started_session_after_process_insert_error(&self, input: DescriptorStartInput<'_>) {
-        if let Err(remove_error) = self
-            .sessions_guard()
-            .map(|mut sessions| sessions.remove(input.acp_id))
-        {
-            tracing::warn!(
-                acp_id = input.acp_id,
-                session_id = input.session_id,
-                %remove_error,
-                "failed to remove ACP session registration after process insert error"
-            );
-        }
     }
 
     pub(super) fn sender(&self) -> broadcast::Sender<StreamEvent> {

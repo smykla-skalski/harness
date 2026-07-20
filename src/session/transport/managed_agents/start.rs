@@ -1,10 +1,12 @@
+use std::collections::BTreeMap;
+
 use clap::{Args, Subcommand};
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::daemon::agent_acp::AcpAgentStartRequest;
+use crate::daemon::agent_acp::{AcpAgentStartRequest, AcpEndpoint};
 use crate::daemon::agent_tui::AgentTuiStartRequest;
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest};
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
 use crate::session::types::SessionRole;
 
@@ -167,10 +169,26 @@ pub struct AcpAgentStartArgs {
     /// loaded.
     #[arg(long = "no-resume")]
     pub no_resume: bool,
+    /// Connect to a remote ACP endpoint instead of spawning the descriptor's
+    /// command. `ws`/`wss` uses WebSocket, `http`/`https` uses SSE with POST.
+    /// The descriptor still names the agent; its launch command is not run.
+    #[arg(long)]
+    pub endpoint: Option<String>,
+    /// Header for the remote connection as `Name=ENV_VAR`. The daemon reads the
+    /// value from that environment variable at connect time, so the secret
+    /// never rides the request. Only http/https endpoints accept headers; ws/wss
+    /// cannot carry them. Repeatable; requires `--endpoint`.
+    #[arg(long = "header-env", requires = "endpoint")]
+    pub header_env: Vec<String>,
 }
 
 impl Execute for AcpAgentStartArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let endpoint = self
+            .endpoint
+            .as_deref()
+            .map(|url| build_endpoint(url, &self.header_env))
+            .transpose()?;
         let request = AcpAgentStartRequest {
             agent: self.agent.clone(),
             role: self.role,
@@ -195,11 +213,43 @@ impl Execute for AcpAgentStartArgs {
             additional_directories: self.additional_directories.clone(),
             resume_session_id: self.resume_session_id.clone(),
             resume_disabled: self.no_resume,
+            endpoint,
         };
         let snapshot = daemon_client()?.start_acp_managed_agent(&self.session_id, &request)?;
         print_json(&snapshot)?;
         Ok(0)
     }
+}
+
+/// Parse `--header-env NAME=ENV_VAR` pairs into an endpoint. The map records the
+/// environment variable name, not its value: the daemon resolves it at connect
+/// time so a token never crosses the start request.
+fn build_endpoint(url: &str, header_env: &[String]) -> Result<AcpEndpoint, CliError> {
+    let mut headers_env: BTreeMap<String, String> = BTreeMap::new();
+    for entry in header_env {
+        let (name, var) = entry
+            .split_once('=')
+            .filter(|(name, var)| !name.is_empty() && !var.is_empty())
+            .ok_or_else(|| {
+                CliErrorKind::workflow_parse(format!("--header-env '{entry}' must be NAME=ENV_VAR"))
+            })?;
+        // HTTP header names are case-insensitive, so reject a repeat under any
+        // casing rather than let the later one silently win.
+        if headers_env
+            .keys()
+            .any(|existing| existing.eq_ignore_ascii_case(name))
+        {
+            return Err(CliErrorKind::workflow_parse(format!(
+                "--header-env sets header '{name}' more than once"
+            ))
+            .into());
+        }
+        headers_env.insert(name.to_string(), var.to_string());
+    }
+    Ok(AcpEndpoint {
+        url: url.to_string(),
+        headers_env,
+    })
 }
 
 #[derive(Debug, Clone, Args)]

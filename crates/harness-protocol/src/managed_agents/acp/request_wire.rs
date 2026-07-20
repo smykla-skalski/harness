@@ -2,7 +2,7 @@ use serde::de::Error as DeError;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::mcp::AcpMcpServer;
-use super::models::{AcpAgentStartRequest, default_acp_role, is_false};
+use super::models::{AcpAgentStartRequest, AcpEndpoint, default_acp_role, is_false};
 use crate::session::SessionRole;
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -45,6 +45,8 @@ struct AcpAgentStartRequestDecode {
     resume_session_id: Option<String>,
     #[serde(default)]
     resume_disabled: bool,
+    #[serde(default)]
+    endpoint: Option<AcpEndpoint>,
 }
 
 /// Keeps MCP credentials, unlike a descriptor: the caller supplied them and
@@ -84,6 +86,8 @@ struct AcpAgentStartRequestEncode<'a> {
     resume_session_id: Option<&'a str>,
     #[serde(skip_serializing_if = "is_false")]
     resume_disabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    endpoint: Option<&'a AcpEndpoint>,
 }
 
 impl Serialize for AcpAgentStartRequest {
@@ -111,6 +115,7 @@ impl Serialize for AcpAgentStartRequest {
             additional_directories: &self.additional_directories,
             resume_session_id: self.resume_session_id.as_deref(),
             resume_disabled: self.resume_disabled,
+            endpoint: self.endpoint.as_ref(),
         }
         .serialize(serializer)
     }
@@ -145,13 +150,16 @@ impl<'de> Deserialize<'de> for AcpAgentStartRequest {
             additional_directories: decoded.additional_directories,
             resume_session_id: decoded.resume_session_id,
             resume_disabled: decoded.resume_disabled,
+            endpoint: decoded.endpoint,
         })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{AcpAgentStartRequest, AcpMcpServer};
+    use std::collections::BTreeMap;
+
+    use super::{AcpAgentStartRequest, AcpEndpoint, AcpMcpServer};
     use crate::managed_agents::acp::{AcpMcpEnvVariable, AcpMcpHttpHeader};
 
     fn request_with_secrets() -> AcpAgentStartRequest {
@@ -211,6 +219,34 @@ mod tests {
 
         assert!(value.get("mcp_servers").is_none());
         assert!(value.get("additional_directories").is_none());
+        assert!(value.get("endpoint").is_none());
+    }
+
+    #[test]
+    fn acp_start_request_round_trips_endpoint() {
+        let request = AcpAgentStartRequest {
+            agent: "copilot".into(),
+            endpoint: Some(AcpEndpoint {
+                url: "https://acp.example.test".into(),
+                headers_env: BTreeMap::from([(
+                    "Authorization".to_string(),
+                    "REMOTE_ACP_TOKEN".to_string(),
+                )]),
+            }),
+            ..AcpAgentStartRequest::default()
+        };
+
+        let value = serde_json::to_value(&request).expect("serialize request");
+        assert_eq!(value["endpoint"]["url"], "https://acp.example.test");
+        assert_eq!(
+            value["endpoint"]["headers_env"]["Authorization"],
+            "REMOTE_ACP_TOKEN",
+            "only the env var name crosses the wire, never the token"
+        );
+
+        let decoded: AcpAgentStartRequest =
+            serde_json::from_value(value).expect("decode request");
+        assert_eq!(decoded, request, "the endpoint must round-trip unchanged");
     }
 
     #[test]
@@ -288,6 +324,7 @@ mod tests {
             additional_directories: Vec::new(),
             resume_session_id: None,
             resume_disabled: false,
+            endpoint: None,
         };
 
         let value = serde_json::to_value(&request).expect("serialize request");

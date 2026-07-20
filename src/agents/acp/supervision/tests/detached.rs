@@ -36,3 +36,17 @@ async fn a_childless_supervisor_still_drives_the_watchdog() {
     assert_eq!(supervisor.watchdog_state(), WatchdogState::Paused);
     assert_eq!(supervisor.pending_request_count(), 0);
 }
+
+/// A remote process reports the zero sentinel: there is no local pid or process
+/// group, and nothing must ever reap group zero.
+#[tokio::test(start_paused = true)]
+async fn a_remote_process_reports_the_zero_sentinel() {
+    let supervisor = AcpSessionSupervisor::with_process(
+        SupervisedProcess::remote(),
+        SupervisionConfig::default(),
+    );
+
+    assert_eq!(supervisor.pid(), 0);
+    assert_eq!(supervisor.pgid(), 0);
+    assert_eq!(supervisor.watchdog_state(), WatchdogState::Paused);
+}

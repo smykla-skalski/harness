@@ -26,6 +26,7 @@ fn start_request() -> AcpAgentStartRequest {
         additional_directories: Vec::new(),
         resume_session_id: None,
         resume_disabled: false,
+        endpoint: None,
     }
 }
 
