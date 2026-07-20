@@ -247,22 +247,6 @@ enum TaskBoardLaneCardHoverID: Hashable {
   case decision(String)
 }
 
-struct TaskBoardLaneCardFrame: Equatable {
-  let id: TaskBoardLaneCardHoverID
-  let frame: CGRect
-}
-
-struct TaskBoardLaneCardFramePreferenceKey: PreferenceKey {
-  static let defaultValue: [TaskBoardLaneCardFrame] = []
-
-  static func reduce(
-    value: inout [TaskBoardLaneCardFrame],
-    nextValue: () -> [TaskBoardLaneCardFrame]
-  ) {
-    value.append(contentsOf: nextValue())
-  }
-}
-
 private struct TaskBoardCardChrome: ViewModifier {
   let tint: Color
   let isHovered: Bool
@@ -352,22 +336,26 @@ extension View {
     )
   }
 
+  /// Each card reports its own frame straight into the lane's hover model.
+  /// Deliberately not a shared preference reduced across the `LazyVStack` - that
+  /// aggregate faulted as "bound preference ... tried to update multiple times
+  /// per frame" while lazy children measured in. `onChange` lets the column
+  /// re-resolve the hovered card when a frame settles or a card scrolls away.
   func taskBoardCardFrame(
     id: TaskBoardLaneCardHoverID,
-    in coordinateSpace: String
+    in coordinateSpace: String,
+    tracking: TaskBoardLaneHoverTracking,
+    onChange: @escaping () -> Void
   ) -> some View {
-    background {
-      GeometryReader { proxy in
-        Color.clear.preference(
-          key: TaskBoardLaneCardFramePreferenceKey.self,
-          value: [
-            TaskBoardLaneCardFrame(
-              id: id,
-              frame: proxy.frame(in: .named(coordinateSpace))
-            )
-          ]
-        )
-      }
+    onGeometryChange(for: CGRect.self) { proxy in
+      proxy.frame(in: .named(coordinateSpace))
+    } action: { frame in
+      tracking.setFrame(frame, for: id)
+      onChange()
+    }
+    .onDisappear {
+      tracking.removeFrame(for: id)
+      onChange()
     }
   }
 }
