@@ -396,6 +396,39 @@ pub(super) async fn post_acp_agent_prompt(
     )
 }
 
+pub(super) async fn post_acp_agent_logout(
+    Path(agent_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let result = match acp_session_id(&state, &agent_id) {
+        Ok(session_id) => {
+            let logout_agent_id = agent_id.clone();
+            with_managed_agent_lock(&state, &session_id, &agent_id, || {
+                run_acp_agent_blocking(&state, "logout", move |manager| {
+                    manager
+                        .logout(&logout_agent_id)
+                        .map(|()| serde_json::json!({ "ok": true }))
+                })
+            })
+            .await
+        }
+        Err(error) => Err(error),
+    };
+    timed_json(
+        "POST",
+        http_paths::MANAGED_AGENT_ACP_LOGOUT,
+        &request_id,
+        start,
+        result,
+    )
+}
+
 pub(super) async fn post_acp_permission(
     Path((agent_id, batch_id)): Path<(String, String)>,
     headers: HeaderMap,

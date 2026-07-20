@@ -250,6 +250,14 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::MANAGED_AGENT_ACP_LOGOUT,
+        parity: HttpRouteParity::Exempt {
+            reason: "CLI-only ACP auth action; no Monitor surface consumes it yet",
+        },
+        swift_client_exposed: false,
+    },
+    HttpApiRouteContract {
         method: HttpRouteMethod::Get,
         path: http_paths::MANAGED_AGENTS_CODEX_INSPECT,
         parity: HttpRouteParity::Rpc {

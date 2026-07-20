@@ -2653,9 +2653,15 @@ const ACP_INSPECT_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit
 // emit THAT under the AcpAgentInspectSnapshotWire name (TYPE_RENAMES) and rename the response's
 // `AcpAgentInspectSnapshot` field reference to it. managed_agent_family (ManagedAgentKind) is
 // dropped via OMITTED_WIRE_FIELDS (the hand snapshot does not model it), so the only deps are
-// primitives. available's default_acp_inspect_available -> true resolves from models.rs.
-const ACP_INSPECT_EMIT_ONLY: &[&str] =
-    &["AcpAgentInspectResponse", "AcpAgentInspectSnapshotDecode"];
+// primitives (plus the serde-derived AcpAgentHandshake from models.rs). available's
+// default_acp_inspect_available -> true resolves from models.rs.
+const ACP_INSPECT_EMIT_ONLY: &[&str] = &[
+    "AcpAgentInspectResponse",
+    "AcpAgentInspectSnapshotDecode",
+    "AcpAgentHandshake",
+    "AcpAgentSessionState",
+    "AcpSessionConfigOptionState",
+];
 const ACP_PERMISSION_ITEM_SOURCE: &str = ACP_MODELS_SOURCE;
 const ACP_PERMISSION_WIRE_SOURCE: &str =
     include_str!("../crates/harness-protocol/src/managed_agents/acp/permission_wire.rs");

@@ -393,6 +393,11 @@ impl DaemonClient {
         self.delete(&format!("/v1/managed-agents/{agent_id}"))
     }
 
+    pub fn logout_acp_managed_agent(&self, agent_id: &str) -> Result<serde_json::Value, CliError> {
+        let body = serde_json::json!({});
+        self.post(&format!("/v1/managed-agents/{agent_id}/logout"), &body)
+    }
+
     pub fn inspect_acp_managed_agents(
         &self,
         session_id: Option<&str>,

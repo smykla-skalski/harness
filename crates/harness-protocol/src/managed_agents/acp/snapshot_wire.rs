@@ -1,7 +1,10 @@
 use serde::de::Error as DeError;
 use serde::{Deserialize, Deserializer, Serialize};
 
-use super::models::{AcpAgentInspectSnapshot, AcpAgentSnapshot, AcpPermissionBatch};
+use super::models::{
+    AcpAgentHandshake, AcpAgentInspectSnapshot, AcpAgentSessionState, AcpAgentSnapshot,
+    AcpPermissionBatch,
+};
 use crate::session::{AgentStatus, ManagedAgentKind};
 
 #[derive(Serialize)]
@@ -52,6 +55,10 @@ struct AcpAgentInspectSnapshotWire<'a> {
     permission_queue_depth: usize,
     terminal_count: usize,
     prompt_deadline_remaining_ms: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    handshake: Option<&'a AcpAgentHandshake>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    session_state: Option<&'a AcpAgentSessionState>,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
@@ -105,6 +112,10 @@ struct AcpAgentInspectSnapshotDecode {
     permission_queue_depth: usize,
     terminal_count: usize,
     prompt_deadline_remaining_ms: u64,
+    #[serde(default)]
+    handshake: Option<AcpAgentHandshake>,
+    #[serde(default)]
+    session_state: Option<AcpAgentSessionState>,
 }
 
 impl Serialize for AcpAgentSnapshot {
@@ -189,6 +200,8 @@ impl Serialize for AcpAgentInspectSnapshot {
             permission_queue_depth: self.permission_queue_depth,
             terminal_count: self.terminal_count,
             prompt_deadline_remaining_ms: self.prompt_deadline_remaining_ms,
+            handshake: self.handshake.as_ref(),
+            session_state: self.session_state.as_ref(),
         }
         .serialize(serializer)
     }
@@ -219,6 +232,8 @@ impl<'de> Deserialize<'de> for AcpAgentInspectSnapshot {
             permission_queue_depth: decoded.permission_queue_depth,
             terminal_count: decoded.terminal_count,
             prompt_deadline_remaining_ms: decoded.prompt_deadline_remaining_ms,
+            handshake: decoded.handshake,
+            session_state: decoded.session_state,
         })
     }
 }
@@ -237,7 +252,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{AcpAgentInspectSnapshot, AcpAgentSnapshot};
+    use super::super::models::AcpSessionConfigOptionState;
+    use super::{
+        AcpAgentHandshake, AcpAgentInspectSnapshot, AcpAgentSessionState, AcpAgentSnapshot,
+    };
 
     #[test]
     fn acp_agent_snapshot_serializes_explicit_identity_fields() {
@@ -289,6 +307,8 @@ mod tests {
             permission_queue_depth: 0,
             terminal_count: 0,
             prompt_deadline_remaining_ms: 10_000,
+            handshake: None,
+            session_state: None,
         };
 
         let value = serde_json::to_value(&snapshot).expect("serialize inspect snapshot");
@@ -297,6 +317,64 @@ mod tests {
         assert_eq!(value["session_agent_id"], "worker-1");
         assert!(value.get("acp_id").is_none());
         assert!(value.get("agent_id").is_none());
+        assert!(value.get("handshake").is_none());
+    }
+
+    #[test]
+    fn acp_agent_inspect_snapshot_round_trips_handshake() {
+        let mut snapshot: AcpAgentInspectSnapshot = serde_json::from_value(serde_json::json!({
+            "managed_agent_id": "acp-1",
+            "managed_agent_family": "acp",
+            "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            "session_agent_id": "worker-1",
+            "display_name": "Copilot",
+            "pid": 42,
+            "pgid": 42,
+            "uptime_ms": 1_000,
+            "last_update_at": "2026-05-06T00:00:01Z",
+            "last_client_call_at": null,
+            "watchdog_state": "healthy",
+            "pending_permissions": 0,
+            "permission_queue_depth": 0,
+            "terminal_count": 0,
+            "prompt_deadline_remaining_ms": 10_000,
+        }))
+        .expect("decode inspect snapshot without handshake");
+        assert_eq!(snapshot.handshake, None);
+
+        snapshot.handshake = Some(AcpAgentHandshake {
+            protocol_version: 1,
+            agent_name: Some("codex-acp".into()),
+            agent_version: Some("0.16.0".into()),
+            agent_title: None,
+            auth_method_ids: vec!["oauth".into()],
+            supports_load_session: true,
+            supports_session_list: true,
+            ..AcpAgentHandshake::default()
+        });
+        snapshot.session_state = Some(AcpAgentSessionState {
+            config_options: vec![AcpSessionConfigOptionState {
+                id: "web_search".into(),
+                name: "Web search".into(),
+                category: None,
+                current_value: "true".into(),
+            }],
+            current_mode_id: Some("focus".into()),
+            available_commands: vec!["review".into()],
+            title: Some("Renamed".into()),
+            updated_at: None,
+        });
+        let value = serde_json::to_value(&snapshot).expect("serialize inspect snapshot");
+        assert_eq!(value["handshake"]["protocol_version"], 1);
+        assert_eq!(value["handshake"]["agent_name"], "codex-acp");
+        assert_eq!(
+            value["session_state"]["config_options"][0]["current_value"],
+            "true"
+        );
+        let decoded: AcpAgentInspectSnapshot =
+            serde_json::from_value(value).expect("decode inspect snapshot with handshake");
+        assert_eq!(decoded.handshake, snapshot.handshake);
+        assert_eq!(decoded.session_state, snapshot.session_state);
     }
 
     #[test]

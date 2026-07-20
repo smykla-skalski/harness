@@ -148,6 +148,10 @@ impl ActiveAcpSession {
         snapshot.clone()
     }
 
+    pub(in crate::daemon::agent_acp) fn logout(&self) -> Result<(), String> {
+        self.process.logout()
+    }
+
     pub(in crate::daemon::agent_acp) fn inspect_snapshot_for(
         &self,
         snapshot: &AcpAgentSnapshot,
@@ -181,6 +185,8 @@ impl ActiveAcpSession {
             permission_queue_depth: snapshot.permission_queue_depth,
             terminal_count: snapshot.terminal_count,
             prompt_deadline_remaining_ms: u64::try_from(remaining.as_millis()).unwrap_or(u64::MAX),
+            handshake: self.process.supervisor.handshake().cloned(),
+            session_state: self.process.supervisor.session_state(),
         }
     }
 

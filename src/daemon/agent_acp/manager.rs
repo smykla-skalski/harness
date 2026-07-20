@@ -280,6 +280,25 @@ impl AcpAgentManagerHandle {
         self.refresh_session_snapshot(&session)
     }
 
+    /// Ask the agent to log out via the ACP `logout` method. Gated on the
+    /// agent advertising the `auth.logout` capability at initialize.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the daemon is sandboxed, the session is
+    /// unknown, the capability is missing, or the agent rejects the call.
+    pub fn logout(&self, acp_id: &str) -> Result<(), CliError> {
+        if crate::daemon::sandboxed_from_env() {
+            return Err(CliErrorKind::workflow_io(
+                "ACP logout is not available from a sandboxed daemon".to_string(),
+            )
+            .into());
+        }
+        let session = self.session(acp_id)?;
+        session.logout().map_err(|error| {
+            CliErrorKind::workflow_io(format!("ACP logout for '{acp_id}': {error}")).into()
+        })
+    }
+
     /// Stop an ACP session and fail every pending permission with daemon shutdown.
     ///
     /// # Errors

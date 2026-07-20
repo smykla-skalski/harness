@@ -211,6 +211,7 @@ fn session_route_guard_bounds_ended_tombstones() {
 }
 
 #[tokio::test]
+#[cfg(unix)]
 async fn expired_tombstone_notification_is_dropped_without_protocol_error() {
     let guard = SessionRouteGuard::default();
     for index in 0..260 {
@@ -222,6 +223,8 @@ async fn expired_tombstone_notification_is_dropped_without_protocol_error() {
         &SessionId::new("acp-session-live"),
         route_target("sess-live"),
     );
+    let mut supervisor_child = Command::new("sleep").arg("60").spawn().expect("child");
+    let supervisor = AcpSessionSupervisor::new(&supervisor_child, SupervisionConfig::default());
     let (notification_tx, mut notifications) = mpsc::channel(1);
     let notification = SessionNotification::new(
         SessionId::new("acp-session-0"),
@@ -230,11 +233,15 @@ async fn expired_tombstone_notification_is_dropped_without_protocol_error() {
         )))),
     );
 
-    let Ok(()) = route_session_notification(&guard, &notification_tx, notification).await else {
+    let Ok(()) =
+        route_session_notification(&guard, &supervisor, &notification_tx, notification).await
+    else {
         unreachable!("expired tombstone notification should be benign");
     };
 
     assert!(notifications.try_recv().is_err());
+    let _ = supervisor_child.kill();
+    let _ = supervisor_child.wait();
 }
 
 #[test]

@@ -66,8 +66,9 @@ mod sandbox_proxy;
 mod spawn_credential;
 
 pub use harness_protocol::managed_agents::acp::{
-    AcpAgentInspectResponse, AcpAgentInspectSnapshot, AcpAgentSnapshot, AcpAgentStartRequest,
-    AcpPermissionBatch, AcpPermissionDecision, AcpPermissionItem, AcpPermissionOption,
+    AcpAgentHandshake, AcpAgentInspectResponse, AcpAgentInspectSnapshot, AcpAgentSessionState,
+    AcpAgentSnapshot, AcpAgentStartRequest, AcpPermissionBatch, AcpPermissionDecision,
+    AcpPermissionItem, AcpPermissionOption, AcpSessionConfigOptionState,
 };
 #[cfg(feature = "daemon-runtime")]
 pub use manager::AcpWakePrompt;

@@ -257,6 +257,63 @@ pub struct AcpAgentSnapshot {
     pub updated_at: String,
 }
 
+/// Result of the ACP `initialize` exchange with a live agent process.
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "mirrors independent ACP capability flags; each bool is a distinct protocol capability"
+)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AcpAgentHandshake {
+    pub protocol_version: u16,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_title: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub auth_method_ids: Vec<String>,
+    #[serde(default)]
+    pub supports_load_session: bool,
+    #[serde(default)]
+    pub supports_session_list: bool,
+    #[serde(default)]
+    pub supports_session_resume: bool,
+    #[serde(default)]
+    pub supports_session_close: bool,
+    #[serde(default)]
+    pub supports_session_delete: bool,
+    #[serde(default)]
+    pub supports_additional_directories: bool,
+    #[serde(default)]
+    pub supports_logout: bool,
+}
+
+/// Live per-session agent state assembled from ACP session notifications.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AcpAgentSessionState {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub config_options: Vec<AcpSessionConfigOptionState>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_mode_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub available_commands: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+}
+
+/// Compact view of one advertised session config option and its value.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AcpSessionConfigOptionState {
+    pub id: String,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+    pub current_value: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AcpAgentInspectSnapshot {
     pub acp_id: String,
@@ -276,6 +333,8 @@ pub struct AcpAgentInspectSnapshot {
     pub permission_queue_depth: usize,
     pub terminal_count: usize,
     pub prompt_deadline_remaining_ms: u64,
+    pub handshake: Option<AcpAgentHandshake>,
+    pub session_state: Option<AcpAgentSessionState>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

@@ -4,6 +4,121 @@
 
 import Foundation
 
+public struct AcpAgentHandshake: Codable, Equatable, Sendable {
+  public var protocolVersion: UInt16
+  public var agentName: String?
+  public var agentVersion: String?
+  public var agentTitle: String?
+  public var authMethodIds: [String]
+  public var supportsLoadSession: Bool
+  public var supportsSessionList: Bool
+  public var supportsSessionResume: Bool
+  public var supportsSessionClose: Bool
+  public var supportsSessionDelete: Bool
+  public var supportsAdditionalDirectories: Bool
+  public var supportsLogout: Bool
+
+  public init(protocolVersion: UInt16 = 0, agentName: String? = nil, agentVersion: String? = nil, agentTitle: String? = nil, authMethodIds: [String] = [], supportsLoadSession: Bool = false, supportsSessionList: Bool = false, supportsSessionResume: Bool = false, supportsSessionClose: Bool = false, supportsSessionDelete: Bool = false, supportsAdditionalDirectories: Bool = false, supportsLogout: Bool = false) {
+    self.protocolVersion = protocolVersion
+    self.agentName = agentName
+    self.agentVersion = agentVersion
+    self.agentTitle = agentTitle
+    self.authMethodIds = authMethodIds
+    self.supportsLoadSession = supportsLoadSession
+    self.supportsSessionList = supportsSessionList
+    self.supportsSessionResume = supportsSessionResume
+    self.supportsSessionClose = supportsSessionClose
+    self.supportsSessionDelete = supportsSessionDelete
+    self.supportsAdditionalDirectories = supportsAdditionalDirectories
+    self.supportsLogout = supportsLogout
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    protocolVersion = try container.decode(UInt16.self, forKey: .protocolVersion)
+    agentName = try container.decodeIfPresent(String.self, forKey: .agentName)
+    agentVersion = try container.decodeIfPresent(String.self, forKey: .agentVersion)
+    agentTitle = try container.decodeIfPresent(String.self, forKey: .agentTitle)
+    authMethodIds = try container.decodeIfPresent([String].self, forKey: .authMethodIds) ?? []
+    supportsLoadSession = try container.decodeIfPresent(Bool.self, forKey: .supportsLoadSession) ?? false
+    supportsSessionList = try container.decodeIfPresent(Bool.self, forKey: .supportsSessionList) ?? false
+    supportsSessionResume = try container.decodeIfPresent(Bool.self, forKey: .supportsSessionResume) ?? false
+    supportsSessionClose = try container.decodeIfPresent(Bool.self, forKey: .supportsSessionClose) ?? false
+    supportsSessionDelete = try container.decodeIfPresent(Bool.self, forKey: .supportsSessionDelete) ?? false
+    supportsAdditionalDirectories = try container.decodeIfPresent(Bool.self, forKey: .supportsAdditionalDirectories) ?? false
+    supportsLogout = try container.decodeIfPresent(Bool.self, forKey: .supportsLogout) ?? false
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case protocolVersion = "protocol_version"
+    case agentName = "agent_name"
+    case agentVersion = "agent_version"
+    case agentTitle = "agent_title"
+    case authMethodIds = "auth_method_ids"
+    case supportsLoadSession = "supports_load_session"
+    case supportsSessionList = "supports_session_list"
+    case supportsSessionResume = "supports_session_resume"
+    case supportsSessionClose = "supports_session_close"
+    case supportsSessionDelete = "supports_session_delete"
+    case supportsAdditionalDirectories = "supports_additional_directories"
+    case supportsLogout = "supports_logout"
+  }
+}
+
+public struct AcpAgentSessionState: Codable, Equatable, Sendable {
+  public var configOptions: [AcpSessionConfigOptionState]
+  public var currentModeId: String?
+  public var availableCommands: [String]
+  public var title: String?
+  public var updatedAt: String?
+
+  public init(configOptions: [AcpSessionConfigOptionState] = [], currentModeId: String? = nil, availableCommands: [String] = [], title: String? = nil, updatedAt: String? = nil) {
+    self.configOptions = configOptions
+    self.currentModeId = currentModeId
+    self.availableCommands = availableCommands
+    self.title = title
+    self.updatedAt = updatedAt
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    configOptions = try container.decodeIfPresent([AcpSessionConfigOptionState].self, forKey: .configOptions) ?? []
+    currentModeId = try container.decodeIfPresent(String.self, forKey: .currentModeId)
+    availableCommands = try container.decodeIfPresent([String].self, forKey: .availableCommands) ?? []
+    title = try container.decodeIfPresent(String.self, forKey: .title)
+    updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case configOptions = "config_options"
+    case currentModeId = "current_mode_id"
+    case availableCommands = "available_commands"
+    case title
+    case updatedAt = "updated_at"
+  }
+}
+
+public struct AcpSessionConfigOptionState: Codable, Equatable, Sendable {
+  public var id: String
+  public var name: String
+  public var category: String?
+  public var currentValue: String
+
+  public init(id: String, name: String, category: String? = nil, currentValue: String) {
+    self.id = id
+    self.name = name
+    self.category = category
+    self.currentValue = currentValue
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case id
+    case name
+    case category
+    case currentValue = "current_value"
+  }
+}
+
 public struct AcpAgentInspectResponseWire: Codable, Equatable, Sendable {
   public var agents: [AcpAgentInspectSnapshotWire]
   public var daemonPerceivedNow: String?
@@ -51,8 +166,10 @@ public struct AcpAgentInspectSnapshotWire: Codable, Equatable, Sendable {
   public var permissionQueueDepth: UInt
   public var terminalCount: UInt
   public var promptDeadlineRemainingMs: UInt64
+  public var handshake: AcpAgentHandshake?
+  public var sessionState: AcpAgentSessionState?
 
-  public init(managedAgentId: String, sessionId: String, sessionAgentId: String, displayName: String, pid: UInt32, pgid: Int32, processKey: String = "", uptimeMs: UInt64, lastUpdateAt: String, lastClientCallAt: String? = nil, watchdogState: String, permissionMode: String = "", permissionLogPath: String? = nil, pendingPermissions: UInt, permissionQueueDepth: UInt = 0, terminalCount: UInt, promptDeadlineRemainingMs: UInt64) {
+  public init(managedAgentId: String, sessionId: String, sessionAgentId: String, displayName: String, pid: UInt32, pgid: Int32, processKey: String = "", uptimeMs: UInt64, lastUpdateAt: String, lastClientCallAt: String? = nil, watchdogState: String, permissionMode: String = "", permissionLogPath: String? = nil, pendingPermissions: UInt, permissionQueueDepth: UInt = 0, terminalCount: UInt, promptDeadlineRemainingMs: UInt64, handshake: AcpAgentHandshake? = nil, sessionState: AcpAgentSessionState? = nil) {
     self.managedAgentId = managedAgentId
     self.sessionId = sessionId
     self.sessionAgentId = sessionAgentId
@@ -70,6 +187,8 @@ public struct AcpAgentInspectSnapshotWire: Codable, Equatable, Sendable {
     self.permissionQueueDepth = permissionQueueDepth
     self.terminalCount = terminalCount
     self.promptDeadlineRemainingMs = promptDeadlineRemainingMs
+    self.handshake = handshake
+    self.sessionState = sessionState
   }
 
   public init(from decoder: Decoder) throws {
@@ -91,6 +210,8 @@ public struct AcpAgentInspectSnapshotWire: Codable, Equatable, Sendable {
     permissionQueueDepth = try container.decodeIfPresent(UInt.self, forKey: .permissionQueueDepth) ?? 0
     terminalCount = try container.decode(UInt.self, forKey: .terminalCount)
     promptDeadlineRemainingMs = try container.decode(UInt64.self, forKey: .promptDeadlineRemainingMs)
+    handshake = try container.decodeIfPresent(AcpAgentHandshake.self, forKey: .handshake)
+    sessionState = try container.decodeIfPresent(AcpAgentSessionState.self, forKey: .sessionState)
   }
 
   enum CodingKeys: String, CodingKey {
@@ -111,5 +232,7 @@ public struct AcpAgentInspectSnapshotWire: Codable, Equatable, Sendable {
     case permissionQueueDepth = "permission_queue_depth"
     case terminalCount = "terminal_count"
     case promptDeadlineRemainingMs = "prompt_deadline_remaining_ms"
+    case handshake
+    case sessionState = "session_state"
   }
 }

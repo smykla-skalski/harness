@@ -1,7 +1,8 @@
 use agent_client_protocol::schema::v1::{
     NewSessionResponse, SessionConfigKind, SessionConfigOption, SessionConfigOptionCategory,
-    SessionConfigSelect, SessionConfigSelectGroup, SessionConfigSelectOption,
-    SessionConfigSelectOptions, SessionConfigValueId, SessionId, SetSessionConfigOptionRequest,
+    SessionConfigOptionValue, SessionConfigSelect, SessionConfigSelectGroup,
+    SessionConfigSelectOption, SessionConfigSelectOptions, SessionId,
+    SetSessionConfigOptionRequest,
 };
 use agent_client_protocol::{
     Agent, ConnectionTo, Error as AcpError, Result as AcpResult, UntypedMessage,
@@ -194,7 +195,7 @@ async fn apply_config_option_value(
                 format!("ACP session config option for {field_name} is not advertised"),
             )
         })?;
-    let value = select_config_value(option, requested_value).ok_or_else(|| {
+    let value = config_request_value(option, requested_value).ok_or_else(|| {
         AcpError::new(
             -32603,
             format!(
@@ -224,16 +225,22 @@ fn find_config_option<'a>(
     })
 }
 
-fn select_config_value<'a>(
-    option: &'a SessionConfigOption,
+fn config_request_value(
+    option: &SessionConfigOption,
     requested_value: &str,
-) -> Option<&'a SessionConfigValueId> {
+) -> Option<SessionConfigOptionValue> {
     match &option.kind {
         SessionConfigKind::Select(select) => select_options(select)
             .into_iter()
             .find(|candidate| candidate.value.0.as_ref() == requested_value)
-            .map(|candidate| &candidate.value),
-        #[allow(unreachable_patterns)]
+            .map(|candidate| SessionConfigOptionValue::ValueId {
+                value: candidate.value.clone(),
+            }),
+        SessionConfigKind::Boolean(_) => match requested_value {
+            "true" => Some(SessionConfigOptionValue::Boolean { value: true }),
+            "false" => Some(SessionConfigOptionValue::Boolean { value: false }),
+            _ => None,
+        },
         _ => None,
     }
 }
@@ -254,7 +261,7 @@ fn grouped_options(
     group.options.iter()
 }
 
-fn session_config_category_name(category: &SessionConfigOptionCategory) -> &str {
+pub(super) fn session_config_category_name(category: &SessionConfigOptionCategory) -> &str {
     match category {
         SessionConfigOptionCategory::Mode => "mode",
         SessionConfigOptionCategory::Model => "model",
@@ -269,17 +276,18 @@ async fn send_set_config_option(
     connection: &ConnectionTo<Agent>,
     session_id: &SessionId,
     option: &SessionConfigOption,
-    value: &SessionConfigValueId,
+    value: SessionConfigOptionValue,
 ) -> AcpResult<()> {
     let _guard = supervisor.enter_pending_request_with_reason(Some("session/set_config_option"));
-    connection
+    let response = connection
         .send_request(SetSessionConfigOptionRequest::new(
             session_id.clone(),
             option.id.clone(),
-            value.clone(),
+            value,
         ))
         .block_task()
         .await?;
+    super::session_state::record_config_snapshot(supervisor, &response);
     Ok(())
 }
 
@@ -297,9 +305,8 @@ async fn apply_session_model_configuration(
 ) -> AcpResult<()> {
     let selector = AcpSessionConfigOptionBinding::default();
     if let Some(option) = find_config_option(config_options, &selector, Some("model")) {
-        if let Some(value) = select_config_value(option, model) {
-            return send_set_config_option(supervisor, connection, session_id, option, value)
-                .await;
+        if let Some(value) = config_request_value(option, model) {
+            return send_set_config_option(supervisor, connection, session_id, option, value).await;
         }
         if !session_config.allow_custom_model {
             return Err(AcpError::new(
@@ -340,4 +347,54 @@ fn trimmed_owned(value: Option<&str>) -> Option<String> {
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(ToOwned::to_owned)
+}
+
+#[cfg(test)]
+mod tests {
+    use agent_client_protocol::schema::v1::{SessionConfigBoolean, SessionConfigSelectOption};
+
+    use super::*;
+
+    fn select_option() -> SessionConfigOption {
+        SessionConfigOption::select(
+            "effort",
+            "Effort",
+            "medium",
+            vec![
+                SessionConfigSelectOption::new("low", "Low"),
+                SessionConfigSelectOption::new("medium", "Medium"),
+            ],
+        )
+    }
+
+    fn boolean_option() -> SessionConfigOption {
+        SessionConfigOption::new(
+            "web_search",
+            "Web search",
+            SessionConfigKind::Boolean(SessionConfigBoolean::new(false)),
+        )
+    }
+
+    #[test]
+    fn config_request_value_resolves_select_value_id() {
+        let value = config_request_value(&select_option(), "low");
+        let Some(SessionConfigOptionValue::ValueId { value }) = value else {
+            panic!("expected select value id, got {value:?}");
+        };
+        assert_eq!(value.0.as_ref(), "low");
+        assert_eq!(config_request_value(&select_option(), "unknown"), None);
+    }
+
+    #[test]
+    fn config_request_value_resolves_boolean_values() {
+        assert_eq!(
+            config_request_value(&boolean_option(), "true"),
+            Some(SessionConfigOptionValue::Boolean { value: true })
+        );
+        assert_eq!(
+            config_request_value(&boolean_option(), "false"),
+            Some(SessionConfigOptionValue::Boolean { value: false })
+        );
+        assert_eq!(config_request_value(&boolean_option(), "maybe"), None);
+    }
 }

@@ -4,6 +4,7 @@ use std::sync::Arc;
 use agent_client_protocol::schema::v1::{NewSessionResponse, SessionId};
 use agent_client_protocol::{Agent, ConnectionTo, Error as AcpError, Result as AcpResult};
 
+use super::handshake::handshake_from_initialize;
 use super::session_guard::{RouteTarget, SessionRouteGuard};
 use super::{AcpAgentManagerHandle, AcpSessionSupervisor, send_initialize, send_new_session};
 use crate::errors::CliError;
@@ -56,8 +57,10 @@ async fn initialize_runtime_session(
     project_dir: PathBuf,
 ) -> AcpResult<InitializedRuntimeSession> {
     let initialize_timeout = supervisor.config().initialize_timeout;
-    send_initialize(supervisor, connection, initialize_timeout).await?;
+    let initialize_response = send_initialize(supervisor, connection, initialize_timeout).await?;
+    supervisor.record_handshake(handshake_from_initialize(&initialize_response));
     let response = send_new_session(supervisor, connection, project_dir).await?;
+    super::session_state::seed_from_new_session(supervisor, &response);
     Ok(InitializedRuntimeSession {
         session_id: response.session_id.clone(),
         response,

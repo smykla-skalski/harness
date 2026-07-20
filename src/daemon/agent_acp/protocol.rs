@@ -6,8 +6,8 @@ use std::time::Duration;
 
 use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::schema::v1::{
-    CancelNotification, ContentBlock, CreateTerminalRequest, InitializeRequest,
-    KillTerminalRequest, NewSessionRequest, NewSessionResponse, PromptRequest,
+    CancelNotification, ContentBlock, CreateTerminalRequest, Implementation, InitializeRequest,
+    InitializeResponse, KillTerminalRequest, NewSessionRequest, NewSessionResponse, PromptRequest,
     ReadTextFileRequest, ReleaseTerminalRequest, RequestPermissionRequest, SessionId,
     SessionNotification, TerminalOutputRequest, TextContent, WaitForTerminalExitRequest,
     WriteTextFileRequest,
@@ -37,13 +37,16 @@ use super::manager::{AcpAgentManagerHandle, AcpAgentStartRequest};
 use super::spawn_credential::{SpawnCredential, release_after_initialization};
 mod commands;
 mod context;
+mod handshake;
 mod runtime_helpers;
 mod session_config;
 mod session_guard;
 mod session_start;
+mod session_state;
 pub(super) use commands::AcpProtocolHandle;
 use commands::{ProtocolCommand, run_protocol_command_loop};
 use context::{ProtocolContext, handle_permission_request, respond_client_result};
+use handshake::harness_client_capabilities;
 pub(super) use session_config::AcpSessionRequestConfig;
 use session_config::{advertised_session_configuration, apply_requested_session_configuration};
 use session_guard::SessionRouteGuard;
@@ -211,6 +214,7 @@ async fn run_protocol(args: RunProtocolArgs) {
     let session_guard = Arc::new(SessionRouteGuard::default());
     let context = ProtocolContext::new(client, Arc::clone(&supervisor), Arc::clone(&session_guard));
     let notification_guard = Arc::clone(&session_guard);
+    let notification_supervisor = Arc::clone(&supervisor);
     let read_context = context.clone();
     let write_context = context.clone();
     let create_terminal_context = context.clone();
@@ -224,7 +228,13 @@ async fn run_protocol(args: RunProtocolArgs) {
         .name("harness")
         .on_receive_notification(
             async move |notification: SessionNotification, _connection| {
-                route_session_notification(&notification_guard, &notifications, notification).await
+                route_session_notification(
+                    &notification_guard,
+                    &notification_supervisor,
+                    &notifications,
+                    notification,
+                )
+                .await
             },
             agent_client_protocol::on_receive_notification!(),
         )
@@ -430,17 +440,17 @@ async fn send_initialize(
     supervisor: &AcpSessionSupervisor,
     connection: &ConnectionTo<Agent>,
     initialize_timeout: Duration,
-) -> AcpResult<()> {
+) -> AcpResult<InitializeResponse> {
     let _guard = supervisor.enter_pending_request_with_reason(Some("session/initialize"));
+    let request = InitializeRequest::new(ProtocolVersion::V1)
+        .client_capabilities(harness_client_capabilities())
+        .client_info(Implementation::new("harness", env!("CARGO_PKG_VERSION")));
     timeout(
         initialize_timeout,
-        connection
-            .send_request(InitializeRequest::new(ProtocolVersion::V1))
-            .block_task(),
+        connection.send_request(request).block_task(),
     )
     .await
-    .map_err(|_| deadline_error("session/initialize", initialize_timeout))??;
-    Ok(())
+    .map_err(|_| deadline_error("session/initialize", initialize_timeout))?
 }
 
 async fn send_new_session(
