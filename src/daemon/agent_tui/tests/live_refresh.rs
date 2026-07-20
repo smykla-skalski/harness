@@ -248,6 +248,7 @@ fn manager_list_prioritizes_leader_tui_over_worker_refresh_order() {
             current_task_id: None,
             runtime_capabilities: crate::agents::runtime::RuntimeCapabilities::default(),
             persona: None,
+            runtime_session_title: None,
         },
     );
     db.sync_session(&project.project_id, &state)

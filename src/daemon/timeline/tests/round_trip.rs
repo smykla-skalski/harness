@@ -138,6 +138,7 @@ fn conversation_entry_emits_assistant_text_rows() {
         sequence: 3,
         kind: ConversationEventKind::AssistantText {
             content: "  Here is the latest status.  ".into(),
+            message_id: None,
         },
         agent: "codex-worker".into(),
         session_id: "sess-conversation".into(),
@@ -159,12 +160,101 @@ fn conversation_entry_emits_assistant_text_rows() {
 }
 
 #[test]
+fn conversation_entry_calls_out_refusal_turns() {
+    let event = ConversationEvent {
+        timestamp: Some("2026-03-28T14:07:00Z".into()),
+        sequence: 6,
+        kind: ConversationEventKind::TurnEnded {
+            stop_reason: "refusal".into(),
+        },
+        agent: "codex-worker".into(),
+        session_id: "sess-conversation".into(),
+    };
+
+    let entry = conversation_entry(
+        "sess-conversation",
+        "codex-worker",
+        "codex",
+        &event,
+        TimelinePayloadScope::Full,
+    )
+    .expect("conversation entry converts")
+    .expect("turn ended emitted");
+
+    assert_eq!(entry.kind, "agent_turn_ended");
+    assert_eq!(entry.summary, "codex-worker refused to continue the turn");
+    assert_eq!(entry.payload["event"]["type"], "turn_ended");
+}
+
+#[test]
+fn conversation_entry_emits_context_usage_rows() {
+    let event = ConversationEvent {
+        timestamp: Some("2026-03-28T14:06:00Z".into()),
+        sequence: 4,
+        kind: ConversationEventKind::ContextUsage {
+            used_tokens: 53_000,
+            context_window_tokens: 200_000,
+            cost_amount: Some(0.045),
+            cost_currency: Some("USD".into()),
+        },
+        agent: "codex-worker".into(),
+        session_id: "sess-conversation".into(),
+    };
+
+    let entry = conversation_entry(
+        "sess-conversation",
+        "codex-worker",
+        "codex",
+        &event,
+        TimelinePayloadScope::Full,
+    )
+    .expect("conversation entry converts")
+    .expect("context usage emitted");
+
+    assert_eq!(entry.kind, "agent_context_usage");
+    assert_eq!(
+        entry.summary,
+        "codex-worker used 53000 of 200000 context tokens (0.045 USD)"
+    );
+    assert_eq!(entry.payload["event"]["type"], "context_usage");
+}
+
+#[test]
+fn conversation_entry_context_usage_summary_omits_absent_cost() {
+    let event = ConversationEvent {
+        timestamp: Some("2026-03-28T14:06:10Z".into()),
+        sequence: 5,
+        kind: ConversationEventKind::ContextUsage {
+            used_tokens: 10,
+            context_window_tokens: 100,
+            cost_amount: None,
+            cost_currency: None,
+        },
+        agent: "codex-worker".into(),
+        session_id: "sess-conversation".into(),
+    };
+
+    let entry = conversation_entry(
+        "sess-conversation",
+        "codex-worker",
+        "codex",
+        &event,
+        TimelinePayloadScope::Full,
+    )
+    .expect("conversation entry converts")
+    .expect("context usage emitted");
+
+    assert_eq!(entry.summary, "codex-worker used 10 of 100 context tokens");
+}
+
+#[test]
 fn conversation_entry_emits_user_prompt_rows() {
     let event = ConversationEvent {
         timestamp: Some("2026-03-28T14:05:10Z".into()),
         sequence: 1,
         kind: ConversationEventKind::UserPrompt {
             content: "Ship the transcript fix".into(),
+            message_id: None,
         },
         agent: "codex-worker".into(),
         session_id: "sess-conversation".into(),

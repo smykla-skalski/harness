@@ -444,6 +444,7 @@ fn seed_sample_acp_transcript(state: &DaemonHttpState) {
             sequence: 7,
             kind: ConversationEventKind::AssistantText {
                 content: "ACP transcript line".into(),
+                message_id: None,
             },
             agent: "codex-worker".into(),
             session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),

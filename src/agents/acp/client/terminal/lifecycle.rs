@@ -14,7 +14,7 @@ use super::{
     SharedTerminalChild, SharedTerminalState, TerminalLifecycleWait, TerminalState,
     TerminalWaitSignal,
 };
-use crate::agents::acp::client::{ClientError, ClientResult};
+use crate::agents::acp::client::{ClientCallCancel, ClientError, ClientResult, REQUEST_CANCELLED};
 
 pub(super) fn spawn_exit_monitor(
     child: SharedTerminalChild,
@@ -68,6 +68,16 @@ pub(super) fn refresh_exit_status(state: &mut TerminalState) -> ClientResult<()>
 
 pub(super) fn wait_for_terminal_exit_state(
     state: &SharedTerminalState,
+    cancel: &ClientCallCancel,
+) -> ClientResult<TerminalExitStatus> {
+    let outcome = wait_for_terminal_exit_until_cancelled(state, cancel);
+    cancel.clear_wake();
+    outcome
+}
+
+fn wait_for_terminal_exit_until_cancelled(
+    state: &SharedTerminalState,
+    cancel: &ClientCallCancel,
 ) -> ClientResult<TerminalExitStatus> {
     loop {
         let (signal, remaining) = {
@@ -83,10 +93,20 @@ pub(super) fn wait_for_terminal_exit_state(
                     .saturating_sub(state.spawned_at.elapsed()),
             )
         };
-        match signal.wait_for_exit_or_error(remaining) {
+        // Re-registered per iteration because `on_cancel` holds one callback:
+        // the signal can differ across loops if the terminal was replaced.
+        let wake_signal = Arc::clone(&signal);
+        cancel.on_cancel(move || wake_signal.wake_waiters());
+        match signal.wait_for_exit_or_error(remaining, cancel) {
             TerminalLifecycleWait::Exit(exit_status) => return Ok(exit_status),
             TerminalLifecycleWait::LifecycleError(error) => {
                 return Err(ClientError::terminal_denied(error));
+            }
+            TerminalLifecycleWait::Cancelled => {
+                return Err(ClientError::new(
+                    REQUEST_CANCELLED,
+                    "terminal wait cancelled by the agent",
+                ));
             }
             TerminalLifecycleWait::TimedOut => {}
         }
@@ -139,9 +159,14 @@ pub(super) fn terminate_process_group(state: &TerminalState) {
 }
 
 fn wait_for_terminal_exit_signal(state: &TerminalState, timeout: Duration) -> bool {
-    match state.signal.wait_for_exit_or_error(timeout) {
+    // Terminal teardown is not agent-cancellable: it runs while the process
+    // group is being reaped, so it passes a token that is never tripped.
+    let cancel = ClientCallCancel::default();
+    match state.signal.wait_for_exit_or_error(timeout, &cancel) {
         TerminalLifecycleWait::Exit(_) => true,
-        TerminalLifecycleWait::LifecycleError(_) | TerminalLifecycleWait::TimedOut => false,
+        TerminalLifecycleWait::Cancelled
+        | TerminalLifecycleWait::LifecycleError(_)
+        | TerminalLifecycleWait::TimedOut => false,
     }
 }
 

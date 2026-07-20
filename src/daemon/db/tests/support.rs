@@ -122,6 +122,7 @@ pub(super) fn sample_session_state() -> SessionState {
             current_task_id: None,
             runtime_capabilities: RuntimeCapabilities::default(),
             persona: None,
+            runtime_session_title: None,
         },
     );
 
@@ -224,6 +225,7 @@ pub(super) fn sample_session_state_with_managed_agents() -> SessionState {
             current_task_id: None,
             runtime_capabilities: RuntimeCapabilities::default(),
             persona: None,
+            runtime_session_title: None,
         },
     );
     state.agents.insert(
@@ -243,6 +245,7 @@ pub(super) fn sample_session_state_with_managed_agents() -> SessionState {
             current_task_id: None,
             runtime_capabilities: RuntimeCapabilities::default(),
             persona: None,
+            runtime_session_title: None,
         },
     );
     state.agents.insert(
@@ -262,6 +265,7 @@ pub(super) fn sample_session_state_with_managed_agents() -> SessionState {
             current_task_id: None,
             runtime_capabilities: RuntimeCapabilities::default(),
             persona: None,
+            runtime_session_title: None,
         },
     );
     state.metrics = SessionMetrics::recalculate(&state);

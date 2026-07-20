@@ -27,6 +27,7 @@ pub(crate) fn sample_conversation_event(sequence: u64, content: &str) -> Convers
         sequence,
         kind: ConversationEventKind::AssistantText {
             content: content.to_string(),
+            message_id: None,
         },
         agent: "claude-leader".into(),
         session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
@@ -140,6 +141,7 @@ pub(crate) fn performance_session_state(
             current_task_id: Some(task_id.clone()),
             runtime_capabilities: RuntimeCapabilities::default(),
             persona: None,
+            runtime_session_title: None,
         },
     );
 

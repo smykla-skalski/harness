@@ -13,7 +13,7 @@ use tokio::runtime::Builder as TokioRuntimeBuilder;
 
 use crate::agents::acp::client::{
     HarnessAcpClient, PERMISSION_RUNTIME_UNSUPPORTED, PERMISSION_TIMEOUT, TERMINAL_DENIED,
-    WRITE_DENIED,
+    WRITE_DENIED, no_cancel,
 };
 use crate::agents::acp::permission::{
     PermissionBridgeRequest, PermissionMode, standard_permission_options,
@@ -67,7 +67,7 @@ fn daemon_bridge_write_waits_for_permission_before_writing() {
     let path = temp.path().join("artifacts/bridge-write.txt");
     let request = WriteTextFileRequest::new("test-session", &path, "hello");
 
-    let handle = thread::spawn(move || client.handle_write_text_file(&request));
+    let handle = thread::spawn(move || client.handle_write_text_file(&request, &no_cancel()));
     let permission = recv_permission(&mut rx);
     assert!(!path.exists(), "write must not happen before approval");
     let raw_input = permission
@@ -95,7 +95,7 @@ fn daemon_bridge_write_denial_returns_json_rpc_error_without_writing() {
     let path = temp.path().join("artifacts/bridge-denied.txt");
     let request = WriteTextFileRequest::new("test-session", &path, "hello");
 
-    let handle = thread::spawn(move || client.handle_write_text_file(&request));
+    let handle = thread::spawn(move || client.handle_write_text_file(&request, &no_cancel()));
     let permission = recv_permission(&mut rx);
     permission
         .response_tx
@@ -116,7 +116,7 @@ fn daemon_bridge_terminal_waits_for_permission_before_spawning() {
     let request = CreateTerminalRequest::new("test-session", "sh")
         .args(vec!["-c".to_string(), "printf approved".to_string()]);
 
-    let handle = thread::spawn(move || client.handle_create_terminal(&request));
+    let handle = thread::spawn(move || client.handle_create_terminal(&request, &no_cancel()));
     let permission = recv_permission(&mut rx);
     let raw_input = permission
         .request
@@ -143,7 +143,7 @@ fn daemon_bridge_terminal_denial_returns_json_rpc_error() {
     let request = CreateTerminalRequest::new("test-session", "sh")
         .args(vec!["-c".to_string(), "printf denied".to_string()]);
 
-    let handle = thread::spawn(move || client.handle_create_terminal(&request));
+    let handle = thread::spawn(move || client.handle_create_terminal(&request, &no_cancel()));
     let permission = recv_permission(&mut rx);
     permission
         .response_tx
@@ -162,7 +162,7 @@ fn daemon_bridge_request_permission_returns_selected_response() {
     let (_temp, client, mut rx) = setup_daemon_bridge_client(Duration::from_secs(1));
     let request = permission_request();
 
-    let handle = thread::spawn(move || client.handle_request_permission(&request));
+    let handle = thread::spawn(move || client.handle_request_permission(&request, &no_cancel()));
     let permission = recv_permission(&mut rx);
     permission
         .response_tx
@@ -185,7 +185,7 @@ fn daemon_bridge_request_permission_times_out_when_bridge_never_replies() {
     let (_temp, client, mut rx) = setup_daemon_bridge_client(Duration::from_millis(20));
     let request = permission_request();
 
-    let handle = thread::spawn(move || client.handle_request_permission(&request));
+    let handle = thread::spawn(move || client.handle_request_permission(&request, &no_cancel()));
     let permission = recv_permission(&mut rx);
     thread::sleep(Duration::from_millis(40));
     drop(permission);
@@ -220,7 +220,7 @@ fn daemon_bridge_request_permission_returns_selected_response_inside_tokio_multi
         });
 
         let response = client
-            .handle_request_permission(&request)
+            .handle_request_permission(&request, &no_cancel())
             .expect("permission approved");
         resolver.await.expect("resolver task");
         assert!(matches!(
@@ -252,7 +252,7 @@ fn daemon_bridge_request_permission_times_out_inside_tokio_multi_thread_runtime(
         });
 
         let error = client
-            .handle_request_permission(&request)
+            .handle_request_permission(&request, &no_cancel())
             .expect_err("permission should time out");
         delayed_drop.await.expect("delayed drop task");
         assert_eq!(error.code, PERMISSION_TIMEOUT);
@@ -274,7 +274,7 @@ fn daemon_bridge_request_permission_rejects_tokio_current_thread_runtime() {
         let request = permission_request();
 
         let error = client
-            .handle_request_permission(&request)
+            .handle_request_permission(&request, &no_cancel())
             .expect_err("current-thread runtime should be rejected");
         assert_eq!(error.code, PERMISSION_RUNTIME_UNSUPPORTED);
         assert!(
@@ -300,7 +300,7 @@ fn daemon_bridge_write_preserves_runtime_unsupported_inside_tokio_current_thread
         let request = WriteTextFileRequest::new("test-session", &path, "hello");
 
         let error = client
-            .handle_write_text_file(&request)
+            .handle_write_text_file(&request, &no_cancel())
             .expect_err("current-thread runtime should be rejected");
         assert_eq!(error.code, PERMISSION_RUNTIME_UNSUPPORTED);
         assert!(
@@ -327,7 +327,7 @@ fn daemon_bridge_terminal_preserves_runtime_unsupported_inside_tokio_current_thr
             .args(vec!["-c".to_string(), "printf unsupported".to_string()]);
 
         let error = client
-            .handle_create_terminal(&request)
+            .handle_create_terminal(&request, &no_cancel())
             .expect_err("current-thread runtime should be rejected");
         assert_eq!(error.code, PERMISSION_RUNTIME_UNSUPPORTED);
         assert!(

@@ -11,7 +11,7 @@ use agent_client_protocol::schema::v1::{
 };
 use tempfile::TempDir;
 
-use crate::agents::acp::client::{HarnessAcpClient, TERMINAL_DENIED};
+use crate::agents::acp::client::{HarnessAcpClient, TERMINAL_DENIED, no_cancel};
 
 use super::{read_log, setup_client, setup_client_with_terminal_cap, setup_recording_client};
 
@@ -40,7 +40,7 @@ fn terminal_denied_binary_rejected() {
     let (_temp, client) = setup_client();
 
     let request = CreateTerminalRequest::new("test-session", "kubectl");
-    let result = client.handle_create_terminal(&request);
+    let result = client.handle_create_terminal(&request, &no_cancel());
 
     assert!(result.is_err());
     let err = result.unwrap_err();
@@ -53,7 +53,7 @@ fn recording_terminal_logs_denial_without_changing_runtime_decision() {
     let request = CreateTerminalRequest::new("session-1", "kubectl");
 
     let error = client
-        .handle_create_terminal(&request)
+        .handle_create_terminal(&request, &no_cancel())
         .expect_err("terminal denied");
 
     assert_eq!(error.code, TERMINAL_DENIED);
@@ -69,7 +69,7 @@ fn terminal_denied_binary_path_rejected_by_basename() {
     let (_temp, client) = setup_client();
 
     let request = CreateTerminalRequest::new("test-session", "/usr/local/bin/kubectl");
-    let result = client.handle_create_terminal(&request);
+    let result = client.handle_create_terminal(&request, &no_cancel());
 
     assert!(result.is_err());
     let err = result.unwrap_err();
@@ -89,14 +89,14 @@ fn terminal_denied_binary_rejected_through_common_wrappers() {
 
     assert_eq!(
         client
-            .handle_create_terminal(&shell)
+            .handle_create_terminal(&shell, &no_cancel())
             .expect_err("shell wrapper should be denied")
             .code,
         TERMINAL_DENIED
     );
     assert_eq!(
         client
-            .handle_create_terminal(&env)
+            .handle_create_terminal(&env, &no_cancel())
             .expect_err("env wrapper should be denied")
             .code,
         TERMINAL_DENIED
@@ -110,7 +110,7 @@ fn terminal_output_for_running_process_returns_promptly() {
     let create = CreateTerminalRequest::new("test-session", "sh")
         .args(vec!["-c".to_string(), "printf ready; sleep 2".to_string()]);
     let terminal = client
-        .handle_create_terminal(&create)
+        .handle_create_terminal(&create, &no_cancel())
         .expect("create terminal")
         .terminal_id;
 
@@ -140,15 +140,15 @@ fn terminal_wait_then_output_returns_exit_status_and_output() {
     let create = CreateTerminalRequest::new("test-session", "sh")
         .args(vec!["-c".to_string(), "printf hello".to_string()]);
     let terminal = client
-        .handle_create_terminal(&create)
+        .handle_create_terminal(&create, &no_cancel())
         .expect("create terminal")
         .terminal_id;
 
     let wait = client
-        .handle_wait_for_terminal_exit(&WaitForTerminalExitRequest::new(
-            "test-session",
-            terminal.clone(),
-        ))
+        .handle_wait_for_terminal_exit(
+            &WaitForTerminalExitRequest::new("test-session", terminal.clone()),
+            &no_cancel(),
+        )
         .expect("wait terminal");
     assert_eq!(wait.exit_status.exit_code, Some(0));
 
@@ -202,6 +202,7 @@ fn terminal_wait_on_one_terminal_does_not_block_output_for_another() {
         .handle_create_terminal(
             &CreateTerminalRequest::new("test-session", shell)
                 .args(vec!["-c".to_string(), gate_script]),
+            &no_cancel(),
         )
         .expect("create slow terminal")
         .terminal_id;
@@ -209,6 +210,7 @@ fn terminal_wait_on_one_terminal_does_not_block_output_for_another() {
         .handle_create_terminal(
             &CreateTerminalRequest::new("test-session", shell)
                 .args(vec!["-c".to_string(), "printf quick".to_string()]),
+            &no_cancel(),
         )
         .expect("create quick terminal")
         .terminal_id;
@@ -227,10 +229,10 @@ fn terminal_wait_on_one_terminal_does_not_block_output_for_another() {
     let wait_client = Arc::clone(&client);
     let wait_terminal = slow.clone();
     let wait_thread = thread::spawn(move || {
-        wait_client.handle_wait_for_terminal_exit(&WaitForTerminalExitRequest::new(
-            "test-session",
-            wait_terminal,
-        ))
+        wait_client.handle_wait_for_terminal_exit(
+            &WaitForTerminalExitRequest::new("test-session", wait_terminal),
+            &no_cancel(),
+        )
     });
     // Guaranteed release: from here on any early exit - a failed readiness or
     // ordering assertion, or normal completion - opens the gate on unwind so the
@@ -324,16 +326,17 @@ fn terminal_wait_returns_when_background_child_keeps_pty_open() {
         .handle_create_terminal(
             &CreateTerminalRequest::new("test-session", "sh")
                 .args(vec!["-c".to_string(), "sleep 1 & exit 0".to_string()]),
+            &no_cancel(),
         )
         .expect("create terminal")
         .terminal_id;
 
     let start = Instant::now();
     client
-        .handle_wait_for_terminal_exit(&WaitForTerminalExitRequest::new(
-            "test-session",
-            terminal.clone(),
-        ))
+        .handle_wait_for_terminal_exit(
+            &WaitForTerminalExitRequest::new("test-session", terminal.clone()),
+            &no_cancel(),
+        )
         .expect("wait terminal");
 
     assert!(
@@ -359,15 +362,16 @@ fn terminal_release_kills_background_child_that_ignores_sigterm() {
     let terminal = client
         .handle_create_terminal(
             &CreateTerminalRequest::new("test-session", "sh").args(vec!["-c".to_string(), script]),
+            &no_cancel(),
         )
         .expect("create terminal")
         .terminal_id;
 
     client
-        .handle_wait_for_terminal_exit(&WaitForTerminalExitRequest::new(
-            "test-session",
-            terminal.clone(),
-        ))
+        .handle_wait_for_terminal_exit(
+            &WaitForTerminalExitRequest::new("test-session", terminal.clone()),
+            &no_cancel(),
+        )
         .expect("wait terminal");
     client
         .handle_release_terminal(&ReleaseTerminalRequest::new("test-session", terminal))
@@ -386,12 +390,12 @@ fn terminal_cap_enforced() {
 
     let request = CreateTerminalRequest::new("test-session", "echo").args(vec!["1".to_string()]);
     let terminal = client
-        .handle_create_terminal(&request)
+        .handle_create_terminal(&request, &no_cancel())
         .expect("first terminal should succeed")
         .terminal_id;
 
     let request = CreateTerminalRequest::new("test-session", "echo").args(vec!["2".to_string()]);
-    let result = client.handle_create_terminal(&request);
+    let result = client.handle_create_terminal(&request, &no_cancel());
 
     assert!(result.is_err());
     let err = result.unwrap_err();

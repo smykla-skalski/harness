@@ -166,6 +166,7 @@ async fn spawn_event_forwarder_persists_live_acp_batches_to_db() {
             sequence: 1,
             kind: ConversationEventKind::AssistantText {
                 content: "hello from Gemini".into(),
+                message_id: None,
             },
             agent: "ignored".into(),
             session_id: "ignored".into(),
@@ -187,7 +188,7 @@ async fn spawn_event_forwarder_persists_live_acp_batches_to_db() {
         .load_conversation_events("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "gemini-worker")
         .expect("load persisted conversation events");
     assert_eq!(events.len(), 1);
-    let ConversationEventKind::AssistantText { content } = &events[0].kind else {
+    let ConversationEventKind::AssistantText { content, .. } = &events[0].kind else {
         panic!("expected assistant text event");
     };
     assert_eq!(content, "hello from Gemini");
@@ -226,6 +227,7 @@ fn sample_session_state() -> SessionState {
             current_task_id: None,
             runtime_capabilities: RuntimeCapabilities::default(),
             persona: None,
+            runtime_session_title: None,
         },
     );
 

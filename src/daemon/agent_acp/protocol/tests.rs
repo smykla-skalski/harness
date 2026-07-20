@@ -2,10 +2,12 @@ use super::*;
 use std::process::Command;
 use std::sync::{Arc, Mutex, OnceLock};
 
-use agent_client_protocol::Channel;
 use agent_client_protocol::schema::v1::{
-    ContentBlock, ContentChunk, SessionId, SessionUpdate, TextContent,
+    ContentBlock, ContentChunk, SessionId, SessionNotification, SessionUpdate, TextContent,
 };
+use agent_client_protocol::{Channel, Client};
+
+use super::runtime_helpers::route_session_notification;
 use tokio::sync::broadcast;
 
 use crate::agents::acp::catalog::{
@@ -20,7 +22,9 @@ use crate::session::service as session_service;
 use crate::session::types::{ManagedAgentRef, SessionRole};
 
 mod agents;
+mod cancellation_tests;
 mod connection_tests;
+mod telemetry_tests;
 
 use agents::{
     run_agent_recording_startup_config_order, run_agent_with_stale_notification,

@@ -363,6 +363,7 @@ mod tests {
             available_commands: vec!["review".into()],
             title: Some("Renamed".into()),
             updated_at: None,
+            last_stop_reason: Some("refusal".into()),
         });
         let value = serde_json::to_value(&snapshot).expect("serialize inspect snapshot");
         assert_eq!(value["handshake"]["protocol_version"], 1);

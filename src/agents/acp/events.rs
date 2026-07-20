@@ -13,10 +13,17 @@
 //! - `CurrentModeUpdate` — internal state, not conversation content
 //! - `ConfigOptionUpdate` — internal state, not conversation content
 //!
+//! Those three carry session state that the protocol layer taps separately in
+//! `daemon::agent_acp::protocol::session_state`, so dropping them here loses
+//! nothing. Any variant added by a future schema falls through to a `debug` log
+//! rather than being silently discarded.
+//!
 //! This means output sequence numbers may have gaps relative to input. Downstream
 //! consumers must not assume contiguous sequences.
 
-use agent_client_protocol::schema::v1::{ContentBlock, SessionUpdate, ToolCallStatus, ToolKind};
+use agent_client_protocol::schema::v1::{
+    ContentBlock, ContentChunk, SessionUpdate, ToolCallStatus, ToolKind,
+};
 use serde_json::Value;
 
 use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
@@ -61,15 +68,15 @@ pub fn materialise_one(
     sequence: u64,
 ) -> Option<ConversationEvent> {
     let kind = match update {
-        SessionUpdate::UserMessageChunk(chunk) => {
-            let content = extract_text_content(&chunk.content);
-            ConversationEventKind::UserPrompt { content }
-        }
+        SessionUpdate::UserMessageChunk(chunk) => ConversationEventKind::UserPrompt {
+            content: extract_text_content(&chunk.content),
+            message_id: chunk_message_id(chunk),
+        },
 
-        SessionUpdate::AgentMessageChunk(chunk) => {
-            let content = extract_text_content(&chunk.content);
-            ConversationEventKind::AssistantText { content }
-        }
+        SessionUpdate::AgentMessageChunk(chunk) => ConversationEventKind::AssistantText {
+            content: extract_text_content(&chunk.content),
+            message_id: chunk_message_id(chunk),
+        },
 
         SessionUpdate::AgentThoughtChunk(chunk) => {
             let content = extract_text_content(&chunk.content);
@@ -122,7 +129,22 @@ pub fn materialise_one(
             }
         }
 
-        _ => {
+        SessionUpdate::UsageUpdate(usage) => ConversationEventKind::ContextUsage {
+            used_tokens: usage.used,
+            context_window_tokens: usage.size,
+            cost_amount: usage.cost.as_ref().map(|cost| cost.amount),
+            cost_currency: usage.cost.as_ref().map(|cost| cost.currency.clone()),
+        },
+
+        SessionUpdate::AvailableCommandsUpdate(_)
+        | SessionUpdate::CurrentModeUpdate(_)
+        | SessionUpdate::ConfigOptionUpdate(_) => return None,
+
+        unknown => {
+            tracing::debug!(
+                update = ?std::mem::discriminant(unknown),
+                "skipping unhandled ACP session update variant"
+            );
             return None;
         }
     };
@@ -134,6 +156,13 @@ pub fn materialise_one(
         agent: agent.to_string(),
         session_id: session_id.to_string(),
     })
+}
+
+fn chunk_message_id(chunk: &ContentChunk) -> Option<String> {
+    chunk
+        .message_id
+        .as_ref()
+        .map(|message_id| message_id.0.to_string())
 }
 
 /// Extract text content from a content block.
@@ -178,8 +207,8 @@ fn tool_kind_to_str(kind: ToolKind) -> &'static str {
 mod tests {
     use super::*;
     use agent_client_protocol::schema::v1::{
-        ContentChunk, SessionId, SessionNotification, TextContent, ToolCall, ToolCallId,
-        ToolCallUpdate, ToolCallUpdateFields, ToolKind,
+        ContentChunk, Cost, MessageId, SessionId, SessionNotification, TextContent, ToolCall,
+        ToolCallId, ToolCallUpdate, ToolCallUpdateFields, ToolKind, UsageUpdate,
     };
 
     use crate::agents::acp::ring::RawSessionUpdate;
@@ -208,7 +237,7 @@ mod tests {
         assert_eq!(event.session_id, "sess1");
         assert_eq!(event.sequence, 0);
 
-        let ConversationEventKind::AssistantText { content } = &event.kind else {
+        let ConversationEventKind::AssistantText { content, .. } = &event.kind else {
             unreachable!("expected AssistantText, got {:?}", event.kind);
         };
         assert_eq!(content, "Hello, world!");
@@ -310,6 +339,125 @@ mod tests {
     fn materialise_skips_config_updates() {
         let update = SessionUpdate::ConfigOptionUpdate(
             agent_client_protocol::schema::v1::ConfigOptionUpdate::new(vec![]),
+        );
+        let raw = make_raw_update(update);
+
+        let (events, _) = materialise_batch(&[raw], "copilot", "sess1", 0);
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn materialise_usage_update() {
+        let update = SessionUpdate::UsageUpdate(
+            UsageUpdate::new(53_000, 200_000).cost(Cost::new(0.045, "USD")),
+        );
+        let raw = make_raw_update(update);
+
+        let (events, _) = materialise_batch(&[raw], "copilot", "sess1", 0);
+
+        assert_eq!(events.len(), 1);
+        let ConversationEventKind::ContextUsage {
+            used_tokens,
+            context_window_tokens,
+            cost_amount,
+            cost_currency,
+        } = &events[0].kind
+        else {
+            unreachable!("expected ContextUsage, got {:?}", events[0].kind);
+        };
+        assert_eq!(*used_tokens, 53_000);
+        assert_eq!(*context_window_tokens, 200_000);
+        assert_eq!(*cost_amount, Some(0.045));
+        assert_eq!(cost_currency.as_deref(), Some("USD"));
+    }
+
+    #[test]
+    fn materialise_usage_update_without_cost() {
+        let raw = make_raw_update(SessionUpdate::UsageUpdate(UsageUpdate::new(10, 100)));
+
+        let (events, _) = materialise_batch(&[raw], "copilot", "sess1", 0);
+
+        let ConversationEventKind::ContextUsage {
+            cost_amount,
+            cost_currency,
+            ..
+        } = &events[0].kind
+        else {
+            unreachable!("expected ContextUsage, got {:?}", events[0].kind);
+        };
+        assert!(cost_amount.is_none());
+        assert!(cost_currency.is_none());
+    }
+
+    #[test]
+    fn materialise_carries_message_id_on_agent_chunk() {
+        let chunk = ContentChunk::new(ContentBlock::Text(TextContent::new("part one")))
+            .message_id(MessageId::new("msg-7"));
+        let raw = make_raw_update(SessionUpdate::AgentMessageChunk(chunk));
+
+        let (events, _) = materialise_batch(&[raw], "copilot", "sess1", 0);
+
+        let ConversationEventKind::AssistantText {
+            content,
+            message_id,
+        } = &events[0].kind
+        else {
+            unreachable!("expected AssistantText, got {:?}", events[0].kind);
+        };
+        assert_eq!(content, "part one");
+        assert_eq!(message_id.as_deref(), Some("msg-7"));
+    }
+
+    #[test]
+    fn materialise_carries_message_id_on_user_chunk() {
+        let chunk = ContentChunk::new(ContentBlock::Text(TextContent::new("ask")))
+            .message_id(MessageId::new("msg-9"));
+        let raw = make_raw_update(SessionUpdate::UserMessageChunk(chunk));
+
+        let (events, _) = materialise_batch(&[raw], "copilot", "sess1", 0);
+
+        let ConversationEventKind::UserPrompt {
+            content,
+            message_id,
+        } = &events[0].kind
+        else {
+            unreachable!("expected UserPrompt, got {:?}", events[0].kind);
+        };
+        assert_eq!(content, "ask");
+        assert_eq!(message_id.as_deref(), Some("msg-9"));
+    }
+
+    #[test]
+    fn materialise_leaves_message_id_unset_when_agent_omits_it() {
+        let raw = make_raw_update(SessionUpdate::AgentMessageChunk(ContentChunk::new(
+            ContentBlock::Text(TextContent::new("no id")),
+        )));
+
+        let (events, _) = materialise_batch(&[raw], "copilot", "sess1", 0);
+
+        let ConversationEventKind::AssistantText { message_id, .. } = &events[0].kind else {
+            unreachable!("expected AssistantText, got {:?}", events[0].kind);
+        };
+        assert!(message_id.is_none());
+    }
+
+    #[test]
+    fn materialise_skips_available_commands_update() {
+        let update = SessionUpdate::AvailableCommandsUpdate(
+            agent_client_protocol::schema::v1::AvailableCommandsUpdate::new(vec![]),
+        );
+        let raw = make_raw_update(update);
+
+        let (events, _) = materialise_batch(&[raw], "copilot", "sess1", 0);
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn materialise_skips_current_mode_update() {
+        let update = SessionUpdate::CurrentModeUpdate(
+            agent_client_protocol::schema::v1::CurrentModeUpdate::new(
+                agent_client_protocol::schema::v1::SessionModeId::new("plan"),
+            ),
         );
         let raw = make_raw_update(update);
 

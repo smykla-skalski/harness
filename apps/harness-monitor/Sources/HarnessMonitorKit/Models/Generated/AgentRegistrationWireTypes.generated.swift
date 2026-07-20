@@ -21,8 +21,9 @@ public struct AgentRegistrationWire: Codable, Equatable, Sendable {
   public var currentTaskId: String?
   public var runtimeCapabilities: RuntimeCapabilitiesWire
   public var persona: AgentPersonaWire?
+  public var runtimeSessionTitle: String?
 
-  public init(sessionAgentId: String, name: String, runtime: JSONValue, descriptorId: String? = nil, role: SessionRole, capabilities: [String] = [], joinedAt: String, updatedAt: String, status: AgentStatus, runtimeSessionId: String? = nil, managedAgentId: String? = nil, managedAgentFamily: ManagedAgentKind? = nil, lastActivityAt: String? = nil, currentTaskId: String? = nil, runtimeCapabilities: RuntimeCapabilitiesWire = RuntimeCapabilitiesWire(), persona: AgentPersonaWire? = nil) {
+  public init(sessionAgentId: String, name: String, runtime: JSONValue, descriptorId: String? = nil, role: SessionRole, capabilities: [String] = [], joinedAt: String, updatedAt: String, status: AgentStatus, runtimeSessionId: String? = nil, managedAgentId: String? = nil, managedAgentFamily: ManagedAgentKind? = nil, lastActivityAt: String? = nil, currentTaskId: String? = nil, runtimeCapabilities: RuntimeCapabilitiesWire = RuntimeCapabilitiesWire(), persona: AgentPersonaWire? = nil, runtimeSessionTitle: String? = nil) {
     self.sessionAgentId = sessionAgentId
     self.name = name
     self.runtime = runtime
@@ -39,6 +40,7 @@ public struct AgentRegistrationWire: Codable, Equatable, Sendable {
     self.currentTaskId = currentTaskId
     self.runtimeCapabilities = runtimeCapabilities
     self.persona = persona
+    self.runtimeSessionTitle = runtimeSessionTitle
   }
 
   public init(from decoder: Decoder) throws {
@@ -59,6 +61,7 @@ public struct AgentRegistrationWire: Codable, Equatable, Sendable {
     currentTaskId = try container.decodeIfPresent(String.self, forKey: .currentTaskId)
     runtimeCapabilities = try container.decodeIfPresent(RuntimeCapabilitiesWire.self, forKey: .runtimeCapabilities) ?? RuntimeCapabilitiesWire()
     persona = try container.decodeIfPresent(AgentPersonaWire.self, forKey: .persona)
+    runtimeSessionTitle = try container.decodeIfPresent(String.self, forKey: .runtimeSessionTitle)
   }
 
   enum CodingKeys: String, CodingKey {
@@ -78,6 +81,7 @@ public struct AgentRegistrationWire: Codable, Equatable, Sendable {
     case currentTaskId = "current_task_id"
     case runtimeCapabilities = "runtime_capabilities"
     case persona
+    case runtimeSessionTitle = "runtime_session_title"
   }
 }
 

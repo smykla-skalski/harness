@@ -10,7 +10,7 @@ use agent_client_protocol::schema::v1::{
 
 use super::output::{append_with_limit, wait_for_output_drain};
 use super::{TerminalLifecycleWait, TerminalManager, TerminalOutputState, TerminalWaitSignal};
-use crate::agents::acp::client::TERMINAL_DENIED;
+use crate::agents::acp::client::{ClientCallCancel, TERMINAL_DENIED, no_cancel};
 use crate::agents::policy::DeniedBinaries;
 
 #[track_caller]
@@ -162,7 +162,7 @@ fn wait_for_exit_or_error_is_level_triggered_after_pre_wait_exit() {
     signal.finish_exit(expected.clone());
 
     let start = Instant::now();
-    let outcome = signal.wait_for_exit_or_error(Duration::from_secs(1));
+    let outcome = signal.wait_for_exit_or_error(Duration::from_secs(1), &no_cancel());
 
     assert!(
         start.elapsed() < Duration::from_millis(100),
@@ -173,10 +173,38 @@ fn wait_for_exit_or_error_is_level_triggered_after_pre_wait_exit() {
         TerminalLifecycleWait::LifecycleError(error) => {
             unreachable!("expected exit status, got lifecycle error: {error}")
         }
+        TerminalLifecycleWait::Cancelled => unreachable!("expected exit status, got cancellation"),
         TerminalLifecycleWait::TimedOut => {
             unreachable!("expected exit status, got timeout")
         }
     }
+}
+
+#[test]
+fn wait_for_exit_or_error_unblocks_on_cancel() {
+    let signal = Arc::new(TerminalWaitSignal::new());
+    let cancel = ClientCallCancel::default();
+    let waker = Arc::clone(&signal);
+    cancel.on_cancel(move || waker.wake_waiters());
+    let waiting_signal = Arc::clone(&signal);
+    let waiting_cancel = cancel.clone();
+
+    let start = Instant::now();
+    let waiter = thread::spawn(move || {
+        waiting_signal.wait_for_exit_or_error(Duration::from_secs(30), &waiting_cancel)
+    });
+    thread::sleep(Duration::from_millis(50));
+    cancel.cancel();
+
+    let outcome = waiter.join().expect("wait thread");
+    assert!(
+        start.elapsed() < Duration::from_secs(5),
+        "cancel must unblock the wait well before its own timeout"
+    );
+    assert!(
+        matches!(outcome, TerminalLifecycleWait::Cancelled),
+        "expected cancellation outcome"
+    );
 }
 
 #[test]
@@ -196,8 +224,10 @@ fn terminal_wait_on_same_terminal_does_not_block_output_or_kill() {
     let wait_manager = Arc::clone(&manager);
     let wait_terminal = terminal_id.clone();
     let wait_thread = thread::spawn(move || {
-        wait_manager
-            .handle_wait_for_exit(&WaitForTerminalExitRequest::new("session-1", wait_terminal))
+        wait_manager.handle_wait_for_exit(
+            &WaitForTerminalExitRequest::new("session-1", wait_terminal),
+            &no_cancel(),
+        )
     });
 
     thread::sleep(Duration::from_millis(100));

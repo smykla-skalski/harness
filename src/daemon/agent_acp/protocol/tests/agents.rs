@@ -162,6 +162,41 @@ pub(super) async fn run_agent_recording_initialize_contract(
         .await
 }
 
+pub(super) async fn run_agent_refusing_prompt(
+    transport: Channel,
+) -> agent_client_protocol::Result<()> {
+    Agent
+        .builder()
+        .name("refusing-agent")
+        .on_receive_request(
+            async move |initialize: InitializeRequest, responder, _connection| {
+                responder.respond(
+                    InitializeResponse::new(initialize.protocol_version)
+                        .agent_capabilities(AgentCapabilities::new()),
+                )
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |_request: NewSessionRequest, responder, _connection| {
+                responder.respond(NewSessionResponse::new("acp-session-1"))
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |_request: PromptRequest, responder, _connection| {
+                responder.respond(PromptResponse::new(StopReason::Refusal))
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_notification(
+            async move |_cancel: CancelNotification, _connection| Ok(()),
+            agent_client_protocol::on_receive_notification!(),
+        )
+        .connect_to(transport)
+        .await
+}
+
 fn boolean_config_option(current_value: bool) -> SessionConfigOption {
     SessionConfigOption::new(
         "web_search",

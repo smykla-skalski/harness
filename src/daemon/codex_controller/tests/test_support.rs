@@ -241,6 +241,7 @@ pub(super) fn sample_session_state_with_codex_agent(status: AgentStatus) -> Sess
             current_task_id: None,
             runtime_capabilities: Default::default(),
             persona: None,
+            runtime_session_title: None,
         },
     );
     state.status = SessionStatus::Active;

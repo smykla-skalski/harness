@@ -31,6 +31,7 @@ pub(super) fn agent_registration(
         current_task_id: None,
         runtime_capabilities: RuntimeCapabilities::default(),
         persona: None,
+        runtime_session_title: None,
     }
 }
 

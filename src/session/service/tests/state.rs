@@ -90,6 +90,54 @@ fn apply_join_session_different_markers_create_distinct() {
 }
 
 #[test]
+fn record_runtime_session_title_stores_and_deduplicates() {
+    let now = "2026-04-12T00:00:00Z";
+    let managed_agent = crate::session::types::ManagedAgentRef::acp("acp-1");
+    let mut state = build_new_session("test", "test", "s-title", "claude", None, now);
+    let agent_id = apply_join_session(
+        &mut state,
+        "acp worker",
+        "codex",
+        SessionRole::Worker,
+        &[],
+        None,
+        now,
+        None,
+        Some(managed_agent.clone()),
+    )
+    .expect("join worker");
+
+    assert!(super::super::apply_record_runtime_session_title(
+        &mut state,
+        &managed_agent,
+        "Fix the flaky test",
+        now,
+    ));
+    assert_eq!(
+        state.agents[&agent_id].runtime_session_title.as_deref(),
+        Some("Fix the flaky test")
+    );
+    assert!(
+        !super::super::apply_record_runtime_session_title(
+            &mut state,
+            &managed_agent,
+            "Fix the flaky test",
+            now,
+        ),
+        "an unchanged title should not report a state change"
+    );
+    assert!(
+        !super::super::apply_record_runtime_session_title(
+            &mut state,
+            &crate::session::types::ManagedAgentRef::acp("acp-missing"),
+            "Other",
+            now,
+        ),
+        "an unknown managed agent should not report a state change"
+    );
+}
+
+#[test]
 fn register_runtime_session_preserves_identity_classes() {
     let now = "2026-04-12T00:00:00Z";
     let managed_agent = crate::session::types::ManagedAgentRef::tui("tui-123");

@@ -134,6 +134,34 @@ impl AcpManagerPort for DaemonAcpManagerPort {
             })?
     }
 
+    fn record_runtime_session_title(
+        &self,
+        session_id: &str,
+        acp_id: &str,
+        title: &str,
+    ) -> Result<bool, CliError> {
+        let db = self.db()?;
+        let db = Self::lock_db(&db)?;
+        let Some(mut state) = db.load_session_state_for_mutation(session_id)? else {
+            return Ok(false);
+        };
+        if !orchestration_service::apply_record_runtime_session_title(
+            &mut state,
+            &ManagedAgentRef::acp(acp_id),
+            title,
+            &utc_now(),
+        ) {
+            return Ok(false);
+        }
+        let project_id = db
+            .project_id_for_session(session_id)?
+            .ok_or_else(|| service::session_not_found(session_id))?;
+        db.save_session_state(&project_id, &state)?;
+        db.bump_change(session_id)?;
+        db.bump_change("global")?;
+        Ok(true)
+    }
+
     fn rollback_registration(
         &self,
         session_id: &str,

@@ -239,6 +239,7 @@ async fn load_session_acp_transcript_entries_includes_managed_native_runtime_row
                     sequence: 7,
                     kind: ConversationEventKind::AssistantText {
                         content: "Gemini transcript line".into(),
+                        message_id: None,
                     },
                     agent: "claude-leader".into(),
                     session_id: state.session_id.clone(),

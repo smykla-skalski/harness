@@ -357,6 +357,11 @@ async fn run_connection_applies_boolean_config_option() {
     let session_guard = Arc::new(SessionRouteGuard::default());
     let notification_guard = Arc::clone(&session_guard);
     let notification_supervisor = Arc::clone(&supervisor);
+    let notification_manager = protocol_manager(
+        "fake",
+        "agent-acp-1",
+        "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e",
+    );
     let (routed_tx, _routed_rx) = mpsc::channel(8);
 
     let protocol_task = tokio::spawn(async move {
@@ -368,6 +373,7 @@ async fn run_connection_applies_boolean_config_option() {
                     route_session_notification(
                         &notification_guard,
                         &notification_supervisor,
+                        &notification_manager,
                         &routed_tx,
                         notification,
                     )

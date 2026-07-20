@@ -33,6 +33,7 @@ fn agent(id: &str, persona_identifier: Option<&str>) -> AgentRegistration {
         current_task_id: None,
         runtime_capabilities: Default::default(),
         persona: persona_identifier.map(persona_for),
+        runtime_session_title: None,
     }
 }
 

@@ -207,6 +207,7 @@ fn sample_state_for_runtime(
             current_task_id: Some("task-1".into()),
             runtime_capabilities: RuntimeCapabilities::default(),
             persona: None,
+            runtime_session_title: None,
         },
     );
 

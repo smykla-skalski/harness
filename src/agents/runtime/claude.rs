@@ -126,9 +126,11 @@ pub(crate) fn parse_common_jsonl(raw_line: &str, agent: &str) -> Option<Conversa
         match role {
             "user" => ConversationEventKind::UserPrompt {
                 content: text.to_string(),
+                message_id: None,
             },
             _ => ConversationEventKind::AssistantText {
                 content: text.to_string(),
+                message_id: None,
             },
         }
     } else {
@@ -151,8 +153,14 @@ fn parse_first_block(blocks: &[serde_json::Value], role: &str) -> Option<Convers
         "text" => {
             let text = block.get("text")?.as_str()?.to_string();
             Some(match role {
-                "user" => ConversationEventKind::UserPrompt { content: text },
-                _ => ConversationEventKind::AssistantText { content: text },
+                "user" => ConversationEventKind::UserPrompt {
+                    content: text,
+                    message_id: None,
+                },
+                _ => ConversationEventKind::AssistantText {
+                    content: text,
+                    message_id: None,
+                },
             })
         }
         "tool_use" => Some(ConversationEventKind::ToolInvocation {

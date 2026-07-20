@@ -113,6 +113,11 @@ pub struct AgentRegistration {
     /// Optional persona assigned at agent join time.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub persona: Option<AgentPersona>,
+    /// Title the runtime reports for its own session, when it sends one. This
+    /// is the agent's name for the conversation and never replaces the
+    /// user-owned session title.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime_session_title: Option<String>,
 }
 
 impl AgentRegistration {

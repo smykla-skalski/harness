@@ -6,14 +6,11 @@ use std::time::Duration;
 
 use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::schema::v1::{
-    CancelNotification, ContentBlock, CreateTerminalRequest, Implementation, InitializeRequest,
-    InitializeResponse, KillTerminalRequest, NewSessionRequest, NewSessionResponse, PromptRequest,
-    ReadTextFileRequest, ReleaseTerminalRequest, RequestPermissionRequest, SessionId,
-    SessionNotification, TerminalOutputRequest, TextContent, WaitForTerminalExitRequest,
-    WriteTextFileRequest,
+    CancelNotification, ContentBlock, Implementation, InitializeRequest, InitializeResponse,
+    NewSessionRequest, NewSessionResponse, PromptRequest, SessionId, TextContent,
 };
 use agent_client_protocol::{
-    Agent, ByteStreams, Client, ConnectionTo, Error as AcpError, ErrorCode, Result as AcpResult,
+    Agent, ByteStreams, ConnectionTo, Error as AcpError, ErrorCode, Result as AcpResult,
 };
 use tokio::process::{ChildStdin, ChildStdout};
 use tokio::sync::{mpsc, oneshot};
@@ -22,7 +19,8 @@ use tokio::time::sleep;
 use tokio::time::timeout;
 use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
-use self::runtime_helpers::{report_protocol_result, route_session_notification};
+use self::handlers::{ClientHandlers, connect_with_client_handlers};
+use self::runtime_helpers::report_protocol_result;
 use self::session_start::initialize_and_bind_runtime_session;
 use crate::agents::acp::batcher::{RoutedSessionNotification, spawn_notification_batcher};
 use crate::agents::acp::client::HarnessAcpClient;
@@ -37,6 +35,7 @@ use super::manager::{AcpAgentManagerHandle, AcpAgentStartRequest};
 use super::spawn_credential::{SpawnCredential, release_after_initialization};
 mod commands;
 mod context;
+mod handlers;
 mod handshake;
 mod runtime_helpers;
 mod session_config;
@@ -45,7 +44,7 @@ mod session_start;
 mod session_state;
 pub(super) use commands::AcpProtocolHandle;
 use commands::{ProtocolCommand, run_protocol_command_loop};
-use context::{ProtocolContext, handle_permission_request, respond_client_result};
+use context::ProtocolContext;
 use handshake::harness_client_capabilities;
 pub(super) use session_config::AcpSessionRequestConfig;
 use session_config::{advertised_session_configuration, apply_requested_session_configuration};
@@ -182,10 +181,6 @@ struct RunProtocolArgs {
     credential: Option<SpawnCredential>,
 }
 
-#[expect(
-    clippy::too_many_lines,
-    reason = "ACP protocol builder keeps all request routing in one registration table"
-)]
 async fn run_protocol(args: RunProtocolArgs) {
     let RunProtocolArgs {
         stdin,
@@ -213,126 +208,33 @@ async fn run_protocol(args: RunProtocolArgs) {
     let transport = ByteStreams::new(stdin.compat_write(), stdout.compat());
     let session_guard = Arc::new(SessionRouteGuard::default());
     let context = ProtocolContext::new(client, Arc::clone(&supervisor), Arc::clone(&session_guard));
-    let notification_guard = Arc::clone(&session_guard);
-    let notification_supervisor = Arc::clone(&supervisor);
-    let read_context = context.clone();
-    let write_context = context.clone();
-    let create_terminal_context = context.clone();
-    let terminal_output_context = context.clone();
-    let release_terminal_context = context.clone();
-    let wait_terminal_context = context.clone();
-    let kill_terminal_context = context.clone();
-    let permission_context = context;
-    let result = Client
-        .builder()
-        .name("harness")
-        .on_receive_notification(
-            async move |notification: SessionNotification, _connection| {
-                route_session_notification(
-                    &notification_guard,
-                    &notification_supervisor,
-                    &notifications,
-                    notification,
-                )
-                .await
-            },
-            agent_client_protocol::on_receive_notification!(),
-        )
-        .on_receive_request(
-            async move |request: ReadTextFileRequest, responder, _connection| {
-                respond_client_result(
-                    responder,
-                    read_context.clone().read_text_file(request).await,
-                )
-            },
-            agent_client_protocol::on_receive_request!(),
-        )
-        .on_receive_request(
-            async move |request: WriteTextFileRequest, responder, _connection| {
-                respond_client_result(
-                    responder,
-                    write_context.clone().write_text_file(request).await,
-                )
-            },
-            agent_client_protocol::on_receive_request!(),
-        )
-        .on_receive_request(
-            async move |request: CreateTerminalRequest, responder, _connection| {
-                respond_client_result(
-                    responder,
-                    create_terminal_context
-                        .clone()
-                        .create_terminal(request)
-                        .await,
-                )
-            },
-            agent_client_protocol::on_receive_request!(),
-        )
-        .on_receive_request(
-            async move |request: TerminalOutputRequest, responder, _connection| {
-                respond_client_result(responder, terminal_output_context.terminal_output(&request))
-            },
-            agent_client_protocol::on_receive_request!(),
-        )
-        .on_receive_request(
-            async move |request: ReleaseTerminalRequest, responder, _connection| {
-                respond_client_result(
-                    responder,
-                    release_terminal_context
-                        .clone()
-                        .release_terminal(request)
-                        .await,
-                )
-            },
-            agent_client_protocol::on_receive_request!(),
-        )
-        .on_receive_request(
-            async move |request: WaitForTerminalExitRequest, responder, _connection| {
-                respond_client_result(
-                    responder,
-                    wait_terminal_context
-                        .clone()
-                        .wait_for_terminal_exit(request)
-                        .await,
-                )
-            },
-            agent_client_protocol::on_receive_request!(),
-        )
-        .on_receive_request(
-            async move |request: KillTerminalRequest, responder, _connection| {
-                respond_client_result(
-                    responder,
-                    kill_terminal_context.clone().kill_terminal(request).await,
-                )
-            },
-            agent_client_protocol::on_receive_request!(),
-        )
-        .on_receive_request(
-            async move |request: RequestPermissionRequest, responder, _connection| {
-                handle_permission_request(request, responder, permission_context.clone()).await
-            },
-            agent_client_protocol::on_receive_request!(),
-        )
-        .connect_with(transport, async move |connection| {
-            run_connection(RunConnectionArgs {
-                connection,
-                project_dir,
-                prompt,
-                session_config,
-                acp_id,
-                session_id,
-                runtime_name,
-                supervisor,
-                initial_prompt_lease,
-                cancel_rx,
-                command_rx,
-                session_guard,
-                manager,
-                credential,
-            })
-            .await
+    let handlers = ClientHandlers {
+        context,
+        session_guard: Arc::clone(&session_guard),
+        supervisor: Arc::clone(&supervisor),
+        manager: manager.clone(),
+        notifications,
+    };
+    let result = connect_with_client_handlers(transport, handlers, async move |connection| {
+        run_connection(RunConnectionArgs {
+            connection,
+            project_dir,
+            prompt,
+            session_config,
+            acp_id,
+            session_id,
+            runtime_name,
+            supervisor,
+            initial_prompt_lease,
+            cancel_rx,
+            command_rx,
+            session_guard,
+            manager,
+            credential,
         })
-        .await;
+        .await
+    })
+    .await;
     report_protocol_result(result, disconnect_tx).await;
 }
 
@@ -481,14 +383,16 @@ async fn send_prompt_or_cancel(
     let mut prompt = Box::pin(connection.send_request(request).block_task());
     tokio::select! {
         result = timeout(prompt_timeout, &mut prompt) => {
-            result.map_err(|_| deadline_error("session/prompt", prompt_timeout))??;
+            let response = result.map_err(|_| deadline_error("session/prompt", prompt_timeout))??;
+            session_state::record_stop_reason(supervisor, &response);
             Ok(false)
         }
         Some(()) = cancel_rx.recv() => {
             send_cancel_notification(connection, session_id)?;
-            timeout(prompt_timeout, prompt)
+            let response = timeout(prompt_timeout, prompt)
                 .await
                 .map_err(|_| deadline_error("session/prompt", prompt_timeout))??;
+            session_state::record_stop_reason(supervisor, &response);
             Ok(true)
         }
     }

@@ -4,19 +4,18 @@
 
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use agent_client_protocol::schema::v1::{
     CreateTerminalRequest, CreateTerminalResponse, KillTerminalRequest, KillTerminalResponse,
-    ReleaseTerminalRequest, ReleaseTerminalResponse, TerminalExitStatus, TerminalId,
-    TerminalOutputRequest, TerminalOutputResponse, WaitForTerminalExitRequest,
-    WaitForTerminalExitResponse,
+    ReleaseTerminalRequest, ReleaseTerminalResponse, TerminalId, TerminalOutputRequest,
+    TerminalOutputResponse, WaitForTerminalExitRequest, WaitForTerminalExitResponse,
 };
 use portable_pty::{Child as PtyChild, CommandBuilder, MasterPty, PtySize, native_pty_system};
 
-use super::{ClientError, ClientResult};
+use super::{ClientCallCancel, ClientError, ClientResult};
 use crate::agents::acp::supervision::MAX_TERMINAL_WALL_CLOCK;
 use crate::agents::policy::DeniedBinaries;
 
@@ -27,6 +26,7 @@ mod policy;
 mod tests;
 #[cfg(test)]
 mod wait_event;
+mod wait_signal;
 
 use lifecycle::{
     close_reader, refresh_exit_status, spawn_exit_monitor, terminate_process_group,
@@ -36,6 +36,7 @@ use output::spawn_output_reader;
 use policy::denied_binary_name;
 #[cfg(test)]
 use wait_event::WaitEventCounter;
+pub(super) use wait_signal::{TerminalLifecycleWait, TerminalWaitSignal};
 
 pub(super) struct TerminalOutputState {
     pub(super) output: Vec<u8>,
@@ -49,125 +50,6 @@ pub(super) type SharedTerminalState = Arc<Mutex<TerminalState>>;
 enum TerminalSlot {
     Reserved,
     Ready(SharedTerminalState),
-}
-
-#[derive(Clone, Copy)]
-pub(super) struct TerminalWaitSnapshot {
-    generation: u64,
-    reader_closed: bool,
-}
-
-pub(super) enum TerminalLifecycleWait {
-    TimedOut,
-    Exit(TerminalExitStatus),
-    LifecycleError(String),
-}
-
-struct TerminalWaitState {
-    generation: u64,
-    reader_closed: bool,
-    exit_status: Option<TerminalExitStatus>,
-    lifecycle_error: Option<String>,
-}
-
-pub(super) struct TerminalWaitSignal {
-    state: Mutex<TerminalWaitState>,
-    condvar: Condvar,
-}
-
-impl TerminalWaitSignal {
-    fn new() -> Self {
-        Self {
-            state: Mutex::new(TerminalWaitState {
-                generation: 0,
-                reader_closed: false,
-                exit_status: None,
-                lifecycle_error: None,
-            }),
-            condvar: Condvar::new(),
-        }
-    }
-
-    pub(super) fn snapshot(&self) -> TerminalWaitSnapshot {
-        let state = self.state.lock().unwrap();
-        TerminalWaitSnapshot {
-            generation: state.generation,
-            reader_closed: state.reader_closed,
-        }
-    }
-
-    pub(super) fn wait_for_change(
-        &self,
-        snapshot: TerminalWaitSnapshot,
-        timeout: Duration,
-    ) -> TerminalWaitSnapshot {
-        let state = self.state.lock().unwrap();
-        let state = self
-            .condvar
-            .wait_timeout_while(state, timeout, |state| {
-                state.generation == snapshot.generation
-                    && state.reader_closed == snapshot.reader_closed
-            })
-            .unwrap()
-            .0;
-        TerminalWaitSnapshot {
-            generation: state.generation,
-            reader_closed: state.reader_closed,
-        }
-    }
-
-    pub(super) fn wait_for_exit_or_error(&self, timeout: Duration) -> TerminalLifecycleWait {
-        let state = self.state.lock().unwrap();
-        let state = self
-            .condvar
-            .wait_timeout_while(state, timeout, |state| {
-                state.exit_status.is_none() && state.lifecycle_error.is_none()
-            })
-            .unwrap()
-            .0;
-        if let Some(exit_status) = state.exit_status.clone() {
-            TerminalLifecycleWait::Exit(exit_status)
-        } else if let Some(error) = state.lifecycle_error.clone() {
-            TerminalLifecycleWait::LifecycleError(error)
-        } else {
-            TerminalLifecycleWait::TimedOut
-        }
-    }
-
-    pub(super) fn note_output_updated(&self) {
-        let mut state = self.state.lock().unwrap();
-        state.generation += 1;
-        self.condvar.notify_all();
-    }
-
-    pub(super) fn note_reader_closed(&self) {
-        let mut state = self.state.lock().unwrap();
-        state.reader_closed = true;
-        state.generation += 1;
-        self.condvar.notify_all();
-    }
-
-    pub(super) fn finish_exit(&self, exit_status: TerminalExitStatus) {
-        let mut state = self.state.lock().unwrap();
-        state.exit_status = Some(exit_status);
-        state.generation += 1;
-        self.condvar.notify_all();
-    }
-
-    pub(super) fn fail_poll(&self, error: String) {
-        let mut state = self.state.lock().unwrap();
-        state.lifecycle_error = Some(error);
-        state.generation += 1;
-        self.condvar.notify_all();
-    }
-
-    pub(super) fn exit_status(&self) -> Option<TerminalExitStatus> {
-        self.state.lock().unwrap().exit_status.clone()
-    }
-
-    pub(super) fn lifecycle_error(&self) -> Option<String> {
-        self.state.lock().unwrap().lifecycle_error.clone()
-    }
 }
 
 /// State for a spawned terminal process.
@@ -388,17 +270,18 @@ impl TerminalManager {
     pub fn handle_wait_for_exit(
         &self,
         request: &WaitForTerminalExitRequest,
+        cancel: &ClientCallCancel,
     ) -> ClientResult<WaitForTerminalExitResponse> {
         let terminal_id = request.terminal_id.0.as_ref();
 
         let state = self.terminal_state(terminal_id, &request.terminal_id)?;
         #[cfg(test)]
         self.wait_started.record();
-        let exit_status = wait_for_terminal_exit_state(&state)?;
+        let exit_status = wait_for_terminal_exit_state(&state, cancel);
         #[cfg(test)]
         self.wait_finished.record();
 
-        Ok(WaitForTerminalExitResponse::new(exit_status))
+        Ok(WaitForTerminalExitResponse::new(exit_status?))
     }
 
     /// Handle `terminal/kill`.

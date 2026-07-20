@@ -135,6 +135,7 @@ pub(crate) fn apply_join_session(
             current_task_id: None,
             runtime_capabilities: runtime_capabilities(runtime_name),
             persona: persona.and_then(super::persona::resolve),
+            runtime_session_title: None,
         },
     );
     if role == SessionRole::Leader && state.leader_id.is_none() {
@@ -178,6 +179,34 @@ pub(crate) fn apply_register_agent_runtime_session(
         .expect("managed-agent lookup resolved mutable agent");
     agent.agent_session_id = Some(runtime_session_id.into_inner());
     Ok(true)
+}
+
+/// Record the title a runtime reports for its own session.
+///
+/// Returns whether the stored title changed, so callers can skip a persist.
+pub(crate) fn apply_record_runtime_session_title(
+    state: &mut SessionState,
+    managed_agent: &ManagedAgentRef,
+    title: &str,
+    now: &str,
+) -> bool {
+    let Some(agent_id) = find_agent_by_managed_agent(state, managed_agent) else {
+        return false;
+    };
+    {
+        let agent = state
+            .agent(&agent_id)
+            .expect("managed-agent lookup resolved agent");
+        if agent.runtime_session_title.as_deref() == Some(title) {
+            return false;
+        }
+    }
+    touch_agent(state, agent_id.as_str(), now);
+    let agent = state
+        .agent_mut(&agent_id)
+        .expect("managed-agent lookup resolved mutable agent");
+    agent.runtime_session_title = Some(title.to_owned());
+    true
 }
 
 /// Remove a just-joined agent registration that never finished startup.

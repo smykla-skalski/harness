@@ -140,6 +140,7 @@ fn sample_session_state(session_id: &str) -> SessionState {
             current_task_id: None,
             runtime_capabilities: RuntimeCapabilities::default(),
             persona: None,
+            runtime_session_title: None,
         },
     );
 

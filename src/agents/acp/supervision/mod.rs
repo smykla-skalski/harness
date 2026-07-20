@@ -66,6 +66,10 @@ pub trait WatchdogEventEmitter: Send + Sync {
     /// Emit a wake-prompt context ack surfaced by the ACP wake-accept path.
     /// Default no-op so non-ACP impls (test doubles) need not provide one.
     fn emit_context_injected(&self, _actor: String, _summary: Option<String>) {}
+
+    /// Emit the stop reason the agent reported for a finished prompt turn.
+    /// Default no-op so non-ACP impls (test doubles) need not provide one.
+    fn emit_turn_ended(&self, _stop_reason: String) {}
 }
 
 /// Supervisor for an ACP session.

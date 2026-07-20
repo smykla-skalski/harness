@@ -73,11 +73,11 @@ pub(crate) fn conversation_entry(
     };
 
     let (entry_kind, summary) = match &event.kind {
-        ConversationEventKind::UserPrompt { content } => (
+        ConversationEventKind::UserPrompt { content, .. } => (
             "user_prompt",
             transcript_summary(content, "Prompt submitted"),
         ),
-        ConversationEventKind::AssistantText { content } => (
+        ConversationEventKind::AssistantText { content, .. } => (
             "assistant_text",
             transcript_summary(content, "Assistant response"),
         ),
@@ -120,22 +120,10 @@ pub(crate) fn conversation_entry(
             "agent_session_marker",
             format!("{agent_id} marked {marker}"),
         ),
-        ConversationEventKind::WatchdogState { from, to, reason } => (
-            "agent_watchdog_state",
-            watchdog_summary(agent_id, from, to, reason.as_deref()),
-        ),
-        ConversationEventKind::PermissionAsked { tool, scope, .. } => (
-            "agent_permission_asked",
-            format!("{agent_id} asked for permission on {tool} ({scope})"),
-        ),
-        ConversationEventKind::ContextInjected { actor, .. } => (
-            "agent_context_injected",
-            format!("{agent_id} accepted context from {actor}"),
-        ),
-        ConversationEventKind::Other { label, data } if label == "thought" => {
-            ("agent_thought", other_text_summary(data, "Agent thought"))
-        }
-        ConversationEventKind::Other { .. } => return Ok(None),
+        other => match agent_entry_descriptor(agent_id, other) {
+            Some(descriptor) => descriptor,
+            None => return Ok(None),
+        },
     };
     let payload = timeline_payload(
         &serde_json::json!({
@@ -156,6 +144,76 @@ pub(crate) fn conversation_entry(
         summary,
         payload,
     }))
+}
+
+/// Entry kind and summary for the agent-emitted event kinds, split out so
+/// `conversation_entry` stays inside the function-length budget.
+fn agent_entry_descriptor(
+    agent_id: &str,
+    kind: &ConversationEventKind,
+) -> Option<(&'static str, String)> {
+    let descriptor = match kind {
+        ConversationEventKind::WatchdogState { from, to, reason } => (
+            "agent_watchdog_state",
+            watchdog_summary(agent_id, from, to, reason.as_deref()),
+        ),
+        ConversationEventKind::PermissionAsked { tool, scope, .. } => (
+            "agent_permission_asked",
+            format!("{agent_id} asked for permission on {tool} ({scope})"),
+        ),
+        ConversationEventKind::ContextInjected { actor, .. } => (
+            "agent_context_injected",
+            format!("{agent_id} accepted context from {actor}"),
+        ),
+        ConversationEventKind::TurnEnded { stop_reason } => (
+            "agent_turn_ended",
+            turn_ended_summary(agent_id, stop_reason),
+        ),
+        ConversationEventKind::ContextUsage {
+            used_tokens,
+            context_window_tokens,
+            cost_amount,
+            cost_currency,
+        } => (
+            "agent_context_usage",
+            context_usage_summary(
+                agent_id,
+                *used_tokens,
+                *context_window_tokens,
+                *cost_amount,
+                cost_currency.as_deref(),
+            ),
+        ),
+        ConversationEventKind::Other { label, data } if label == "thought" => {
+            ("agent_thought", other_text_summary(data, "Agent thought"))
+        }
+        _ => return None,
+    };
+    Some(descriptor)
+}
+
+fn turn_ended_summary(agent_id: &str, stop_reason: &str) -> String {
+    match stop_reason {
+        "refusal" => format!("{agent_id} refused to continue the turn"),
+        "cancelled" => format!("{agent_id} turn cancelled"),
+        "max_tokens" => format!("{agent_id} turn hit the token limit"),
+        "max_turn_requests" => format!("{agent_id} turn hit the request limit"),
+        other => format!("{agent_id} turn ended ({other})"),
+    }
+}
+
+fn context_usage_summary(
+    agent_id: &str,
+    used_tokens: u64,
+    context_window_tokens: u64,
+    cost_amount: Option<f64>,
+    cost_currency: Option<&str>,
+) -> String {
+    let usage = format!("{agent_id} used {used_tokens} of {context_window_tokens} context tokens");
+    match (cost_amount, cost_currency) {
+        (Some(amount), Some(currency)) => format!("{usage} ({amount} {currency})"),
+        _ => usage,
+    }
 }
 
 fn transcript_summary(content: &str, fallback: &str) -> String {

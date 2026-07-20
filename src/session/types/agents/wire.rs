@@ -32,6 +32,8 @@ pub(super) struct AgentRegistrationWire {
     runtime_capabilities: RuntimeCapabilities,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     persona: Option<super::AgentPersona>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    runtime_session_title: Option<String>,
 }
 
 impl From<&AgentRegistration> for AgentRegistrationWire {
@@ -57,6 +59,7 @@ impl From<&AgentRegistration> for AgentRegistrationWire {
             current_task_id: value.current_task_id.clone(),
             runtime_capabilities: value.runtime_capabilities.clone(),
             persona: value.persona.clone(),
+            runtime_session_title: value.runtime_session_title.clone(),
         }
     }
 }
@@ -90,6 +93,7 @@ impl TryFrom<AgentRegistrationWire> for AgentRegistration {
             current_task_id: value.current_task_id,
             runtime_capabilities: value.runtime_capabilities,
             persona: value.persona,
+            runtime_session_title: value.runtime_session_title,
         })
     }
 }
