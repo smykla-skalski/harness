@@ -105,7 +105,7 @@ gh api --method POST repos/smykla-skalski/harness/pulls/<PR_NUMBER>/requested_re
 
 This repository allows squash merges only. The branch collapses into one new commit on `upstream/main`, so its commits never reach `main` and it can never fast-forward. Closeout realigns local state instead of integrating anything.
 
-Confirm the PR merged, then check that `<main-checkout>` is on `main`, `<worktree>` is on `<session-branch>`, and both are clean:
+Confirm the PR merged, then check that `<main-checkout>` is on `main`, `<worktree>` is on `<session-branch>`, both are clean, and local `main` carries no unpublished `replay` commits (reconcile those first, as described below):
 
 ```bash
 git -C <main-checkout> fetch --prune upstream
