@@ -27,9 +27,6 @@ struct TaskBoardStepRailView: View {
     isActionInFlight || state.isBusy || store.contentUI.dashboard.connectionState != .online
   }
 
-  private var cautionFont: Font {
-    HarnessMonitorTextSize.scaledFont(.callout.weight(.semibold), by: fontScale)
-  }
   private var primaryButtonFont: Font {
     HarnessMonitorTextSize.scaledFont(.callout.weight(.semibold), by: fontScale)
   }
@@ -41,6 +38,7 @@ struct TaskBoardStepRailView: View {
     TaskBoardSection(title: "Manual Steps") {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
         TaskBoardStepRailTargetView(item: activeItem, isPicked: stepFlow.hasPicked)
+        Divider()
         TaskBoardStepProgressRail(
           current: stagePlan.column,
           isBlocked: stagePlan.isBlockedColumn,
@@ -101,6 +99,8 @@ struct TaskBoardStepRailView: View {
     } description: {
       Text(stagePlan.whatNext)
     } actions: {
+      // The board chrome's Sync covers this too, but an empty state without a
+      // way out is worse than the overlap.
       Button {
         state.presentConfirmation(.externalSync(itemID: activeItem?.id))
       } label: {
@@ -119,8 +119,6 @@ struct TaskBoardStepRailView: View {
       whatHappened: nil,
       whatNext: column.explanation
     ) {
-      EmptyView()
-    } actions: {
       Button {
         state.viewingColumn = nil
       } label: {
@@ -138,10 +136,6 @@ struct TaskBoardStepRailView: View {
       whatHappened: plan.whatHappened,
       whatNext: plan.whatNext
     ) {
-      if let action = plan.primaryAction {
-        primaryButton(action)
-      }
-    } actions: {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
         if plan.stage == .readyToDeliver, let selection = activeSelection {
           TaskBoardStepPromptPreview(prompt: selection.plan.renderedPrompt)
@@ -154,12 +148,10 @@ struct TaskBoardStepRailView: View {
     }
   }
 
-  @ViewBuilder
+  /// Closing row of the stage card: whatever secondary controls this stage
+  /// offers on the left, the primary Next action pinned to the right.
   private func secondaryRow(_ plan: TaskBoardStepStagePlan) -> some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      if plan.primaryAction != .sync {
-        syncButton
-      }
       if plan.stage == .done, plan.primaryAction == nil {
         Button {
           state.resetFlow()
@@ -170,7 +162,12 @@ struct TaskBoardStepRailView: View {
         .controlSize(.small)
         .accessibilityIdentifier("harness.task-board.step.start-next")
       }
+      Spacer(minLength: HarnessMonitorTheme.spacingMD)
+      if let action = plan.primaryAction {
+        primaryButton(action)
+      }
     }
+    .frame(maxWidth: .infinity, alignment: .trailing)
   }
 
   private func primaryButton(_ action: TaskBoardStepPrimaryAction) -> some View {
@@ -208,18 +205,6 @@ struct TaskBoardStepRailView: View {
         .accessibilityIdentifier("harness.task-board.step.link.\(link.rawValue)")
       }
     }
-  }
-
-  private var syncButton: some View {
-    Button {
-      state.presentConfirmation(.externalSync(itemID: activeItem?.id))
-    } label: {
-      Label("Sync external sources", systemImage: "arrow.triangle.2.circlepath").font(linkFont)
-    }
-    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-    .controlSize(.small)
-    .disabled(controlsDisabled)
-    .accessibilityIdentifier("harness.task-board.step.sync")
   }
 
   private func primaryIcon(_ action: TaskBoardStepPrimaryAction) -> String {
@@ -274,26 +259,14 @@ struct TaskBoardStepRailView: View {
   }
 
   private var contextDisclosure: some View {
-    DisclosureGroup {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-        TaskBoardApprovalGrantsView(
-          store: store,
-          workspace: workspace,
-          refreshID: approvalGrantRefreshID,
-          isDisabled: controlsDisabled
-        )
-        HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingXL) {
-          TaskBoardHeldDispatchesView(summary: status.heldDispatches)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-          TaskBoardPolicyGuardsView(workspace: workspace)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-        }
-      }
-      .padding(.top, HarnessMonitorTheme.spacingSM)
-    } label: {
-      Label("Automation context", systemImage: "gearshape").font(cautionFont)
-    }
-    .accessibilityIdentifier("harness.task-board.step.context")
+    TaskBoardStepContextDisclosure(
+      store: store,
+      workspace: workspace,
+      heldDispatches: status.heldDispatches,
+      refreshID: approvalGrantRefreshID,
+      isDisabled: controlsDisabled,
+      isExpanded: $state.isAutomationContextExpanded
+    )
   }
 
   private var confirmationPresented: Binding<Bool> {

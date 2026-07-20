@@ -37,6 +37,9 @@ final class TaskBoardStepRailState {
   var lockedItemID: String?
   /// A rail node the user tapped to read ahead; nil shows the live current stage.
   var viewingColumn: TaskBoardStepColumn?
+  /// Whether the automation-context footer is open. Held here rather than left
+  /// to `DisclosureGroup` so the label can drive it from a full-width tap.
+  var isAutomationContextExpanded = false
 
   var isBusy: Bool { isRunning }
 

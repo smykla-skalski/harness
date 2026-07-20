@@ -59,11 +59,76 @@ struct TaskBoardStepRailTargetView: View {
     Label("Live", systemImage: "bolt.fill")
       .font(badgeFont)
       .foregroundStyle(HarnessMonitorTheme.caution)
+      .padding(.horizontal, HarnessMonitorTheme.pillPaddingH)
+      .harnessOpticallyBalancedVerticalPadding(HarnessMonitorTheme.pillPaddingV)
       .harnessControlPillGlass(tint: HarnessMonitorTheme.caution)
       .help("Manual steps run live against the board")
       .accessibilityLabel("Live operations")
       .accessibilityHint("Manual steps run live against the board")
       .accessibilityIdentifier("harness.task-board.step.live-mode")
+  }
+}
+
+/// The automation-context footer of the manual-steps card.
+///
+/// `DisclosureGroup` only hit-tests its triangle on macOS, so the label carries
+/// its own full-width tap target and hover highlight - otherwise the row reads
+/// as static text and the only way in is a 12pt chevron.
+struct TaskBoardStepContextDisclosure: View {
+  let store: HarnessMonitorStore
+  let workspace: PolicyCanvasWorkspace?
+  let heldDispatches: TaskBoardHeldDispatchSummary
+  let refreshID: TaskBoardApprovalGrantRefreshID
+  let isDisabled: Bool
+  @Binding var isExpanded: Bool
+
+  @Environment(\.fontScale)
+  private var fontScale
+  @Environment(\.accessibilityReduceMotion)
+  private var reduceMotion
+  @State private var isHovered = false
+
+  private var labelFont: Font {
+    HarnessMonitorTextSize.scaledFont(.callout.weight(.semibold), by: fontScale)
+  }
+
+  var body: some View {
+    DisclosureGroup(isExpanded: $isExpanded) {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+        TaskBoardApprovalGrantsView(
+          store: store,
+          workspace: workspace,
+          refreshID: refreshID,
+          isDisabled: isDisabled
+        )
+        HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingXL) {
+          TaskBoardHeldDispatchesView(summary: heldDispatches)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+          TaskBoardPolicyGuardsView(workspace: workspace)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+      }
+      .padding(.top, HarnessMonitorTheme.spacingSM)
+    } label: {
+      Label("Automation context", systemImage: "gearshape")
+        .font(labelFont)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, HarnessMonitorTheme.spacingXS)
+        .padding(.horizontal, HarnessMonitorTheme.spacingSM)
+        .background(
+          HarnessMonitorTheme.accent.opacity(isHovered ? 0.08 : 0),
+          in: .rect(cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
+        )
+        .contentShape(.rect)
+        .onHover { isHovered = $0 }
+        .onTapGesture {
+          withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+            isExpanded.toggle()
+          }
+        }
+        .accessibilityAddTraits(.isButton)
+    }
+    .accessibilityIdentifier("harness.task-board.step.context")
   }
 }
 
