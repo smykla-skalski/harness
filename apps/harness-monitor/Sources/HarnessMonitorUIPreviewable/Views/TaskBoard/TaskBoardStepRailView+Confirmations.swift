@@ -31,11 +31,13 @@ extension TaskBoardStepRailView {
         runConfirmation(confirmation)
       }
       .disabled(controlsDisabled)
-    case .evaluate:
+    case .evaluate(let itemID):
       Button("Evaluate Live", role: .destructive) {
         runConfirmation(confirmation)
       }
-      .disabled(controlsDisabled)
+      // Mirrors the guard in enqueueEvaluation. Without it the flow can move on
+      // while the dialog sits open and the press lands on a silent early return.
+      .disabled(controlsDisabled || activeItem?.id != itemID)
     case .deliver(let itemID):
       Button("Deliver Live", role: .destructive) {
         runConfirmation(confirmation)
@@ -43,11 +45,12 @@ extension TaskBoardStepRailView {
       // Re-checks the item at press time: the flow may have moved on while the
       // dialog sat open.
       .disabled(controlsDisabled || deliveryItemID != itemID)
-    case .complete:
+    case .complete(let itemID):
       Button("Complete", role: .destructive) {
         runConfirmation(confirmation)
       }
-      .disabled(controlsDisabled)
+      // Mirrors the guard in enqueueCompletion, same reason as Evaluate above.
+      .disabled(controlsDisabled || activeItem?.id != itemID)
     }
     Button("Cancel", role: .cancel) {}
   }
