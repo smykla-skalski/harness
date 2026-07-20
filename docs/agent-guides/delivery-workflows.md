@@ -77,9 +77,13 @@ Use only this PR-body shape:
 
 ## Implementation
 - <Three to six outcome-oriented one-sentence bullets, with material validation in the final bullet.>
+
+Closes #<issue>
 ```
 
 Use a factual technical tone and describe outcomes, not files or chronology. Add no other sections, checklists, or boilerplate, and keep each paragraph or bullet on one physical line.
+
+The closing line is optional. Add it only when the task actually worked on a real issue that this PR finishes. Confirm the issue exists and matches the change with `gh issue view <issue>` before writing the line, and never guess or invent a number. Omit it when no such issue exists, and mention an issue this PR only advances as plain `#<issue>` text inside a bullet so the merge leaves it open.
 
 ### Copilot review loop
 
@@ -98,7 +102,7 @@ gh api --method POST repos/smykla-skalski/harness/pulls/<PR_NUMBER>/requested_re
 
 ### Ready and merge
 
-1. Require an accurate two-section PR body, a current-tree Copilot review with no new comments, zero unresolved conversations, and green required checks.
+1. Require an accurate PR body in the shape above, a current-tree Copilot review with no new comments, zero unresolved conversations, and green required checks.
 2. Mark the PR ready for review only after every gate passes, notify the user, and monitor until the user merges or closes it. Never merge the PR as the agent.
 
 ### Close out
