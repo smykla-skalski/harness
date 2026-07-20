@@ -11,6 +11,7 @@ use super::super::commands::ProtocolCommandResult;
 use super::agents::{
     run_agent_recording_initialize_contract, run_agent_recording_session_lifecycle,
 };
+use super::lifecycle_agents::run_agent_recording_session_inputs;
 use super::*;
 
 type AgentResult = agent_client_protocol::Result<()>;
@@ -29,6 +30,17 @@ struct LifecycleHarness {
 /// Drive `run_connection` against `spawn_agent` and hand back the command
 /// channel, so each test only has to describe the lifecycle call it makes.
 fn lifecycle_harness<F, Fut>(spawn_agent: F) -> LifecycleHarness
+where
+    F: FnOnce(Channel, Arc<Mutex<Vec<String>>>) -> Fut,
+    Fut: Future<Output = AgentResult> + Send + 'static,
+{
+    lifecycle_harness_with_config(spawn_agent, disabled_session_config())
+}
+
+fn lifecycle_harness_with_config<F, Fut>(
+    spawn_agent: F,
+    session_config: AcpSessionRequestConfig,
+) -> LifecycleHarness
 where
     F: FnOnce(Channel, Arc<Mutex<Vec<String>>>) -> Fut,
     Fut: Future<Output = AgentResult> + Send + 'static,
@@ -68,7 +80,7 @@ where
                     connection,
                     project_dir,
                     prompt: None,
-                    session_config: disabled_session_config(),
+                    session_config,
                     acp_id: "agent-acp-1".to_string(),
                     session_id: "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e".to_string(),
                     runtime_name: "fake".to_string(),
@@ -141,6 +153,26 @@ impl LifecycleHarness {
         self.operations.lock().expect("recorded operations").clone()
     }
 
+    /// Wait for the agent to record an operation starting with `prefix`.
+    async fn await_recorded(&self, prefix: &str) -> String {
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        loop {
+            if let Some(record) = self
+                .recorded()
+                .into_iter()
+                .find(|operation| operation.starts_with(prefix))
+            {
+                return record;
+            }
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "agent should record a '{prefix}' operation; got {:?}",
+                self.recorded()
+            );
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    }
+
     async fn shutdown(self) {
         assert!(self.cancel_tx.send(()).is_ok());
         let protocol_result = ok(
@@ -154,6 +186,27 @@ impl LifecycleHarness {
         self.agent_task.abort();
         let _ = self.agent_task.await;
     }
+}
+
+/// The first session on a process is created by `run_connection` itself rather
+/// than by the attach command, so it needs its own proof that the declared
+/// inputs reached the agent.
+#[tokio::test]
+#[cfg(unix)]
+async fn primary_session_new_carries_declared_mcp_servers_and_directories() {
+    let harness = lifecycle_harness_with_config(
+        run_agent_recording_session_inputs,
+        session_config_with_inputs(),
+    );
+
+    let record = harness.await_recorded("new:").await;
+
+    assert_eq!(
+        record, "new:mcp=descriptor-server,start-server:dirs=/work/descriptor,/work/start",
+        "the first session on a process must carry the same inputs a later attach does"
+    );
+
+    harness.shutdown().await;
 }
 
 #[tokio::test]

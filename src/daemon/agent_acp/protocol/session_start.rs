@@ -5,6 +5,7 @@ use agent_client_protocol::schema::v1::{NewSessionResponse, SessionId};
 use agent_client_protocol::{Agent, ConnectionTo, Error as AcpError, Result as AcpResult};
 
 use super::handshake::handshake_from_initialize;
+use super::session_config::AcpSessionRequestConfig;
 use super::session_guard::{RouteTarget, SessionRouteGuard};
 use super::{AcpAgentManagerHandle, AcpSessionSupervisor, send_initialize, send_new_session};
 use crate::errors::CliError;
@@ -14,21 +15,34 @@ pub(super) struct InitializedRuntimeSession {
     pub(super) response: NewSessionResponse,
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "ACP initialize+bind needs all of these on one call site to keep the route-registration ordering invariant explicit"
-)]
+pub(super) struct RuntimeSessionStart<'a> {
+    pub(super) manager: &'a AcpAgentManagerHandle,
+    pub(super) supervisor: &'a Arc<AcpSessionSupervisor>,
+    pub(super) connection: &'a ConnectionTo<Agent>,
+    pub(super) project_dir: PathBuf,
+    pub(super) session_config: &'a AcpSessionRequestConfig,
+    pub(super) session_id: &'a str,
+    pub(super) acp_id: &'a str,
+    pub(super) runtime_name: &'a str,
+    pub(super) session_guard: &'a SessionRouteGuard,
+}
+
 pub(super) async fn initialize_and_bind_runtime_session(
-    manager: &AcpAgentManagerHandle,
-    supervisor: &Arc<AcpSessionSupervisor>,
-    connection: &ConnectionTo<Agent>,
-    project_dir: PathBuf,
-    session_id: &str,
-    acp_id: &str,
-    runtime_name: &str,
-    session_guard: &SessionRouteGuard,
+    input: RuntimeSessionStart<'_>,
 ) -> AcpResult<InitializedRuntimeSession> {
-    let started_session = initialize_runtime_session(supervisor, connection, project_dir).await?;
+    let RuntimeSessionStart {
+        manager,
+        supervisor,
+        connection,
+        project_dir,
+        session_config,
+        session_id,
+        acp_id,
+        runtime_name,
+        session_guard,
+    } = input;
+    let started_session =
+        initialize_runtime_session(supervisor, connection, project_dir, session_config).await?;
     let acp_session_id = started_session.session_id.clone();
     // Register the route the moment we know the runtime's session_id - the runtime
     // can fire `session/update` notifications immediately after `new_session` returns,
@@ -55,11 +69,14 @@ async fn initialize_runtime_session(
     supervisor: &Arc<AcpSessionSupervisor>,
     connection: &ConnectionTo<Agent>,
     project_dir: PathBuf,
+    session_config: &AcpSessionRequestConfig,
 ) -> AcpResult<InitializedRuntimeSession> {
     let initialize_timeout = supervisor.config().initialize_timeout;
     let initialize_response = send_initialize(supervisor, connection, initialize_timeout).await?;
+    // The session inputs are capability-gated, so the handshake has to be
+    // recorded before the request is built.
     supervisor.record_handshake(handshake_from_initialize(&initialize_response));
-    let response = send_new_session(supervisor, connection, project_dir).await?;
+    let response = send_new_session(supervisor, connection, project_dir, session_config).await?;
     super::session_state::seed_from_new_session(supervisor, &response);
     Ok(InitializedRuntimeSession {
         session_id: response.session_id.clone(),

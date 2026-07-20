@@ -15,7 +15,7 @@ use crate::agents::acp::catalog::{
     AcpSessionEffortTransport, AcpSessionModelTransport, DoctorProbe,
 };
 use crate::agents::acp::supervision::{SupervisionConfig, WatchdogState};
-use crate::daemon::agent_acp::AcpAgentManagerHandle;
+use crate::daemon::agent_acp::{AcpAgentManagerHandle, AcpMcpServer};
 use crate::daemon::db::DaemonDb;
 use crate::daemon::index::DiscoveredProject;
 use crate::session::service as session_service;
@@ -24,6 +24,7 @@ use crate::session::types::{ManagedAgentRef, SessionRole};
 mod agents;
 mod cancellation_tests;
 mod connection_tests;
+mod lifecycle_agents;
 mod lifecycle_tests;
 mod telemetry_tests;
 
@@ -139,6 +140,31 @@ fn disabled_session_config() -> AcpSessionRequestConfig {
         &AcpAgentStartRequest::default(),
         &descriptor_with_session_configuration(Default::default()),
     )
+}
+
+/// One MCP server and one extra root from each source, so a test can tell a
+/// dropped descriptor input apart from a dropped per-start one.
+fn session_config_with_inputs() -> AcpSessionRequestConfig {
+    let descriptor = descriptor_with_session_configuration(AcpSessionConfiguration {
+        mcp_servers: vec![stdio_mcp_server("descriptor-server")],
+        additional_directories: vec!["/work/descriptor".to_string()],
+        ..Default::default()
+    });
+    let request = AcpAgentStartRequest {
+        mcp_servers: vec![stdio_mcp_server("start-server")],
+        additional_directories: vec!["/work/start".to_string()],
+        ..AcpAgentStartRequest::default()
+    };
+    AcpSessionRequestConfig::from_request(&request, &descriptor)
+}
+
+fn stdio_mcp_server(name: &str) -> AcpMcpServer {
+    AcpMcpServer::Stdio {
+        name: name.to_string(),
+        command: "/usr/bin/true".to_string(),
+        args: Vec::new(),
+        env: Vec::new(),
+    }
 }
 
 #[tokio::test]

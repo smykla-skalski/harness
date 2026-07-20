@@ -7,7 +7,7 @@ use std::time::Duration;
 use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::schema::v1::{
     CancelNotification, ContentBlock, Implementation, InitializeRequest, InitializeResponse,
-    NewSessionRequest, NewSessionResponse, PromptRequest, SessionId, TextContent,
+    NewSessionResponse, PromptRequest, SessionId, TextContent,
 };
 use agent_client_protocol::{
     Agent, ByteStreams, ConnectionTo, Error as AcpError, ErrorCode, Result as AcpResult,
@@ -21,7 +21,7 @@ use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
 use self::handlers::{ClientHandlers, connect_with_client_handlers};
 use self::runtime_helpers::report_protocol_result;
-use self::session_start::initialize_and_bind_runtime_session;
+use self::session_start::{RuntimeSessionStart, initialize_and_bind_runtime_session};
 use crate::agents::acp::batcher::{RoutedSessionNotification, spawn_notification_batcher};
 use crate::agents::acp::client::HarnessAcpClient;
 use crate::agents::acp::connection::{ConnectionConfig, EventBatch, SupervisorEventSink};
@@ -262,16 +262,17 @@ async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
     // runtime's `new_session` response and the orchestration bind, so notifications fired
     // by the runtime during the bind window land on the route guard instead of being
     // dropped with `routing_not_initialized`.
-    let initialization = initialize_and_bind_runtime_session(
-        &manager,
-        &supervisor,
-        &connection,
+    let initialization = initialize_and_bind_runtime_session(RuntimeSessionStart {
+        manager: &manager,
+        supervisor: &supervisor,
+        connection: &connection,
         project_dir,
-        &session_id,
-        &acp_id,
-        &runtime_name,
-        &session_guard,
-    )
+        session_config: &session_config,
+        session_id: &session_id,
+        acp_id: &acp_id,
+        runtime_name: &runtime_name,
+        session_guard: &session_guard,
+    })
     .await;
     let started_session = release_after_initialization(initialization, credential)?;
     let acp_session_id = started_session.session_id.clone();
@@ -361,12 +362,12 @@ async fn send_new_session(
     supervisor: &AcpSessionSupervisor,
     connection: &ConnectionTo<Agent>,
     project_dir: PathBuf,
+    session_config: &AcpSessionRequestConfig,
 ) -> AcpResult<NewSessionResponse> {
     let _guard = supervisor.enter_pending_request_with_reason(Some("session/new"));
-    connection
-        .send_request(NewSessionRequest::new(project_dir))
-        .block_task()
-        .await
+    let request =
+        session_inputs::new_session_request(project_dir, session_config, supervisor.handshake());
+    connection.send_request(request).block_task().await
 }
 
 async fn send_prompt_or_cancel(
