@@ -108,6 +108,46 @@ async fn acp_start_route_returns_acp_disabled_when_feature_flag_off() {
     .await;
 }
 
+/// MCP servers have no CLI flag, so this route is the only way to set them.
+/// The request type denies unknown fields, so a decode gap shows up as 422
+/// here rather than as inputs the agent silently never receives.
+#[tokio::test]
+async fn acp_start_route_accepts_per_start_mcp_servers_and_directories() {
+    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("0"))], async {
+        let (base_url, server) = spawn_managed_agent_server(minimal_state()).await;
+        let response = reqwest::Client::new()
+            .post(format!(
+                "{base_url}/v1/sessions/test-session/managed-agents/acp"
+            ))
+            .bearer_auth("token")
+            .json(&json!({
+                "descriptor_id": "copilot",
+                "role": "worker",
+                "capabilities": [],
+                "record_permissions": false,
+                "additional_directories": ["/extra"],
+                "mcp_servers": [{
+                    "transport": "http",
+                    "name": "remote",
+                    "url": "https://example.test/mcp",
+                    "headers": [{"name": "Authorization", "value": "Bearer secret"}]
+                }]
+            }))
+            .send()
+            .await
+            .expect("send request");
+        let (status, body) = response_json(response).await;
+        stop_server(server).await;
+        assert_eq!(
+            status,
+            StatusCode::SERVICE_UNAVAILABLE,
+            "the body must decode and fail on the feature flag, not on parsing"
+        );
+        assert_eq!(body["error"]["code"], "ACP_DISABLED");
+    })
+    .await;
+}
+
 #[tokio::test]
 async fn acp_start_route_rejects_missing_session_before_spawn() {
     let tmp = tempdir().expect("tempdir");

@@ -20,8 +20,10 @@ public struct AcpAgentStartRequestWire: Codable, Equatable, Sendable {
   public var effort: String?
   public var allowCustomModel: Bool
   public var recordPermissions: Bool
+  public var mcpServers: [AcpMcpServer]
+  public var additionalDirectories: [String]
 
-  public init(descriptorId: String, role: SessionRole = .worker, fallbackRole: SessionRole? = nil, capabilities: [String] = [], name: String? = nil, prompt: String? = nil, projectDir: String? = nil, persona: String? = nil, taskId: String? = nil, boardItemId: String? = nil, workflowExecutionId: String? = nil, model: String? = nil, effort: String? = nil, allowCustomModel: Bool = false, recordPermissions: Bool = false) {
+  public init(descriptorId: String, role: SessionRole = .worker, fallbackRole: SessionRole? = nil, capabilities: [String] = [], name: String? = nil, prompt: String? = nil, projectDir: String? = nil, persona: String? = nil, taskId: String? = nil, boardItemId: String? = nil, workflowExecutionId: String? = nil, model: String? = nil, effort: String? = nil, allowCustomModel: Bool = false, recordPermissions: Bool = false, mcpServers: [AcpMcpServer] = [], additionalDirectories: [String] = []) {
     self.descriptorId = descriptorId
     self.role = role
     self.fallbackRole = fallbackRole
@@ -37,6 +39,8 @@ public struct AcpAgentStartRequestWire: Codable, Equatable, Sendable {
     self.effort = effort
     self.allowCustomModel = allowCustomModel
     self.recordPermissions = recordPermissions
+    self.mcpServers = mcpServers
+    self.additionalDirectories = additionalDirectories
   }
 
   public init(from decoder: Decoder) throws {
@@ -56,6 +60,8 @@ public struct AcpAgentStartRequestWire: Codable, Equatable, Sendable {
     effort = try container.decodeIfPresent(String.self, forKey: .effort)
     allowCustomModel = try container.decodeIfPresent(Bool.self, forKey: .allowCustomModel) ?? false
     recordPermissions = try container.decodeIfPresent(Bool.self, forKey: .recordPermissions) ?? false
+    mcpServers = try container.decodeIfPresent([AcpMcpServer].self, forKey: .mcpServers) ?? []
+    additionalDirectories = try container.decodeIfPresent([String].self, forKey: .additionalDirectories) ?? []
   }
 
   enum CodingKeys: String, CodingKey {
@@ -74,5 +80,7 @@ public struct AcpAgentStartRequestWire: Codable, Equatable, Sendable {
     case effort
     case allowCustomModel = "allow_custom_model"
     case recordPermissions = "record_permissions"
+    case mcpServers = "mcp_servers"
+    case additionalDirectories = "additional_directories"
   }
 }
