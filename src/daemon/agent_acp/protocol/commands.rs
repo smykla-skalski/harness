@@ -153,6 +153,50 @@ impl AcpProtocolHandle {
             .map_err(|_| "ACP protocol command channel is closed".to_string())?;
         receive_response(&response_rx)
     }
+
+    pub(in crate::daemon::agent_acp) fn list_sessions(
+        &self,
+        cwd: Option<PathBuf>,
+        cursor: Option<String>,
+    ) -> ProtocolCommandResult<AcpSessionListPage> {
+        let (response_tx, response_rx) = mpsc::sync_channel(1);
+        let request = ListSessionsRequest::new().cwd(cwd).cursor(cursor);
+        self.command_tx
+            .send(ProtocolCommand::ListSessions {
+                request,
+                response_tx,
+            })
+            .map_err(|_| "ACP protocol command channel is closed".to_string())?;
+        receive_response(&response_rx)
+    }
+
+    pub(in crate::daemon::agent_acp) fn close_session(
+        &self,
+        session_id: &str,
+    ) -> ProtocolCommandResult<()> {
+        let (response_tx, response_rx) = mpsc::sync_channel(1);
+        self.command_tx
+            .send(ProtocolCommand::CloseSession {
+                session_id: SessionId::new(session_id.to_string()),
+                response_tx,
+            })
+            .map_err(|_| "ACP protocol command channel is closed".to_string())?;
+        receive_response(&response_rx)
+    }
+
+    pub(in crate::daemon::agent_acp) fn delete_session(
+        &self,
+        session_id: &str,
+    ) -> ProtocolCommandResult<()> {
+        let (response_tx, response_rx) = mpsc::sync_channel(1);
+        self.command_tx
+            .send(ProtocolCommand::DeleteSession {
+                session_id: SessionId::new(session_id.to_string()),
+                response_tx,
+            })
+            .map_err(|_| "ACP protocol command channel is closed".to_string())?;
+        receive_response(&response_rx)
+    }
 }
 
 fn receive_response<T>(

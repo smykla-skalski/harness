@@ -167,6 +167,11 @@ pub const MANAGED_AGENT_ACP_PERMISSION: &str =
 pub const MANAGED_AGENT_DELETE: &str = "/v1/managed-agents/{managed_agent_id}";
 pub const MANAGED_AGENT_ACP_PROMPT: &str = "/v1/managed-agents/{managed_agent_id}/prompt";
 pub const MANAGED_AGENT_ACP_LOGOUT: &str = "/v1/managed-agents/{managed_agent_id}/logout";
+pub const MANAGED_AGENT_ACP_SESSIONS: &str = "/v1/managed-agents/{managed_agent_id}/sessions";
+pub const MANAGED_AGENT_ACP_SESSION_DELETE: &str =
+    "/v1/managed-agents/{managed_agent_id}/sessions/{agent_session_id}";
+pub const MANAGED_AGENT_ACP_SESSION_CLOSE: &str =
+    "/v1/managed-agents/{managed_agent_id}/sessions/{agent_session_id}/close";
 pub const MANAGED_AGENTS_CODEX_INSPECT: &str = "/v1/managed-agents/codex/inspect";
 pub const MANAGED_AGENTS_CODEX_TRANSCRIPT: &str = "/v1/managed-agents/codex/transcript";
 pub const MANAGED_AGENTS_ACP_INSPECT: &str = "/v1/managed-agents/acp/inspect";

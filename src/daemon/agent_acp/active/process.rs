@@ -13,6 +13,7 @@ use crate::agents::acp::supervision::{AcpSessionSupervisor, kill_process_group};
 use crate::agents::kind::DisconnectReason;
 
 use super::SharedStderrTail;
+use crate::daemon::agent_acp::AcpSessionListPage;
 use crate::daemon::agent_acp::prompt_gate::{PromptGate, PromptOwner};
 use crate::daemon::agent_acp::protocol::{AcpProtocolHandle, AcpSessionRequestConfig};
 
@@ -215,6 +216,22 @@ impl ActiveAcpProcess {
 
     pub(super) fn logout(&self) -> Result<(), String> {
         self.protocol_handle.logout()
+    }
+
+    pub(super) fn list_sessions(
+        &self,
+        cwd: Option<PathBuf>,
+        cursor: Option<String>,
+    ) -> Result<AcpSessionListPage, String> {
+        self.protocol_handle.list_sessions(cwd, cursor)
+    }
+
+    pub(super) fn close_session(&self, session_id: &str) -> Result<(), String> {
+        self.protocol_handle.close_session(session_id)
+    }
+
+    pub(super) fn delete_session(&self, session_id: &str) -> Result<(), String> {
+        self.protocol_handle.delete_session(session_id)
     }
 }
 

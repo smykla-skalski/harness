@@ -7,6 +7,7 @@ use tokio::task::JoinHandle;
 use crate::agents::acp::supervision::WatchdogEventEmitter;
 use crate::agents::acp::supervision::WatchdogState;
 use crate::agents::kind::DisconnectReason;
+use crate::daemon::agent_acp::AcpSessionListPage;
 use crate::daemon::agent_acp::manager::{AcpAgentInspectSnapshot, AcpAgentSnapshot};
 use crate::daemon::agent_acp::permission_bridge::{
     AcpPermissionBatch, AcpPermissionDecision, PermissionBridgeHandle,
@@ -150,6 +151,28 @@ impl ActiveAcpSession {
 
     pub(in crate::daemon::agent_acp) fn logout(&self) -> Result<(), String> {
         self.process.logout()
+    }
+
+    pub(in crate::daemon::agent_acp) fn list_sessions(
+        &self,
+        cwd: Option<PathBuf>,
+        cursor: Option<String>,
+    ) -> Result<AcpSessionListPage, String> {
+        self.process.list_sessions(cwd, cursor)
+    }
+
+    pub(in crate::daemon::agent_acp) fn close_session(
+        &self,
+        session_id: &str,
+    ) -> Result<(), String> {
+        self.process.close_session(session_id)
+    }
+
+    pub(in crate::daemon::agent_acp) fn delete_session(
+        &self,
+        session_id: &str,
+    ) -> Result<(), String> {
+        self.process.delete_session(session_id)
     }
 
     pub(in crate::daemon::agent_acp) fn inspect_snapshot_for(
