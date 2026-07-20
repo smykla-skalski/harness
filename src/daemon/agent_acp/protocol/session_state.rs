@@ -46,7 +46,7 @@ pub(super) fn record_config_snapshot(
 /// Record why a prompt turn stopped, both on the inspectable session state and
 /// as a timeline event so a refusal is visible without reading the daemon log.
 pub(super) fn record_stop_reason(supervisor: &AcpSessionSupervisor, response: &PromptResponse) {
-    let label = stop_reason_label(&response.stop_reason);
+    let label = stop_reason_label(response.stop_reason);
     supervisor.mutate_session_state(|state| {
         state.last_stop_reason = Some(label.to_owned());
     });
@@ -55,7 +55,7 @@ pub(super) fn record_stop_reason(supervisor: &AcpSessionSupervisor, response: &P
     }
 }
 
-fn stop_reason_label(stop_reason: &StopReason) -> &'static str {
+fn stop_reason_label(stop_reason: StopReason) -> &'static str {
     match stop_reason {
         StopReason::EndTurn => "end_turn",
         StopReason::MaxTokens => "max_tokens",

@@ -24,7 +24,8 @@ use agent_client_protocol::schema::v1::{
     WaitForTerminalExitRequest, WriteTextFileRequest,
 };
 use agent_client_protocol::{
-    Agent, Client, ConnectTo, ConnectionTo, RequestCancellation, Result as AcpResult,
+    Agent, Client, ConnectTo, ConnectionTo, JsonRpcResponse, RequestCancellation, Responder,
+    Result as AcpResult,
 };
 use tokio::sync::mpsc;
 
@@ -95,16 +96,8 @@ pub(super) async fn connect_with_client_handlers<R>(
         .on_receive_request(
             async move |request: WriteTextFileRequest, responder, connection| {
                 let context = write_context.clone();
-                connection.spawn(async move {
-                    let cancellation = responder.cancellation();
-                    let cancel = ClientCallCancel::default();
-                    let result = run_cancellable(
-                        context.write_text_file(request, cancel.clone()),
-                        &cancellation,
-                        &cancel,
-                    )
-                    .await;
-                    respond_client_result(responder, result)
+                spawn_cancellable(&connection, responder, move |cancel| {
+                    context.write_text_file(request, cancel)
                 })
             },
             agent_client_protocol::on_receive_request!(),
@@ -112,16 +105,8 @@ pub(super) async fn connect_with_client_handlers<R>(
         .on_receive_request(
             async move |request: CreateTerminalRequest, responder, connection| {
                 let context = create_terminal_context.clone();
-                connection.spawn(async move {
-                    let cancellation = responder.cancellation();
-                    let cancel = ClientCallCancel::default();
-                    let result = run_cancellable(
-                        context.create_terminal(request, cancel.clone()),
-                        &cancellation,
-                        &cancel,
-                    )
-                    .await;
-                    respond_client_result(responder, result)
+                spawn_cancellable(&connection, responder, move |cancel| {
+                    context.create_terminal(request, cancel)
                 })
             },
             agent_client_protocol::on_receive_request!(),
@@ -147,16 +132,8 @@ pub(super) async fn connect_with_client_handlers<R>(
         .on_receive_request(
             async move |request: WaitForTerminalExitRequest, responder, connection| {
                 let context = wait_terminal_context.clone();
-                connection.spawn(async move {
-                    let cancellation = responder.cancellation();
-                    let cancel = ClientCallCancel::default();
-                    let result = run_cancellable(
-                        context.wait_for_terminal_exit(request, cancel.clone()),
-                        &cancellation,
-                        &cancel,
-                    )
-                    .await;
-                    respond_client_result(responder, result)
+                spawn_cancellable(&connection, responder, move |cancel| {
+                    context.wait_for_terminal_exit(request, cancel)
                 })
             },
             agent_client_protocol::on_receive_request!(),
@@ -173,22 +150,34 @@ pub(super) async fn connect_with_client_handlers<R>(
         .on_receive_request(
             async move |request: RequestPermissionRequest, responder, connection| {
                 let context = permission_context.clone();
-                connection.spawn(async move {
-                    let cancellation = responder.cancellation();
-                    let cancel = ClientCallCancel::default();
-                    let result = run_cancellable(
-                        context.request_permission(request, cancel.clone()),
-                        &cancellation,
-                        &cancel,
-                    )
-                    .await;
-                    respond_client_result(responder, result)
+                spawn_cancellable(&connection, responder, move |cancel| {
+                    context.request_permission(request, cancel)
                 })
             },
             agent_client_protocol::on_receive_request!(),
         )
         .connect_with(transport, main_fn)
         .await
+}
+
+/// Answer a client request from a spawned task so the dispatch loop stays free,
+/// tripping the call's cancel token if the agent cancels the request.
+fn spawn_cancellable<Response, Work, Fut>(
+    connection: &ConnectionTo<Agent>,
+    responder: Responder<Response>,
+    work: Work,
+) -> AcpResult<()>
+where
+    Response: JsonRpcResponse + Send + 'static,
+    Work: FnOnce(ClientCallCancel) -> Fut + Send + 'static,
+    Fut: Future<Output = ClientResult<Response>> + Send,
+{
+    connection.spawn(async move {
+        let cancellation = responder.cancellation();
+        let cancel = ClientCallCancel::default();
+        let result = run_cancellable(work(cancel.clone()), &cancellation, &cancel).await;
+        respond_client_result(responder, result)
+    })
 }
 
 /// Run `work`, tripping `cancel` if the agent cancels the request.

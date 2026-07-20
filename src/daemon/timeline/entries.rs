@@ -120,6 +120,39 @@ pub(crate) fn conversation_entry(
             "agent_session_marker",
             format!("{agent_id} marked {marker}"),
         ),
+        other => match agent_entry_descriptor(agent_id, other) {
+            Some(descriptor) => descriptor,
+            None => return Ok(None),
+        },
+    };
+    let payload = timeline_payload(
+        &serde_json::json!({
+            "runtime": runtime,
+            "event": event.kind,
+        }),
+        "agent conversation event",
+        payload_scope,
+    )?;
+
+    Ok(Some(TimelineEntry {
+        entry_id: format!("{runtime}-{agent_id}-{entry_kind}-{}", event.sequence),
+        recorded_at,
+        kind: entry_kind.into(),
+        session_id: session_id.to_string(),
+        agent_id: Some(agent_id.to_string()),
+        task_id: None,
+        summary,
+        payload,
+    }))
+}
+
+/// Entry kind and summary for the agent-emitted event kinds, split out so
+/// `conversation_entry` stays inside the function-length budget.
+fn agent_entry_descriptor(
+    agent_id: &str,
+    kind: &ConversationEventKind,
+) -> Option<(&'static str, String)> {
+    let descriptor = match kind {
         ConversationEventKind::WatchdogState { from, to, reason } => (
             "agent_watchdog_state",
             watchdog_summary(agent_id, from, to, reason.as_deref()),
@@ -154,27 +187,9 @@ pub(crate) fn conversation_entry(
         ConversationEventKind::Other { label, data } if label == "thought" => {
             ("agent_thought", other_text_summary(data, "Agent thought"))
         }
-        ConversationEventKind::Other { .. } => return Ok(None),
+        _ => return None,
     };
-    let payload = timeline_payload(
-        &serde_json::json!({
-            "runtime": runtime,
-            "event": event.kind,
-        }),
-        "agent conversation event",
-        payload_scope,
-    )?;
-
-    Ok(Some(TimelineEntry {
-        entry_id: format!("{runtime}-{agent_id}-{entry_kind}-{}", event.sequence),
-        recorded_at,
-        kind: entry_kind.into(),
-        session_id: session_id.to_string(),
-        agent_id: Some(agent_id.to_string()),
-        task_id: None,
-        summary,
-        payload,
-    }))
+    Some(descriptor)
 }
 
 fn turn_ended_summary(agent_id: &str, stop_reason: &str) -> String {
