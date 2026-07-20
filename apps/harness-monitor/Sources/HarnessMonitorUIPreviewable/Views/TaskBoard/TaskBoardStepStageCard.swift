@@ -1,9 +1,10 @@
 import SwiftUI
 
 /// The focused stage card: the stage title, what just happened, what Next will
-/// do, and a slot for the controls that close the card - secondary actions on
-/// the left, the primary Next button on the right. Presentational only - the
-/// parent supplies the buttons so this view stores no action closures.
+/// do, and a closing slot for whatever controls the stage offers. Arranging
+/// that slot is the caller's job; the card only stacks it last. Presentational
+/// only - the parent supplies the buttons so this view stores no action
+/// closures.
 struct TaskBoardStepStageCard<Actions: View>: View {
   let stageTitle: String
   let whatHappened: String?
