@@ -27,7 +27,7 @@ struct TaskBoardStepRailTargetView: View {
   var body: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
       HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-        Label(isPicked ? "Picked item" : "Current target", systemImage: "scope")
+        Label(isPicked ? "Picked item:" : "Current target:", systemImage: "scope")
           .font(labelFont)
           .foregroundStyle(.secondary)
         identity
@@ -59,11 +59,113 @@ struct TaskBoardStepRailTargetView: View {
     Label("Live", systemImage: "bolt.fill")
       .font(badgeFont)
       .foregroundStyle(HarnessMonitorTheme.caution)
+      .padding(.horizontal, HarnessMonitorTheme.pillPaddingH)
+      .harnessOpticallyBalancedVerticalPadding(HarnessMonitorTheme.pillPaddingV)
       .harnessControlPillGlass(tint: HarnessMonitorTheme.caution)
       .help("Manual steps run live against the board")
       .accessibilityLabel("Live operations")
       .accessibilityHint("Manual steps run live against the board")
       .accessibilityIdentifier("harness.task-board.step.live-mode")
+  }
+}
+
+/// The automation-context footer of the manual-steps card.
+///
+/// `DisclosureGroup` only hit-tests its triangle on macOS, so the label carries
+/// its own full-width button - otherwise the row reads as static text and the
+/// only way in is a 12pt chevron. A real button rather than a tap gesture so
+/// the row stays tab-reachable and keyboard-activatable.
+/// Feedback for the automation-context row. The row sits directly on the
+/// manual-steps card, so it rests fully transparent and only tints while the
+/// pointer is over it or it is held down.
+private struct TaskBoardStepContextRowButtonStyle: ButtonStyle {
+  let isHovered: Bool
+
+  @Environment(\.isEnabled)
+  private var isEnabled
+
+  private var shape: RoundedRectangle {
+    RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
+  }
+
+  private func fillOpacity(isPressed: Bool) -> Double {
+    isPressed ? 0.10 : isHovered ? 0.06 : 0
+  }
+
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .background {
+        shape.fill(
+          HarnessMonitorTheme.ink.opacity(fillOpacity(isPressed: configuration.isPressed))
+        )
+      }
+      .contentShape(shape)
+      .opacity(isEnabled ? 1 : 0.4)
+      .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+  }
+}
+
+struct TaskBoardStepContextDisclosure: View {
+  let store: HarnessMonitorStore
+  let workspace: PolicyCanvasWorkspace?
+  let heldDispatches: TaskBoardHeldDispatchSummary
+  let refreshID: TaskBoardApprovalGrantRefreshID
+  let isDisabled: Bool
+  @Binding var isExpanded: Bool
+
+  @Environment(\.fontScale)
+  private var fontScale
+  @Environment(\.accessibilityReduceMotion)
+  private var reduceMotion
+  @State private var isHovered = false
+
+  private var labelFont: Font {
+    HarnessMonitorTextSize.scaledFont(.callout.weight(.semibold), by: fontScale)
+  }
+
+  var body: some View {
+    DisclosureGroup(isExpanded: $isExpanded) {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+        TaskBoardApprovalGrantsView(
+          store: store,
+          workspace: workspace,
+          refreshID: refreshID,
+          isDisabled: isDisabled
+        )
+        HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingXL) {
+          TaskBoardHeldDispatchesView(summary: heldDispatches)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+          TaskBoardPolicyGuardsView(workspace: workspace)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+      }
+      .padding(.top, HarnessMonitorTheme.spacingSM)
+    } label: {
+      Button {
+        isExpanded.toggle()
+      } label: {
+        Label("Automation context", systemImage: "gearshape")
+          .font(labelFont)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.vertical, HarnessMonitorTheme.spacingXS)
+          .padding(.horizontal, HarnessMonitorTheme.spacingSM)
+      }
+      .buttonStyle(TaskBoardStepContextRowButtonStyle(isHovered: isHovered))
+      .onHover { hovering in
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) {
+          isHovered = hovering
+        }
+      }
+      // Standing in for the DisclosureGroup label costs VoiceOver the
+      // expanded state, so the button carries it.
+      .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+      .accessibilityHint("Shows approval grants, held dispatches, and policy guards")
+    }
+    // Animate here rather than inside the button: the disclosure triangle
+    // writes the binding directly, so only a modifier keyed on the value
+    // catches both ways in.
+    .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: isExpanded)
+    .accessibilityIdentifier("harness.task-board.step.context")
   }
 }
 
