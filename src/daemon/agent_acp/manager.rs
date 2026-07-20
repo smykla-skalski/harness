@@ -1,5 +1,4 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
 #[cfg(feature = "daemon-runtime")]
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -27,6 +26,7 @@ use crate::workspace::utc_now;
 pub(super) const PERMISSION_RESPONSE_DEADLINE: Duration = Duration::from_mins(5);
 const PROCESS_KEY_BACKOFF: Duration = Duration::from_secs(1);
 
+mod agent_sessions;
 mod locks;
 #[cfg(feature = "daemon-runtime")]
 mod orchestration;
@@ -298,58 +298,6 @@ impl AcpAgentManagerHandle {
         let session = self.session(acp_id)?;
         session.logout().map_err(|error| {
             CliErrorKind::workflow_io(format!("ACP logout for '{acp_id}': {error}")).into()
-        })
-    }
-
-    /// List the sessions the agent itself knows about.
-    ///
-    /// These ids belong to the agent, not to harness, so the result is display
-    /// data rather than a source of harness session state.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the session is unknown, the capability is
-    /// missing, or the agent rejects the call.
-    pub fn list_agent_sessions(
-        &self,
-        acp_id: &str,
-        cwd: Option<PathBuf>,
-        cursor: Option<String>,
-    ) -> Result<AcpSessionListPage, CliError> {
-        let session = self.session(acp_id)?;
-        session.list_sessions(cwd, cursor).map_err(|error| {
-            CliErrorKind::workflow_io(format!("ACP session list for '{acp_id}': {error}")).into()
-        })
-    }
-
-    /// Ask the agent to close one of its sessions.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the session is unknown, the capability is
-    /// missing, or the agent rejects the call.
-    pub fn close_agent_session(
-        &self,
-        acp_id: &str,
-        agent_session_id: &str,
-    ) -> Result<(), CliError> {
-        let session = self.session(acp_id)?;
-        session.close_session(agent_session_id).map_err(|error| {
-            CliErrorKind::workflow_io(format!("ACP session close for '{acp_id}': {error}")).into()
-        })
-    }
-
-    /// Ask the agent to delete one of its sessions.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the session is unknown, the capability is
-    /// missing, or the agent rejects the call.
-    pub fn delete_agent_session(
-        &self,
-        acp_id: &str,
-        agent_session_id: &str,
-    ) -> Result<(), CliError> {
-        let session = self.session(acp_id)?;
-        session.delete_session(agent_session_id).map_err(|error| {
-            CliErrorKind::workflow_io(format!("ACP session delete for '{acp_id}': {error}")).into()
         })
     }
 
