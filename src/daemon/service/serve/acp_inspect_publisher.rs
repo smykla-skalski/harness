@@ -319,6 +319,7 @@ mod tests {
             permission_queue_depth: 0,
             terminal_count: 0,
             prompt_deadline_remaining_ms: 0,
+            handshake: None,
         }
     }
 }

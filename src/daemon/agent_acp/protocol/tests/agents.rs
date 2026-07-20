@@ -1,10 +1,10 @@
 use std::sync::{Arc, Mutex};
 
 use agent_client_protocol::schema::v1::{
-    AgentCapabilities, CancelNotification, ContentBlock, ContentChunk, InitializeRequest,
-    InitializeResponse, NewSessionRequest, NewSessionResponse, PromptRequest, PromptResponse,
-    SessionConfigKind, SessionConfigOption, SessionConfigOptionCategory, SessionConfigSelect,
-    SessionConfigSelectOption, SessionId, SessionNotification, SessionUpdate,
+    AgentCapabilities, CancelNotification, ContentBlock, ContentChunk, Implementation,
+    InitializeRequest, InitializeResponse, NewSessionRequest, NewSessionResponse, PromptRequest,
+    PromptResponse, SessionConfigKind, SessionConfigOption, SessionConfigOptionCategory,
+    SessionConfigSelect, SessionConfigSelectOption, SessionId, SessionNotification, SessionUpdate,
     SetSessionConfigOptionRequest, SetSessionConfigOptionResponse, StopReason, TextContent,
 };
 use agent_client_protocol::util::internal_error;
@@ -109,12 +109,10 @@ pub(super) async fn run_agent_recording_initialize_contract(
                     .as_ref()
                     .and_then(|session| session.config_options.as_ref())
                     .is_some_and(|options| options.boolean.is_some());
-                let client = initialize
-                    .client_info
-                    .as_ref()
-                    .map_or_else(|| "none".to_owned(), |info| {
-                        format!("{}@{}", info.name, info.version)
-                    });
+                let client = initialize.client_info.as_ref().map_or_else(
+                    || "none".to_owned(),
+                    |info| format!("{}@{}", info.name, info.version),
+                );
                 operations.lock().expect("record initialize").push(format!(
                     "initialize:read={},write={},terminal={},boolean={boolean},client={client}",
                     capabilities.fs.read_text_file,
@@ -123,7 +121,11 @@ pub(super) async fn run_agent_recording_initialize_contract(
                 ));
                 responder.respond(
                     InitializeResponse::new(initialize.protocol_version)
-                        .agent_capabilities(AgentCapabilities::new()),
+                        .agent_info(Some(Implementation::new(
+                            "initialize-contract-agent",
+                            "1.2.3",
+                        )))
+                        .agent_capabilities(AgentCapabilities::new().load_session(true)),
                 )
             },
             agent_client_protocol::on_receive_request!(),
@@ -160,7 +162,8 @@ pub(super) async fn run_agent_recording_startup_config_order(
         )
         .on_receive_request(
             async move |_request: NewSessionRequest, responder, _connection| {
-                responder.respond(NewSessionResponse::new("acp-session-1").config_options(vec![
+                responder.respond(
+                    NewSessionResponse::new("acp-session-1").config_options(vec![
                         SessionConfigOption::select(
                             "effort",
                             "Effort",
@@ -171,7 +174,8 @@ pub(super) async fn run_agent_recording_startup_config_order(
                             ],
                         )
                         .category(SessionConfigOptionCategory::Other("effort".to_string())),
-                    ]))
+                    ]),
+                )
             },
             agent_client_protocol::on_receive_request!(),
         )

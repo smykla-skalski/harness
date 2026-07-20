@@ -6,12 +6,11 @@ use std::time::Duration;
 
 use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::schema::v1::{
-    BooleanConfigOptionCapabilities, CancelNotification, ClientCapabilities,
-    ClientSessionCapabilities, ContentBlock, CreateTerminalRequest, FileSystemCapabilities,
-    Implementation, InitializeRequest, InitializeResponse, KillTerminalRequest, NewSessionRequest,
-    NewSessionResponse, PromptRequest, ReadTextFileRequest, ReleaseTerminalRequest,
-    RequestPermissionRequest, SessionConfigOptionsCapabilities, SessionId, SessionNotification,
-    TerminalOutputRequest, TextContent, WaitForTerminalExitRequest, WriteTextFileRequest,
+    CancelNotification, ContentBlock, CreateTerminalRequest, Implementation, InitializeRequest,
+    InitializeResponse, KillTerminalRequest, NewSessionRequest, NewSessionResponse, PromptRequest,
+    ReadTextFileRequest, ReleaseTerminalRequest, RequestPermissionRequest, SessionId,
+    SessionNotification, TerminalOutputRequest, TextContent, WaitForTerminalExitRequest,
+    WriteTextFileRequest,
 };
 use agent_client_protocol::{
     Agent, ByteStreams, Client, ConnectionTo, Error as AcpError, ErrorCode, Result as AcpResult,
@@ -38,6 +37,7 @@ use super::manager::{AcpAgentManagerHandle, AcpAgentStartRequest};
 use super::spawn_credential::{SpawnCredential, release_after_initialization};
 mod commands;
 mod context;
+mod handshake;
 mod runtime_helpers;
 mod session_config;
 mod session_guard;
@@ -45,6 +45,7 @@ mod session_start;
 pub(super) use commands::AcpProtocolHandle;
 use commands::{ProtocolCommand, run_protocol_command_loop};
 use context::{ProtocolContext, handle_permission_request, respond_client_result};
+use handshake::harness_client_capabilities;
 pub(super) use session_config::AcpSessionRequestConfig;
 use session_config::{advertised_session_configuration, apply_requested_session_configuration};
 use session_guard::SessionRouteGuard;
@@ -425,20 +426,6 @@ struct RunConnectionArgs {
     session_guard: Arc<SessionRouteGuard>,
     manager: AcpAgentManagerHandle,
     credential: Option<SpawnCredential>,
-}
-
-fn harness_client_capabilities() -> ClientCapabilities {
-    ClientCapabilities::new()
-        .fs(FileSystemCapabilities::new()
-            .read_text_file(true)
-            .write_text_file(true))
-        .terminal(true)
-        .session(
-            ClientSessionCapabilities::new().config_options(
-                SessionConfigOptionsCapabilities::new()
-                    .boolean(BooleanConfigOptionCapabilities::new()),
-            ),
-        )
 }
 
 async fn send_initialize(

@@ -181,6 +181,7 @@ impl ActiveAcpSession {
             permission_queue_depth: snapshot.permission_queue_depth,
             terminal_count: snapshot.terminal_count,
             prompt_deadline_remaining_ms: u64::try_from(remaining.as_millis()).unwrap_or(u64::MAX),
+            handshake: self.process.supervisor.handshake().cloned(),
         }
     }
 

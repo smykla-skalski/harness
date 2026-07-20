@@ -376,6 +376,18 @@ async fn run_connection_sends_client_capabilities_and_client_info() {
             env!("CARGO_PKG_VERSION"),
         )]
     );
+    let handshake = some(
+        supervisor.handshake().cloned(),
+        "initialize response should be recorded on the supervisor",
+    );
+    assert_eq!(handshake.protocol_version, 1);
+    assert_eq!(
+        handshake.agent_name.as_deref(),
+        Some("initialize-contract-agent")
+    );
+    assert_eq!(handshake.agent_version.as_deref(), Some("1.2.3"));
+    assert!(handshake.supports_load_session);
+    assert!(!handshake.supports_session_list);
 
     let _ = supervisor_child.kill();
     let _ = supervisor_child.wait();

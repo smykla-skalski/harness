@@ -28,6 +28,8 @@ use tokio::time::Instant;
 use tokio::sync::Notify;
 use tracing::warn;
 
+use harness_protocol::managed_agents::acp::AcpAgentHandshake;
+
 use crate::agents::kind::DisconnectReason;
 use crate::workspace::utc_now;
 
@@ -161,6 +163,7 @@ pub struct AcpSessionSupervisor {
     /// and panic-free on attach contention; the prior `Mutex<Option<Arc>>`
     /// would have crashed the supervisor on a poisoned lock.
     event_emitter: OnceLock<Arc<dyn WatchdogEventEmitter>>,
+    handshake: OnceLock<AcpAgentHandshake>,
 }
 
 impl AcpSessionSupervisor {
@@ -187,7 +190,20 @@ impl AcpSessionSupervisor {
             last_client_call_at: Mutex::new(None),
             watchdog_notify: Notify::new(),
             event_emitter: OnceLock::new(),
+            handshake: OnceLock::new(),
         }
+    }
+
+    /// Record the `initialize` exchange result. First write wins; a
+    /// reconnect on the same process would re-run initialize against the
+    /// same agent, so later identical writes are dropped silently.
+    pub fn record_handshake(&self, handshake: AcpAgentHandshake) {
+        let _ = self.handshake.set(handshake);
+    }
+
+    #[must_use]
+    pub fn handshake(&self) -> Option<&AcpAgentHandshake> {
+        self.handshake.get()
     }
 
     /// Attach a sink that receives watchdog state transitions.

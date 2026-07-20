@@ -7,10 +7,10 @@ mod snapshot_wire;
 mod wire;
 
 pub use models::{
-    AcpAgentDescriptor, AcpAgentInspectResponse, AcpAgentInspectSnapshot, AcpAgentSnapshot,
-    AcpAgentStartRequest, AcpAuthState, AcpPermissionBatch, AcpPermissionDecision,
-    AcpPermissionItem, AcpPermissionOption, AcpPermissionOptionKind, AcpRuntimeProbe,
-    AcpRuntimeProbeResponse, AcpSessionConfigOptionBinding, AcpSessionConfiguration,
-    AcpSessionEffortTransport, AcpSessionModelTransport, AcpSpawnConfiguration,
-    BridgeAcpStartRequest, CapabilityTag, DoctorProbe,
+    AcpAgentDescriptor, AcpAgentHandshake, AcpAgentInspectResponse, AcpAgentInspectSnapshot,
+    AcpAgentSnapshot, AcpAgentStartRequest, AcpAuthState, AcpPermissionBatch,
+    AcpPermissionDecision, AcpPermissionItem, AcpPermissionOption, AcpPermissionOptionKind,
+    AcpRuntimeProbe, AcpRuntimeProbeResponse, AcpSessionConfigOptionBinding,
+    AcpSessionConfiguration, AcpSessionEffortTransport, AcpSessionModelTransport,
+    AcpSpawnConfiguration, BridgeAcpStartRequest, CapabilityTag, DoctorProbe,
 };
