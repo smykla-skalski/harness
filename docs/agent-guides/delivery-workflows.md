@@ -92,7 +92,7 @@ gh api --method POST repos/smykla-skalski/harness/pulls/<PR_NUMBER>/requested_re
 1. Wait for a Copilot review whose reviewed commit is the exact current head; a review of an older head does not count.
 2. Inspect every remark and unresolved conversation. Implement valid fixes, run affected validation, commit the explicit paths with signing and sign-off, and push.
 3. After each fix push, resolve only the conversations that push addressed. A fix needs no reply.
-4. Answer an incorrect finding before resuming other work, then resolve the thread. Give the evidence, not the verdict: the command that proves it and the mechanism behind it. Write one or two plain sentences, and drop the polite filler, bullets, and trailing period. Never silently resolve a wrong finding, because a silent resolve reads as a real defect quietly ignored and leaves the next reader no record of why nothing changed. Use the `gh-review-comments` skill to post, and the `writing-clearly-and-concisely` and `humanize` skills to draft.
+4. Answer an incorrect finding before resuming other work, then resolve the thread. Give the evidence, not the verdict: the command that proves it and the mechanism behind it. Write one or two plain sentences, and drop the polite filler, bullets, and trailing period. Never silently resolve a wrong finding, because a silent resolve reads as a real defect quietly ignored and leaves the next reader no record of why nothing changed.
 5. Re-request Copilot and repeat without a fixed round limit until it reviews the exact current head and reports no new comments.
 6. If the head, PR body, feedback, or required checks change, invalidate the prior result and resume the loop. Escalate only a genuine impasse, a recurring already-addressed finding, or persistent Copilot or API failure; keep the PR draft while blocked.
 
@@ -111,10 +111,10 @@ Confirm the PR merged, check both checkouts are clean, then run:
 git -C <main-checkout> fetch --prune upstream
 git -C <main-checkout> merge --ff-only upstream/main
 git -C <worktree> reset --hard main
-git -C <worktree> branch --unset-upstream
+git -C <worktree> branch --unset-upstream <session-branch>
 ```
 
-That is the whole closeout. The `reset --hard` is safe only on the session branch with a clean worktree; the commits it discards are already merged. Do not rerun validation on `main`, and keep the worktree and lane available.
+That is the whole closeout. The `reset --hard` is safe only on the session branch with a clean worktree; the squash commit on `main` already carries every change it discards. Do not rerun validation on `main`, and keep the worktree and lane available.
 
 It deliberately skips three things:
 
