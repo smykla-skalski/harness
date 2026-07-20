@@ -74,6 +74,12 @@ impl SessionRouteGuard {
         }
     }
 
+    /// Every protocol session still routed, for teardown to close.
+    pub(super) fn active_sessions(&self) -> Vec<SessionId> {
+        let state = self.state.lock().expect("session route guard lock");
+        state.routes.keys().cloned().map(SessionId::new).collect()
+    }
+
     pub(super) fn stop_target(&self, target: &RouteTarget) -> Option<SessionId> {
         let mut state = self.state.lock().expect("session route guard lock");
         let session_id = state

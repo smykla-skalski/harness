@@ -22,8 +22,10 @@ public struct AcpAgentStartRequestWire: Codable, Equatable, Sendable {
   public var recordPermissions: Bool
   public var mcpServers: [AcpMcpServer]
   public var additionalDirectories: [String]
+  public var resumeSessionId: String?
+  public var resumeDisabled: Bool
 
-  public init(descriptorId: String, role: SessionRole = .worker, fallbackRole: SessionRole? = nil, capabilities: [String] = [], name: String? = nil, prompt: String? = nil, projectDir: String? = nil, persona: String? = nil, taskId: String? = nil, boardItemId: String? = nil, workflowExecutionId: String? = nil, model: String? = nil, effort: String? = nil, allowCustomModel: Bool = false, recordPermissions: Bool = false, mcpServers: [AcpMcpServer] = [], additionalDirectories: [String] = []) {
+  public init(descriptorId: String, role: SessionRole = .worker, fallbackRole: SessionRole? = nil, capabilities: [String] = [], name: String? = nil, prompt: String? = nil, projectDir: String? = nil, persona: String? = nil, taskId: String? = nil, boardItemId: String? = nil, workflowExecutionId: String? = nil, model: String? = nil, effort: String? = nil, allowCustomModel: Bool = false, recordPermissions: Bool = false, mcpServers: [AcpMcpServer] = [], additionalDirectories: [String] = [], resumeSessionId: String? = nil, resumeDisabled: Bool = false) {
     self.descriptorId = descriptorId
     self.role = role
     self.fallbackRole = fallbackRole
@@ -41,6 +43,8 @@ public struct AcpAgentStartRequestWire: Codable, Equatable, Sendable {
     self.recordPermissions = recordPermissions
     self.mcpServers = mcpServers
     self.additionalDirectories = additionalDirectories
+    self.resumeSessionId = resumeSessionId
+    self.resumeDisabled = resumeDisabled
   }
 
   public init(from decoder: Decoder) throws {
@@ -62,6 +66,8 @@ public struct AcpAgentStartRequestWire: Codable, Equatable, Sendable {
     recordPermissions = try container.decodeIfPresent(Bool.self, forKey: .recordPermissions) ?? false
     mcpServers = try container.decodeIfPresent([AcpMcpServer].self, forKey: .mcpServers) ?? []
     additionalDirectories = try container.decodeIfPresent([String].self, forKey: .additionalDirectories) ?? []
+    resumeSessionId = try container.decodeIfPresent(String.self, forKey: .resumeSessionId)
+    resumeDisabled = try container.decodeIfPresent(Bool.self, forKey: .resumeDisabled) ?? false
   }
 
   enum CodingKeys: String, CodingKey {
@@ -82,6 +88,8 @@ public struct AcpAgentStartRequestWire: Codable, Equatable, Sendable {
     case recordPermissions = "record_permissions"
     case mcpServers = "mcp_servers"
     case additionalDirectories = "additional_directories"
+    case resumeSessionId = "resume_session_id"
+    case resumeDisabled = "resume_disabled"
   }
 }
 

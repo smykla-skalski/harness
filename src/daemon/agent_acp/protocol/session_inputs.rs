@@ -8,17 +8,23 @@ use std::path::PathBuf;
 
 use agent_client_protocol::schema::v1::{
     EnvVariable, HttpHeader, McpServer, McpServerHttp, McpServerSse, McpServerStdio,
-    NewSessionRequest,
+    NewSessionRequest, ResumeSessionRequest, SessionId,
 };
 
 use super::session_config::AcpSessionRequestConfig;
 use crate::daemon::agent_acp::{AcpAgentHandshake, AcpMcpServer};
 
-pub(super) fn new_session_request(
-    cwd: PathBuf,
+/// The inputs both `session/new` and `session/resume` carry, after the
+/// capability gate has dropped whatever this agent cannot accept.
+struct SessionInputs {
+    additional_directories: Vec<PathBuf>,
+    mcp_servers: Vec<McpServer>,
+}
+
+fn session_inputs(
     config: &AcpSessionRequestConfig,
     handshake: Option<&AcpAgentHandshake>,
-) -> NewSessionRequest {
+) -> SessionInputs {
     let additional_directories = if handshake.is_some_and(|handshake| {
         handshake.supports_additional_directories
     }) {
@@ -30,15 +36,40 @@ pub(super) fn new_session_request(
     } else {
         Vec::new()
     };
-    let mcp_servers = config
-        .mcp_servers()
-        .iter()
-        .filter(|server| agent_accepts(server, handshake))
-        .map(mcp_server)
-        .collect::<Vec<_>>();
+    SessionInputs {
+        additional_directories,
+        mcp_servers: config
+            .mcp_servers()
+            .iter()
+            .filter(|server| agent_accepts(server, handshake))
+            .map(mcp_server)
+            .collect(),
+    }
+}
+
+pub(super) fn new_session_request(
+    cwd: PathBuf,
+    config: &AcpSessionRequestConfig,
+    handshake: Option<&AcpAgentHandshake>,
+) -> NewSessionRequest {
+    let inputs = session_inputs(config, handshake);
     NewSessionRequest::new(cwd)
-        .additional_directories(additional_directories)
-        .mcp_servers(mcp_servers)
+        .additional_directories(inputs.additional_directories)
+        .mcp_servers(inputs.mcp_servers)
+}
+
+/// Resume carries the same inputs as a new session: the agent needs its MCP
+/// servers and roots again, whether the conversation is fresh or not.
+pub(super) fn resume_session_request(
+    session_id: SessionId,
+    cwd: PathBuf,
+    config: &AcpSessionRequestConfig,
+    handshake: Option<&AcpAgentHandshake>,
+) -> ResumeSessionRequest {
+    let inputs = session_inputs(config, handshake);
+    ResumeSessionRequest::new(session_id, cwd)
+        .additional_directories(inputs.additional_directories)
+        .mcp_servers(inputs.mcp_servers)
 }
 
 /// Stdio servers are baseline in protocol v1; the networked transports each

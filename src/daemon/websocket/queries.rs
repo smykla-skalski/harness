@@ -73,7 +73,7 @@ async fn dispatch_daemon_status_query(
         ws_methods::GITHUB_STATUS => Some(dispatch_github_status_query(&request.id).await),
         ws_methods::AUDIT_EVENTS => Some(dispatch_audit_events_query(request, state, viewer).await),
         ws_methods::CONFIG => Some(dispatch_config_query(&request.id)),
-        ws_methods::DAEMON_STOP => Some(dispatch_daemon_stop_query(&request.id, state)),
+        ws_methods::DAEMON_STOP => Some(dispatch_daemon_stop_query(&request.id, state).await),
         ws_methods::DAEMON_LOG_LEVEL => Some(dispatch_query(&request.id, service::get_log_level)),
         _ => None,
     }
@@ -123,14 +123,12 @@ fn dispatch_config_query(request_id: &str) -> WsResponse {
     dispatch_query_result(request_id, Ok(build_config_payload()))
 }
 
-fn dispatch_daemon_stop_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
-    dispatch_query_result(
-        request_id,
-        state
-            .acp_agent_manager
-            .shutdown_all()
-            .and_then(|()| service::request_shutdown()),
-    )
+async fn dispatch_daemon_stop_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
+    let result = match state.acp_agent_manager.shutdown_all_async().await {
+        Ok(()) => service::request_shutdown(),
+        Err(error) => Err(error),
+    };
+    dispatch_query_result(request_id, result)
 }
 
 #[expect(

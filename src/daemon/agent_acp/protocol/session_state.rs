@@ -3,7 +3,7 @@
 
 use agent_client_protocol::schema::MaybeUndefined;
 use agent_client_protocol::schema::v1::{
-    NewSessionResponse, PromptResponse, SessionConfigKind, SessionConfigOption, SessionUpdate,
+    PromptResponse, SessionConfigKind, SessionConfigOption, SessionModeState, SessionUpdate,
     SetSessionConfigOptionResponse, StopReason,
 };
 
@@ -12,15 +12,14 @@ use crate::daemon::agent_acp::AcpSessionConfigOptionState;
 
 use super::session_config::session_config_category_name;
 
-pub(super) fn seed_from_new_session(
+/// Seed the live state from whichever call opened the session; `session/new`
+/// and `session/resume` both report these two.
+pub(super) fn seed_from_session_start(
     supervisor: &AcpSessionSupervisor,
-    response: &NewSessionResponse,
+    config_options: Option<&[SessionConfigOption]>,
+    modes: Option<&SessionModeState>,
 ) {
-    let config_options = response.config_options.as_deref();
-    let mode_id = response
-        .modes
-        .as_ref()
-        .map(|modes| modes.current_mode_id.0.to_string());
+    let mode_id = modes.map(|modes| modes.current_mode_id.0.to_string());
     if config_options.is_none() && mode_id.is_none() {
         return;
     }

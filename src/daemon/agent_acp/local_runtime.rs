@@ -37,6 +37,7 @@ use super::protocol::{
 };
 use super::spawn_credential::SpawnCredential;
 
+mod resume;
 mod reused_session;
 mod rollback;
 mod sandbox_state;
@@ -280,6 +281,7 @@ impl AcpAgentManagerHandle {
                     input.request,
                     input.descriptor,
                 ),
+                resume_session_id: self.resume_target(input.request, input.session_id, &input.descriptor.id),
                 acp_id: input.acp_id,
                 session_id: input.session_id,
                 agent_name: context.display_name.clone(),

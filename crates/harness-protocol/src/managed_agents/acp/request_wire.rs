@@ -2,7 +2,7 @@ use serde::de::Error as DeError;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::mcp::AcpMcpServer;
-use super::models::{AcpAgentStartRequest, default_acp_role};
+use super::models::{AcpAgentStartRequest, default_acp_role, is_false};
 use crate::session::SessionRole;
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -41,6 +41,10 @@ struct AcpAgentStartRequestDecode {
     mcp_servers: Vec<AcpMcpServer>,
     #[serde(default)]
     additional_directories: Vec<String>,
+    #[serde(default)]
+    resume_session_id: Option<String>,
+    #[serde(default)]
+    resume_disabled: bool,
 }
 
 /// Keeps MCP credentials, unlike a descriptor: the caller supplied them and
@@ -76,6 +80,10 @@ struct AcpAgentStartRequestEncode<'a> {
     mcp_servers: &'a [AcpMcpServer],
     #[serde(skip_serializing_if = "<[String]>::is_empty")]
     additional_directories: &'a [String],
+    #[serde(skip_serializing_if = "Option::is_none")]
+    resume_session_id: Option<&'a str>,
+    #[serde(skip_serializing_if = "is_false")]
+    resume_disabled: bool,
 }
 
 impl Serialize for AcpAgentStartRequest {
@@ -101,6 +109,8 @@ impl Serialize for AcpAgentStartRequest {
             record_permissions: self.record_permissions,
             mcp_servers: &self.mcp_servers,
             additional_directories: &self.additional_directories,
+            resume_session_id: self.resume_session_id.as_deref(),
+            resume_disabled: self.resume_disabled,
         }
         .serialize(serializer)
     }
@@ -133,6 +143,8 @@ impl<'de> Deserialize<'de> for AcpAgentStartRequest {
             record_permissions: decoded.record_permissions,
             mcp_servers: decoded.mcp_servers,
             additional_directories: decoded.additional_directories,
+            resume_session_id: decoded.resume_session_id,
+            resume_disabled: decoded.resume_disabled,
         })
     }
 }
@@ -274,6 +286,8 @@ mod tests {
             record_permissions: true,
             mcp_servers: Vec::new(),
             additional_directories: Vec::new(),
+            resume_session_id: None,
+            resume_disabled: false,
         };
 
         let value = serde_json::to_value(&request).expect("serialize request");

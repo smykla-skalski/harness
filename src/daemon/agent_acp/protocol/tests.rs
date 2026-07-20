@@ -15,7 +15,7 @@ use crate::agents::acp::catalog::{
     AcpSessionEffortTransport, AcpSessionModelTransport, DoctorProbe,
 };
 use crate::agents::acp::supervision::{SupervisionConfig, WatchdogState};
-use crate::daemon::agent_acp::AcpAgentManagerHandle;
+use crate::daemon::agent_acp::{AcpAgentManagerHandle, AcpMcpServer};
 use crate::daemon::db::DaemonDb;
 use crate::daemon::index::DiscoveredProject;
 use crate::session::service as session_service;
@@ -24,6 +24,7 @@ use crate::session::types::{ManagedAgentRef, SessionRole};
 mod agents;
 mod cancellation_tests;
 mod connection_tests;
+mod lifecycle_agents;
 mod lifecycle_tests;
 mod telemetry_tests;
 
@@ -141,6 +142,31 @@ fn disabled_session_config() -> AcpSessionRequestConfig {
     )
 }
 
+/// One MCP server and one extra root from each source, so a test can tell a
+/// dropped descriptor input apart from a dropped per-start one.
+fn session_config_with_inputs() -> AcpSessionRequestConfig {
+    let descriptor = descriptor_with_session_configuration(AcpSessionConfiguration {
+        mcp_servers: vec![stdio_mcp_server("descriptor-server")],
+        additional_directories: vec!["/work/descriptor".to_string()],
+        ..Default::default()
+    });
+    let request = AcpAgentStartRequest {
+        mcp_servers: vec![stdio_mcp_server("start-server")],
+        additional_directories: vec!["/work/start".to_string()],
+        ..AcpAgentStartRequest::default()
+    };
+    AcpSessionRequestConfig::from_request(&request, &descriptor)
+}
+
+fn stdio_mcp_server(name: &str) -> AcpMcpServer {
+    AcpMcpServer::Stdio {
+        name: name.to_string(),
+        command: "/usr/bin/true".to_string(),
+        args: Vec::new(),
+        env: Vec::new(),
+    }
+}
+
 #[tokio::test]
 #[cfg(unix)]
 async fn prompt_turn_against_sdk_cookbook_style_agent_streams_events() {
@@ -190,6 +216,7 @@ async fn prompt_turn_against_sdk_cookbook_style_agent_streams_events() {
                     project_dir,
                     prompt: Some("smoke the second descriptor".to_string()),
                     session_config: disabled_session_config(),
+                    resume_session_id: None,
                     acp_id: "agent-acp-1".to_string(),
                     session_id: "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e".to_string(),
                     runtime_name: "fake".to_string(),
@@ -285,6 +312,7 @@ async fn protocol_rejects_notification_with_unknown_session_id() {
                     project_dir,
                     prompt: Some("trigger stale session".to_string()),
                     session_config: disabled_session_config(),
+                    resume_session_id: None,
                     acp_id: "agent-acp-1".to_string(),
                     session_id: "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e".to_string(),
                     runtime_name: "fake".to_string(),
@@ -379,6 +407,7 @@ async fn run_connection_applies_session_configuration_before_first_prompt() {
                     project_dir,
                     prompt: request.prompt.clone(),
                     session_config: AcpSessionRequestConfig::from_request(&request, &descriptor),
+                    resume_session_id: None,
                     acp_id: "agent-acp-1".to_string(),
                     session_id: "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e".to_string(),
                     runtime_name: "fake".to_string(),

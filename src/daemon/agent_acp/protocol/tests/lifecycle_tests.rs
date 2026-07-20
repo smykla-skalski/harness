@@ -8,10 +8,17 @@ use std::path::PathBuf;
 use agent_client_protocol::schema::v1::ListSessionsRequest;
 
 use super::super::commands::ProtocolCommandResult;
+use super::super::session_guard::RouteTarget;
 use super::agents::{
     run_agent_recording_initialize_contract, run_agent_recording_session_lifecycle,
 };
+use super::lifecycle_agents::{
+    run_agent_never_answering_close, run_agent_recording_session_inputs,
+    run_agent_recording_session_resume,
+};
 use super::*;
+
+mod teardown_tests;
 
 type AgentResult = agent_client_protocol::Result<()>;
 
@@ -33,6 +40,29 @@ where
     F: FnOnce(Channel, Arc<Mutex<Vec<String>>>) -> Fut,
     Fut: Future<Output = AgentResult> + Send + 'static,
 {
+    lifecycle_harness_with_config(spawn_agent, disabled_session_config())
+}
+
+fn lifecycle_harness_with_config<F, Fut>(
+    spawn_agent: F,
+    session_config: AcpSessionRequestConfig,
+) -> LifecycleHarness
+where
+    F: FnOnce(Channel, Arc<Mutex<Vec<String>>>) -> Fut,
+    Fut: Future<Output = AgentResult> + Send + 'static,
+{
+    lifecycle_harness_resuming(spawn_agent, session_config, None)
+}
+
+fn lifecycle_harness_resuming<F, Fut>(
+    spawn_agent: F,
+    session_config: AcpSessionRequestConfig,
+    resume_session_id: Option<String>,
+) -> LifecycleHarness
+where
+    F: FnOnce(Channel, Arc<Mutex<Vec<String>>>) -> Fut,
+    Fut: Future<Output = AgentResult> + Send + 'static,
+{
     let project = ok(tempfile::tempdir(), "project tempdir");
     let supervisor_child = ChildGuard(ok(
         Command::new("sleep").arg("60").spawn(),
@@ -43,6 +73,7 @@ where
         SupervisionConfig {
             initialize_timeout: Duration::from_secs(1),
             prompt_timeout: Duration::from_secs(1),
+            lifecycle_timeout: Duration::from_millis(500),
             ..SupervisionConfig::default()
         },
     ));
@@ -68,7 +99,8 @@ where
                     connection,
                     project_dir,
                     prompt: None,
-                    session_config: disabled_session_config(),
+                    session_config,
+                    resume_session_id,
                     acp_id: "agent-acp-1".to_string(),
                     session_id: "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e".to_string(),
                     runtime_name: "fake".to_string(),
@@ -141,6 +173,26 @@ impl LifecycleHarness {
         self.operations.lock().expect("recorded operations").clone()
     }
 
+    /// Wait for the agent to record an operation starting with `prefix`.
+    async fn await_recorded(&self, prefix: &str) -> String {
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        loop {
+            if let Some(record) = self
+                .recorded()
+                .into_iter()
+                .find(|operation| operation.starts_with(prefix))
+            {
+                return record;
+            }
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "agent should record a '{prefix}' operation; got {:?}",
+                self.recorded()
+            );
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    }
+
     async fn shutdown(self) {
         assert!(self.cancel_tx.send(()).is_ok());
         let protocol_result = ok(
@@ -154,6 +206,58 @@ impl LifecycleHarness {
         self.agent_task.abort();
         let _ = self.agent_task.await;
     }
+}
+
+/// The first session on a process is created by `run_connection` itself rather
+/// than by the attach command, so it needs its own proof that the declared
+/// inputs reached the agent.
+#[tokio::test]
+#[cfg(unix)]
+async fn primary_session_new_carries_declared_mcp_servers_and_directories() {
+    let harness = lifecycle_harness_with_config(
+        run_agent_recording_session_inputs,
+        session_config_with_inputs(),
+    );
+
+    let record = harness.await_recorded("new:").await;
+
+    assert_eq!(
+        record, "new:mcp=descriptor-server,start-server:dirs=/work/descriptor,/work/start",
+        "the first session on a process must carry the same inputs a later attach does"
+    );
+
+    harness.shutdown().await;
+}
+
+/// A wedged agent must surface a deadline, not park the caller. Without a
+/// bound this call never returns, and on the teardown path it takes the
+/// process-lifecycle lock and the daemon shutdown down with it.
+#[tokio::test]
+#[cfg(unix)]
+async fn lifecycle_call_against_a_wedged_agent_fails_on_its_deadline() {
+    let harness = lifecycle_harness(run_agent_never_answering_close);
+
+    let result = harness
+        .dispatch(|response_tx| ProtocolCommand::CloseSession {
+            session_id: SessionId::new("acp-session-7"),
+            response_tx,
+        })
+        .await;
+
+    let Err(message) = result else {
+        unreachable!("close must not succeed against an agent that never answers");
+    };
+    assert!(
+        message.contains("timed out"),
+        "error should report the deadline; got {message}"
+    );
+    assert!(
+        harness.recorded().contains(&"close:acp-session-7".to_string()),
+        "the agent should have received the close before we gave up; got {:?}",
+        harness.recorded()
+    );
+
+    harness.shutdown().await;
 }
 
 #[tokio::test]

@@ -1,5 +1,5 @@
 use agent_client_protocol::schema::v1::{
-    NewSessionResponse, SessionConfigKind, SessionConfigOption, SessionConfigOptionCategory,
+    SessionConfigKind, SessionConfigOption, SessionConfigOptionCategory,
     SessionConfigOptionValue, SessionConfigSelect, SessionConfigSelectGroup,
     SessionConfigSelectOption, SessionConfigSelectOptions, SessionId,
     SetSessionConfigOptionRequest,
@@ -108,12 +108,14 @@ pub(super) struct SessionConfigurationAdvertisement<'a> {
     config_options: &'a [SessionConfigOption],
 }
 
+/// Takes the options rather than a response, because `session/new` and
+/// `session/resume` advertise the same thing from different response types.
 #[must_use]
 pub(super) fn advertised_session_configuration(
-    response: &NewSessionResponse,
+    config_options: Option<&[SessionConfigOption]>,
 ) -> SessionConfigurationAdvertisement<'_> {
     SessionConfigurationAdvertisement {
-        config_options: response.config_options.as_deref().unwrap_or(&[]),
+        config_options: config_options.unwrap_or(&[]),
     }
 }
 

@@ -57,6 +57,7 @@ async fn prompt_turn_records_refusal_stop_reason() {
                     project_dir,
                     prompt: Some("do something disallowed".to_string()),
                     session_config: disabled_session_config(),
+                    resume_session_id: None,
                     acp_id: "agent-acp-1".to_string(),
                     session_id: "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e".to_string(),
                     runtime_name: "fake".to_string(),
