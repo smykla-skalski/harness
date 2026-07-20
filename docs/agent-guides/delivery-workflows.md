@@ -105,7 +105,7 @@ gh api --method POST repos/smykla-skalski/harness/pulls/<PR_NUMBER>/requested_re
 
 This repository allows squash merges only. The branch collapses into one new commit on `upstream/main`, so its commits never reach `main` and it can never fast-forward. Closeout realigns local state instead of integrating anything.
 
-Confirm the PR merged, check both checkouts are clean, then run:
+Confirm the PR merged, then check that `<main-checkout>` is on `main`, `<worktree>` is on `<session-branch>`, and both are clean:
 
 ```bash
 git -C <main-checkout> fetch --prune upstream
@@ -114,11 +114,11 @@ git -C <worktree> reset --hard main
 git -C <worktree> branch --unset-upstream <session-branch>
 ```
 
-That is the whole closeout. The `reset --hard` is safe only on the session branch with a clean worktree; the squash commit on `main` already carries every change it discards. Do not rerun validation on `main`, and keep the worktree and lane available.
+That is the whole closeout. The squash commit on `main` already carries every change the `reset --hard` discards. Do not rerun validation on `main`, and keep the worktree and lane available.
 
 It deliberately skips three things:
 
-- No signature check on the merge. GitHub commits the squash as `GitHub <noreply@github.com>`, so `%G?` reports `E` locally. That is expected. The signing contract covers commits the agent writes.
+- No signature check on the merge. GitHub creates the squash commit and signs it with its own key, so a local signature check cannot verify it. That is expected. The signing contract covers commits the agent writes.
 - No remote branch deletion. GitHub deletes it on merge and `fetch --prune` drops the tracking ref.
 - No head comparison. A merged PR is proof enough.
 
