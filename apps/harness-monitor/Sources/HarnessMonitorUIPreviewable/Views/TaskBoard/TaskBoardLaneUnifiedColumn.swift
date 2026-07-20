@@ -187,6 +187,7 @@ struct TaskBoardLaneUnifiedColumn: View {
           id: hoverID,
           in: cardHoverCoordinateSpace,
           tracking: hoverTracking,
+          isHovered: hoveredCardID == hoverID,
           onChange: resolveHoveredCard
         )
         .contextMenu {
@@ -215,6 +216,7 @@ struct TaskBoardLaneUnifiedColumn: View {
           id: hoverID,
           in: cardHoverCoordinateSpace,
           tracking: hoverTracking,
+          isHovered: hoveredCardID == hoverID,
           onChange: resolveHoveredCard
         )
         .contextMenu {
@@ -243,6 +245,7 @@ struct TaskBoardLaneUnifiedColumn: View {
           id: cardID,
           in: cardHoverCoordinateSpace,
           tracking: hoverTracking,
+          isHovered: hoveredCardID == cardID,
           onChange: resolveHoveredCard
         )
       }

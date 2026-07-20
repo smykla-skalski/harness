@@ -339,26 +339,28 @@ extension View {
   /// Each card reports its own frame straight into the lane's hover model.
   /// Deliberately not a shared preference reduced across the `LazyVStack` - that
   /// aggregate faulted as "bound preference ... tried to update multiple times
-  /// per frame" while lazy children measured in. `onChange` re-resolves the
-  /// hovered card when a frame settles or a card leaves, gated on an active
-  /// pointer: geometry churns every frame during scroll, and there is nothing to
-  /// re-resolve when nothing is hovered. Frame recording stays unconditional so
-  /// the model is current the instant the pointer arrives.
+  /// per frame" while lazy children measured in. Frame recording stays
+  /// unconditional so the model is current the instant the pointer arrives, but
+  /// re-resolving the hovered card is gated: every visible card's frame changes
+  /// each scroll frame, yet only the card now under the pointer, or the one
+  /// sliding off it, can change the hit. `isHovered` is that second case.
   func taskBoardCardFrame(
     id: TaskBoardLaneCardHoverID,
     in coordinateSpace: String,
     tracking: TaskBoardLaneHoverTracking,
+    isHovered: Bool,
     onChange: @escaping () -> Void
   ) -> some View {
     onGeometryChange(for: CGRect.self) { proxy in
       proxy.frame(in: .named(coordinateSpace))
     } action: { frame in
       tracking.setFrame(frame, for: id)
-      if tracking.location != nil { onChange() }
+      guard let location = tracking.location else { return }
+      if isHovered || frame.contains(location) { onChange() }
     }
     .onDisappear {
       tracking.removeFrame(for: id)
-      if tracking.location != nil { onChange() }
+      if isHovered { onChange() }
     }
   }
 }
