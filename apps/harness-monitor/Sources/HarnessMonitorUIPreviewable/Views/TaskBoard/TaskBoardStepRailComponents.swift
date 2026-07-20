@@ -123,6 +123,10 @@ struct TaskBoardStepContextDisclosure: View {
           .padding(.horizontal, HarnessMonitorTheme.spacingSM)
       }
       .harnessSidebarRowButtonStyle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
+      // Standing in for the DisclosureGroup label costs VoiceOver the
+      // expanded state, so the button carries it.
+      .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+      .accessibilityHint("Shows approval grants, held dispatches, and policy guards")
     }
     .accessibilityIdentifier("harness.task-board.step.context")
   }
