@@ -24,12 +24,27 @@ use crate::session::types::{ManagedAgentRef, SessionRole};
 mod agents;
 mod cancellation_tests;
 mod connection_tests;
+mod lifecycle_tests;
 mod telemetry_tests;
 
 use agents::{
     run_agent_recording_startup_config_order, run_agent_with_stale_notification,
     run_cookbook_style_agent,
 };
+
+/// `std::process::Child` has no `Drop`, so a placeholder supervisor process
+/// would outlive a test that returns early or panics. Harness structs hold this
+/// guard as a field rather than implementing `Drop` themselves, because tests
+/// routinely move other fields out of those harnesses and Rust forbids partial
+/// moves out of a `Drop` type.
+struct ChildGuard(std::process::Child);
+
+impl Drop for ChildGuard {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
 
 #[track_caller]
 fn ok<T, E: std::fmt::Debug>(result: Result<T, E>, context: &str) -> T {

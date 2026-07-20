@@ -37,6 +37,7 @@ mod commands;
 mod context;
 mod handlers;
 mod handshake;
+mod lifecycle;
 mod runtime_helpers;
 mod session_config;
 mod session_guard;

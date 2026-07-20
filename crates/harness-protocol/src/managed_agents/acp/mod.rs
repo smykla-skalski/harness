@@ -12,6 +12,6 @@ pub use models::{
     AcpPermissionDecision, AcpPermissionItem, AcpPermissionOption, AcpPermissionOptionKind,
     AcpRuntimeProbe, AcpRuntimeProbeResponse, AcpSessionConfigOptionBinding,
     AcpSessionConfigOptionState, AcpSessionConfiguration, AcpSessionEffortTransport,
-    AcpSessionModelTransport, AcpSpawnConfiguration, BridgeAcpStartRequest, CapabilityTag,
-    DoctorProbe,
+    AcpSessionListPage, AcpSessionModelTransport, AcpSessionSummary, AcpSpawnConfiguration,
+    BridgeAcpStartRequest, CapabilityTag, DoctorProbe,
 };

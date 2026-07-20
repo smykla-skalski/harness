@@ -307,6 +307,32 @@ pub struct AcpAgentSessionState {
     pub last_stop_reason: Option<String>,
 }
 
+/// One session an agent reports from `session/list`.
+///
+/// Distinct from a harness session: the agent owns these ids and may report
+/// sessions harness never started, so callers treat the list as display data
+/// rather than a source of harness session state.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AcpSessionSummary {
+    pub session_id: String,
+    pub cwd: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub additional_directories: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+}
+
+/// One page of `session/list` results, carrying the agent's opaque cursor.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AcpSessionListPage {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sessions: Vec<AcpSessionSummary>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<String>,
+}
+
 /// Compact view of one advertised session config option and its value.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AcpSessionConfigOptionState {

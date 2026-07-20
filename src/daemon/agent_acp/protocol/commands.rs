@@ -5,12 +5,15 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use agent_client_protocol::schema::v1::{
-    CancelNotification, ContentBlock, LogoutRequest, NewSessionRequest, PromptRequest, SessionId,
-    TextContent,
+    CancelNotification, ContentBlock, ListSessionsRequest, LogoutRequest, NewSessionRequest,
+    PromptRequest, SessionId, TextContent,
 };
 use agent_client_protocol::{Agent, ConnectionTo, Result as AcpResult};
 use tokio::sync::mpsc as tokio_mpsc;
 use tokio::time::timeout;
+
+use super::lifecycle;
+use crate::daemon::agent_acp::AcpSessionListPage;
 
 use super::session_config::{
     AcpSessionRequestConfig, advertised_session_configuration,
@@ -50,6 +53,18 @@ pub(super) enum ProtocolCommand {
         response_tx: mpsc::SyncSender<ProtocolCommandResult<()>>,
     },
     Logout {
+        response_tx: mpsc::SyncSender<ProtocolCommandResult<()>>,
+    },
+    ListSessions {
+        request: ListSessionsRequest,
+        response_tx: mpsc::SyncSender<ProtocolCommandResult<AcpSessionListPage>>,
+    },
+    CloseSession {
+        session_id: SessionId,
+        response_tx: mpsc::SyncSender<ProtocolCommandResult<()>>,
+    },
+    DeleteSession {
+        session_id: SessionId,
         response_tx: mpsc::SyncSender<ProtocolCommandResult<()>>,
     },
 }
@@ -239,6 +254,27 @@ async fn handle_protocol_command(
         }
         ProtocolCommand::Logout { response_tx } => {
             let result = send_logout(&supervisor, connection).await;
+            let _ = response_tx.send(result);
+        }
+        ProtocolCommand::ListSessions {
+            request,
+            response_tx,
+        } => {
+            let result = lifecycle::list_sessions(&supervisor, connection, request).await;
+            let _ = response_tx.send(result);
+        }
+        ProtocolCommand::CloseSession {
+            session_id,
+            response_tx,
+        } => {
+            let result = lifecycle::close_session(&supervisor, connection, session_id).await;
+            let _ = response_tx.send(result);
+        }
+        ProtocolCommand::DeleteSession {
+            session_id,
+            response_tx,
+        } => {
+            let result = lifecycle::delete_session(&supervisor, connection, session_id).await;
             let _ = response_tx.send(result);
         }
     }

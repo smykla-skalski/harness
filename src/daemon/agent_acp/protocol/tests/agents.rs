@@ -1,14 +1,18 @@
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use agent_client_protocol::schema::v1::{
     AgentAuthCapabilities, AgentCapabilities, AvailableCommand, AvailableCommandsUpdate,
-    CancelNotification, ContentBlock, ContentChunk, CurrentModeUpdate, Implementation,
-    InitializeRequest, InitializeResponse, LogoutCapabilities, LogoutRequest, LogoutResponse,
-    NewSessionRequest, NewSessionResponse, PromptRequest, PromptResponse, SessionConfigBoolean,
-    SessionConfigKind, SessionConfigOption, SessionConfigOptionCategory, SessionConfigOptionValue,
-    SessionConfigSelect, SessionConfigSelectOption, SessionId, SessionInfoUpdate, SessionMode,
-    SessionModeState, SessionNotification, SessionUpdate, SetSessionConfigOptionRequest,
-    SetSessionConfigOptionResponse, StopReason, TextContent,
+    CancelNotification, CloseSessionRequest, CloseSessionResponse, ContentBlock, ContentChunk,
+    CurrentModeUpdate, DeleteSessionRequest, DeleteSessionResponse, Implementation,
+    InitializeRequest, InitializeResponse, ListSessionsRequest, ListSessionsResponse,
+    LogoutCapabilities, LogoutRequest, LogoutResponse, NewSessionRequest, NewSessionResponse,
+    PromptRequest, PromptResponse, SessionCapabilities, SessionCloseCapabilities,
+    SessionConfigBoolean, SessionConfigKind, SessionConfigOption, SessionConfigOptionCategory,
+    SessionConfigOptionValue, SessionConfigSelect, SessionConfigSelectOption,
+    SessionDeleteCapabilities, SessionId, SessionInfo, SessionInfoUpdate, SessionListCapabilities,
+    SessionMode, SessionModeState, SessionNotification, SessionResumeCapabilities, SessionUpdate,
+    SetSessionConfigOptionRequest, SetSessionConfigOptionResponse, StopReason, TextContent,
 };
 use agent_client_protocol::util::internal_error;
 use agent_client_protocol::{Agent, Channel, UntypedMessage};
@@ -151,6 +155,95 @@ pub(super) async fn run_agent_recording_initialize_contract(
                     .expect("record logout")
                     .push("logout".to_string());
                 responder.respond(LogoutResponse::new())
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_notification(
+            async move |_cancel: CancelNotification, _connection| Ok(()),
+            agent_client_protocol::on_receive_notification!(),
+        )
+        .connect_to(transport)
+        .await
+}
+
+/// Agent advertising the full session lifecycle capability set, recording each
+/// lifecycle request so a test can assert what actually reached the wire.
+pub(super) async fn run_agent_recording_session_lifecycle(
+    transport: Channel,
+    operations: Arc<Mutex<Vec<String>>>,
+) -> agent_client_protocol::Result<()> {
+    let list_operations = Arc::clone(&operations);
+    let close_operations = Arc::clone(&operations);
+    let delete_operations = Arc::clone(&operations);
+    Agent
+        .builder()
+        .name("session-lifecycle-agent")
+        .on_receive_request(
+            async move |initialize: InitializeRequest, responder, _connection| {
+                responder.respond(
+                    InitializeResponse::new(initialize.protocol_version)
+                        .agent_info(Some(Implementation::new("session-lifecycle-agent", "1.0.0")))
+                        .agent_capabilities(
+                            AgentCapabilities::new()
+                                .load_session(true)
+                                .session_capabilities(
+                                    SessionCapabilities::new()
+                                        .list(SessionListCapabilities::new())
+                                        .resume(SessionResumeCapabilities::new())
+                                        .close(SessionCloseCapabilities::new())
+                                        .delete(SessionDeleteCapabilities::new()),
+                                ),
+                        ),
+                )
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |_request: NewSessionRequest, responder, _connection| {
+                responder.respond(NewSessionResponse::new("acp-session-1"))
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: ListSessionsRequest, responder, _connection| {
+                let cwd = request
+                    .cwd
+                    .as_ref()
+                    .map_or_else(|| "none".to_owned(), |path| path.display().to_string());
+                let cursor = request.cursor.clone().unwrap_or_else(|| "none".to_owned());
+                list_operations
+                    .lock()
+                    .expect("record list")
+                    .push(format!("list:cwd={cwd}:cursor={cursor}"));
+                responder.respond(
+                    ListSessionsResponse::new(vec![
+                        SessionInfo::new("acp-session-1", PathBuf::from("/work/one"))
+                            .title(Some("First".to_owned()))
+                            .updated_at(Some("2026-07-20T00:00:00Z".to_owned())),
+                        SessionInfo::new("acp-session-2", PathBuf::from("/work/two")),
+                    ])
+                    .next_cursor(Some("page-2".to_owned())),
+                )
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: CloseSessionRequest, responder, _connection| {
+                close_operations
+                    .lock()
+                    .expect("record close")
+                    .push(format!("close:{}", request.session_id.0));
+                responder.respond(CloseSessionResponse::new())
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: DeleteSessionRequest, responder, _connection| {
+                delete_operations
+                    .lock()
+                    .expect("record delete")
+                    .push(format!("delete:{}", request.session_id.0));
+                responder.respond(DeleteSessionResponse::new())
             },
             agent_client_protocol::on_receive_request!(),
         )
