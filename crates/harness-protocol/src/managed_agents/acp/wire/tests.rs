@@ -22,6 +22,8 @@ fn start_request() -> AcpAgentStartRequest {
         effort: Some("high".into()),
         allow_custom_model: true,
         record_permissions: true,
+        mcp_servers: Vec::new(),
+        additional_directories: Vec::new(),
     }
 }
 

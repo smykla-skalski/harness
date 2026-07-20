@@ -24,6 +24,10 @@ pub struct AcpAgentStartRequest {
     pub effort: Option<String>,
     pub allow_custom_model: bool,
     pub record_permissions: bool,
+    /// Added to the descriptor's own servers; same name overrides.
+    pub mcp_servers: Vec<AcpMcpServer>,
+    /// Added to the descriptor's own roots.
+    pub additional_directories: Vec<String>,
 }
 
 impl Default for AcpAgentStartRequest {
@@ -44,6 +48,8 @@ impl Default for AcpAgentStartRequest {
             effort: None,
             allow_custom_model: false,
             record_permissions: false,
+            mcp_servers: Vec::new(),
+            additional_directories: Vec::new(),
         }
     }
 }
@@ -123,7 +129,13 @@ pub struct AcpSessionConfiguration {
     ///
     /// Http and Sse entries are dropped for agents that do not advertise the
     /// matching MCP capability, so a descriptor can list them unconditionally.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    ///
+    /// Serializes with credentials blanked; see [`AcpMcpServer::redacted`].
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        serialize_with = "serialize_mcp_servers_redacted"
+    )]
     pub mcp_servers: Vec<AcpMcpServer>,
     /// Roots beyond the project directory the agent may work in, sent on
     /// `session/new` only when the agent advertises `additionalDirectories`.
@@ -169,26 +181,94 @@ pub enum AcpMcpServer {
     },
 }
 
+impl AcpMcpServer {
+    /// The server with secrets blanked, for publishing to clients.
+    ///
+    /// Redaction belongs to the boundary, not the value: descriptors publish
+    /// outbound and must hide credentials, start requests carry credentials
+    /// the agent needs. Marking the fields `skip_serializing` covered the
+    /// first and silently emptied the second.
+    ///
+    /// Returns `Self` so a new variant or field must be handled here to
+    /// compile, and the redacted form cannot fall behind.
+    #[must_use]
+    pub fn redacted(&self) -> Self {
+        match self {
+            Self::Stdio {
+                name,
+                command,
+                args,
+                env,
+            } => Self::Stdio {
+                name: name.clone(),
+                command: command.clone(),
+                args: args.clone(),
+                env: env
+                    .iter()
+                    .map(|variable| AcpMcpEnvVariable {
+                        name: variable.name.clone(),
+                        value: String::new(),
+                    })
+                    .collect(),
+            },
+            Self::Http { name, url, headers } => Self::Http {
+                name: name.clone(),
+                url: url.clone(),
+                headers: redacted_headers(headers),
+            },
+            Self::Sse { name, url, headers } => Self::Sse {
+                name: name.clone(),
+                url: url.clone(),
+                headers: redacted_headers(headers),
+            },
+        }
+    }
+
+    #[must_use]
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Stdio { name, .. } | Self::Http { name, .. } | Self::Sse { name, .. } => name,
+        }
+    }
+}
+
+fn redacted_headers(headers: &[AcpMcpHttpHeader]) -> Vec<AcpMcpHttpHeader> {
+    headers
+        .iter()
+        .map(|header| AcpMcpHttpHeader {
+            name: header.name.clone(),
+            value: String::new(),
+        })
+        .collect()
+}
+
+/// Every descriptor-declared server reaches clients through this one field,
+/// so redacting here covers the websocket push and every descriptor response.
+fn serialize_mcp_servers_redacted<S>(
+    servers: &[AcpMcpServer],
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    servers
+        .iter()
+        .map(AcpMcpServer::redacted)
+        .collect::<Vec<_>>()
+        .serialize(serializer)
+}
+
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AcpMcpEnvVariable {
     pub name: String,
-    /// Never serialized. See [`AcpMcpHttpHeader::value`] for why.
-    #[serde(default, skip_serializing)]
+    #[serde(default)]
     pub value: String,
 }
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AcpMcpHttpHeader {
     pub name: String,
-    /// Read from configuration but never written back out.
-    ///
-    /// Descriptors are pushed wholesale to every websocket client through
-    /// `WsConfigPayload::acp_agents`, including remote ones, so a serializable
-    /// header value would hand out whatever `Authorization` the descriptor
-    /// carries. Skipping it on serialize closes that at every boundary rather
-    /// than relying on each one to remember to redact. In-process use is
-    /// unaffected: the value still reaches `session/new`.
-    #[serde(default, skip_serializing)]
+    #[serde(default)]
     pub value: String,
 }
 
@@ -487,6 +567,70 @@ impl fmt::Debug for BridgeAcpStartRequest {
             .field("disable_pooling", &self.disable_pooling)
             .field("openrouter_token", &redacted_token)
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod mcp_redaction_tests {
+    use super::{
+        AcpMcpEnvVariable, AcpMcpHttpHeader, AcpMcpServer, AcpSessionConfiguration,
+    };
+
+    fn servers_with_secrets() -> Vec<AcpMcpServer> {
+        vec![
+            AcpMcpServer::Http {
+                name: "remote".into(),
+                url: "https://example.test/mcp".into(),
+                headers: vec![AcpMcpHttpHeader {
+                    name: "Authorization".into(),
+                    value: "Bearer descriptor-secret".into(),
+                }],
+            },
+            AcpMcpServer::Stdio {
+                name: "local".into(),
+                command: "/usr/bin/mcp".into(),
+                args: vec!["--serve".into()],
+                env: vec![AcpMcpEnvVariable {
+                    name: "TOKEN".into(),
+                    value: "descriptor-secret".into(),
+                }],
+            },
+        ]
+    }
+
+    /// Descriptors reach every websocket client, remote ones included.
+    #[test]
+    fn session_configuration_publishes_mcp_servers_without_credentials() {
+        let configuration = AcpSessionConfiguration {
+            mcp_servers: servers_with_secrets(),
+            ..AcpSessionConfiguration::default()
+        };
+
+        let encoded = serde_json::to_string(&configuration).expect("serialize configuration");
+
+        assert!(
+            !encoded.contains("descriptor-secret"),
+            "no credential may be published; got {encoded}"
+        );
+        assert!(
+            encoded.contains("Authorization") && encoded.contains("TOKEN"),
+            "names stay visible so a client can still show what is configured"
+        );
+        assert!(
+            encoded.contains("https://example.test/mcp") && encoded.contains("--serve"),
+            "everything that is not a credential survives"
+        );
+    }
+
+    /// Logs and panics leak in both directions, so `Debug` always redacts.
+    #[test]
+    fn mcp_secrets_stay_out_of_debug_output() {
+        let debugged = format!("{:?}", servers_with_secrets());
+
+        assert!(
+            !debugged.contains("descriptor-secret"),
+            "Debug must redact credentials; got {debugged}"
+        );
     }
 }
 

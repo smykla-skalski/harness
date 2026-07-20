@@ -154,6 +154,10 @@ pub struct AcpAgentStartArgs {
     /// Record ACP permission decisions without granting permission requests.
     #[arg(long)]
     pub record_permissions: bool,
+    /// Extra root the agent may work in, beyond the project directory. May be
+    /// repeated. Ignored by agents that do not advertise `additionalDirectories`.
+    #[arg(long = "additional-directory")]
+    pub additional_directories: Vec<String>,
 }
 
 impl Execute for AcpAgentStartArgs {
@@ -177,6 +181,9 @@ impl Execute for AcpAgentStartArgs {
             effort: self.effort.clone(),
             allow_custom_model: self.allow_custom_model,
             record_permissions: self.record_permissions,
+            // Too structured for a flag; set these over the HTTP start route.
+            mcp_servers: Vec::new(),
+            additional_directories: self.additional_directories.clone(),
         };
         let snapshot = daemon_client()?.start_acp_managed_agent(&self.session_id, &request)?;
         print_json(&snapshot)?;

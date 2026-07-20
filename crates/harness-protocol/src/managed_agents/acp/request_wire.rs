@@ -1,7 +1,7 @@
 use serde::de::Error as DeError;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::models::{AcpAgentStartRequest, default_acp_role};
+use super::models::{AcpAgentStartRequest, AcpMcpServer, default_acp_role};
 use crate::session::SessionRole;
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -36,8 +36,14 @@ struct AcpAgentStartRequestDecode {
     allow_custom_model: bool,
     #[serde(default)]
     record_permissions: bool,
+    #[serde(default)]
+    mcp_servers: Vec<AcpMcpServer>,
+    #[serde(default)]
+    additional_directories: Vec<String>,
 }
 
+/// Keeps MCP credentials, unlike a descriptor: the caller supplied them and
+/// the agent needs them after the bridge re-serializes this request.
 #[derive(Serialize)]
 struct AcpAgentStartRequestEncode<'a> {
     descriptor_id: &'a str,
@@ -65,6 +71,10 @@ struct AcpAgentStartRequestEncode<'a> {
     effort: Option<&'a str>,
     allow_custom_model: bool,
     record_permissions: bool,
+    #[serde(skip_serializing_if = "<[AcpMcpServer]>::is_empty")]
+    mcp_servers: &'a [AcpMcpServer],
+    #[serde(skip_serializing_if = "<[String]>::is_empty")]
+    additional_directories: &'a [String],
 }
 
 impl Serialize for AcpAgentStartRequest {
@@ -88,6 +98,8 @@ impl Serialize for AcpAgentStartRequest {
             effort: self.effort.as_deref(),
             allow_custom_model: self.allow_custom_model,
             record_permissions: self.record_permissions,
+            mcp_servers: &self.mcp_servers,
+            additional_directories: &self.additional_directories,
         }
         .serialize(serializer)
     }
@@ -118,13 +130,75 @@ impl<'de> Deserialize<'de> for AcpAgentStartRequest {
             effort: decoded.effort,
             allow_custom_model: decoded.allow_custom_model,
             record_permissions: decoded.record_permissions,
+            mcp_servers: decoded.mcp_servers,
+            additional_directories: decoded.additional_directories,
         })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::AcpAgentStartRequest;
+    use super::{AcpAgentStartRequest, AcpMcpServer};
+    use crate::managed_agents::acp::{AcpMcpEnvVariable, AcpMcpHttpHeader};
+
+    fn request_with_secrets() -> AcpAgentStartRequest {
+        AcpAgentStartRequest {
+            agent: "copilot".into(),
+            mcp_servers: vec![
+                AcpMcpServer::Http {
+                    name: "remote".into(),
+                    url: "https://example.test/mcp".into(),
+                    headers: vec![AcpMcpHttpHeader {
+                        name: "Authorization".into(),
+                        value: "Bearer caller-secret".into(),
+                    }],
+                },
+                AcpMcpServer::Stdio {
+                    name: "local".into(),
+                    command: "/usr/bin/mcp".into(),
+                    args: vec!["--serve".into()],
+                    env: vec![AcpMcpEnvVariable {
+                        name: "TOKEN".into(),
+                        value: "caller-secret".into(),
+                    }],
+                },
+            ],
+            additional_directories: vec!["/extra".into()],
+            ..AcpAgentStartRequest::default()
+        }
+    }
+
+    /// The opposite of the descriptor case in `AcpMcpServer::redacted`.
+    #[test]
+    fn acp_start_request_round_trips_mcp_credentials() {
+        let request = request_with_secrets();
+
+        let encoded = serde_json::to_string(&request).expect("serialize request");
+        assert!(
+            encoded.contains("Bearer caller-secret"),
+            "an http header value must cross the wire verbatim"
+        );
+        assert!(
+            encoded.contains("caller-secret"),
+            "a stdio env value must cross the wire verbatim"
+        );
+
+        let decoded: AcpAgentStartRequest =
+            serde_json::from_str(&encoded).expect("decode request");
+        assert_eq!(decoded, request, "the request must round-trip unchanged");
+    }
+
+    #[test]
+    fn acp_start_request_omits_empty_session_inputs() {
+        let value = serde_json::to_value(AcpAgentStartRequest {
+            agent: "copilot".into(),
+            ..AcpAgentStartRequest::default()
+        })
+        .expect("serialize request");
+
+        assert!(value.get("mcp_servers").is_none());
+        assert!(value.get("additional_directories").is_none());
+    }
 
     #[test]
     fn acp_start_request_decodes_canonical_descriptor_id() {
@@ -197,6 +271,8 @@ mod tests {
             effort: Some("high".into()),
             allow_custom_model: true,
             record_permissions: true,
+            mcp_servers: Vec::new(),
+            additional_directories: Vec::new(),
         };
 
         let value = serde_json::to_value(&request).expect("serialize request");

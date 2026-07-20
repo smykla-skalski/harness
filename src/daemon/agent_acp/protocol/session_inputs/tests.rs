@@ -40,6 +40,24 @@ fn config(
     AcpSessionRequestConfig::from_request(&AcpAgentStartRequest::default(), &descriptor)
 }
 
+fn merged_config(
+    descriptor_servers: Vec<AcpMcpServer>,
+    descriptor_directories: Vec<String>,
+    request: &AcpAgentStartRequest,
+) -> AcpSessionRequestConfig {
+    let descriptor = descriptor_with_inputs(descriptor_servers, descriptor_directories);
+    AcpSessionRequestConfig::from_request(request, &descriptor)
+}
+
+fn named_stdio_server(name: &str, command: &str) -> AcpMcpServer {
+    AcpMcpServer::Stdio {
+        name: name.to_owned(),
+        command: command.to_owned(),
+        args: Vec::new(),
+        env: Vec::new(),
+    }
+}
+
 fn handshake(http: bool, sse: bool, additional_directories: bool) -> AcpAgentHandshake {
     AcpAgentHandshake {
         supports_mcp_http: http,
@@ -213,4 +231,100 @@ fn stdio_server_carries_args_and_environment() {
     assert_eq!(stdio.env.len(), 1);
     assert_eq!(stdio.env[0].name, "TOKEN");
     assert_eq!(stdio.env[0].value, "secret");
+}
+
+#[test]
+fn per_start_servers_are_appended_after_descriptor_servers() {
+    let request = AcpAgentStartRequest {
+        mcp_servers: vec![named_stdio_server("per-start", "/usr/bin/extra")],
+        ..AcpAgentStartRequest::default()
+    };
+    let session = new_session_request(
+        PathBuf::from("/work"),
+        &merged_config(vec![stdio_server()], Vec::new(), &request),
+        Some(&handshake(false, false, false)),
+    );
+
+    assert_eq!(
+        server_names(&session),
+        vec!["local".to_string(), "per-start".to_string()],
+        "descriptor servers keep their order and per-start ones follow"
+    );
+}
+
+#[test]
+fn per_start_server_replaces_the_descriptor_server_of_the_same_name() {
+    let request = AcpAgentStartRequest {
+        mcp_servers: vec![named_stdio_server("local", "/usr/bin/override")],
+        ..AcpAgentStartRequest::default()
+    };
+    let session = new_session_request(
+        PathBuf::from("/work"),
+        &merged_config(
+            vec![stdio_server(), named_stdio_server("other", "/usr/bin/other")],
+            Vec::new(),
+            &request,
+        ),
+        Some(&handshake(false, false, false)),
+    );
+
+    assert_eq!(
+        server_names(&session),
+        vec!["local".to_string(), "other".to_string()],
+        "an override replaces in place rather than appending a duplicate name"
+    );
+    let McpServer::Stdio(stdio) = &session.mcp_servers[0] else {
+        unreachable!("stdio server must round-trip as stdio");
+    };
+    assert_eq!(
+        stdio.command,
+        PathBuf::from("/usr/bin/override"),
+        "the per-start definition wins"
+    );
+}
+
+#[test]
+fn per_start_servers_are_capability_filtered_like_descriptor_servers() {
+    let request = AcpAgentStartRequest {
+        mcp_servers: vec![
+            AcpMcpServer::Http {
+                name: "per-start-remote".to_owned(),
+                url: "https://example.test/mcp".to_owned(),
+                headers: Vec::new(),
+            },
+            named_stdio_server("per-start-local", "/usr/bin/extra"),
+        ],
+        ..AcpAgentStartRequest::default()
+    };
+    let session = new_session_request(
+        PathBuf::from("/work"),
+        &merged_config(Vec::new(), Vec::new(), &request),
+        Some(&handshake(false, false, false)),
+    );
+
+    assert_eq!(
+        server_names(&session),
+        vec!["per-start-local".to_string()],
+        "a per-start http server is gated on the same capability as a declared one, \
+         while stdio still gets through"
+    );
+}
+
+#[test]
+fn per_start_additional_directories_append_and_drop_duplicates() {
+    let request = AcpAgentStartRequest {
+        additional_directories: vec!["/shared".to_owned(), "/extra".to_owned()],
+        ..AcpAgentStartRequest::default()
+    };
+    let session = new_session_request(
+        PathBuf::from("/work"),
+        &merged_config(Vec::new(), vec!["/shared".to_owned()], &request),
+        Some(&handshake(false, false, true)),
+    );
+
+    assert_eq!(
+        session.additional_directories,
+        vec![PathBuf::from("/shared"), PathBuf::from("/extra")],
+        "a directory declared on both sides is sent once"
+    );
 }

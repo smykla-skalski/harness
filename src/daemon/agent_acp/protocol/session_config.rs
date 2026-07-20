@@ -33,7 +33,7 @@ impl AcpSessionRequestConfig {
             model: trimmed_owned(request.model.as_deref()),
             effort: trimmed_owned(request.effort.as_deref()),
             allow_custom_model: request.allow_custom_model,
-            session_configuration: descriptor.session_configuration.clone(),
+            session_configuration: merge_session_inputs(&descriptor.session_configuration, request),
         }
     }
 
@@ -74,6 +74,33 @@ impl AcpSessionRequestConfig {
                 AcpSessionEffortTransport::Disabled
             )
     }
+}
+
+/// The start request adds to the descriptor's inputs rather than replacing
+/// them, so asking for one extra MCP server does not drop the agent's own.
+/// A same-named server overrides in place, keeping the rest in order.
+fn merge_session_inputs(
+    declared: &AcpSessionConfiguration,
+    request: &AcpAgentStartRequest,
+) -> AcpSessionConfiguration {
+    let mut merged = declared.clone();
+    for server in &request.mcp_servers {
+        if let Some(existing) = merged
+            .mcp_servers
+            .iter_mut()
+            .find(|candidate| candidate.name() == server.name())
+        {
+            *existing = server.clone();
+        } else {
+            merged.mcp_servers.push(server.clone());
+        }
+    }
+    for directory in &request.additional_directories {
+        if !merged.additional_directories.contains(directory) {
+            merged.additional_directories.push(directory.clone());
+        }
+    }
+    merged
 }
 
 #[derive(Clone, Copy)]
