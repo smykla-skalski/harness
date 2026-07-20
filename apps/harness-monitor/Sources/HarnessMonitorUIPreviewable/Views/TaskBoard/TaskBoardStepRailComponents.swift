@@ -88,11 +88,17 @@ private struct TaskBoardStepContextRowButtonStyle: ButtonStyle {
     RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
   }
 
+  private func fillOpacity(isPressed: Bool) -> Double {
+    isPressed ? 0.10 : isHovered ? 0.06 : 0
+  }
+
   func makeBody(configuration: Configuration) -> some View {
-    let fillOpacity = configuration.isPressed ? 0.10 : isHovered ? 0.06 : 0
-    return
-      configuration.label
-      .background { shape.fill(HarnessMonitorTheme.ink.opacity(fillOpacity)) }
+    configuration.label
+      .background {
+        shape.fill(
+          HarnessMonitorTheme.ink.opacity(fillOpacity(isPressed: configuration.isPressed))
+        )
+      }
       .contentShape(shape)
       .opacity(isEnabled ? 1 : 0.4)
       .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
