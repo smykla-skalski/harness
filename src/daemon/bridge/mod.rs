@@ -6,6 +6,7 @@ mod bridge_state;
 mod capability_lifecycle;
 mod client;
 mod client_acp;
+mod codex_process;
 mod commands;
 mod control;
 mod core;
@@ -32,7 +33,7 @@ pub use control::{
     reconfigure_bridge, reconfigure_bridge_async, spawn_manifest_watcher, stop_bridge,
 };
 #[cfg(feature = "daemon-runtime")]
-pub(crate) use runtime::probe_codex_readiness;
+pub(crate) use codex_process::probe_codex_readiness;
 pub use types::{
     AgentTuiStartSpec, BRIDGE_CAPABILITY_ACP, BRIDGE_CAPABILITY_AGENT_TUI, BRIDGE_CAPABILITY_CODEX,
     BRIDGE_LAUNCH_AGENT_LABEL, BridgeCapability, BridgeConfigArgs, BridgeInstallLaunchAgentArgs,

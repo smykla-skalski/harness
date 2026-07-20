@@ -10,7 +10,7 @@ use crate::infra::io::write_text;
 
 use super::core::{BridgeActiveTui, BridgeCodexProcess, ResolvedBridgeConfig};
 use super::helpers::{launch_agent_plist_path, render_launch_agent_plist, stringify_metadata_map};
-use super::runtime::{spawn_codex_monitor, spawn_codex_process};
+use super::codex_process::{spawn_codex_monitor, spawn_codex_process};
 use super::server::BridgeServer;
 use super::types::{
     BRIDGE_CAPABILITY_ACP, BRIDGE_CAPABILITY_AGENT_TUI, BRIDGE_CAPABILITY_CODEX, BridgeCapability,
@@ -310,7 +310,7 @@ impl BridgeServer {
 
     fn stop_codex_process(codex: &mut Option<BridgeCodexProcess>) {
         if let Some(process) = codex.as_mut() {
-            super::runtime::kill_codex_process_group(process);
+            super::codex_process::kill_codex_process_group(process);
             codex.take();
         }
     }

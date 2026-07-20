@@ -206,7 +206,7 @@ impl SessionAdopter {
             session_id: state.session_id.clone(),
         };
 
-        let external_origin = if sessions_root.starts_with(data_root_sessions) {
+        let external_origin = if is_within(&sessions_root, data_root_sessions) {
             None
         } else {
             Some(session_root)
@@ -252,6 +252,19 @@ impl SessionAdopter {
             external_origin,
         })
     }
+}
+
+/// Prefix check that tolerates symlinked components on either side.
+///
+/// macOS canonicalizes the incoming adopt request (`/var` is a symlink to
+/// `/private/var`) while the daemon's data root comes straight from config, so a
+/// raw comparison reports every internal session as external.
+fn is_within(candidate: &Path, root: &Path) -> bool {
+    if candidate.starts_with(root) {
+        return true;
+    }
+    let resolve = |path: &Path| fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    resolve(candidate).starts_with(resolve(root))
 }
 
 #[cfg(test)]

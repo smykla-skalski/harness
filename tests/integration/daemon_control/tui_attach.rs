@@ -64,12 +64,22 @@ fn local_agent_tui_attach_replays_existing_screen_and_keeps_streaming() {
     );
 
     let mut attached = AttachedTuiSession::spawn(&home, &xdg, &started.tui_id);
+    // Wait for the replay before typing: the PTY echoes our own keystrokes, so
+    // writing first lets that echo satisfy the wait below while the attach client
+    // is still starting up, and the replay assertion then reads an empty screen.
+    attached.wait_for_output("already-there");
     attached.write_line("from attach");
     attached.wait_for_output("from attach");
+    let transcript = attached.output_text();
+    let replay_at = transcript
+        .find("already-there")
+        .expect("replayed screen text must stay in the attach transcript");
+    let live_at = transcript
+        .find("from attach")
+        .expect("live streamed text must reach the attach transcript");
     assert!(
-        attached.output_text().contains("already-there"),
-        "attach output should replay existing screen state before live bytes; output={:?}",
-        attached.output_text()
+        replay_at < live_at,
+        "attach must replay existing screen state before live bytes; output={transcript:?}"
     );
 
     let stop_output = run_harness(
@@ -151,12 +161,22 @@ fn sandboxed_agent_tui_attach_replays_existing_screen_and_keeps_streaming() {
     );
 
     let mut attached = AttachedTuiSession::spawn(&home, &xdg, &started.tui_id);
+    // Wait for the replay before typing: the PTY echoes our own keystrokes, so
+    // writing first lets that echo satisfy the wait below while the attach client
+    // is still starting up, and the replay assertion then reads an empty screen.
+    attached.wait_for_output("already-there");
     attached.write_line("from attach");
     attached.wait_for_output("from attach");
+    let transcript = attached.output_text();
+    let replay_at = transcript
+        .find("already-there")
+        .expect("replayed screen text must stay in the attach transcript");
+    let live_at = transcript
+        .find("from attach")
+        .expect("live streamed text must reach the attach transcript");
     assert!(
-        attached.output_text().contains("already-there"),
-        "attach output should replay existing screen state before live bytes; output={:?}",
-        attached.output_text()
+        replay_at < live_at,
+        "attach must replay existing screen state before live bytes; output={transcript:?}"
     );
 
     let stop_output = run_harness(
