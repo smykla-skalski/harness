@@ -3,6 +3,23 @@ import Foundation
 /// Human-readable summaries for the ACP conversation-event kinds that carry
 /// their detail inside the opaque `kind` payload.
 extension AcpConversationEvent {
+  /// Prompt-turn telemetry kinds, split from the main transcript switch so
+  /// each stays inside the cyclomatic-complexity budget.
+  static func turnTelemetryDescriptor(
+    for type: String,
+    event: [String: JSONValue],
+    prefix: String
+  ) -> (entryKind: String, summary: String)? {
+    switch type {
+    case "turn_ended":
+      return ("agent_turn_ended", turnEndedSummary(prefix: prefix, event: event))
+    case "context_usage":
+      return ("agent_context_usage", contextUsageSummary(prefix: prefix, event: event))
+    default:
+      return nil
+    }
+  }
+
   static func stateChangeSummary(prefix: String, event: [String: JSONValue]) -> String {
     let from = event.stringValue(for: "from") ?? "unknown"
     let to = event.stringValue(for: "to") ?? "unknown"

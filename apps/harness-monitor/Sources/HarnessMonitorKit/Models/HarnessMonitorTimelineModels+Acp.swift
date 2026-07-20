@@ -229,18 +229,8 @@ extension AcpConversationEvent {
         "agent_context_injected",
         contextSummary(prefix: identity.summaryActor, event: event)
       )
-    case "turn_ended":
-      return (
-        "agent_turn_ended",
-        turnEndedSummary(prefix: identity.summaryActor, event: event)
-      )
-    case "context_usage":
-      return (
-        "agent_context_usage",
-        contextUsageSummary(prefix: identity.summaryActor, event: event)
-      )
     default:
-      return nil
+      return turnTelemetryDescriptor(for: type, event: event, prefix: identity.summaryActor)
     }
   }
 
