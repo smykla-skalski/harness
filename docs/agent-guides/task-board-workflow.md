@@ -262,7 +262,9 @@ harness session agents start acp --session-id <session-id> --agent <descriptor> 
 Managed agent controls include `list`, `show`, terminal `input`/`resize`/`stop`,
 Codex `steer`/`interrupt`/`approve`, and ACP `inspect`. Start commands can carry
 role, fallback role, capability tags, display name, persona, model, effort, and
-project directory where the runtime supports them.
+project directory where the runtime supports them. ACP starts also take
+repeated `--additional-directory` roots; MCP servers are structured, so they go
+over the HTTP start route instead of a flag.
 
 ## Runtime And Provider Settings
 
