@@ -12,9 +12,12 @@
 //! `mise run codegen`.
 //!
 //! Memory discipline: every emitter appends into one caller-owned `String`
-//! buffer via `write!` (no per-item temporaries), the case helpers pre-size
-//! their single allocation, and the driver streams one source file at a time so
-//! only the current file's AST and one type live at once.
+//! buffer via `write!` (no per-item temporaries) and the case helpers pre-size
+//! their single allocation. Each module still parses one source file at a time,
+//! so only that file's AST is ever live, but the driver holds every rendered
+//! module at once: a type one module references may be emitted by another, and
+//! [`swift_type_check`] can only tell a dangling name from a cross-module one
+//! after all of them exist.
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt::Write as _;
