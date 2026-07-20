@@ -2707,6 +2707,7 @@ const ACP_START_REQUEST_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMoni
 // role defaults via default_acp_role (resolved from models.rs).
 const ACP_START_REQUEST_EMIT_ONLY: &[&str] = &[
     "AcpAgentStartRequestDecode",
+    "AcpEndpoint",
     "AcpMcpServer",
     "AcpMcpEnvVariable",
     "AcpMcpHttpHeader",

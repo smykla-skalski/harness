@@ -24,8 +24,9 @@ public struct AcpAgentStartRequestWire: Codable, Equatable, Sendable {
   public var additionalDirectories: [String]
   public var resumeSessionId: String?
   public var resumeDisabled: Bool
+  public var endpoint: AcpEndpoint?
 
-  public init(descriptorId: String, role: SessionRole = .worker, fallbackRole: SessionRole? = nil, capabilities: [String] = [], name: String? = nil, prompt: String? = nil, projectDir: String? = nil, persona: String? = nil, taskId: String? = nil, boardItemId: String? = nil, workflowExecutionId: String? = nil, model: String? = nil, effort: String? = nil, allowCustomModel: Bool = false, recordPermissions: Bool = false, mcpServers: [AcpMcpServer] = [], additionalDirectories: [String] = [], resumeSessionId: String? = nil, resumeDisabled: Bool = false) {
+  public init(descriptorId: String, role: SessionRole = .worker, fallbackRole: SessionRole? = nil, capabilities: [String] = [], name: String? = nil, prompt: String? = nil, projectDir: String? = nil, persona: String? = nil, taskId: String? = nil, boardItemId: String? = nil, workflowExecutionId: String? = nil, model: String? = nil, effort: String? = nil, allowCustomModel: Bool = false, recordPermissions: Bool = false, mcpServers: [AcpMcpServer] = [], additionalDirectories: [String] = [], resumeSessionId: String? = nil, resumeDisabled: Bool = false, endpoint: AcpEndpoint? = nil) {
     self.descriptorId = descriptorId
     self.role = role
     self.fallbackRole = fallbackRole
@@ -45,6 +46,7 @@ public struct AcpAgentStartRequestWire: Codable, Equatable, Sendable {
     self.additionalDirectories = additionalDirectories
     self.resumeSessionId = resumeSessionId
     self.resumeDisabled = resumeDisabled
+    self.endpoint = endpoint
   }
 
   public init(from decoder: Decoder) throws {
@@ -68,6 +70,7 @@ public struct AcpAgentStartRequestWire: Codable, Equatable, Sendable {
     additionalDirectories = try container.decodeIfPresent([String].self, forKey: .additionalDirectories) ?? []
     resumeSessionId = try container.decodeIfPresent(String.self, forKey: .resumeSessionId)
     resumeDisabled = try container.decodeIfPresent(Bool.self, forKey: .resumeDisabled) ?? false
+    endpoint = try container.decodeIfPresent(AcpEndpoint.self, forKey: .endpoint)
   }
 
   enum CodingKeys: String, CodingKey {
@@ -90,6 +93,28 @@ public struct AcpAgentStartRequestWire: Codable, Equatable, Sendable {
     case additionalDirectories = "additional_directories"
     case resumeSessionId = "resume_session_id"
     case resumeDisabled = "resume_disabled"
+    case endpoint
+  }
+}
+
+public struct AcpEndpoint: Codable, Equatable, Sendable {
+  public var url: String
+  public var headersEnv: [String: String]
+
+  public init(url: String = "", headersEnv: [String: String] = [:]) {
+    self.url = url
+    self.headersEnv = headersEnv
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    url = try container.decode(String.self, forKey: .url)
+    headersEnv = try container.decodeIfPresent([String: String].self, forKey: .headersEnv) ?? [:]
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case url
+    case headersEnv = "headers_env"
   }
 }
 

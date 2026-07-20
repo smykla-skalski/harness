@@ -127,6 +127,25 @@ struct ManagedAgentRequestWireEncodingTests {
     #expect(json["allow_custom_model"] as? Bool == true)
     #expect(json["record_permissions"] as? Bool == true)
     #expect(json["role"] as? String == "worker")
+    // The domain model never sets an endpoint, so the wire omits the key.
+    #expect(json["endpoint"] == nil)
+  }
+
+  @Test("acp start request endpoint pins url and headers_env snake keys")
+  func acpStartRequestEndpoint() throws {
+    let wire = AcpAgentStartRequestWire(
+      descriptorId: "copilot",
+      endpoint: AcpEndpoint(
+        url: "wss://acp.example.test",
+        headersEnv: ["Authorization": "REMOTE_ACP_TOKEN"]
+      )
+    )
+    let json = try object(wire)
+    let endpoint = try #require(json["endpoint"] as? [String: Any])
+    #expect(endpoint["url"] as? String == "wss://acp.example.test")
+    let headers = try #require(endpoint["headers_env"] as? [String: Any])
+    // The env var name crosses the wire, never the token value.
+    #expect(headers["Authorization"] as? String == "REMOTE_ACP_TOKEN")
   }
 
   @Test("agent-tui input request wraps the input event faithfully")
