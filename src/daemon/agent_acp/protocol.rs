@@ -7,7 +7,8 @@ use std::time::Duration;
 use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::schema::v1::{
     CancelNotification, ContentBlock, Implementation, InitializeRequest, InitializeResponse,
-    NewSessionResponse, PromptRequest, ResumeSessionResponse, SessionId, TextContent,
+    LoadSessionResponse, NewSessionResponse, PromptRequest, ResumeSessionResponse, SessionId,
+    TextContent,
 };
 use agent_client_protocol::{
     Agent, ByteStreams, ConnectionTo, Error as AcpError, ErrorCode, Result as AcpResult,
@@ -409,6 +410,29 @@ async fn send_resume_session(
     timeout(budget, connection.send_request(request).block_task())
         .await
         .map_err(|_| deadline_error("session/resume", budget))?
+}
+
+/// The load is bounded like every other lifecycle call, but its budget also
+/// covers the replay the agent streams first: a long conversation answers
+/// later than a resume of the same session would.
+async fn send_load_session(
+    supervisor: &AcpSessionSupervisor,
+    connection: &ConnectionTo<Agent>,
+    project_dir: PathBuf,
+    session_config: &AcpSessionRequestConfig,
+    load_session_id: &str,
+) -> AcpResult<LoadSessionResponse> {
+    let _guard = supervisor.enter_pending_request_with_reason(Some("session/load"));
+    let request = session_inputs::load_session_request(
+        SessionId::new(load_session_id.to_string()),
+        project_dir,
+        session_config,
+        supervisor.handshake(),
+    );
+    let budget = supervisor.config().lifecycle_timeout;
+    timeout(budget, connection.send_request(request).block_task())
+        .await
+        .map_err(|_| deadline_error("session/load", budget))?
 }
 
 async fn send_prompt_or_cancel(

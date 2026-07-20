@@ -158,11 +158,13 @@ pub struct AcpAgentStartArgs {
     /// repeated. Ignored by agents that do not advertise `additionalDirectories`.
     #[arg(long = "additional-directory")]
     pub additional_directories: Vec<String>,
-    /// Pick up this agent session instead of opening a new one. Overrides the
-    /// session the daemon would have resumed on its own.
+    /// Pick up this agent session instead of opening a new one, by resume or
+    /// load depending on what the agent supports. Overrides the session the
+    /// daemon would have picked up on its own.
     #[arg(long = "resume-session", conflicts_with = "no_resume")]
     pub resume_session_id: Option<String>,
-    /// Always open a new session, even when a previous one could be resumed.
+    /// Always open a new session, even when a previous one could be resumed or
+    /// loaded.
     #[arg(long = "no-resume")]
     pub no_resume: bool,
 }

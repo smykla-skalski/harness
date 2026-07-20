@@ -8,10 +8,11 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use agent_client_protocol::schema::v1::{
-    AgentCapabilities, CancelNotification, CloseSessionRequest, InitializeRequest,
-    InitializeResponse, McpServer, NewSessionRequest, NewSessionResponse, ResumeSessionRequest,
-    ResumeSessionResponse, SessionAdditionalDirectoriesCapabilities, SessionCapabilities,
-    SessionCloseCapabilities, SessionResumeCapabilities,
+    AgentCapabilities, CancelNotification, CloseSessionRequest, ContentBlock, ContentChunk,
+    InitializeRequest, InitializeResponse, LoadSessionRequest, LoadSessionResponse, McpServer,
+    NewSessionRequest, NewSessionResponse, ResumeSessionRequest, ResumeSessionResponse,
+    SessionAdditionalDirectoriesCapabilities, SessionCapabilities, SessionCloseCapabilities,
+    SessionNotification, SessionResumeCapabilities, SessionUpdate, TextContent,
 };
 use agent_client_protocol::{Agent, Channel};
 
@@ -152,6 +153,181 @@ pub(super) async fn run_agent_never_answering_close(
                     .push(format!("close:{}", request.session_id.0));
                 std::future::pending::<()>().await;
                 Ok(())
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_notification(
+            async move |_cancel: CancelNotification, _connection| Ok(()),
+            agent_client_protocol::on_receive_notification!(),
+        )
+        .connect_to(transport)
+        .await
+}
+
+/// Advertises both `resume` and `loadSession`, and records which one the
+/// client chose. Resume restores the same context without a replay, so a
+/// client offered both must reach for it, never for load.
+pub(super) async fn run_agent_advertising_resume_and_load(
+    transport: Channel,
+    operations: Arc<Mutex<Vec<String>>>,
+) -> agent_client_protocol::Result<()> {
+    let load_operations = Arc::clone(&operations);
+    Agent
+        .builder()
+        .name("resume-and-load-agent")
+        .on_receive_request(
+            async move |initialize: InitializeRequest, responder, _connection| {
+                responder.respond(
+                    InitializeResponse::new(initialize.protocol_version).agent_capabilities(
+                        AgentCapabilities::new().load_session(true).session_capabilities(
+                            SessionCapabilities::new().resume(SessionResumeCapabilities::new()),
+                        ),
+                    ),
+                )
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: ResumeSessionRequest, responder, _connection| {
+                operations
+                    .lock()
+                    .expect("record resume")
+                    .push(format!("resume:{}", request.session_id.0));
+                responder.respond(ResumeSessionResponse::new())
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: LoadSessionRequest, responder, _connection| {
+                load_operations
+                    .lock()
+                    .expect("record load")
+                    .push(format!("load:{}", request.session_id.0));
+                responder.respond(LoadSessionResponse::new())
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_notification(
+            async move |_cancel: CancelNotification, _connection| Ok(()),
+            agent_client_protocol::on_receive_notification!(),
+        )
+        .connect_to(transport)
+        .await
+}
+
+/// Loads a session the way protocol v1 specifies: the whole conversation is
+/// replayed as `session/update` notifications before the response.
+///
+/// Advertises `loadSession` but not `resume`, so a start with a stored id has
+/// only this route to take.
+pub(super) async fn run_agent_replaying_session_load(
+    transport: Channel,
+    operations: Arc<Mutex<Vec<String>>>,
+) -> agent_client_protocol::Result<()> {
+    let new_operations = Arc::clone(&operations);
+    Agent
+        .builder()
+        .name("session-load-agent")
+        .on_receive_request(
+            async move |initialize: InitializeRequest, responder, _connection| {
+                responder.respond(
+                    InitializeResponse::new(initialize.protocol_version).agent_capabilities(
+                        AgentCapabilities::new().load_session(true).session_capabilities(
+                            SessionCapabilities::new().additional_directories(
+                                SessionAdditionalDirectoriesCapabilities::new(),
+                            ),
+                        ),
+                    ),
+                )
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: NewSessionRequest, responder, _connection| {
+                new_operations.lock().expect("record new").push(session_inputs_record(
+                    "new",
+                    &request.mcp_servers,
+                    &request.additional_directories,
+                ));
+                responder.respond(NewSessionResponse::new("acp-session-fresh"))
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: LoadSessionRequest, responder, connection| {
+                operations.lock().expect("record load").push(format!(
+                    "load:{}:{}",
+                    request.session_id.0,
+                    session_inputs_record(
+                        "inputs",
+                        &request.mcp_servers,
+                        &request.additional_directories
+                    )
+                ));
+                for turn in ["replayed user turn", "replayed agent turn"] {
+                    connection.send_notification(SessionNotification::new(
+                        request.session_id.clone(),
+                        SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::Text(
+                            TextContent::new(turn),
+                        ))),
+                    ))?;
+                }
+                responder.respond(LoadSessionResponse::new())
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_notification(
+            async move |_cancel: CancelNotification, _connection| Ok(()),
+            agent_client_protocol::on_receive_notification!(),
+        )
+        .connect_to(transport)
+        .await
+}
+
+/// Advertises `loadSession` and then refuses the load.
+///
+/// Stands in for an agent that has since dropped the stored session, which the
+/// start has to survive by opening a fresh one.
+pub(super) async fn run_agent_refusing_session_load(
+    transport: Channel,
+    operations: Arc<Mutex<Vec<String>>>,
+) -> agent_client_protocol::Result<()> {
+    let new_operations = Arc::clone(&operations);
+    Agent
+        .builder()
+        .name("session-load-refusing-agent")
+        .on_receive_request(
+            async move |initialize: InitializeRequest, responder, _connection| {
+                responder.respond(
+                    InitializeResponse::new(initialize.protocol_version)
+                        .agent_capabilities(AgentCapabilities::new().load_session(true)),
+                )
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: NewSessionRequest, responder, _connection| {
+                new_operations.lock().expect("record new").push(session_inputs_record(
+                    "new",
+                    &request.mcp_servers,
+                    &request.additional_directories,
+                ));
+                responder.respond(NewSessionResponse::new("acp-session-fresh"))
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: LoadSessionRequest,
+                        responder: agent_client_protocol::Responder<LoadSessionResponse>,
+                        _connection| {
+                operations
+                    .lock()
+                    .expect("record load")
+                    .push(format!("load-refused:{}", request.session_id.0));
+                responder.respond_with_error(agent_client_protocol::Error::new(
+                    -32602,
+                    "no such session".to_string(),
+                ))
             },
             agent_client_protocol::on_receive_request!(),
         )

@@ -7,8 +7,8 @@
 use std::path::PathBuf;
 
 use agent_client_protocol::schema::v1::{
-    EnvVariable, HttpHeader, McpServer, McpServerHttp, McpServerSse, McpServerStdio,
-    NewSessionRequest, ResumeSessionRequest, SessionId,
+    EnvVariable, HttpHeader, LoadSessionRequest, McpServer, McpServerHttp, McpServerSse,
+    McpServerStdio, NewSessionRequest, ResumeSessionRequest, SessionId,
 };
 
 use super::session_config::AcpSessionRequestConfig;
@@ -68,6 +68,20 @@ pub(super) fn resume_session_request(
 ) -> ResumeSessionRequest {
     let inputs = session_inputs(config, handshake);
     ResumeSessionRequest::new(session_id, cwd)
+        .additional_directories(inputs.additional_directories)
+        .mcp_servers(inputs.mcp_servers)
+}
+
+/// Load carries the same inputs as resume; the two differ only in whether the
+/// agent replays the conversation back to us before answering.
+pub(super) fn load_session_request(
+    session_id: SessionId,
+    cwd: PathBuf,
+    config: &AcpSessionRequestConfig,
+    handshake: Option<&AcpAgentHandshake>,
+) -> LoadSessionRequest {
+    let inputs = session_inputs(config, handshake);
+    LoadSessionRequest::new(session_id, cwd)
         .additional_directories(inputs.additional_directories)
         .mcp_servers(inputs.mcp_servers)
 }

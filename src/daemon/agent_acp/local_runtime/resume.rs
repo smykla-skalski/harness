@@ -3,12 +3,14 @@
 use super::super::manager::{AcpAgentManagerHandle, AcpAgentStartRequest};
 
 impl AcpAgentManagerHandle {
-    /// The agent session this start should resume, if any.
+    /// The prior agent session this start should pick up, if any.
     ///
-    /// An explicit id wins, `resume_disabled` forces a fresh session, and
-    /// otherwise the last session this runtime recorded on this harness session
-    /// is resumed. Looking it up is best effort: failing to read the store is a
-    /// reason to start clean, never to fail the start.
+    /// Only the id is decided here; whether it is resumed or loaded is chosen
+    /// later from what the agent advertises. An explicit id wins,
+    /// `resume_disabled` forces a fresh session, and otherwise the last session
+    /// this runtime recorded on this harness session is picked up. Looking it up
+    /// is best effort: failing to read the store is a reason to start clean,
+    /// never to fail the start.
     #[expect(
         clippy::cognitive_complexity,
         reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
