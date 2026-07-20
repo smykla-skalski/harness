@@ -76,6 +76,11 @@ fn handler_harness() -> HandlerHarness {
             ),
             session_guard,
             supervisor,
+            manager: protocol_manager(
+                "fake",
+                "agent-acp-1",
+                "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e",
+            ),
             notifications,
         },
         _bridge: bridge,

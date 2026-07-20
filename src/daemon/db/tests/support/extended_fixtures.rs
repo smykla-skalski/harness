@@ -141,6 +141,7 @@ pub(crate) fn performance_session_state(
             current_task_id: Some(task_id.clone()),
             runtime_capabilities: RuntimeCapabilities::default(),
             persona: None,
+            runtime_session_title: None,
         },
     );
 

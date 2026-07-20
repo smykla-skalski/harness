@@ -233,8 +233,19 @@ async fn expired_tombstone_notification_is_dropped_without_protocol_error() {
         )))),
     );
 
-    let Ok(()) =
-        route_session_notification(&guard, &supervisor, &notification_tx, notification).await
+    let manager = protocol_manager(
+        "fake",
+        "agent-acp-1",
+        "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e",
+    );
+    let Ok(()) = route_session_notification(
+        &guard,
+        &supervisor,
+        &manager,
+        &notification_tx,
+        notification,
+    )
+    .await
     else {
         unreachable!("expired tombstone notification should be benign");
     };

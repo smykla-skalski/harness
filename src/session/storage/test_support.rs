@@ -40,6 +40,7 @@ pub(super) fn sample_state(session_id: &str) -> SessionState {
                 current_task_id: None,
                 runtime_capabilities: RuntimeCapabilities::default(),
                 persona: None,
+                runtime_session_title: None,
             },
         )]),
         tasks: BTreeMap::from([(

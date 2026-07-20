@@ -32,6 +32,7 @@ use crate::agents::acp::batcher::RoutedSessionNotification;
 use crate::agents::acp::client::{ClientCallCancel, ClientResult};
 use crate::agents::acp::supervision::AcpSessionSupervisor;
 
+use super::AcpAgentManagerHandle;
 use super::context::{ProtocolContext, respond_client_result};
 use super::runtime_helpers::route_session_notification;
 use super::session_guard::SessionRouteGuard;
@@ -40,6 +41,7 @@ pub(super) struct ClientHandlers {
     pub(super) context: ProtocolContext,
     pub(super) session_guard: Arc<SessionRouteGuard>,
     pub(super) supervisor: Arc<AcpSessionSupervisor>,
+    pub(super) manager: AcpAgentManagerHandle,
     pub(super) notifications: mpsc::Sender<RoutedSessionNotification>,
 }
 
@@ -54,6 +56,7 @@ pub(super) async fn connect_with_client_handlers<R>(
         context,
         session_guard,
         supervisor,
+        manager,
         notifications,
     } = handlers;
     let read_context = context.clone();
@@ -72,6 +75,7 @@ pub(super) async fn connect_with_client_handlers<R>(
                 route_session_notification(
                     &session_guard,
                     &supervisor,
+                    &manager,
                     &notifications,
                     notification,
                 )

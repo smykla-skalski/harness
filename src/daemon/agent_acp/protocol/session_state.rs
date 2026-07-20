@@ -66,7 +66,14 @@ fn stop_reason_label(stop_reason: &StopReason) -> &'static str {
     }
 }
 
-pub(super) fn apply_session_update(supervisor: &AcpSessionSupervisor, update: &SessionUpdate) {
+/// Fold a session update into the supervisor's live state.
+///
+/// Returns the agent-reported title when this update set one, so the caller can
+/// persist it into the session index.
+pub(super) fn apply_session_update(
+    supervisor: &AcpSessionSupervisor,
+    update: &SessionUpdate,
+) -> Option<String> {
     match update {
         SessionUpdate::ConfigOptionUpdate(update) => supervisor.mutate_session_state(|state| {
             state.config_options = config_option_states(&update.config_options);
@@ -83,12 +90,18 @@ pub(super) fn apply_session_update(supervisor: &AcpSessionSupervisor, update: &S
                     .collect();
             });
         }
-        SessionUpdate::SessionInfoUpdate(update) => supervisor.mutate_session_state(|state| {
-            apply_maybe(&update.title, &mut state.title);
-            apply_maybe(&update.updated_at, &mut state.updated_at);
-        }),
+        SessionUpdate::SessionInfoUpdate(update) => {
+            supervisor.mutate_session_state(|state| {
+                apply_maybe(&update.title, &mut state.title);
+                apply_maybe(&update.updated_at, &mut state.updated_at);
+            });
+            if let MaybeUndefined::Value(title) = &update.title {
+                return Some(title.clone());
+            }
+        }
         _ => {}
     }
+    None
 }
 
 fn apply_maybe(update: &MaybeUndefined<String>, target: &mut Option<String>) {

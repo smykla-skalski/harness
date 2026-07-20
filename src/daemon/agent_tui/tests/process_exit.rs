@@ -58,6 +58,7 @@ fn final_tui_snapshot_disconnects_registered_agent_and_broadcasts_session_refres
             current_task_id: None,
             runtime_capabilities: crate::agents::runtime::RuntimeCapabilities::default(),
             persona: None,
+            runtime_session_title: None,
         },
     );
     db.sync_session(&project.project_id, &state)
@@ -217,6 +218,7 @@ fn live_refresh_disconnects_joined_agent_when_child_process_exits() {
                     current_task_id: None,
                     runtime_capabilities: crate::agents::runtime::RuntimeCapabilities::default(),
                     persona: None,
+                    runtime_session_title: None,
                 },
             );
             db_guard

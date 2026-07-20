@@ -230,6 +230,7 @@ fn prepare_agent_conversation_imports_and_activity_loads_each_agent_once() {
             current_task_id: None,
             runtime_capabilities: RuntimeCapabilities::default(),
             persona: None,
+            runtime_session_title: None,
         },
     );
     let session_id = state.session_id.clone();

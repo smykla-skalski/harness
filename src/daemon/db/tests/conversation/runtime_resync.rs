@@ -23,6 +23,7 @@ fn prepare_runtime_transcript_resync_only_loads_matching_agent() {
             current_task_id: None,
             runtime_capabilities: RuntimeCapabilities::default(),
             persona: None,
+            runtime_session_title: None,
         },
     );
     let session_id = state.session_id.clone();
@@ -97,6 +98,7 @@ fn apply_prepared_runtime_transcript_resync_preserves_other_agents() {
             current_task_id: None,
             runtime_capabilities: RuntimeCapabilities::default(),
             persona: None,
+            runtime_session_title: None,
         },
     );
     db.sync_session(&project.project_id, &state)
@@ -335,6 +337,7 @@ fn worker_state() -> SessionState {
             current_task_id: None,
             runtime_capabilities: RuntimeCapabilities::default(),
             persona: None,
+            runtime_session_title: None,
         },
     );
     state

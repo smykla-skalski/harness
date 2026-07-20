@@ -70,6 +70,7 @@ mod tests {
             current_task_id: None,
             runtime_capabilities: Default::default(),
             persona: persona_id.map(persona),
+            runtime_session_title: None,
         }
     }
 

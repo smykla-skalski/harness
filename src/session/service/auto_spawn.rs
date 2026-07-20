@@ -108,6 +108,7 @@ mod tests {
             current_task_id: None,
             runtime_capabilities: Default::default(),
             persona: None,
+            runtime_session_title: None,
         }
     }
 

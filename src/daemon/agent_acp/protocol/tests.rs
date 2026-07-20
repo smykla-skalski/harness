@@ -24,6 +24,7 @@ use crate::session::types::{ManagedAgentRef, SessionRole};
 mod agents;
 mod cancellation_tests;
 mod connection_tests;
+mod telemetry_tests;
 
 use agents::{
     run_agent_recording_startup_config_order, run_agent_with_stale_notification,

@@ -43,6 +43,7 @@ fn session_detail_applies_shared_agent_and_task_ordering() {
                     current_task_id: None,
                     runtime_capabilities: crate::agents::runtime::RuntimeCapabilities::default(),
                     persona: None,
+                    runtime_session_title: None,
                 },
             );
             state.agents.insert(
@@ -62,6 +63,7 @@ fn session_detail_applies_shared_agent_and_task_ordering() {
                     current_task_id: None,
                     runtime_capabilities: crate::agents::runtime::RuntimeCapabilities::default(),
                     persona: None,
+                    runtime_session_title: None,
                 },
             );
             state.leader_id = Some("leader-1".into());

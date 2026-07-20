@@ -2,6 +2,7 @@ use crate::agents::acp::supervision::AcpSessionSupervisor;
 
 use agent_client_protocol::schema::v1::SessionNotification;
 
+use super::AcpAgentManagerHandle;
 use super::{
     ACP_DEADLINE_EXCEEDED, AcpError, AcpResult, DisconnectReason, ErrorCode,
     RoutedSessionNotification, SessionId, SessionRouteGuard, mpsc, session_state,
@@ -10,13 +11,22 @@ use super::{
 pub(super) async fn route_session_notification(
     notification_guard: &SessionRouteGuard,
     supervisor: &AcpSessionSupervisor,
+    manager: &AcpAgentManagerHandle,
     notifications: &mpsc::Sender<RoutedSessionNotification>,
     notification: SessionNotification,
 ) -> AcpResult<()> {
     let Some(routed) = routed_session_notification(notification_guard, notification) else {
         return Ok(());
     };
-    session_state::apply_session_update(supervisor, &routed.notification.update);
+    if let Some(title) =
+        session_state::apply_session_update(supervisor, &routed.notification.update)
+    {
+        manager.record_runtime_session_title_best_effort(
+            &routed.session_id,
+            &routed.acp_id,
+            &title,
+        );
+    }
     notifications
         .send(routed)
         .await

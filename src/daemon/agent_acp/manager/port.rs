@@ -72,6 +72,14 @@ pub(in crate::daemon::agent_acp) trait AcpManagerPort:
         self.bind_runtime_session(binding)
     }
 
+    /// Persist the title a runtime reports for its own session.
+    fn record_runtime_session_title(
+        &self,
+        session_id: &str,
+        acp_id: &str,
+        title: &str,
+    ) -> Result<bool, CliError>;
+
     fn rollback_registration(
         &self,
         session_id: &str,
@@ -173,6 +181,15 @@ impl AcpManagerPort for BridgeAcpManagerPort {
             payload: serde_json::to_value(payload).unwrap_or_default(),
         });
         Ok(true)
+    }
+
+    fn record_runtime_session_title(
+        &self,
+        _session_id: &str,
+        _acp_id: &str,
+        _title: &str,
+    ) -> Result<bool, CliError> {
+        Ok(false)
     }
 
     fn rollback_registration(
@@ -281,6 +298,25 @@ impl AcpAgentManagerHandle {
             runtime_name,
             agent_session_id,
         })
+    }
+
+    /// Persist an agent-reported session title without blocking the caller's
+    /// path: the title is advisory metadata, so a failed write is logged and
+    /// the next update simply tries again.
+    pub(in crate::daemon::agent_acp) fn record_runtime_session_title_best_effort(
+        &self,
+        session_id: &str,
+        acp_id: &str,
+        title: &str,
+    ) {
+        if let Err(error) = self
+            .state
+            .port
+            .record_runtime_session_title(session_id, acp_id, title)
+        {
+            tracing::warn!(session_id, acp_id, %error,
+                "failed to record ACP runtime session title");
+        }
     }
 
     pub(in crate::daemon::agent_acp) fn rollback_orchestration_registration_best_effort(

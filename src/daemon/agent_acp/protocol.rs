@@ -212,6 +212,7 @@ async fn run_protocol(args: RunProtocolArgs) {
         context,
         session_guard: Arc::clone(&session_guard),
         supervisor: Arc::clone(&supervisor),
+        manager: manager.clone(),
         notifications,
     };
     let result = connect_with_client_handlers(transport, handlers, async move |connection| {
