@@ -339,8 +339,11 @@ extension View {
   /// Each card reports its own frame straight into the lane's hover model.
   /// Deliberately not a shared preference reduced across the `LazyVStack` - that
   /// aggregate faulted as "bound preference ... tried to update multiple times
-  /// per frame" while lazy children measured in. `onChange` lets the column
-  /// re-resolve the hovered card when a frame settles or a card scrolls away.
+  /// per frame" while lazy children measured in. `onChange` re-resolves the
+  /// hovered card when a frame settles or a card leaves, gated on an active
+  /// pointer: geometry churns every frame during scroll, and there is nothing to
+  /// re-resolve when nothing is hovered. Frame recording stays unconditional so
+  /// the model is current the instant the pointer arrives.
   func taskBoardCardFrame(
     id: TaskBoardLaneCardHoverID,
     in coordinateSpace: String,
@@ -351,11 +354,11 @@ extension View {
       proxy.frame(in: .named(coordinateSpace))
     } action: { frame in
       tracking.setFrame(frame, for: id)
-      onChange()
+      if tracking.location != nil { onChange() }
     }
     .onDisappear {
       tracking.removeFrame(for: id)
-      onChange()
+      if tracking.location != nil { onChange() }
     }
   }
 }
