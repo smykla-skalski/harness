@@ -8,7 +8,7 @@
 
 use std::path::{Path, PathBuf};
 
-use agent_client_protocol::schema::{
+use agent_client_protocol::schema::v1::{
     CreateTerminalRequest, KillTerminalRequest, ReadTextFileRequest, ReleaseTerminalRequest,
     SessionId, TerminalId, TerminalOutputRequest, WaitForTerminalExitRequest, WriteTextFileRequest,
 };
@@ -41,7 +41,9 @@ pub async fn dispatch_tool_call(
             dispatch_create_terminal(connection, session_id, project_dir, &parsed).await
         }
         TOOL_TERMINAL_OUTPUT => dispatch_terminal_output(connection, session_id, &parsed).await,
-        TOOL_WAIT_FOR_TERMINAL_EXIT => dispatch_wait_for_exit(connection, session_id, &parsed).await,
+        TOOL_WAIT_FOR_TERMINAL_EXIT => {
+            dispatch_wait_for_exit(connection, session_id, &parsed).await
+        }
         TOOL_KILL_TERMINAL => dispatch_kill(connection, session_id, &parsed).await,
         TOOL_RELEASE_TERMINAL => dispatch_release(connection, session_id, &parsed).await,
         other => error_value(&format!("unknown tool: {other}")),
@@ -146,7 +148,8 @@ async fn dispatch_terminal_output(
         Ok(value) => value,
         Err(error) => return error_value(&format!("invalid terminal_output arguments: {error}")),
     };
-    let request = TerminalOutputRequest::new(session_id.clone(), TerminalId::new(parsed.terminal_id));
+    let request =
+        TerminalOutputRequest::new(session_id.clone(), TerminalId::new(parsed.terminal_id));
     match connection.send_request(request).block_task().await {
         Ok(response) => {
             let mut payload = json!({
@@ -173,7 +176,9 @@ async fn dispatch_wait_for_exit(
     let parsed: TerminalIdArgs = match serde_json::from_value(args.clone()) {
         Ok(value) => value,
         Err(error) => {
-            return error_value(&format!("invalid wait_for_terminal_exit arguments: {error}"));
+            return error_value(&format!(
+                "invalid wait_for_terminal_exit arguments: {error}"
+            ));
         }
     };
     let request =
@@ -196,8 +201,7 @@ async fn dispatch_kill(
         Ok(value) => value,
         Err(error) => return error_value(&format!("invalid kill_terminal arguments: {error}")),
     };
-    let request =
-        KillTerminalRequest::new(session_id.clone(), TerminalId::new(parsed.terminal_id));
+    let request = KillTerminalRequest::new(session_id.clone(), TerminalId::new(parsed.terminal_id));
     match connection.send_request(request).block_task().await {
         Ok(_) => json!({ "ok": true }),
         Err(error) => acp_error_value(&error),

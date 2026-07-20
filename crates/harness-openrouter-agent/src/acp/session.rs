@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use agent_client_protocol::schema::SessionId;
+use agent_client_protocol::schema::v1::SessionId;
 use tokio::sync::Mutex;
 
 use crate::openrouter::ChatMessage;
@@ -61,13 +61,17 @@ impl SessionStore {
     /// Snapshot the session's history, project dir, model, reasoning effort,
     /// and cancel-flag handle. Returns `None` if no such session exists.
     pub async fn snapshot(&self, session_id: &SessionId) -> Option<SessionSnapshot> {
-        self.inner.lock().await.get(session_id).map(|state| SessionSnapshot {
-            project_dir: state.project_dir.clone(),
-            model: state.model.clone(),
-            reasoning_effort: state.reasoning_effort.clone(),
-            history: state.history.clone(),
-            cancel_flag: state.cancel_flag.clone(),
-        })
+        self.inner
+            .lock()
+            .await
+            .get(session_id)
+            .map(|state| SessionSnapshot {
+                project_dir: state.project_dir.clone(),
+                model: state.model.clone(),
+                reasoning_effort: state.reasoning_effort.clone(),
+                history: state.history.clone(),
+                cancel_flag: state.cancel_flag.clone(),
+            })
     }
 
     /// Append `messages` to the named session's history. Silently drops the
@@ -75,6 +79,16 @@ impl SessionStore {
     pub async fn extend_history(&self, session_id: &SessionId, messages: Vec<ChatMessage>) {
         if let Some(state) = self.inner.lock().await.get_mut(session_id) {
             state.history.extend(messages);
+        }
+    }
+
+    /// Update the session's model. Returns `true` when the session existed.
+    pub async fn set_model(&self, session_id: &SessionId, model: &str) -> bool {
+        if let Some(state) = self.inner.lock().await.get_mut(session_id) {
+            state.model = model.to_owned();
+            true
+        } else {
+            false
         }
     }
 
@@ -151,6 +165,22 @@ mod tests {
         store.reset_cancel(&id).await;
         let snap = store.snapshot(&id).await.expect("snapshot");
         assert!(!snap.cancel_flag.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn set_model_updates_existing_session_only() {
+        let store = SessionStore::new();
+        let id = session("openrouter-4");
+        assert!(!store.set_model(&id, "openai/gpt-5.5").await);
+        store
+            .insert(
+                id.clone(),
+                SessionState::new(PathBuf::from("/tmp"), "m".to_owned()),
+            )
+            .await;
+        assert!(store.set_model(&id, "openai/gpt-5.5").await);
+        let snap = store.snapshot(&id).await.expect("snapshot");
+        assert_eq!(snap.model, "openai/gpt-5.5");
     }
 
     #[tokio::test]

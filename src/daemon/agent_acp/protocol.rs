@@ -4,9 +4,10 @@ use std::process::Child;
 use std::sync::Arc;
 use std::time::Duration;
 
-use agent_client_protocol::schema::{
+use agent_client_protocol::schema::ProtocolVersion;
+use agent_client_protocol::schema::v1::{
     CancelNotification, ContentBlock, CreateTerminalRequest, InitializeRequest,
-    KillTerminalRequest, NewSessionRequest, NewSessionResponse, PromptRequest, ProtocolVersion,
+    KillTerminalRequest, NewSessionRequest, NewSessionResponse, PromptRequest,
     ReadTextFileRequest, ReleaseTerminalRequest, RequestPermissionRequest, SessionId,
     SessionNotification, TerminalOutputRequest, TextContent, WaitForTerminalExitRequest,
     WriteTextFileRequest,

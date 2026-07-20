@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::process::{Child, Stdio};
 use std::sync::Arc;
 
-use agent_client_protocol::schema::SessionNotification;
+use agent_client_protocol::schema::v1::SessionNotification;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::ChildStdout;
 use tokio::sync::mpsc;
@@ -436,7 +436,7 @@ impl SpawnConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use agent_client_protocol::schema::{
+    use agent_client_protocol::schema::v1::{
         ContentBlock, ContentChunk, SessionId, SessionUpdate, TextContent,
     };
 

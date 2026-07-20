@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, Weak};
 use std::time::Duration;
 
-use agent_client_protocol::schema::{
+use agent_client_protocol::schema::v1::{
     PermissionOption, PermissionOptionKind, RequestPermissionOutcome, RequestPermissionResponse,
     SelectedPermissionOutcome,
 };

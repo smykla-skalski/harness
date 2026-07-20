@@ -3,7 +3,7 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
-use agent_client_protocol::schema::TerminalExitStatus;
+use agent_client_protocol::schema::v1::TerminalExitStatus;
 use nix::sys::signal::{Signal, killpg};
 use nix::unistd::Pid;
 use portable_pty::ExitStatus as PtyExitStatus;

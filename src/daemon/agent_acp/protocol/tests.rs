@@ -3,7 +3,7 @@ use std::process::Command;
 use std::sync::{Arc, Mutex, OnceLock};
 
 use agent_client_protocol::Channel;
-use agent_client_protocol::schema::{
+use agent_client_protocol::schema::v1::{
     ContentBlock, ContentChunk, SessionId, SessionUpdate, TextContent,
 };
 use tokio::sync::broadcast;

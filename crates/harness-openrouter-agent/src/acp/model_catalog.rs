@@ -2,18 +2,25 @@
 //!
 //! Combines a curated default list (so the model picker is never empty when
 //! the live API call fails) with the live `/models/user` response. The
-//! curated entries always appear first.
+//! curated entries always appear first, advertised as a `model`-category
+//! session config option.
 
-use agent_client_protocol::schema::{ModelId, ModelInfo, SessionModelState};
+use agent_client_protocol::schema::v1::{
+    SessionConfigOption, SessionConfigOptionCategory, SessionConfigSelectOption,
+    SessionConfigSelectOptions,
+};
 
 use crate::openrouter::{ModelEntry, OpenRouterClient};
 
 /// Default model presented to the user when the daemon does not pin one.
 pub const DEFAULT_MODEL_ID: &str = "anthropic/claude-sonnet-4-6";
 
+/// Config option id the model catalog is advertised under.
+pub const MODEL_CONFIG_OPTION_ID: &str = "model";
+
 /// Curated, hardcoded fallback list that mirrors the catalogs.rs entry.
 #[must_use]
-pub fn curated_models() -> Vec<ModelInfo> {
+pub fn curated_models() -> Vec<SessionConfigSelectOption> {
     [
         ("anthropic/claude-haiku-4-5", "Claude Haiku 4.5"),
         ("anthropic/claude-sonnet-4-6", "Claude Sonnet 4.6"),
@@ -25,62 +32,101 @@ pub fn curated_models() -> Vec<ModelInfo> {
         ("google/gemini-3.1-pro-preview", "Gemini 3.1 Pro (preview)"),
     ]
     .into_iter()
-    .map(|(id, name)| ModelInfo::new(ModelId::new(id.to_owned()), name.to_owned()))
+    .map(|(id, name)| SessionConfigSelectOption::new(id, name))
     .collect()
 }
 
 /// Fetch the per-key model list and merge it with the curated defaults. The
-/// curated list always appears first; live entries with the same `id` are
-/// skipped to avoid duplicates. Errors fall back to the curated list with a
-/// trace warning so a temporary outage never breaks `session/new`.
-pub async fn build_session_models(
+/// curated list always appears first; live entries with the same id are
+/// skipped. Errors fall back to the curated list with a trace warning so a
+/// temporary outage never breaks `session/new`. The selected model is
+/// appended when absent (custom models, fetch fallback) so `current_value`
+/// always names an advertised choice.
+pub async fn build_model_config_option(
     client: &OpenRouterClient,
     selected_model: &str,
-) -> SessionModelState {
-    let mut models = curated_models();
+) -> SessionConfigOption {
+    let mut options = curated_models();
     match client.list_models().await {
         Ok(response) => {
             for entry in response.data {
-                if models.iter().any(|m| m.model_id.0.as_ref() == entry.id) {
+                if options.iter().any(|m| m.value.0.as_ref() == entry.id) {
                     continue;
                 }
-                models.push(model_info_from_entry(entry));
+                options.push(select_option_from_entry(entry));
             }
         }
         Err(error) => {
             tracing::warn!(%error, "failed to fetch live OpenRouter model list; using curated fallback");
         }
     }
-    SessionModelState::new(ModelId::new(selected_model.to_owned()), models)
+    if !options.iter().any(|m| m.value.0.as_ref() == selected_model) {
+        options.push(SessionConfigSelectOption::new(
+            selected_model.to_owned(),
+            selected_model.to_owned(),
+        ));
+    }
+    SessionConfigOption::select(
+        MODEL_CONFIG_OPTION_ID,
+        "Model",
+        selected_model.to_owned(),
+        SessionConfigSelectOptions::Ungrouped(options),
+    )
+    .category(SessionConfigOptionCategory::Model)
 }
 
-fn model_info_from_entry(entry: ModelEntry) -> ModelInfo {
-    let id = ModelId::new(entry.id.clone());
-    let name = entry.name.clone().unwrap_or(entry.id);
-    ModelInfo::new(id, name)
+fn select_option_from_entry(entry: ModelEntry) -> SessionConfigSelectOption {
+    let name = entry.name.clone().unwrap_or_else(|| entry.id.clone());
+    SessionConfigSelectOption::new(entry.id, name)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use agent_client_protocol::schema::v1::SessionConfigKind;
+
+    #[tokio::test]
+    async fn selected_model_always_present_in_options() {
+        // base_url:0 fails the live fetch fast, leaving the curated fallback.
+        let client = OpenRouterClient::new("http://127.0.0.1:0/api/v1", "sk-test", "ref", "title")
+            .expect("client");
+        let option = build_model_config_option(&client, "custom/model-not-in-catalog").await;
+        let SessionConfigKind::Select(select) = &option.kind else {
+            panic!("model option must be a select, got {:?}", option.kind);
+        };
+        assert_eq!(
+            select.current_value.0.as_ref(),
+            "custom/model-not-in-catalog"
+        );
+        let SessionConfigSelectOptions::Ungrouped(choices) = &select.options else {
+            panic!("model options must be ungrouped");
+        };
+        assert!(
+            choices
+                .iter()
+                .any(|m| m.value.0.as_ref() == "custom/model-not-in-catalog")
+        );
+    }
 
     #[test]
     fn curated_list_includes_default_model() {
         let models = curated_models();
-        assert!(models
-            .iter()
-            .any(|m| m.model_id.0.as_ref() == DEFAULT_MODEL_ID));
+        assert!(
+            models
+                .iter()
+                .any(|m| m.value.0.as_ref() == DEFAULT_MODEL_ID)
+        );
     }
 
     #[test]
-    fn model_info_falls_back_to_id_when_name_missing() {
-        let info = model_info_from_entry(ModelEntry {
+    fn select_option_falls_back_to_id_when_name_missing() {
+        let option = select_option_from_entry(ModelEntry {
             id: "x/y".to_owned(),
             name: None,
             context_length: None,
             supported_parameters: Vec::new(),
         });
-        assert_eq!(info.model_id.0.as_ref(), "x/y");
-        assert_eq!(info.name, "x/y");
+        assert_eq!(option.value.0.as_ref(), "x/y");
+        assert_eq!(option.name, "x/y");
     }
 }

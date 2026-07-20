@@ -1,24 +1,25 @@
 ---
 source: src/run/workflow/tests/phase_transitions.rs
+assertion_line: 312
 expression: "serde_json::to_string_pretty(&json).unwrap()"
 ---
 {
-  "last_event": "ClusterPrepared",
   "state": {
-    "history": [
-      {
-        "event": "cluster-prepared",
-        "from": "bootstrap",
-        "timestamp": "REDACTED",
-        "to": "preflight"
-      }
-    ],
     "phase": "preflight",
     "preflight": {
       "status": "pending"
     },
+    "history": [
+      {
+        "from": "bootstrap",
+        "to": "preflight",
+        "event": "cluster-prepared",
+        "timestamp": "REDACTED"
+      }
+    ],
     "updated_at": "REDACTED"
   },
+  "updated_at": "REDACTED",
   "transition_count": 1,
-  "updated_at": "REDACTED"
+  "last_event": "ClusterPrepared"
 }

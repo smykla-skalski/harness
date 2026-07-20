@@ -17,12 +17,13 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use agent_client_protocol::schema::{
+use agent_client_protocol::schema::ProtocolVersion;
+use agent_client_protocol::schema::v1::{
     ContentBlock, CreateTerminalRequest, CreateTerminalResponse, EnvVariable, InitializeRequest,
     KillTerminalRequest, KillTerminalResponse, McpServer, McpServerStdio, NewSessionRequest,
-    PromptRequest, ProtocolVersion, ReadTextFileRequest, ReadTextFileResponse,
-    ReleaseTerminalRequest, ReleaseTerminalResponse, RequestPermissionRequest,
-    RequestPermissionResponse, SessionNotification, SessionUpdate, StopReason, TerminalId,
+    PromptRequest, ReadTextFileRequest, ReadTextFileResponse, ReleaseTerminalRequest,
+    ReleaseTerminalResponse, RequestPermissionRequest, RequestPermissionResponse,
+    SessionConfigKind, SessionNotification, SessionUpdate, StopReason, TerminalId,
     TerminalOutputRequest, TerminalOutputResponse, TextContent, WaitForTerminalExitRequest,
     WaitForTerminalExitResponse, WriteTextFileRequest, WriteTextFileResponse,
 };
@@ -155,7 +156,7 @@ pub(super) fn client_builder_with_chunks(
         )
         .on_receive_request(
             async move |_req: RequestPermissionRequest, responder, _cx| {
-                use agent_client_protocol::schema::{
+                use agent_client_protocol::schema::v1::{
                     RequestPermissionOutcome, SelectedPermissionOutcome,
                 };
                 responder.respond(RequestPermissionResponse::new(
@@ -221,14 +222,20 @@ async fn session_new_returns_session_id_and_models() {
                 .block_task()
                 .await?;
             let response = cx
-                .send_request(NewSessionRequest::new(PathBuf::from(std::env::temp_dir())))
+                .send_request(NewSessionRequest::new(std::env::temp_dir()))
                 .block_task()
                 .await?;
             assert!(!response.session_id.0.as_ref().is_empty());
-            let models = response.models.expect("models");
-            assert!(!models.available_models.is_empty());
+            let options = response.config_options.expect("config options");
+            let option = options
+                .iter()
+                .find(|option| option.id.0.as_ref() == "model")
+                .expect("model option");
+            let SessionConfigKind::Select(select) = &option.kind else {
+                panic!("model option must be a select, got {:?}", option.kind);
+            };
             assert_eq!(
-                models.current_model_id.0.as_ref(),
+                select.current_value.0.as_ref(),
                 "anthropic/claude-sonnet-4-6"
             );
             Ok(())

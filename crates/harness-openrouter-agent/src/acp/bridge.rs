@@ -1,28 +1,29 @@
 //! ACP agent-side bridge entry point.
 //!
 //! Wires up the `Agent.builder()` from `agent_client_protocol`, registers
-//! handlers for `initialize`, `session/new`, `session/prompt`, and the
-//! `session/cancel` notification, then connects to stdio.
+//! handlers for `initialize`, `session/new`, `session/set_config_option`,
+//! `session/prompt`, and the `session/cancel` notification, then connects
+//! to stdio.
 //!
-//! The handlers share a [`SessionStore`] and an [`AgentConfig`] captured at
+//! The handlers share a [`SessionStore`] and an [`OpenRouterClient`] built at
 //! process start. The `session/prompt` turn loop runs in `cx.spawn` so the
 //! ACP event loop keeps servicing other messages — most importantly the
 //! `session/cancel` notification — while a turn is in flight.
 
 use std::path::PathBuf;
-use std::sync::Arc;
 use uuid::Uuid;
 
-use agent_client_protocol::schema::{
+use agent_client_protocol::schema::v1::{
     AgentCapabilities, CancelNotification, Implementation, InitializeRequest, InitializeResponse,
-    NewSessionRequest, NewSessionResponse, PromptRequest, PromptResponse, SessionId, StopReason,
+    NewSessionRequest, NewSessionResponse, PromptRequest, PromptResponse, SessionId,
+    SetSessionConfigOptionRequest, SetSessionConfigOptionResponse,
 };
 use agent_client_protocol::util::internal_error;
 use agent_client_protocol::{Agent, ConnectionTo, Dispatch, Stdio};
 
 use crate::openrouter::{AgentConfig, ConfigError, OpenRouterClient, discard_api_key_file};
 
-use super::model_catalog::{DEFAULT_MODEL_ID, build_session_models};
+use super::model_catalog::{DEFAULT_MODEL_ID, MODEL_CONFIG_OPTION_ID, build_model_config_option};
 use super::session::{SessionState, SessionStore};
 use super::turn::drive_turn;
 
@@ -36,24 +37,25 @@ use super::turn::drive_turn;
 /// # Errors
 /// Returns an error if the underlying ACP connection terminates abnormally
 /// or the `api_key_file` is missing, unreadable, or empty.
-pub async fn run_stdio(
-    api_key_file: Option<PathBuf>,
-) -> Result<(), agent_client_protocol::Error> {
+pub async fn run_stdio(api_key_file: Option<PathBuf>) -> Result<(), agent_client_protocol::Error> {
     let store = SessionStore::new();
     let path = api_key_file.ok_or_else(|| config_error(ConfigError::MissingApiKeyFile))?;
     let config = match AgentConfig::from_api_key_file(&path) {
-        Ok(config) => Arc::new(config),
+        Ok(config) => config,
         Err(error) => {
             discard_api_key_file(&path);
             return Err(config_error(error));
         }
     };
     discard_api_key_file(&path);
+    let client = build_client(config)?;
 
     let store_new = store.clone();
-    let config_new = config.clone();
+    let client_new = client.clone();
+    let store_config = store.clone();
+    let client_config = client.clone();
     let store_prompt = store.clone();
-    let config_prompt = config.clone();
+    let client_prompt = client;
     let store_cancel = store.clone();
 
     Agent
@@ -67,7 +69,15 @@ pub async fn run_stdio(
         )
         .on_receive_request(
             async move |request: NewSessionRequest, responder, _connection| {
-                let response = handle_new_session(&store_new, &config_new, request).await;
+                let response = handle_new_session(&store_new, &client_new, request).await;
+                responder.respond(response)
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: SetSessionConfigOptionRequest, responder, _connection| {
+                let response =
+                    handle_set_config_option(&store_config, &client_config, request).await;
                 match response {
                     Ok(response) => responder.respond(response),
                     Err(error) => responder.respond_with_error(error),
@@ -78,11 +88,18 @@ pub async fn run_stdio(
         .on_receive_request(
             async move |request: PromptRequest, responder, connection| {
                 let store = store_prompt.clone();
-                let config = config_prompt.clone();
+                let client = client_prompt.clone();
                 connection.spawn({
                     let connection = connection.clone();
                     async move {
-                        let stop_reason = run_prompt(&connection, &store, &config, request).await;
+                        let stop_reason = drive_turn(
+                            &connection,
+                            &client,
+                            &store,
+                            &request.session_id,
+                            request.prompt,
+                        )
+                        .await;
                         responder.respond(PromptResponse::new(stop_reason))
                     }
                 })?;
@@ -98,7 +115,8 @@ pub async fn run_stdio(
             agent_client_protocol::on_receive_notification!(),
         )
         .on_receive_dispatch(
-            async move |message: Dispatch, connection: ConnectionTo<agent_client_protocol::Client>| {
+            async move |message: Dispatch,
+                        connection: ConnectionTo<agent_client_protocol::Client>| {
                 let method = message.method().to_owned();
                 message.respond_with_error(
                     internal_error(format!(
@@ -117,6 +135,16 @@ fn config_error(error: ConfigError) -> agent_client_protocol::Error {
     internal_error(format!("openrouter shim config error: {error}"))
 }
 
+fn build_client(config: AgentConfig) -> Result<OpenRouterClient, agent_client_protocol::Error> {
+    OpenRouterClient::new(
+        config.base_url,
+        config.api_key,
+        config.http_referer,
+        config.x_title,
+    )
+    .map_err(|error| internal_error(format!("failed to build OpenRouter client: {error}")))
+}
+
 fn initialize_response(request: InitializeRequest) -> InitializeResponse {
     InitializeResponse::new(request.protocol_version)
         .agent_capabilities(AgentCapabilities::new())
@@ -126,58 +154,57 @@ fn initialize_response(request: InitializeRequest) -> InitializeResponse {
         )))
 }
 
-async fn run_prompt(
-    connection: &ConnectionTo<agent_client_protocol::Client>,
-    store: &SessionStore,
-    config: &AgentConfig,
-    request: PromptRequest,
-) -> StopReason {
-    let client = match OpenRouterClient::new(
-        config.base_url.clone(),
-        config.api_key.clone(),
-        config.http_referer.clone(),
-        config.x_title.clone(),
-    ) {
-        Ok(client) => client,
-        Err(error) => {
-            tracing::warn!(%error, "failed to build OpenRouter client for prompt");
-            return StopReason::EndTurn;
-        }
-    };
-    drive_turn(connection, &client, store, &request.session_id, request.prompt).await
-}
-
 async fn handle_new_session(
     store: &SessionStore,
-    config: &AgentConfig,
+    client: &OpenRouterClient,
     request: NewSessionRequest,
-) -> Result<NewSessionResponse, agent_client_protocol::Error> {
+) -> NewSessionResponse {
     let session_id = SessionId::new(Uuid::new_v4().to_string());
-    let client = OpenRouterClient::new(
-        config.base_url.clone(),
-        config.api_key.clone(),
-        config.http_referer.clone(),
-        config.x_title.clone(),
-    )
-    .map_err(|error| internal_error(format!("failed to build OpenRouter client: {error}")))?;
-
-    let model_state = build_session_models(&client, DEFAULT_MODEL_ID).await;
-    let selected_model = model_state.current_model_id.0.as_ref().to_owned();
+    let model_option = build_model_config_option(client, DEFAULT_MODEL_ID).await;
 
     store
         .insert(
             session_id.clone(),
-            SessionState::new(request.cwd, selected_model),
+            SessionState::new(request.cwd, DEFAULT_MODEL_ID.to_owned()),
         )
         .await;
 
-    Ok(NewSessionResponse::new(session_id).models(Some(model_state)))
+    NewSessionResponse::new(session_id).config_options(vec![model_option])
+}
+
+async fn handle_set_config_option(
+    store: &SessionStore,
+    client: &OpenRouterClient,
+    request: SetSessionConfigOptionRequest,
+) -> Result<SetSessionConfigOptionResponse, agent_client_protocol::Error> {
+    if request.config_id.0.as_ref() != MODEL_CONFIG_OPTION_ID {
+        return Err(internal_error(format!(
+            "unknown session config option '{}'",
+            request.config_id.0
+        )));
+    }
+    let Some(model) = request.value.as_value_id() else {
+        return Err(internal_error("model config option expects a select value"));
+    };
+    let model = model.0.to_string();
+    if !store.set_model(&request.session_id, &model).await {
+        return Err(internal_error(format!(
+            "unknown ACP session '{}'",
+            request.session_id.0
+        )));
+    }
+    let option = build_model_config_option(client, &model).await;
+    Ok(SetSessionConfigOptionResponse::new(vec![option]))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use agent_client_protocol::schema::ProtocolVersion;
+    use agent_client_protocol::schema::v1::{
+        SessionConfigKind, SessionConfigOption, SessionConfigOptionCategory,
+        SessionConfigSelectOptions,
+    };
     use std::path::PathBuf;
 
     fn initialize_request() -> InitializeRequest {
@@ -193,6 +220,10 @@ mod tests {
         .expect("config")
     }
 
+    fn test_client() -> OpenRouterClient {
+        build_client(test_config()).expect("client")
+    }
+
     #[test]
     fn initialize_response_carries_agent_info() {
         let response = initialize_response(initialize_request());
@@ -201,16 +232,24 @@ mod tests {
         assert_eq!(info.version, env!("CARGO_PKG_VERSION"));
     }
 
+    fn model_option_state(option: &SessionConfigOption) -> (String, usize) {
+        let SessionConfigKind::Select(select) = &option.kind else {
+            panic!("model option must be a select, got {:?}", option.kind);
+        };
+        let SessionConfigSelectOptions::Ungrouped(choices) = &select.options else {
+            panic!("model options must be ungrouped");
+        };
+        (select.current_value.0.to_string(), choices.len())
+    }
+
     #[tokio::test]
     async fn new_session_assigns_uuid_and_stores_state() {
         let store = SessionStore::new();
-        let config = test_config();
-        // base_url:0 means the list_models call fails fast; build_session_models
-        // falls back to the curated list, so handle_new_session still succeeds.
+        let client = test_client();
+        // base_url:0 fails the live model fetch fast; the curated fallback
+        // keeps the model option populated.
         let request = NewSessionRequest::new(PathBuf::from("/tmp/proj"));
-        let response = handle_new_session(&store, &config, request)
-            .await
-            .expect("new session");
+        let response = handle_new_session(&store, &client, request).await;
         assert!(!response.session_id.0.as_ref().is_empty());
         let snapshot = store
             .snapshot(&response.session_id)
@@ -218,8 +257,74 @@ mod tests {
             .expect("session stored");
         assert_eq!(snapshot.project_dir, PathBuf::from("/tmp/proj"));
         assert_eq!(snapshot.model, DEFAULT_MODEL_ID);
-        let models = response.models.expect("models");
-        assert_eq!(models.current_model_id.0.as_ref(), DEFAULT_MODEL_ID);
-        assert!(!models.available_models.is_empty());
+        let options = response.config_options.expect("config options");
+        let option = options
+            .iter()
+            .find(|option| option.id.0.as_ref() == MODEL_CONFIG_OPTION_ID)
+            .expect("model option");
+        assert_eq!(option.category, Some(SessionConfigOptionCategory::Model));
+        let (current, choice_count) = model_option_state(option);
+        assert_eq!(current, DEFAULT_MODEL_ID);
+        assert!(choice_count > 0);
+    }
+
+    #[tokio::test]
+    async fn set_config_option_updates_model_and_returns_snapshot() {
+        let store = SessionStore::new();
+        let client = test_client();
+        let request = NewSessionRequest::new(PathBuf::from("/tmp/proj"));
+        let response = handle_new_session(&store, &client, request).await;
+        let session_id = response.session_id.clone();
+
+        let set = SetSessionConfigOptionRequest::new(
+            session_id.clone(),
+            MODEL_CONFIG_OPTION_ID,
+            "anthropic/claude-haiku-4-5",
+        );
+        let snapshot_response = handle_set_config_option(&store, &client, set)
+            .await
+            .expect("set model");
+
+        let stored = store.snapshot(&session_id).await.expect("session stored");
+        assert_eq!(stored.model, "anthropic/claude-haiku-4-5");
+        let option = snapshot_response
+            .config_options
+            .iter()
+            .find(|option| option.id.0.as_ref() == MODEL_CONFIG_OPTION_ID)
+            .expect("model option");
+        let (current, _) = model_option_state(option);
+        assert_eq!(current, "anthropic/claude-haiku-4-5");
+    }
+
+    #[tokio::test]
+    async fn set_config_option_rejects_unknown_option_and_session() {
+        let store = SessionStore::new();
+        let client = test_client();
+        let request = NewSessionRequest::new(PathBuf::from("/tmp/proj"));
+        let response = handle_new_session(&store, &client, request).await;
+
+        let unknown_option = SetSessionConfigOptionRequest::new(
+            response.session_id.clone(),
+            "sampling",
+            "anthropic/claude-haiku-4-5",
+        );
+        handle_set_config_option(&store, &client, unknown_option)
+            .await
+            .expect_err("unknown option id must be rejected");
+
+        let unknown_session = SetSessionConfigOptionRequest::new(
+            SessionId::new("missing-session"),
+            MODEL_CONFIG_OPTION_ID,
+            "anthropic/claude-haiku-4-5",
+        );
+        handle_set_config_option(&store, &client, unknown_session)
+            .await
+            .expect_err("unknown session must be rejected");
+
+        let stored = store
+            .snapshot(&response.session_id)
+            .await
+            .expect("session stored");
+        assert_eq!(stored.model, DEFAULT_MODEL_ID);
     }
 }

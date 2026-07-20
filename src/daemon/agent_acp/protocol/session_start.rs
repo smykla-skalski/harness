@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use agent_client_protocol::schema::{NewSessionResponse, SessionId};
+use agent_client_protocol::schema::v1::{NewSessionResponse, SessionId};
 use agent_client_protocol::{Agent, ConnectionTo, Error as AcpError, Result as AcpResult};
 
 use super::session_guard::{RouteTarget, SessionRouteGuard};

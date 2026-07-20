@@ -8,7 +8,7 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
-use agent_client_protocol::schema::{
+use agent_client_protocol::schema::v1::{
     CreateTerminalRequest, CreateTerminalResponse, KillTerminalRequest, KillTerminalResponse,
     ReleaseTerminalRequest, ReleaseTerminalResponse, TerminalExitStatus, TerminalId,
     TerminalOutputRequest, TerminalOutputResponse, WaitForTerminalExitRequest,
