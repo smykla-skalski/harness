@@ -15,7 +15,7 @@
 //!    and re-bind to confirm the port is free.
 //!
 //! This recovery path is also the safety net for the SIGTERM-mid-spawn
-//! window: while [`super::runtime::spawn_codex_process`] is waiting for
+//! window: while [`super::codex_process::spawn_codex_process`] is waiting for
 //! the new child to become ready, the child has not yet been registered
 //! with [`super::server::BridgeServer`], so the signal-handler cleanup
 //! cannot reach it. If the bridge dies in that window the codex still
@@ -32,7 +32,7 @@ use std::time::{Duration, Instant};
 use nix::sys::signal::{Signal, kill};
 use nix::unistd::Pid;
 
-use super::runtime::probe_codex_readiness;
+use super::codex_process::probe_codex_readiness;
 use super::types::CODEX_READY_PROBE_TIMEOUT;
 
 const SIGTERM_GRACE: Duration = Duration::from_secs(3);
