@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use agent_client_protocol::schema::v1::ListSessionsRequest;
 
 use super::super::commands::ProtocolCommandResult;
+use super::super::session_guard::RouteTarget;
 use super::agents::{
     run_agent_recording_initialize_contract, run_agent_recording_session_lifecycle,
 };
@@ -237,6 +238,121 @@ async fn lifecycle_call_against_a_wedged_agent_fails_on_its_deadline() {
     assert!(
         harness.recorded().contains(&"close:acp-session-7".to_string()),
         "the agent should have received the close before we gave up; got {:?}",
+        harness.recorded()
+    );
+
+    harness.shutdown().await;
+}
+
+/// Teardown closes what the connection still routes so the agent can keep the
+/// session, instead of losing it to the kill that follows.
+#[tokio::test]
+#[cfg(unix)]
+async fn close_routed_sessions_closes_the_live_session() {
+    let harness = lifecycle_harness(run_agent_recording_session_lifecycle);
+
+    let closed = ok(
+        harness
+            .dispatch(|response_tx| ProtocolCommand::CloseRoutedSessions {
+                budget: Duration::from_secs(2),
+                response_tx,
+            })
+            .await,
+        "the close sweep should succeed",
+    );
+
+    assert_eq!(closed, 1, "the routed session should have been closed");
+    assert!(
+        harness
+            .recorded()
+            .contains(&"close:acp-session-1".to_string()),
+        "agent should have received close for the routed session; got {:?}",
+        harness.recorded()
+    );
+
+    harness.shutdown().await;
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn close_routed_sessions_skips_an_agent_without_the_capability() {
+    let harness = lifecycle_harness(run_agent_recording_initialize_contract);
+
+    let closed = ok(
+        harness
+            .dispatch(|response_tx| ProtocolCommand::CloseRoutedSessions {
+                budget: Duration::from_secs(2),
+                response_tx,
+            })
+            .await,
+        "the sweep must not fail an agent that cannot close",
+    );
+
+    assert_eq!(closed, 0);
+    assert!(
+        !harness
+            .recorded()
+            .iter()
+            .any(|operation| operation.starts_with("close:")),
+        "agent must not receive close without the capability"
+    );
+
+    harness.shutdown().await;
+}
+
+/// One wedged agent must not stretch shutdown: the budget covers the whole
+/// sweep, not each session in it.
+#[tokio::test]
+#[cfg(unix)]
+async fn close_routed_sessions_gives_up_within_its_budget() {
+    let harness = lifecycle_harness(run_agent_never_answering_close);
+
+    let started = std::time::Instant::now();
+    let closed = ok(
+        harness
+            .dispatch(|response_tx| ProtocolCommand::CloseRoutedSessions {
+                budget: Duration::from_millis(200),
+                response_tx,
+            })
+            .await,
+        "the sweep must return even when the agent never answers",
+    );
+
+    assert_eq!(closed, 0, "a session that never answered is not closed");
+    assert!(
+        started.elapsed() < Duration::from_secs(1),
+        "sweep took {:?}, past its budget",
+        started.elapsed()
+    );
+
+    harness.shutdown().await;
+}
+
+/// Detaching one logical session ends it on the agent too, rather than leaving
+/// it open on a process other sessions keep alive.
+#[tokio::test]
+#[cfg(unix)]
+async fn detaching_a_session_closes_it_on_the_agent() {
+    let harness = lifecycle_harness(run_agent_recording_session_lifecycle);
+
+    ok(
+        harness
+            .dispatch(|response_tx| ProtocolCommand::DetachTarget {
+                target: RouteTarget {
+                    acp_id: "agent-acp-1".to_string(),
+                    session_id: "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e".to_string(),
+                },
+                response_tx,
+            })
+            .await,
+        "detach should succeed",
+    );
+
+    assert!(
+        harness
+            .recorded()
+            .contains(&"close:acp-session-1".to_string()),
+        "agent should have received close for the detached session; got {:?}",
         harness.recorded()
     );
 
