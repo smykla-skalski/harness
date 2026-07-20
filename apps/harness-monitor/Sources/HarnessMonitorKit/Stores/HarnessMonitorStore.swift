@@ -319,7 +319,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var manifestURL: URL?
   var transportLatencySamplesMs: [Int] = []
   var requestLatencySamplesMs: [Int] = []
-  var trafficSampleTimes: [Date] = []
+  @ObservationIgnored var trafficRateMeter = ConnectionTrafficRateMeter()
   var activeSessionLoadRequest: UInt64 = 0
   var sessionLoadSequence: UInt64 = 0
   var sessionPushFallbackSequence: UInt64 = 0
