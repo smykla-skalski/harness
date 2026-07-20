@@ -27,7 +27,20 @@ struct HandlerHarness {
     _bridge: PermissionBridgeHandle,
     readable: PathBuf,
     _project: tempfile::TempDir,
-    _supervisor_child: std::process::Child,
+    _supervisor_child: ChildGuard,
+}
+
+/// `std::process::Child` has no `Drop`, so the placeholder supervisor process
+/// would outlive a test that returns early or panics. The guard lives on
+/// `HandlerHarness` rather than the harness owning a `Drop` impl itself,
+/// because both tests move `handlers` out of the harness.
+struct ChildGuard(std::process::Child);
+
+impl Drop for ChildGuard {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
 }
 
 /// Build the real harness client handler set over a permission bridge that
@@ -37,12 +50,12 @@ fn handler_harness() -> HandlerHarness {
     let project = ok(tempfile::tempdir(), "project tempdir");
     let readable = project.path().join("readable.txt");
     ok(std::fs::write(&readable, "contents"), "seed readable file");
-    let supervisor_child = ok(
+    let supervisor_child = ChildGuard(ok(
         Command::new("sleep").arg("60").spawn(),
         "spawn supervisor child",
-    );
+    ));
     let supervisor = Arc::new(AcpSessionSupervisor::new(
-        &supervisor_child,
+        &supervisor_child.0,
         SupervisionConfig::default(),
     ));
     let (sender, _receiver) = broadcast::channel(8);
