@@ -6,9 +6,9 @@ Research the codebase thoroughly before drafting, then keep almost all of that r
 
 ## Title
 
-Use `type(scope): summary` with the same types as commits: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `perf`, `style`. Keep it imperative and under 70 characters. PRs squash-merge, so an issue title routinely becomes the commit title on `main`.
+Use `type(scope): summary` with the same types as commits: `feat`, `fix`, `refactor`, `chore`, `docs`, `style`, `test`, or `perf`. Keep it imperative and under 70 characters. PRs squash-merge, so an issue title routinely becomes the commit title on `main`.
 
-Umbrella issues prefix the title with `☂️ `, for example `☂️ feat(task-board): triage and prioritise arriving work`. Children carry no emoji, so the umbrella is the only entry that stands out in a list view.
+Umbrella issues prefix the title with `☂️ `, for example `☂️ feat(monitor): connect to multiple daemons at once`. Children carry no emoji, so the umbrella is the only entry that stands out in a list view.
 
 ## Body
 
@@ -16,7 +16,7 @@ Three sections at most.
 
 `## Problem` comes first: two to four sentences of prose, active voice, present tense. State the user-visible impact and why it matters. No solution belongs in this section. If the reader cannot tell what goes wrong today, the issue is not ready.
 
-`## Expected outcome` comes second: three to six bullets, every one testable by someone who never read the issue, describing observable behaviour only. "Tab moves focus in reading order in every view" passes. "Call `.focusSection()` in the sidebar" does not. Prefer outcomes that name the failure they prevent, since those survive a rewrite of the implementation.
+`## Expected outcome` comes second: three to six bullets, every one testable by someone who never read the issue, describing observable behavior only. "Tab moves focus in reading order in every view" passes. "Call `.focusSection()` in the sidebar" does not. Prefer outcomes that name the failure they prevent, since those survive a rewrite of the implementation.
 
 `## Out of scope` comes third, and only when scope drift is genuinely likely. Otherwise cut it. Use it to record adjacent work that a reader would reasonably assume is included, and to point at the issue that does cover it.
 
