@@ -148,8 +148,9 @@ struct TaskBoardStepRailView: View {
     }
   }
 
-  /// Closing row of the stage card: whatever secondary controls this stage
-  /// offers on the left, the primary Next action pinned to the right.
+  /// Closing row of the stage card, trailing-aligned. The two branches are
+  /// mutually exclusive on `primaryAction`, so whichever control this stage
+  /// offers lands in the same corner.
   private func secondaryRow(_ plan: TaskBoardStepStagePlan) -> some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
       if plan.stage == .done, plan.primaryAction == nil {
@@ -162,7 +163,6 @@ struct TaskBoardStepRailView: View {
         .controlSize(.small)
         .accessibilityIdentifier("harness.task-board.step.start-next")
       }
-      Spacer(minLength: HarnessMonitorTheme.spacingMD)
       if let action = plan.primaryAction {
         primaryButton(action)
       }
