@@ -111,6 +111,8 @@ fn event_kind(kind: &ConversationEventKind) -> &'static str {
         ConversationEventKind::WatchdogState { .. } => "watchdog_state",
         ConversationEventKind::PermissionAsked { .. } => "permission_asked",
         ConversationEventKind::ContextInjected { .. } => "context_injected",
+        ConversationEventKind::TurnEnded { .. } => "turn_ended",
+        ConversationEventKind::ContextUsage { .. } => "context_usage",
         ConversationEventKind::Other { .. } => "other",
     }
 }

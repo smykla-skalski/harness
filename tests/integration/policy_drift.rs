@@ -20,7 +20,7 @@ use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 
 use agent_client_protocol::schema::v1::WriteTextFileRequest;
-use harness::agents::acp::client::HarnessAcpClient;
+use harness::agents::acp::client::{ClientCallCancel, HarnessAcpClient};
 use harness::agents::acp::permission::PermissionMode;
 use harness::agents::policy::{DeniedBinaries, WriteDecision, WriteSurfaceContext, evaluate_write};
 use harness::hooks::guard_write;
@@ -234,7 +234,7 @@ fn test_hook(path: &Path, run_dir: &Path, expected_allow: bool, fixture_name: &s
 fn test_acp_client(path: &Path, run_dir: &Path, expected_allow: bool, fixture_name: &str) {
     let client = acp_client(run_dir);
     let request = WriteTextFileRequest::new("policy-drift", path, "policy drift fixture");
-    let result = client.handle_write_text_file(&request);
+    let result = client.handle_write_text_file(&request, &ClientCallCancel::default());
     assert_eq!(
         result.is_ok(),
         expected_allow,

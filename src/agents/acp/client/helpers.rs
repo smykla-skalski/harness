@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::time::Duration;
 
-use agent_client_protocol::schema::v1::RequestPermissionResponse;
+use agent_client_protocol::schema::v1::{RequestPermissionOutcome, RequestPermissionResponse};
 use tokio::runtime::{Builder, Handle, RuntimeFlavor};
 use tokio::sync::oneshot;
 use tokio::task::block_in_place;
@@ -9,6 +9,7 @@ use tokio::time::timeout;
 
 use crate::agents::acp::permission::PermissionBridgeResult;
 
+use super::cancel::ClientCallCancel;
 use super::error::{
     ClientError, ClientResult, DAEMON_SHUTDOWN, PERMISSION_RUNTIME_UNSUPPORTED, PERMISSION_TIMEOUT,
 };
@@ -32,18 +33,28 @@ pub(super) fn ensure_permission_bridge_wait_runtime_supported() -> ClientResult<
 pub(super) fn wait_permission_bridge_response(
     deadline: Duration,
     response_rx: oneshot::Receiver<PermissionBridgeResult>,
+    cancel: &ClientCallCancel,
 ) -> ClientResult<RequestPermissionResponse> {
+    let cancel = cancel.clone();
     let future = async move {
-        match timeout(deadline, response_rx).await {
-            Ok(Ok(Ok(response))) => Ok(response),
-            Ok(Ok(Err(error))) => Err(ClientError::new(error.code, error.message)),
-            Ok(Err(_)) => Err(ClientError::new(
-                DAEMON_SHUTDOWN,
-                "permission bridge disconnected",
-            )),
-            Err(_) => Err(ClientError::new(
-                PERMISSION_TIMEOUT,
-                "permission response timed out",
+        tokio::select! {
+            biased;
+            result = timeout(deadline, response_rx) => match result {
+                Ok(Ok(Ok(response))) => Ok(response),
+                Ok(Ok(Err(error))) => Err(ClientError::new(error.code, error.message)),
+                Ok(Err(_)) => Err(ClientError::new(
+                    DAEMON_SHUTDOWN,
+                    "permission bridge disconnected",
+                )),
+                Err(_) => Err(ClientError::new(
+                    PERMISSION_TIMEOUT,
+                    "permission response timed out",
+                )),
+            },
+            // Dropping `response_rx` here closes the bridge channel, which is
+            // how the bridge learns the batch is abandoned.
+            () = cancel.cancelled() => Ok(RequestPermissionResponse::new(
+                RequestPermissionOutcome::Cancelled,
             )),
         }
     };

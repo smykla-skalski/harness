@@ -30,6 +30,9 @@ pub const PERMISSION_RUNTIME_UNSUPPORTED: i32 = -32008;
 /// JSON-RPC error code: daemon shutdown in progress.
 pub const DAEMON_SHUTDOWN: i32 = -32099;
 
+/// ACP standard error code for a request the peer asked to cancel.
+pub const REQUEST_CANCELLED: i32 = -32800;
+
 /// Result type for client handler operations.
 pub type ClientResult<T> = Result<T, ClientError>;
 

@@ -1,9 +1,10 @@
 use crate::agents::acp::supervision::AcpSessionSupervisor;
 
+use agent_client_protocol::schema::v1::SessionNotification;
+
 use super::{
     ACP_DEADLINE_EXCEEDED, AcpError, AcpResult, DisconnectReason, ErrorCode,
-    RoutedSessionNotification, SessionId, SessionNotification, SessionRouteGuard, mpsc,
-    session_state,
+    RoutedSessionNotification, SessionId, SessionRouteGuard, mpsc, session_state,
 };
 
 pub(super) async fn route_session_notification(

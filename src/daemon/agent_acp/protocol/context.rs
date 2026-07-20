@@ -8,7 +8,7 @@ use agent_client_protocol::schema::v1::{
 use agent_client_protocol::{Error as AcpError, Responder};
 use tokio::task::spawn_blocking;
 
-use crate::agents::acp::client::{ClientError, ClientResult, HarnessAcpClient};
+use crate::agents::acp::client::{ClientCallCancel, ClientError, ClientResult, HarnessAcpClient};
 use crate::agents::acp::supervision::AcpSessionSupervisor;
 
 use super::session_guard::SessionRouteGuard;
@@ -52,6 +52,7 @@ impl ProtocolContext {
     pub(super) async fn write_text_file(
         self,
         request: WriteTextFileRequest,
+        cancel: ClientCallCancel,
     ) -> ClientResult<<WriteTextFileRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
         let _target = self.session_guard.ensure_known(&request.session_id)?;
@@ -60,7 +61,7 @@ impl ProtocolContext {
             self.client,
             "join write_text_file",
             "client/write_text_file",
-            move |client| client.handle_write_text_file(&request),
+            move |client| client.handle_write_text_file(&request, &cancel),
         )
         .await
     }
@@ -68,6 +69,7 @@ impl ProtocolContext {
     pub(super) async fn create_terminal(
         self,
         request: CreateTerminalRequest,
+        cancel: ClientCallCancel,
     ) -> ClientResult<<CreateTerminalRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
         let _target = self.session_guard.ensure_known(&request.session_id)?;
@@ -76,7 +78,7 @@ impl ProtocolContext {
             self.client,
             "join create_terminal",
             "client/create_terminal",
-            move |client| client.handle_create_terminal(&request),
+            move |client| client.handle_create_terminal(&request, &cancel),
         )
         .await
     }
@@ -111,6 +113,7 @@ impl ProtocolContext {
     pub(super) async fn wait_for_terminal_exit(
         self,
         request: WaitForTerminalExitRequest,
+        cancel: ClientCallCancel,
     ) -> ClientResult<<WaitForTerminalExitRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
         let _target = self.session_guard.ensure_known(&request.session_id)?;
@@ -119,7 +122,7 @@ impl ProtocolContext {
             self.client,
             "join wait_for_terminal_exit",
             "client/wait_for_terminal_exit",
-            move |client| client.handle_wait_for_terminal_exit(&request),
+            move |client| client.handle_wait_for_terminal_exit(&request, &cancel),
         )
         .await
     }
@@ -143,6 +146,7 @@ impl ProtocolContext {
     pub(super) async fn request_permission(
         self,
         request: RequestPermissionRequest,
+        cancel: ClientCallCancel,
     ) -> ClientResult<<RequestPermissionRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
         let _target = self.session_guard.ensure_known(&request.session_id)?;
@@ -151,21 +155,10 @@ impl ProtocolContext {
             self.client,
             "join permission bridge",
             "client/request_permission",
-            move |client| client.handle_request_permission(&request),
+            move |client| client.handle_request_permission(&request, &cancel),
         )
         .await
     }
-}
-
-pub(super) async fn handle_permission_request(
-    request: RequestPermissionRequest,
-    responder: Responder<
-        <RequestPermissionRequest as agent_client_protocol::JsonRpcRequest>::Response,
-    >,
-    context: ProtocolContext,
-) -> agent_client_protocol::Result<()> {
-    let result = context.request_permission(request).await;
-    respond_client_result(responder, result)
 }
 
 pub(super) fn respond_client_result<T>(

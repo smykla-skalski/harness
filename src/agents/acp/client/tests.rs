@@ -18,7 +18,7 @@ use tempfile::TempDir;
 use super::{
     BINARY_DENIED, DAEMON_SHUTDOWN, HarnessAcpClient, PERMISSION_CAP_REACHED,
     PERMISSION_RUNTIME_UNSUPPORTED, PERMISSION_TIMEOUT, READ_DENIED, TERMINAL_DENIED,
-    TERMINAL_NOT_FOUND, WRITE_DENIED,
+    TERMINAL_NOT_FOUND, WRITE_DENIED, no_cancel,
 };
 use crate::agents::acp::permission::{PermissionMode, standard_permission_options};
 
@@ -129,7 +129,7 @@ fn write_to_artifacts_allowed() {
 
     let request = WriteTextFileRequest::new("test-session", &path, "hello");
     ok(
-        client.handle_write_text_file(&request),
+        client.handle_write_text_file(&request, &no_cancel()),
         "write to artifacts allowed",
     );
     assert_eq!(ok(fs::read_to_string(&path), "read written file"), "hello");
@@ -142,7 +142,7 @@ fn write_outside_surface_denied() {
 
     let request = WriteTextFileRequest::new("test-session", &path, "hello");
     let err = err(
-        client.handle_write_text_file(&request),
+        client.handle_write_text_file(&request, &no_cancel()),
         "write should be denied",
     );
     assert_eq!(err.code, WRITE_DENIED);
@@ -155,7 +155,7 @@ fn write_denied_binary_rejected() {
 
     let request = WriteTextFileRequest::new("test-session", &path, "#!/bin/bash");
     let err = err(
-        client.handle_write_text_file(&request),
+        client.handle_write_text_file(&request, &no_cancel()),
         "binary should be denied",
     );
     assert_eq!(err.code, BINARY_DENIED);
@@ -167,7 +167,10 @@ fn recording_write_logs_policy_decision_and_still_writes_when_allowed() {
     let path = temp.path().join("artifacts/test.txt");
     let request = WriteTextFileRequest::new("session-1", &path, "hello");
 
-    ok(client.handle_write_text_file(&request), "write allowed");
+    ok(
+        client.handle_write_text_file(&request, &no_cancel()),
+        "write allowed",
+    );
 
     let records = read_log(&log_path);
     assert_eq!(records.len(), 1);
@@ -183,7 +186,10 @@ fn recording_write_logs_denial_aligned_with_policy() {
     let path = temp.path().join("artifacts/kubectl");
     let request = WriteTextFileRequest::new("session-1", &path, "#!/bin/sh");
 
-    let error = err(client.handle_write_text_file(&request), "denied binary");
+    let error = err(
+        client.handle_write_text_file(&request, &no_cancel()),
+        "denied binary",
+    );
 
     assert_eq!(error.code, BINARY_DENIED);
     let records = read_log(&log_path);
@@ -205,7 +211,7 @@ fn recording_write_logs_denial_when_allowed_path_fails_to_write() {
     let request = WriteTextFileRequest::new("session-1", &path, "hello");
 
     let error = err(
-        client.handle_write_text_file(&request),
+        client.handle_write_text_file(&request, &no_cancel()),
         "cannot write file over directory",
     );
 
@@ -274,7 +280,7 @@ fn closed_daemon_permission_bridge_returns_shutdown() {
         RequestPermissionRequest::new("session-1", tool_call, standard_permission_options());
 
     let error = err(
-        client.handle_request_permission(&request),
+        client.handle_request_permission(&request, &no_cancel()),
         "closed bridge should fail",
     );
 
@@ -289,7 +295,7 @@ fn recording_permission_request_never_blocks_or_approves() {
         RequestPermissionRequest::new("session-1", tool_call, standard_permission_options());
 
     let response = ok(
-        client.handle_request_permission(&request),
+        client.handle_request_permission(&request, &no_cancel()),
         "record permission",
     );
 
@@ -342,7 +348,7 @@ fn handle_request_permission_emits_permission_asked_event() {
         RequestPermissionRequest::new("session-fixture", tool_call, standard_permission_options());
 
     let _ = ok(
-        client.handle_request_permission(&request),
+        client.handle_request_permission(&request, &no_cancel()),
         "recording mode permission",
     );
 
@@ -379,7 +385,7 @@ fn handle_request_permission_with_no_sink_emits_nothing() {
         RequestPermissionRequest::new("session-fixture", tool_call, standard_permission_options());
 
     let _ = ok(
-        client.handle_request_permission(&request),
+        client.handle_request_permission(&request, &no_cancel()),
         "recording mode permission",
     );
     // No sink attached -> no panic, no emit; the test passes if we got here.

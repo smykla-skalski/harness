@@ -32,11 +32,15 @@
 //!   response carries `RequestPermissionOutcome::Cancelled`. Agent stops
 //!   the turn.
 
+mod cancel;
 mod error;
 mod helpers;
 mod permission_gate;
 mod terminal;
 
+pub use cancel::ClientCallCancel;
+#[cfg(test)]
+pub(crate) use cancel::no_cancel;
 pub use error::*;
 
 use std::collections::BTreeSet;
@@ -207,6 +211,7 @@ impl HarnessAcpClient {
     pub fn handle_write_text_file(
         &self,
         request: &WriteTextFileRequest,
+        cancel: &ClientCallCancel,
     ) -> ClientResult<WriteTextFileResponse> {
         let path = &request.path;
         let ctx = if let Some(ref suite_dir) = self.suite_dir {
@@ -249,7 +254,7 @@ impl HarnessAcpClient {
             return result;
         }
 
-        self.require_permission(&write_permission_request(request))
+        self.require_permission(&write_permission_request(request), cancel)
             .map_err(|error| {
                 if error.is_permission_gateway_error() {
                     error
@@ -296,6 +301,7 @@ impl HarnessAcpClient {
     pub fn handle_create_terminal(
         &self,
         request: &CreateTerminalRequest,
+        cancel: &ClientCallCancel,
     ) -> ClientResult<CreateTerminalResponse> {
         let validation = TerminalManager::validate_create_request(request, &self.denied_binaries);
         if let Err(error) = validation {
@@ -304,7 +310,7 @@ impl HarnessAcpClient {
             }
             return Err(error);
         }
-        self.require_permission(&terminal_permission_request(request))
+        self.require_permission(&terminal_permission_request(request), cancel)
             .map_err(|error| {
                 if error.is_permission_gateway_error() {
                     error
@@ -337,11 +343,15 @@ impl HarnessAcpClient {
     ///
     /// Returns `TERMINAL_NOT_FOUND` if the terminal id is unknown, or
     /// `TERMINAL_DENIED` if the wait fails.
+    /// `cancel` is tripped by the protocol layer when the agent sends
+    /// `$/cancel_request`, so the wait unwinds instead of holding a blocking
+    /// thread until the terminal's wall-clock cap.
     pub fn handle_wait_for_terminal_exit(
         &self,
         request: &WaitForTerminalExitRequest,
+        cancel: &ClientCallCancel,
     ) -> ClientResult<WaitForTerminalExitResponse> {
-        self.terminals.handle_wait_for_exit(request)
+        self.terminals.handle_wait_for_exit(request, cancel)
     }
 
     /// Handle `terminal/kill`.
@@ -396,9 +406,14 @@ impl HarnessAcpClient {
     /// Returns `PERMISSION_TIMEOUT` if the stdin gateway fails or if the daemon
     /// bridge response deadline expires. Returns `DAEMON_SHUTDOWN` if the
     /// daemon bridge is gone.
+    /// `cancel` is tripped by the protocol layer when the agent sends
+    /// `$/cancel_request`, resolving the wait as
+    /// `RequestPermissionOutcome::Cancelled` per the rejection-recovery
+    /// contract above instead of holding the decision open.
     pub fn handle_request_permission(
         &self,
         request: &RequestPermissionRequest,
+        cancel: &ClientCallCancel,
     ) -> ClientResult<RequestPermissionResponse> {
         self.emit_permission_asked(request);
         match &self.permission_mode {
@@ -426,7 +441,7 @@ impl HarnessAcpClient {
                         ClientError::new(DAEMON_SHUTDOWN, "permission bridge disconnected")
                     }
                 })?;
-                wait_permission_bridge_response(*deadline, response_rx)
+                wait_permission_bridge_response(*deadline, response_rx, cancel)
             }
         }
     }
@@ -453,13 +468,14 @@ impl HarnessAcpClient {
     pub(super) fn require_permission(
         &self,
         request: &RequestPermissionRequest,
+        cancel: &ClientCallCancel,
     ) -> ClientResult<()> {
         if matches!(self.permission_mode, PermissionMode::Recording { .. }) {
             return Ok(());
         }
 
         let options = request.options.clone();
-        let response = self.handle_request_permission(request)?;
+        let response = self.handle_request_permission(request, cancel)?;
         if is_allow_outcome(&response.outcome, &options) {
             Ok(())
         } else {
