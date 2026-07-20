@@ -59,8 +59,48 @@ impl ActiveAcpProcess {
         stderr_tail: SharedStderrTail,
         tasks: ActiveAcpTasks,
     ) -> Self {
+        Self::with_optional_child(
+            Some(child),
+            supervisor,
+            protocol_handle,
+            prompt_gate,
+            stderr_tail,
+            tasks,
+        )
+    }
+
+    /// A session whose agent runs behind a remote transport. There is no child
+    /// to wait on or reap; disconnect is observed through the protocol channel
+    /// rather than `try_wait`, and the reaper's `Some(child)` guard makes
+    /// shutdown a no-op on the process.
+    #[must_use]
+    pub(in crate::daemon::agent_acp) fn new_remote(
+        supervisor: Arc<AcpSessionSupervisor>,
+        protocol_handle: AcpProtocolHandle,
+        prompt_gate: PromptGate,
+        stderr_tail: SharedStderrTail,
+        tasks: ActiveAcpTasks,
+    ) -> Self {
+        Self::with_optional_child(
+            None,
+            supervisor,
+            protocol_handle,
+            prompt_gate,
+            stderr_tail,
+            tasks,
+        )
+    }
+
+    fn with_optional_child(
+        child: Option<Child>,
+        supervisor: Arc<AcpSessionSupervisor>,
+        protocol_handle: AcpProtocolHandle,
+        prompt_gate: PromptGate,
+        stderr_tail: SharedStderrTail,
+        tasks: ActiveAcpTasks,
+    ) -> Self {
         Self {
-            child: Mutex::new(Some(child)),
+            child: Mutex::new(child),
             supervisor,
             protocol_handle,
             stderr_tail,

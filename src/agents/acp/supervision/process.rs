@@ -36,6 +36,17 @@ impl SupervisedProcess {
         }
     }
 
+    /// A remote agent the daemon connects to but never spawned. The pid and
+    /// process group are zero: there is no local process to report or reap, and
+    /// the childless session never calls the reaper.
+    #[must_use]
+    pub const fn remote() -> Self {
+        Self {
+            pid: 0,
+            process_group: 0,
+        }
+    }
+
     #[must_use]
     pub const fn pid(&self) -> u32 {
         self.pid

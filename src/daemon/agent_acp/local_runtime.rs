@@ -33,10 +33,12 @@ use super::permission_bridge::PermissionBridgeHandle;
 use super::pool_key::AcpProcessPoolKey;
 use super::prompt_gate::{PromptGate, PromptOwner, prompt_text};
 use super::protocol::{
-    AcpSessionRequestConfig, SpawnProtocolInput, SpawnedAcpProtocol, spawn_protocol_task,
+    AcpSessionRequestConfig, AcpTransport, SpawnProtocolInput, SpawnedAcpProtocol,
+    spawn_protocol_task,
 };
 use super::spawn_credential::SpawnCredential;
 
+mod remote;
 mod resume;
 mod reused_session;
 mod rollback;
@@ -85,6 +87,27 @@ impl AcpAgentManagerHandle {
         let project_dir = self.resolve_project_dir(session_id, request.project_dir.as_deref())?;
         let acp_id = format!("agent-acp-{}", Uuid::new_v4());
         let session_config = AcpSessionRequestConfig::from_request(request, descriptor);
+        if let Some(endpoint) = request.endpoint.as_ref() {
+            // A remote agent is never pooled or reused: no spawn inputs to key
+            // on, and the connection is this start's alone.
+            let process_key = format!("remote:{}:{acp_id}", endpoint.url);
+            let input = DescriptorStartInput {
+                acp_id: &acp_id,
+                session_id,
+                request,
+                descriptor,
+                project_dir: &project_dir,
+                process_key: &process_key,
+            };
+            let _lifecycle = self.process_lifecycle_guard()?;
+            if self.start_requested_after_shutdown() {
+                return Err(CliErrorKind::workflow_io(
+                    "ACP manager is shutting down; new ACP agents are blocked".to_string(),
+                )
+                .into());
+            }
+            return self.start_remote_connect_session(input, endpoint);
+        }
         let mut spawn =
             build_spawn_config(descriptor, &session_config, &project_dir, openrouter_token)?;
         let process_key = AcpProcessPoolKey::from_spawn_inputs(
@@ -138,13 +161,19 @@ impl AcpAgentManagerHandle {
             ))
         })?;
         let context = self.build_started_process_context(input, &mut child);
+        let transport = AcpTransport::from_child(&mut child).map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "attach ACP protocol for '{}': {error}",
+                input.descriptor.id
+            )))
+        })?;
         let protocol =
-            self.attach_protocol_for_started_process(input, &context, &mut child, credential)?;
+            self.attach_protocol_for_started_process(input, &context, transport, credential)?;
         let registration = self.register_started_orchestration_agent(
             input,
             input.descriptor.id.as_str(),
             &context.display_name,
-            &mut child,
+            Some(&mut child),
             &protocol,
         )?;
         let event_task = spawn_event_forwarder(
@@ -258,7 +287,7 @@ impl AcpAgentManagerHandle {
         &self,
         input: DescriptorStartInput<'_>,
         context: &StartedProcessContext,
-        child: &mut Child,
+        transport: AcpTransport,
         credential: Option<SpawnCredential>,
     ) -> Result<SpawnedAcpProtocol, CliError> {
         let initial_prompt_lease = prompt_text(input.request.prompt.as_deref())
@@ -274,7 +303,7 @@ impl AcpAgentManagerHandle {
             |log_path| PermissionMode::Recording { log_path },
         );
         spawn_protocol_task(
-            child,
+            transport,
             SpawnProtocolInput {
                 request: input.request,
                 session_config: AcpSessionRequestConfig::from_request(
@@ -308,7 +337,7 @@ impl AcpAgentManagerHandle {
         input: DescriptorStartInput<'_>,
         descriptor_id: &str,
         display_name: &str,
-        child: &mut Child,
+        child: Option<&mut Child>,
         protocol: &SpawnedAcpProtocol,
     ) -> Result<AcpOrchestrationRegistration, CliError> {
         self.register_orchestration_agent(
@@ -322,7 +351,9 @@ impl AcpAgentManagerHandle {
         .inspect_err(|_| {
             protocol.protocol.abort();
             protocol.batcher.abort();
-            let _ = child.kill();
+            if let Some(child) = child {
+                let _ = child.kill();
+            }
         })
         .map_err(|error| {
             CliErrorKind::workflow_io(format!(

@@ -1,6 +1,5 @@
 use std::io;
 use std::path::PathBuf;
-use std::process::Child;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -11,16 +10,14 @@ use agent_client_protocol::schema::v1::{
     TextContent,
 };
 use agent_client_protocol::{
-    Agent, ByteStreams, ConnectionTo, Error as AcpError, ErrorCode, Result as AcpResult,
+    Agent, ConnectionTo, Error as AcpError, ErrorCode, Result as AcpResult,
 };
-use tokio::process::{ChildStdin, ChildStdout};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use tokio::time::timeout;
-use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
-use self::handlers::{ClientHandlers, connect_with_client_handlers};
+use self::handlers::ClientHandlers;
 use self::runtime_helpers::report_protocol_result;
 use self::session_start::{RuntimeSessionStart, initialize_and_bind_runtime_session};
 use crate::agents::acp::batcher::{RoutedSessionNotification, spawn_notification_batcher};
@@ -45,6 +42,8 @@ mod session_guard;
 mod session_inputs;
 mod session_start;
 mod session_state;
+mod transport;
+pub(in crate::daemon::agent_acp) use transport::AcpTransport;
 pub(super) use commands::AcpProtocolHandle;
 use commands::{ProtocolCommand, run_protocol_command_loop};
 use context::ProtocolContext;
@@ -81,7 +80,7 @@ pub(super) struct SpawnProtocolInput<'a> {
 }
 
 pub(super) fn spawn_protocol_task(
-    child: &mut Child,
+    transport: AcpTransport,
     input: SpawnProtocolInput<'_>,
 ) -> io::Result<SpawnedAcpProtocol> {
     let SpawnProtocolInput {
@@ -99,16 +98,6 @@ pub(super) fn spawn_protocol_task(
         manager,
         credential,
     } = input;
-    let stdin = child
-        .stdin
-        .take()
-        .expect("child stdin not captured; spawn with Stdio::piped()");
-    let stdout = child
-        .stdout
-        .take()
-        .expect("child stdout not captured; spawn with Stdio::piped()");
-    let stdin = ChildStdin::from_std(stdin)?;
-    let stdout = ChildStdout::from_std(stdout)?;
 
     let batcher = spawn_notification_batcher(
         agent_name.clone(),
@@ -137,8 +126,7 @@ pub(super) fn spawn_protocol_task(
     let (disconnect_tx, disconnects) = mpsc::channel(1);
     let (start_tx, start_rx) = oneshot::channel();
     let protocol_task = tokio::spawn(run_protocol(RunProtocolArgs {
-        stdin,
-        stdout,
+        transport,
         project_dir,
         prompt: request.prompt.clone(),
         session_config,
@@ -176,8 +164,7 @@ pub(super) fn spawn_protocol_task(
 }
 
 struct RunProtocolArgs {
-    stdin: ChildStdin,
-    stdout: ChildStdout,
+    transport: AcpTransport,
     project_dir: PathBuf,
     prompt: Option<String>,
     session_config: AcpSessionRequestConfig,
@@ -199,8 +186,7 @@ struct RunProtocolArgs {
 
 async fn run_protocol(args: RunProtocolArgs) {
     let RunProtocolArgs {
-        stdin,
-        stdout,
+        transport,
         project_dir,
         prompt,
         session_config,
@@ -222,7 +208,6 @@ async fn run_protocol(args: RunProtocolArgs) {
     if start_rx.await.is_err() {
         return;
     }
-    let transport = ByteStreams::new(stdin.compat_write(), stdout.compat());
     let session_guard = Arc::new(SessionRouteGuard::default());
     let context = ProtocolContext::new(client, Arc::clone(&supervisor), Arc::clone(&session_guard));
     let handlers = ClientHandlers {
@@ -232,27 +217,28 @@ async fn run_protocol(args: RunProtocolArgs) {
         manager: manager.clone(),
         notifications,
     };
-    let result = connect_with_client_handlers(transport, handlers, async move |connection| {
-        run_connection(RunConnectionArgs {
-            connection,
-            project_dir,
-            prompt,
-            session_config,
-            resume_session_id,
-            acp_id,
-            session_id,
-            runtime_name,
-            supervisor,
-            initial_prompt_lease,
-            cancel_rx,
-            command_rx,
-            session_guard,
-            manager,
-            credential,
+    let result = transport
+        .connect(handlers, async move |connection| {
+            run_connection(RunConnectionArgs {
+                connection,
+                project_dir,
+                prompt,
+                session_config,
+                resume_session_id,
+                acp_id,
+                session_id,
+                runtime_name,
+                supervisor,
+                initial_prompt_lease,
+                cancel_rx,
+                command_rx,
+                session_guard,
+                manager,
+                credential,
+            })
+            .await
         })
-        .await
-    })
-    .await;
+        .await;
     report_protocol_result(result, disconnect_tx).await;
 }
 
