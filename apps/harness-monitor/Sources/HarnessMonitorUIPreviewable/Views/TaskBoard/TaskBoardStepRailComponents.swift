@@ -142,9 +142,7 @@ struct TaskBoardStepContextDisclosure: View {
       .padding(.top, HarnessMonitorTheme.spacingSM)
     } label: {
       Button {
-        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
-          isExpanded.toggle()
-        }
+        isExpanded.toggle()
       } label: {
         Label("Automation context", systemImage: "gearshape")
           .font(labelFont)
@@ -163,6 +161,10 @@ struct TaskBoardStepContextDisclosure: View {
       .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
       .accessibilityHint("Shows approval grants, held dispatches, and policy guards")
     }
+    // Animate here rather than inside the button: the disclosure triangle
+    // writes the binding directly, so only a modifier keyed on the value
+    // catches both ways in.
+    .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: isExpanded)
     .accessibilityIdentifier("harness.task-board.step.context")
   }
 }
