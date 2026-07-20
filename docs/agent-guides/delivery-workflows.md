@@ -33,13 +33,12 @@ Choose one delivery mode before creating the editing worktree, then keep that mo
 
 ## `replay`
 
-1. Use current local `main` as the worktree's base and integration target. Before integration, confirm that no active PR reservation blocks replay.
+1. Use current local `main` as the worktree's base and integration target.
 2. Finish and commit the task in the session worktree. Immediately before delivery, rebase the unpublished task range once onto current local `main`, resolve conflicts in the worktree, and rerun affected validation when the rebase materially changes the result.
 3. Verify a clean worktree, the exact task range, every signature, and every sign-off.
-4. Acquire the shared integration lock, recheck that no PR reservation exists, and require the local `main` checkout to be clean.
-5. From the local-main checkout, fast-forward local `main` to the verified worktree tip with `git merge --ff-only <session-branch>`. If it cannot fast-forward, release the lock and reconcile in the worktree; never cherry-pick replacement commits or resolve conflicts on `main`.
-6. Release the integration lock. Do not push the session branch or local `main` unless the user separately requests it, and do not rerun validation on `main` merely because the fast-forward succeeded.
-7. Finish only when local `main` and the session worktree branch point to the same commit and both checkouts are clean. Keep the worktree and lane available, and report any intentional difference from `upstream/main`.
+4. From a clean local-`main` checkout, fast-forward local `main` to the verified worktree tip with `git merge --ff-only <session-branch>`. If it cannot fast-forward, reconcile in the worktree; never cherry-pick replacement commits or resolve conflicts on `main`.
+5. Do not push the session branch or local `main` unless the user separately requests it, and do not rerun validation on `main` merely because the fast-forward succeeded.
+6. Finish only when local `main` and the session worktree branch point to the same commit and both checkouts are clean. Keep the worktree and lane available, and report any intentional difference from `upstream/main`.
 
 ## `pr`
 
@@ -55,7 +54,7 @@ When a feature is expected to exceed about 5,000 Copilot-reviewable changed line
 6. Obtain explicit user approval for an operationally necessary staged transition such as expand, migrate, and contract. Record every production-safe intermediate state and planned removal before implementation; staged rollout needs do not justify ordinary implementation churn.
 7. Deliver dependent or semantically overlapping slices serially. Complete exact-head Copilot review, user merge, and normal closeout before implementing the next slice from current `upstream/main`; read-only planning may continue while waiting.
 8. Run slices in parallel only as separate agent sessions, each with its own worktree and lane, and only when they share no code contract, migration, runtime dependency, or semantic ownership and remain correct and mergeable in either order.
-9. Give every slice its own dedicated branch, reservation, complete PR review loop, and terminal state. Within one session, reuse that session's worktree and build, test, and runtime lane across serial slices.
+9. Give every slice its own dedicated branch, complete PR review loop, and terminal state. Within one session, reuse that session's worktree and build, test, and runtime lane across serial slices.
 10. Recalculate the review budget before publication and the first Copilot request. Reslice when a sound boundary exists; when the smallest self-contained slice still exceeds the budget, stop for explicit user approval and record why an artificial split would be worse. Do not add an automated size gate.
 11. After each merge, record the exact merged contract and commit, then reassess the remaining boundaries, estimates, overlap, and validation before implementation continues.
 12. Use the final slice to prove the complete acceptance path and finish only whole-feature documentation, versioning, and integration not required by an earlier outcome; never use it to repair an earlier slice or defer that slice's obligations. A closed-unmerged prerequisite blocks dependent work, and the feature is complete only after every planned slice merges, required validation and cleanup finish, and local `main`, `upstream/main`, and the reusable worktree align.
@@ -63,10 +62,12 @@ When a feature is expected to exceed about 5,000 Copilot-reviewable changed line
 ### Prepare and publish
 
 1. Fetch and prune `upstream`, then require a clean `local main == upstream/main`. Fast-forward clean local `main` if it is behind `upstream/main`; stop for direction if local `main` is ahead or diverged.
-2. Create the session worktree and dedicated branch from `upstream/main`, create its delivery reservation, and leave local `main` untouched until post-merge closeout.
+2. Create the session worktree and dedicated branch from `upstream/main`, and leave local `main` untouched until post-merge closeout.
 3. Rebase the completed branch onto current `upstream/main` before its first push, resolve conflicts in the worktree, run affected validation, and verify the signed task range.
-4. Push the dedicated branch and open a draft PR. After publication, prefer additive signed fix commits; use `--force-with-lease` only when an unavoidable rebase rewrites this session-owned branch after its expected remote tip has been verified. Never plain-force or rewrite a shared branch.
+4. Push the dedicated branch and open a draft PR. The merge squashes the branch into one commit, so add signed fix commits instead of rewriting history; use `--force-with-lease` only for an unavoidable rebase onto `upstream/main`, after verifying the expected remote tip. Never plain-force or rewrite a shared branch.
 5. Include every approved required version bump in the reviewed branch.
+
+The PR title becomes the commit title on `main`, so write it as a commit message: `{type}({scope}): {message}`, 50 characters or fewer. GitHub appends ` (#<number>)`.
 
 Use only this PR-body shape:
 
@@ -90,23 +91,43 @@ gh api --method POST repos/smykla-skalski/harness/pulls/<PR_NUMBER>/requested_re
 
 1. Wait for a Copilot review whose reviewed commit is the exact current head; a review of an older head does not count.
 2. Inspect every remark and unresolved conversation. Implement valid fixes, run affected validation, commit the explicit paths with signing and sign-off, and push.
-3. After each fix push, silently resolve only the conversations addressed by that push. Post no replies. Resolve an incorrect, stale, or duplicate finding only after evidence proves that no change is needed.
-4. Re-request Copilot and repeat without a fixed round limit until it reviews the exact current head and reports no new comments.
-5. If the head, PR body, feedback, or required checks change, invalidate the prior result and resume the loop. Escalate only a genuine impasse, a recurring already-addressed finding, or persistent Copilot or API failure; keep the PR draft while blocked.
+3. After each fix push, resolve only the conversations that push addressed. A fix needs no reply.
+4. Answer an incorrect finding before resuming other work, then resolve the thread. Give the evidence, not the verdict: the command that proves it and the mechanism behind it. Write one or two plain sentences, and drop the polite filler, bullets, and trailing period. Never silently resolve a wrong finding, because a silent resolve reads as a real defect quietly ignored and leaves the next reader no record of why nothing changed.
+5. Re-request Copilot and repeat without a fixed round limit until it reviews the exact current head and reports no new comments.
+6. If the head, PR body, feedback, or required checks change, invalidate the prior result and resume the loop. Escalate only a genuine impasse, a recurring already-addressed finding, or persistent Copilot or API failure; keep the PR draft while blocked.
 
-### Ready, merge, and close out
+### Ready and merge
 
 1. Require an accurate two-section PR body, an exact-head Copilot review with no new comments, zero unresolved conversations, and green required checks.
 2. Mark the PR ready for review only after every gate passes, notify the user, and monitor until the user merges or closes it. Never merge the PR as the agent.
-3. After a user merge, acquire the integration lock, fetch and prune `upstream`, verify the recorded PR head against the worktree's old head, and require both local checkouts to be clean. Treat unpublished local commits as reconcilable only when they are a stable, signed, signed-off range owned by completed `replay` work; stop for the user if any unpublished commit falls outside that range or fails a precondition.
-4. Fast-forward clean local `main` to `upstream/main` when no local replay range exists. Otherwise rebase and re-sign only that range onto merged `upstream/main`, preserve its sign-offs, and wait for the user to push the resulting fast-forward; never cherry-pick the PR commit on top of the local range or reset those commits away. Do not rerun validation on `main` merely because reconciliation succeeded.
-5. Fetch and prune after any user push, require `local main == upstream/main`, then detach the session worktree at current `main`, force-move only its session-owned local branch to `main`, switch back to that branch, and remove stale upstream tracking. Let GitHub delete the remote branch and let fetch pruning remove its remote-tracking ref.
-6. Release the reservation and integration lock only when worktree HEAD, local `main`, and `upstream/main` are the same commit and the worktree is clean. Keep the reusable worktree and lane available.
-7. If the PR closes without merge, verify that state through GitHub, leave local `main` unchanged, preserve the branch, commits, tracking, worktree, and lane, record the task as undelivered, and release the reservation. Revision needs a new reservation; abandonment or cleanup needs explicit user direction.
 
-## Integration coordination
+### Close out
 
-- The shared state root is `$(git rev-parse --path-format=absolute --git-common-dir)/harness` so every linked worktree sees the same state.
-- Serialize each local-`main` mutation by atomically creating `delivery-lock/`, recording its owner, and removing it immediately after the mutation. If the directory already exists, inspect its owner and wait or coordinate; never delete another live owner's lock.
-- A PR task creates `delivery-reservations/<session-id>.json` after the equality preflight and retains it through merge alignment or verified closure without merge. Record the owner session and worktree, branch, base commit, PR number when known, and creation time.
-- PR development may proceed concurrently, but every `replay` integration waits while any other active PR reservation exists. Never remove a reservation because of age alone; first verify merge, closure, or explicit abandonment.
+This repository allows squash merges only. The branch collapses into one new commit on `upstream/main`, so its commits never reach `main` and it can never fast-forward. Closeout realigns local state instead of integrating anything.
+
+Confirm the PR merged, then check that `<main-checkout>` is on `main`, `<worktree>` is on `<session-branch>`, both are clean, and local `main` carries no unpublished `replay` commits (reconcile those first, as described below):
+
+```bash
+git -C <main-checkout> fetch --prune upstream
+git -C <main-checkout> merge --ff-only upstream/main
+git -C <worktree> reset --hard main
+git -C <worktree> branch --unset-upstream <session-branch> || true  # no-op on a rerun
+```
+
+That is the whole closeout. The squash commit on `main` already carries every change the `reset --hard` discards. Do not rerun validation on `main`, and keep the worktree and lane available.
+
+It deliberately skips three things:
+
+- No signature check on the merge. GitHub creates the squash commit and signs it with its own key, so a local signature check cannot verify it. That is expected. The signing contract covers commits the agent writes.
+- No remote branch deletion. GitHub deletes it on merge and `fetch --prune` drops the tracking ref.
+- No head comparison. A merged PR is proof enough.
+
+When unpublished local `replay` commits sit on `main`, rebase and re-sign only that range onto merged `upstream/main`, preserve its sign-offs, and wait for the user to push. Never cherry-pick the squash commit on top of that range or reset those commits away. Stop for the user if any unpublished commit falls outside a stable, signed, signed-off replay range.
+
+If the PR closes without merging, verify that state through GitHub, leave `main`, the branch, its tracking, the worktree, and the lane untouched, and record the task as undelivered. Abandonment or cleanup needs explicit user direction.
+
+## Working alongside other sessions
+
+Several worktrees share one local `main`. Read real Git state before you move it: `git worktree list` shows what else is checked out and on which branch, and `git status` shows whether the main checkout is clean.
+
+Fast-forwarding local `main` to `upstream/main` is convergent, so it stays correct no matter what else is running. Every other move of `main` can surprise another session, so require a clean main checkout, take the smallest step that delivers the work, and stop for the user when the repository does not look the way you expect.

@@ -130,7 +130,7 @@ Hook landing rule: a new hook lands with observable handler behavior, or behind 
 - Hook messages use `HookMessage` with `into_result()`.
 - Diagnostic output uses `tracing` macros. Default filter: `RUST_LOG=harness=info`. Do not add `eprintln!` diagnostics.
 - Keep Rust files under 520 lines and functions under 100 lines.
-- Commit messages: `{type}({scope}): {message}` with `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, or `perf`.
+- Commit messages: `{type}({scope}): {message}` with `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, or `perf`. PRs squash-merge, so the PR title uses the same format and becomes the commit title on `main`.
 - Never create merge commits or rewrite local `main`. In `replay`, perform the final rebase onto local `main` in the worktree and integrate only by fast-forward. In `pr`, base the branch on `upstream/main`; after publication, prefer additive commits and use `--force-with-lease` only for an unavoidable rewrite of the dedicated session branch. Never plain-force or rewrite a shared branch.
 
 ## Commit signing
