@@ -153,7 +153,7 @@ impl AcpAgentManagerHandle {
 fn build_http_client(endpoint: &AcpEndpoint) -> Result<HttpClient, CliError> {
     if endpoint_is_websocket(&endpoint.url) && !endpoint.headers_env.is_empty() {
         return Err(CliErrorKind::workflow_io(
-            "--header-env is not supported for ws/wss endpoints; put credentials in the URL"
+            "--header-env is not supported over ws/wss because the WebSocket transport drops request headers; use an http/https endpoint for header auth"
                 .to_string(),
         )
         .into());

@@ -269,7 +269,8 @@ without spawning a local process: `--endpoint <url>` connects over HTTP
 (`http`/`https`, using SSE) or WebSocket (`ws`/`wss`), and repeated
 `--header-env Name=ENV_VAR` sends a header whose value the daemon reads from that
 environment variable at connect time, so no secret rides the request. WebSocket
-connects cannot carry those headers, so credentials belong in the URL there.
+connects cannot carry those headers, so `--header-env` needs an http/https
+endpoint.
 
 ## Runtime And Provider Settings
 

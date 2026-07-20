@@ -196,3 +196,16 @@ fn build_endpoint_rejects_malformed_header_env() {
         build_endpoint("wss://acp.example.test", &["nope".to_string()]).expect_err("malformed");
     assert!(error.to_string().contains("NAME=ENV_VAR"));
 }
+
+#[test]
+fn build_endpoint_rejects_duplicate_header_names() {
+    let error = build_endpoint(
+        "https://acp.example.test",
+        &[
+            "Authorization=TOKEN_A".to_string(),
+            "authorization=TOKEN_B".to_string(),
+        ],
+    )
+    .expect_err("duplicate header name");
+    assert!(error.to_string().contains("more than once"));
+}
