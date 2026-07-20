@@ -54,7 +54,7 @@ fn sync_conversation_events_replaces_existing_rows() {
     assert_eq!(loaded[0].sequence, 1);
     assert_eq!(loaded[1].sequence, 3);
     match &loaded[0].kind {
-        ConversationEventKind::AssistantText { content } => assert_eq!(content, "updated"),
+        ConversationEventKind::AssistantText { content, .. } => assert_eq!(content, "updated"),
         other => panic!("unexpected event kind: {other:?}"),
     }
 

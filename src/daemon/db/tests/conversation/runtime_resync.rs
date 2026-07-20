@@ -237,6 +237,7 @@ fn append_conversation_events_merges_live_batches_without_replacing_history() {
         sequence: 1,
         kind: ConversationEventKind::AssistantText {
             content: "first response".into(),
+            message_id: None,
         },
         agent: "claude-leader".into(),
         session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
@@ -246,6 +247,7 @@ fn append_conversation_events_merges_live_batches_without_replacing_history() {
         sequence: 2,
         kind: ConversationEventKind::AssistantText {
             content: "second response".into(),
+            message_id: None,
         },
         agent: "claude-leader".into(),
         session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
@@ -344,6 +346,7 @@ fn worker_event(sequence: u64, timestamp: &str) -> ConversationEvent {
         sequence,
         kind: ConversationEventKind::AssistantText {
             content: format!("response {sequence}"),
+            message_id: None,
         },
         agent: "codex-worker".into(),
         session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),

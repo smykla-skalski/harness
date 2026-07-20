@@ -294,7 +294,7 @@ mod tests {
             .events
             .iter()
             .map(|event| match &event.kind {
-                ConversationEventKind::AssistantText { content } => content.as_str(),
+                ConversationEventKind::AssistantText { content, .. } => content.as_str(),
                 other => panic!("expected assistant text, got {other:?}"),
             })
             .collect::<Vec<_>>();

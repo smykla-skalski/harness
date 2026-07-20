@@ -209,6 +209,7 @@ async fn supervisor_event_sink_carries_terminal_transition_through_mpsc() {
         sequence: supervisor_sequence,
         kind: ConversationEventKind::AssistantText {
             content: "hello".to_string(),
+            message_id: None,
         },
         agent: "agent-test".to_string(),
         session_id: "session-test".to_string(),

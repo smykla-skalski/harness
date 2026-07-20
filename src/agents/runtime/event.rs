@@ -24,9 +24,21 @@ pub struct ConversationEvent {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ConversationEventKind {
     /// User submitted a prompt.
-    UserPrompt { content: String },
+    UserPrompt {
+        content: String,
+        /// Chunks sharing a `message_id` belong to one logical message; a
+        /// change marks a new message. Absent for runtimes that do not send it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        message_id: Option<String>,
+    },
     /// Assistant produced text output.
-    AssistantText { content: String },
+    AssistantText {
+        content: String,
+        /// Chunks sharing a `message_id` belong to one logical message; a
+        /// change marks a new message. Absent for runtimes that do not send it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        message_id: Option<String>,
+    },
     /// Agent invoked a tool.
     ToolInvocation {
         tool_name: String,
@@ -54,6 +66,15 @@ pub enum ConversationEventKind {
     },
     /// Agent state transition.
     StateChange { from: String, to: String },
+    /// Context-window and cost telemetry reported during a prompt turn.
+    ContextUsage {
+        used_tokens: u64,
+        context_window_tokens: u64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cost_amount: Option<f64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cost_currency: Option<String>,
+    },
     /// A file was modified during this event.
     FileModification { path: PathBuf, operation: String },
     /// Session lifecycle marker (start, stop, resume).

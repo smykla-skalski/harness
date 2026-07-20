@@ -73,11 +73,11 @@ pub(crate) fn conversation_entry(
     };
 
     let (entry_kind, summary) = match &event.kind {
-        ConversationEventKind::UserPrompt { content } => (
+        ConversationEventKind::UserPrompt { content, .. } => (
             "user_prompt",
             transcript_summary(content, "Prompt submitted"),
         ),
-        ConversationEventKind::AssistantText { content } => (
+        ConversationEventKind::AssistantText { content, .. } => (
             "assistant_text",
             transcript_summary(content, "Assistant response"),
         ),
@@ -132,6 +132,21 @@ pub(crate) fn conversation_entry(
             "agent_context_injected",
             format!("{agent_id} accepted context from {actor}"),
         ),
+        ConversationEventKind::ContextUsage {
+            used_tokens,
+            context_window_tokens,
+            cost_amount,
+            cost_currency,
+        } => (
+            "agent_context_usage",
+            context_usage_summary(
+                agent_id,
+                *used_tokens,
+                *context_window_tokens,
+                *cost_amount,
+                cost_currency.as_deref(),
+            ),
+        ),
         ConversationEventKind::Other { label, data } if label == "thought" => {
             ("agent_thought", other_text_summary(data, "Agent thought"))
         }
@@ -156,6 +171,20 @@ pub(crate) fn conversation_entry(
         summary,
         payload,
     }))
+}
+
+fn context_usage_summary(
+    agent_id: &str,
+    used_tokens: u64,
+    context_window_tokens: u64,
+    cost_amount: Option<f64>,
+    cost_currency: Option<&str>,
+) -> String {
+    let usage = format!("{agent_id} used {used_tokens} of {context_window_tokens} context tokens");
+    match (cost_amount, cost_currency) {
+        (Some(amount), Some(currency)) => format!("{usage} ({amount} {currency})"),
+        _ => usage,
+    }
 }
 
 fn transcript_summary(content: &str, fallback: &str) -> String {
