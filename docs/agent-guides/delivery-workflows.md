@@ -111,7 +111,7 @@ Confirm the PR merged, then check that `<main-checkout>` is on `main`, `<worktre
 git -C <main-checkout> fetch --prune upstream
 git -C <main-checkout> merge --ff-only upstream/main
 git -C <worktree> reset --hard main
-git -C <worktree> branch --unset-upstream <session-branch>
+git -C <worktree> branch --unset-upstream <session-branch> || true  # no-op on a rerun
 ```
 
 That is the whole closeout. The squash commit on `main` already carries every change the `reset --hard` discards. Do not rerun validation on `main`, and keep the worktree and lane available.
