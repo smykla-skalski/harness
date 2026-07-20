@@ -298,8 +298,7 @@ async fn apply_session_model_configuration(
     let selector = AcpSessionConfigOptionBinding::default();
     if let Some(option) = find_config_option(config_options, &selector, Some("model")) {
         if let Some(value) = select_config_value(option, model) {
-            return send_set_config_option(supervisor, connection, session_id, option, value)
-                .await;
+            return send_set_config_option(supervisor, connection, session_id, option, value).await;
         }
         if !session_config.allow_custom_model {
             return Err(AcpError::new(
