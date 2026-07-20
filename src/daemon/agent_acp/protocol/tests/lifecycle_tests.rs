@@ -19,6 +19,7 @@ struct LifecycleHarness {
     command_tx: mpsc::UnboundedSender<ProtocolCommand>,
     cancel_tx: mpsc::UnboundedSender<()>,
     operations: Arc<Mutex<Vec<String>>>,
+    supervisor: Arc<AcpSessionSupervisor>,
     protocol_task: tokio::task::JoinHandle<AgentResult>,
     agent_task: tokio::task::JoinHandle<AgentResult>,
     _project: tempfile::TempDir,
@@ -51,6 +52,7 @@ where
     let (cancel_tx, cancel_rx) = mpsc::unbounded_channel();
     let (command_tx, command_rx) = mpsc::unbounded_channel();
     let project_dir = project.path().to_path_buf();
+    let protocol_supervisor = Arc::clone(&supervisor);
     let manager = protocol_manager(
         "fake",
         "agent-acp-1",
@@ -70,7 +72,7 @@ where
                     acp_id: "agent-acp-1".to_string(),
                     session_id: "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e".to_string(),
                     runtime_name: "fake".to_string(),
-                    supervisor,
+                    supervisor: protocol_supervisor,
                     initial_prompt_lease: None,
                     cancel_rx,
                     command_rx,
@@ -87,6 +89,7 @@ where
         command_tx,
         cancel_tx,
         operations,
+        supervisor,
         protocol_task,
         agent_task,
         _project: project,
@@ -102,9 +105,7 @@ impl LifecycleHarness {
         T: Send + 'static,
         F: FnOnce(std::sync::mpsc::SyncSender<ProtocolCommandResult<T>>) -> ProtocolCommand,
     {
-        // The connection has to finish initialize before a capability gate can
-        // read the handshake it records.
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        self.await_handshake().await;
         let (response_tx, response_rx) = std::sync::mpsc::sync_channel(1);
         assert!(self.command_tx.send(build(response_tx)).is_ok());
         ok(
@@ -117,6 +118,23 @@ impl LifecycleHarness {
             ),
             "command response should arrive",
         )
+    }
+
+    /// Block until the connection has recorded the agent's handshake.
+    ///
+    /// The capability gate reads exactly this value, so waiting on it removes
+    /// the race a fixed delay would leave: under load the initialize round trip
+    /// can outlast any sleep, and every command would then be refused for a
+    /// capability the agent had in fact advertised.
+    async fn await_handshake(&self) {
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        while self.supervisor.handshake().is_none() {
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "agent handshake should be recorded before commands dispatch"
+            );
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
     }
 
     fn recorded(&self) -> Vec<String> {

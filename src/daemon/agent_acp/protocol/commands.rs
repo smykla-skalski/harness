@@ -352,11 +352,8 @@ async fn attach_protocol_session(
     project_dir: PathBuf,
     session_config: &AcpSessionRequestConfig,
 ) -> ProtocolCommandResult<SessionId> {
-    let request = super::session_inputs::new_session_request(
-        project_dir,
-        session_config,
-        supervisor.handshake().as_deref(),
-    );
+    let request =
+        super::session_inputs::new_session_request(project_dir, session_config, supervisor.handshake());
     let response = {
         let _guard = supervisor.enter_pending_request_with_reason(Some("session/new"));
         connection
