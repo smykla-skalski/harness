@@ -192,6 +192,7 @@ fn process_incident_event(snapshot: &AcpAgentSnapshot) -> Option<StreamEvent> {
         DisconnectReason::TransportClosed | DisconnectReason::StdioClosed => "transport_closed",
         DisconnectReason::InitializeTimeout | DisconnectReason::PromptTimeout => "protocol_desync",
         DisconnectReason::WatchdogFired => "watchdog_fired",
+        DisconnectReason::AuthRequired => "auth_required",
         DisconnectReason::SessionStopped
         | DisconnectReason::SessionEnded
         | DisconnectReason::UserCancelled
@@ -243,6 +244,7 @@ fn reason_kind(reason: &DisconnectReason) -> String {
         DisconnectReason::InitializeTimeout => "initialize_timeout".to_string(),
         DisconnectReason::PromptTimeout => "prompt_timeout".to_string(),
         DisconnectReason::WatchdogFired => "watchdog_fired".to_string(),
+        DisconnectReason::AuthRequired => "auth_required".to_string(),
         DisconnectReason::UserCancelled => "user_cancelled".to_string(),
         DisconnectReason::SessionStopped => "session_stopped".to_string(),
         DisconnectReason::SessionEnded => "session_ended".to_string(),

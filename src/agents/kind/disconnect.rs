@@ -34,6 +34,8 @@ pub enum DisconnectReason {
     PromptTimeout,
     /// No-events watchdog fired.
     WatchdogFired,
+    /// Agent rejected a request with the ACP `auth_required` error (-32000).
+    AuthRequired,
     /// User cancelled the session.
     UserCancelled,
     /// Logical ACP session was stopped explicitly.
@@ -76,7 +78,10 @@ impl DisconnectReason {
             | Self::PromptTimeout
             | Self::InitializeTimeout
             | Self::OomKilled => true,
-            Self::UserCancelled
+            // Restarting an unauthenticated agent fails identically; the
+            // operator must authenticate first.
+            Self::AuthRequired
+            | Self::UserCancelled
             | Self::SessionStopped
             | Self::SessionEnded
             | Self::DaemonShutdown
@@ -93,6 +98,7 @@ impl DisconnectReason {
             Self::InitializeTimeout => KIND_INITIALIZE_TIMEOUT,
             Self::PromptTimeout => KIND_PROMPT_TIMEOUT,
             Self::WatchdogFired => KIND_WATCHDOG_FIRED,
+            Self::AuthRequired => KIND_AUTH_REQUIRED,
             Self::UserCancelled => KIND_USER_CANCELLED,
             Self::SessionStopped => KIND_SESSION_STOPPED,
             Self::SessionEnded => KIND_SESSION_ENDED,
@@ -113,6 +119,7 @@ const KIND_TRANSPORT_CLOSED: &str = "transport_closed";
 const KIND_INITIALIZE_TIMEOUT: &str = "initialize_timeout";
 const KIND_PROMPT_TIMEOUT: &str = "prompt_timeout";
 const KIND_WATCHDOG_FIRED: &str = "watchdog_fired";
+const KIND_AUTH_REQUIRED: &str = "auth_required";
 const KIND_USER_CANCELLED: &str = "user_cancelled";
 const KIND_SESSION_STOPPED: &str = "session_stopped";
 const KIND_SESSION_ENDED: &str = "session_ended";
@@ -177,6 +184,7 @@ impl<'de> Deserialize<'de> for DisconnectReason {
             KIND_INITIALIZE_TIMEOUT => Self::InitializeTimeout,
             KIND_PROMPT_TIMEOUT => Self::PromptTimeout,
             KIND_WATCHDOG_FIRED => Self::WatchdogFired,
+            KIND_AUTH_REQUIRED => Self::AuthRequired,
             KIND_USER_CANCELLED => Self::UserCancelled,
             KIND_SESSION_STOPPED => Self::SessionStopped,
             KIND_SESSION_ENDED => Self::SessionEnded,
@@ -206,6 +214,7 @@ mod tests {
             DisconnectReason::InitializeTimeout,
             DisconnectReason::PromptTimeout,
             DisconnectReason::WatchdogFired,
+            DisconnectReason::AuthRequired,
             DisconnectReason::UserCancelled,
             DisconnectReason::SessionStopped,
             DisconnectReason::SessionEnded,
@@ -254,6 +263,7 @@ mod tests {
             }
             .is_restartable()
         );
+        assert!(!DisconnectReason::AuthRequired.is_restartable());
         assert!(!DisconnectReason::UserCancelled.is_restartable());
         assert!(!DisconnectReason::SessionStopped.is_restartable());
         assert!(!DisconnectReason::SessionEnded.is_restartable());

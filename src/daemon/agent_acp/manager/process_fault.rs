@@ -123,6 +123,7 @@ impl AcpAgentManagerHandle {
                 | DisconnectReason::InitializeTimeout
                 | DisconnectReason::PromptTimeout
                 | DisconnectReason::WatchdogFired
+                | DisconnectReason::AuthRequired
         ) {
             return Ok((false, false));
         }

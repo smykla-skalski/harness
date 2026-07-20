@@ -396,6 +396,15 @@ async fn run_connection_sends_client_capabilities_and_client_info() {
     let _ = agent_task.await;
 }
 
+#[test]
+fn auth_required_error_maps_to_auth_required_disconnect() {
+    let error = AcpError::auth_required();
+    assert_eq!(
+        runtime_helpers::disconnect_reason_from_error(&error),
+        DisconnectReason::AuthRequired
+    );
+}
+
 #[tokio::test]
 #[cfg(unix)]
 async fn run_connection_applies_boolean_config_option() {

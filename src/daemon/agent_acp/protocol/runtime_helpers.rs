@@ -75,7 +75,9 @@ fn warn_protocol_error(error: &AcpError) {
 }
 
 pub(super) fn disconnect_reason_from_error(error: &AcpError) -> DisconnectReason {
-    if matches!(error.code, ErrorCode::Other(ACP_DEADLINE_EXCEEDED))
+    if matches!(error.code, ErrorCode::AuthRequired) {
+        DisconnectReason::AuthRequired
+    } else if matches!(error.code, ErrorCode::Other(ACP_DEADLINE_EXCEEDED))
         && error.message.contains("session/initialize")
     {
         DisconnectReason::InitializeTimeout
