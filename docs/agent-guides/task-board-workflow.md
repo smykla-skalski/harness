@@ -264,7 +264,12 @@ Codex `steer`/`interrupt`/`approve`, and ACP `inspect`. Start commands can carry
 role, fallback role, capability tags, display name, persona, model, effort, and
 project directory where the runtime supports them. ACP starts also take
 repeated `--additional-directory` roots; MCP servers are structured, so they go
-over the HTTP start route instead of a flag.
+over the HTTP start route instead of a flag. A remote ACP agent is reachable
+without spawning a local process: `--endpoint <url>` connects over HTTP
+(`http`/`https`, using SSE) or WebSocket (`ws`/`wss`), and repeated
+`--header-env Name=ENV_VAR` sends a header whose value the daemon reads from that
+environment variable at connect time, so no secret rides the request. WebSocket
+connects cannot carry those headers, so credentials belong in the URL there.
 
 ## Runtime And Provider Settings
 
