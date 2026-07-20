@@ -13,6 +13,7 @@ This is the repo-level contract for agents working in `harness`. Direct system, 
 | Work area | Start here |
 | --- | --- |
 | Delivery selection, replay, PR review, and closeout | `docs/agent-guides/delivery-workflows.md` |
+| Writing and filing GitHub issues | `docs/agent-guides/github-issues.md` |
 | Rust CLI, hooks, orchestration, runtime bootstrap | This file, then `docs/agent-guides/root-reference.md` when details are needed |
 | Harness Monitor macOS app | `apps/harness-monitor/AGENTS.md` |
 | Monitor previewable SwiftUI layer | `apps/harness-monitor/Sources/HarnessMonitorUIPreviewable/AGENTS.md` |
