@@ -1,11 +1,16 @@
 import SwiftUI
 
-/// The focused stage card: the stage title, what just happened, what Next will
-/// do, and a closing slot for whatever controls the stage offers. Arranging
-/// that slot is the caller's job; the card only stacks it last. Presentational
-/// only - the parent supplies the buttons so this view stores no action
-/// closures.
-struct TaskBoardStepStageCard<Actions: View>: View {
+/// The focused stage detail: the stage title, what just happened, what Next
+/// will do, and a closing slot for whatever controls the stage offers.
+/// Arranging that slot is the caller's job; this view only stacks it last.
+/// Presentational only - the parent supplies the buttons so this view stores no
+/// action closures.
+///
+/// Carries no surface of its own - hence "detail" rather than "card". It is
+/// the detail column of the manual-steps panel, separated from the progress
+/// rail by that panel's separator, and a second nested card inside the panel
+/// only muddied the hierarchy.
+struct TaskBoardStepStageDetail<Actions: View>: View {
   let stageTitle: String
   let whatHappened: String?
   let whatNext: String
@@ -31,36 +36,38 @@ struct TaskBoardStepStageCard<Actions: View>: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-      titleText
-      if let whatHappened {
+    // Outer spacing is 0 so the Spacer below is the *only* gap above the action
+    // slot. Left inside a spaced stack it would pick up that spacing on both
+    // sides as well as its own minimum, padding the column past the rail's
+    // height and leaving dead space under the last step.
+    VStack(alignment: .leading, spacing: 0) {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+        titleText
+        if let whatHappened {
+          TaskBoardStepStageBlock(
+            label: "Just happened",
+            systemImage: "clock.arrow.circlepath",
+            text: whatHappened,
+            tint: .secondary
+          )
+        }
         TaskBoardStepStageBlock(
-          label: "Just happened",
-          systemImage: "clock.arrow.circlepath",
-          text: whatHappened,
-          tint: .secondary
+          label: "Next",
+          systemImage: "arrow.forward.circle",
+          text: whatNext,
+          tint: HarnessMonitorTheme.accent,
+          emphasized: true
         )
       }
-      TaskBoardStepStageBlock(
-        label: "Next",
-        systemImage: "arrow.forward.circle",
-        text: whatNext,
-        tint: HarnessMonitorTheme.accent,
-        emphasized: true
-      )
+      // Drops the action slot to the bottom of the detail column so its
+      // controls land on the panel's bottom edge rather than floating under the
+      // copy. At its minimum it is exactly the stack's own gap, so a stage
+      // whose copy already fills the column looks untouched.
+      Spacer(minLength: HarnessMonitorTheme.spacingMD)
       actions
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(HarnessMonitorTheme.spacingLG)
-    .background(
-      HarnessMonitorTheme.ink.opacity(0.05),
-      in: .rect(cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
-    )
-    .overlay {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
-        .strokeBorder(HarnessMonitorTheme.ink.opacity(0.08))
-    }
-    .accessibilityIdentifier("harness.task-board.step.stage-card")
+    .accessibilityIdentifier("harness.task-board.step.stage-detail")
   }
 
   private var titleText: some View {
@@ -107,7 +114,7 @@ private struct TaskBoardStepStageBlock: View {
     // The rule rides in an overlay rather than beside the text in an HStack: a
     // Capsule is flexible in both axes, so as an HStack sibling it soaked up
     // whatever height the card was offered and left the block stretched far
-    // below its own text. An overlay is proposed the content's size instead.
+    // below its own text. SwiftUI hands an overlay the content's size instead.
     .overlay(alignment: .leading) {
       if emphasized {
         Capsule().fill(tint.opacity(0.55)).frame(width: Self.ruleWidth)

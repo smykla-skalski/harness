@@ -20,11 +20,33 @@ struct TaskBoardStepRailView: View {
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
   @State private var state = TaskBoardStepRailState()
+  // Deterministic if/else on a measured width rather than ViewThatFits, which
+  // would build both candidate trees on every update.
+  @State private var showsRailTitles = true
 
   var stepRailState: TaskBoardStepRailState { state }
 
-  private var controlsDisabled: Bool {
+  // Not private: the confirmation dialog lives in a companion file.
+  var controlsDisabled: Bool {
     isActionInFlight || state.isBusy || store.contentUI.dashboard.connectionState != .online
+  }
+
+  /// Below this the rail titles crowd the detail column, so the track drops to
+  /// badges and keeps its meaning in tooltips and accessibility labels.
+  private static let railTitleMinWidth: CGFloat = 480
+
+  private var railWidth: CGFloat {
+    let scale = min(SessionWindowFontScale.metricsScale(for: fontScale), 1.4)
+    return showsRailTitles
+      ? 132 * scale
+      : TaskBoardStepProgressRail.badgeSide(for: fontScale)
+  }
+
+  /// The panel stops growing well before the board column does. Left to fill an
+  /// ultra-wide display it ran body copy past a hundred characters a line and
+  /// stranded the primary button an arm's length from the text it acts on.
+  private var panelMaxWidth: CGFloat {
+    840 * min(SessionWindowFontScale.metricsScale(for: fontScale), 1.5)
   }
 
   private var primaryButtonFont: Font {
@@ -39,13 +61,8 @@ struct TaskBoardStepRailView: View {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
         TaskBoardStepRailTargetView(item: activeItem, isPicked: stepFlow.hasPicked)
         Divider()
-        TaskBoardStepProgressRail(
-          current: stagePlan.column,
-          isBlocked: stagePlan.isBlockedColumn,
-          viewing: state.viewingColumn,
-          state: state
-        )
-        cardArea
+        stageSplit
+        Divider()
         contextDisclosure
       }
       .padding(HarnessMonitorTheme.spacingLG)
@@ -57,6 +74,10 @@ struct TaskBoardStepRailView: View {
         RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD)
           .strokeBorder(HarnessMonitorTheme.ink.opacity(0.10))
       }
+      .frame(maxWidth: panelMaxWidth, alignment: .leading)
+      // The cap only bounds the panel; this pins the bounded panel to the
+      // leading edge instead of letting the container centre it.
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
     .confirmationDialog(
       confirmationTitle,
@@ -77,6 +98,58 @@ struct TaskBoardStepRailView: View {
     .accessibilityIdentifier("harness.task-board.step-rail")
   }
 
+  /// The lifecycle track on the left, the stage it points at on the right. One
+  /// panel with a divider rather than two surfaces: the rail selects and the
+  /// detail displays, so they read as a single control.
+  private var stageSplit: some View {
+    HStack(alignment: .top, spacing: splitGutter * 2) {
+      TaskBoardStepProgressRail(
+        current: stagePlan.column,
+        isBlocked: stagePlan.isBlockedColumn,
+        viewing: state.viewingColumn,
+        state: state,
+        showsTitles: showsRailTitles
+      )
+      .frame(width: railWidth)
+      cardArea
+    }
+    // The separator is an overlay, not a Divider sitting between the columns: a
+    // Divider is flexible along the stack's cross axis, so as a sibling it made
+    // the split greedy and stretched the panel down the whole window.
+    .overlay(alignment: .leading) { columnSeparator }
+    // The detail column fills the stack so its Spacer can bottom-align the
+    // action row against the rail. That makes the column vertically flexible,
+    // and pinning the split to its ideal height stops the flexibility from
+    // propagating up and stretching the panel down the window again. The ideal
+    // is max(rail, detail), which SwiftUI derives - do not reintroduce a
+    // hand-computed rail height here, it only drifts from the real layout.
+    .fixedSize(horizontal: false, vertical: true)
+    .onGeometryChange(for: CGFloat.self) { proxy in
+      proxy.size.width
+    } action: { width in
+      let next = width >= Self.railTitleMinWidth
+      if showsRailTitles != next {
+        showsRailTitles = next
+      }
+    }
+  }
+
+  /// Clear space on either side of the column separator. Matches the vertical
+  /// gap the panel's VStack leaves under the header rule, so the detail title is
+  /// inset from the separator by exactly what it is inset from the rule above.
+  private var splitGutter: CGFloat { HarnessMonitorTheme.spacingLG }
+
+  private var columnSeparator: some View {
+    Rectangle()
+      .fill(HarnessMonitorTheme.ink.opacity(0.10))
+      .frame(width: 1)
+      .padding(.leading, railWidth + splitGutter)
+      // Decorative: it rides above both columns, so leave clicks and VoiceOver
+      // to the controls underneath.
+      .allowsHitTesting(false)
+      .accessibilityHidden(true)
+  }
+
   private var cardArea: some View {
     Group {
       switch cardPresentation {
@@ -91,6 +164,10 @@ struct TaskBoardStepRailView: View {
     .id(cardIdentity)
     .transition(.opacity)
     .animation(.easeInOut(duration: reduceMotion ? 0 : 0.2), value: cardIdentity)
+    // Fills the split both ways: the width so copy uses the column, the height
+    // so the stage detail's Spacer has slack to push its actions onto the
+    // rail's bottom edge. Height only fills what the split resolved to.
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   private var emptyState: some View {
@@ -114,7 +191,7 @@ struct TaskBoardStepRailView: View {
   }
 
   private func previewCard(for column: TaskBoardStepColumn) -> some View {
-    TaskBoardStepStageCard(
+    TaskBoardStepStageDetail(
       stageTitle: column.title,
       whatHappened: nil,
       whatNext: column.explanation
@@ -131,7 +208,7 @@ struct TaskBoardStepRailView: View {
   }
 
   private func liveCard(_ plan: TaskBoardStepStagePlan) -> some View {
-    TaskBoardStepStageCard(
+    TaskBoardStepStageDetail(
       stageTitle: plan.stage.title,
       whatHappened: plan.whatHappened,
       whatNext: plan.whatNext
@@ -140,34 +217,50 @@ struct TaskBoardStepRailView: View {
         if plan.stage == .readyToDeliver, let selection = activeSelection {
           TaskBoardStepPromptPreview(prompt: selection.plan.renderedPrompt)
         }
-        if !plan.inlineLinks.isEmpty {
-          inlineLinksRow(plan.inlineLinks)
+        if offersActions(plan) {
+          actionRow(plan)
         }
-        secondaryRow(plan)
       }
     }
   }
 
-  /// Closing row of the stage card, trailing-aligned. The two branches are
-  /// mutually exclusive on `primaryAction`, so whichever control this stage
-  /// offers lands in the same corner.
-  private func secondaryRow(_ plan: TaskBoardStepStagePlan) -> some View {
-    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+  /// Whether the stage offers any control at all. Without the guard the row
+  /// still renders as a lone Spacer and the stack spends a gap on it, which
+  /// shows up at `.readyToDeliver` when a held delivery cannot be retried:
+  /// no primary action, and this stage carries no inline links.
+  private func offersActions(_ plan: TaskBoardStepStagePlan) -> Bool {
+    plan.primaryAction != nil || !plan.inlineLinks.isEmpty || plan.stage == .done
+  }
+
+  /// Closing row of the detail column: navigation links on the leading edge,
+  /// the stage's primary control on the trailing edge, centred against each
+  /// other so the small links sit level with the large button. The two trailing
+  /// branches are mutually exclusive on `primaryAction`, so whichever control
+  /// this stage offers lands in the same corner.
+  private func actionRow(_ plan: TaskBoardStepStagePlan) -> some View {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+      if !plan.inlineLinks.isEmpty {
+        inlineLinksRow(plan.inlineLinks)
+      }
+      Spacer(minLength: HarnessMonitorTheme.spacingSM)
       if plan.stage == .done, plan.primaryAction == nil {
-        Button {
-          state.resetFlow()
-        } label: {
-          Label("Start next item", systemImage: "forward.end").font(linkFont)
-        }
-        .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-        .controlSize(.small)
-        .accessibilityIdentifier("harness.task-board.step.start-next")
+        startNextItemButton
       }
       if let action = plan.primaryAction {
         primaryButton(action)
       }
     }
-    .frame(maxWidth: .infinity, alignment: .trailing)
+  }
+
+  private var startNextItemButton: some View {
+    Button {
+      state.resetFlow()
+    } label: {
+      Label("Start next item", systemImage: "forward.end").font(linkFont)
+    }
+    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    .controlSize(.small)
+    .accessibilityIdentifier("harness.task-board.step.start-next")
   }
 
   private func primaryButton(_ action: TaskBoardStepPrimaryAction) -> some View {
@@ -267,79 +360,6 @@ struct TaskBoardStepRailView: View {
       isDisabled: controlsDisabled,
       isExpanded: $state.isAutomationContextExpanded
     )
-  }
-
-  private var confirmationPresented: Binding<Bool> {
-    Binding(
-      get: { state.confirmation != nil },
-      set: { if !$0 { state.confirmation = nil } }
-    )
-  }
-
-  private var confirmationTitle: String {
-    switch state.confirmation {
-    case .externalSync: "Run live external sync?"
-    case .evaluate: "Run live task-board evaluation?"
-    case .deliver: "Deliver and spawn this item?"
-    case .complete: "Complete this board item?"
-    case nil: "Confirm manual step"
-    }
-  }
-
-  @ViewBuilder
-  private func confirmationActions(
-    _ confirmation: TaskBoardStepRailState.Confirmation
-  ) -> some View {
-    switch confirmation {
-    case .externalSync:
-      Button("Sync Live", role: .destructive) {
-        runConfirmation(confirmation)
-      }
-      .disabled(controlsDisabled)
-    case .evaluate:
-      Button("Evaluate Live", role: .destructive) {
-        runConfirmation(confirmation)
-      }
-      .disabled(controlsDisabled)
-    case .deliver(let itemID):
-      Button("Deliver Live", role: .destructive) {
-        runConfirmation(confirmation)
-      }
-      .disabled(controlsDisabled || deliveryItemID != itemID)
-    case .complete:
-      Button("Complete", role: .destructive) {
-        runConfirmation(confirmation)
-      }
-      .disabled(controlsDisabled)
-    }
-    Button("Cancel", role: .cancel) {}
-  }
-
-  func runConfirmation(_ confirmation: TaskBoardStepRailState.Confirmation) {
-    state.confirmation = nil
-    switch confirmation {
-    case .externalSync(let itemID): enqueueExternalSync(itemID: itemID)
-    case .evaluate(let itemID): enqueueEvaluation(itemID: itemID)
-    case .deliver(let itemID): enqueueDelivery(itemID: itemID)
-    case .complete(let itemID): enqueueCompletion(itemID: itemID)
-    }
-  }
-
-  private func confirmationMessage(_ confirmation: TaskBoardStepRailState.Confirmation) -> String {
-    let title =
-      confirmation.itemID.flatMap { itemID in
-        activeItem.flatMap { $0.id == itemID ? $0.title : nil }
-      } ?? "the current item"
-    return switch confirmation {
-    case .externalSync:
-      "This pulls external task sources and applies changes to the live board"
-    case .evaluate:
-      "This evaluates \(title) and applies any resulting board transition"
-    case .deliver:
-      "This reserves \(title) in step mode and starts its managed worker"
-    case .complete:
-      "This moves \(title) to Done"
-    }
   }
 
   private var approvalGrantRefreshID: TaskBoardApprovalGrantRefreshID {
