@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
@@ -36,6 +36,23 @@ pub struct AcpAgentStartRequest {
     pub resume_session_id: Option<String>,
     /// Always open a new session, even when a previous one could be resumed.
     pub resume_disabled: bool,
+    /// Connect to a remote ACP endpoint instead of spawning the descriptor's
+    /// command. When set, the descriptor still identifies the agent (name,
+    /// capabilities, session config) but its `launch_command` is not run.
+    pub endpoint: Option<AcpEndpoint>,
+}
+
+/// A remote ACP endpoint the daemon connects to instead of spawning a child.
+///
+/// The URL scheme selects the transport: `ws`/`wss` uses WebSocket, `http`/
+/// `https` uses SSE with POST. Only header names and the environment variables
+/// holding their values cross the wire; the daemon resolves the values at
+/// connect time so a token never rides the request.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct AcpEndpoint {
+    pub url: String,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub headers_env: BTreeMap<String, String>,
 }
 
 impl Default for AcpAgentStartRequest {
@@ -60,6 +77,7 @@ impl Default for AcpAgentStartRequest {
             additional_directories: Vec::new(),
             resume_session_id: None,
             resume_disabled: false,
+            endpoint: None,
         }
     }
 }
