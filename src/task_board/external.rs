@@ -1,4 +1,5 @@
 use std::fmt;
+use std::ops::Not;
 
 use async_trait::async_trait;
 use clap::ValueEnum;
@@ -176,7 +177,7 @@ pub struct ExternalTask {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_reference: Option<ExternalTaskRef>,
     /// Whether the provider reports this task as tracking children of its own.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Not::not")]
     pub tracks_children: bool,
 }
 
