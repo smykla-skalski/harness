@@ -25,6 +25,7 @@ mod inbox;
 mod review_projection;
 #[cfg(test)]
 mod test_support;
+mod tracking;
 mod write;
 
 use errors::warn_github_message;
@@ -33,6 +34,7 @@ pub(crate) use review_projection::{
     imported_review_references_from_items, reconcile_review_item_from_snapshots,
     reconciled_external_status,
 };
+use tracking::{body_lists_child_issues, parent_reference_in_body};
 #[derive(Clone)]
 pub struct GitHubSyncClient {
     client: GitHubProtectedClient,
@@ -140,6 +142,10 @@ impl GitHubSyncClient {
                     })
                     .map(|issue| {
                         let number = issue.number;
+                        let labels = issue.label_names();
+                        let body = issue.body.unwrap_or_default();
+                        let parent_reference = parent_reference_in_body(&repository, &body);
+                        let tracks_children = body_lists_child_issues(&body);
                         (
                             number,
                             ExternalTask {
@@ -149,10 +155,13 @@ impl GitHubSyncClient {
                                 )
                                 .with_url(issue.url),
                                 title: issue.title,
-                                body: issue.body.unwrap_or_default(),
+                                body,
                                 status: github_issue_search_status(issue.state.as_str()),
                                 project_id: Some(project_id.clone()),
                                 updated_at: Some(issue.updated_at),
+                                labels,
+                                parent_reference,
+                                tracks_children,
                             },
                         )
                     }),

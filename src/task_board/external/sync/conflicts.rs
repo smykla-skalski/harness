@@ -123,6 +123,7 @@ mod tests {
             status: TaskBoardStatus::Done,
             project_id: Some("acme/widgets".into()),
             updated_at: Some("2026-07-15T10:05:00Z".into()),
+            ..ExternalTask::default()
         };
 
         let conflicts = build_sync_conflicts(&item, &task, &[ExternalSyncField::Title], 7);

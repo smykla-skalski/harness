@@ -345,6 +345,7 @@ fn patch_from_request(request: &TaskBoardUpdateItemRequest) -> TaskBoardItemPatc
         status: request.status,
         priority: request.priority,
         tags: request.tags.clone(),
+        kind: request.kind.clone(),
         project_id: optional_string_patch(
             request.project_id.as_ref(),
             request.clear_identity.clear_project_id,
@@ -377,6 +378,10 @@ fn patch_from_request(request: &TaskBoardUpdateItemRequest) -> TaskBoardItemPatc
         work_item_id: optional_string_patch(
             request.work_item_id.as_ref(),
             request.clear_identity.clear_work_item_id,
+        ),
+        parent_item_id: optional_string_patch(
+            request.parent_item_id.as_ref(),
+            request.clear_identity.clear_parent_item_id,
         ),
     }
 }

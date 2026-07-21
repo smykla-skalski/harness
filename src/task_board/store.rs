@@ -21,8 +21,8 @@ use super::TaskBoardWorkflowKind;
 #[cfg(test)]
 use super::types::CURRENT_TASK_BOARD_ITEM_VERSION;
 use super::types::{
-    AgentMode, ExternalRef, PlanningState, TaskBoardItem, TaskBoardPriority, TaskBoardStatus,
-    TaskBoardWorkflowState,
+    AgentMode, ExternalRef, PlanningState, TaskBoardItem, TaskBoardItemKind, TaskBoardPriority,
+    TaskBoardStatus, TaskBoardWorkflowState,
 };
 
 #[derive(Debug, Clone)]
@@ -38,6 +38,7 @@ pub struct TaskBoardItemPatch {
     pub status: Option<TaskBoardStatus>,
     pub priority: Option<TaskBoardPriority>,
     pub tags: Option<Vec<String>>,
+    pub kind: Option<TaskBoardItemKind>,
     pub project_id: OptionalFieldPatch<String>,
     pub target_project_types: Option<Vec<String>>,
     pub agent_mode: Option<AgentMode>,
@@ -56,6 +57,7 @@ pub struct TaskBoardItemPatch {
     pub clear_workflow: bool,
     pub session_id: OptionalFieldPatch<String>,
     pub work_item_id: OptionalFieldPatch<String>,
+    pub parent_item_id: OptionalFieldPatch<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -297,6 +299,7 @@ fn apply_core_patch(item: &mut TaskBoardItem, patch: &TaskBoardItemPatch) {
     assign_copy_if_some(&mut item.agent_mode, patch.agent_mode);
     assign_copy_if_some(&mut item.workflow_kind, patch.workflow_kind);
     assign_if_some(&mut item.tags, patch.tags.as_ref());
+    assign_if_some(&mut item.kind, patch.kind.as_ref());
     assign_if_some(
         &mut item.target_project_types,
         patch.target_project_types.as_ref(),
@@ -344,6 +347,7 @@ fn apply_link_patch(item: &mut TaskBoardItem, patch: TaskBoardItemPatch) {
     );
     apply_optional_patch(&mut item.session_id, patch.session_id);
     apply_optional_patch(&mut item.work_item_id, patch.work_item_id);
+    apply_optional_patch(&mut item.parent_item_id, patch.parent_item_id);
 }
 
 fn assign_if_some<T: Clone>(target: &mut T, value: Option<&T>) {

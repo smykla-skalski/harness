@@ -363,6 +363,7 @@ fn updated_remote_task(
                 .or_else(|| item.project_id.clone())
         },
         updated_at: provider_revision.resolve(state.and_then(|state| state.updated_at.as_deref())),
+        ..ExternalTask::default()
     }
 }
 

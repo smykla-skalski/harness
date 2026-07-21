@@ -103,6 +103,32 @@ async fn github_inbox_pull_imports_review_requests_as_backlog() {
 }
 
 #[tokio::test]
+async fn github_inbox_review_request_tasks_parse_the_same_tracking_convention_as_issues() {
+    let _guard = acquire_global_budget_test_lock().await;
+    let (endpoint, _requests, handle) = spawn_sequence_mock(vec![
+        MockResponse::json(200, viewer_response("octo-user")),
+        MockResponse::json(200, empty_search_response()),
+        MockResponse::json(
+            200,
+            search_response_with_issue_body("https://example.test/good/pull/7", "Part of #5"),
+        ),
+    ]);
+    let client = inbox_client_with_base_uri(endpoint, &["good/repo"]);
+
+    let tasks = client.pull_tasks().await.expect("inbox pull");
+
+    handle.join().expect("mock server");
+    assert_eq!(tasks.len(), 1);
+    assert_eq!(
+        tasks[0]
+            .parent_reference
+            .as_ref()
+            .map(|reference| reference.external_id.as_str()),
+        Some("good/repo#5")
+    );
+}
+
+#[tokio::test]
 async fn github_inbox_pull_maps_closed_assigned_issues_to_done() {
     let _guard = acquire_global_budget_test_lock().await;
     let (endpoint, _requests, handle) = spawn_sequence_mock(vec![
@@ -197,6 +223,28 @@ fn search_response_with_issue_state(url: &str, state: &str) -> serde_json::Value
                     "body": null,
                     "url": url,
                     "state": state,
+                    "updatedAt": "2026-05-19T00:00:00Z",
+                    "labels": { "nodes": [] }
+                }]
+            }
+        }
+    })
+}
+
+fn search_response_with_issue_body(url: &str, body: &str) -> serde_json::Value {
+    json!({
+        "data": {
+            "search": {
+                "pageInfo": {
+                    "hasNextPage": false,
+                    "endCursor": null
+                },
+                "nodes": [{
+                    "number": 7,
+                    "title": "Keep pullable repo",
+                    "body": body,
+                    "url": url,
+                    "state": "OPEN",
                     "updatedAt": "2026-05-19T00:00:00Z",
                     "labels": { "nodes": [] }
                 }]

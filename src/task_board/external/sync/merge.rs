@@ -300,6 +300,27 @@ fn remote_status_changed(remote: TaskBoardStatus, last_synced: Option<TaskBoardS
         .is_none_or(|last_synced| canonical_external_status(remote) != last_synced)
 }
 
+/// GitHub reports tracked children through body text (no native sub-issues in
+/// use), so the checklist is the primary signal; the title glyph is a
+/// fallback that alone is still sufficient, for a title that predates the
+/// checklist convention or names its children in a body this parser misses.
+pub(super) fn task_signals_umbrella(task: &ExternalTask) -> bool {
+    task.tracks_children || task.title.trim_start().starts_with('☂')
+}
+
+/// Adds provider labels the item does not already carry as a tag, never
+/// removing an existing tag. A full mirror would clobber tags a user added
+/// by hand, and re-sync has no conflict tracking for tags to fall back on.
+pub(super) fn merge_external_labels(existing: &[String], labels: &[String]) -> Vec<String> {
+    let mut merged = existing.to_vec();
+    for label in labels {
+        if !merged.iter().any(|tag| tag.eq_ignore_ascii_case(label)) {
+            merged.push(label.clone());
+        }
+    }
+    merged
+}
+
 pub(super) fn matching_ref<'a>(
     item: &'a TaskBoardItem,
     reference: &ExternalTaskRef,

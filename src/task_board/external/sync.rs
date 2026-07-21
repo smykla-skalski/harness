@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::errors::CliError;
 use crate::task_board::TaskBoardExternalCreateIntent;
-use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
+use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
+use crate::task_board::types::{TaskBoardItem, TaskBoardItemKind, TaskBoardStatus};
 use crate::workspace::utc_now;
 
 use super::targeting::{board_project_id_for_task, execution_repository_for_task};
@@ -44,8 +45,11 @@ pub(crate) use create_recovery::{
     prepare_external_create_recovery,
 };
 use import::{external_item_id, imported_external_planning};
-use lookup::{OperationDraft, build_external_ref_index, item_for_ref, operation, provider_ref};
-use merge::{matching_ref, pull_create_fields, sync_state_from_task};
+use lookup::{
+    OperationDraft, build_external_ref_index, item_for_ref, operation, provider_ref,
+    resolve_parent_item_id,
+};
+use merge::{matching_ref, pull_create_fields, sync_state_from_task, task_signals_umbrella};
 use push::push_board_tasks;
 use reconcile::reconcile_existing_item;
 use scope::SyncClientError;
@@ -234,6 +238,7 @@ async fn pull_provider_tasks(
     let board_items = board.list_items(None).await?;
     let item_index = build_external_ref_index(&board_items);
     for task in tasks.iter().cloned() {
+        let resolved_parent_item_id = resolve_parent_item_id(&board_items, &item_index, &task);
         if let Some(item) = item_for_ref(
             &board_items,
             &item_index,
@@ -243,8 +248,16 @@ async fn pull_provider_tasks(
             if !existing_pull_matches_status_filter(options.status, item, &task) {
                 continue;
             }
-            reconcile_existing_item(board, options, client.provider(), item, task, operations)
-                .await?;
+            reconcile_existing_item(
+                board,
+                options,
+                client.provider(),
+                item,
+                task,
+                resolved_parent_item_id.as_deref(),
+                operations,
+            )
+            .await?;
             continue;
         }
         if !new_pull_matches_status_filter(options.status, &task) {
@@ -270,11 +283,20 @@ async fn pull_provider_tasks(
                 let Some(item) = find_item_for_task(board, &task).await? else {
                     return Err(error);
                 };
-                reconcile_existing_item(board, options, client.provider(), &item, task, operations)
-                    .await?;
+                reconcile_existing_item(
+                    board,
+                    options,
+                    client.provider(),
+                    &item,
+                    task,
+                    resolved_parent_item_id.as_deref(),
+                    operations,
+                )
+                .await?;
                 continue;
             }
         };
+        let item = link_resolved_parent(board, item, resolved_parent_item_id.as_deref()).await?;
         operations.push(operation(OperationDraft {
             provider: client.provider(),
             action: ExternalSyncAction::Pull,
@@ -341,6 +363,10 @@ fn create_item_from_external(task: &ExternalTask) -> TaskBoardItem {
     item.status = canonical_external_status(task.status);
     item.project_id = board_project_id_for_task(task);
     item.execution_repository = execution_repository_for_task(task);
+    item.tags.clone_from(&task.labels);
+    if task_signals_umbrella(task) {
+        item.kind = TaskBoardItemKind::Umbrella;
+    }
     let mut reference = task.reference.clone().into_core_ref();
     reference.sync_state = Some(sync_state_from_task(task));
     item.external_refs = vec![reference];
@@ -349,4 +375,52 @@ fn create_item_from_external(task: &ExternalTask) -> TaskBoardItem {
         item.planning = planning;
     }
     item
+}
+
+/// Sets the item's parent through a follow-up update rather than at create
+/// time, so the same code path that computes sibling `child_order` and
+/// rejects cycles for a manual re-parent also governs an imported one.
+///
+/// A rejected assignment (self-parent, cycle, or otherwise invalid) is
+/// isolated to this one item: a bad GitHub cross-reference must not abort
+/// the whole sync batch, and the item simply stays unparented, exactly as
+/// it would if the parent were not yet resolvable at all.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing::warn! macro expands into a chain clippy reads as branchy"
+)]
+async fn link_resolved_parent(
+    board: &dyn TaskBoardSyncStore,
+    item: TaskBoardItem,
+    parent_item_id: Option<&str>,
+) -> Result<TaskBoardItem, CliError> {
+    let Some(parent_item_id) = parent_item_id else {
+        return Ok(item);
+    };
+    if parent_item_id == item.id || item.parent_item_id.as_deref() == Some(parent_item_id) {
+        return Ok(item);
+    }
+    let item_id = item.id.clone();
+    match board
+        .update_item(
+            &item,
+            TaskBoardItemPatch {
+                parent_item_id: OptionalFieldPatch::Set(parent_item_id.to_owned()),
+                ..TaskBoardItemPatch::default()
+            },
+        )
+        .await
+    {
+        Ok(updated) => Ok(updated),
+        Err(error) if error.code() == "WORKFLOW_IO" => {
+            tracing::warn!(
+                item_id,
+                parent_item_id,
+                error = %error.message(),
+                "task-board github import: rejected parent link, leaving item unparented"
+            );
+            Ok(item)
+        }
+        Err(error) => Err(error),
+    }
 }

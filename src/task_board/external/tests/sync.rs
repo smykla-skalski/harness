@@ -191,6 +191,7 @@ async fn sync_external_tasks_reconciles_closed_existing_provider_ref() {
         status: TaskBoardStatus::Done,
         project_id: Some("provider/project".to_owned()),
         updated_at: Some("2026-05-14T03:00:00Z".to_string()),
+        ..ExternalTask::default()
     };
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient::new(
         ExternalProvider::Todoist,

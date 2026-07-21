@@ -13,9 +13,9 @@ use crate::task_board::normalize_repository_slug;
 use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 
 use super::{
-    GitHubRepository, assigned_issue_query, github_external_id, github_inbox_issue_status, graphql,
-    parse_github_repository, review_request_query, search_label_matches_filter,
-    warn_github_message,
+    GitHubRepository, assigned_issue_query, body_lists_child_issues, github_external_id,
+    github_inbox_issue_status, graphql, parent_reference_in_body, parse_github_repository,
+    review_request_query, search_label_matches_filter, warn_github_message,
 };
 
 #[derive(Clone)]
@@ -198,13 +198,22 @@ impl GitHubInboxSyncClient {
         Ok(items
             .into_iter()
             .filter(|item| search_label_matches_filter(&item.label_names(), &self.import_labels))
-            .map(|item| ExternalTask {
-                reference: github_task_ref(repository, item.number, item.url),
-                title: item.title,
-                body: item.body.unwrap_or_default(),
-                status: github_inbox_issue_status(item.state.as_str()),
-                project_id: Some(project_id.clone()),
-                updated_at: Some(item.updated_at),
+            .map(|item| {
+                let labels = item.label_names();
+                let body = item.body.unwrap_or_default();
+                let parent_reference = parent_reference_in_body(repository, &body);
+                let tracks_children = body_lists_child_issues(&body);
+                ExternalTask {
+                    reference: github_task_ref(repository, item.number, item.url),
+                    title: item.title,
+                    body,
+                    status: github_inbox_issue_status(item.state.as_str()),
+                    project_id: Some(project_id.clone()),
+                    updated_at: Some(item.updated_at),
+                    labels,
+                    parent_reference,
+                    tracks_children,
+                }
             })
             .collect())
     }
@@ -221,13 +230,25 @@ impl GitHubInboxSyncClient {
         Ok(items
             .into_iter()
             .filter(|item| search_label_matches_filter(&item.label_names(), &self.import_labels))
-            .map(|item| ExternalTask {
-                reference: github_task_ref(repository, item.number, item.url),
-                title: item.title,
-                body: item.body.unwrap_or_default(),
-                status: TaskBoardStatus::Backlog,
-                project_id: Some(project_id.clone()),
-                updated_at: Some(item.updated_at),
+            .map(|item| {
+                let labels = item.label_names();
+                // A review-requested PR names its tracking issue the same
+                // way an issue does ("Part of #N"), so it participates in
+                // the same hierarchy rather than always importing as a leaf.
+                let body = item.body.unwrap_or_default();
+                let parent_reference = parent_reference_in_body(repository, &body);
+                let tracks_children = body_lists_child_issues(&body);
+                ExternalTask {
+                    reference: github_task_ref(repository, item.number, item.url),
+                    title: item.title,
+                    body,
+                    status: TaskBoardStatus::Backlog,
+                    project_id: Some(project_id.clone()),
+                    updated_at: Some(item.updated_at),
+                    labels,
+                    parent_reference,
+                    tracks_children,
+                }
             })
             .collect())
     }

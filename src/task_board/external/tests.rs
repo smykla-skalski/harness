@@ -2,6 +2,7 @@ mod config;
 mod create_done;
 mod delete;
 mod github;
+mod github_hierarchy;
 mod support;
 mod sync;
 mod sync_backlog;

@@ -361,6 +361,7 @@ impl ExternalSyncClient for RecoveryPullClient {
             status: TaskBoardStatus::Backlog,
             project_id: Some("provider-project".into()),
             updated_at: Some("provider-revision-1".into()),
+            ..ExternalTask::default()
         }])
     }
 

@@ -136,6 +136,7 @@ impl GitHubIssueResponse {
             status: github_issue_search_status(&self.state),
             project_id: Some(repository.slug()),
             updated_at: self.updated_at,
+            ..ExternalTask::default()
         }
     }
 }

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::task_board::types::{ExternalRefProvider, TaskBoardItem};
 
 use super::{
-    ExternalProvider, ExternalSyncAction, ExternalSyncField, ExternalSyncOperation,
+    ExternalProvider, ExternalSyncAction, ExternalSyncField, ExternalSyncOperation, ExternalTask,
     ExternalTaskRef, matching_ref,
 };
 
@@ -36,6 +36,26 @@ pub(super) fn build_external_ref_index(
         }
     }
     index
+}
+
+/// Resolves the tracking issue a task names as its parent to an already
+/// imported local item. Absence is not an error: the parent may not have
+/// been imported yet, and the same lookup on a later sync links it up.
+pub(super) fn resolve_parent_item_id(
+    board_items: &[TaskBoardItem],
+    item_index: &HashMap<(ExternalRefProvider, String), usize>,
+    task: &ExternalTask,
+) -> Option<String> {
+    let reference = task.parent_reference.as_ref()?;
+    // The legacy cross-repo fallback needs the *parent's* repository, which
+    // for a cross-repo reference differs from the child's own task.project_id.
+    let parent_project_id = reference
+        .external_id
+        .rsplit_once('#')
+        .map(|(project_id, _)| project_id)
+        .filter(|project_id| !project_id.is_empty())
+        .or(task.project_id.as_deref());
+    item_for_ref(board_items, item_index, reference, parent_project_id).map(|item| item.id.clone())
 }
 
 pub(super) fn provider_ref(
@@ -84,4 +104,44 @@ pub(super) fn provider_is_allowed(
     filter: Option<ExternalProvider>,
 ) -> bool {
     filter.is_none_or(|target| target == provider)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::task_board::types::{ExternalRef, TaskBoardStatus};
+
+    #[test]
+    fn resolve_parent_item_id_matches_a_legacy_cross_repo_parent_by_its_own_repo() {
+        let mut parent = TaskBoardItem::new(
+            "legacy-parent".into(),
+            "Parent issue".into(),
+            String::new(),
+            "2026-07-15T10:00:00Z".into(),
+        );
+        parent.execution_repository = Some("other-owner/other-repo".into());
+        parent.external_refs = vec![ExternalRef {
+            provider: ExternalRefProvider::GitHub,
+            external_id: "42".into(),
+            url: None,
+            sync_state: None,
+        }];
+        let board_items = vec![parent];
+        let item_index = build_external_ref_index(&board_items);
+        let task = ExternalTask {
+            reference: ExternalTaskRef::new(ExternalProvider::GitHub, "child-owner/child-repo#7"),
+            title: "Child issue".into(),
+            status: TaskBoardStatus::Backlog,
+            project_id: Some("child-owner/child-repo".into()),
+            parent_reference: Some(ExternalTaskRef::new(
+                ExternalProvider::GitHub,
+                "other-owner/other-repo#42",
+            )),
+            ..ExternalTask::default()
+        };
+
+        let resolved = resolve_parent_item_id(&board_items, &item_index, &task);
+
+        assert_eq!(resolved, Some("legacy-parent".to_string()));
+    }
 }

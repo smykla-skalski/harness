@@ -257,6 +257,7 @@ fn marked_task(item_id: &str, title: &str) -> ExternalTask {
         status: TaskBoardStatus::Backlog,
         project_id: Some("provider-project".into()),
         updated_at: Some("provider-revision-2".into()),
+        ..ExternalTask::default()
     }
 }
 
