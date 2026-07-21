@@ -293,6 +293,7 @@ async fn scoped_sync_keeps_successful_repository_when_another_repository_fails()
                 status: TaskBoardStatus::Backlog,
                 project_id: Some("acme/widgets".into()),
                 updated_at: Some("2026-07-15T10:00:00Z".into()),
+                ..ExternalTask::default()
             },
         )),
     ];
@@ -477,5 +478,6 @@ fn remote_task(
         status,
         project_id: None,
         updated_at: Some("2026-05-14T01:00:00Z".to_string()),
+        ..ExternalTask::default()
     }
 }

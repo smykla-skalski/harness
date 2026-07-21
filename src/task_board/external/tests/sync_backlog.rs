@@ -59,6 +59,7 @@ async fn todo_filtered_bidirectional_sync_preserves_legacy_todo_without_stale_ch
         status: TaskBoardStatus::Backlog,
         project_id: Some("owner/repo".to_owned()),
         updated_at: Some("2026-05-14T04:00:00Z".to_owned()),
+        ..ExternalTask::default()
     };
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(
         FakeSyncClient::new(ExternalProvider::GitHub, vec![remote])
@@ -114,6 +115,7 @@ async fn todo_filtered_bidirectional_sync_preserves_open_workflow_lane_without_c
         status: TaskBoardStatus::Backlog,
         project_id: Some("owner/repo".to_owned()),
         updated_at: Some("2026-05-14T03:00:00Z".to_owned()),
+        ..ExternalTask::default()
     };
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(
         FakeSyncClient::new(ExternalProvider::GitHub, vec![remote])
@@ -216,5 +218,6 @@ fn terminal_review_task(external_id: &str) -> ExternalTask {
         status: TaskBoardStatus::Done,
         project_id: Some("owner/repo".to_owned()),
         updated_at: Some("2026-05-14T04:00:00Z".to_owned()),
+        ..ExternalTask::default()
     }
 }

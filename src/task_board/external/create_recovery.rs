@@ -301,6 +301,7 @@ mod tests {
             status: TaskBoardStatus::Backlog,
             project_id: Some(request.provider_target().to_owned()),
             updated_at: Some("revision-1".into()),
+            ..ExternalTask::default()
         }
     }
 

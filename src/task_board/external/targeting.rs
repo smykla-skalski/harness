@@ -87,6 +87,7 @@ mod tests {
             status: TaskBoardStatus::Todo,
             project_id: project_id.map(ToOwned::to_owned),
             updated_at: None,
+            ..ExternalTask::default()
         }
     }
 }

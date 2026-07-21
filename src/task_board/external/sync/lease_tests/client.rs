@@ -88,6 +88,7 @@ impl ExternalCreateRecoveryClient for DurableCreateClient {
             project_id: (self.provider == ExternalProvider::Todoist)
                 .then(|| request.provider_target().into()),
             updated_at: Some("provider-revision-1".into()),
+            ..ExternalTask::default()
         })
     }
 

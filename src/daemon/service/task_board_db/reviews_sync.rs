@@ -295,6 +295,7 @@ fn review_external_task(item: &ReviewItem) -> ExternalTask {
         status: TaskBoardStatus::Backlog,
         project_id: Some(item.repository.clone()),
         updated_at: Some(item.updated_at.to_rfc3339_opts(SecondsFormat::Secs, true)),
+        ..ExternalTask::default()
     }
 }
 

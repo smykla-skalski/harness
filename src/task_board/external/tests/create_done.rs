@@ -377,5 +377,6 @@ fn task_from_request(request: &ExternalCreateRequest, updated_at: Option<String>
         status: TaskBoardStatus::Backlog,
         project_id: Some(request.provider_target().into()),
         updated_at,
+        ..ExternalTask::default()
     }
 }

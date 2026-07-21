@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::task_board::types::{ExternalRefProvider, TaskBoardItem};
 
 use super::{
-    ExternalProvider, ExternalSyncAction, ExternalSyncField, ExternalSyncOperation,
+    ExternalProvider, ExternalSyncAction, ExternalSyncField, ExternalSyncOperation, ExternalTask,
     ExternalTaskRef, matching_ref,
 };
 
@@ -36,6 +36,24 @@ pub(super) fn build_external_ref_index(
         }
     }
     index
+}
+
+/// Resolves the tracking issue a task names as its parent to an already
+/// imported local item. Absence is not an error: the parent may not have
+/// been imported yet, and the same lookup on a later sync links it up.
+pub(super) fn resolve_parent_item_id(
+    board_items: &[TaskBoardItem],
+    item_index: &HashMap<(ExternalRefProvider, String), usize>,
+    task: &ExternalTask,
+) -> Option<String> {
+    let reference = task.parent_reference.as_ref()?;
+    item_for_ref(
+        board_items,
+        item_index,
+        reference,
+        task.project_id.as_deref(),
+    )
+    .map(|item| item.id.clone())
 }
 
 pub(super) fn provider_ref(

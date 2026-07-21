@@ -461,6 +461,7 @@ impl From<TodoistTask> for ExternalTask {
             },
             project_id: task.project_id,
             updated_at: task.updated_at,
+            ..Self::default()
         }
     }
 }

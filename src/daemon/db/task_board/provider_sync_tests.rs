@@ -284,6 +284,7 @@ impl ExternalSyncClient for ConflictPullClient {
             status: TaskBoardStatus::Done,
             project_id: Some("acme/widgets".into()),
             updated_at: Some("2026-07-15T10:05:00Z".into()),
+            ..ExternalTask::default()
         }])
     }
 
@@ -371,6 +372,7 @@ fn external_task(external_id: &str, status: TaskBoardStatus) -> ExternalTask {
         status,
         project_id: Some("acme/widgets".into()),
         updated_at: Some("2026-07-15T10:05:00Z".into()),
+        ..ExternalTask::default()
     }
 }
 

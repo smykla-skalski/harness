@@ -89,6 +89,7 @@ async fn github_pull_preserves_project_identity_while_backfilling_execution_repo
         status: TaskBoardStatus::Backlog,
         project_id: Some("owner/repo".to_owned()),
         updated_at: Some("2026-05-14T03:00:00Z".to_owned()),
+        ..ExternalTask::default()
     };
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient::new(
         ExternalProvider::GitHub,
@@ -191,5 +192,6 @@ fn created_github_task(request: &ExternalCreateRequest) -> ExternalTask {
         status: TaskBoardStatus::Backlog,
         project_id: Some("owner/repo".into()),
         updated_at: Some("provider-revision-1".into()),
+        ..ExternalTask::default()
     }
 }

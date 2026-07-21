@@ -6,13 +6,15 @@ use crate::task_board::external::{
     ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncField, ExternalTask, ExternalTaskRef,
 };
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
-use crate::task_board::types::{ExternalRef, ExternalRefSyncState, TaskBoardItem, TaskBoardStatus};
+use crate::task_board::types::{
+    ExternalRef, ExternalRefSyncState, TaskBoardItem, TaskBoardItemKind, TaskBoardStatus,
+};
 
 use super::super::github::reconciled_external_status;
 use super::conflicts::build_sync_conflicts;
 use super::merge::{
-    changed_fields, external_ref_matches, matching_ref, pull_conflict_fields,
-    pull_resolution_fields, sync_state_from_task,
+    changed_fields, external_ref_matches, matching_ref, merge_external_labels,
+    pull_conflict_fields, pull_resolution_fields, sync_state_from_task, task_signals_umbrella,
 };
 use super::{
     ExternalSyncAction, ExternalSyncDirection, ExternalSyncOperation, ExternalSyncOptions,
@@ -29,6 +31,7 @@ pub(super) async fn reconcile_existing_item(
     provider: ExternalProvider,
     item: &TaskBoardItem,
     task: ExternalTask,
+    resolved_parent_item_id: Option<&str>,
     operations: &mut Vec<ExternalSyncOperation>,
 ) -> Result<(), CliError> {
     let reports_conflicts = matches!(options.direction, ExternalSyncDirection::Both)
@@ -70,7 +73,7 @@ pub(super) async fn reconcile_existing_item(
         ExternalSyncConflictPolicy::PreferRemote
     ) || matches!(options.direction, ExternalSyncDirection::Pull)
         && matches!(options.conflict_policy, ExternalSyncConflictPolicy::Report);
-    let patch = reconciliation_patch(item, &task, prefer_remote);
+    let patch = reconciliation_patch(item, &task, prefer_remote, resolved_parent_item_id);
     if !has_reconciliation_change(&patch) {
         supersede_resolved_conflicts(board, options, provider, item, &task, &conflict_fields)
             .await?;
@@ -90,7 +93,15 @@ pub(super) async fn reconcile_existing_item(
         }));
         return Ok(());
     }
-    let applied = apply_reconciliation(board, item, &task, prefer_remote, patch).await?;
+    let applied = apply_reconciliation(
+        board,
+        item,
+        &task,
+        prefer_remote,
+        resolved_parent_item_id,
+        patch,
+    )
+    .await?;
     let records_applied_operation = applied
         && !(matches!(
             options.conflict_policy,
@@ -118,13 +129,22 @@ async fn apply_reconciliation(
     item: &TaskBoardItem,
     task: &ExternalTask,
     prefer_remote: bool,
+    resolved_parent_item_id: Option<&str>,
     patch: TaskBoardItemPatch,
 ) -> Result<bool, CliError> {
     match board.update_item(item, patch).await {
         Ok(_) => Ok(true),
         Err(error) if error.code() != "WORKFLOW_CONCURRENT" => Err(error),
         Err(error) => {
-            if latest_item_still_needs_reconciliation(board, item, task, prefer_remote).await? {
+            if latest_item_still_needs_reconciliation(
+                board,
+                item,
+                task,
+                prefer_remote,
+                resolved_parent_item_id,
+            )
+            .await?
+            {
                 return Err(error);
             }
             Ok(false)
@@ -192,6 +212,7 @@ async fn latest_item_still_needs_reconciliation(
     expected_item: &TaskBoardItem,
     task: &ExternalTask,
     prefer_remote: bool,
+    resolved_parent_item_id: Option<&str>,
 ) -> Result<bool, CliError> {
     let latest = board
         .list_items(None)
@@ -199,7 +220,12 @@ async fn latest_item_still_needs_reconciliation(
         .into_iter()
         .find(|item| item.id == expected_item.id);
     Ok(latest.as_ref().is_none_or(|item| {
-        has_reconciliation_change(&reconciliation_patch(item, task, prefer_remote))
+        has_reconciliation_change(&reconciliation_patch(
+            item,
+            task,
+            prefer_remote,
+            resolved_parent_item_id,
+        ))
     }))
 }
 
@@ -207,6 +233,7 @@ fn reconciliation_patch(
     item: &TaskBoardItem,
     task: &ExternalTask,
     prefer_remote: bool,
+    resolved_parent_item_id: Option<&str>,
 ) -> TaskBoardItemPatch {
     let mut patch = TaskBoardItemPatch::default();
     let sync_state = matching_ref(item, &task.reference, task.project_id.as_deref())
@@ -267,7 +294,34 @@ fn reconciliation_patch(
     if let Some(refs) = reconciled_external_refs(item, task) {
         patch.external_refs = Some(refs);
     }
+    apply_hierarchy_patch(&mut patch, item, task, resolved_parent_item_id);
     patch
+}
+
+/// Reconciles tags, kind, and parent linkage. Split out from
+/// `reconciliation_patch` to keep that function's branch count under the
+/// cognitive-complexity gate.
+fn apply_hierarchy_patch(
+    patch: &mut TaskBoardItemPatch,
+    item: &TaskBoardItem,
+    task: &ExternalTask,
+    resolved_parent_item_id: Option<&str>,
+) {
+    if task_signals_umbrella(task) && item.kind != TaskBoardItemKind::Umbrella {
+        // One-directional: recognizing an umbrella is automatic, but a human
+        // may have deliberately picked some other kind, so this never demotes.
+        patch.kind = Some(TaskBoardItemKind::Umbrella);
+    }
+    let merged_tags = merge_external_labels(&item.tags, &task.labels);
+    if merged_tags != item.tags {
+        patch.tags = Some(merged_tags);
+    }
+    if let Some(parent_item_id) = resolved_parent_item_id
+        && parent_item_id != item.id
+        && item.parent_item_id.as_deref() != Some(parent_item_id)
+    {
+        patch.parent_item_id = OptionalFieldPatch::Set(parent_item_id.to_owned());
+    }
 }
 
 fn reconciled_status(item: &TaskBoardItem, task: &ExternalTask) -> TaskBoardStatus {
@@ -294,6 +348,9 @@ fn has_reconciliation_change(patch: &TaskBoardItemPatch) -> bool {
         || !matches!(patch.project_id, OptionalFieldPatch::Unchanged)
         || !matches!(patch.execution_repository, OptionalFieldPatch::Unchanged)
         || patch.external_refs.is_some()
+        || patch.kind.is_some()
+        || patch.tags.is_some()
+        || !matches!(patch.parent_item_id, OptionalFieldPatch::Unchanged)
 }
 
 fn reconciled_external_refs(item: &TaskBoardItem, task: &ExternalTask) -> Option<Vec<ExternalRef>> {
@@ -336,169 +393,4 @@ fn reference_changed(
 }
 
 #[cfg(test)]
-mod tests {
-    use async_trait::async_trait;
-
-    use super::*;
-    use crate::errors::CliErrorKind;
-    use crate::task_board::TaskBoardSyncConflict;
-    use crate::task_board::external::{
-        ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
-        ExternalProviderScopeState, ExternalSyncDirection, TaskBoardSyncItemSnapshot,
-    };
-
-    #[tokio::test]
-    async fn prefer_remote_concurrent_edit_never_claims_unapplied_remote_intent() {
-        let task = remote_task();
-        let expected = locally_edited_item();
-        let mut latest = expected.clone();
-        latest.title = "Concurrent edit".into();
-        latest.external_refs[0].sync_state = Some(sync_state_from_task(&task));
-        let store = ConcurrentEditStore { latest };
-        let mut operations = Vec::new();
-
-        let error = reconcile_existing_item(
-            &store,
-            ExternalSyncOptions {
-                status: None,
-                provider: Some(ExternalProvider::Todoist),
-                direction: ExternalSyncDirection::Pull,
-                conflict_policy: ExternalSyncConflictPolicy::PreferRemote,
-                dry_run: false,
-            },
-            ExternalProvider::Todoist,
-            &expected,
-            task,
-            &mut operations,
-        )
-        .await
-        .expect_err("concurrent edit still missing remote title must fail");
-
-        assert_eq!(error.code(), "WORKFLOW_CONCURRENT");
-        assert!(operations.is_empty());
-    }
-
-    struct ConcurrentEditStore {
-        latest: TaskBoardItem,
-    }
-
-    impl crate::task_board::TaskBoardExternalCreateStore for ConcurrentEditStore {}
-
-    #[async_trait]
-    impl TaskBoardSyncStore for ConcurrentEditStore {
-        async fn list_items(
-            &self,
-            _status: Option<TaskBoardStatus>,
-        ) -> Result<Vec<TaskBoardItem>, CliError> {
-            Ok(vec![self.latest.clone()])
-        }
-
-        async fn list_items_including_deleted(&self) -> Result<Vec<TaskBoardItem>, CliError> {
-            Ok(vec![self.latest.clone()])
-        }
-
-        async fn create_item(&self, _item: TaskBoardItem) -> Result<TaskBoardItem, CliError> {
-            unreachable!("reconciliation never creates an item")
-        }
-
-        async fn update_item(
-            &self,
-            _expected_item: &TaskBoardItem,
-            _patch: TaskBoardItemPatch,
-        ) -> Result<TaskBoardItem, CliError> {
-            Err(CliErrorKind::concurrent_modification("concurrent test edit").into())
-        }
-
-        async fn item_snapshot(
-            &self,
-            _item_id: &str,
-        ) -> Result<TaskBoardSyncItemSnapshot, CliError> {
-            Ok(TaskBoardSyncItemSnapshot::new(self.latest.clone(), 0))
-        }
-
-        async fn provider_scope_state(
-            &self,
-            _provider: ExternalProvider,
-            _scope_id: &str,
-        ) -> Result<ExternalProviderScopeState, CliError> {
-            unreachable!("reconciliation test does not inspect provider scope state")
-        }
-
-        async fn begin_provider_scope_attempt(
-            &self,
-            _provider: ExternalProvider,
-            _scope_id: &str,
-            _now: &str,
-        ) -> Result<ExternalProviderScopeAttemptDecision, CliError> {
-            unreachable!("reconciliation test does not begin provider attempts")
-        }
-
-        async fn renew_provider_scope_attempt(
-            &self,
-            _attempt: &ExternalProviderScopeAttempt,
-            _now: &str,
-        ) -> Result<(), CliError> {
-            unreachable!("reconciliation test does not renew provider attempts")
-        }
-
-        async fn complete_provider_scope_success(
-            &self,
-            _attempt: &ExternalProviderScopeAttempt,
-            _base_revision: Option<&str>,
-            _completed_at: &str,
-        ) -> Result<(), CliError> {
-            unreachable!("reconciliation test does not complete provider attempts")
-        }
-
-        async fn complete_provider_scope_failure(
-            &self,
-            _attempt: &ExternalProviderScopeAttempt,
-            _completed_at: &str,
-        ) -> Result<ExternalProviderScopeState, CliError> {
-            unreachable!("reconciliation test does not complete provider attempts")
-        }
-
-        async fn replace_open_sync_conflicts(
-            &self,
-            _item_id: &str,
-            _provider: ExternalProvider,
-            _external_ref: &str,
-            _item_revision: i64,
-            _conflicts: &[TaskBoardSyncConflict],
-        ) -> Result<(), CliError> {
-            Ok(())
-        }
-    }
-
-    fn locally_edited_item() -> TaskBoardItem {
-        let mut item = TaskBoardItem::new(
-            "task-concurrent".into(),
-            "Local edit".into(),
-            "Body".into(),
-            "2026-07-15T10:00:00Z".into(),
-        );
-        let mut reference =
-            ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1").into_core_ref();
-        reference.sync_state = Some(ExternalRefSyncState {
-            title: Some("Old title".into()),
-            body: Some("Body".into()),
-            status: Some(TaskBoardStatus::Backlog),
-            project_id: None,
-            updated_at: Some("2026-07-15T10:00:00Z".into()),
-            synced_at: Some("2026-07-15T10:00:00Z".into()),
-        });
-        item.external_refs = vec![reference];
-        item
-    }
-
-    fn remote_task() -> ExternalTask {
-        ExternalTask {
-            reference: ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1"),
-            title: "Remote edit".into(),
-            body: "Body".into(),
-            status: TaskBoardStatus::Backlog,
-            project_id: None,
-            updated_at: Some("2026-07-15T10:05:00Z".into()),
-        }
-    }
-}
+mod tests;
