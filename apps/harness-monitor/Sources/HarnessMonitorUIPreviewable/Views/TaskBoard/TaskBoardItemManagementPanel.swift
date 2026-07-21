@@ -248,6 +248,7 @@ struct TaskBoardItemManagementPanel: View {
     .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
     .controlSize(HarnessMonitorControlMetrics.compactControlSize)
     .disabled(isActionInFlight || !draft.canSubmit || !canSubmit)
+    .accessibilityIdentifier("harness.task-board.manage-item.submit")
 
     if let item {
       TaskBoardPlanLifecycleActionButtons(
@@ -340,6 +341,7 @@ struct TaskBoardItemManagementPanel: View {
       actions.updateTaskBoardItem(item.id, request: draft.updateRequest)
     } else {
       actions.createTaskBoardItem(draft.createRequest, initialStatus: draft.status)
+      dismiss()
     }
   }
 }
