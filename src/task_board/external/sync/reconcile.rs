@@ -80,6 +80,7 @@ pub(super) async fn reconcile_existing_item(
         return Ok(());
     }
     let changed_fields = changed_fields(&patch);
+    let hierarchy_changed = hierarchy_fields_changed(&patch);
     if options.dry_run {
         operations.push(operation(OperationDraft {
             provider,
@@ -103,11 +104,13 @@ pub(super) async fn reconcile_existing_item(
     )
     .await?;
     let records_applied_operation = applied
-        && !(matches!(
-            options.conflict_policy,
-            ExternalSyncConflictPolicy::PreferLocal
-        ) && !conflict_fields.is_empty()
-            && changed_fields.is_empty());
+        && (hierarchy_changed
+            || !changed_fields.is_empty()
+            || conflict_fields.is_empty()
+            || !matches!(
+                options.conflict_policy,
+                ExternalSyncConflictPolicy::PreferLocal
+            ));
     if records_applied_operation {
         operations.push(operation(OperationDraft {
             provider,
@@ -342,8 +345,9 @@ fn apply_hierarchy_patch(
     resolved_parent_item_id: Option<&str>,
 ) {
     if task_signals_umbrella(task) && item.kind != TaskBoardItemKind::Umbrella {
-        // One-directional: recognizing an umbrella is automatic, but a human
-        // may have deliberately picked some other kind, so this never demotes.
+        // One-directional: we promote to Umbrella whenever the provider
+        // signals it, but we never demote an existing Umbrella back to
+        // something else.
         patch.kind = Some(TaskBoardItemKind::Umbrella);
     }
     let merged_tags = merge_external_labels(&item.tags, &task.labels);
@@ -392,7 +396,15 @@ fn has_reconciliation_change(patch: &TaskBoardItemPatch) -> bool {
         || !matches!(patch.project_id, OptionalFieldPatch::Unchanged)
         || !matches!(patch.execution_repository, OptionalFieldPatch::Unchanged)
         || patch.external_refs.is_some()
-        || patch.kind.is_some()
+        || hierarchy_fields_changed(patch)
+}
+
+/// `changed_fields()` only reports title/body/status/project, so a patch
+/// that touches only tags, kind, or parent looks field-less to callers that
+/// gate on it (for example, whether a `PreferLocal` conflict still counts as
+/// an applied operation). This lets them ask about hierarchy fields too.
+fn hierarchy_fields_changed(patch: &TaskBoardItemPatch) -> bool {
+    patch.kind.is_some()
         || patch.tags.is_some()
         || !matches!(patch.parent_item_id, OptionalFieldPatch::Unchanged)
 }

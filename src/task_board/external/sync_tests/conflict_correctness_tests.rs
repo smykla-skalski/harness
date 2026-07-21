@@ -247,6 +247,66 @@ async fn remote_update_with_failed_local_persistence_records_conflict_evidence()
     );
 }
 
+#[tokio::test]
+async fn prefer_local_still_records_a_hierarchy_only_applied_change_despite_a_conflict() {
+    let dir = tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+        .await
+        .expect("database");
+    let item = linked_item(
+        "task-hierarchy-only",
+        "Local edit",
+        "Old body",
+        TaskBoardStatus::Todo,
+    );
+    db.create_task_board_item(item).await.expect("create item");
+    let client = UpdateFakeSyncClient::new(
+        ExternalProvider::Todoist,
+        vec![ExternalSyncField::Title],
+        vec![ExternalTask {
+            labels: vec!["urgent".into()],
+            ..remote_task(
+                "remote-1",
+                "Remote edit",
+                "Old body",
+                TaskBoardStatus::Backlog,
+            )
+        }],
+    );
+    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(client)];
+
+    let operations = sync_external_tasks(
+        &db,
+        ExternalSyncOptions {
+            provider: Some(ExternalProvider::Todoist),
+            direction: ExternalSyncDirection::Pull,
+            conflict_policy: ExternalSyncConflictPolicy::PreferLocal,
+            dry_run: false,
+            status: None,
+        },
+        &clients,
+    )
+    .await
+    .expect("sync external tasks");
+
+    let item = db
+        .task_board_item("task-hierarchy-only")
+        .await
+        .expect("item");
+    assert_eq!(item.title, "Local edit", "the title conflict keeps local");
+    assert_eq!(
+        item.tags,
+        vec!["urgent".to_string()],
+        "the non-conflicting tag change still applies"
+    );
+    assert_eq!(
+        operations.len(),
+        1,
+        "the applied tag change must still be recorded as evidence"
+    );
+    assert!(operations[0].applied);
+}
+
 fn push_options() -> ExternalSyncOptions {
     ExternalSyncOptions {
         provider: Some(ExternalProvider::Todoist),
