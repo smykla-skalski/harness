@@ -3735,6 +3735,7 @@ name = "harness-daemon"
 version = "49.3.0"
 dependencies = [
  "agent-client-protocol",
+ "agent-client-protocol-http",
  "arc-swap",
  "assert_cmd",
  "async-stream",
