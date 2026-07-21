@@ -69,6 +69,32 @@ public enum TaskBoardStatus: TaskBoardOpenEnum, CaseIterable, Identifiable {
   public var id: String { rawValue }
 }
 
+public enum TaskBoardItemKind: TaskBoardOpenEnum, CaseIterable, Identifiable {
+  case task
+  case umbrella
+  case unknown(String)
+
+  public static let allCases: [Self] = [.task, .umbrella]
+
+  public var rawValue: String {
+    switch self {
+    case .task: "task"
+    case .umbrella: "umbrella"
+    case .unknown(let raw): raw
+    }
+  }
+
+  public init(rawValue: String) {
+    switch rawValue {
+    case "task": self = .task
+    case "umbrella": self = .umbrella
+    default: self = .unknown(rawValue)
+    }
+  }
+
+  public var id: String { rawValue }
+}
+
 public enum TaskBoardPriority: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
   case low = "low"
   case medium = "medium"

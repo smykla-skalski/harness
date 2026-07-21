@@ -176,6 +176,11 @@ const OPEN_STRING_ENUMS: &[&str] = &[
     // closed (default emit). Their .title moves to a hand extension.
     "TaskBoardStatus",
     "TaskBoardAgentMode",
+    // TaskBoardItemKind (#314): the Rust enum already carries its own #[serde(other)]
+    // Unknown fallback for forward compat on the wire; emit_open_enum drops that
+    // explicit case and folds it into the standard .unknown(String) catch-all so a
+    // Monitor build never fails to decode a kind it does not recognize yet.
+    "TaskBoardItemKind",
 ];
 
 /// Emit an open Swift enum conforming to `TaskBoardOpenEnum` (which supplies the
@@ -2526,10 +2531,16 @@ const SESSION_TASKS_SOURCE: &str = include_str!("../src/session/types/tasks.rs")
 const TASK_BOARD_PROTOCOL_SOURCE: &str = include_str!("../src/daemon/protocol/task_board.rs");
 const TASK_BOARD_TYPES_SOURCE: &str = include_str!("../src/task_board/types.rs");
 const TASK_BOARD_ENUMS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardEnums.generated.swift";
-// The three task-board foundation enums in types.rs that every item/summary/request
+// The task-board foundation enums in types.rs that every item/summary/request
 // references. The rich TaskBoardItem and the other types.rs structs are excluded by
-// the allow-list. TaskBoardStatus/AgentMode emit open, TaskBoardPriority closed.
-const TASK_BOARD_ENUMS_EMIT_ONLY: &[&str] = &["TaskBoardStatus", "TaskBoardPriority", "AgentMode"];
+// the allow-list. TaskBoardStatus/AgentMode/TaskBoardItemKind emit open, TaskBoardPriority
+// closed.
+const TASK_BOARD_ENUMS_EMIT_ONLY: &[&str] = &[
+    "TaskBoardStatus",
+    "TaskBoardPriority",
+    "AgentMode",
+    "TaskBoardItemKind",
+];
 const TASK_BOARD_SUMMARY_SOURCE: &str = include_str!("../src/task_board/summary.rs");
 const TASK_BOARD_SUMMARY_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardSummaryWireTypes.generated.swift";
 // The audit, project and machine summary structs - all over primitives plus the
