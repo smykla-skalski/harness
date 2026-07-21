@@ -44,6 +44,58 @@ fn seed_ready_item(board: &TaskBoardStore, id: &str) {
 }
 
 #[test]
+fn machine_mismatch_never_masks_a_kind_block() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("board");
+    let board = TaskBoardStore::new(root.clone());
+    let mut item = TaskBoardItem::new(
+        "umbrella-1".into(),
+        "umbrella-1".into(),
+        String::new(),
+        "2026-05-15T00:00:00Z".into(),
+    );
+    item.status = TaskBoardStatus::Todo;
+    item.kind = TaskBoardItemKind::Umbrella;
+    item.target_project_types = vec!["data".into()];
+    board
+        .create("umbrella-1", "", item)
+        .expect("create board item");
+
+    let registry = MachineRegistry::new(root.clone());
+    let mut local = registry.ensure_local().expect("ensure local");
+    local.project_types = vec!["web".into()];
+    registry.upsert(&local).expect("declare project types");
+
+    let response = dispatch_task_board(
+        &TaskBoardDispatchRequest {
+            item_id: None,
+            status: Some(TaskBoardStatus::Todo),
+            dry_run: true,
+            project_dir: None,
+            actor: None,
+        },
+        None,
+        &board,
+    )
+    .expect("dispatch");
+
+    let plan = response
+        .plans
+        .iter()
+        .find(|plan| plan.board_item_id == "umbrella-1")
+        .expect("umbrella plan present");
+    match &plan.readiness {
+        DispatchReadiness::Blocked {
+            reason: DispatchBlockReason::Kind { item_kind },
+        } => assert_eq!(*item_kind, TaskBoardItemKind::Umbrella),
+        other => panic!(
+            "a kind block must survive machine filtering so the explicit \
+             dispatch guard still sees it, got {other:?}"
+        ),
+    }
+}
+
+#[test]
 fn dispatch_surfaces_machine_mismatch_for_other_project_types() {
     let temp = tempdir().expect("tempdir");
     let root = temp.path().join("board");
@@ -116,6 +168,11 @@ fn explicit_dispatch_of_an_umbrella_item_is_refused_with_a_typed_error() {
     .expect_err("an explicit umbrella dispatch must be refused, not silently no-op");
 
     assert_eq!(error.code(), "KSRCLI094");
+    assert!(
+        error.message().contains("'umbrella'"),
+        "message must use the wire value, not the Rust variant name: {}",
+        error.message()
+    );
 }
 
 #[test]

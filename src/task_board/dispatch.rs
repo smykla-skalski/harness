@@ -371,29 +371,15 @@ pub fn machine_mismatch_plan_with_policy_root(
     machine: &Machine,
     policy_root: &Path,
 ) -> DispatchPlan {
-    let worker = WorkerIntent {
-        mode: item.agent_mode,
-    };
-    let reviewer = reviewer_intent();
-    let evaluator = evaluator_intent();
     let (policy, policy_decision_id) = dispatch_policy(item, policy_root);
-    DispatchPlan {
-        board_item_id: item.id.clone(),
-        rendered_prompt: super::plan_worker_prompt(item),
-        readiness: blocked(DispatchBlockReason::MachineMismatch {
+    let mut plan = build_dispatch_plan_with_decision(item, policy, policy_decision_id, None);
+    if !is_kind_blocked(&plan.readiness) {
+        plan.readiness = blocked(DispatchBlockReason::MachineMismatch {
             required: item.target_project_types.clone(),
             declared: machine.project_types.clone(),
-        }),
-        session: session_intent(item),
-        task: task_creation_intent(item),
-        lifecycle: DispatchLifecycle::planned(&worker, &reviewer, &evaluator),
-        worker,
-        reviewer,
-        evaluator,
-        policy,
-        policy_decision_id,
-        consumed_approval_grant_id: None,
+        });
     }
+    plan
 }
 
 #[must_use]
@@ -414,11 +400,26 @@ pub(crate) fn machine_mismatch_plan_with_policy(
     );
     let consumed = consumed_grant_id(grant, &decision);
     let mut plan = build_dispatch_plan_with_decision(item, decision, decision_id, consumed);
-    plan.readiness = blocked(DispatchBlockReason::MachineMismatch {
-        required: item.target_project_types.clone(),
-        declared: machine.project_types.clone(),
-    });
+    if !is_kind_blocked(&plan.readiness) {
+        plan.readiness = blocked(DispatchBlockReason::MachineMismatch {
+            required: item.target_project_types.clone(),
+            declared: machine.project_types.clone(),
+        });
+    }
     plan
+}
+
+/// A kind block is a structural fact about the item (never a unit of work at
+/// all) rather than a routing or workflow-state concern, so machine
+/// filtering must never clobber it - otherwise the explicit `--item-id`
+/// dispatch guard, which looks specifically for this reason, would miss it.
+fn is_kind_blocked(readiness: &DispatchReadiness) -> bool {
+    matches!(
+        readiness,
+        DispatchReadiness::Blocked {
+            reason: DispatchBlockReason::Kind { .. }
+        }
+    )
 }
 
 #[path = "dispatch_spawn_policy.rs"]

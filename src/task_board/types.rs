@@ -218,6 +218,17 @@ impl TaskBoardItemKind {
     pub const fn is_dispatchable(self) -> bool {
         matches!(self, Self::Task)
     }
+
+    /// The `snake_case` wire/CLI value, for user-facing messages that must
+    /// match `--kind` and JSON rather than the Rust variant name.
+    #[must_use]
+    pub const fn as_wire_str(self) -> &'static str {
+        match self {
+            Self::Task => "task",
+            Self::Umbrella => "umbrella",
+            Self::Unknown => "unknown",
+        }
+    }
 }
 
 impl TaskBoardStatus {
@@ -402,5 +413,19 @@ mod tests {
         assert!(TaskBoardItemKind::Task.is_dispatchable());
         assert!(!TaskBoardItemKind::Umbrella.is_dispatchable());
         assert!(!TaskBoardItemKind::Unknown.is_dispatchable());
+    }
+
+    #[test]
+    fn as_wire_str_matches_the_serde_wire_value() {
+        for kind in [
+            TaskBoardItemKind::Task,
+            TaskBoardItemKind::Umbrella,
+            TaskBoardItemKind::Unknown,
+        ] {
+            assert_eq!(
+                serde_json::to_value(kind).expect("serialize kind"),
+                kind.as_wire_str()
+            );
+        }
     }
 }

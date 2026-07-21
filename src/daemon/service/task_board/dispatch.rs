@@ -133,8 +133,9 @@ fn reject_explicit_kind_block(
         } = &plan.readiness
         {
             return Err(CliErrorKind::item_not_dispatchable(format!(
-                "task-board item '{}' is kind '{item_kind:?}' and cannot be dispatched to an agent",
-                plan.board_item_id
+                "task-board item '{}' is kind '{}' and cannot be dispatched to an agent",
+                plan.board_item_id,
+                item_kind.as_wire_str()
             ))
             .into());
         }
