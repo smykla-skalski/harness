@@ -66,6 +66,7 @@ pub(crate) async fn create_task_board_item_db(
     item.priority = request.priority;
     item.agent_mode = request.agent_mode;
     item.workflow_kind = request.workflow_kind;
+    item.kind = request.kind;
     item.execution_repository
         .clone_from(&request.execution_repository);
     item.estimated_tokens = request.estimated_tokens;
@@ -358,6 +359,7 @@ fn apply_update_request(
     assign_copy_if_some(&mut item.priority, request.priority);
     assign_copy_if_some(&mut item.agent_mode, request.agent_mode);
     assign_copy_if_some(&mut item.workflow_kind, request.workflow_kind);
+    assign_copy_if_some(&mut item.kind, request.kind);
     assign_if_some(&mut item.tags, request.tags.as_ref());
     assign_if_some(
         &mut item.target_project_types,

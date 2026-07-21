@@ -274,9 +274,9 @@ pub(super) async fn insert_item_in_tx(
         target_project_types_json, agent_mode, workflow_kind, execution_repository,
         estimated_tokens, estimated_cost_microusd, imported_from_provider, planning_json,
         workflow_json, session_id, work_item_id, usage_json, parent_item_id, child_order,
-        created_at, updated_at, deleted_at, revision
+        created_at, updated_at, deleted_at, revision, kind
     ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
-        ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26)",
+        ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27)",
     )
     .bind(&item.id)
     .bind(i64::from(item.schema_version))
@@ -317,6 +317,7 @@ pub(super) async fn insert_item_in_tx(
     .bind(&item.updated_at)
     .bind(&item.deleted_at)
     .bind(revision)
+    .bind(label(item.kind, "task board kind")?)
     .execute(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("insert task board item '{}': {error}", item.id)))?;
@@ -338,7 +339,7 @@ pub(super) async fn replace_item_in_tx(
         imported_from_provider = ?15, planning_json = ?16, workflow_json = ?17,
         session_id = ?18, work_item_id = ?19, usage_json = ?20, parent_item_id = ?21,
         child_order = ?22, created_at = ?23, updated_at = ?24, deleted_at = ?25,
-        revision = ?26
+        revision = ?26, kind = ?27
         WHERE item_id = ?1",
     )
     .bind(&item.id)
@@ -380,6 +381,7 @@ pub(super) async fn replace_item_in_tx(
     .bind(&item.updated_at)
     .bind(&item.deleted_at)
     .bind(revision)
+    .bind(label(item.kind, "task board kind")?)
     .execute(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("replace task board item '{}': {error}", item.id)))?;
