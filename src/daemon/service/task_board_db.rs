@@ -18,7 +18,8 @@ use crate::task_board::planning::PlanningTransition;
 use crate::task_board::{
     ExternalRef, ExternalSyncConfig, Machine, PlanningState, SpawnGateSwitches, TaskBoardItem,
     TaskBoardWorkflowState, approve_plan, begin_planning, build_audit_summary_with_policy,
-    build_machine_summaries, build_project_summaries, revoke_plan, submit_plan,
+    build_machine_summaries, build_progress_rollups, build_project_summaries, revoke_plan,
+    submit_plan,
 };
 use crate::workspace::utc_now;
 
@@ -89,9 +90,25 @@ pub(crate) async fn list_task_board_items_db(
     db: &AsyncDaemonDb,
     request: &TaskBoardListItemsRequest,
 ) -> Result<TaskBoardListItemsResponse, CliError> {
-    db.list_task_board_items(request.status)
-        .await
-        .map(|items| TaskBoardListItemsResponse { items })
+    // Roll-ups always derive from the full live set, never the status-filtered
+    // `items` below, or a status filter would silently undercount siblings
+    // that don't match it.
+    let all_items = db.list_task_board_items(None).await?;
+    let progress_rollups = build_progress_rollups(&all_items);
+    let items = match request.status {
+        Some(status) => {
+            let status = status.canonical_persisted_status();
+            all_items
+                .into_iter()
+                .filter(|item| item.status == status)
+                .collect()
+        }
+        None => all_items,
+    };
+    Ok(TaskBoardListItemsResponse {
+        items,
+        progress_rollups,
+    })
 }
 
 pub(crate) async fn get_task_board_item_db(

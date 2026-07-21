@@ -26,8 +26,8 @@ use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 #[cfg(test)]
 use crate::task_board::{
     ExternalSyncConfig, ExternalSyncOperation, TaskBoardItem, TaskBoardOrchestrator,
-    TaskBoardStore, build_audit_summary, build_machine_summaries, build_project_summaries,
-    configured_sync_clients, default_board_root, sync_external_tasks,
+    TaskBoardStore, build_audit_summary, build_machine_summaries, build_progress_rollups,
+    build_project_summaries, configured_sync_clients, default_board_root, sync_external_tasks,
 };
 #[cfg(test)]
 use crate::task_board::{
@@ -119,9 +119,22 @@ pub fn create_task_board_item(
 pub fn list_task_board_items(
     request: &TaskBoardListItemsRequest,
 ) -> Result<TaskBoardListItemsResponse, CliError> {
-    store()
-        .list(request.status)
-        .map(|items| TaskBoardListItemsResponse { items })
+    let all_items = store().list(None)?;
+    let progress_rollups = build_progress_rollups(&all_items);
+    let items = match request.status {
+        Some(status) => {
+            let status = status.canonical_persisted_status();
+            all_items
+                .into_iter()
+                .filter(|item| item.status == status)
+                .collect()
+        }
+        None => all_items,
+    };
+    Ok(TaskBoardListItemsResponse {
+        items,
+        progress_rollups,
+    })
 }
 
 /// Load one task-board item.
