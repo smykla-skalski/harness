@@ -39,8 +39,8 @@ uuid = { version = "1.18.1", features = ["v4"] }
 walkdir = "2.5.0"
 
 [dev-dependencies]
-temp-env = "0.3.6"
-tracing-subscriber = "0.3.23"
+temp-env = "=0.3.6"
+tracing-subscriber = "=0.3.23"
 
 [features]
 default = ["standalone-worker"]

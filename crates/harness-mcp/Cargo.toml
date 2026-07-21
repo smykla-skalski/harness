@@ -25,10 +25,10 @@ tracing = "0.1.44"
 uuid = { version = "1.18.1", features = ["v4"] }
 
 [dev-dependencies]
-axum = { version = "0.8.7", features = ["ws"] }
+axum = { version = "=0.8.9", features = ["ws"] }
 harness-daemon-client = { path = "../harness-daemon-client", version = "49.3.0", features = ["test-support"] }
-temp-env = { version = "0.3.6", features = ["async_closure"] }
-tempfile = "3.27.0"
+temp-env = { version = "=0.3.6", features = ["async_closure"] }
+tempfile = "=3.27.0"
 
 [lints.clippy]
 pedantic = { level = "deny", priority = 1 }

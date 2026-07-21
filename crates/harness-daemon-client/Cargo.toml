@@ -16,8 +16,8 @@ user_dirs = "0.2.0"
 uzers = { version = "0.12.2", default-features = false }
 
 [dev-dependencies]
-temp-env = "0.3.6"
-tempfile = "3.27.0"
+temp-env = "=0.3.6"
+tempfile = "=3.27.0"
 
 [features]
 test-support = []

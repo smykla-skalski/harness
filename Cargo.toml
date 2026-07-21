@@ -130,12 +130,12 @@ tempfile = "=3.27.0"
 insta = "=1.46.3"
 harness-testkit = { path = "testkit" }
 temp-env = { version = "=0.3.6", features = ["async_closure"] }
-axum = { version = "0.8.7", features = ["json", "ws"] }
+axum = { version = "=0.8.9", features = ["json", "ws"] }
 agent-client-protocol-http = { version = "=1.2.0", default-features = false, features = ["client", "server"] }
-opentelemetry = { version = "0.32.0", default-features = false, features = ["trace", "metrics", "logs"] }
-opentelemetry_sdk = { version = "0.32.0", default-features = false, features = ["trace", "metrics", "logs", "rt-tokio"] }
-tracing-opentelemetry = { version = "0.33.0", default-features = false }
-tracing-subscriber = { version = "0.3.23", features = ["chrono", "env-filter", "json"] }
+opentelemetry = { version = "=0.32.0", default-features = false, features = ["trace", "metrics", "logs"] }
+opentelemetry_sdk = { version = "=0.32.1", default-features = false, features = ["trace", "metrics", "logs", "rt-tokio"] }
+tracing-opentelemetry = { version = "=0.33.0", default-features = false }
+tracing-subscriber = { version = "=0.3.23", features = ["chrono", "env-filter", "json"] }
 
 [features]
 default = ["all-adapters"]

@@ -26,8 +26,8 @@ tracing-subscriber = { version = "0.3.23", features = ["chrono", "env-filter", "
 user_dirs = "0.2.0"
 
 [dev-dependencies]
-temp-env = "0.3.6"
-tempfile = "3.27.0"
+temp-env = "=0.3.6"
+tempfile = "=3.27.0"
 
 [features]
 tokio-console = ["dep:console-subscriber"]
