@@ -76,8 +76,9 @@ pub(super) async fn next_child_order_in_tx(
         .map_err(|error| db_error(format!("task board child order overflow: {error}")))
 }
 
-/// Unparent every live reference to `parent_id` so deleting a parent leaves
-/// its children intact rather than orphaned or hidden.
+/// Unparent every reference to `parent_id`, live or tombstoned, so deleting a
+/// parent leaves its children intact rather than orphaned or hidden, and no
+/// item is ever left pointing at a deleted parent.
 pub(super) async fn clear_children_parent_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     parent_id: &str,
