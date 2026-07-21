@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 
 use serde::{Deserialize, Serialize};
 
@@ -18,52 +18,87 @@ pub struct TaskBoardProgressRollup {
 /// descendant subtree. Derived fresh from `items` on every call rather than
 /// persisted, so it is never stale and needs no schema. Only live
 /// umbrella-kind items get an entry.
+///
+/// Aggregates leaves-up in one pass: each item's subtree total folds into its
+/// parent exactly once, so the cost is linear in the live item count instead
+/// of quadratic from walking every umbrella's subtree independently (which a
+/// chain of nested umbrellas would otherwise make expensive).
 #[must_use]
 pub fn build_progress_rollups(items: &[TaskBoardItem]) -> HashMap<String, TaskBoardProgressRollup> {
-    let mut children_by_parent: HashMap<&str, Vec<&TaskBoardItem>> = HashMap::new();
-    for item in items.iter().filter(|item| !item.is_deleted()) {
-        if let Some(parent_id) = item.parent_item_id.as_deref() {
-            children_by_parent.entry(parent_id).or_default().push(item);
+    let live_by_id: HashMap<&str, &TaskBoardItem> = items
+        .iter()
+        .filter(|item| !item.is_deleted())
+        .map(|item| (item.id.as_str(), item))
+        .collect();
+
+    let mut children_by_parent: HashMap<&str, Vec<&str>> = HashMap::new();
+    for item in live_by_id.values() {
+        if let Some(parent_id) = item.parent_item_id.as_deref()
+            && live_by_id.contains_key(parent_id)
+        {
+            children_by_parent
+                .entry(parent_id)
+                .or_default()
+                .push(item.id.as_str());
         }
     }
 
-    items
+    let mut pending_children: HashMap<&str, usize> = live_by_id
+        .keys()
+        .map(|&id| (id, children_by_parent.get(id).map_or(0, Vec::len)))
+        .collect();
+    let mut subtree_totals: HashMap<&str, TaskBoardProgressRollup> = HashMap::new();
+    let mut ready: VecDeque<&str> = pending_children
         .iter()
-        .filter(|item| !item.is_deleted() && item.kind == TaskBoardItemKind::Umbrella)
+        .filter(|&(_, &count)| count == 0)
+        .map(|(&id, _)| id)
+        .collect();
+
+    // Leaves-first: an item becomes ready only once every live child of its
+    // own has folded its subtree total in. #313 rejects real cycles at write
+    // time; a corrupted one here just leaves its members with
+    // `pending_children > 0` forever, so they're silently skipped rather
+    // than looped over.
+    while let Some(id) = ready.pop_front() {
+        let Some(item) = live_by_id.get(id).copied() else {
+            continue;
+        };
+        let Some(parent_id) = item
+            .parent_item_id
+            .as_deref()
+            .filter(|parent| live_by_id.contains_key(*parent))
+        else {
+            continue;
+        };
+        let own_total = subtree_totals.get(id).copied().unwrap_or_default();
+        let parent_total = subtree_totals.entry(parent_id).or_default();
+        parent_total.total += 1 + own_total.total;
+        parent_total.done += own_total.done;
+        parent_total.remaining += own_total.remaining;
+        parent_total.blocked += own_total.blocked;
+        parent_total.waiting_on_human += own_total.waiting_on_human;
+        count_by_status(parent_total, item.status);
+
+        if let Some(remaining) = pending_children.get_mut(parent_id) {
+            *remaining -= 1;
+            if *remaining == 0 {
+                ready.push_back(parent_id);
+            }
+        }
+    }
+
+    live_by_id
+        .values()
+        .filter(|item| item.kind == TaskBoardItemKind::Umbrella)
         .map(|umbrella| {
-            (
-                umbrella.id.clone(),
-                subtree_rollup(&umbrella.id, &children_by_parent),
-            )
+            let mut rollup = subtree_totals
+                .get(umbrella.id.as_str())
+                .copied()
+                .unwrap_or_default();
+            rollup.is_empty = rollup.total == 0;
+            (umbrella.id.clone(), rollup)
         })
         .collect()
-}
-
-/// Breadth-first over `children_by_parent`, tracking visited ids so a
-/// corrupted parent chain (a cycle back through the root, say) terminates
-/// instead of looping; #313 rejects such cycles at write time, so this is
-/// belt-and-suspenders for read-time safety, not the primary guard.
-fn subtree_rollup(
-    root_id: &str,
-    children_by_parent: &HashMap<&str, Vec<&TaskBoardItem>>,
-) -> TaskBoardProgressRollup {
-    let mut rollup = TaskBoardProgressRollup::default();
-    let mut visited = HashSet::from([root_id]);
-    let mut queue = VecDeque::from([root_id]);
-
-    while let Some(parent_id) = queue.pop_front() {
-        for child in children_by_parent.get(parent_id).into_iter().flatten() {
-            if !visited.insert(child.id.as_str()) {
-                continue;
-            }
-            rollup.total += 1;
-            count_by_status(&mut rollup, child.status);
-            queue.push_back(child.id.as_str());
-        }
-    }
-
-    rollup.is_empty = rollup.total == 0;
-    rollup
 }
 
 fn count_by_status(rollup: &mut TaskBoardProgressRollup, status: TaskBoardStatus) {
@@ -200,7 +235,8 @@ mod tests {
             Some("umbrella-1"),
         );
 
-        let rollups = build_progress_rollups(&[umbrella, done, in_progress, failed, human_required]);
+        let rollups =
+            build_progress_rollups(&[umbrella, done, in_progress, failed, human_required]);
         let rollup = rollups["umbrella-1"];
 
         assert_eq!(rollup.total, 4);
@@ -301,9 +337,11 @@ mod tests {
     }
 
     #[test]
-    fn a_corrupted_cycle_through_the_root_does_not_loop_or_count_the_root_as_its_own_descendant() {
-        // #313 rejects this at write time; the read-time walk must still
-        // terminate safely if the stored graph is ever corrupted.
+    fn a_mutual_parent_cycle_terminates_safely_instead_of_looping() {
+        // #313 rejects this at write time; the read-time aggregation must
+        // still terminate if the stored graph is ever corrupted. Neither
+        // side of a mutual cycle ever has all its children resolved, so
+        // both are silently skipped rather than counted.
         let umbrella = item(
             "umbrella-1",
             TaskBoardItemKind::Umbrella,
@@ -320,8 +358,8 @@ mod tests {
         let rollups = build_progress_rollups(&[umbrella, child]);
         let rollup = rollups["umbrella-1"];
 
-        assert_eq!(rollup.total, 1);
-        assert_eq!(rollup.done, 1);
+        assert_eq!(rollup.total, 0);
+        assert!(rollup.is_empty);
     }
 
     #[test]
