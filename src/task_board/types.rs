@@ -47,6 +47,10 @@ pub struct TaskBoardItem {
     pub work_item_id: Option<String>,
     #[serde(default)]
     pub usage: TaskUsage,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_item_id: Option<String>,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub child_order: u32,
     pub created_at: String,
     pub updated_at: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -78,6 +82,8 @@ impl TaskBoardItem {
             session_id: None,
             work_item_id: None,
             usage: TaskUsage::default(),
+            parent_item_id: None,
+            child_order: 0,
             created_at: now.clone(),
             updated_at: now,
             deleted_at: None,
