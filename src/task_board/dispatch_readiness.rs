@@ -10,7 +10,7 @@ pub(super) fn readiness(item: &TaskBoardItem, policy: &PolicyDecision) -> Dispat
     }
     if !item.kind.is_dispatchable() {
         return blocked(DispatchBlockReason::Kind {
-            item_kind: item.kind,
+            item_kind: item.kind.clone(),
         });
     }
     if let Some(work_item_id) = item.work_item_id.as_deref() {

@@ -40,6 +40,8 @@ pub(crate) use workflow_dispatch::workflow_owner;
 #[cfg(test)]
 mod item_estimate_tests;
 #[cfg(test)]
+mod item_kind_tests;
+#[cfg(test)]
 mod provider_external_create_finalize_tests;
 #[cfg(test)]
 mod provider_external_create_follow_up_tests;

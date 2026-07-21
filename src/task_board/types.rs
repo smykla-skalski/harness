@@ -1,4 +1,5 @@
 use clap::ValueEnum;
+use clap::builder::PossibleValue;
 use serde::{Deserialize, Serialize};
 
 use super::automation::TaskBoardWorkflowKind;
@@ -194,19 +195,20 @@ pub enum TaskBoardStatus {
 /// What kind of item a task-board row is. Open by design: a future variant is
 /// an additive change, and any wire value this binary does not recognize
 /// (older reader against a newer writer, or the reverse) falls back to
-/// `Unknown` instead of failing to deserialize the whole item.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
-#[value(rename_all = "snake_case")]
-#[serde(rename_all = "snake_case")]
+/// `Unknown`, which keeps the original string so a later write-back (an
+/// update to some unrelated field re-serializes every field, `kind`
+/// included) round-trips it instead of silently downgrading it to the
+/// literal string `"unknown"`.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum TaskBoardItemKind {
     /// A leaf unit of work an agent can pick up and run.
     #[default]
     Task,
     /// A tracking item grouping other items; never a unit of work itself.
     Umbrella,
-    #[serde(other)]
-    #[value(skip)]
-    Unknown,
+    /// A kind this binary does not recognize, carrying the original wire
+    /// value verbatim.
+    Unknown(String),
 }
 
 impl TaskBoardItemKind {
@@ -215,18 +217,49 @@ impl TaskBoardItemKind {
     /// defaults to non-dispatchable until code explicitly allows it) is
     /// refused.
     #[must_use]
-    pub const fn is_dispatchable(self) -> bool {
+    pub const fn is_dispatchable(&self) -> bool {
         matches!(self, Self::Task)
     }
 
     /// The `snake_case` wire/CLI value, for user-facing messages that must
     /// match `--kind` and JSON rather than the Rust variant name.
     #[must_use]
-    pub const fn as_wire_str(self) -> &'static str {
+    pub fn as_wire_str(&self) -> &str {
         match self {
             Self::Task => "task",
             Self::Umbrella => "umbrella",
-            Self::Unknown => "unknown",
+            Self::Unknown(raw) => raw,
+        }
+    }
+}
+
+impl Serialize for TaskBoardItemKind {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_wire_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for TaskBoardItemKind {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let raw = String::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "task" => Self::Task,
+            "umbrella" => Self::Umbrella,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
+impl ValueEnum for TaskBoardItemKind {
+    fn value_variants<'a>() -> &'a [Self] {
+        &[Self::Task, Self::Umbrella]
+    }
+
+    fn to_possible_value(&self) -> Option<PossibleValue> {
+        match self {
+            Self::Task => Some(PossibleValue::new("task")),
+            Self::Umbrella => Some(PossibleValue::new("umbrella")),
+            Self::Unknown(_) => None,
         }
     }
 }
@@ -404,15 +437,26 @@ mod tests {
         assert_eq!(
             serde_json::from_str::<TaskBoardItemKind>("\"epic\"")
                 .expect("an unrecognized kind must not fail to deserialize"),
-            TaskBoardItemKind::Unknown
+            TaskBoardItemKind::Unknown("epic".into())
         );
+    }
+
+    #[test]
+    fn an_unknown_kind_round_trips_its_original_wire_value() {
+        // A newer writer's kind must survive an older reader's write-back
+        // (e.g. an update to some unrelated field, which re-serializes every
+        // field including kind) instead of being downgraded to the literal
+        // string "unknown".
+        let kind: TaskBoardItemKind =
+            serde_json::from_str("\"epic\"").expect("deserialize a future kind");
+        assert_eq!(serde_json::to_string(&kind).expect("serialize"), "\"epic\"");
     }
 
     #[test]
     fn only_task_kind_is_dispatchable() {
         assert!(TaskBoardItemKind::Task.is_dispatchable());
         assert!(!TaskBoardItemKind::Umbrella.is_dispatchable());
-        assert!(!TaskBoardItemKind::Unknown.is_dispatchable());
+        assert!(!TaskBoardItemKind::Unknown("epic".into()).is_dispatchable());
     }
 
     #[test]
@@ -420,10 +464,10 @@ mod tests {
         for kind in [
             TaskBoardItemKind::Task,
             TaskBoardItemKind::Umbrella,
-            TaskBoardItemKind::Unknown,
+            TaskBoardItemKind::Unknown("epic".into()),
         ] {
             assert_eq!(
-                serde_json::to_value(kind).expect("serialize kind"),
+                serde_json::to_value(&kind).expect("serialize kind"),
                 kind.as_wire_str()
             );
         }

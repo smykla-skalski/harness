@@ -67,7 +67,7 @@ impl From<&TaskBoardItem> for TaskBoardFrontmatter {
             target_project_types: item.target_project_types.clone(),
             agent_mode: item.agent_mode,
             workflow_kind: item.workflow_kind,
-            kind: item.kind,
+            kind: item.kind.clone(),
             execution_repository: item.execution_repository.clone(),
             estimated_tokens: item.estimated_tokens,
             estimated_cost_microusd: item.estimated_cost_microusd,

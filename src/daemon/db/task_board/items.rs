@@ -317,7 +317,7 @@ pub(super) async fn insert_item_in_tx(
     .bind(&item.updated_at)
     .bind(&item.deleted_at)
     .bind(revision)
-    .bind(label(item.kind, "task board kind")?)
+    .bind(label(item.kind.clone(), "task board kind")?)
     .execute(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("insert task board item '{}': {error}", item.id)))?;
@@ -381,7 +381,7 @@ pub(super) async fn replace_item_in_tx(
     .bind(&item.updated_at)
     .bind(&item.deleted_at)
     .bind(revision)
-    .bind(label(item.kind, "task board kind")?)
+    .bind(label(item.kind.clone(), "task board kind")?)
     .execute(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("replace task board item '{}': {error}", item.id)))?;
