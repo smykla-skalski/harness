@@ -1184,6 +1184,9 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "TaskBoardWorkflowState",
     "TaskBoardWorkflowStatus",
     "TaskUsage",
+    // task_board progress_rollup.rs per-umbrella subtree roll-up, nested as a
+    // dictionary in the items-list response below (generate-only, plain counts).
+    "TaskBoardProgressRollup",
     // task_board.rs items-list response wrapper (Swift hand TaskBoardListItemsResponse);
     // wraps [TaskBoardItemWire] for the /v1/task-board/items decode reroute.
     "TaskBoardListItemsResponse",
@@ -2525,6 +2528,8 @@ const WEBSOCKET_EMIT_ONLY: &[&str] = &[
 const SESSION_TASKS_SOURCE: &str = include_str!("../src/session/types/tasks.rs");
 const TASK_BOARD_PROTOCOL_SOURCE: &str = include_str!("../src/daemon/protocol/task_board.rs");
 const TASK_BOARD_TYPES_SOURCE: &str = include_str!("../src/task_board/types.rs");
+const TASK_BOARD_PROGRESS_ROLLUP_SOURCE: &str =
+    include_str!("../src/task_board/progress_rollup.rs");
 const TASK_BOARD_ENUMS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardEnums.generated.swift";
 // The task-board foundation enums in types.rs that every item/summary/request
 // references. The rich TaskBoardItem and the other types.rs structs are excluded
@@ -2559,6 +2564,7 @@ const TASK_BOARD_ITEM_EMIT_ONLY: &[&str] = &[
     "TaskBoardWorkflowState",
     "TaskBoardWorkflowStatus",
     "TaskUsage",
+    "TaskBoardProgressRollup",
     "TaskBoardListItemsResponse",
 ];
 const TASK_BOARD_MACHINES_SOURCE: &str = include_str!("../src/task_board/machines.rs");
@@ -3070,7 +3076,11 @@ fn modules() -> Vec<GeneratedModule> {
             output: TASK_BOARD_ITEM_OUTPUT,
             description: "the Rust task-board item, its nested graph and the items-list response",
             defaults: &[],
-            sources: &[TASK_BOARD_TYPES_SOURCE, TASK_BOARD_PROTOCOL_SOURCE],
+            sources: &[
+                TASK_BOARD_TYPES_SOURCE,
+                TASK_BOARD_PROTOCOL_SOURCE,
+                TASK_BOARD_PROGRESS_ROLLUP_SOURCE,
+            ],
         },
         GeneratedModule {
             output: TASK_BOARD_MACHINES_OUTPUT,
