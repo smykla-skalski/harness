@@ -159,7 +159,7 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     let managementPanel = element(in: app, identifier: "harness.task-board.manage-item.new")
     XCTAssertTrue(managementPanel.waitForExistence(timeout: Self.actionTimeout))
 
-    let titleField = app.textFields["Title"]
+    let titleField = app.textFields["Title"].firstMatch
     XCTAssertTrue(titleField.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(tapElementReliably(in: app, element: titleField))
     titleField.typeText("Duplicate-guard verification item")
