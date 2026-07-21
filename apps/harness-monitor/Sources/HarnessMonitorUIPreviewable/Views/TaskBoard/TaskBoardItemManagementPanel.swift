@@ -16,6 +16,9 @@ struct TaskBoardItemManagementPanel: View {
   let evaluateDryRun: Bool
   let actions: TaskBoardOverviewActions
   let evaluatePreviewState: TaskBoardEvaluatePreviewState
+  let selectionModel: TaskBoardCardSelectionModel
+  let backlink: TaskBoardParentBacklink
+  let childrenSummary: TaskBoardUmbrellaChildrenSummary?
 
   @State private var draft: TaskBoardItemEditorDraft
   @State private var projectTypeSuggestions: [String] = []
@@ -45,7 +48,10 @@ struct TaskBoardItemManagementPanel: View {
     runOnceDryRun: Bool = true,
     evaluateDryRun: Bool = true,
     actions: TaskBoardOverviewActions,
-    evaluatePreviewState: TaskBoardEvaluatePreviewState
+    evaluatePreviewState: TaskBoardEvaluatePreviewState,
+    selectionModel: TaskBoardCardSelectionModel,
+    backlink: TaskBoardParentBacklink = .none,
+    childrenSummary: TaskBoardUmbrellaChildrenSummary? = nil
   ) {
     self.item = item
     self.metrics = metrics
@@ -54,6 +60,9 @@ struct TaskBoardItemManagementPanel: View {
     self.evaluateDryRun = evaluateDryRun
     self.actions = actions
     self.evaluatePreviewState = evaluatePreviewState
+    self.selectionModel = selectionModel
+    self.backlink = backlink
+    self.childrenSummary = childrenSummary
     _draft = State(
       initialValue: item.map(TaskBoardItemEditorDraft.init) ?? TaskBoardItemEditorDraft()
     )
@@ -64,6 +73,13 @@ struct TaskBoardItemManagementPanel: View {
       header
       statusPills
       TaskBoardManagementFacts(facts: managementFacts)
+      TaskBoardManagementHierarchySection(
+        backlink: backlink,
+        childrenSummary: childrenSummary,
+        metrics: metrics,
+        selectionModel: selectionModel,
+        actions: actions
+      )
       editorFields
       routesToEditor
       approvalReadout

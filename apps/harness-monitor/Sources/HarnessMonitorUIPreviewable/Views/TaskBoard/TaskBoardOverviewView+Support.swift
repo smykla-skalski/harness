@@ -60,15 +60,19 @@ extension TaskBoardOverviewView {
   }
 
   func taskBoardManagementSheetContent(_ sheet: TaskBoardManagementSheet) -> some View {
-    ScrollView {
+    let item = taskBoardManagementItem(for: sheet)
+    return ScrollView {
       TaskBoardItemManagementPanel(
-        item: taskBoardManagementItem(for: sheet),
+        item: item,
         metrics: metrics,
         isActionInFlight: isActionInFlight,
         runOnceDryRun: runOnceDryRun,
         evaluateDryRun: evaluateDryRun,
         actions: actions,
-        evaluatePreviewState: evaluatePreviewStateValue
+        evaluatePreviewState: evaluatePreviewStateValue,
+        selectionModel: selectionModelValue,
+        backlink: taskBoardParentBacklink(for: item),
+        childrenSummary: taskBoardChildrenSummary(for: item)
       )
       .padding(HarnessMonitorTheme.spacingLG)
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -79,6 +83,28 @@ extension TaskBoardOverviewView {
       minHeight: 760,
       maxHeight: .infinity,
       alignment: .topLeading
+    )
+  }
+
+  /// The umbrella/children relationship spans every project and repository,
+  /// so it must resolve from the store's full item pool - never from
+  /// `taskBoardItems`, which can be scoped to one session when this view is
+  /// embedded there.
+  var allKnownTaskBoardItems: [TaskBoardItem] {
+    store?.globalTaskBoardItems ?? taskBoardItems
+  }
+
+  private func taskBoardParentBacklink(for item: TaskBoardItem?) -> TaskBoardParentBacklink {
+    guard let item else { return .none }
+    return TaskBoardParentBacklink(item: item, loadedItems: allKnownTaskBoardItems)
+  }
+
+  private func taskBoardChildrenSummary(
+    for item: TaskBoardItem?
+  ) -> TaskBoardUmbrellaChildrenSummary? {
+    guard let item, item.kind == .umbrella else { return nil }
+    return TaskBoardUmbrellaChildrenSummary.summarizing(
+      item.id, in: allKnownTaskBoardItems, collapsedLanes: collapsedLanesValue
     )
   }
 
