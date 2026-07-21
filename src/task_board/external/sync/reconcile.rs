@@ -132,24 +132,58 @@ async fn apply_reconciliation(
     resolved_parent_item_id: Option<&str>,
     patch: TaskBoardItemPatch,
 ) -> Result<bool, CliError> {
-    match board.update_item(item, patch).await {
-        Ok(_) => Ok(true),
-        Err(error) if error.code() != "WORKFLOW_CONCURRENT" => Err(error),
-        Err(error) => {
-            if latest_item_still_needs_reconciliation(
-                board,
-                item,
-                task,
-                prefer_remote,
-                resolved_parent_item_id,
-            )
-            .await?
-            {
-                return Err(error);
-            }
-            Ok(false)
-        }
+    let sets_parent = matches!(patch.parent_item_id, OptionalFieldPatch::Set(_));
+    let patch_without_parent = TaskBoardItemPatch {
+        parent_item_id: OptionalFieldPatch::Unchanged,
+        ..patch.clone()
+    };
+    let Err(error) = board.update_item(item, patch).await else {
+        return Ok(true);
+    };
+    if sets_parent && error.code() == "WORKFLOW_IO" {
+        return apply_reconciliation_without_parent(board, item, &error, patch_without_parent)
+            .await;
     }
+    if error.code() != "WORKFLOW_CONCURRENT" {
+        return Err(error);
+    }
+    if latest_item_still_needs_reconciliation(
+        board,
+        item,
+        task,
+        prefer_remote,
+        resolved_parent_item_id,
+    )
+    .await?
+    {
+        return Err(error);
+    }
+    Ok(false)
+}
+
+/// A rejected parent assignment (self-parent, cycle, or otherwise invalid)
+/// must not undo the rest of this item's reconciliation: a bad GitHub
+/// cross-reference is isolated to just the parent field, and the item's
+/// other fields still apply.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing::warn! macro expands into a chain clippy reads as branchy"
+)]
+async fn apply_reconciliation_without_parent(
+    board: &dyn TaskBoardSyncStore,
+    item: &TaskBoardItem,
+    original_error: &CliError,
+    patch: TaskBoardItemPatch,
+) -> Result<bool, CliError> {
+    tracing::warn!(
+        item_id = %item.id,
+        error = %original_error.message(),
+        "task-board github import: rejected parent link, applying the rest of this sync without it"
+    );
+    if !has_reconciliation_change(&patch) {
+        return Ok(false);
+    }
+    board.update_item(item, patch).await.map(|_| true)
 }
 
 async fn supersede_resolved_conflicts(

@@ -111,6 +111,67 @@ async fn failed_provider_scope_does_not_block_a_successful_scope() {
 }
 
 #[tokio::test]
+async fn a_mutual_parent_cycle_does_not_abort_the_batch_or_get_stuck() {
+    let dir = tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+        .await
+        .expect("database");
+    let tasks = |unrelated_title: &str| {
+        vec![
+            cyclic_task("acme/widgets#100", "acme/widgets#101"),
+            cyclic_task("acme/widgets#101", "acme/widgets#100"),
+            ExternalTask {
+                title: unrelated_title.into(),
+                ..external_task("acme/widgets#102", TaskBoardStatus::Backlog)
+            },
+        ]
+    };
+
+    // First sync: neither cyclic item can resolve the other yet (both are
+    // new in this same pass), so both import unlinked.
+    sync_scoped(&db, tasks("Remote task"))
+        .await
+        .expect("first sync completes")
+        .into_completed()
+        .expect("first sync must not hard-error");
+
+    // Second sync: both cyclic items now exist, so parent resolution finds
+    // them. Whichever is processed first commits its link; the other's
+    // attempt would create a cycle and must be skipped, not abort the batch.
+    // The unrelated item's title also changes here, so an operation for it
+    // only appears if the loop actually keeps going past the cyclic pair.
+    let second = sync_scoped(&db, tasks("Remote task v2"))
+        .await
+        .expect("second sync completes")
+        .into_completed()
+        .expect("a parent cycle must not hard-error the whole batch");
+    assert!(
+        second
+            .operations
+            .iter()
+            .any(|operation| operation.external_id.as_deref() == Some("acme/widgets#102")),
+        "the unrelated item in the same batch must still sync"
+    );
+
+    let items = db.list_task_board_items(None).await.expect("items");
+    let first_item = find_by_external_id(&items, "acme/widgets#100");
+    let second_item = find_by_external_id(&items, "acme/widgets#101");
+    assert!(
+        !(first_item.parent_item_id.as_deref() == Some(second_item.id.as_str())
+            && second_item.parent_item_id.as_deref() == Some(first_item.id.as_str())),
+        "no cycle may ever be persisted"
+    );
+
+    // Third sync: the unresolved half of the cycle keeps getting retried
+    // (and keeps failing validation), but the batch must stay healthy.
+    sync_scoped(&db, tasks("Remote task v2"))
+        .await
+        .expect("third sync completes")
+        .into_completed()
+        .expect("re-syncing the same cycle must not get the batch stuck");
+}
+
+#[tokio::test]
 async fn replacing_conflicts_keeps_current_fields_and_supersedes_removed_fields() {
     let dir = tempdir().expect("tempdir");
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
@@ -312,6 +373,13 @@ impl ScopedPullClient {
             result: Ok(vec![task]),
         }
     }
+
+    fn successful_many(scope_id: &str, tasks: Vec<ExternalTask>) -> Self {
+        Self {
+            scope_id: scope_id.into(),
+            result: Ok(tasks),
+        }
+    }
 }
 
 #[async_trait]
@@ -374,6 +442,37 @@ fn external_task(external_id: &str, status: TaskBoardStatus) -> ExternalTask {
         updated_at: Some("2026-07-15T10:05:00Z".into()),
         ..ExternalTask::default()
     }
+}
+
+fn cyclic_task(external_id: &str, parent_external_id: &str) -> ExternalTask {
+    ExternalTask {
+        parent_reference: Some(ExternalTaskRef::new(
+            ExternalProvider::GitHub,
+            parent_external_id,
+        )),
+        ..external_task(external_id, TaskBoardStatus::Backlog)
+    }
+}
+
+async fn sync_scoped(
+    db: &AsyncDaemonDb,
+    tasks: Vec<ExternalTask>,
+) -> Result<crate::task_board::external::ExternalSyncBatch, CliError> {
+    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(
+        ScopedPullClient::successful_many("acme/widgets", tasks),
+    )];
+    crate::task_board::external::sync_external_tasks_scoped(db, pull_options(), &clients).await
+}
+
+fn find_by_external_id<'a>(items: &'a [TaskBoardItem], external_id: &str) -> &'a TaskBoardItem {
+    items
+        .iter()
+        .find(|item| {
+            item.external_refs
+                .iter()
+                .any(|reference| reference.external_id == external_id)
+        })
+        .unwrap_or_else(|| panic!("no imported item for external id '{external_id}'"))
 }
 
 fn linked_item(id: &str, status: TaskBoardStatus) -> TaskBoardItem {

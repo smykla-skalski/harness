@@ -380,6 +380,15 @@ fn create_item_from_external(task: &ExternalTask) -> TaskBoardItem {
 /// Sets the item's parent through a follow-up update rather than at create
 /// time, so the same code path that computes sibling `child_order` and
 /// rejects cycles for a manual re-parent also governs an imported one.
+///
+/// A rejected assignment (self-parent, cycle, or otherwise invalid) is
+/// isolated to this one item: a bad GitHub cross-reference must not abort
+/// the whole sync batch, and the item simply stays unparented, exactly as
+/// it would if the parent were not yet resolvable at all.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing::warn! macro expands into a chain clippy reads as branchy"
+)]
 async fn link_resolved_parent(
     board: &dyn TaskBoardSyncStore,
     item: TaskBoardItem,
@@ -391,7 +400,8 @@ async fn link_resolved_parent(
     if parent_item_id == item.id || item.parent_item_id.as_deref() == Some(parent_item_id) {
         return Ok(item);
     }
-    board
+    let item_id = item.id.clone();
+    match board
         .update_item(
             &item,
             TaskBoardItemPatch {
@@ -400,4 +410,17 @@ async fn link_resolved_parent(
             },
         )
         .await
+    {
+        Ok(updated) => Ok(updated),
+        Err(error) if error.code() == "WORKFLOW_IO" => {
+            tracing::warn!(
+                item_id,
+                parent_item_id,
+                error = %error.message(),
+                "task-board github import: rejected parent link, leaving item unparented"
+            );
+            Ok(item)
+        }
+        Err(error) => Err(error),
+    }
 }
