@@ -57,8 +57,11 @@ pub fn build_progress_rollups(items: &[TaskBoardItem]) -> HashMap<String, TaskBo
     // Leaves-first: an item becomes ready only once every live child of its
     // own has folded its subtree total in. #313 rejects real cycles at write
     // time; a corrupted one here just leaves its members with
-    // `pending_children > 0` forever, so they're silently skipped rather
-    // than looped over.
+    // `pending_children > 0` forever, so the walk terminates instead of
+    // looping. That is NOT the same as a clean skip: a cycle member with a
+    // live non-cyclic child still gets that child's contribution folded in
+    // before the cycle stalls it, so it can end up with a partial, nonzero
+    // rollup rather than an empty one.
     while let Some(id) = ready.pop_front() {
         let Some(item) = live_by_id.get(id).copied() else {
             continue;
@@ -339,9 +342,9 @@ mod tests {
     #[test]
     fn a_mutual_parent_cycle_terminates_safely_instead_of_looping() {
         // #313 rejects this at write time; the read-time aggregation must
-        // still terminate if the stored graph is ever corrupted. Neither
-        // side of a mutual cycle ever has all its children resolved, so
-        // both are silently skipped rather than counted.
+        // still terminate if the stored graph is ever corrupted. With no
+        // non-cyclic child anywhere, neither side of this mutual cycle ever
+        // has all its children resolved, so both end up empty.
         let umbrella = item(
             "umbrella-1",
             TaskBoardItemKind::Umbrella,
@@ -360,6 +363,44 @@ mod tests {
 
         assert_eq!(rollup.total, 0);
         assert!(rollup.is_empty);
+    }
+
+    #[test]
+    fn a_cycle_member_with_a_live_child_reports_a_partial_rollup_not_empty() {
+        // A cycle does not poison every count it touches: umbrella-1 folds in
+        // its live, non-cyclic child before the umbrella-1/umbrella-2 cycle
+        // stalls further progress, so it ends up with a real partial total
+        // rather than the empty result the naive "cycles are skipped" story
+        // would predict. umbrella-2 never resolves anything and stays empty.
+        let umbrella_one = item(
+            "umbrella-1",
+            TaskBoardItemKind::Umbrella,
+            TaskBoardStatus::Todo,
+            Some("umbrella-2"),
+        );
+        let umbrella_two = item(
+            "umbrella-2",
+            TaskBoardItemKind::Umbrella,
+            TaskBoardStatus::Todo,
+            Some("umbrella-1"),
+        );
+        let task = item(
+            "task-1",
+            TaskBoardItemKind::Task,
+            TaskBoardStatus::Done,
+            Some("umbrella-1"),
+        );
+
+        let rollups = build_progress_rollups(&[umbrella_one, umbrella_two, task]);
+
+        let rollup_one = rollups["umbrella-1"];
+        assert_eq!(rollup_one.total, 1);
+        assert_eq!(rollup_one.done, 1);
+        assert!(!rollup_one.is_empty);
+
+        let rollup_two = rollups["umbrella-2"];
+        assert_eq!(rollup_two.total, 0);
+        assert!(rollup_two.is_empty);
     }
 
     #[test]
