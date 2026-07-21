@@ -149,6 +149,8 @@ pub struct TaskBoardUpdateArgs {
     pub project_id: Option<String>,
     #[arg(long)]
     pub target_project_type: Vec<String>,
+    #[arg(long)]
+    pub parent_id: Option<String>,
     #[command(flatten)]
     pub fields: TaskBoardItemFieldArgs,
     #[command(flatten)]
@@ -159,6 +161,10 @@ pub struct TaskBoardUpdateArgs {
     pub clear_state: TaskBoardUpdateClearStateArgs,
 }
 
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "CLI surface exposes independent identity-clear flags"
+)]
 #[derive(Debug, Clone, Args)]
 pub struct TaskBoardUpdateClearLinkArgs {
     #[arg(long)]
@@ -167,6 +173,8 @@ pub struct TaskBoardUpdateClearLinkArgs {
     pub clear_session: bool,
     #[arg(long)]
     pub clear_work_item: bool,
+    #[arg(long, conflicts_with = "parent_id")]
+    pub clear_parent: bool,
 }
 
 #[derive(Debug, Clone, Args)]
