@@ -34,7 +34,7 @@ extension TaskBoardOverviewView {
   var selectedTaskBoardItem: TaskBoardItem? {
     guard let selectedItemID = selectionModelValue.selectedItemID else { return nil }
     return currentPresentation.taskBoardItem(id: selectedItemID)
-      ?? taskBoardItems.first { $0.id == selectedItemID }
+      ?? allKnownTaskBoardItems.first { $0.id == selectedItemID }
   }
 
   var taskBoardManagementSheet: Binding<TaskBoardManagementSheet?> {
@@ -60,15 +60,19 @@ extension TaskBoardOverviewView {
   }
 
   func taskBoardManagementSheetContent(_ sheet: TaskBoardManagementSheet) -> some View {
-    ScrollView {
+    let item = taskBoardManagementItem(for: sheet)
+    return ScrollView {
       TaskBoardItemManagementPanel(
-        item: taskBoardManagementItem(for: sheet),
+        item: item,
         metrics: metrics,
         isActionInFlight: isActionInFlight,
         runOnceDryRun: runOnceDryRun,
         evaluateDryRun: evaluateDryRun,
         actions: actions,
-        evaluatePreviewState: evaluatePreviewStateValue
+        evaluatePreviewState: evaluatePreviewStateValue,
+        selectionModel: selectionModelValue,
+        backlink: taskBoardParentBacklink(for: item),
+        childrenSummary: taskBoardChildrenSummary(for: item)
       )
       .padding(HarnessMonitorTheme.spacingLG)
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -79,6 +83,38 @@ extension TaskBoardOverviewView {
       minHeight: 760,
       maxHeight: .infinity,
       alignment: .topLeading
+    )
+  }
+
+  /// The umbrella/children relationship spans every project and repository,
+  /// so it must resolve from a true superset of every item this view knows
+  /// about, not just `store.globalTaskBoardItems`. That pool can still be
+  /// empty at cold start or mid-refresh while a session-window embedding's
+  /// own independent snapshot (`taskBoardItems`) is already populated, so a
+  /// plain `??` would drop it - union both, global entries winning on id
+  /// collision since they are the more authoritative, board-wide source.
+  var allKnownTaskBoardItems: [TaskBoardItem] {
+    guard let store else { return taskBoardItems }
+    guard !taskBoardItems.isEmpty else { return store.globalTaskBoardItems }
+    var seenIDs = Set(store.globalTaskBoardItems.map(\.id))
+    var merged = store.globalTaskBoardItems
+    for item in taskBoardItems where seenIDs.insert(item.id).inserted {
+      merged.append(item)
+    }
+    return merged
+  }
+
+  private func taskBoardParentBacklink(for item: TaskBoardItem?) -> TaskBoardParentBacklink {
+    guard let item else { return .none }
+    return TaskBoardParentBacklink(item: item, loadedItems: allKnownTaskBoardItems)
+  }
+
+  private func taskBoardChildrenSummary(
+    for item: TaskBoardItem?
+  ) -> TaskBoardUmbrellaChildrenSummary? {
+    guard let item, item.kind == .umbrella else { return nil }
+    return TaskBoardUmbrellaChildrenSummary.summarizing(
+      item.id, in: allKnownTaskBoardItems, collapsedLanes: collapsedLanesValue
     )
   }
 
@@ -140,7 +176,7 @@ extension TaskBoardOverviewView {
       nil
     case .edit(let itemID):
       currentPresentation.taskBoardItem(id: itemID)
-        ?? taskBoardItems.first(where: { $0.id == itemID })
+        ?? allKnownTaskBoardItems.first(where: { $0.id == itemID })
     }
   }
 }

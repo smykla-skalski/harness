@@ -95,6 +95,8 @@ extension TaskBoardItem {
       sessionId: wire.sessionId,
       workItemId: wire.workItemId,
       usage: TaskBoardUsage(wire: wire.usage),
+      parentItemId: wire.parentItemId,
+      childOrder: wire.childOrder,
       createdAt: wire.createdAt,
       updatedAt: wire.updatedAt,
       deletedAt: wire.deletedAt

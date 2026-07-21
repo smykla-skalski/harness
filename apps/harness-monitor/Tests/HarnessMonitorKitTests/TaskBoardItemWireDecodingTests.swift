@@ -107,6 +107,31 @@ struct TaskBoardItemWireDecodingTests {
     #expect(TaskBoardItem(wire: defaultWire).kind == .task)
   }
 
+  @Test("maps the parent link to the hand model, defaulting to no parent and order zero")
+  func mapsParentLinkToHandModel() throws {
+    let childWire = try decoder.decode(
+      TaskBoardItemWire.self,
+      from: Data(
+        #"{"schema_version": 1, "id": "task-5", "title": "Child", "parent_item_id": "task-3", "child_order": 2, "created_at": "a", "updated_at": "b"}"#
+          .utf8
+      )
+    )
+    let child = TaskBoardItem(wire: childWire)
+    #expect(child.parentItemId == "task-3")
+    #expect(child.childOrder == 2)
+
+    let defaultWire = try decoder.decode(
+      TaskBoardItemWire.self,
+      from: Data(
+        #"{"schema_version": 1, "id": "task-6", "title": "Solo", "created_at": "a", "updated_at": "b"}"#
+          .utf8
+      )
+    )
+    let solo = TaskBoardItem(wire: defaultWire)
+    #expect(solo.parentItemId == nil)
+    #expect(solo.childOrder == 0)
+  }
+
   @Test("maps an omitted wire workflow to a nil hand workflow")
   func mapsMinimalItemWorkflowToNil() throws {
     let wire = try decoder.decode(
