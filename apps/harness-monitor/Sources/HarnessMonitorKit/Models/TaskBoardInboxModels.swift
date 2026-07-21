@@ -2,10 +2,10 @@ import Foundation
 
 @frozen
 public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
-  /// Raw value deliberately isn't the bare string "umbrella" - that string is a
-  /// migration sentinel for the lane once named Umbrella, now `.backlog` (see
-  /// commit 89b359780); reusing it here would make the collapse/appearance
-  /// preference decoders silently swallow this lane's persisted overrides.
+  /// Raw value deliberately isn't the bare string "umbrella": that string is
+  /// the migration sentinel for the lane once named Umbrella, now `.backlog`.
+  /// Reusing it here would make the collapse/appearance preference decoders
+  /// silently swallow this lane's persisted overrides.
   case umbrella = "umbrella_items"
   case backlog
   case todo
