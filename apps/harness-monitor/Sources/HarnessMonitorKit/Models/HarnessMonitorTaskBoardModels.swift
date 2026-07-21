@@ -290,6 +290,8 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
   public let sessionId: String?
   public let workItemId: String?
   public let usage: TaskBoardUsage
+  public let parentItemId: String?
+  public let childOrder: UInt32
   public let createdAt: String
   public let updatedAt: String
   public let deletedAt: String?
@@ -314,6 +316,8 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
     sessionId: String?,
     workItemId: String?,
     usage: TaskBoardUsage,
+    parentItemId: String? = nil,
+    childOrder: UInt32 = 0,
     createdAt: String,
     updatedAt: String,
     deletedAt: String?
@@ -337,6 +341,8 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
     self.sessionId = sessionId
     self.workItemId = workItemId
     self.usage = usage
+    self.parentItemId = parentItemId
+    self.childOrder = childOrder
     self.createdAt = createdAt
     self.updatedAt = updatedAt
     self.deletedAt = deletedAt
@@ -364,6 +370,8 @@ extension TaskBoardItem {
     case sessionId
     case workItemId
     case usage
+    case parentItemId
+    case childOrder
     case createdAt
     case updatedAt
     case deletedAt
@@ -397,6 +405,8 @@ extension TaskBoardItem {
     self.sessionId = try container.decodeIfPresent(String.self, forKey: .sessionId)
     self.workItemId = try container.decodeIfPresent(String.self, forKey: .workItemId)
     self.usage = try container.decode(TaskBoardUsage.self, forKey: .usage)
+    self.parentItemId = try container.decodeIfPresent(String.self, forKey: .parentItemId)
+    self.childOrder = try container.decodeIfPresent(UInt32.self, forKey: .childOrder) ?? 0
     self.createdAt = try container.decode(String.self, forKey: .createdAt)
     self.updatedAt = try container.decode(String.self, forKey: .updatedAt)
     self.deletedAt = try container.decodeIfPresent(String.self, forKey: .deletedAt)
