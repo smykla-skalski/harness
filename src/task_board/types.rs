@@ -27,6 +27,8 @@ pub struct TaskBoardItem {
     pub agent_mode: AgentMode,
     #[serde(default)]
     pub workflow_kind: TaskBoardWorkflowKind,
+    #[serde(default)]
+    pub kind: TaskBoardItemKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_repository: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -72,6 +74,7 @@ impl TaskBoardItem {
             target_project_types: Vec::new(),
             agent_mode: AgentMode::Headless,
             workflow_kind: TaskBoardWorkflowKind::DefaultTask,
+            kind: TaskBoardItemKind::default(),
             execution_repository: None,
             estimated_tokens: None,
             estimated_cost_microusd: None,
@@ -188,6 +191,35 @@ pub enum TaskBoardStatus {
     Blocked,
 }
 
+/// What kind of item a task-board row is. Open by design: a future variant is
+/// an additive change, and any wire value this binary does not recognize
+/// (older reader against a newer writer, or the reverse) falls back to
+/// `Unknown` instead of failing to deserialize the whole item.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
+#[value(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum TaskBoardItemKind {
+    /// A leaf unit of work an agent can pick up and run.
+    #[default]
+    Task,
+    /// A tracking item grouping other items; never a unit of work itself.
+    Umbrella,
+    #[serde(other)]
+    #[value(skip)]
+    Unknown,
+}
+
+impl TaskBoardItemKind {
+    /// Whether this kind can be dispatched to an agent as a unit of work.
+    /// Anything other than `Task` (including `Unknown`, so a future kind
+    /// defaults to non-dispatchable until code explicitly allows it) is
+    /// refused.
+    #[must_use]
+    pub const fn is_dispatchable(self) -> bool {
+        matches!(self, Self::Task)
+    }
+}
+
 impl TaskBoardStatus {
     #[must_use]
     pub fn canonical_persisted_status(self) -> Self {
@@ -291,7 +323,7 @@ fn is_zero(value: &u32) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::TaskBoardStatus;
+    use super::{TaskBoardItem, TaskBoardItemKind, TaskBoardStatus};
 
     #[test]
     fn backlog_is_the_canonical_status_wire_value() {
@@ -311,5 +343,64 @@ mod tests {
             serde_json::from_str::<TaskBoardStatus>("\"umbrella\"").is_err(),
             "legacy umbrella is accepted only at persisted-data migration boundaries"
         );
+    }
+
+    #[test]
+    fn new_item_defaults_to_task_kind() {
+        let item = TaskBoardItem::new(
+            "item-1".into(),
+            "title".into(),
+            String::new(),
+            "2026-07-21T00:00:00Z".into(),
+        );
+        assert_eq!(item.kind, TaskBoardItemKind::Task);
+        assert!(item.kind.is_dispatchable());
+    }
+
+    #[test]
+    fn missing_kind_on_the_wire_defaults_to_task() {
+        let item: TaskBoardItem = serde_json::from_str(
+            r#"{
+                "schema_version": 1,
+                "id": "item-1",
+                "title": "title",
+                "created_at": "2026-07-21T00:00:00Z",
+                "updated_at": "2026-07-21T00:00:00Z"
+            }"#,
+        )
+        .expect("deserialize item without a kind field");
+        assert_eq!(item.kind, TaskBoardItemKind::Task);
+    }
+
+    #[test]
+    fn kind_wire_values_round_trip() {
+        assert_eq!(
+            serde_json::to_string(&TaskBoardItemKind::Task).expect("serialize task"),
+            "\"task\""
+        );
+        assert_eq!(
+            serde_json::to_string(&TaskBoardItemKind::Umbrella).expect("serialize umbrella"),
+            "\"umbrella\""
+        );
+        assert_eq!(
+            serde_json::from_str::<TaskBoardItemKind>("\"umbrella\"").expect("deserialize"),
+            TaskBoardItemKind::Umbrella
+        );
+    }
+
+    #[test]
+    fn a_future_kind_deserializes_safely_to_unknown() {
+        assert_eq!(
+            serde_json::from_str::<TaskBoardItemKind>("\"epic\"")
+                .expect("an unrecognized kind must not fail to deserialize"),
+            TaskBoardItemKind::Unknown
+        );
+    }
+
+    #[test]
+    fn only_task_kind_is_dispatchable() {
+        assert!(TaskBoardItemKind::Task.is_dispatchable());
+        assert!(!TaskBoardItemKind::Umbrella.is_dispatchable());
+        assert!(!TaskBoardItemKind::Unknown.is_dispatchable());
     }
 }
