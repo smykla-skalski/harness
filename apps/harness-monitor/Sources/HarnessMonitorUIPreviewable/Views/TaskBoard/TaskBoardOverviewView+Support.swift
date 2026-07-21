@@ -89,13 +89,14 @@ extension TaskBoardOverviewView {
     guard
       let item = currentPresentation.taskBoardItem(id: itemID)
         ?? taskBoardItems.first(where: { $0.id == itemID }),
-      let currentLane = TaskBoardInboxLane(status: item.status),
-      currentLane != lane
+      let currentLane = TaskBoardInboxLane(taskBoardItem: item),
+      currentLane != lane,
+      let dropStatus = lane.taskBoardDropStatus(for: item)
     else {
       return false
     }
     actions.moveTaskBoardItems([
-      TaskBoardItemStatusUpdate(id: itemID, status: lane.taskBoardDropStatus(for: item))
+      TaskBoardItemStatusUpdate(id: itemID, status: dropStatus)
     ])
     return true
   }

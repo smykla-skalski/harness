@@ -362,7 +362,42 @@ struct HarnessMonitorStoreTaskBoardStatusUpdateTests {
     #expect(store.currentFailureFeedbackMessage != nil)
   }
 
-  private func taskBoardItem(id: String, status: TaskBoardStatus) -> TaskBoardItem {
+  @Test("Optimistic move preserves the item's kind")
+  func optimisticMovePreservesKind() async {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardItems([
+      taskBoardItem(id: "board-1", status: .todo, kind: .umbrella)
+    ])
+    client.configureMutationDelay(.milliseconds(200))
+    let store = await makeBootstrappedStore(client: client)
+
+    let mutation = Task { @MainActor in
+      await store.updateTaskBoardItemStatuses([
+        TaskBoardItemStatusUpdate(id: "board-1", status: .inProgress)
+      ])
+    }
+
+    var observedOptimisticKind: TaskBoardItemKind?
+    for _ in 0..<50 {
+      if let item = store.globalTaskBoardItems.first(where: { $0.id == "board-1" }),
+        item.status == .inProgress
+      {
+        observedOptimisticKind = item.kind
+        break
+      }
+      await Task.yield()
+    }
+    _ = await mutation.value
+
+    #expect(observedOptimisticKind == .umbrella)
+    #expect(store.globalTaskBoardItems.first(where: { $0.id == "board-1" })?.kind == .umbrella)
+  }
+
+  private func taskBoardItem(
+    id: String,
+    status: TaskBoardStatus,
+    kind: TaskBoardItemKind = .task
+  ) -> TaskBoardItem {
     TaskBoardItem(
       schemaVersion: 1,
       id: id,
@@ -373,6 +408,7 @@ struct HarnessMonitorStoreTaskBoardStatusUpdateTests {
       tags: ["automation"],
       projectId: "project-1",
       agentMode: .interactive,
+      kind: kind,
       externalRefs: [],
       planning: TaskBoardPlanningState(),
       workflow: nil,

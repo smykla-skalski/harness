@@ -282,6 +282,7 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
   public let executionRepository: String?
   public let targetProjectTypes: [String]
   public let agentMode: TaskBoardAgentMode
+  public let kind: TaskBoardItemKind
   public let externalRefs: [TaskBoardExternalRef]
   public let importedFromProvider: TaskBoardExternalRefProvider?
   public let planning: TaskBoardPlanningState
@@ -305,6 +306,7 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
     executionRepository: String? = nil,
     targetProjectTypes: [String] = [],
     agentMode: TaskBoardAgentMode,
+    kind: TaskBoardItemKind = .task,
     externalRefs: [TaskBoardExternalRef],
     importedFromProvider: TaskBoardExternalRefProvider? = nil,
     planning: TaskBoardPlanningState,
@@ -327,6 +329,7 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
     self.executionRepository = executionRepository
     self.targetProjectTypes = targetProjectTypes
     self.agentMode = agentMode
+    self.kind = kind
     self.externalRefs = externalRefs
     self.importedFromProvider = importedFromProvider
     self.planning = planning
@@ -353,6 +356,7 @@ extension TaskBoardItem {
     case executionRepository
     case targetProjectTypes
     case agentMode
+    case kind
     case externalRefs
     case importedFromProvider
     case planning
@@ -380,6 +384,7 @@ extension TaskBoardItem {
     self.targetProjectTypes =
       try container.decodeIfPresent([String].self, forKey: .targetProjectTypes) ?? []
     self.agentMode = try container.decode(TaskBoardAgentMode.self, forKey: .agentMode)
+    self.kind = try container.decodeIfPresent(TaskBoardItemKind.self, forKey: .kind) ?? .task
     self.externalRefs =
       try container.decodeIfPresent([TaskBoardExternalRef].self, forKey: .externalRefs) ?? []
     self.importedFromProvider =

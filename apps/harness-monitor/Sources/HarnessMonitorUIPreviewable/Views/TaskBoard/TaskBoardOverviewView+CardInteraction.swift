@@ -86,7 +86,7 @@ extension TaskBoardOverviewView {
       guard let item = currentPresentation.taskBoardItem(id: itemID) else {
         return nil
       }
-      return .api(itemID: item.id, status: item.status)
+      return .api(itemID: item.id, status: item.status, kind: item.kind)
     case .inbox(let sessionID, let taskID):
       guard
         let item = currentPresentation.inboxItem(id: cardID)

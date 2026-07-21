@@ -3,7 +3,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 enum TaskBoardCardDragItem: Codable, Equatable, Sendable, Identifiable {
-  case api(itemID: String, status: TaskBoardStatus)
+  case api(itemID: String, status: TaskBoardStatus, kind: TaskBoardItemKind = .task)
   case inbox(
     sessionID: String,
     taskID: String,
@@ -13,7 +13,7 @@ enum TaskBoardCardDragItem: Codable, Equatable, Sendable, Identifiable {
 
   var id: TaskBoardCardID {
     switch self {
-    case .api(let itemID, _):
+    case .api(let itemID, _, _):
       .api(itemID)
     case .inbox(let sessionID, let taskID, _, _):
       .inbox(sessionID: sessionID, taskID: taskID)
@@ -22,15 +22,17 @@ enum TaskBoardCardDragItem: Codable, Equatable, Sendable, Identifiable {
 
   var sourceLane: TaskBoardInboxLane? {
     switch self {
-    case .api(_, let status):
-      TaskBoardInboxLane(status: status)
+    case .api(_, let status, let kind):
+      TaskBoardInboxLane(status: status, kind: kind)
     case .inbox(_, _, _, let sourceLaneRawValue):
       TaskBoardInboxLane(rawValue: sourceLaneRawValue)
     }
   }
 
+  /// The umbrella lane never accepts a drop: it has no workflow status of its
+  /// own for a card to land on, so there is nothing a drop into it could mean.
   func accepts(destination: TaskBoardInboxLane) -> Bool {
-    guard let sourceLane, sourceLane != destination else {
+    guard destination != .umbrella, let sourceLane, sourceLane != destination else {
       return false
     }
     switch self {
@@ -73,7 +75,7 @@ extension TaskBoardInboxLane {
     switch self {
     case .todo, .inProgress, .inReview, .toReview, .failed:
       true
-    case .backlog, .planning, .agenticReview, .testing, .humanRequired:
+    case .umbrella, .backlog, .planning, .agenticReview, .testing, .humanRequired:
       false
     }
   }

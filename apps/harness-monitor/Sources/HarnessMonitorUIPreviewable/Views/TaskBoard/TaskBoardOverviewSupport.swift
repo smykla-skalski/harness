@@ -376,13 +376,17 @@ extension TaskBoardInboxLane {
       .inReview
     case .failed:
       .blocked
-    case .agenticReview, .testing, .humanRequired:
+    case .umbrella, .agenticReview, .testing, .humanRequired:
       nil
     }
   }
 
-  var taskBoardDropStatus: TaskBoardStatus {
+  /// `nil` only for `.umbrella`: it has no corresponding workflow status, so a
+  /// drop that would land there is unrepresentable rather than defaulted.
+  var taskBoardDropStatus: TaskBoardStatus? {
     switch self {
+    case .umbrella:
+      nil
     case .backlog:
       .backlog
     case .todo:
@@ -406,7 +410,7 @@ extension TaskBoardInboxLane {
     }
   }
 
-  func taskBoardDropStatus(for _: TaskBoardItem) -> TaskBoardStatus {
+  func taskBoardDropStatus(for _: TaskBoardItem) -> TaskBoardStatus? {
     taskBoardDropStatus
   }
 }

@@ -96,7 +96,9 @@ struct TaskBoardCardContextMenu: View {
     }
     Divider()
     Menu("Move to...") {
-      ForEach(TaskBoardInboxLane.allCases) { lane in
+      // The umbrella lane has no workflow status of its own, so it can never be
+      // a valid move target - list only lanes a card could actually land in.
+      ForEach(TaskBoardInboxLane.allCases.filter { $0 != .umbrella }) { lane in
         Button {
           actions.move(scope.cardIDs, lane)
         } label: {

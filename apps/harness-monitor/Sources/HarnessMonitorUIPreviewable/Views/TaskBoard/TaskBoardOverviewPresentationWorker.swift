@@ -148,7 +148,7 @@ actor TaskBoardOverviewPresentationWorker {
       }
     let taskBoardItems = TaskBoardVisibleItems.sorted(scopedTaskBoardItems)
     let apiItemsByLane = Dictionary(grouping: taskBoardItems) { item in
-      TaskBoardInboxLane(status: item.status) ?? .backlog
+      TaskBoardInboxLane(taskBoardItem: item) ?? .backlog
     }
     let inboxItems = uniqueInboxItems(input.snapshot.items)
     let inboxItemsByLane = Dictionary(grouping: inboxItems, by: \.lane)

@@ -168,15 +168,16 @@ public struct TaskBoardOverviewActions: Equatable {
     for item in items {
       guard item.accepts(destination: lane) else { return false }
       switch item {
-      case .api(let itemID, let sourceStatus):
+      case .api(let itemID, let sourceStatus, _):
         guard
           let current = store.globalTaskBoardItems.first(where: { $0.id == itemID }),
-          current.status == sourceStatus
+          current.status == sourceStatus,
+          let dropStatus = lane.taskBoardDropStatus
         else {
           return false
         }
         taskBoardUpdates.append(
-          TaskBoardItemStatusUpdate(id: itemID, status: lane.taskBoardDropStatus)
+          TaskBoardItemStatusUpdate(id: itemID, status: dropStatus)
         )
       case .inbox(let sessionID, let taskID, let sourceStatus, let sourceLaneRawValue):
         guard

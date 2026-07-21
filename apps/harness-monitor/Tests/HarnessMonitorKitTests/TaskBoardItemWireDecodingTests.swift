@@ -86,6 +86,27 @@ struct TaskBoardItemWireDecodingTests {
     #expect(item.usage.inputTokens == 100)
   }
 
+  @Test("maps the wire item kind to the hand model, defaulting to task")
+  func mapsItemKindToHandModel() throws {
+    let umbrellaWire = try decoder.decode(
+      TaskBoardItemWire.self,
+      from: Data(
+        #"{"schema_version": 1, "id": "task-3", "title": "Umbrella", "kind": "umbrella", "created_at": "a", "updated_at": "b"}"#
+          .utf8
+      )
+    )
+    #expect(TaskBoardItem(wire: umbrellaWire).kind == .umbrella)
+
+    let defaultWire = try decoder.decode(
+      TaskBoardItemWire.self,
+      from: Data(
+        #"{"schema_version": 1, "id": "task-4", "title": "Plain", "created_at": "a", "updated_at": "b"}"#
+          .utf8
+      )
+    )
+    #expect(TaskBoardItem(wire: defaultWire).kind == .task)
+  }
+
   @Test("maps an omitted wire workflow to a nil hand workflow")
   func mapsMinimalItemWorkflowToNil() throws {
     let wire = try decoder.decode(

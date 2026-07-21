@@ -164,6 +164,7 @@ extension TaskBoardItem {
       projectId: projectId,
       targetProjectTypes: targetProjectTypes,
       agentMode: agentMode,
+      kind: kind,
       externalRefs: externalRefs,
       importedFromProvider: importedFromProvider,
       planning: planning,

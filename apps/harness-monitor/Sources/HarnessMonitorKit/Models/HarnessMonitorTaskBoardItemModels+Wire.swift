@@ -87,6 +87,7 @@ extension TaskBoardItem {
       executionRepository: wire.executionRepository,
       targetProjectTypes: wire.targetProjectTypes,
       agentMode: wire.agentMode,
+      kind: wire.kind,
       externalRefs: wire.externalRefs.map(TaskBoardExternalRef.init(wire:)),
       importedFromProvider: wire.importedFromProvider.map(TaskBoardExternalRefProvider.init(wire:)),
       planning: TaskBoardPlanningState(wire: wire.planning),
