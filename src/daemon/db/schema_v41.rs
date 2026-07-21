@@ -88,7 +88,7 @@ mod tests {
     }
 
     #[test]
-    fn migration_is_restart_safe_and_preserves_existing_links() {
+    fn migration_is_restart_safe_and_preserves_the_parent_link() {
         let db = DaemonDb::open_in_memory().expect("open daemon db");
         db.connection()
             .execute_batch(

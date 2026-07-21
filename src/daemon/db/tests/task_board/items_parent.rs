@@ -1,13 +1,32 @@
-use tempfile::tempdir;
+use std::ops::Deref;
+
+use tempfile::{TempDir, tempdir};
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::TaskBoardItem;
 
-async fn test_db() -> AsyncDaemonDb {
-    let dir = tempdir().expect("tempdir");
-    AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+struct TestDb {
+    db: AsyncDaemonDb,
+    _directory: TempDir,
+}
+
+impl Deref for TestDb {
+    type Target = AsyncDaemonDb;
+
+    fn deref(&self) -> &Self::Target {
+        &self.db
+    }
+}
+
+async fn test_db() -> TestDb {
+    let directory = tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&directory.path().join("harness.db"))
         .await
-        .expect("open db")
+        .expect("open db");
+    TestDb {
+        db,
+        _directory: directory,
+    }
 }
 
 fn new_item(id: &str) -> TaskBoardItem {
