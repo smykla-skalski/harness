@@ -34,7 +34,7 @@ extension TaskBoardOverviewView {
   var selectedTaskBoardItem: TaskBoardItem? {
     guard let selectedItemID = selectionModelValue.selectedItemID else { return nil }
     return currentPresentation.taskBoardItem(id: selectedItemID)
-      ?? taskBoardItems.first { $0.id == selectedItemID }
+      ?? allKnownTaskBoardItems.first { $0.id == selectedItemID }
   }
 
   var taskBoardManagementSheet: Binding<TaskBoardManagementSheet?> {
@@ -166,7 +166,7 @@ extension TaskBoardOverviewView {
       nil
     case .edit(let itemID):
       currentPresentation.taskBoardItem(id: itemID)
-        ?? taskBoardItems.first(where: { $0.id == itemID })
+        ?? allKnownTaskBoardItems.first(where: { $0.id == itemID })
     }
   }
 }

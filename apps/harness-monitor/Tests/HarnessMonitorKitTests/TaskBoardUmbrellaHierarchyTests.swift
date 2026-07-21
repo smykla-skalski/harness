@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 
 @testable import HarnessMonitorKit
@@ -139,6 +140,32 @@ struct TaskBoardUmbrellaHierarchyTests {
     )
 
     #expect(summary.notShownMessage == "2 children not shown here")
+  }
+
+  @Test("Opening a cross-scope item resolves from the full pool, not the view's scoped items")
+  @MainActor
+  func selectedItemResolvesAcrossScopeEvenWhenViewItemsAreScoped() {
+    let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .empty)
+    let umbrella = makeTaskBoardItem(id: "umbrella-1", kind: .umbrella)
+    let crossScopeChild = makeTaskBoardItem(id: "child-other-session", parentItemId: "umbrella-1")
+    store.globalTaskBoardItems = [umbrella, crossScopeChild]
+
+    // A session-window embedding whose own item snapshot has not (yet) picked up
+    // the cross-scope child - `currentPresentation` stays empty here too, since
+    // its rebuild only runs through the view's live `.task(id:)` lifecycle.
+    let view = TaskBoardOverviewView(
+      snapshot: TaskBoardInboxSnapshot(),
+      taskBoardItems: [umbrella],
+      store: store,
+      taskBoardSessionID: "session-a",
+      actions: TaskBoardOverviewActions(store: store, scope: .session(sessionID: "session-a")),
+      decisionItems: [],
+      decisionsByID: [:]
+    )
+
+    view.selectionModelValue.selectedItemID = crossScopeChild.id
+
+    #expect(view.selectedTaskBoardItem?.id == crossScopeChild.id)
   }
 }
 
