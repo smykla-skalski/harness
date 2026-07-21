@@ -58,7 +58,11 @@ public enum BuildPhases {
                 "$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.managed.plist",
                 "$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.plist",
                 "$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist",
-                "$(PROJECT_DIR)/HarnessMonitorDaemon.entitlements"
+                "$(PROJECT_DIR)/HarnessMonitorDaemon.entitlements",
+                // Read by the daemon-cargo-build invocation-token fast path. The
+                // prepare-app-entitlements pre-action stamps it in PROJECT_TEMP_DIR;
+                // declare it so the user-script sandbox permits the cmp/cp reads.
+                "$(PROJECT_TEMP_DIR)/HarnessMonitor-daemon-build-invocation.id"
             ],
             outputPaths: [
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness-daemon",
@@ -69,7 +73,12 @@ public enum BuildPhases {
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/Q498EB36N4.io.harnessmonitor.daemon.plist.staging",
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/io.harnessmonitor.daemon.managed.plist",
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/io.harnessmonitor.daemon.plist",
-                "$(DERIVED_FILE_DIR)/$(TARGET_NAME)-bundle-daemon-agent.stamp"
+                "$(DERIVED_FILE_DIR)/$(TARGET_NAME)-bundle-daemon-agent.stamp",
+                // Read+written by the fast path (cmp compares, cp+mv refresh it).
+                // Declared as outputs so the sandbox grants read-write on both the
+                // final token and its atomic .staging sibling.
+                "$(PROJECT_TEMP_DIR)/HarnessMonitor-daemon-staged-ready.id",
+                "$(PROJECT_TEMP_DIR)/HarnessMonitor-daemon-staged-ready.id.staging"
             ],
             // Rust compiler inputs are discovered dynamically from Cargo dep-info,
             // so Xcode cannot model the complete input set here. Keep this phase
