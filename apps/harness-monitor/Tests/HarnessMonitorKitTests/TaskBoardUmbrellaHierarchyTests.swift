@@ -167,6 +167,31 @@ struct TaskBoardUmbrellaHierarchyTests {
 
     #expect(view.selectedTaskBoardItem?.id == crossScopeChild.id)
   }
+
+  @Test("A not-yet-hydrated store still falls through to the view's own items")
+  @MainActor
+  func selectedItemResolvesFromViewItemsWhenStoreIsNotYetHydrated() {
+    let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .empty)
+    // Cold launch / not-yet-hydrated dashboard: the store exists but hasn't
+    // populated its global pool yet, while this session-window embedding's
+    // own independent snapshot fetch already has the item.
+    store.globalTaskBoardItems = []
+    let item = makeTaskBoardItem(id: "session-only-item")
+
+    let view = TaskBoardOverviewView(
+      snapshot: TaskBoardInboxSnapshot(),
+      taskBoardItems: [item],
+      store: store,
+      taskBoardSessionID: "session-a",
+      actions: TaskBoardOverviewActions(store: store, scope: .session(sessionID: "session-a")),
+      decisionItems: [],
+      decisionsByID: [:]
+    )
+
+    view.selectionModelValue.selectedItemID = item.id
+
+    #expect(view.selectedTaskBoardItem?.id == item.id)
+  }
 }
 
 extension TaskBoardUmbrellaHierarchyTests {

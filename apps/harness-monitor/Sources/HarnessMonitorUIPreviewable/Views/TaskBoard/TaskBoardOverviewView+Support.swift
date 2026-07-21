@@ -87,11 +87,21 @@ extension TaskBoardOverviewView {
   }
 
   /// The umbrella/children relationship spans every project and repository,
-  /// so it must resolve from the store's full item pool - never from
-  /// `taskBoardItems`, which can be scoped to one session when this view is
-  /// embedded there.
+  /// so it must resolve from a true superset of every item this view knows
+  /// about, not just `store.globalTaskBoardItems`. That pool can still be
+  /// empty at cold start or mid-refresh while a session-window embedding's
+  /// own independent snapshot (`taskBoardItems`) is already populated, so a
+  /// plain `??` would drop it - union both, global entries winning on id
+  /// collision since they are the more authoritative, board-wide source.
   var allKnownTaskBoardItems: [TaskBoardItem] {
-    store?.globalTaskBoardItems ?? taskBoardItems
+    guard let store else { return taskBoardItems }
+    guard !taskBoardItems.isEmpty else { return store.globalTaskBoardItems }
+    var seenIDs = Set(store.globalTaskBoardItems.map(\.id))
+    var merged = store.globalTaskBoardItems
+    for item in taskBoardItems where seenIDs.insert(item.id).inserted {
+      merged.append(item)
+    }
+    return merged
   }
 
   private func taskBoardParentBacklink(for item: TaskBoardItem?) -> TaskBoardParentBacklink {
