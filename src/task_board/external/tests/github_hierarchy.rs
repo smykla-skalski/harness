@@ -373,6 +373,58 @@ async fn resync_unparents_a_child_whose_new_tracking_issue_has_not_imported_yet(
 }
 
 #[tokio::test]
+async fn resync_unparents_an_issue_that_now_names_itself_as_its_own_parent() {
+    let temp = tempdir().expect("tempdir");
+    let board = TaskBoardStore::new(temp.path().join("board"));
+
+    sync(
+        &board,
+        vec![github_umbrella_task(
+            "owner/repo#400",
+            "Umbrella issue",
+            "owner/repo",
+        )],
+    )
+    .await;
+    sync(
+        &board,
+        vec![
+            github_umbrella_task("owner/repo#400", "Umbrella issue", "owner/repo"),
+            github_child_task(
+                "owner/repo#401",
+                "Child issue",
+                "owner/repo",
+                "owner/repo#400",
+            ),
+        ],
+    )
+    .await;
+    let items = board.list(None).expect("list items");
+    let parent = find_by_external_id(&items, "owner/repo#400");
+    let child = find_by_external_id(&items, "owner/repo#401");
+    assert_eq!(child.parent_item_id, Some(parent.id));
+
+    // GitHub now (erroneously) reports the child tracking itself: the stale
+    // link to its real prior parent must not linger.
+    sync(
+        &board,
+        vec![
+            github_umbrella_task("owner/repo#400", "Umbrella issue", "owner/repo"),
+            github_child_task(
+                "owner/repo#401",
+                "Child issue",
+                "owner/repo",
+                "owner/repo#401",
+            ),
+        ],
+    )
+    .await;
+
+    let child = find_by_external_id(&board.list(None).expect("list items"), "owner/repo#401");
+    assert_eq!(child.parent_item_id, None);
+}
+
+#[tokio::test]
 async fn the_umbrella_title_glyph_is_a_hint_when_the_body_has_no_checklist() {
     let temp = tempdir().expect("tempdir");
     let board = TaskBoardStore::new(temp.path().join("board"));

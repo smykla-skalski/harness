@@ -354,17 +354,21 @@ fn apply_hierarchy_patch(
     if merged_tags != item.tags {
         patch.tags = Some(merged_tags);
     }
+    // A self-reference (the remote body naming this same issue as its own
+    // parent) is as unusable as a parent that hasn't imported yet, so it
+    // takes the same "unresolvable" path below rather than being kept as a
+    // valid target.
+    let resolved_parent_item_id =
+        resolved_parent_item_id.filter(|&parent_item_id| parent_item_id != item.id);
     match resolved_parent_item_id {
-        Some(parent_item_id)
-            if parent_item_id != item.id
-                && item.parent_item_id.as_deref() != Some(parent_item_id) =>
-        {
+        Some(parent_item_id) if item.parent_item_id.as_deref() != Some(parent_item_id) => {
             patch.parent_item_id = OptionalFieldPatch::Set(parent_item_id.to_owned());
         }
         // The task still names a parent, just not one resolvable locally yet
-        // (a re-parent to an issue not imported yet, not the absence of any
-        // parent at all): drop the stale link rather than keep pointing at
-        // whichever issue used to track it, and defer to a later sync.
+        // (a re-parent to an issue not imported yet, or a self-reference,
+        // rather than the absence of any parent at all): drop the stale
+        // link instead of keeping whichever issue used to track it, and
+        // defer to a later sync.
         None if task.parent_reference.is_some() && item.parent_item_id.is_some() => {
             patch.parent_item_id = OptionalFieldPatch::Clear;
         }
