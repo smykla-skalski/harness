@@ -7,7 +7,7 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{
     ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncDirection,
 };
-use crate::task_board::types::{AgentMode, TaskBoardPriority, TaskBoardStatus};
+use crate::task_board::types::{AgentMode, TaskBoardItemKind, TaskBoardPriority, TaskBoardStatus};
 
 mod catalog;
 mod dispatch;
@@ -103,6 +103,8 @@ pub struct TaskBoardCreateArgs {
     pub priority: TaskBoardPriority,
     #[arg(long, value_enum, default_value = "headless")]
     pub agent_mode: AgentMode,
+    #[arg(long, value_enum, default_value = "task")]
+    pub kind: TaskBoardItemKind,
     #[arg(long)]
     pub tag: Vec<String>,
     #[arg(long)]
@@ -143,6 +145,8 @@ pub struct TaskBoardUpdateArgs {
     pub priority: Option<TaskBoardPriority>,
     #[arg(long, value_enum)]
     pub agent_mode: Option<AgentMode>,
+    #[arg(long, value_enum)]
+    pub kind: Option<TaskBoardItemKind>,
     #[arg(long)]
     pub tag: Vec<String>,
     #[arg(long)]
