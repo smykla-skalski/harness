@@ -26,6 +26,47 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(presentation.apiItems(in: .todo).map(\.id) == ["session-item"])
   }
 
+  @Test("Umbrella items group under the umbrella lane regardless of status, even once done")
+  func umbrellaItemsGroupUnderUmbrellaLaneRegardlessOfStatus() async {
+    let worker = TaskBoardOverviewPresentationWorker()
+    let openUmbrella = taskBoardItem(id: "umbrella-open", status: .todo, kind: .umbrella)
+    let closedUmbrella = taskBoardItem(id: "umbrella-closed", status: .done, kind: .umbrella)
+    let plainTodo = taskBoardItem(id: "plain-todo", status: .todo, kind: .task)
+
+    let presentation = await worker.compute(
+      input: TaskBoardOverviewPresentationInput(
+        snapshot: TaskBoardInboxSnapshot(),
+        taskBoardItems: [openUmbrella, closedUmbrella, plainTodo],
+        decisionItems: [],
+        scopeSessionID: nil
+      )
+    )
+
+    #expect(
+      Set(presentation.apiItems(in: .umbrella).map(\.id))
+        == ["umbrella-open", "umbrella-closed"]
+    )
+    #expect(presentation.apiItems(in: .todo).map(\.id) == ["plain-todo"])
+  }
+
+  @Test("A closed umbrella counts once, as done, never also as open")
+  func closedUmbrellaCountsOnceAsDoneNeverAlsoAsOpen() async {
+    let worker = TaskBoardOverviewPresentationWorker()
+    let closedUmbrella = taskBoardItem(id: "umbrella-closed", status: .done, kind: .umbrella)
+
+    let presentation = await worker.compute(
+      input: TaskBoardOverviewPresentationInput(
+        snapshot: TaskBoardInboxSnapshot(),
+        taskBoardItems: [closedUmbrella],
+        decisionItems: [],
+        scopeSessionID: nil
+      )
+    )
+
+    #expect(presentation.aggregateDoneCount == 1)
+    #expect(presentation.aggregateOpenCount == 0)
+  }
+
   @Test("Step Mode target is the top Todo item and never another lane")
   func stepModeTargetIsTopTodoItem() async {
     let worker = TaskBoardOverviewPresentationWorker()
@@ -149,6 +190,14 @@ extension TaskBoardOverviewBehaviorTests {
     )
 
     #expect(TaskBoardInboxLane.humanRequired.taskBoardDropStatus(for: inboxItem) == .humanRequired)
+  }
+
+  @Test("Umbrella lane has no drop status: there is no workflow status it corresponds to")
+  func umbrellaLaneHasNoDropStatus() {
+    let item = taskBoardItem(id: "board-only", status: .todo)
+
+    #expect(TaskBoardInboxLane.umbrella.taskBoardDropStatus == nil)
+    #expect(TaskBoardInboxLane.umbrella.taskBoardDropStatus(for: item) == nil)
   }
 
   @Test("Agentic Review lane applies explicit backend status for manual items")
@@ -356,6 +405,7 @@ extension TaskBoardOverviewBehaviorTests {
     priority: TaskBoardPriority = .medium,
     targetProjectTypes: [String] = [],
     projectId: String? = "project-1",
+    kind: TaskBoardItemKind = .task,
     externalRefs: [TaskBoardExternalRef] = [],
     planning: TaskBoardPlanningState = TaskBoardPlanningState(),
     sessionId: String? = nil,
@@ -373,6 +423,7 @@ extension TaskBoardOverviewBehaviorTests {
       projectId: projectId,
       targetProjectTypes: targetProjectTypes,
       agentMode: .interactive,
+      kind: kind,
       externalRefs: externalRefs,
       planning: planning,
       workflow: nil,

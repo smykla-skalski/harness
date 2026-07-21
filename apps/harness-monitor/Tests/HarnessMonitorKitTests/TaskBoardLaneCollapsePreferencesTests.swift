@@ -83,6 +83,19 @@ struct TaskBoardLaneCollapsePreferencesTests {
     #expect(canonicalRawValue == #"{"backlog":false}"#)
   }
 
+  @Test("Umbrella lane override persists independently of the legacy backlog sentinel")
+  func umbrellaLaneOverridePersistsIndependentlyOfLegacySentinel() {
+    let rawValue = TaskBoardLaneCollapsePreferences.toggledRawValue(
+      lane: .umbrella,
+      contentCount: 0,
+      rawValue: TaskBoardLaneCollapsePreferences.emptyRawValue
+    )
+    let overrides = TaskBoardLaneCollapsePreferences.overrides(from: rawValue)
+
+    #expect(overrides[.umbrella] == false)
+    #expect(overrides[.backlog] == nil)
+  }
+
   @Test("Repeated parses of the same raw value return equal results")
   func repeatedParsesOfSameRawValueReturnEqualResults() {
     let rawValue = #"{"inReview":true,"testing":false}"#

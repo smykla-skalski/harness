@@ -2,6 +2,11 @@ import Foundation
 
 @frozen
 public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
+  /// Raw value deliberately isn't the bare string "umbrella": that string is
+  /// the migration sentinel for the lane once named Umbrella, now `.backlog`.
+  /// Reusing it here would make the collapse/appearance preference decoders
+  /// silently swallow this lane's persisted overrides.
+  case umbrella = "umbrella_items"
   case backlog
   case todo
   case planning
@@ -14,6 +19,7 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
   case failed
 
   private static let orderedCases: [Self] = [
+    .umbrella,
     .backlog,
     .todo,
     .planning,
@@ -54,6 +60,8 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
 
   public var title: String {
     switch self {
+    case .umbrella:
+      "Umbrella"
     case .backlog:
       "Backlog"
     case .todo:
@@ -79,6 +87,8 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
 
   public var systemImage: String {
     switch self {
+    case .umbrella:
+      "umbrella.fill"
     case .backlog:
       "tray"
     case .todo:
@@ -137,7 +147,7 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
   }
 
   public init?(taskBoardItem item: TaskBoardItem) {
-    self.init(status: item.status)
+    self.init(status: item.status, kind: item.kind)
   }
 
   public init?(status: TaskBoardStatus) {
@@ -145,6 +155,17 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
       return nil
     }
     self = lane
+  }
+
+  /// An umbrella stays in its own lane no matter what its workflow status is -
+  /// including `.done` once closed, which no ordinary status maps to a lane at
+  /// all. Kind wins over status; every other kind keeps the plain status route.
+  public init?(status: TaskBoardStatus, kind: TaskBoardItemKind) {
+    guard kind != .umbrella else {
+      self = .umbrella
+      return
+    }
+    self.init(status: status)
   }
 }
 

@@ -43,6 +43,24 @@ struct TaskBoardOverviewActionsTests {
     )
   }
 
+  @Test("Moving an umbrella card off its lane is accepted like any other status move")
+  func movingUmbrellaCardOffItsLaneIsAccepted() {
+    let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .empty)
+    store.globalTaskBoardItems = [
+      Self.makeAPIItem(id: "item-umbrella", status: .todo, kind: .umbrella)
+    ]
+    let actions = TaskBoardOverviewActions(store: store, scope: .dashboard)
+    let dragItem = TaskBoardCardDragItem.api(itemID: "item-umbrella", status: .todo, kind: .umbrella)
+
+    #expect(
+      actions.moveCards(
+        [dragItem],
+        to: .inProgress,
+        liveInboxItems: TaskBoardLiveInboxItems()
+      )
+    )
+  }
+
   @Test("Stale selected-session inbox move is rejected")
   func staleSelectedSessionInboxMoveRejected() {
     let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .empty)
@@ -222,7 +240,11 @@ struct TaskBoardOverviewActionsTests {
     actions.reportDropRejection("Cannot move task: an action is already in progress")
   }
 
-  private static func makeAPIItem(id: String, status: TaskBoardStatus) -> TaskBoardItem {
+  private static func makeAPIItem(
+    id: String,
+    status: TaskBoardStatus,
+    kind: TaskBoardItemKind = .task
+  ) -> TaskBoardItem {
     TaskBoardItem(
       schemaVersion: 1,
       id: id,
@@ -233,6 +255,7 @@ struct TaskBoardOverviewActionsTests {
       tags: [],
       projectId: nil,
       agentMode: .interactive,
+      kind: kind,
       externalRefs: [],
       planning: TaskBoardPlanningState(),
       workflow: nil,

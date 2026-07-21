@@ -125,7 +125,7 @@ struct TaskBoardItemRow: View {
   }
 
   private var statusSymbol: String? {
-    TaskBoardInboxLane(status: item.status).flatMap { lane in
+    TaskBoardInboxLane(taskBoardItem: item).flatMap { lane in
       taskBoardLaneSystemImage(for: lane, appearance: laneAppearance)
     }
   }

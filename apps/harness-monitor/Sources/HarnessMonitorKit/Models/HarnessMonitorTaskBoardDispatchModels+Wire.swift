@@ -59,6 +59,8 @@ extension TaskBoardDispatchBlockReason {
       )
     case .status(let status):
       self.init(kind: "status", workItemId: nil, reason: nil, decision: nil, status: status)
+    case .kind:
+      self.init(kind: "item_kind", workItemId: nil, reason: nil, decision: nil, status: nil)
     }
   }
 }

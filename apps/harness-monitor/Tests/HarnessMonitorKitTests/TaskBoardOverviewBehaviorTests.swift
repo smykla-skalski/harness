@@ -95,6 +95,51 @@ struct TaskBoardOverviewBehaviorTests {
     #expect(confirmation.message.contains("current filter"))
   }
 
+  @Test("Umbrella lane never accepts a card drop, regardless of the dragged item's kind")
+  func umbrellaLaneNeverAcceptsACardDrop() {
+    let plainTask = TaskBoardCardDragItem.api(itemID: "board-1", status: .todo)
+    let umbrellaCard = TaskBoardCardDragItem.api(itemID: "board-2", status: .todo, kind: .umbrella)
+    let inboxCard = TaskBoardCardDragItem.inbox(
+      sessionID: "session-1",
+      taskID: "task-1",
+      status: .open,
+      sourceLaneRawValue: TaskBoardInboxLane.backlog.rawValue
+    )
+
+    #expect(!plainTask.accepts(destination: .umbrella))
+    #expect(!umbrellaCard.accepts(destination: .umbrella))
+    #expect(!inboxCard.accepts(destination: .umbrella))
+
+    #expect(
+      TaskBoardCardDropPlan.resolve(
+        [TaskBoardCardDragPayload(item: plainTask)],
+        to: .umbrella
+      ) == nil
+    )
+  }
+
+  @Test("A dragged card's source lane honors kind, not just status")
+  func draggedCardSourceLaneHonorsKind() {
+    let umbrellaCard = TaskBoardCardDragItem.api(itemID: "board-1", status: .todo, kind: .umbrella)
+    let plainTask = TaskBoardCardDragItem.api(itemID: "board-2", status: .todo)
+
+    #expect(umbrellaCard.sourceLane == .umbrella)
+    #expect(plainTask.sourceLane == .todo)
+  }
+
+  /// The drop plan only ever carries a destination status - kind has no path
+  /// through it, so it can never be touched here.
+  @Test("Dragging an umbrella card out of its lane resolves a plan that keeps its kind intact")
+  func draggingUmbrellaCardOutResolvesAPlanThatKeepsItsKindIntact() throws {
+    let umbrellaCard = TaskBoardCardDragItem.api(itemID: "board-1", status: .todo, kind: .umbrella)
+    let payload = TaskBoardCardDragPayload(item: umbrellaCard)
+
+    let plan = try #require(TaskBoardCardDropPlan.resolve([payload], to: .inProgress))
+
+    #expect(plan.items == [umbrellaCard])
+    #expect(TaskBoardInboxLane.inProgress.taskBoardDropStatus == .inProgress)
+  }
+
   @Test("Card drop plan rejects unknown inbox source lanes")
   func cardDropPlanRejectsUnknownInboxSourceLanes() {
     let item = TaskBoardCardDragItem.inbox(

@@ -3,7 +3,7 @@ import HarnessMonitorKit
 enum TaskBoardVisibleItems {
   static func sorted(_ items: [TaskBoardItem]) -> [TaskBoardItem] {
     items
-      .filter { TaskBoardInboxLane(status: $0.status) != nil && $0.deletedAt == nil }
+      .filter { TaskBoardInboxLane(taskBoardItem: $0) != nil && $0.deletedAt == nil }
       .sorted { left, right in
         if left.priority != right.priority {
           return priorityRank(left.priority) > priorityRank(right.priority)

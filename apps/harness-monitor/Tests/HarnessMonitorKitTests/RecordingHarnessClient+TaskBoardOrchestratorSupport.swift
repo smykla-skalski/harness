@@ -346,6 +346,7 @@ extension TaskBoardItem {
       projectId: request.clearProjectId ? nil : request.projectId ?? projectId,
       targetProjectTypes: request.targetProjectTypes ?? targetProjectTypes,
       agentMode: request.agentMode ?? agentMode,
+      kind: kind,
       externalRefs: request.externalRefs ?? externalRefs,
       planning: request.planning ?? planning,
       workflow: request.workflow ?? workflow,

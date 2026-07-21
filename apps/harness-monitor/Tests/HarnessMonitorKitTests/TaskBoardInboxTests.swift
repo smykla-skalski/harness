@@ -10,6 +10,7 @@ struct TaskBoardInboxTests {
   func inboxLanesUseGlobalBoardOrdering() {
     #expect(
       TaskBoardInboxLane.allCases == [
+        .umbrella,
         .backlog,
         .todo,
         .planning,
@@ -21,6 +22,44 @@ struct TaskBoardInboxTests {
         .humanRequired,
         .failed,
       ])
+  }
+
+  @Test("Umbrella lane's raw value never collides with the legacy backlog sentinel")
+  func umbrellaLaneRawValueDoesNotCollideWithLegacySentinel() {
+    #expect(TaskBoardInboxLane.umbrella.rawValue != "umbrella")
+  }
+
+  @Test("Umbrella-kind items route to the umbrella lane regardless of status")
+  func umbrellaKindItemsRouteToUmbrellaLaneRegardlessOfStatus() {
+    #expect(
+      TaskBoardInboxLane(
+        taskBoardItem: makeTaskBoardItem(status: .todo, kind: .umbrella)
+      ) == .umbrella
+    )
+    #expect(
+      TaskBoardInboxLane(
+        taskBoardItem: makeTaskBoardItem(status: .failed, kind: .umbrella)
+      ) == .umbrella
+    )
+    #expect(
+      TaskBoardInboxLane(
+        taskBoardItem: makeTaskBoardItem(status: .done, kind: .umbrella)
+      ) == .umbrella
+    )
+  }
+
+  @Test("Non-umbrella items keep routing by status")
+  func nonUmbrellaItemsKeepRoutingByStatus() {
+    #expect(
+      TaskBoardInboxLane(
+        taskBoardItem: makeTaskBoardItem(status: .agenticReview, kind: .task)
+      ) == .agenticReview
+    )
+    #expect(
+      TaskBoardInboxLane(
+        taskBoardItem: makeTaskBoardItem(status: .done, kind: .task)
+      ) == nil
+    )
   }
 
   @Test("Snapshot groups cached tasks into global board lanes")
@@ -315,7 +354,10 @@ struct TaskBoardInboxTests {
     )
   }
 
-  private func makeTaskBoardItem(status: TaskBoardStatus) -> TaskBoardItem {
+  private func makeTaskBoardItem(
+    status: TaskBoardStatus,
+    kind: TaskBoardItemKind = .task
+  ) -> TaskBoardItem {
     TaskBoardItem(
       schemaVersion: 1,
       id: "board-\(status.rawValue)",
@@ -326,6 +368,7 @@ struct TaskBoardInboxTests {
       tags: [],
       projectId: nil,
       agentMode: .headless,
+      kind: kind,
       externalRefs: [],
       planning: TaskBoardPlanningState(),
       workflow: nil,

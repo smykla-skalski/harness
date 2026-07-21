@@ -369,6 +369,8 @@ enum TaskBoardLaneAppearancePreferences {
 
   static func defaultColorToken(for lane: TaskBoardInboxLane) -> TaskBoardLaneColorToken {
     switch lane {
+    case .umbrella:
+      .purple
     case .backlog:
       .warmAccent
     case .todo:
