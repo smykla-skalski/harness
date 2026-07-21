@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -14,8 +16,8 @@ use crate::task_board::{
     PolicyPipelineGoLiveDiff, PolicyPipelineReplayResult, PolicyPipelineSaveResponse,
     PolicyPipelineSimulationResult, PolicyScenario, TaskBoardAuditSummary,
     TaskBoardAutomationSnapshot, TaskBoardEvaluationSummary, TaskBoardGitIdentityDefaults,
-    TaskBoardItem, TaskBoardMachineSummary, TaskBoardProjectSummary, TaskBoardStatus,
-    TaskBoardSyncSummary, planning::PlanningTransition,
+    TaskBoardItem, TaskBoardMachineSummary, TaskBoardProgressRollup, TaskBoardProjectSummary,
+    TaskBoardStatus, TaskBoardSyncSummary, planning::PlanningTransition,
 };
 
 pub use crate::task_board::{
@@ -59,6 +61,10 @@ pub struct TaskBoardPlanRevokeRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskBoardListItemsResponse {
     pub items: Vec<TaskBoardItem>,
+    /// Keyed by umbrella item id, computed fresh from the full live item set
+    /// at read time regardless of any `status` filter applied to `items`.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub progress_rollups: HashMap<String, TaskBoardProgressRollup>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -7,11 +7,10 @@ use crate::daemon::protocol::{
     TaskBoardAuditRequest, TaskBoardAuditResponse, TaskBoardCatalogRequest,
     TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardGetItemRequest,
     TaskBoardHostListResponse, TaskBoardHostLocalResponse, TaskBoardHostSetProjectTypesRequest,
-    TaskBoardHostSetProjectTypesResponse, TaskBoardListItemsRequest, TaskBoardListItemsResponse,
-    TaskBoardMachinesResponse, TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest,
-    TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse,
-    TaskBoardProjectsResponse, TaskBoardSyncRequest, TaskBoardSyncResponse,
-    TaskBoardUpdateItemRequest,
+    TaskBoardHostSetProjectTypesResponse, TaskBoardMachinesResponse, TaskBoardPlanApproveRequest,
+    TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest,
+    TaskBoardPlanningResponse, TaskBoardProjectsResponse, TaskBoardSyncRequest,
+    TaskBoardSyncResponse, TaskBoardUpdateItemRequest,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::planning::PlanningTransition;
@@ -31,6 +30,7 @@ pub(crate) use crate::task_board::external::{
 mod estimate_validation;
 #[cfg(test)]
 mod external_ref_tests;
+mod list_items;
 mod provider_sync_context_store;
 mod provider_sync_execution;
 mod provider_sync_store;
@@ -39,6 +39,7 @@ mod sync_audit;
 mod sync_run_context;
 
 use estimate_validation::{validate_estimate, validate_update_estimates};
+pub(crate) use list_items::list_task_board_items_db;
 pub(crate) use reviews_sync::reconcile_shared_review_items_db;
 use reviews_sync::shared_review_request_clients;
 use sync_audit::SyncExecutionMetrics;
@@ -83,15 +84,6 @@ pub(crate) async fn create_task_board_item_db(
     item.session_id.clone_from(&request.session_id);
     item.work_item_id.clone_from(&request.work_item_id);
     Ok(db.create_task_board_item(item).await?.item)
-}
-
-pub(crate) async fn list_task_board_items_db(
-    db: &AsyncDaemonDb,
-    request: &TaskBoardListItemsRequest,
-) -> Result<TaskBoardListItemsResponse, CliError> {
-    db.list_task_board_items(request.status)
-        .await
-        .map(|items| TaskBoardListItemsResponse { items })
 }
 
 pub(crate) async fn get_task_board_item_db(

@@ -15,6 +15,7 @@ pub mod policy;
 pub mod policy_graph;
 #[cfg(feature = "daemon-runtime")]
 pub mod policy_runtime;
+pub mod progress_rollup;
 pub mod runtime_config;
 pub mod store;
 pub mod summary;
@@ -110,6 +111,7 @@ pub use policy_graph::{
     PolicyPipelineValidationIssue, PolicyScenario, replay::PolicyPipelineReplayDecision,
     replay::PolicyPipelineReplayResult,
 };
+pub use progress_rollup::{TaskBoardProgressRollup, build_progress_rollups};
 pub use runtime_config::{
     TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
     TaskBoardGitHubTokensSyncResponse, TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig,

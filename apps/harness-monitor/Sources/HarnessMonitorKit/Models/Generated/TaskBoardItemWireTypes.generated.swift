@@ -293,12 +293,48 @@ public struct TaskUsageWire: Codable, Equatable, Sendable {
 
 public struct TaskBoardListItemsResponseWire: Codable, Equatable, Sendable {
   public var items: [TaskBoardItemWire]
+  public var progressRollups: [String: TaskBoardProgressRollupWire]
 
-  public init(items: [TaskBoardItemWire]) {
+  public init(items: [TaskBoardItemWire], progressRollups: [String: TaskBoardProgressRollupWire] = [:]) {
     self.items = items
+    self.progressRollups = progressRollups
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    items = try container.decode([TaskBoardItemWire].self, forKey: .items)
+    progressRollups = try container.decodeIfPresent([String: TaskBoardProgressRollupWire].self, forKey: .progressRollups) ?? [:]
   }
 
   enum CodingKeys: String, CodingKey {
     case items
+    case progressRollups = "progress_rollups"
+  }
+}
+
+public struct TaskBoardProgressRollupWire: Codable, Equatable, Sendable {
+  public var total: UInt
+  public var done: UInt
+  public var remaining: UInt
+  public var blocked: UInt
+  public var waitingOnHuman: UInt
+  public var isEmpty: Bool
+
+  public init(total: UInt = 0, done: UInt = 0, remaining: UInt = 0, blocked: UInt = 0, waitingOnHuman: UInt = 0, isEmpty: Bool = false) {
+    self.total = total
+    self.done = done
+    self.remaining = remaining
+    self.blocked = blocked
+    self.waitingOnHuman = waitingOnHuman
+    self.isEmpty = isEmpty
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case total
+    case done
+    case remaining
+    case blocked
+    case waitingOnHuman = "waiting_on_human"
+    case isEmpty = "is_empty"
   }
 }
