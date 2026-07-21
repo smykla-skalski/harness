@@ -20,7 +20,8 @@
   "ignorePaths": [
     "**/tmp/**",
     ".github/workflows/smyklot-pr-commands.yml",
-    ".github/workflows/smyklot-poll.yml"
+    ".github/workflows/smyklot-poll.yml",
+    "crates/harness-codex-acp/**"
   ],
   "osvVulnerabilityAlerts": true,
   "gitIgnoredAuthors": ["205507218+smyklot[bot]@users.noreply.github.com"],

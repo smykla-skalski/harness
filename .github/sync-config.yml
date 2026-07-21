@@ -1,0 +1,23 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/smykla-skalski/.github/main/schemas/sync-config.schema.json
+# Harness-specific overrides deep-merged onto the org-wide renovate.json.
+# Without this file the org sync replaces renovate.json wholesale, dropping the
+# Saturday schedule and any repo-local ignore paths.
+sync:
+  files:
+    merge:
+      - path: "renovate.json"
+        strategy: "deep-merge"
+        arrayStrategies:
+          "$.ignorePaths": "append"
+        overrides:
+          timezone: "Europe/Warsaw"
+          schedule:
+            - "* 4 * * 6"
+          # The codex-acp workspace is a vendored adapter whose dependency graph
+          # is fixed by the pinned codex rust-v0.137.0 and zed codex-acp v0.16.0
+          # tags. Renovate has no way to disable lock file maintenance for a single
+          # lock, so ignore the whole directory: maintenance floated transitive
+          # crates (e.g. rmcp) that the pinned codex code fails to build against.
+          ignorePaths:
+            - "crates/harness-codex-acp/**"
