@@ -62,7 +62,20 @@ public enum BuildPhases {
                 // Read by the daemon-cargo-build invocation-token fast path. The
                 // prepare-app-entitlements pre-action stamps it in PROJECT_TEMP_DIR;
                 // declare it so the user-script sandbox permits the cmp/cp reads.
-                "$(PROJECT_TEMP_DIR)/HarnessMonitor-daemon-build-invocation.id"
+                "$(PROJECT_TEMP_DIR)/HarnessMonitor-daemon-build-invocation.id",
+                // Read-only here: the fast-path cmp compares this against the token
+                // above. This marker is shared by every target that bundles the
+                // daemon (HarnessMonitor, HarnessMonitorExternalDaemon,
+                // HarnessMonitorUITestHost), so it must stay input-only on each of
+                // their phases -- an output declared on more than one target's phase
+                // makes Xcode reject the build with "Multiple commands produce" the
+                // moment two of them build together (e.g. an XCUITest run). The
+                // daemon-build-agent scheme pre-action is the actual writer; it runs
+                // once per invocation and isn't sandboxed. When it hasn't run first,
+                // the cmp here just misses and daemon-cargo-build.sh falls back to
+                // its content-hash freshness check.
+                "$(PROJECT_TEMP_DIR)/HarnessMonitor-daemon-staged-ready.id",
+                "$(PROJECT_TEMP_DIR)/HarnessMonitor-daemon-staged-ready.id.staging"
             ],
             outputPaths: [
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness-daemon",
@@ -73,12 +86,7 @@ public enum BuildPhases {
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/Q498EB36N4.io.harnessmonitor.daemon.plist.staging",
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/io.harnessmonitor.daemon.managed.plist",
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/io.harnessmonitor.daemon.plist",
-                "$(DERIVED_FILE_DIR)/$(TARGET_NAME)-bundle-daemon-agent.stamp",
-                // Read+written by the fast path (cmp compares, cp+mv refresh it).
-                // Declared as outputs so the sandbox grants read-write on both the
-                // final token and its atomic .staging sibling.
-                "$(PROJECT_TEMP_DIR)/HarnessMonitor-daemon-staged-ready.id",
-                "$(PROJECT_TEMP_DIR)/HarnessMonitor-daemon-staged-ready.id.staging"
+                "$(DERIVED_FILE_DIR)/$(TARGET_NAME)-bundle-daemon-agent.stamp"
             ],
             // Rust compiler inputs are discovered dynamically from Cargo dep-info,
             // so Xcode cannot model the complete input set here. Keep this phase
