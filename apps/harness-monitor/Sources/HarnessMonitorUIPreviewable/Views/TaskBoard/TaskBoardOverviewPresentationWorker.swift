@@ -170,7 +170,10 @@ actor TaskBoardOverviewPresentationWorker {
     let taskBoardDoneCount = scopedTaskBoardItems.count {
       $0.deletedAt == nil && $0.status == .done
     }
-    let taskBoardOpenCount = taskBoardItems.count
+    // A closed umbrella stays visible in its own lane (unlike an ordinary closed
+    // item, which drops off the board entirely), so it is in `taskBoardItems` -
+    // exclude it here or it would double-count as both open and done.
+    let taskBoardOpenCount = taskBoardItems.count { $0.status != .done }
     let projectLabelResolver = TaskBoardProjectLabelResolver(
       projectIDs: taskBoardItems.compactMap(\.taskBoardRepositoryIdentity)
     )

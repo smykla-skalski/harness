@@ -49,6 +49,24 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(presentation.apiItems(in: .todo).map(\.id) == ["plain-todo"])
   }
 
+  @Test("A closed umbrella counts once, as done, never also as open")
+  func closedUmbrellaCountsOnceAsDoneNeverAlsoAsOpen() async {
+    let worker = TaskBoardOverviewPresentationWorker()
+    let closedUmbrella = taskBoardItem(id: "umbrella-closed", status: .done, kind: .umbrella)
+
+    let presentation = await worker.compute(
+      input: TaskBoardOverviewPresentationInput(
+        snapshot: TaskBoardInboxSnapshot(),
+        taskBoardItems: [closedUmbrella],
+        decisionItems: [],
+        scopeSessionID: nil
+      )
+    )
+
+    #expect(presentation.aggregateDoneCount == 1)
+    #expect(presentation.aggregateOpenCount == 0)
+  }
+
   @Test("Step Mode target is the top Todo item and never another lane")
   func stepModeTargetIsTopTodoItem() async {
     let worker = TaskBoardOverviewPresentationWorker()

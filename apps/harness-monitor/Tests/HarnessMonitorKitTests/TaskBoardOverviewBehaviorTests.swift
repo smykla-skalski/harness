@@ -127,8 +127,11 @@ struct TaskBoardOverviewBehaviorTests {
     #expect(plainTask.sourceLane == .todo)
   }
 
-  @Test("Dragging an umbrella card out of its lane still changes only status, never kind")
-  func draggingUmbrellaCardOutOnlyChangesStatus() throws {
+  /// The drop plan itself only ever carries a destination status: it has no
+  /// path to touch kind at all, `HarnessMonitorStoreTaskBoardStatusUpdateTests
+  /// .optimisticMovePreservesKind` proves that end to end through the store.
+  @Test("Dragging an umbrella card out of its lane resolves a plan that keeps its kind intact")
+  func draggingUmbrellaCardOutResolvesAPlanThatKeepsItsKindIntact() throws {
     let umbrellaCard = TaskBoardCardDragItem.api(itemID: "board-1", status: .todo, kind: .umbrella)
     let payload = TaskBoardCardDragPayload(item: umbrellaCard)
 

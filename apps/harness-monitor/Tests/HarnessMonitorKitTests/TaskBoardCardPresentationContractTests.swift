@@ -21,6 +21,12 @@ struct TaskBoardCardPresentationContractTests {
     #expect(source.contains(".multilineTextAlignment(.leading)"))
   }
 
+  @Test("Card status glyph is kind-aware so a closed umbrella still gets its lane's icon")
+  func cardStatusGlyphIsKindAware() throws {
+    let rows = try taskBoardSource("TaskBoardLaneViews.swift")
+    #expect(rows.contains("TaskBoardInboxLane(taskBoardItem: item)"))
+  }
+
   @Test("Review prefix stays in the card title text flow with reduced emphasis")
   func reviewPrefixStaysInCardTitleTextFlowWithReducedEmphasis() throws {
     let rows = try taskBoardSource("TaskBoardLaneViews.swift")
