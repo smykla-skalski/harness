@@ -55,3 +55,31 @@ fn body_lists_child_issues_ignores_unrelated_checkboxes() {
 fn body_lists_child_issues_is_false_for_a_leaf_issue_body() {
     assert!(!body_lists_child_issues(CHILD_BODY));
 }
+
+#[test]
+fn parent_reference_in_body_ignores_a_fenced_code_example() {
+    let body = "Example of the convention:\n```\nPart of #999\n```\n\nPart of #5\n";
+    let reference =
+        parent_reference_in_body(&repository(), body).expect("body names a tracking issue");
+    assert_eq!(reference.external_id, "smykla-skalski/harness#5");
+}
+
+#[test]
+fn parent_reference_in_body_ignores_a_blockquoted_mention() {
+    let body = "> This previously said part of #999, which was a mistake.\n\nPart of #5\n";
+    let reference =
+        parent_reference_in_body(&repository(), body).expect("body names a tracking issue");
+    assert_eq!(reference.external_id, "smykla-skalski/harness#5");
+}
+
+#[test]
+fn body_lists_child_issues_ignores_a_fenced_checklist_example() {
+    let body = "Example child list format:\n```\n- [ ] #1 example child\n```\n";
+    assert!(!body_lists_child_issues(body));
+}
+
+#[test]
+fn body_lists_child_issues_ignores_a_blockquoted_checklist() {
+    let body = "> - [ ] #1 quoted from another issue\n\nJust a regular issue.\n";
+    assert!(!body_lists_child_issues(body));
+}

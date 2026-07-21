@@ -21,7 +21,8 @@ pub(super) fn parent_reference_in_body(
     repository: &GitHubRepository,
     body: &str,
 ) -> Option<ExternalTaskRef> {
-    let captures = PARENT_REFERENCE_RE.captures(body)?;
+    let body = narrative_body(body);
+    let captures = PARENT_REFERENCE_RE.captures(&body)?;
     let issue_number = captures.get(2)?.as_str();
     let repository_slug = captures
         .get(1)
@@ -33,7 +34,26 @@ pub(super) fn parent_reference_in_body(
 }
 
 pub(super) fn body_lists_child_issues(body: &str) -> bool {
-    CHILD_CHECKLIST_RE.is_match(body)
+    CHILD_CHECKLIST_RE.is_match(&narrative_body(body))
+}
+
+/// Blanks fenced code blocks and blockquoted lines, line-for-line, so a
+/// quoted or exemplary "Part of #N" / "- [ ] #N" cannot be mistaken for the
+/// issue's own declaration. Line count is preserved so callers matching with
+/// `(?m)^...` still see accurate line boundaries for the remaining text.
+fn narrative_body(body: &str) -> String {
+    let mut narrative = String::with_capacity(body.len());
+    let mut in_fence = false;
+    for line in body.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+            in_fence = !in_fence;
+        } else if !in_fence && !trimmed.starts_with('>') {
+            narrative.push_str(line);
+        }
+        narrative.push('\n');
+    }
+    narrative
 }
 
 #[cfg(test)]
