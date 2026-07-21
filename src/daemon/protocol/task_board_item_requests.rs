@@ -2,7 +2,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::task_board::{
     AgentMode, ExternalRef, PlanningState, TaskBoardPriority, TaskBoardStatus,
-    TaskBoardWorkflowKind, types::TaskBoardWorkflowState,
+    TaskBoardWorkflowKind,
+    types::{TaskBoardItemKind, TaskBoardWorkflowState},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -16,6 +17,8 @@ pub struct TaskBoardCreateItemRequest {
     pub agent_mode: AgentMode,
     #[serde(default)]
     pub workflow_kind: TaskBoardWorkflowKind,
+    #[serde(default)]
+    pub kind: TaskBoardItemKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_repository: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -67,6 +70,8 @@ pub struct TaskBoardUpdateItemRequest {
     pub agent_mode: Option<AgentMode>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workflow_kind: Option<TaskBoardWorkflowKind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<TaskBoardItemKind>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_repository: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

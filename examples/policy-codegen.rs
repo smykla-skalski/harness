@@ -2526,9 +2526,12 @@ const SESSION_TASKS_SOURCE: &str = include_str!("../src/session/types/tasks.rs")
 const TASK_BOARD_PROTOCOL_SOURCE: &str = include_str!("../src/daemon/protocol/task_board.rs");
 const TASK_BOARD_TYPES_SOURCE: &str = include_str!("../src/task_board/types.rs");
 const TASK_BOARD_ENUMS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardEnums.generated.swift";
-// The three task-board foundation enums in types.rs that every item/summary/request
-// references. The rich TaskBoardItem and the other types.rs structs are excluded by
-// the allow-list. TaskBoardStatus/AgentMode emit open, TaskBoardPriority closed.
+// The task-board foundation enums in types.rs that every item/summary/request
+// references. The rich TaskBoardItem and the other types.rs structs are excluded
+// by the allow-list; so is TaskBoardItemKind, which is hand-written (see
+// EXTERNAL_SWIFT_TYPES) because its Unknown(String) variant carries a raw wire
+// value the string-enum emitter cannot model. TaskBoardStatus/AgentMode emit
+// open, TaskBoardPriority closed.
 const TASK_BOARD_ENUMS_EMIT_ONLY: &[&str] = &["TaskBoardStatus", "TaskBoardPriority", "AgentMode"];
 const TASK_BOARD_SUMMARY_SOURCE: &str = include_str!("../src/task_board/summary.rs");
 const TASK_BOARD_SUMMARY_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardSummaryWireTypes.generated.swift";

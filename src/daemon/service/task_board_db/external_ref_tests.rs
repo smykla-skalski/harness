@@ -97,6 +97,7 @@ async fn external_ref_creation_rejects_client_sync_state() {
         priority: Default::default(),
         agent_mode: Default::default(),
         workflow_kind: Default::default(),
+        kind: Default::default(),
         execution_repository: None,
         estimated_tokens: None,
         estimated_cost_microusd: None,

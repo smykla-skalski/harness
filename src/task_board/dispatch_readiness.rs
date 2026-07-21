@@ -8,6 +8,11 @@ pub(super) fn readiness(item: &TaskBoardItem, policy: &PolicyDecision) -> Dispat
     if item.is_deleted() {
         return blocked(DispatchBlockReason::Deleted);
     }
+    if !item.kind.is_dispatchable() {
+        return blocked(DispatchBlockReason::Kind {
+            item_kind: item.kind.clone(),
+        });
+    }
     if let Some(work_item_id) = item.work_item_id.as_deref() {
         return blocked(DispatchBlockReason::AlreadyLinked {
             work_item_id: work_item_id.to_string(),

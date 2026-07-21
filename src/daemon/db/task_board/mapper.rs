@@ -29,6 +29,7 @@ pub(super) fn item_from_rows(
             )?,
             agent_mode: parse_label(&row.agent_mode, "task board agent mode")?,
             workflow_kind: parse_label(&row.workflow_kind, "task board workflow kind")?,
+            kind: parse_label(&row.kind, "task board kind")?,
             execution_repository: row.execution_repository,
             estimated_tokens: optional_u64(row.estimated_tokens, "task board estimated tokens")?,
             estimated_cost_microusd: optional_u64(

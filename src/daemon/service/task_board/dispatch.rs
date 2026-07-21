@@ -9,18 +9,17 @@ use crate::daemon::protocol::{
     TaskBoardDispatchPickResponse, TaskBoardDispatchPickSelection, TaskBoardDispatchRequest,
     TaskBoardDispatchResponse,
 };
-use crate::errors::CliError;
-#[cfg(test)]
-use crate::errors::CliErrorKind;
+use crate::errors::{CliError, CliErrorKind};
 #[cfg(test)]
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::policy_graph::PolicyGraph;
 #[cfg(test)]
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::{
-    DispatchAppliedTask, DispatchExecutionSummary, DispatchFailure, DispatchFailureKind,
-    DispatchPlan, Machine, PolicyAction, PolicyApprovalGrant, SpawnGateSwitches, TaskBoardItem,
-    TaskBoardStatus, build_dispatch_plans_with_policy, machine_mismatch_plan_with_policy,
+    DispatchAppliedTask, DispatchBlockReason, DispatchExecutionSummary, DispatchFailure,
+    DispatchFailureKind, DispatchPlan, DispatchReadiness, Machine, PolicyAction,
+    PolicyApprovalGrant, SpawnGateSwitches, TaskBoardItem, TaskBoardStatus,
+    build_dispatch_plans_with_policy, machine_mismatch_plan_with_policy,
 };
 #[cfg(test)]
 use crate::task_board::{
@@ -52,6 +51,7 @@ pub fn dispatch_task_board(
     if request.dry_run {
         return Ok(DispatchExecutionSummary::dry_run(plans));
     }
+    reject_explicit_kind_block(request, &plans)?;
     let mut applied = Vec::new();
     let mut failures = Vec::new();
     for plan in plans.iter().filter(|plan| plan.is_ready()) {
@@ -88,6 +88,7 @@ pub async fn dispatch_task_board_async(
     if request.dry_run {
         return Ok(DispatchExecutionSummary::dry_run(plans));
     }
+    reject_explicit_kind_block(request, &plans)?;
     let mut applied = Vec::new();
     let mut failures = Vec::new();
     let hold_worker = async_db.task_board_orchestrator_settings().await?.step_mode;
@@ -108,6 +109,38 @@ pub async fn dispatch_task_board_async(
         applied,
         failures,
     })
+}
+
+/// Refuse an explicitly targeted, non-dry-run dispatch whose item is blocked
+/// because of its kind (an umbrella, or any other non-unit-of-work kind).
+/// A status- or policy-driven sweep silently skips such items instead - this
+/// guard exists only for the interactive `--item-id` path, where a silent
+/// no-op would look like a bug rather than a refusal.
+///
+/// # Errors
+/// Returns `CliError` when the caller named one item and that item's kind
+/// blocks dispatch.
+fn reject_explicit_kind_block(
+    request: &TaskBoardDispatchRequest,
+    plans: &[DispatchPlan],
+) -> Result<(), CliError> {
+    if request.item_id.is_none() {
+        return Ok(());
+    }
+    for plan in plans {
+        if let DispatchReadiness::Blocked {
+            reason: DispatchBlockReason::Kind { item_kind },
+        } = &plan.readiness
+        {
+            return Err(CliErrorKind::item_not_dispatchable(format!(
+                "task-board item '{}' is kind '{}' and cannot be dispatched to an agent",
+                plan.board_item_id,
+                item_kind.as_wire_str()
+            ))
+            .into());
+        }
+    }
+    Ok(())
 }
 
 /// Preview the highest-priority ready todo item without reserving it.

@@ -68,6 +68,7 @@ const EXTERNAL_SWIFT_TYPES: &[&str] = &[
     "TaskBoardGitHubAutomation",
     "TaskBoardGitHubMergeMethod",
     "TaskBoardGitSigningMode",
+    "TaskBoardItemKind",
     "TaskBoardOpenEnum",
     "TaskBoardOrchestratorRunStatus",
     "TaskBoardOrchestratorTickPhase",

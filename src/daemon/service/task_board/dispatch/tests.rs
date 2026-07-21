@@ -1,7 +1,20 @@
 use super::*;
 use crate::task_board::planning::{approve_plan, submit_plan};
+use crate::task_board::types::TaskBoardItemKind;
 use crate::task_board::{DispatchBlockReason, DispatchReadiness, MachineRegistry};
 use tempfile::tempdir;
+
+fn seed_umbrella(board: &TaskBoardStore, id: &str) {
+    let mut item = TaskBoardItem::new(
+        id.into(),
+        id.into(),
+        String::new(),
+        "2026-05-15T00:00:00Z".into(),
+    );
+    item.status = TaskBoardStatus::Todo;
+    item.kind = TaskBoardItemKind::Umbrella;
+    board.create(id, "", item).expect("create board item");
+}
 
 fn seed_item(board: &TaskBoardStore, id: &str, project_type: Option<&str>) {
     let mut item = TaskBoardItem::new(
@@ -28,6 +41,58 @@ fn seed_ready_item(board: &TaskBoardStore, id: &str) {
     let item = submit_plan(&item, "Plan summary").apply_to(&item);
     let item = approve_plan(&item, "lead", "2026-05-15T00:00:00Z").apply_to(&item);
     board.create(id, "", item).expect("create board item");
+}
+
+#[test]
+fn machine_mismatch_never_masks_a_kind_block() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("board");
+    let board = TaskBoardStore::new(root.clone());
+    let mut item = TaskBoardItem::new(
+        "umbrella-1".into(),
+        "umbrella-1".into(),
+        String::new(),
+        "2026-05-15T00:00:00Z".into(),
+    );
+    item.status = TaskBoardStatus::Todo;
+    item.kind = TaskBoardItemKind::Umbrella;
+    item.target_project_types = vec!["data".into()];
+    board
+        .create("umbrella-1", "", item)
+        .expect("create board item");
+
+    let registry = MachineRegistry::new(root.clone());
+    let mut local = registry.ensure_local().expect("ensure local");
+    local.project_types = vec!["web".into()];
+    registry.upsert(&local).expect("declare project types");
+
+    let response = dispatch_task_board(
+        &TaskBoardDispatchRequest {
+            item_id: None,
+            status: Some(TaskBoardStatus::Todo),
+            dry_run: true,
+            project_dir: None,
+            actor: None,
+        },
+        None,
+        &board,
+    )
+    .expect("dispatch");
+
+    let plan = response
+        .plans
+        .iter()
+        .find(|plan| plan.board_item_id == "umbrella-1")
+        .expect("umbrella plan present");
+    match &plan.readiness {
+        DispatchReadiness::Blocked {
+            reason: DispatchBlockReason::Kind { item_kind },
+        } => assert_eq!(*item_kind, TaskBoardItemKind::Umbrella),
+        other => panic!(
+            "a kind block must survive machine filtering so the explicit \
+             dispatch guard still sees it, got {other:?}"
+        ),
+    }
 }
 
 #[test]
@@ -79,6 +144,73 @@ fn dispatch_surfaces_machine_mismatch_for_other_project_types() {
             assert_eq!(declared, &vec!["web".to_string()]);
         }
         other => panic!("expected machine_mismatch, got {other:?}"),
+    }
+}
+
+#[test]
+fn explicit_dispatch_of_an_umbrella_item_is_refused_with_a_typed_error() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("board");
+    let board = TaskBoardStore::new(root);
+    seed_umbrella(&board, "umbrella-1");
+
+    let error = dispatch_task_board(
+        &TaskBoardDispatchRequest {
+            item_id: Some("umbrella-1".into()),
+            status: None,
+            dry_run: false,
+            project_dir: None,
+            actor: None,
+        },
+        None,
+        &board,
+    )
+    .expect_err("an explicit umbrella dispatch must be refused, not silently no-op");
+
+    assert_eq!(error.code(), "KSRCLI094");
+    assert!(
+        error.message().contains("'umbrella'"),
+        "message must use the wire value, not the Rust variant name: {}",
+        error.message()
+    );
+}
+
+#[test]
+fn a_status_sweep_silently_skips_an_umbrella_item_without_erroring() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("board");
+    let board = TaskBoardStore::new(root);
+    seed_umbrella(&board, "umbrella-1");
+
+    let response = dispatch_task_board(
+        &TaskBoardDispatchRequest {
+            item_id: None,
+            status: Some(TaskBoardStatus::Todo),
+            dry_run: false,
+            project_dir: None,
+            actor: None,
+        },
+        None,
+        &board,
+    )
+    .expect("a status-driven sweep must not error just because it contains an umbrella");
+
+    assert!(
+        response.applied.is_empty(),
+        "an umbrella can never become ready, so it can never be applied"
+    );
+    assert!(response.failures.is_empty(), "a skip is not a failure");
+    match &response
+        .plans
+        .iter()
+        .find(|plan| plan.board_item_id == "umbrella-1")
+        .expect("umbrella plan present in the sweep")
+        .readiness
+    {
+        DispatchReadiness::Blocked {
+            reason: DispatchBlockReason::Kind { item_kind },
+        } => assert_eq!(*item_kind, TaskBoardItemKind::Umbrella),
+        other => panic!("expected a kind block, got {other:?}"),
     }
 }
 

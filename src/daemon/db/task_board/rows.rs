@@ -28,6 +28,7 @@ pub(super) struct ItemRow {
     pub(super) updated_at: String,
     pub(super) deleted_at: Option<String>,
     pub(super) revision: i64,
+    pub(super) kind: String,
 }
 
 #[derive(Debug, FromRow)]

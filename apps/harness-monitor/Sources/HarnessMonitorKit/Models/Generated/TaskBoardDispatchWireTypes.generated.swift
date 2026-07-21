@@ -139,6 +139,7 @@ public enum DispatchBlockReasonWire: Codable, Equatable, Sendable {
   case planApproval(reason: PlanApprovalBlockReasonWire)
   case policy(decision: PolicyDecision)
   case status(status: TaskBoardStatus)
+  case kind(itemKind: TaskBoardItemKind)
 
   enum CodingKeys: String, CodingKey {
     case kind
@@ -148,6 +149,7 @@ public enum DispatchBlockReasonWire: Codable, Equatable, Sendable {
     case reason
     case decision
     case status
+    case itemKind = "item_kind"
   }
 
   public init(from decoder: Decoder) throws {
@@ -166,6 +168,8 @@ public enum DispatchBlockReasonWire: Codable, Equatable, Sendable {
       self = .policy(decision: try container.decode(PolicyDecision.self, forKey: .decision))
     case "status":
       self = .status(status: try container.decode(TaskBoardStatus.self, forKey: .status))
+    case "kind":
+      self = .kind(itemKind: try container.decode(TaskBoardItemKind.self, forKey: .itemKind))
     default:
       throw DecodingError.dataCorruptedError(forKey: .kind, in: container, debugDescription: "unknown DispatchBlockReasonWire kind \(kind)")
     }
@@ -192,6 +196,9 @@ public enum DispatchBlockReasonWire: Codable, Equatable, Sendable {
     case .status(let status):
       try container.encode("status", forKey: .kind)
       try container.encode(status, forKey: .status)
+    case .kind(let itemKind):
+      try container.encode("kind", forKey: .kind)
+      try container.encode(itemKind, forKey: .itemKind)
     }
   }
 }

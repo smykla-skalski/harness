@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 
 use super::super::TaskBoardWorkflowKind;
 use super::super::types::{
-    AgentMode, ExternalRef, ExternalRefProvider, PlanningState, TaskBoardItem, TaskBoardPriority,
-    TaskBoardStatus, TaskBoardWorkflowState, TaskUsage,
+    AgentMode, ExternalRef, ExternalRefProvider, PlanningState, TaskBoardItem, TaskBoardItemKind,
+    TaskBoardPriority, TaskBoardStatus, TaskBoardWorkflowState, TaskUsage,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,6 +22,8 @@ pub(super) struct TaskBoardFrontmatter {
     agent_mode: AgentMode,
     #[serde(default)]
     workflow_kind: TaskBoardWorkflowKind,
+    #[serde(default)]
+    kind: TaskBoardItemKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     execution_repository: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -65,6 +67,7 @@ impl From<&TaskBoardItem> for TaskBoardFrontmatter {
             target_project_types: item.target_project_types.clone(),
             agent_mode: item.agent_mode,
             workflow_kind: item.workflow_kind,
+            kind: item.kind.clone(),
             execution_repository: item.execution_repository.clone(),
             estimated_tokens: item.estimated_tokens,
             estimated_cost_microusd: item.estimated_cost_microusd,
@@ -98,6 +101,7 @@ impl TaskBoardFrontmatter {
             target_project_types: self.target_project_types,
             agent_mode: self.agent_mode,
             workflow_kind: self.workflow_kind,
+            kind: self.kind,
             execution_repository: self.execution_repository,
             estimated_tokens: self.estimated_tokens,
             estimated_cost_microusd: self.estimated_cost_microusd,
