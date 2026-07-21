@@ -20,7 +20,7 @@ mod tests {
     fn current_schema_contains_task_board_admission_storage() {
         let db = DaemonDb::open_in_memory().expect("open daemon db");
 
-        assert_eq!(db.schema_version().expect("schema version"), "41");
+        assert_eq!(db.schema_version().expect("schema version"), "42");
         for column in ["estimated_tokens", "estimated_cost_microusd"] {
             let exists: i64 = db
                 .connection()

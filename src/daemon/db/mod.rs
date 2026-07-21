@@ -104,6 +104,7 @@ mod schema_v38;
 mod schema_v39;
 mod schema_v40;
 mod schema_v41;
+mod schema_v42;
 #[allow(dead_code)]
 mod task_board;
 pub(crate) use task_board::workflow_owner;
@@ -313,7 +314,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-pub(crate) const SCHEMA_VERSION: &str = "41";
+pub(crate) const SCHEMA_VERSION: &str = "42";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]

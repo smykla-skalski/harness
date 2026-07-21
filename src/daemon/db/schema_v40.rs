@@ -90,7 +90,7 @@ mod tests {
             .connection()
             .execute("DROP TABLE task_board_reconciliation_cursors", [])
             .expect("drop current cursor table");
-        assert_eq!(sync_db.schema_version().expect("schema version"), "41");
+        assert_eq!(sync_db.schema_version().expect("schema version"), "42");
         drop(sync_db);
 
         let async_db = AsyncDaemonDb::connect(&path)
@@ -132,7 +132,7 @@ mod tests {
                  VALUES ('read_only_recoverable', 'execution-a', 'keep');",
             )
             .expect("seed malformed current cursor table");
-        assert_eq!(sync_db.schema_version().expect("schema version"), "41");
+        assert_eq!(sync_db.schema_version().expect("schema version"), "42");
         drop(sync_db);
 
         let error = AsyncDaemonDb::connect(&path)
