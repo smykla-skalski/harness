@@ -49,6 +49,9 @@ pub(super) fn item_from_rows(
             session_id: row.session_id,
             work_item_id: row.work_item_id,
             usage: parse_json(&row.usage_json, "task board usage")?,
+            parent_item_id: row.parent_item_id,
+            child_order: u32::try_from(row.child_order)
+                .map_err(|error| db_error(format!("parse task board child order: {error}")))?,
             created_at: row.created_at,
             updated_at: row.updated_at,
             deleted_at: row.deleted_at,

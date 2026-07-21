@@ -42,6 +42,10 @@ pub(super) struct TaskBoardFrontmatter {
     work_item_id: Option<String>,
     #[serde(default)]
     usage: TaskUsage,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    parent_item_id: Option<String>,
+    #[serde(default)]
+    child_order: u32,
     created_at: String,
     updated_at: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -71,6 +75,8 @@ impl From<&TaskBoardItem> for TaskBoardFrontmatter {
             session_id: item.session_id.clone(),
             work_item_id: item.work_item_id.clone(),
             usage: item.usage.clone(),
+            parent_item_id: item.parent_item_id.clone(),
+            child_order: item.child_order,
             created_at: item.created_at.clone(),
             updated_at: item.updated_at.clone(),
             deleted_at: item.deleted_at.clone(),
@@ -102,6 +108,8 @@ impl TaskBoardFrontmatter {
             session_id: self.session_id,
             work_item_id: self.work_item_id,
             usage: self.usage,
+            parent_item_id: self.parent_item_id,
+            child_order: self.child_order,
             created_at: self.created_at,
             updated_at: self.updated_at,
             deleted_at: self.deleted_at,

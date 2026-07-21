@@ -95,6 +95,8 @@ pub struct TaskBoardUpdateItemRequest {
     pub session_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub work_item_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_item_id: Option<String>,
 }
 
 #[expect(
@@ -111,6 +113,8 @@ pub struct TaskBoardUpdateIdentityClears {
     pub clear_session_id: bool,
     #[serde(default)]
     pub clear_work_item_id: bool,
+    #[serde(default)]
+    pub clear_parent_item_id: bool,
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]

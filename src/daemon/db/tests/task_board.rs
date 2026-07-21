@@ -21,6 +21,7 @@ mod admission_lifecycle_tests;
 mod dispatch;
 mod dispatch_claims;
 mod imports;
+mod items_parent;
 mod terminal_dispatch_lifecycle;
 mod workflow_executions;
 mod workflow_phase_settlement;

@@ -22,6 +22,12 @@ use lifecycle::{
     task_board_item_is_terminal,
 };
 
+#[path = "items_parent.rs"]
+mod parent;
+use parent::{
+    clear_children_parent_in_tx, ensure_parent_assignment_is_valid_in_tx, next_child_order_in_tx,
+};
+
 const SELECT_ITEM: &str = "SELECT * FROM task_board_items WHERE item_id = ?1";
 const SELECT_REFS: &str = "SELECT item_id, position, provider, external_id, url, sync_state_json
     FROM task_board_external_refs WHERE item_id = ?1 ORDER BY position";
@@ -171,6 +177,7 @@ impl AsyncDaemonDb {
             .await?
             .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
         let prior_estimates = (item.estimated_tokens, item.estimated_cost_microusd);
+        let prior_parent_item_id = item.parent_item_id.clone();
         if !mutate(&mut item)? {
             transaction
                 .commit()
@@ -191,10 +198,23 @@ impl AsyncDaemonDb {
         validate_item(&item)?;
         item.status = item.status.canonical_persisted_status();
         item.updated_at = utc_now();
+        if item.parent_item_id != prior_parent_item_id {
+            item.child_order = match item.parent_item_id.clone() {
+                Some(parent_id) => {
+                    ensure_parent_assignment_is_valid_in_tx(&mut transaction, item_id, &parent_id)
+                        .await?;
+                    next_child_order_in_tx(&mut transaction, &parent_id).await?
+                }
+                None => 0,
+            };
+        }
         if task_board_item_is_terminal(&item) {
             ensure_item_admission_can_terminate_in_tx(&mut transaction, item_id).await?;
             cancel_prestart_dispatch_for_terminal_item_in_tx(&mut transaction, item_id).await?;
             release_item_admission_in_tx(&mut transaction, item_id).await?;
+        }
+        if item.deleted_at.is_some() {
+            clear_children_parent_in_tx(&mut transaction, item_id).await?;
         }
         replace_item_in_tx(&mut transaction, &item, revision + 1).await?;
         let change_revision = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
@@ -253,10 +273,10 @@ pub(super) async fn insert_item_in_tx(
         item_id, schema_version, title, body, status, priority, tags_json, project_id,
         target_project_types_json, agent_mode, workflow_kind, execution_repository,
         estimated_tokens, estimated_cost_microusd, imported_from_provider, planning_json,
-        workflow_json, session_id, work_item_id, usage_json, created_at, updated_at,
-        deleted_at, revision
+        workflow_json, session_id, work_item_id, usage_json, parent_item_id, child_order,
+        created_at, updated_at, deleted_at, revision
     ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
-        ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
+        ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26)",
     )
     .bind(&item.id)
     .bind(i64::from(item.schema_version))
@@ -291,6 +311,8 @@ pub(super) async fn insert_item_in_tx(
     .bind(&item.session_id)
     .bind(&item.work_item_id)
     .bind(to_json(&item.usage, "task board usage")?)
+    .bind(&item.parent_item_id)
+    .bind(i64::from(item.child_order))
     .bind(&item.created_at)
     .bind(&item.updated_at)
     .bind(&item.deleted_at)
@@ -314,8 +336,9 @@ pub(super) async fn replace_item_in_tx(
         agent_mode = ?10, workflow_kind = ?11, execution_repository = ?12,
         estimated_tokens = ?13, estimated_cost_microusd = ?14,
         imported_from_provider = ?15, planning_json = ?16, workflow_json = ?17,
-        session_id = ?18, work_item_id = ?19, usage_json = ?20, created_at = ?21,
-        updated_at = ?22, deleted_at = ?23, revision = ?24
+        session_id = ?18, work_item_id = ?19, usage_json = ?20, parent_item_id = ?21,
+        child_order = ?22, created_at = ?23, updated_at = ?24, deleted_at = ?25,
+        revision = ?26
         WHERE item_id = ?1",
     )
     .bind(&item.id)
@@ -351,6 +374,8 @@ pub(super) async fn replace_item_in_tx(
     .bind(&item.session_id)
     .bind(&item.work_item_id)
     .bind(to_json(&item.usage, "task board usage")?)
+    .bind(&item.parent_item_id)
+    .bind(i64::from(item.child_order))
     .bind(&item.created_at)
     .bind(&item.updated_at)
     .bind(&item.deleted_at)
@@ -443,6 +468,12 @@ fn validate_item(item: &TaskBoardItem) -> Result<(), CliError> {
         .is_some_and(|value| !(1..=MAX_TASK_BOARD_ESTIMATE).contains(&value))
     {
         return Err(db_error("task-board estimated cost is out of range"));
+    }
+    if item.parent_item_id.as_deref() == Some(item.id.as_str()) {
+        return Err(db_error(format!(
+            "task-board item '{}' cannot be its own parent",
+            item.id
+        )));
     }
     Ok(())
 }

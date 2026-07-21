@@ -25,11 +25,13 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
   public var sessionId: String?
   public var workItemId: String?
   public var usage: TaskUsageWire
+  public var parentItemId: String?
+  public var childOrder: UInt32
   public var createdAt: String
   public var updatedAt: String
   public var deletedAt: String?
 
-  public init(schemaVersion: UInt32, id: String, title: String, body: String = "", status: TaskBoardStatus = .todo, priority: TaskBoardPriority = .medium, tags: [String] = [], projectId: String? = nil, targetProjectTypes: [String] = [], agentMode: TaskBoardAgentMode = .headless, executionRepository: String? = nil, estimatedTokens: UInt64? = nil, estimatedCostMicrousd: UInt64? = nil, externalRefs: [ExternalRefWire] = [], importedFromProvider: ExternalRefProviderWire? = nil, planning: PlanningStateWire = PlanningStateWire(), workflow: TaskBoardWorkflowStateWire? = nil, sessionId: String? = nil, workItemId: String? = nil, usage: TaskUsageWire = TaskUsageWire(), createdAt: String, updatedAt: String, deletedAt: String? = nil) {
+  public init(schemaVersion: UInt32, id: String, title: String, body: String = "", status: TaskBoardStatus = .todo, priority: TaskBoardPriority = .medium, tags: [String] = [], projectId: String? = nil, targetProjectTypes: [String] = [], agentMode: TaskBoardAgentMode = .headless, executionRepository: String? = nil, estimatedTokens: UInt64? = nil, estimatedCostMicrousd: UInt64? = nil, externalRefs: [ExternalRefWire] = [], importedFromProvider: ExternalRefProviderWire? = nil, planning: PlanningStateWire = PlanningStateWire(), workflow: TaskBoardWorkflowStateWire? = nil, sessionId: String? = nil, workItemId: String? = nil, usage: TaskUsageWire = TaskUsageWire(), parentItemId: String? = nil, childOrder: UInt32 = 0, createdAt: String, updatedAt: String, deletedAt: String? = nil) {
     self.schemaVersion = schemaVersion
     self.id = id
     self.title = title
@@ -50,6 +52,8 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
     self.sessionId = sessionId
     self.workItemId = workItemId
     self.usage = usage
+    self.parentItemId = parentItemId
+    self.childOrder = childOrder
     self.createdAt = createdAt
     self.updatedAt = updatedAt
     self.deletedAt = deletedAt
@@ -77,6 +81,8 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
     sessionId = try container.decodeIfPresent(String.self, forKey: .sessionId)
     workItemId = try container.decodeIfPresent(String.self, forKey: .workItemId)
     usage = try container.decodeIfPresent(TaskUsageWire.self, forKey: .usage) ?? TaskUsageWire()
+    parentItemId = try container.decodeIfPresent(String.self, forKey: .parentItemId)
+    childOrder = try container.decodeIfPresent(UInt32.self, forKey: .childOrder) ?? 0
     createdAt = try container.decode(String.self, forKey: .createdAt)
     updatedAt = try container.decode(String.self, forKey: .updatedAt)
     deletedAt = try container.decodeIfPresent(String.self, forKey: .deletedAt)
@@ -103,6 +109,8 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
     case sessionId = "session_id"
     case workItemId = "work_item_id"
     case usage
+    case parentItemId = "parent_item_id"
+    case childOrder = "child_order"
     case createdAt = "created_at"
     case updatedAt = "updated_at"
     case deletedAt = "deleted_at"

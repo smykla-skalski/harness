@@ -396,6 +396,11 @@ fn apply_update_request(
         request.work_item_id.as_ref(),
         request.clear_identity.clear_work_item_id,
     );
+    apply_optional_string(
+        &mut item.parent_item_id,
+        request.parent_item_id.as_ref(),
+        request.clear_identity.clear_parent_item_id,
+    );
     apply_update_state(item, request);
     Ok(())
 }

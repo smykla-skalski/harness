@@ -22,6 +22,8 @@ pub(super) struct ItemRow {
     pub(super) session_id: Option<String>,
     pub(super) work_item_id: Option<String>,
     pub(super) usage_json: String,
+    pub(super) parent_item_id: Option<String>,
+    pub(super) child_order: i64,
     pub(super) created_at: String,
     pub(super) updated_at: String,
     pub(super) deleted_at: Option<String>,

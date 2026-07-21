@@ -111,6 +111,7 @@ impl TaskBoardUpdateArgs {
                 clear_execution_repository: false,
                 clear_session_id: self.clear_links.clear_session,
                 clear_work_item_id: self.clear_links.clear_work_item,
+                clear_parent_item_id: self.clear_links.clear_parent,
             },
             external_refs: self.external_refs_patch(),
             planning: self.fields.planning(),
@@ -121,6 +122,7 @@ impl TaskBoardUpdateArgs {
             workflow: self.fields.workflow(current.map(|item| &item.workflow)),
             session_id: self.fields.session_id.clone(),
             work_item_id: self.fields.work_item_id.clone(),
+            parent_item_id: self.parent_id.clone(),
         }
     }
 
