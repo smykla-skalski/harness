@@ -62,4 +62,9 @@ impl CliErrorKind {
     pub fn session_scope_denied(detail: impl Into<Cow<'static, str>>) -> Self {
         Self::Workflow(WorkflowError::session_scope_denied(detail))
     }
+
+    #[must_use]
+    pub fn item_not_dispatchable(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::Workflow(WorkflowError::item_not_dispatchable(detail))
+    }
 }

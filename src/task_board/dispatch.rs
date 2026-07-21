@@ -16,7 +16,9 @@ use super::planning::{PlanApprovalBlockReason, PlanApprovalGate, approval_gate};
 use super::policy::{PolicyApprovalGrant, PolicyDecision};
 #[cfg(test)]
 use super::store::TaskBoardStore;
-use super::types::{AgentMode, ExternalRef, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
+use super::types::{
+    AgentMode, ExternalRef, TaskBoardItem, TaskBoardItemKind, TaskBoardPriority, TaskBoardStatus,
+};
 use super::{
     TaskBoardPlanApprovalBinding, TaskBoardPlanningResult, TaskBoardPullRequestIdentity,
     TaskBoardReadOnlyRunContext, TaskBoardResolvedReviewer, TaskBoardWorkflowKind,
@@ -168,6 +170,9 @@ pub enum DispatchBlockReason {
     },
     Status {
         status: TaskBoardStatus,
+    },
+    Kind {
+        item_kind: TaskBoardItemKind,
     },
 }
 

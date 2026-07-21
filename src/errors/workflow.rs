@@ -27,6 +27,8 @@ pub enum WorkflowError {
     AcpDisabled,
     #[error("session scope denied: {detail}")]
     SessionScopeDenied { detail: Cow<'static, str> },
+    #[error("item not dispatchable: {detail}")]
+    ItemNotDispatchable { detail: Cow<'static, str> },
 }
 
 impl WorkflowError {
@@ -45,6 +47,7 @@ impl WorkflowError {
             Self::InvalidProjectDir { .. } => "KSRCLI093",
             Self::AcpDisabled => "ACP_DISABLED",
             Self::SessionScopeDenied { .. } => "SESSION_SCOPE_DENIED",
+            Self::ItemNotDispatchable { .. } => "KSRCLI094",
         }
     }
 
@@ -129,6 +132,13 @@ impl WorkflowError {
     #[must_use]
     pub fn session_scope_denied(detail: impl Into<Cow<'static, str>>) -> Self {
         Self::SessionScopeDenied {
+            detail: detail.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn item_not_dispatchable(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::ItemNotDispatchable {
             detail: detail.into(),
         }
     }
