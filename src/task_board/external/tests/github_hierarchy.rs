@@ -321,6 +321,58 @@ async fn resync_reparents_a_child_when_its_tracking_issue_changes() {
 }
 
 #[tokio::test]
+async fn resync_unparents_a_child_whose_new_tracking_issue_has_not_imported_yet() {
+    let temp = tempdir().expect("tempdir");
+    let board = TaskBoardStore::new(temp.path().join("board"));
+
+    sync(
+        &board,
+        vec![github_umbrella_task(
+            "owner/repo#200",
+            "Old umbrella",
+            "owner/repo",
+        )],
+    )
+    .await;
+    sync(
+        &board,
+        vec![
+            github_umbrella_task("owner/repo#200", "Old umbrella", "owner/repo"),
+            github_child_task(
+                "owner/repo#201",
+                "Child issue",
+                "owner/repo",
+                "owner/repo#200",
+            ),
+        ],
+    )
+    .await;
+    let items = board.list(None).expect("list items");
+    let old_parent = find_by_external_id(&items, "owner/repo#200");
+    let child = find_by_external_id(&items, "owner/repo#201");
+    assert_eq!(child.parent_item_id, Some(old_parent.id));
+
+    // GitHub now says the child tracks a different issue that has not been
+    // imported yet: the stale link to the old parent must not linger.
+    sync(
+        &board,
+        vec![
+            github_umbrella_task("owner/repo#200", "Old umbrella", "owner/repo"),
+            github_child_task(
+                "owner/repo#201",
+                "Child issue",
+                "owner/repo",
+                "owner/repo#300",
+            ),
+        ],
+    )
+    .await;
+
+    let child = find_by_external_id(&board.list(None).expect("list items"), "owner/repo#201");
+    assert_eq!(child.parent_item_id, None);
+}
+
+#[tokio::test]
 async fn the_umbrella_title_glyph_is_a_hint_when_the_body_has_no_checklist() {
     let temp = tempdir().expect("tempdir");
     let board = TaskBoardStore::new(temp.path().join("board"));
