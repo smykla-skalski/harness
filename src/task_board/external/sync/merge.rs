@@ -301,7 +301,9 @@ fn remote_status_changed(remote: TaskBoardStatus, last_synced: Option<TaskBoardS
 }
 
 /// GitHub reports tracked children through body text (no native sub-issues in
-/// use), so a title glyph is only a secondary hint, never the sole signal.
+/// use), so the checklist is the primary signal; the title glyph is a
+/// fallback that alone is still sufficient, for a title that predates the
+/// checklist convention or names its children in a body this parser misses.
 pub(super) fn task_signals_umbrella(task: &ExternalTask) -> bool {
     task.tracks_children || task.title.trim_start().starts_with('☂')
 }
