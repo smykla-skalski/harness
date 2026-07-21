@@ -126,7 +126,7 @@ pub fn list_task_board_items(
             let status = status.canonical_persisted_status();
             all_items
                 .into_iter()
-                .filter(|item| item.status == status)
+                .filter(|item| item.status.canonical_persisted_status() == status)
                 .collect()
         }
         None => all_items,

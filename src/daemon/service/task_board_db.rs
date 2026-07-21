@@ -7,19 +7,17 @@ use crate::daemon::protocol::{
     TaskBoardAuditRequest, TaskBoardAuditResponse, TaskBoardCatalogRequest,
     TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardGetItemRequest,
     TaskBoardHostListResponse, TaskBoardHostLocalResponse, TaskBoardHostSetProjectTypesRequest,
-    TaskBoardHostSetProjectTypesResponse, TaskBoardListItemsRequest, TaskBoardListItemsResponse,
-    TaskBoardMachinesResponse, TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest,
-    TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse,
-    TaskBoardProjectsResponse, TaskBoardSyncRequest, TaskBoardSyncResponse,
-    TaskBoardUpdateItemRequest,
+    TaskBoardHostSetProjectTypesResponse, TaskBoardMachinesResponse, TaskBoardPlanApproveRequest,
+    TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest,
+    TaskBoardPlanningResponse, TaskBoardProjectsResponse, TaskBoardSyncRequest,
+    TaskBoardSyncResponse, TaskBoardUpdateItemRequest,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::planning::PlanningTransition;
 use crate::task_board::{
     ExternalRef, ExternalSyncConfig, Machine, PlanningState, SpawnGateSwitches, TaskBoardItem,
     TaskBoardWorkflowState, approve_plan, begin_planning, build_audit_summary_with_policy,
-    build_machine_summaries, build_progress_rollups, build_project_summaries, revoke_plan,
-    submit_plan,
+    build_machine_summaries, build_project_summaries, revoke_plan, submit_plan,
 };
 use crate::workspace::utc_now;
 
@@ -32,6 +30,7 @@ pub(crate) use crate::task_board::external::{
 mod estimate_validation;
 #[cfg(test)]
 mod external_ref_tests;
+mod list_items;
 mod provider_sync_context_store;
 mod provider_sync_execution;
 mod provider_sync_store;
@@ -40,6 +39,7 @@ mod sync_audit;
 mod sync_run_context;
 
 use estimate_validation::{validate_estimate, validate_update_estimates};
+pub(crate) use list_items::list_task_board_items_db;
 pub(crate) use reviews_sync::reconcile_shared_review_items_db;
 use reviews_sync::shared_review_request_clients;
 use sync_audit::SyncExecutionMetrics;
@@ -84,31 +84,6 @@ pub(crate) async fn create_task_board_item_db(
     item.session_id.clone_from(&request.session_id);
     item.work_item_id.clone_from(&request.work_item_id);
     Ok(db.create_task_board_item(item).await?.item)
-}
-
-pub(crate) async fn list_task_board_items_db(
-    db: &AsyncDaemonDb,
-    request: &TaskBoardListItemsRequest,
-) -> Result<TaskBoardListItemsResponse, CliError> {
-    // Roll-ups always derive from the full live set, never the status-filtered
-    // `items` below, or a status filter would silently undercount siblings
-    // that don't match it.
-    let all_items = db.list_task_board_items(None).await?;
-    let progress_rollups = build_progress_rollups(&all_items);
-    let items = match request.status {
-        Some(status) => {
-            let status = status.canonical_persisted_status();
-            all_items
-                .into_iter()
-                .filter(|item| item.status == status)
-                .collect()
-        }
-        None => all_items,
-    };
-    Ok(TaskBoardListItemsResponse {
-        items,
-        progress_rollups,
-    })
 }
 
 pub(crate) async fn get_task_board_item_db(
