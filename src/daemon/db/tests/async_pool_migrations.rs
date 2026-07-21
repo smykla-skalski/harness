@@ -74,7 +74,7 @@ async fn connect_upgrades_applied_original_v34_migration() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        (1..=34).collect::<Vec<i64>>()
+        (1..=35).collect::<Vec<i64>>()
     );
     let requires_live = query_scalar::<_, bool>(
         "SELECT spawn_requires_live_policy FROM policy_workspace WHERE singleton = 1",
