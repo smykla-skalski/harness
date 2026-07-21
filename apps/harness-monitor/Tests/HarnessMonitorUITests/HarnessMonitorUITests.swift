@@ -143,6 +143,42 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testTaskBoardCreatingItemDismissesTheManagementSheet() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: [
+        "HARNESS_MONITOR_PREVIEW_SCENARIO": "task-board-board-only"
+      ]
+    )
+
+    let boardRoot = element(in: app, identifier: Accessibility.sessionsBoardRoot)
+    XCTAssertTrue(boardRoot.waitForExistence(timeout: Self.actionTimeout))
+
+    tapButton(in: app, identifier: "harness.task-board.new-item")
+
+    let managementPanel = element(in: app, identifier: "harness.task-board.manage-item.new")
+    XCTAssertTrue(managementPanel.waitForExistence(timeout: Self.actionTimeout))
+
+    let titleField = app.textFields["Title"].firstMatch
+    XCTAssertTrue(titleField.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(tapElementReliably(in: app, element: titleField))
+    titleField.typeText("Duplicate-guard verification item")
+
+    let createButton = button(in: app, identifier: "harness.task-board.manage-item.submit")
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) { createButton.isEnabled },
+      "Create Item should enable once the title is filled in"
+    )
+
+    tapButton(in: app, identifier: "harness.task-board.manage-item.submit")
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) { !managementPanel.exists },
+      "Create Board Item should dismiss the sheet after creating the item, "
+        + "otherwise a second press on Create Item duplicates it."
+    )
+  }
+
   func testToolbarSurvivesSidebarToggle() throws {
     let app = launch(mode: "preview")
 

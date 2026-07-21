@@ -2,6 +2,12 @@ import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
+@MainActor
+@Observable
+final class TaskBoardItemCreationOutcome {
+  var succeeded = false
+}
+
 struct TaskBoardItemManagementPanel: View {
   let item: TaskBoardItem?
   let metrics: TaskBoardOverviewMetrics
@@ -13,6 +19,7 @@ struct TaskBoardItemManagementPanel: View {
 
   @State private var draft: TaskBoardItemEditorDraft
   @State private var projectTypeSuggestions: [String] = []
+  @State private var creationOutcome = TaskBoardItemCreationOutcome()
   @Environment(\.fontScale)
   var fontScale
   @Environment(\.dismiss)
@@ -73,6 +80,11 @@ struct TaskBoardItemManagementPanel: View {
     .accessibilityIdentifier("harness.task-board.manage-item.\(item?.id ?? "new")")
     .onChange(of: item) { _, newValue in
       draft = newValue.map(TaskBoardItemEditorDraft.init) ?? TaskBoardItemEditorDraft()
+    }
+    .onChange(of: creationOutcome.succeeded) { _, succeeded in
+      if succeeded {
+        dismiss()
+      }
     }
   }
 
@@ -248,6 +260,7 @@ struct TaskBoardItemManagementPanel: View {
     .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
     .controlSize(HarnessMonitorControlMetrics.compactControlSize)
     .disabled(isActionInFlight || !draft.canSubmit || !canSubmit)
+    .accessibilityIdentifier("harness.task-board.manage-item.submit")
 
     if let item {
       TaskBoardPlanLifecycleActionButtons(
@@ -339,7 +352,11 @@ struct TaskBoardItemManagementPanel: View {
     if let item {
       actions.updateTaskBoardItem(item.id, request: draft.updateRequest)
     } else {
-      actions.createTaskBoardItem(draft.createRequest, initialStatus: draft.status)
+      actions.createTaskBoardItem(
+        draft.createRequest,
+        initialStatus: draft.status,
+        outcome: creationOutcome
+      )
     }
   }
 }
