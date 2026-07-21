@@ -40,6 +40,11 @@
       "enabled": false,
       "matchManagers": ["github-actions"],
       "matchPackageNames": ["smykla-skalski/smyklot"]
+    },
+    {
+      "description": "Freeze the vendored codex-acp workspace lock; its deps are pinned to codex rust-v0.137.0 / zed codex-acp v0.16.0",
+      "matchFileNames": ["crates/harness-codex-acp/Cargo.toml"],
+      "lockFileMaintenance": { "enabled": false }
     }
   ],
   "vulnerabilityAlerts": {
