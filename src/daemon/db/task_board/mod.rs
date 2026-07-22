@@ -18,6 +18,8 @@ mod items_reads;
 mod lane_order;
 mod lane_order_api;
 mod lane_order_audit;
+#[cfg(test)]
+mod lane_order_tests;
 mod mapper;
 mod policy_queues;
 mod policy_runs;
