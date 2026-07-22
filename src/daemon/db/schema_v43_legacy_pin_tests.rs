@@ -101,7 +101,10 @@ fn seed_mixed_pin_fixture(db: &DaemonDb) {
 }
 
 fn assert_sync_quarantine(db: &DaemonDb) -> String {
-    assert_eq!(db.schema_version().expect("schema version"), "43");
+    assert_eq!(
+        db.schema_version().expect("schema version"),
+        crate::daemon::db::SCHEMA_VERSION
+    );
     let settings_json: String = db
         .connection()
         .query_row(
@@ -155,7 +158,10 @@ fn assert_sync_quarantine(db: &DaemonDb) -> String {
 }
 
 async fn assert_async_quarantine(db: &AsyncDaemonDb) -> String {
-    assert_eq!(db.schema_version().await.expect("schema version"), "43");
+    assert_eq!(
+        db.schema_version().await.expect("schema version"),
+        crate::daemon::db::SCHEMA_VERSION
+    );
     let settings_json = query_scalar::<_, String>(
         "SELECT settings_json FROM task_board_orchestrator_settings WHERE singleton = 1",
     )

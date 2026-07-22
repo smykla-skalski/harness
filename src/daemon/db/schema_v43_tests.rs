@@ -49,7 +49,10 @@ fn fresh_schema_includes_v43_remote_execution_evidence() {
         )
         .expect("inspect durable source abandonment authority schema");
     assert_eq!(abandonment_columns, 4);
-    assert_eq!(db.schema_version().expect("schema version"), "43");
+    assert_eq!(
+        db.schema_version().expect("schema version"),
+        crate::daemon::db::SCHEMA_VERSION
+    );
 }
 
 #[test]

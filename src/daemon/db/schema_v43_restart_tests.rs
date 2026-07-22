@@ -246,7 +246,10 @@ fn migrate_v43_with_quarantine(path: &Path) -> DaemonDb {
     drop(legacy);
 
     let migrated = DaemonDb::open(path).expect("migrate v43 with populated quarantine ledger");
-    assert_eq!(migrated.schema_version().expect("schema version"), "43");
+    assert_eq!(
+        migrated.schema_version().expect("schema version"),
+        crate::daemon::db::SCHEMA_VERSION
+    );
     assert_eq!(
         quarantine_row_count(migrated.connection()),
         1,

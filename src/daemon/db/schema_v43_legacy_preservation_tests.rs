@@ -99,7 +99,10 @@ async fn async_v36_assignment_upgrade_preserves_every_legacy_field() {
         .await
         .expect("migrate legacy remote assignment asynchronously");
 
-    assert_eq!(db.schema_version().await.expect("schema version"), "43");
+    assert_eq!(
+        db.schema_version().await.expect("schema version"),
+        crate::daemon::db::SCHEMA_VERSION
+    );
     let migration_count: i64 =
         query_scalar("SELECT COUNT(*) FROM _sqlx_migrations WHERE version = 35")
             .fetch_one(db.pool())
