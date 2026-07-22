@@ -142,15 +142,15 @@ extension RecordingHarnessClient {
   }
 
   private func replaceInMaterializedLane(_ item: TaskBoardItem, at target: Int) {
-    var laneItems = taskBoardItemsStorage.filter { entry in
-      entry.status == item.status && entry.id != item.id
+    let liveLaneIndices = taskBoardItemsStorage.indices.filter { index in
+      let entry = taskBoardItemsStorage[index]
+      return entry.status == item.status && entry.deletedAt == nil
     }
+    var laneItems = liveLaneIndices.map { taskBoardItemsStorage[$0] }
+    laneItems.removeAll { $0.id == item.id }
     laneItems.insert(item, at: target)
-    var laneIndex = 0
-    taskBoardItemsStorage = taskBoardItemsStorage.map { entry in
-      guard entry.status == item.status else { return entry }
-      defer { laneIndex += 1 }
-      return laneItems[laneIndex]
+    for (storageIndex, laneItem) in zip(liveLaneIndices, laneItems) {
+      taskBoardItemsStorage[storageIndex] = laneItem
     }
   }
 

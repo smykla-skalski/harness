@@ -141,6 +141,32 @@ struct HarnessMonitorStoreTaskBoardReorderTests {
     )
   }
 
+  @Test("Recording reorder leaves deleted same-status rows in place")
+  func reorderFixturePreservesDeletedRows() async throws {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardItems([
+      taskBoardItem(id: "a", status: .todo),
+      taskBoardItem(
+        id: "deleted",
+        status: .todo,
+        deletedAt: "2026-07-22T15:00:00Z"
+      ),
+      taskBoardItem(id: "b", status: .todo),
+    ])
+    let store = await makeBootstrappedStore(client: client)
+
+    let success = await store.reorderTaskBoardItem(
+      id: "a",
+      status: .todo,
+      placement: placement(after: "b")
+    )
+    let snapshot = try await client.taskBoardItemsSnapshot(status: .todo)
+
+    #expect(success)
+    #expect(snapshot.items.map(\.id) == ["b", "deleted", "a"])
+    #expect(snapshot.items.first(where: { $0.id == "deleted" })?.deletedAt != nil)
+  }
+
   @Test("Resetting a manually placed item clears its lane placement")
   func resetClearsManualPlacement() async {
     let client = RecordingHarnessClient()
@@ -242,7 +268,8 @@ struct HarnessMonitorStoreTaskBoardReorderTests {
     status: TaskBoardStatus,
     kind: TaskBoardItemKind = .task,
     lanePosition: UInt32? = nil,
-    laneOrigin: TaskBoardLaneOrigin? = nil
+    laneOrigin: TaskBoardLaneOrigin? = nil,
+    deletedAt: String? = nil
   ) -> TaskBoardItem {
     TaskBoardItem(
       schemaVersion: 1,
@@ -266,7 +293,7 @@ struct HarnessMonitorStoreTaskBoardReorderTests {
       laneSetAt: nil,
       createdAt: "2026-05-14T10:00:00Z",
       updatedAt: "2026-05-14T10:01:00Z",
-      deletedAt: nil
+      deletedAt: deletedAt
     )
   }
 }
