@@ -49,6 +49,14 @@ public enum HarnessMonitorTheme {
   public static let success = harnessColor("HarnessMonitorSuccess")
   public static let caution = harnessColor("HarnessMonitorCaution")
   public static let danger = harnessColor("HarnessMonitorDanger")
+  /// Selectable lane-palette hues. Kept as calibrated assets (not SwiftUI's raw
+  /// `.blue`/`.purple`/...) so every lane colour clears WCAG AA against the
+  /// board canvas in both appearances; the raw system hues did not.
+  public static let blue = harnessColor("HarnessMonitorBlue")
+  public static let teal = harnessColor("HarnessMonitorTeal")
+  public static let purple = harnessColor("HarnessMonitorPurple")
+  public static let pink = harnessColor("HarnessMonitorPink")
+  public static let mint = harnessColor("HarnessMonitorMint")
   public static let controlBorder = harnessColor("HarnessMonitorControlBorder")
   public static let overlayScrim = harnessColor("HarnessMonitorOverlayScrim")
   public static let disabledConnectionChrome = ink.opacity(0.32)
