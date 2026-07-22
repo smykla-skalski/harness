@@ -47,6 +47,7 @@ mod remote_authz_audit;
 mod remote_authz_audit_contention;
 mod remote_authz_matrix;
 mod remote_clients;
+mod remote_execution;
 mod remote_limits;
 mod remote_limits_support;
 mod remote_pairing;

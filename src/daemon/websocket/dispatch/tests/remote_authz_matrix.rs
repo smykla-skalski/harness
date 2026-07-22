@@ -81,6 +81,7 @@ struct MatrixClients {
     operator: Arc<Mutex<ConnectionState>>,
     admin: Arc<Mutex<ConnectionState>>,
     write_only: Arc<Mutex<ConnectionState>>,
+    executor: Arc<Mutex<ConnectionState>>,
 }
 
 impl MatrixClients {
@@ -100,6 +101,12 @@ impl MatrixClients {
                 RemoteRole::Operator,
                 &[RemoteAccessScope::Write],
             )),
+            executor: connection(registered_client(
+                state,
+                "executor",
+                RemoteRole::ExecutionCoordinator,
+                &[],
+            )),
         }
     }
 
@@ -108,13 +115,14 @@ impl MatrixClients {
             RemoteAccessScope::Read => &self.viewer,
             RemoteAccessScope::Write => &self.operator,
             RemoteAccessScope::Admin => &self.admin,
+            RemoteAccessScope::Execute => &self.executor,
         }
     }
 
     fn denied(&self, scope: RemoteAccessScope) -> &Arc<Mutex<ConnectionState>> {
         match scope {
             RemoteAccessScope::Read | RemoteAccessScope::Admin => &self.write_only,
-            RemoteAccessScope::Write => &self.viewer,
+            RemoteAccessScope::Write | RemoteAccessScope::Execute => &self.viewer,
         }
     }
 }

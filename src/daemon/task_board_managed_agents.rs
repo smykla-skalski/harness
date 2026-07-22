@@ -470,3 +470,10 @@ mod tests;
 #[cfg(test)]
 #[path = "task_board_managed_agents/read_only_start_revision_tests.rs"]
 mod read_only_start_revision_tests;
+
+#[cfg(test)]
+#[path = "task_board_managed_agents/workflow_prepared_terminal_started_tests.rs"]
+mod workflow_prepared_terminal_started_tests;
+#[cfg(test)]
+#[path = "task_board_managed_agents/workflow_prepared_terminal_tests.rs"]
+mod workflow_prepared_terminal_tests;

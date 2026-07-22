@@ -281,10 +281,7 @@ fn worktree(item: &TaskBoardItem) -> Result<&str, CliError> {
 }
 
 const fn is_write_workflow(kind: TaskBoardWorkflowKind) -> bool {
-    matches!(
-        kind,
-        TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
-    )
+    kind.is_write()
 }
 
 fn invalid_transition(detail: impl Into<String>) -> CliError {

@@ -11,6 +11,20 @@ mod completion_fence_tests;
 mod estimate_freeze_tests;
 #[path = "admission_dispatch_read_only_revision.rs"]
 mod read_only_revision_tests;
+#[path = "admission_dispatch_remote_cancel.rs"]
+mod remote_cancel_tests;
+#[path = "admission_dispatch_remote_completion.rs"]
+mod remote_completion_tests;
+#[path = "admission_dispatch_remote_result_adoption.rs"]
+mod remote_result_adoption_tests;
+#[path = "admission_dispatch_remote_result_import.rs"]
+mod remote_result_import_tests;
+#[path = "admission_dispatch_remote_start.rs"]
+mod remote_start_tests;
+#[path = "admission_dispatch_remote_status.rs"]
+mod remote_status_tests;
+pub(crate) use remote_start_tests::{PreparedRemoteOffer, prepare_remote_offer};
+pub(crate) use remote_result_import_tests::prepare_remote_implementation_offer;
 #[path = "admission_dispatch_startup_reconciliation.rs"]
 mod startup_reconciliation_tests;
 #[path = "admission_dispatch_write_workflow.rs"]
@@ -225,7 +239,7 @@ async fn terminal_run_before_dispatch_commit_releases_only_concurrency() {
     assert_eq!(ledger_kind_state(&db, &intent, "rate").await, "committed");
 }
 
-pub(super) struct TestDb {
+pub(crate) struct TestDb {
     db: AsyncDaemonDb,
     _directory: TempDir,
 }
@@ -239,7 +253,7 @@ impl Deref for TestDb {
 }
 
 impl TestDb {
-    pub(super) async fn reopen(&self) -> AsyncDaemonDb {
+    pub(crate) async fn reopen(&self) -> AsyncDaemonDb {
         AsyncDaemonDb::connect(&self._directory.path().join("harness.db"))
             .await
             .expect("reopen test db")

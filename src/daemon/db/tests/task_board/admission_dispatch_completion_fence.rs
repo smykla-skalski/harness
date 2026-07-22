@@ -159,7 +159,7 @@ async fn read_only_launch(
         },
         provider_revision: None,
         pull_request: None,
-        exact_head_revision: "head-frozen".into(),
+        exact_head_revision: "1111111111111111111111111111111111111111".into(),
     }
 }
 

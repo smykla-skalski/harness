@@ -76,8 +76,5 @@ fn object_exists(conn: &Connection, object_type: &str, name: &str) -> Result<boo
 }
 
 fn normalize_sql(sql: &str) -> String {
-    sql.split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .to_ascii_lowercase()
+    super::schema_repairs::normalize_schema_sql(sql)
 }

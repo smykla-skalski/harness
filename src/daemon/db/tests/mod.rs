@@ -37,7 +37,7 @@ mod schema_shape_repairs_wake_events;
 mod signals;
 mod sync;
 mod sync_change_tracking;
-mod task_board;
+pub(crate) mod task_board;
 
 #[test]
 fn db_round_trip_smoke_covers_public_surface() {

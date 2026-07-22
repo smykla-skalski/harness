@@ -62,6 +62,30 @@ async fn side_effect_claim_updates_parent_and_child_and_fences_terminal_writer()
         TaskBoardExecutionState::Starting
     );
     assert_eq!(durable.attempts[0].state, TaskBoardAttemptState::Running);
+    assert_eq!(
+        durable
+            .ownership
+            .resources
+            .get("execution_target")
+            .map(String::as_str),
+        Some("local")
+    );
+    assert_eq!(
+        durable
+            .ownership
+            .resources
+            .get("execution_target_action_key")
+            .map(String::as_str),
+        Some("review:reviewer")
+    );
+    assert_eq!(
+        durable
+            .ownership
+            .resources
+            .get("execution_target_attempt")
+            .map(String::as_str),
+        Some("1")
+    );
 
     let mut stopped = execution.clone();
     stopped.transition.execution_state = TaskBoardExecutionState::HumanRequired;
@@ -87,7 +111,7 @@ async fn seed_starting_report(
         action_key: "review:reviewer".into(),
         attempt: 1,
         idempotency_key: format!("codex-{}-review-1", execution.execution_id),
-        state: TaskBoardAttemptState::Starting,
+        state: TaskBoardAttemptState::Preparing,
         failure_class: None,
         available_at: None,
         error: None,
@@ -97,7 +121,24 @@ async fn seed_starting_report(
         completed_at: None,
     })
     .await
-    .expect("seed Starting report attempt");
+    .expect("seed preparing report attempt");
+    // A report side effect is only claimable once the local target is selected,
+    // so drive the real Preparing -> Starting selection instead of faking the state.
+    let prepared = db
+        .task_board_workflow_execution(&execution.execution_id)
+        .await
+        .expect("load preparing report execution")
+        .expect("preparing report execution");
+    assert!(
+        db.select_task_board_local_execution_target(
+            &TaskBoardWorkflowExecutionCas::from(&prepared),
+            &TaskBoardExecutionAttemptCas::from(&prepared.attempts[0]),
+            NOW,
+        )
+        .await
+        .expect("select local report target"),
+        "fixture must select the local target",
+    );
     db.task_board_workflow_execution(&execution.execution_id)
         .await
         .expect("load Starting report execution")
@@ -129,7 +170,7 @@ async fn assert_claim_not_recorded(db: &AsyncDaemonDb, execution_id: &str) {
         .expect("unclaimed execution");
     assert_eq!(
         durable.transition.execution_state,
-        TaskBoardExecutionState::Pending
+        TaskBoardExecutionState::Starting
     );
     assert_eq!(durable.attempts[0].state, TaskBoardAttemptState::Starting);
 }

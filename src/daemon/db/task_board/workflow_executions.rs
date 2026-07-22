@@ -2,11 +2,16 @@ use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
+use super::remote_assignment_io_authority::has_remote_io_authority;
+use super::remote_assignment_stop_fence::{
+    RemoteTargetStopPlan, remote_stop_requires_cancellation, remote_target_stop_plan_in_tx,
+};
 use super::workflow_execution_attempts::load_execution_attempts_in_tx;
 use super::workflow_execution_revisions::live_execution_revision_mismatch_in_tx;
 use super::workflow_execution_rows::{WorkflowExecutionRow, execution_json, label, phase_label};
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error};
 use crate::task_board::{
+    TASK_BOARD_REMOTE_CANCEL_INTENT_RESOURCE,
     TaskBoardAttemptState, TaskBoardExecutionPhase, TaskBoardExecutionState,
     TaskBoardWorkflowCasMismatch, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionCasOutcome, TaskBoardWorkflowExecutionCreateOutcome,
@@ -152,14 +157,24 @@ impl AsyncDaemonDb {
             })?;
             return Ok(TaskBoardWorkflowExecutionCasOutcome::Unchanged(current));
         }
-        update_execution_in_tx(&mut transaction, expected, updated).await?;
+        let persisted = match remote_target_stop_plan_in_tx(&mut transaction, &current, updated)
+            .await?
+        {
+            RemoteTargetStopPlan::ApplyRequested => updated.clone(),
+            RemoteTargetStopPlan::PersistCancelIntent(parent) => parent,
+            RemoteTargetStopPlan::ReplayedCancelIntent(parent) => {
+                transaction.commit().await.map_err(|error| {
+                    db_error(format!("commit replayed remote cancellation CAS: {error}"))
+                })?;
+                return Ok(TaskBoardWorkflowExecutionCasOutcome::Unchanged(parent));
+            }
+        };
+        update_execution_in_tx(&mut transaction, expected, &persisted).await?;
         bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
         transaction.commit().await.map_err(|error| {
             db_error(format!("commit task board workflow execution CAS: {error}"))
         })?;
-        Ok(TaskBoardWorkflowExecutionCasOutcome::Updated(
-            updated.clone(),
-        ))
+        Ok(TaskBoardWorkflowExecutionCasOutcome::Updated(persisted))
     }
 
     pub(crate) async fn task_board_configuration_revision(&self) -> Result<u64, CliError> {
@@ -387,7 +402,10 @@ pub(super) fn ensure_terminal_transition_has_no_active_side_effect(
 ) -> Result<(), CliError> {
     let stops = !is_stopped(current.transition.execution_state)
         && is_stopped(updated.transition.execution_state);
-    if stops && has_active_external_side_effect(current) {
+    if stops
+        && has_active_external_side_effect(current)
+        && !remote_stop_requires_cancellation(current, updated)
+    {
         return Err(CliErrorKind::concurrent_modification(
             "workflow execution has an admitted external side effect",
         )
@@ -397,22 +415,28 @@ pub(super) fn ensure_terminal_transition_has_no_active_side_effect(
 }
 
 fn has_active_external_side_effect(execution: &TaskBoardWorkflowExecutionRecord) -> bool {
-    execution
-        .attempts
-        .iter()
-        .any(|attempt| match execution.transition.phase {
-            Some(
-                TaskBoardExecutionPhase::Implementation
-                | TaskBoardExecutionPhase::Review
-                | TaskBoardExecutionPhase::Evaluate,
-            ) => {
-                matches!(attempt.state, TaskBoardAttemptState::Running)
-            }
-            Some(TaskBoardExecutionPhase::Publish) => {
-                attempt.action_key == "publish" && attempt.state == TaskBoardAttemptState::Running
-            }
-            _ => false,
-        })
+    has_remote_io_authority(execution)
+        || execution
+            .ownership
+            .resources
+            .contains_key(TASK_BOARD_REMOTE_CANCEL_INTENT_RESOURCE)
+        || execution
+            .attempts
+            .iter()
+            .any(|attempt| match execution.transition.phase {
+                Some(
+                    TaskBoardExecutionPhase::Implementation
+                    | TaskBoardExecutionPhase::Review
+                    | TaskBoardExecutionPhase::Evaluate,
+                ) => {
+                    matches!(attempt.state, TaskBoardAttemptState::Running)
+                }
+                Some(TaskBoardExecutionPhase::Publish) => {
+                    attempt.action_key == "publish"
+                        && attempt.state == TaskBoardAttemptState::Running
+                }
+                _ => false,
+            })
 }
 
 const fn is_stopped(state: TaskBoardExecutionState) -> bool {

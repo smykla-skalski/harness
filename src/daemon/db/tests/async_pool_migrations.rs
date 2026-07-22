@@ -11,15 +11,10 @@ async fn connect_upgrades_applied_original_v34_migration() {
     let tmp = tempdir().expect("tempdir");
     let db_path = tmp.path().join("harness.db");
     let sync_db = DaemonDb::open(&db_path).expect("open current sync daemon db");
+    restore_original_v34_upgrade_shape(&sync_db);
     drop(sync_db);
 
     let conn = Connection::open(&db_path).expect("open sqlite");
-    conn.execute(
-        "ALTER TABLE task_board_dispatch_intents
-         DROP COLUMN consumed_approval_grant_id",
-        [],
-    )
-    .expect("restore original v34 dispatch schema");
     conn.execute(
         "INSERT INTO policy_workspace (
             singleton, active_canvas_id, workspace_schema_version, updated_at
@@ -74,7 +69,7 @@ async fn connect_upgrades_applied_original_v34_migration() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        (1..=36).collect::<Vec<i64>>()
+        (1..=37).collect::<Vec<i64>>()
     );
     let requires_live = query_scalar::<_, bool>(
         "SELECT spawn_requires_live_policy FROM policy_workspace WHERE singleton = 1",
@@ -93,9 +88,28 @@ async fn connect_upgrades_applied_original_v34_migration() {
     assert_eq!(has_grant_tracking, 1);
 }
 
-#[test]
-fn shipped_daemon_async_migration_checksums_remain_stable() {
-    let migrations = [
+fn restore_original_v34_upgrade_shape(db: &DaemonDb) {
+    // This compatibility test starts from the current sync snapshot so it can
+    // seed one historical SQLx ledger row. A version stamp alone is not a
+    // historical schema: strict v43 correctly rejects current remote tables
+    // paired with a partially downgraded dispatch table. Restore the remote
+    // and dispatch lineage to shapes the v35 -> v43 chain can actually emit,
+    // then remove the v35 and v39 effects exercised by that chain.
+    crate::daemon::db::schema_v43::restore_legacy_v40_for_test(db);
+    db.connection()
+        .execute_batch(
+            "DROP TABLE task_board_dispatch_admission_ledger;
+             DROP TABLE task_board_dispatch_admission_decisions;
+             DROP INDEX task_board_dispatch_intents_admission_identity;
+             ALTER TABLE task_board_dispatch_intents DROP COLUMN compensation_pending;
+             ALTER TABLE task_board_items DROP COLUMN estimated_cost_microusd;
+             ALTER TABLE task_board_items DROP COLUMN estimated_tokens;
+             ALTER TABLE task_board_dispatch_intents DROP COLUMN consumed_approval_grant_id;",
+        )
+        .expect("restore original v34 admission and dispatch effects");
+}
+
+const SHIPPED_MIGRATION_CHECKSUMS: &[(&str, &str)] = &[
         (
             "0001_daemon_v7_baseline.sql",
             "6EEA02EDAA6DBAF2DC500FFC9969898E332A333F76036F9ECE6721D92B0F01C3D7F8CDEAADA20566C3241AAF8D73A7D8",
@@ -189,10 +203,17 @@ fn shipped_daemon_async_migration_checksums_remain_stable() {
             "0034_daemon_v40_task_board_reconciliation_cursors.sql",
             "FC06379A2C8BB18CD0EB3C6D20A5F83F6E0DA271B47891BB1BE1F3E7ADF9A431C664C6527D2BB7348CECDAA1BB96D4B0",
         ),
-    ];
+        (
+            "0037_daemon_v43_task_board_remote_execution.sql",
+            "F125288DF483846801C2E50E4B5313747ED4817A91E87675B1040CE2D661806957E44B8F3953530077670F0B2DCF4083",
+        ),
+];
+
+#[test]
+fn shipped_daemon_async_migration_checksums_remain_stable() {
     let migrations_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/daemon/db/migrations");
 
-    for (filename, expected_checksum) in migrations {
+    for &(filename, expected_checksum) in SHIPPED_MIGRATION_CHECKSUMS {
         let bytes = std::fs::read(migrations_dir.join(filename)).expect("read migration");
         let actual_checksum = hex::encode_upper(Sha384::digest(bytes));
         assert_eq!(

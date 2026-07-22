@@ -179,6 +179,80 @@ async fn concurrent_recovery_selectors_advance_successive_windows() {
 }
 
 #[tokio::test]
+async fn remote_candidates_and_local_recovery_use_independent_restart_safe_cursors() {
+    const PAGE: usize = 16;
+    let (db, temp) = workflow_database().await;
+    for index in 0..48 {
+        let state = match index {
+            0..=19 => TaskBoardExecutionState::Running,
+            20..=27 => TaskBoardExecutionState::Starting,
+            _ => TaskBoardExecutionState::Preparing,
+        };
+        mixed_execution(&db, index, state).await;
+    }
+
+    let first_remote = db
+        .remote_candidate_task_board_workflow_executions(PAGE)
+        .await
+        .expect("select first remote-candidate page");
+    assert_eq!(first_remote.len(), PAGE);
+    assert_eq!(owned_execution_ids(&first_remote), mixed_ids(28..44));
+    assert_eq!(recovery_cursor(&db).await, None);
+    assert!(remote_candidate_cursor(&db).await.is_some());
+
+    let path = temp.path().join("harness.db");
+    drop(db);
+    let reopened = AsyncDaemonDb::connect(&path)
+        .await
+        .expect("reopen database after remote selection");
+    let second_remote = reopened
+        .remote_candidate_task_board_workflow_executions(PAGE)
+        .await
+        .expect("resume remote-candidate cursor");
+    assert_eq!(second_remote.len(), PAGE);
+    let selected_remote = first_remote
+        .iter()
+        .chain(&second_remote)
+        .map(|execution| execution.execution_id.clone())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(selected_remote, mixed_ids(28..48).into_iter().collect());
+
+    let remote_cursor_before_local = remote_candidate_cursor(&reopened).await;
+    let first_local = reopened
+        .recoverable_task_board_workflow_executions(PAGE)
+        .await
+        .expect("select first local recovery page after remote pages");
+    assert_eq!(first_local.len(), PAGE);
+    assert_eq!(owned_execution_ids(&first_local), mixed_ids(0..16));
+    assert_eq!(
+        remote_candidate_cursor(&reopened).await,
+        remote_cursor_before_local
+    );
+
+    drop(reopened);
+    let restarted = AsyncDaemonDb::connect(&path)
+        .await
+        .expect("restart with both durable cursors");
+    let second_local = restarted
+        .recoverable_task_board_workflow_executions(PAGE)
+        .await
+        .expect("resume second local recovery page");
+    let third_remote = restarted
+        .remote_candidate_task_board_workflow_executions(PAGE)
+        .await
+        .expect("advance remote candidates between local pages");
+    let third_local = restarted
+        .recoverable_task_board_workflow_executions(PAGE)
+        .await
+        .expect("resume third local recovery page");
+    assert_eq!(second_local.len(), PAGE);
+    assert_eq!(third_remote.len(), PAGE);
+    assert_eq!(third_local.len(), PAGE);
+    assert_eq!(owned_execution_ids(&second_local), mixed_ids(16..32));
+    assert_eq!(owned_execution_ids(&third_local), mixed_ids(32..48));
+}
+
+#[tokio::test]
 async fn malformed_candidate_rolls_back_cursor() {
     let (db, _temp) = workflow_database().await;
     running_execution(&db, "a", EARLY).await;
@@ -314,6 +388,29 @@ async fn running_execution(
     .await
 }
 
+async fn mixed_execution(
+    db: &AsyncDaemonDb,
+    index: usize,
+    state: TaskBoardExecutionState,
+) -> TaskBoardWorkflowExecutionRecord {
+    let timestamp = format!("2026-07-17T09:{index:02}:00Z");
+    let execution = create_execution(db, &format!("mixed-{index:02}"), &timestamp).await;
+    set_state(db, execution, state, None, &timestamp).await
+}
+
+fn owned_execution_ids(executions: &[TaskBoardWorkflowExecutionRecord]) -> Vec<String> {
+    executions
+        .iter()
+        .map(|execution| execution.execution_id.clone())
+        .collect()
+}
+
+fn mixed_ids(range: std::ops::Range<usize>) -> Vec<String> {
+    range
+        .map(|index| format!("execution-mixed-{index:02}"))
+        .collect()
+}
+
 async fn recovery_cursor(db: &AsyncDaemonDb) -> Option<(String, String)> {
     query_as(
         "SELECT sort_updated_at, sort_execution_id
@@ -323,6 +420,17 @@ async fn recovery_cursor(db: &AsyncDaemonDb) -> Option<(String, String)> {
     .fetch_optional(db.pool())
     .await
     .expect("load recovery cursor")
+}
+
+async fn remote_candidate_cursor(db: &AsyncDaemonDb) -> Option<(String, String)> {
+    query_as(
+        "SELECT sort_updated_at, sort_execution_id
+         FROM task_board_reconciliation_cursors
+         WHERE queue = 'remote_target_candidates'",
+    )
+    .fetch_optional(db.pool())
+    .await
+    .expect("load remote-candidate cursor")
 }
 
 async fn store_cursor(db: &AsyncDaemonDb, updated_at: &str, execution_id: &str) {

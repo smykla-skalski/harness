@@ -71,6 +71,11 @@ fn apply_automation_fields(
     if let Some(execution_hosts) = &update.execution_hosts {
         settings.execution_hosts.clone_from(execution_hosts);
     }
+    if let Some(local_execution_host) = &update.local_execution_host {
+        settings
+            .local_execution_host
+            .clone_from(local_execution_host);
+    }
     if let Some(admission_policy) = &update.admission_policy {
         settings.admission_policy.clone_from(admission_policy);
     }

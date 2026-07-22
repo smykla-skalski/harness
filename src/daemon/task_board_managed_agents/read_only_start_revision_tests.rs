@@ -9,8 +9,9 @@ use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::CodexRunStatus;
 use crate::task_board::{
     AgentMode, SpawnGateSwitches, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardItem,
-    TaskBoardReadOnlyRunContext, TaskBoardReadOnlyWorkflowLaunch, TaskBoardWorkflowKind,
-    build_dispatch_plans_with_policy, resolve_task_board_reviewers,
+    TaskBoardPolicyLimit, TaskBoardPolicyScope, TaskBoardReadOnlyRunContext,
+    TaskBoardReadOnlyWorkflowLaunch, TaskBoardWorkflowKind, build_dispatch_plans_with_policy,
+    resolve_task_board_reviewers,
 };
 
 use super::start_authorization_test_support::StartAuthorizationPause;
@@ -19,6 +20,42 @@ use super::{
     codex_worker_request, managed_worker_id, settle_claimed_task_board_worker,
     start_worker_for_applied_task,
 };
+
+#[tokio::test]
+async fn workflow_dispatch_persists_before_any_codex_start() {
+    let (state, mut claim, _worktree) = claimed_read_only_dispatch().await;
+    let db = state.async_db.get().cloned().expect("test async db");
+    seed_session(&db, &claim.applied.session_id).await;
+
+    let settlement = settle_claimed_task_board_worker(&state, &db, &mut claim)
+        .await
+        .expect("persist workflow dispatch");
+
+    assert!(settlement.is_none());
+    assert_eq!(codex_run_count(&db).await, 0);
+    assert_eq!(workflow_execution_count(&db).await, 1);
+    assert_eq!(
+        intent_status(&db, &claim.intent_id).await,
+        "workflow_prepared"
+    );
+    assert_eq!(admission_state_counts(&db, &claim.intent_id).await, (1, 0));
+    let execution_id = claim
+        .applied
+        .item
+        .workflow
+        .execution_id
+        .as_deref()
+        .expect("workflow execution id");
+    let execution = db
+        .task_board_workflow_execution(execution_id)
+        .await
+        .expect("load workflow execution")
+        .expect("durable workflow execution");
+    assert_eq!(
+        execution.attempts[0].state,
+        crate::task_board::TaskBoardAttemptState::Preparing
+    );
+}
 
 #[tokio::test]
 async fn managed_read_only_start_rejects_revision_drift_before_codex() {
@@ -229,9 +266,35 @@ async fn stale_claim_after_probe_keeps_exact_worker_running() {
     assert_eq!(fenced.updated_at, probed.updated_at);
 }
 
-async fn claimed_read_only_dispatch() -> (DaemonHttpState, ClaimedTaskBoardDispatch, TempDir) {
+pub(super) async fn claimed_read_only_dispatch()
+-> (DaemonHttpState, ClaimedTaskBoardDispatch, TempDir) {
+    claimed_read_only_dispatch_with_policy(true).await
+}
+
+pub(super) async fn claimed_read_only_dispatch_without_policy()
+-> (DaemonHttpState, ClaimedTaskBoardDispatch, TempDir) {
+    claimed_read_only_dispatch_with_policy(false).await
+}
+
+async fn claimed_read_only_dispatch_with_policy(
+    finite_policy: bool,
+) -> (DaemonHttpState, ClaimedTaskBoardDispatch, TempDir) {
     let state = test_http_state();
     let db = state.async_db.get().cloned().expect("test async db");
+    if finite_policy {
+        let mut settings = db
+            .task_board_orchestrator_settings()
+            .await
+            .expect("load settings");
+        settings.admission_policy.limits = vec![TaskBoardPolicyLimit::Concurrency {
+            scope: TaskBoardPolicyScope::Global,
+            limit: 1,
+            reservation: 1,
+        }];
+        db.replace_task_board_orchestrator_settings(&settings)
+            .await
+            .expect("configure finite workflow admission");
+    }
     let worktree = tempfile::tempdir().expect("review worktree");
     harness_testkit::init_git_repo_with_seed(worktree.path());
     let exact_head = harness_testkit::git_head_sha(worktree.path(), "HEAD");
@@ -398,7 +461,10 @@ async fn workflow_execution_count(db: &crate::daemon::db::AsyncDaemonDb) -> i64 
         .expect("count workflow executions")
 }
 
-async fn intent_status(db: &crate::daemon::db::AsyncDaemonDb, intent_id: &str) -> String {
+pub(super) async fn intent_status(
+    db: &crate::daemon::db::AsyncDaemonDb,
+    intent_id: &str,
+) -> String {
     sqlx::query_scalar("SELECT status FROM task_board_dispatch_intents WHERE intent_id = ?1")
         .bind(intent_id)
         .fetch_one(db.pool())
@@ -417,6 +483,22 @@ async fn intent_compensation_pending(
     .fetch_one(db.pool())
     .await
     .expect("load intent compensation state")
+}
+
+pub(super) async fn admission_state_counts(
+    db: &crate::daemon::db::AsyncDaemonDb,
+    intent_id: &str,
+) -> (i64, i64) {
+    sqlx::query_as(
+        "SELECT
+             COALESCE(SUM(CASE WHEN state = 'reserved' THEN 1 ELSE 0 END), 0),
+             COALESCE(SUM(CASE WHEN state = 'committed' THEN 1 ELSE 0 END), 0)
+         FROM task_board_dispatch_admission_ledger WHERE intent_id = ?1",
+    )
+    .bind(intent_id)
+    .fetch_one(db.pool())
+    .await
+    .expect("load dispatch admission states")
 }
 
 async fn current_intent_claim(

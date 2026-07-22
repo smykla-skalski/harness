@@ -427,7 +427,7 @@ async fn reserved_read_only_unclaimed(
         },
         provider_revision: None,
         pull_request: None,
-        exact_head_revision: "head-frozen".into(),
+        exact_head_revision: "1111111111111111111111111111111111111111".into(),
     };
     (db, intent, item_id, launch)
 }

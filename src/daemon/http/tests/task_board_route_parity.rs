@@ -7,15 +7,21 @@ use crate::task_board::policy_graph::PolicyCanvasWorkspace;
 
 use super::task_board_route_parity_support::*;
 use super::task_board_support::{
-    assert_task_board_capabilities_match, without_durable_task_board_automation,
+    assert_task_board_capabilities_match, on_large_stack, without_durable_task_board_automation,
 };
 
 #[test]
 fn task_board_http_and_ws_workflow_routes_match() {
-    let sandbox = tempdir().expect("tempdir");
-    harness_testkit::with_isolated_harness_env(sandbox.path(), || {
-        let runtime = tokio::runtime::Runtime::new().expect("runtime");
-        runtime.block_on(run_task_board_workflow_parity());
+    on_large_stack(|| {
+        let sandbox = tempdir().expect("tempdir");
+        harness_testkit::with_isolated_harness_env(sandbox.path(), || {
+            let runtime = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .thread_stack_size(32 * 1024 * 1024)
+                .build()
+                .expect("runtime");
+            runtime.block_on(run_task_board_workflow_parity());
+        });
     });
 }
 
@@ -161,11 +167,17 @@ async fn assert_planning_routes_match(
 
 #[test]
 fn task_board_http_and_ws_orchestrator_routes_match() {
-    let sandbox = tempdir().expect("tempdir");
-    harness_testkit::with_isolated_harness_env(sandbox.path(), || {
-        let runtime = tokio::runtime::Runtime::new().expect("runtime");
-        without_durable_task_board_automation(|| {
-            runtime.block_on(run_task_board_orchestrator_parity());
+    on_large_stack(|| {
+        let sandbox = tempdir().expect("tempdir");
+        harness_testkit::with_isolated_harness_env(sandbox.path(), || {
+            let runtime = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .thread_stack_size(32 * 1024 * 1024)
+                .build()
+                .expect("runtime");
+            without_durable_task_board_automation(|| {
+                runtime.block_on(run_task_board_orchestrator_parity());
+            });
         });
     });
 }

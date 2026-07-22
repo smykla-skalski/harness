@@ -1,19 +1,28 @@
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error};
 use crate::task_board::{
-    TaskBoardAttemptState, TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptRecord,
-    TaskBoardExecutionPhase, TaskBoardExecutionState, TaskBoardOrchestratorSettings,
-    TaskBoardWorkflowCasMismatch, TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
-    TaskBoardWorkflowKind, validate_task_board_attempt_update,
-    validate_task_board_execution_update, validate_task_board_workflow_execution,
+    TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE, TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
+    TASK_BOARD_EXECUTION_TARGET_RESOURCE, TASK_BOARD_LEGACY_LOCAL_TARGET_ACTION_RESOURCE,
+    TASK_BOARD_LEGACY_LOCAL_TARGET_ADOPTION_RESOURCE, TASK_BOARD_LEGACY_LOCAL_TARGET_ADOPTION_V43,
+    TASK_BOARD_LEGACY_LOCAL_TARGET_ATTEMPT_RESOURCE,
+    TASK_BOARD_LEGACY_LOCAL_TARGET_IDEMPOTENCY_RESOURCE, TaskBoardAttemptState,
+    TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
+    TaskBoardExecutionState, TaskBoardOrchestratorSettings, TaskBoardWorkflowCasMismatch,
+    TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
+    validate_task_board_attempt_update, validate_task_board_execution_target_claim,
+    validate_task_board_legacy_local_target_adoption, validate_task_board_workflow_execution,
 };
 
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
+use super::remote_assignment_active_fence::active_remote_assignment_exists_in_tx;
 use super::workflow_execution_attempts::{
     attempt_cas_matches, attempt_identity_matches, update_attempt_in_tx, validate_attempt_phase,
 };
 use super::workflow_execution_revisions::live_execution_revision_mismatch_in_tx;
 use super::workflow_executions::{cas_mismatch, load_execution_in_tx, update_execution_in_tx};
+use super::workflow_first_start_admission::{
+    TaskBoardFirstStartAdmission, revalidate_first_start_admission_in_tx,
+};
 
 enum SideEffectClaimDisposition {
     Claim,
@@ -69,21 +78,33 @@ impl AsyncDaemonDb {
             })?;
             return Ok(None);
         }
+        if active_remote_assignment_exists_in_tx(&mut transaction, &expected_execution.execution_id)
+            .await?
+        {
+            return Err(CliErrorKind::concurrent_modification(
+                "active remote assignment fenced the local side-effect claim",
+            )
+            .into());
+        }
+        if target_selection_required(&parent, &current) {
+            return Err(CliErrorKind::concurrent_modification(
+                "workflow execution target selection is incomplete",
+            )
+            .into());
+        }
         validate_task_board_attempt_update(&current, claimed_attempt)
             .map_err(|error| db_error(format!("validate side-effect attempt claim: {error}")))?;
         validate_attempt_phase(&parent, claimed_attempt)?;
         ensure_live_revisions(&mut transaction, &parent).await?;
-        let mut parent_state = parent.clone();
-        parent_state.transition.execution_state = TaskBoardExecutionState::Starting;
-        parent_state.available_at = None;
-        parent_state.blocked_reason = None;
-        parent_state.updated_at = now.to_string();
-        validate_task_board_execution_update(&parent, &parent_state)
-            .map_err(|error| db_error(format!("validate side-effect parent claim: {error}")))?;
-        let mut claimed_record = parent_state.clone();
-        claimed_record.attempts[index] = claimed_attempt.clone();
-        validate_task_board_workflow_execution(&claimed_record)
-            .map_err(|error| db_error(format!("validate claimed workflow execution: {error}")))?;
+        if revalidate_first_start_admission_in_tx(&mut transaction, &parent, &current, now).await?
+            == TaskBoardFirstStartAdmission::Settled
+        {
+            transaction.commit().await.map_err(|error| {
+                db_error(format!("commit blocked workflow first start: {error}"))
+            })?;
+            return Ok(None);
+        }
+        let parent_state = claimed_parent_record(&parent, &current, claimed_attempt, index, now)?;
         update_execution_in_tx(&mut transaction, expected_execution, &parent_state).await?;
         update_attempt_in_tx(&mut transaction, expected_attempt, claimed_attempt).await?;
         bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
@@ -94,6 +115,53 @@ impl AsyncDaemonDb {
         })?;
         Ok(Some(claimed_attempt.clone()))
     }
+}
+
+fn claimed_parent_record(
+    parent: &TaskBoardWorkflowExecutionRecord,
+    current: &TaskBoardExecutionAttemptRecord,
+    claimed_attempt: &TaskBoardExecutionAttemptRecord,
+    index: usize,
+    now: &str,
+) -> Result<TaskBoardWorkflowExecutionRecord, CliError> {
+    let mut parent_state = parent.clone();
+    parent_state.transition.execution_state = TaskBoardExecutionState::Starting;
+    parent_state.ownership.host_id = None;
+    parent_state
+        .ownership
+        .resources
+        .insert(TASK_BOARD_EXECUTION_TARGET_RESOURCE.into(), "local".into());
+    parent_state.ownership.resources.insert(
+        TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE.into(),
+        claimed_attempt.action_key.clone(),
+    );
+    parent_state.ownership.resources.insert(
+        TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE.into(),
+        claimed_attempt.attempt.to_string(),
+    );
+    for key in [
+        TASK_BOARD_LEGACY_LOCAL_TARGET_ADOPTION_RESOURCE,
+        TASK_BOARD_LEGACY_LOCAL_TARGET_ACTION_RESOURCE,
+        TASK_BOARD_LEGACY_LOCAL_TARGET_ATTEMPT_RESOURCE,
+        TASK_BOARD_LEGACY_LOCAL_TARGET_IDEMPOTENCY_RESOURCE,
+    ] {
+        parent_state.ownership.resources.remove(key);
+    }
+    parent_state.available_at = None;
+    parent_state.blocked_reason = None;
+    parent_state.updated_at = now.to_string();
+    let mut claimed_record = parent_state.clone();
+    claimed_record.attempts[index] = claimed_attempt.clone();
+    let target_result = if legacy_local_target_adoption(parent, current) {
+        validate_task_board_legacy_local_target_adoption(parent, &claimed_record)
+    } else {
+        validate_task_board_execution_target_claim(parent, &claimed_record)
+    };
+    target_result
+        .map_err(|error| db_error(format!("validate side-effect parent claim: {error}")))?;
+    validate_task_board_workflow_execution(&claimed_record)
+        .map_err(|error| db_error(format!("validate claimed workflow execution: {error}")))?;
+    Ok(parent_state)
 }
 
 fn claim_disposition(
@@ -136,8 +204,10 @@ fn claim_disposition(
         )
         .into());
     }
-    if current.state != TaskBoardAttemptState::Starting
-        || claimed_attempt.state != TaskBoardAttemptState::Running
+    if !matches!(
+        current.state,
+        TaskBoardAttemptState::Preparing | TaskBoardAttemptState::Starting
+    ) || claimed_attempt.state != TaskBoardAttemptState::Running
         || !matches!(
             parent.transition.phase,
             Some(
@@ -149,10 +219,86 @@ fn claim_disposition(
         )
     {
         return Err(db_error(
-            "workflow side-effect claim requires a Starting external attempt",
+            "workflow side-effect claim requires a Preparing or Starting external attempt",
         ));
     }
     Ok(SideEffectClaimDisposition::Claim)
+}
+
+fn target_selection_required(
+    parent: &TaskBoardWorkflowExecutionRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
+) -> bool {
+    if !matches!(
+        parent.transition.phase,
+        Some(
+            TaskBoardExecutionPhase::Implementation
+                | TaskBoardExecutionPhase::Review
+                | TaskBoardExecutionPhase::Evaluate
+        )
+    ) {
+        return false;
+    }
+    !exact_local_target(parent, attempt) && !legacy_local_target_adoption(parent, attempt)
+}
+
+fn exact_local_target(
+    parent: &TaskBoardWorkflowExecutionRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
+) -> bool {
+    parent.ownership.host_id.is_none()
+        && parent
+            .ownership
+            .resources
+            .get(TASK_BOARD_EXECUTION_TARGET_RESOURCE)
+            .map(String::as_str)
+            == Some("local")
+        && parent
+            .ownership
+            .resources
+            .get(TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE)
+            == Some(&attempt.action_key)
+        && parent
+            .ownership
+            .resources
+            .get(TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE)
+            .is_some_and(|number| number == &attempt.attempt.to_string())
+}
+
+fn legacy_local_target_adoption(
+    parent: &TaskBoardWorkflowExecutionRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
+) -> bool {
+    attempt.state == TaskBoardAttemptState::Starting
+        && parent.ownership.host_id.is_none()
+        && parent
+            .ownership
+            .resources
+            .get(TASK_BOARD_LEGACY_LOCAL_TARGET_ADOPTION_RESOURCE)
+            .map(String::as_str)
+            == Some(TASK_BOARD_LEGACY_LOCAL_TARGET_ADOPTION_V43)
+        && parent
+            .ownership
+            .resources
+            .get(TASK_BOARD_LEGACY_LOCAL_TARGET_ACTION_RESOURCE)
+            == Some(&attempt.action_key)
+        && parent
+            .ownership
+            .resources
+            .get(TASK_BOARD_LEGACY_LOCAL_TARGET_ATTEMPT_RESOURCE)
+            .is_some_and(|number| number == &attempt.attempt.to_string())
+        && parent
+            .ownership
+            .resources
+            .get(TASK_BOARD_LEGACY_LOCAL_TARGET_IDEMPOTENCY_RESOURCE)
+            == Some(&attempt.idempotency_key)
+        && [
+            TASK_BOARD_EXECUTION_TARGET_RESOURCE,
+            TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE,
+            TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
+        ]
+        .iter()
+        .all(|key| !parent.ownership.resources.contains_key(*key))
 }
 
 async fn ensure_live_revisions(

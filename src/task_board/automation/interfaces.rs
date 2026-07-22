@@ -2,48 +2,9 @@ use async_trait::async_trait;
 
 use crate::errors::CliError;
 use crate::task_board::{
-    TaskBoardAdmissionRequirement, TaskBoardAutomationScope, TaskBoardExecutionHostAdvertisement,
-    TaskBoardLifecycleOutcome, TaskBoardLifecycleRequest, TaskBoardRemoteExecutionClaim,
-    TaskBoardRemoteExecutionRequest, TaskBoardRemoteExecutionResult,
-    TaskBoardRemoteExecutionStatus, TaskBoardWorkflowSnapshot,
+    TaskBoardAdmissionRequirement, TaskBoardAutomationScope, TaskBoardLifecycleOutcome,
+    TaskBoardLifecycleRequest, TaskBoardWorkflowSnapshot,
 };
-
-#[async_trait]
-pub trait TaskBoardExecutionTargetResolver: Send + Sync {
-    async fn resolve_host(
-        &self,
-        repository: &str,
-        workflow: &TaskBoardWorkflowSnapshot,
-    ) -> Result<TaskBoardExecutionHostAdvertisement, CliError>;
-}
-
-#[async_trait]
-pub trait TaskBoardRemoteExecutionClient: Send + Sync {
-    async fn claim(
-        &self,
-        host: &TaskBoardExecutionHostAdvertisement,
-        request: &TaskBoardRemoteExecutionRequest,
-    ) -> Result<TaskBoardRemoteExecutionClaim, CliError>;
-
-    async fn status(
-        &self,
-        host: &TaskBoardExecutionHostAdvertisement,
-        assignment_id: &str,
-    ) -> Result<TaskBoardRemoteExecutionStatus, CliError>;
-
-    async fn result(
-        &self,
-        host: &TaskBoardExecutionHostAdvertisement,
-        assignment_id: &str,
-    ) -> Result<TaskBoardRemoteExecutionResult, CliError>;
-
-    async fn cancel(
-        &self,
-        host: &TaskBoardExecutionHostAdvertisement,
-        assignment_id: &str,
-        fencing_epoch: u64,
-    ) -> Result<TaskBoardRemoteExecutionStatus, CliError>;
-}
 
 #[async_trait]
 pub trait TaskBoardAdmissionRequirementEvaluator: Send + Sync {

@@ -1,17 +1,16 @@
-use super::ITEMS_CHANGE_SCOPE;
-use super::admission_lifecycle::{
-    ensure_item_admission_can_terminate_in_tx, release_managed_worker_admission_in_tx,
-};
-use super::items::{bump_change_in_tx, load_item_in_tx, replace_item_in_tx};
+use super::admission_lifecycle::release_managed_worker_admission_in_tx;
 use super::workflow_executions::load_execution_in_tx;
-use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
+use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardItem;
 
+#[path = "workflow_terminal_dispatch.rs"]
+mod dispatch;
 #[path = "workflow_terminal_projection.rs"]
 mod projection;
-use projection::{
-    apply_terminal_target, item_identity_matches, terminal_target, validate_terminal_execution,
-};
+pub(super) use dispatch::settle_prepared_dispatch_in_tx;
+#[path = "workflow_terminal_in_tx.rs"]
+mod in_tx;
+pub(super) use in_tx::project_terminal_execution_in_tx;
 
 #[derive(Debug)]
 pub(crate) struct TaskBoardWorkflowTerminalProjection {
@@ -78,54 +77,13 @@ impl AsyncDaemonDb {
         let execution = load_execution_in_tx(&mut transaction, execution_id)
             .await?
             .ok_or_else(|| db_error(format!("workflow execution '{execution_id}' not found")))?;
-        let owner = validate_terminal_execution(&execution)?;
-        let (mut item, item_revision) = load_item_in_tx(&mut transaction, &execution.item_id)
-            .await?
-            .ok_or_else(|| {
-                db_error(format!("task-board item '{}' not found", execution.item_id))
-            })?;
-        if !item_identity_matches(&item, &execution) {
-            let admission_released =
-                release_managed_worker_admission_in_tx(&mut transaction, &owner).await?;
-            transaction.commit().await.map_err(|error| {
-                db_error(format!(
-                    "commit detached read-only workflow admission release: {error}"
-                ))
-            })?;
-            return Ok(TaskBoardWorkflowTerminalProjection {
-                item,
-                item_revision,
-                item_changed: false,
-                admission_released,
-            });
-        }
-        let target = terminal_target(&execution)?;
-        let item_changed = apply_terminal_target(&mut item, &target);
-        let admission_released =
-            release_managed_worker_admission_in_tx(&mut transaction, &owner).await?;
-        ensure_item_admission_can_terminate_in_tx(&mut transaction, &execution.item_id).await?;
-        let projected_revision = if item_changed {
-            item.updated_at = utc_now();
-            let projected_revision = item_revision.saturating_add(1);
-            replace_item_in_tx(&mut transaction, &item, projected_revision).await?;
-            if !admission_released {
-                bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
-            }
-            projected_revision
-        } else {
-            item_revision
-        };
+        let projection = project_terminal_execution_in_tx(&mut transaction, &execution).await?;
         transaction.commit().await.map_err(|error| {
             db_error(format!(
                 "commit read-only workflow terminal projection: {error}"
             ))
         })?;
-        Ok(TaskBoardWorkflowTerminalProjection {
-            item,
-            item_revision: projected_revision,
-            item_changed,
-            admission_released,
-        })
+        Ok(projection)
     }
 }
 
@@ -136,6 +94,7 @@ mod tests {
     use tempfile::tempdir;
 
     use super::super::workflow_dispatch::workflow_owner;
+    use super::projection::terminal_target;
     use super::*;
     use crate::task_board::{
         TaskBoardExecutionOwnership, TaskBoardExecutionPhase, TaskBoardExecutionState,

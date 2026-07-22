@@ -368,8 +368,5 @@ fn normalized_table_sql(conn: &Connection) -> Result<String, CliError> {
 }
 
 fn normalize_sql(sql: &str) -> String {
-    sql.split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .to_ascii_lowercase()
+    super::schema_repairs::normalize_schema_sql(sql)
 }

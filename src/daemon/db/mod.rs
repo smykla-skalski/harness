@@ -70,6 +70,7 @@ mod schema_repairs;
 mod schema_repairs_admission;
 mod schema_repairs_external_creates;
 mod schema_repairs_reconciliation_cursors;
+mod schema_repairs_remote_execution;
 mod schema_repairs_wake_events;
 mod schema_sql;
 mod schema_v10;
@@ -105,8 +106,31 @@ mod schema_v39;
 mod schema_v40;
 mod schema_v41;
 mod schema_v42;
+mod schema_v43;
 #[allow(dead_code)]
 mod task_board;
+#[cfg(test)]
+#[allow(unused_imports)]
+pub(crate) use task_board::remote_assignment_test_support::{
+    CLAIMED_AT as REMOTE_EXECUTOR_CLAIMED_AT, ControllerFixture as RemoteControllerFixture,
+    ExecutorFixture as RemoteExecutorFixture, PRINCIPAL as REMOTE_EXECUTOR_PRINCIPAL,
+    accept_executor as accept_remote_executor,
+    authorize_and_start_executor as authorize_and_start_remote_executor,
+    claim_request as remote_executor_claim_request,
+    controller_fixture as remote_controller_fixture, executor_fixture as remote_executor_fixture,
+};
+#[cfg(test)]
+pub(crate) use task_board::{
+    accept_controller as accept_remote_controller,
+    claim_controller as claim_remote_controller,
+    running_status as remote_controller_running_status,
+    status_request as remote_controller_status_request,
+};
+#[cfg(test)]
+pub(crate) use task_board::remote_assignment_terminal_handoff_tests::{
+    detached_terminal_assignment, restore_parent_to_targetless_preparing,
+};
+pub(crate) use task_board::{exact_active_remote_target, parent_points_to_assignment};
 pub(crate) use task_board::workflow_owner;
 #[cfg(test)]
 pub(crate) use task_board::write_workflow_fixture::{
@@ -118,7 +142,31 @@ pub(crate) use task_board::{
     TaskBoardAdmissionMissingRunRecovery, TaskBoardAdmissionWorkerRecovery,
     TaskBoardAutomationControlRecord, TaskBoardAutomationRunAdmission, TaskBoardAutomationRunFence,
     TaskBoardAutomationRunLease, TaskBoardAutomationRunStage, TaskBoardDispatchClaimAction,
-    TaskBoardImportMarker, TaskBoardItemSnapshot, TaskBoardRunAcquireRequest,
+    TaskBoardImportMarker, TaskBoardItemSnapshot, TaskBoardRemoteAssignmentRecord,
+    TaskBoardRemoteControllerOperationToken, TaskBoardRemoteControllerScanItem,
+    TaskBoardRemoteControllerScanStep,
+    TaskBoardRemoteHostSelection,
+    TaskBoardRemoteArtifact,
+    TaskBoardRemoteExecutorIdentity, TaskBoardRemoteExecutorScan,
+    TaskBoardRemoteExecutorStartAuthority, TaskBoardRemoteExecutorStartIoPermit,
+    TaskBoardRemoteExecutorStartIoPermitOutcome,
+    TaskBoardRemoteExecutorStopAuthority,
+    TaskBoardRemoteExecutorStopPending, TaskBoardRemoteExecutorStopReason,
+    TaskBoardRemoteTerminalArtifact, REMOTE_IMPLEMENTATION_BUNDLE_MEDIA_TYPE,
+    REMOTE_IMPLEMENTATION_BUNDLE_PATH, REMOTE_RESULT_ARTIFACT_MEDIA_TYPE,
+    REMOTE_RESULT_ARTIFACT_PATH, REMOTE_START_INTERRUPTED_WITHOUT_RUN_ERROR_CODE,
+    REMOTE_START_INTERRUPTED_WITHOUT_RUN_FAILURE_CLASS, REMOTE_START_PREFLIGHT_ERROR_CODE,
+    REMOTE_START_PREFLIGHT_FAILURE_CLASS,
+    TaskBoardRemoteHostTrustFence, TaskBoardRemoteIoAuthority, TaskBoardRemoteMutationOutcome,
+    TaskBoardRemoteOfferOutcome, TaskBoardRemoteOfferReceipt, TaskBoardRemoteOfferReceiptDisposition,
+    TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence, TaskBoardRemoteRecoveryBatch,
+    TaskBoardRemoteRecoveryFailure, TaskBoardRemoteResultAdoptionOutcome,
+    TaskBoardRemoteResultImportRecord, TaskBoardRemoteResultImportRequest,
+    TaskBoardRemoteResultImportState,
+    TaskBoardRemoteSettlementReceipt, TaskBoardRemoteSourceBundle, TaskBoardRunAcquireRequest,
+    TaskBoardRemoteLifecycleTrustSnapshot, TaskBoardRemotePriorPhaseBundle,
+    executor_start_authority, executor_start_io_permit,
+    remote_executor_identity, remote_executor_identity_from_parts, stop_pending_snapshot_matches,
 };
 mod session_data;
 mod signals;
@@ -314,7 +362,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-pub(crate) const SCHEMA_VERSION: &str = "42";
+pub(crate) const SCHEMA_VERSION: &str = "43";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]
@@ -394,3 +442,5 @@ pub(crate) fn usize_from_i64(value: i64) -> usize {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+pub(crate) use tests::task_board::{PreparedRemoteOffer, prepare_remote_offer};

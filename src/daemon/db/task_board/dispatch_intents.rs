@@ -347,7 +347,7 @@ async fn active_intent_payload(
 ) -> Result<Option<String>, CliError> {
     query_as::<_, (String,)>(
         "SELECT payload_json FROM task_board_dispatch_intents
-         WHERE item_id = ?1 AND status IN ('pending', 'starting')
+         WHERE item_id = ?1 AND status IN ('pending', 'starting', 'workflow_prepared')
          ORDER BY created_at DESC LIMIT 1",
     )
     .bind(item_id)
@@ -390,7 +390,7 @@ async fn insert_intent(
     Ok(())
 }
 
-async fn claimed_intent_identity(
+pub(super) async fn claimed_intent_identity(
     transaction: &mut Transaction<'_, Sqlite>,
     intent_id: &str,
     claim_token: &str,

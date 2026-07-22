@@ -17,6 +17,17 @@ pub(super) fn without_durable_task_board_automation<R>(body: impl FnOnce() -> R)
     )
 }
 
+// Some parity flows build a deep async dispatch future whose unoptimized debug state machine
+// exceeds the default test stack; run them on a larger stack.
+pub(super) fn on_large_stack(body: impl FnOnce() + Send + 'static) {
+    std::thread::Builder::new()
+        .stack_size(32 * 1024 * 1024)
+        .spawn(body)
+        .expect("spawn large-stack test thread")
+        .join()
+        .expect("large-stack test thread");
+}
+
 pub(super) async fn assert_task_board_capabilities_match(client: &reqwest::Client, base_url: &str) {
     let capabilities = get_json(client, base_url, http_paths::TASK_BOARD_CAPABILITIES).await;
     assert_eq!(capabilities["storage"], "database");

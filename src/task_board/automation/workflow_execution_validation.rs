@@ -2,6 +2,7 @@ use std::{collections::BTreeSet, fmt::Display};
 
 use chrono::{DateTime, Utc};
 
+use super::workflow_execution_authority_validation::validate_remote_io_authority;
 use super::workflow_execution_write_validation::{
     is_write_workflow, validate_write_attempt_artifact, validate_write_frozen_contract,
 };
@@ -49,7 +50,8 @@ pub fn validate_task_board_workflow_execution(
     }
     validate_frozen_contract(record)?;
     validate_artifacts(record)?;
-    validate_attempts(record)
+    validate_attempts(record)?;
+    validate_remote_io_authority(record)
 }
 
 /// Validate an update to a persisted workflow execution record.

@@ -228,7 +228,7 @@ fn provisional_publication_is_write_only_non_authoritative_and_revision_bound() 
     assert_invalid_write_contract(&read_only, "artifacts");
 }
 
-fn write_execution() -> TaskBoardWorkflowExecutionRecord {
+pub(super) fn write_execution() -> TaskBoardWorkflowExecutionRecord {
     let reviewer = reviewers();
     let snapshot = TaskBoardWorkflowSnapshot {
         workflow_kind: TaskBoardWorkflowKind::DefaultTask,
@@ -304,7 +304,7 @@ fn reviewers() -> TaskBoardResolvedReviewer {
     }
 }
 
-fn implementation_attempt(cycle: u32) -> TaskBoardExecutionAttemptRecord {
+pub(super) fn implementation_attempt(cycle: u32) -> TaskBoardExecutionAttemptRecord {
     completed_attempt(
         &format!("implementation:{cycle}"),
         TaskBoardAttemptResultArtifact::Implementation(TaskBoardImplementationResult {

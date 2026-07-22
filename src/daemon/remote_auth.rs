@@ -125,6 +125,30 @@ pub enum RemoteAuthTarget {
     WsMethod {
         method: String,
     },
+    Execution {
+        operation: &'static str,
+    },
+}
+
+/// Authorize a paired execution coordinator for one private executor operation.
+///
+/// Execution credentials carry only [`RemoteAccessScope::Execute`]. They do
+/// not inherit daemon read, write, or administration authority.
+///
+/// # Errors
+/// Returns [`RemoteAuthError::InsufficientScope`] unless the client has the
+/// dedicated executor scope.
+pub fn authorize_remote_execution_operation(
+    client: &RemoteStoredClient,
+    operation: &'static str,
+) -> Result<RemoteAuthDecision, RemoteAuthError> {
+    let required_scope = RemoteAccessScope::Execute;
+    authorize_client_scope(client, required_scope)?;
+    Ok(RemoteAuthDecision {
+        client_id: client.client_id.clone(),
+        target: RemoteAuthTarget::Execution { operation },
+        required_scope,
+    })
 }
 
 /// Authorize a remote client for an HTTP daemon route.

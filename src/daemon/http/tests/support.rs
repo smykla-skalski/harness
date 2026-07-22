@@ -1,12 +1,15 @@
 use std::collections::BTreeMap;
 use std::env::temp_dir;
+use std::future::Future;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock};
 
 use axum::body::to_bytes;
 use axum::http::{HeaderMap, StatusCode, header::AUTHORIZATION};
+#[cfg(test)]
+use rustls::pki_types::CertificateDer;
 use serde_json::Value;
-use tokio::sync::broadcast;
+use tokio::sync::{Mutex as AsyncMutex, broadcast};
 use uuid::Uuid;
 
 use crate::agents::runtime::RuntimeCapabilities;
@@ -55,10 +58,17 @@ pub(in crate::daemon::http) fn auth_headers() -> HeaderMap {
 }
 
 pub(in crate::daemon::http) fn test_http_state_with_db() -> DaemonHttpState {
+    let db_path = temp_dir().join(format!("harness-http-test-{}.db", Uuid::new_v4()));
+    test_http_state_with_db_path(&db_path, "epoch")
+}
+
+pub(in crate::daemon::http) fn test_http_state_with_db_path(
+    db_path: &std::path::Path,
+    daemon_epoch: &str,
+) -> DaemonHttpState {
     let (sender, _) = broadcast::channel(8);
     let db_slot = Arc::new(OnceLock::new());
     let async_db = Arc::new(OnceLock::new());
-    let db_path = temp_dir().join(format!("harness-http-test-{}.db", Uuid::new_v4()));
     let db = Arc::new(Mutex::new(DaemonDb::open(&db_path).expect("open file db")));
     db_slot.set(db).expect("install db");
     async_db
@@ -87,11 +97,11 @@ pub(in crate::daemon::http) fn test_http_state_with_db() -> DaemonHttpState {
         sender: sender.clone(),
         prepared_sender: broadcast::channel(8).0,
         manifest,
-        daemon_epoch: "epoch".into(),
+        daemon_epoch: daemon_epoch.into(),
         replay_buffer: Arc::new(Mutex::new(crate::daemon::websocket::ReplayBuffer::new(8))),
         db: db_slot.clone(),
         async_db: super::super::AsyncDaemonDbSlot::from_inner(async_db.clone()),
-        db_path: Some(db_path),
+        db_path: Some(db_path.to_path_buf()),
         codex_controller: CodexControllerHandle::new_with_async_db(
             sender.clone(),
             db_slot.clone(),
@@ -110,6 +120,35 @@ pub(in crate::daemon::http) fn test_http_state_with_db() -> DaemonHttpState {
         recovery_snapshot: Default::default(),
     }
 }
+
+#[cfg(test)]
+static TEST_REMOTE_TLS_ROOT_LOCK: OnceLock<AsyncMutex<()>> = OnceLock::new();
+
+#[cfg(test)]
+pub(in crate::daemon::http) async fn with_test_remote_tls_root<T, Work>(
+    root: CertificateDer<'static>,
+    variables: &[(&str, &str)],
+    work: Work,
+) -> T
+where
+    Work: Future<Output = T>,
+{
+    let lock = TEST_REMOTE_TLS_ROOT_LOCK.get_or_init(|| AsyncMutex::new(()));
+    let _guard = lock.lock().await;
+    let name = crate::daemon::task_board_remote_transport::tls_pin::test_extra_roots_env();
+    let mut scoped = Vec::with_capacity(variables.len() + 1);
+    scoped.push((name, Some(hex::encode(root.as_ref()))));
+    scoped.extend(
+        variables
+            .iter()
+            .map(|(name, value)| (*name, Some((*value).to_string()))),
+    );
+    temp_env::async_with_vars(scoped, work).await
+}
+
+#[cfg(test)]
+#[path = "remote_execution_acceptance/mod.rs"]
+mod remote_execution_acceptance;
 
 pub(in crate::daemon::http) fn test_http_state_with_sync_db_only(
     db_path: &std::path::Path,

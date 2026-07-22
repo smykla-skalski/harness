@@ -16,12 +16,16 @@ use crate::task_board::{
 
 mod admission_compensation;
 mod admission_dispatch;
+pub(crate) use admission_dispatch::{
+    PreparedRemoteOffer, prepare_remote_implementation_offer, prepare_remote_offer,
+};
 mod admission_evidence;
 mod admission_lifecycle_tests;
 mod dispatch;
 mod dispatch_claims;
 mod imports;
 mod items_parent;
+mod remote_hosts;
 mod terminal_dispatch_lifecycle;
 mod workflow_executions;
 mod workflow_phase_settlement;

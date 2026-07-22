@@ -49,18 +49,34 @@ impl RemoteHttpAuditContext {
         request: &Request<Body>,
         route: &HttpApiRouteContract,
     ) -> Result<Self, RemoteAuthError> {
-        Ok(Self {
+        Ok(Self::new(
+            request,
+            format!("{} {}", request.method(), route.path),
+            remote_http_required_scope(route)?,
+        ))
+    }
+
+    pub(super) fn from_execution_request(request: &Request<Body>) -> Self {
+        Self::new(
+            request,
+            format!("{} {}", request.method(), request.uri().path()),
+            RemoteAccessScope::Execute,
+        )
+    }
+
+    fn new(request: &Request<Body>, target: String, scope: RemoteAccessScope) -> Self {
+        Self {
             request_id: super::extract_request_id(request.headers()),
             attempted_client_id: attempted_client_id(request.headers()),
-            target: format!("{} {}", request.method(), route.path),
-            scope: remote_http_required_scope(route)?,
+            target,
+            scope,
             remote_addr: request
                 .extensions()
                 .get::<ConnectInfo<DaemonConnectInfo>>()
                 .map(|ConnectInfo(info)| info.remote_addr().ip().to_string()),
             marker: request.extensions().get::<RemoteHttpAuditMarker>().cloned(),
             receipt: OnceLock::new(),
-        })
+        }
     }
 
     pub(super) async fn record_allowed(

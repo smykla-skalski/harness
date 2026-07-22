@@ -15,7 +15,7 @@ pub(super) async fn start_and_complete_delivered_worker(
     state: &DaemonHttpState,
     db: &AsyncDaemonDb,
     claim: &mut ClaimedTaskBoardDispatch,
-) -> Result<ManagedAgentSnapshot, CliError> {
+) -> Result<Option<ManagedAgentSnapshot>, CliError> {
     let _heartbeat =
         maintain_task_board_dispatch_claim(db.clone(), &claim.intent_id, &claim.claim_token);
     settle_claimed_task_board_worker(state, db, claim).await

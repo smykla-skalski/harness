@@ -50,6 +50,22 @@ fn remote_pairing_code_hash_normalizes_surrounding_whitespace() {
 }
 
 #[test]
+fn execution_coordinator_pairing_grants_only_execution_scope() {
+    let record = RemotePairingRecord::new_for_tests(
+        "pairing-executor",
+        RemoteRole::ExecutionCoordinator,
+        &[],
+        "executor-pairing-secret",
+        "2026-07-19T12:00:00Z",
+        "2026-07-19T12:10:00Z",
+    )
+    .expect("execution pairing");
+
+    assert_eq!(record.role, RemoteRole::ExecutionCoordinator);
+    assert_eq!(record.scopes, vec![RemoteAccessScope::Execute]);
+}
+
+#[test]
 fn remote_pairing_record_normalizes_reviews_query_profile() {
     let query = ReviewsQueryRequest {
         authors: vec![" renovate[bot] ".into(), "renovate[bot]".into()],

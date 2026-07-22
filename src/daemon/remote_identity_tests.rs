@@ -42,6 +42,21 @@ fn role_expansion_defaults_and_rejects_out_of_role_scope_requests() {
         expand_client_scopes(RemoteRole::Viewer, &[RemoteAccessScope::Write]).is_err(),
         "viewer must not be able to request write scope"
     );
+    assert_eq!(
+        expand_client_scopes(RemoteRole::ExecutionCoordinator, &[])
+            .expect("executor default scope"),
+        vec![RemoteAccessScope::Execute]
+    );
+    for forbidden in [
+        RemoteAccessScope::Read,
+        RemoteAccessScope::Write,
+        RemoteAccessScope::Admin,
+    ] {
+        assert!(
+            expand_client_scopes(RemoteRole::ExecutionCoordinator, &[forbidden]).is_err(),
+            "executor credentials must not inherit generic daemon authority"
+        );
+    }
 }
 
 #[test]

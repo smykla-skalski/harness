@@ -42,27 +42,12 @@ pub async fn serve_remote_https(
     shutdown_rx: tokio_watch::Receiver<bool>,
 ) -> Result<(), CliError> {
     let remote_request_limits = build_remote_request_limits(&config)?;
-    super::super::log_sandbox_startup(config.sandboxed);
-    run_startup_sweep();
-
-    let legacy_migration_report = state::migrate_legacy_daemon_root_for_current_process()?;
-    log_legacy_daemon_root_migration(&legacy_migration_report);
-    state::ensure_daemon_dirs()?;
-    cleanup_abandoned_sessions()?;
+    prepare_remote_daemon_environment(&config)?;
     let daemon_lock = state::acquire_singleton_lock()?;
 
-    let tls_config = RemoteTlsConfigHandle::new(acme_plan.certificate().clone())
-        .map_err(|error| remote_tls_config_cli_error(&error))?;
-    let request_limit_config = remote_request_limits.config();
-    tracing::info!(
-        tls_generation = tls_config.generation(),
-        certificate_fingerprint = %tls_config.certificate_fingerprint(),
-        "remote TLS certificate loaded",
-    );
-    let listener = bind_remote_tls_listener(&config, &tls_config, request_limit_config).await?;
-    let endpoint = acme_plan.public_https_origin();
-    let manifest = remote_daemon_manifest(&endpoint, config.sandboxed);
-    state::append_event("info", &remote_bound_event_message(&endpoint))?;
+    let (tls_config, listener) =
+        prepare_remote_tls_listener(&config, &acme_plan, &remote_request_limits).await?;
+    let (endpoint, manifest) = prepare_remote_daemon_manifest(&acme_plan, config.sandboxed)?;
 
     let (sender, _) = broadcast::channel(256);
     let db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>> = Arc::new(OnceLock::new());
@@ -91,9 +76,6 @@ pub async fn serve_remote_https(
         async_db.clone(),
         config.sandboxed,
     );
-    codex_controller
-        .reconcile_task_board_admission_workers_after_restart()
-        .await?;
     let agent_tui_manager = AgentTuiManagerHandle::new_with_async_db(
         sender.clone(),
         db.clone(),
@@ -123,6 +105,13 @@ pub async fn serve_remote_https(
         managed_agent_mutation_locks: http::ManagedAgentMutationLocks::default(),
         recovery_snapshot: Arc::default(),
     };
+    if let Some(async_db) = app_state.async_db.get() {
+        super::recover_remote_assignments_at_startup_with_controller(&app_state, async_db).await?;
+    }
+    app_state
+        .codex_controller
+        .reconcile_task_board_admission_workers_after_restart()
+        .await?;
     let _background = spawn_background_tasks(&app_state, config.poll_interval, shutdown_rx.clone());
 
     let serve_result = http::serve(listener, app_state, shutdown_rx).await;
@@ -144,6 +133,44 @@ pub async fn serve_remote_https(
         (Err(error), _, _) | (Ok(()), Err(error), _) | (Ok(()), Ok(()), Err(error)) => Err(error),
         (Ok(()), Ok(()), Ok(())) => Ok(()),
     }
+}
+
+fn prepare_remote_daemon_environment(config: &DaemonServeConfig) -> Result<(), CliError> {
+    super::super::log_sandbox_startup(config.sandboxed);
+    run_startup_sweep();
+
+    let legacy_migration_report = state::migrate_legacy_daemon_root_for_current_process()?;
+    log_legacy_daemon_root_migration(&legacy_migration_report);
+    state::ensure_daemon_dirs()?;
+    cleanup_abandoned_sessions()?;
+    Ok(())
+}
+
+async fn prepare_remote_tls_listener(
+    config: &DaemonServeConfig,
+    acme_plan: &RemoteAcmeRuntimePlan,
+    remote_request_limits: &http::RemoteRequestLimits,
+) -> Result<(RemoteTlsConfigHandle, RemoteTlsListener), CliError> {
+    let tls_config = RemoteTlsConfigHandle::new(acme_plan.certificate().clone())
+        .map_err(|error| remote_tls_config_cli_error(&error))?;
+    let request_limit_config = remote_request_limits.config();
+    tracing::info!(
+        tls_generation = tls_config.generation(),
+        certificate_fingerprint = %tls_config.certificate_fingerprint(),
+        "remote TLS certificate loaded",
+    );
+    let listener = bind_remote_tls_listener(config, &tls_config, request_limit_config).await?;
+    Ok((tls_config, listener))
+}
+
+fn prepare_remote_daemon_manifest(
+    acme_plan: &RemoteAcmeRuntimePlan,
+    sandboxed: bool,
+) -> Result<(String, DaemonManifest), CliError> {
+    let endpoint = acme_plan.public_https_origin();
+    let manifest = remote_daemon_manifest(&endpoint, sandboxed);
+    state::append_event("info", &remote_bound_event_message(&endpoint))?;
+    Ok((endpoint, manifest))
 }
 
 fn build_remote_request_limits(

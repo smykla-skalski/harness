@@ -14,22 +14,44 @@ pub(crate) fn codex_attempt_request(
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
 ) -> Result<CodexRunRequest, CliError> {
+    codex_attempt_request_for_target(execution, attempt, TaskBoardCodexLaunchTarget::Local)
+}
+
+pub(crate) fn remote_codex_attempt_request(
+    execution: &TaskBoardWorkflowExecutionRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
+) -> Result<CodexRunRequest, CliError> {
+    codex_attempt_request_for_target(execution, attempt, TaskBoardCodexLaunchTarget::Remote)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TaskBoardCodexLaunchTarget {
+    Local,
+    Remote,
+}
+
+fn codex_attempt_request_for_target(
+    execution: &TaskBoardWorkflowExecutionRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
+    target: TaskBoardCodexLaunchTarget,
+) -> Result<CodexRunRequest, CliError> {
     if execution.transition.phase == Some(TaskBoardExecutionPhase::Implementation) {
-        write_implementation_request(execution, attempt)
+        write_implementation_request(execution, attempt, target)
     } else {
-        codex_report_request(execution, attempt)
+        codex_report_request_for_target(execution, attempt, target)
     }
 }
 
-pub(super) fn codex_report_request(
+fn codex_report_request_for_target(
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
+    target: TaskBoardCodexLaunchTarget,
 ) -> Result<CodexRunRequest, CliError> {
     let profile = attempt_profile(execution, attempt)?;
     let context = run_context(execution)?;
     let prompt = match execution.transition.phase {
         Some(TaskBoardExecutionPhase::Review) => {
-            review_prompt(execution, context, attempt, &profile.id)?
+            review_prompt(execution, context, attempt, &profile.id, target)?
         }
         Some(TaskBoardExecutionPhase::Evaluate) => evaluation_prompt(execution, context, attempt)?,
         _ => {
@@ -97,12 +119,13 @@ pub(super) fn attempt_profile<'a>(
 fn write_implementation_request(
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
+    target: TaskBoardCodexLaunchTarget,
 ) -> Result<CodexRunRequest, CliError> {
     let context = run_context(execution)?;
     let task_id = write_task_id(execution)?;
     Ok(CodexRunRequest {
         actor: Some(CONTROL_PLANE_ACTOR_ID.to_string()),
-        prompt: implementation_prompt(execution, context, attempt)?,
+        prompt: implementation_prompt(execution, context, attempt, target)?,
         mode: CodexRunMode::WorkspaceWrite,
         role: SessionRole::Leader,
         fallback_role: Some(SessionRole::Worker),
@@ -139,6 +162,7 @@ fn implementation_prompt(
     execution: &TaskBoardWorkflowExecutionRecord,
     context: &TaskBoardReadOnlyRunContext,
     attempt: &TaskBoardExecutionAttemptRecord,
+    target: TaskBoardCodexLaunchTarget,
 ) -> Result<String, CliError> {
     let base_head = exact_head(execution)?;
     let planning = execution
@@ -169,10 +193,10 @@ fn implementation_prompt(
         .collect::<Vec<_>>()
         .join("\n");
     Ok(format!(
-        "Implement the exact approved plan for Task Board item '{}'.\n\nTitle: {}\nWorktree: {}\nBase head: {}\n\nApproved plan:\n{}\n\nAcceptance criteria:\n{}\n\nWork only in the assigned worktree. Preserve unrelated changes, run focused validation through repository workflows, and create local commits as required by the repository; do not push, publish, or merge. Before responding, replace every REPLACE_WITH_CURRENT_HEAD token below with the exact resulting Git HEAD. Your final message must contain only one JSON value matching this exact identity and shape:\n{}",
+        "Implement the exact approved plan for Task Board item '{}'.\n\nTitle: {}\n{}\nBase head: {}\n\nApproved plan:\n{}\n\nAcceptance criteria:\n{}\n\nWork only in the assigned worktree. Preserve unrelated changes, run focused validation through repository workflows, and create local commits as required by the repository; do not push, publish, or merge. Before responding, replace every REPLACE_WITH_CURRENT_HEAD token below with the exact resulting Git HEAD. Your final message must contain only one JSON value matching this exact identity and shape:\n{}",
         execution.item_id,
         context.title,
-        context.worktree,
+        workspace_directive(context, target),
         base_head,
         planning.plan_markdown,
         criteria,
@@ -187,6 +211,7 @@ fn review_prompt(
     context: &TaskBoardReadOnlyRunContext,
     attempt: &TaskBoardExecutionAttemptRecord,
     profile_id: &str,
+    target: TaskBoardCodexLaunchTarget,
 ) -> Result<String, CliError> {
     let exact_head = exact_head(execution)?;
     let response = TaskBoardLocalAttemptResult {
@@ -214,13 +239,13 @@ fn review_prompt(
             format!("\nPull request: {}#{}", pr.repository, pr.number)
         });
     Ok(format!(
-        "Run a strictly read-only review for Task Board item '{}'.\n\nTitle: {}\nContext: {}\nExact head: {}{}\nWorktree: {}\n\nDo not modify files, commits, branches, task state, pull requests, or external systems. Verify that every inspected change belongs to the exact frozen head above; return human_required when that revision cannot be inspected. Your final message must contain only one JSON value matching this exact identity and shape (use verdict pass, changes_required, or human_required):\n{}",
+        "Run a strictly read-only review for Task Board item '{}'.\n\nTitle: {}\nContext: {}\nExact head: {}{}\n{}\n\nDo not modify files, commits, branches, task state, pull requests, or external systems. Verify that every inspected change belongs to the exact frozen head above; return human_required when that revision cannot be inspected. Your final message must contain only one JSON value matching this exact identity and shape (use verdict pass, changes_required, or human_required):\n{}",
         execution.item_id,
         context.title,
         context.body,
         exact_head,
         pull_request,
-        context.worktree,
+        workspace_directive(context, target),
         serde_json::to_string_pretty(&response).map_err(|error| {
             invalid_transition(format!("serialize review result template: {error}"))
         })?,
@@ -286,6 +311,18 @@ fn write_capabilities(item_id: &str, tags: &[String], run_id: &str) -> Vec<Strin
     capabilities.push("task-board:workflow:write".into());
     capabilities.push(format!("task-board:attempt:{run_id}"));
     capabilities
+}
+
+fn workspace_directive(
+    context: &TaskBoardReadOnlyRunContext,
+    target: TaskBoardCodexLaunchTarget,
+) -> String {
+    match target {
+        TaskBoardCodexLaunchTarget::Local => format!("Worktree: {}", context.worktree),
+        TaskBoardCodexLaunchTarget::Remote => {
+            "Workspace: use the isolated executor checkout assigned to this run".into()
+        }
+    }
 }
 
 pub(super) fn run_context(

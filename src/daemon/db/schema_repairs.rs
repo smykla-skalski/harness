@@ -61,6 +61,61 @@ const CURRENT_SCHEMA_REMOTE_ACME_COLUMNS: &[(&str, &str)] = &[
     ("remote_acme_state", "account_credentials_json"),
 ];
 
+pub(super) fn normalize_schema_sql(sql: &str) -> String {
+    let mut normalized = String::with_capacity(sql.len());
+    let mut in_literal = false;
+    let mut pending_space = false;
+    for character in sql.chars() {
+        if character == '\'' {
+            if pending_space && !normalized.is_empty() && !normalized.ends_with('(') {
+                normalized.push(' ');
+            }
+            pending_space = false;
+            normalized.push(character);
+            in_literal = !in_literal;
+        } else if !in_literal && character.is_whitespace() {
+            pending_space = true;
+        } else {
+            if pending_space
+                && !normalized.is_empty()
+                && !normalized.ends_with('(')
+                && character != ')'
+            {
+                normalized.push(' ');
+            }
+            pending_space = false;
+            normalized.push(if in_literal {
+                character
+            } else {
+                character.to_ascii_lowercase()
+            });
+        }
+    }
+    remove_outside_literal(&normalized, "if not exists ")
+}
+
+fn remove_outside_literal(sql: &str, pattern: &str) -> String {
+    let mut result = String::with_capacity(sql.len());
+    let mut index = 0;
+    let mut in_literal = false;
+    while index < sql.len() {
+        if !in_literal && sql[index..].starts_with(pattern) {
+            index += pattern.len();
+            continue;
+        }
+        let character = sql[index..]
+            .chars()
+            .next()
+            .expect("index remains on a character boundary");
+        if character == '\'' {
+            in_literal = !in_literal;
+        }
+        result.push(character);
+        index += character.len_utf8();
+    }
+    result
+}
+
 pub(super) fn current_schema_shape_needs_repair(
     conn: &super::Connection,
 ) -> Result<bool, CliError> {
@@ -105,6 +160,7 @@ pub(super) fn current_schema_shape_needs_repair(
         "task_board_sync_conflicts",
         "task_board_execution_hosts",
         "task_board_remote_assignments",
+        "task_board_remote_host_quarantines",
         "task_board_orchestrator_wake_events",
         "task_board_reconciliation_cursors",
     ] {
@@ -154,6 +210,9 @@ pub(super) fn current_schema_shape_needs_repair(
     if super::schema_repairs_reconciliation_cursors::shape_needs_repair(conn)? {
         return Ok(true);
     }
+    if super::schema_repairs_remote_execution::shape_needs_repair(conn)? {
+        return Ok(true);
+    }
     Ok(false)
 }
 
@@ -191,10 +250,12 @@ pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError>
     super::schema_v40::run(&db.conn)?;
     super::schema_v41::run(&db.conn)?;
     super::schema_v42::run(&db.conn)?;
+    super::schema_v43::run(&db.conn)?;
     super::schema_repairs_external_creates::require_complete_shape(&db.conn)?;
     super::schema_repairs_wake_events::require_complete_shape(&db.conn)?;
     super::schema_repairs_admission::require_complete_shape(&db.conn)?;
     super::schema_repairs_reconciliation_cursors::require_complete_shape(&db.conn)?;
+    super::schema_repairs_remote_execution::require_complete_shape(&db.conn)?;
     db.conn
         .execute(
             "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",

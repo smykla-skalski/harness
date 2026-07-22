@@ -49,6 +49,10 @@ async fn run_task_board_dispatch_loop(
     reason = "recovery drains preparation and worker intent queues while preserving per-claim errors"
 )]
 async fn recover_pending_dispatches(state: &DaemonHttpState, db: &AsyncDaemonDb) {
+    if let Err(error) = super::recover_remote_assignments_before_local_work(state, db).await {
+        warn!(%error, "remote assignment recovery blocked dispatch reconciliation");
+        return;
+    }
     for _ in 0..MAX_RECOVERIES_PER_TICK {
         let preparation = match db.claim_next_task_board_dispatch_preparation().await {
             Ok(Some(claim)) => claim,
@@ -66,6 +70,10 @@ async fn recover_pending_dispatches(state: &DaemonHttpState, db: &AsyncDaemonDb)
             warn!(%release_error, "task board dispatch preparation release failed");
         }
     }
+    if let Err(error) = super::recover_remote_assignments_before_local_work(state, db).await {
+        warn!(%error, "remote target selection blocked dispatch reconciliation");
+        return;
+    }
     for _ in 0..MAX_RECOVERIES_PER_TICK {
         let claim = match db.claim_next_task_board_dispatch().await {
             Ok(Some(claim)) => claim,
@@ -78,7 +86,7 @@ async fn recover_pending_dispatches(state: &DaemonHttpState, db: &AsyncDaemonDb)
         finish_claim(state, db, claim).await;
     }
     if let Err(error) = Box::pin(
-        super::super::task_board_read_only_coordinator::reconcile_task_board_read_only_workflows(
+        crate::daemon::service::task_board_read_only_coordinator::reconcile_task_board_read_only_workflows(
             state, db,
         ),
     )

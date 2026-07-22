@@ -5,6 +5,7 @@ use chrono::Utc;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::http::DaemonHttpState;
 use crate::errors::CliError;
+use crate::task_board::task_board_remote_execution_target;
 
 use super::task_board_read_only_runtime::{
     ProductionTaskBoardReadOnlyRuntime, TaskBoardReadOnlyRuntime,
@@ -109,6 +110,9 @@ async fn reconcile_candidate<R>(
 {
     let execution_id = execution.execution_id.clone();
     if !seen.insert(execution_id.clone()) {
+        return;
+    }
+    if task_board_remote_execution_target(&execution).is_some() {
         return;
     }
     report.processed += 1;

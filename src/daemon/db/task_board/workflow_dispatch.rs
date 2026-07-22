@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use chrono::{DateTime, Duration};
 use sqlx::{Sqlite, Transaction, query_scalar};
 
 use super::ORCHESTRATOR_CHANGE_SCOPE;
@@ -9,12 +8,12 @@ use super::workflow_execution_attempts::insert_attempt_in_tx;
 use super::workflow_executions::insert_execution_in_tx;
 use crate::daemon::db::{CliError, db_error, utc_now};
 use crate::task_board::{
-    AgentMode, PlanApprovalGate, TASK_BOARD_SIDE_EFFECT_CLAIM_GRACE_SECONDS, TaskBoardAttemptState,
-    TaskBoardExecutionAttemptRecord, TaskBoardExecutionOwnership, TaskBoardExecutionState,
-    TaskBoardReadOnlyWorkflowLaunch, TaskBoardWorkflowExecutionArtifacts,
-    TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind, TaskBoardWorkflowSnapshot,
-    TaskBoardWriteWorkflowLaunch, advance_task_board_workflow, approval_gate, bind_plan_approval,
-    build_planning_result, resolve_task_board_pull_request_identity, start_task_board_workflow,
+    AgentMode, PlanApprovalGate, TaskBoardAttemptState, TaskBoardExecutionAttemptRecord,
+    TaskBoardExecutionOwnership, TaskBoardExecutionState, TaskBoardReadOnlyWorkflowLaunch,
+    TaskBoardWorkflowExecutionArtifacts, TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
+    TaskBoardWorkflowSnapshot, TaskBoardWriteWorkflowLaunch, advance_task_board_workflow,
+    approval_gate, bind_plan_approval, build_planning_result,
+    resolve_task_board_pull_request_identity, start_task_board_workflow,
     task_board_read_only_execution_repository, validate_task_board_read_only_item_revisions,
     validate_task_board_read_only_run_context, validate_task_board_workflow_execution,
 };
@@ -45,14 +44,13 @@ pub(super) async fn insert_started_read_only_workflow_in_tx(
         )));
     }
     let now = utc_now();
-    let report_claim_deadline = initial_report_claim_deadline(&now)?;
     let mut transition = start_task_board_workflow(
         launch.workflow_kind,
         launch.pull_request.as_ref(),
         Some(&launch.exact_head_revision),
     )
     .map_err(|error| db_error(format!("start read-only workflow: {error}")))?;
-    transition.execution_state = TaskBoardExecutionState::Running;
+    transition.execution_state = TaskBoardExecutionState::Preparing;
     let profile = launch
         .resolved_reviewers
         .profiles
@@ -63,9 +61,9 @@ pub(super) async fn insert_started_read_only_workflow_in_tx(
         action_key: format!("review:{}", profile.id),
         attempt: 1,
         idempotency_key: format!("codex-{intent_id}"),
-        state: TaskBoardAttemptState::Running,
+        state: TaskBoardAttemptState::Preparing,
         failure_class: None,
-        available_at: Some(report_claim_deadline),
+        available_at: None,
         error: None,
         artifact: None,
         started_at: now.clone(),
@@ -154,16 +152,16 @@ pub(super) async fn insert_started_write_workflow_in_tx(
         )
     })
     .map_err(|error| db_error(format!("start write workflow: {error}")))?;
-    transition.execution_state = TaskBoardExecutionState::Running;
+    transition.execution_state = TaskBoardExecutionState::Preparing;
     let now = utc_now();
     let attempt = TaskBoardExecutionAttemptRecord {
         execution_id: execution_id.to_string(),
         action_key: "implementation:1".into(),
         attempt: 1,
         idempotency_key: format!("codex-{intent_id}"),
-        state: TaskBoardAttemptState::Running,
+        state: TaskBoardAttemptState::Preparing,
         failure_class: None,
-        available_at: Some(initial_report_claim_deadline(&now)?),
+        available_at: None,
         error: None,
         artifact: None,
         started_at: now.clone(),
@@ -290,16 +288,6 @@ fn validate_write_launch(
         ));
     }
     Ok(snapshot)
-}
-
-fn initial_report_claim_deadline(now: &str) -> Result<String, CliError> {
-    let now = DateTime::parse_from_rfc3339(now)
-        .map_err(|error| db_error(format!("parse initial report claim time: {error}")))?;
-    now.checked_add_signed(Duration::seconds(
-        TASK_BOARD_SIDE_EFFECT_CLAIM_GRACE_SECONDS,
-    ))
-    .ok_or_else(|| db_error("initial report claim deadline is out of range"))
-    .map(|deadline| deadline.to_rfc3339())
 }
 
 fn validate_launch(
