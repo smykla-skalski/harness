@@ -5,9 +5,7 @@ struct TaskBoardAutomationManualView: View {
   let metrics: TaskBoardOverviewMetrics
   let isPresentationCurrent: Bool
   let activeAction: TaskBoardAutomationInspectorAction?
-  let onStart: () -> Void
-  let onStop: () -> Void
-  let onRunOnce: () -> Void
+  let actions: TaskBoardAutomationInspectorActions
 
   var body: some View {
     TaskBoardOperationsCard(title: "Manual controls", metrics: metrics) {
@@ -44,8 +42,7 @@ struct TaskBoardAutomationManualView: View {
             accessibilityIdentifier: "harness.task-board.automation.start",
             help: "Start continuous task-board automation"
           ),
-          blockedReason: controlBlockedReason,
-          perform: onStart
+          blockedReason: controlBlockedReason
         )
         controlButton(
           action: .stop,
@@ -57,8 +54,7 @@ struct TaskBoardAutomationManualView: View {
             accessibilityIdentifier: "harness.task-board.automation.stop",
             help: "Stop task-board automation after current work drains"
           ),
-          blockedReason: controlBlockedReason,
-          perform: onStop
+          blockedReason: controlBlockedReason
         )
         controlButton(
           action: .runOnce,
@@ -70,8 +66,7 @@ struct TaskBoardAutomationManualView: View {
             accessibilityIdentifier: "harness.task-board.automation.runOnce",
             help: "Run one task-board automation reconciliation"
           ),
-          blockedReason: controlBlockedReason,
-          perform: onRunOnce
+          blockedReason: controlBlockedReason
         )
       }
 
@@ -88,10 +83,15 @@ struct TaskBoardAutomationManualView: View {
   private func controlButton(
     action: TaskBoardAutomationInspectorAction,
     descriptor: TaskBoardActionButtonDescriptor,
-    blockedReason: String?,
-    perform: @escaping () -> Void
+    blockedReason: String?
   ) -> some View {
-    Button(action: perform) {
+    Button {
+      actions.enqueueControl(
+        action,
+        isPresentationCurrent: isPresentationCurrent,
+        controlBlockedReason: blockedReason
+      )
+    } label: {
       HStack(spacing: HarnessMonitorTheme.spacingXS) {
         if activeAction == action {
           ProgressView()

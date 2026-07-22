@@ -1,21 +1,34 @@
 import HarnessMonitorKit
 
-extension TaskBoardAutomationInspector {
+struct TaskBoardAutomationInspectorActions: Equatable {
+  let store: HarnessMonitorStore
+  let state: TaskBoardAutomationInspectorState
+  let isActive: Bool
+
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.store === rhs.store
+      && lhs.state === rhs.state
+      && lhs.isActive == rhs.isActive
+  }
+
+  @MainActor
   func enqueueVisibleLoads() {
-    guard isActive, dashboard.connectionState == .online else { return }
+    guard isActive, isOnline else { return }
     enqueueMetrics(force: false)
     if state.surface == .history {
       enqueueHistory(force: false)
     }
   }
 
+  @MainActor
   func enqueueHistoryAndMetricsRefresh() {
     enqueueHistory(force: true)
     enqueueMetrics(force: true)
   }
 
-  func enqueueHistory(force: Bool) {
-    guard isActive, dashboard.connectionState == .online,
+  @MainActor
+  private func enqueueHistory(force: Bool) {
+    guard isActive, isOnline,
       let request = state.beginInitialHistoryLoad(force: force)
     else {
       return
@@ -31,8 +44,9 @@ extension TaskBoardAutomationInspector {
     )
   }
 
+  @MainActor
   func enqueueOlderHistory() {
-    guard isActive, dashboard.connectionState == .online,
+    guard isActive, isOnline,
       let request = state.beginOlderHistoryLoad()
     else {
       return
@@ -48,8 +62,9 @@ extension TaskBoardAutomationInspector {
     )
   }
 
+  @MainActor
   func enqueueRunDetail(runID: String) {
-    guard isActive, dashboard.connectionState == .online, isWriteAuthorized,
+    guard isActive, isOnline, isWriteAuthorized,
       let request = state.beginDetailLoad(runID: runID)
     else {
       return
@@ -65,8 +80,9 @@ extension TaskBoardAutomationInspector {
     )
   }
 
-  func enqueueMetrics(force: Bool) {
-    guard isActive, dashboard.connectionState == .online,
+  @MainActor
+  private func enqueueMetrics(force: Bool) {
+    guard isActive, isOnline,
       let request = state.beginMetricsLoad(force: force)
     else {
       return
@@ -82,31 +98,13 @@ extension TaskBoardAutomationInspector {
     )
   }
 
-  func enqueueStart() {
-    enqueueControl(.start, title: "Starting task-board automation") {
-      await store.startTaskBoardOrchestrator()
-    }
-  }
-
-  func enqueueStop() {
-    enqueueControl(.stop, title: "Stopping task-board automation") {
-      await store.stopTaskBoardOrchestrator()
-    }
-  }
-
-  func enqueueRunOnce() {
-    enqueueControl(.runOnce, title: "Running task-board automation once") {
-      await store.runTaskBoardOrchestratorOnce()
-    }
-  }
-
-  private func enqueueControl(
+  @MainActor
+  func enqueueControl(
     _ action: TaskBoardAutomationInspectorAction,
-    title: String,
-    operation: @escaping @MainActor @Sendable () async -> Bool
+    isPresentationCurrent: Bool,
+    controlBlockedReason: String?
   ) {
-    guard isPresentationCurrent,
-      cachedPresentation.controlAvailability.controlBlockedReason == nil,
+    guard isPresentationCurrent, controlBlockedReason == nil,
       let request = state.beginAction(action)
     else {
       return
@@ -114,12 +112,12 @@ extension TaskBoardAutomationInspector {
 
     let state = state
     HarnessMonitorAsyncWorkQueue.shared.submit(
-      .init(title: title) {
+      .init(title: controlTitle(action)) {
         guard
           let succeeded = await performCurrentTaskBoardAutomationControl(
+            store: store,
             state: state,
-            request: request,
-            operation: operation
+            request: request
           )
         else {
           return
@@ -133,14 +131,45 @@ extension TaskBoardAutomationInspector {
       }
     )
   }
+
+  @MainActor
+  private var isOnline: Bool {
+    store.contentUI.dashboard.connectionState == .online
+  }
+
+  @MainActor
+  private var isWriteAuthorized: Bool {
+    guard let profile = store.remoteDaemonProfile else { return true }
+    return profile.status == .active
+      && profile.role != .viewer
+      && profile.scopes.contains("write")
+  }
+
+  private func controlTitle(_ action: TaskBoardAutomationInspectorAction) -> String {
+    switch action {
+    case .start:
+      "Starting task-board automation"
+    case .stop:
+      "Stopping task-board automation"
+    case .runOnce:
+      "Running task-board automation once"
+    }
+  }
 }
 
 @MainActor
 private func performCurrentTaskBoardAutomationControl(
+  store: HarnessMonitorStore,
   state: TaskBoardAutomationInspectorState,
-  request: TaskBoardAutomationActionRequest,
-  operation: @escaping @MainActor @Sendable () async -> Bool
+  request: TaskBoardAutomationActionRequest
 ) async -> Bool? {
   guard state.isCurrentAction(request) else { return nil }
-  return await operation()
+  switch request.action {
+  case .start:
+    return await store.startTaskBoardOrchestrator()
+  case .stop:
+    return await store.stopTaskBoardOrchestrator()
+  case .runOnce:
+    return await store.runTaskBoardOrchestratorOnce()
+  }
 }

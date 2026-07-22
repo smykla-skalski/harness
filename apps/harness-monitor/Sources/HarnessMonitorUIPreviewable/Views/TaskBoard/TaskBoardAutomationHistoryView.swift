@@ -9,14 +9,14 @@ struct TaskBoardAutomationHistoryView: View {
   let isMetricsLoading: Bool
   let hasOlder: Bool
   let isDetailAuthorized: Bool
-  let onRefresh: () -> Void
-  let onSelectRun: (String) -> Void
-  let onLoadOlder: () -> Void
+  let actions: TaskBoardAutomationInspectorActions
 
   var body: some View {
     TaskBoardOperationsCard(title: "Automation history", metrics: metrics) {
       HStack(spacing: HarnessMonitorTheme.spacingSM) {
-        Button(action: onRefresh) {
+        Button {
+          actions.enqueueHistoryAndMetricsRefresh()
+        } label: {
           Label("Refresh", systemImage: "arrow.clockwise")
         }
         .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
@@ -62,7 +62,9 @@ struct TaskBoardAutomationHistoryView: View {
       }
 
       if hasOlder {
-        Button(action: onLoadOlder) {
+        Button {
+          actions.enqueueOlderHistory()
+        } label: {
           HStack(spacing: HarnessMonitorTheme.spacingXS) {
             if historyLoad == .older {
               ProgressView()
@@ -89,7 +91,7 @@ struct TaskBoardAutomationHistoryView: View {
 
   private func runButton(_ run: TaskBoardAutomationRunRow) -> some View {
     Button {
-      onSelectRun(run.id)
+      actions.enqueueRunDetail(runID: run.id)
     } label: {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
         HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
@@ -128,7 +130,10 @@ struct TaskBoardAutomationHistoryView: View {
           )
       }
     }
-    .harnessPlainButtonStyle()
+    .harnessInteractiveCardButtonStyle(
+      cornerRadius: HarnessMonitorTheme.cornerRadiusSM,
+      tint: selectedRunID == run.id ? HarnessMonitorTheme.accent : nil
+    )
     .disabled(!isDetailAuthorized)
     .help(isDetailAuthorized ? "Inspect run detail" : "Run detail requires operator write access")
     .accessibilityElement(children: .combine)

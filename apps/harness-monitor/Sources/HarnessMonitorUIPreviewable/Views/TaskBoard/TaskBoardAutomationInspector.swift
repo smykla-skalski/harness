@@ -40,6 +40,9 @@ struct TaskBoardAutomationInspector: View {
   }
   var dashboard: HarnessMonitorStore.ContentDashboardSlice { store.contentUI.dashboard }
   var metrics: TaskBoardOverviewMetrics { TaskBoardOverviewMetrics(fontScale: fontScale) }
+  var actions: TaskBoardAutomationInspectorActions {
+    TaskBoardAutomationInspectorActions(store: store, state: state, isActive: isActive)
+  }
 
   var presentationInput: TaskBoardAutomationPresentationInput {
     let snapshot = dashboard.taskBoardAutomationSnapshot
@@ -109,7 +112,7 @@ struct TaskBoardAutomationInspector: View {
       )
     ) {
       if input.isOnline {
-        enqueueVisibleLoads()
+        actions.enqueueVisibleLoads()
       } else {
         state.resetRemoteData()
       }
@@ -137,9 +140,7 @@ struct TaskBoardAutomationInspector: View {
         metrics: metrics,
         isPresentationCurrent: isPresentationCurrent,
         activeAction: state.activeAction,
-        onStart: enqueueStart,
-        onStop: enqueueStop,
-        onRunOnce: enqueueRunOnce
+        actions: actions
       )
     case .history:
       TaskBoardAutomationHistoryView(
@@ -151,9 +152,7 @@ struct TaskBoardAutomationInspector: View {
         isMetricsLoading: state.isMetricsLoading,
         hasOlder: state.hasOlder,
         isDetailAuthorized: isWriteAuthorized,
-        onRefresh: enqueueHistoryAndMetricsRefresh,
-        onSelectRun: enqueueRunDetail,
-        onLoadOlder: enqueueOlderHistory
+        actions: actions
       )
     }
   }
