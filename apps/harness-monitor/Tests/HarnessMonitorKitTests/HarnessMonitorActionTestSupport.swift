@@ -190,6 +190,8 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       id: String,
       status: TaskBoardStatus?
     )
+    case setTaskBoardItemPosition(id: String, status: TaskBoardStatus, lanePosition: UInt32)
+    case resetTaskBoardItemPosition(id: String)
     case deleteTaskBoardItem(id: String)
     case beginTaskBoardPlan(id: String)
     case submitTaskBoardPlan(id: String, summary: String)
@@ -295,6 +297,10 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var taskBoardProjectSummariesStorage: [TaskBoardProjectSummary]?
   var taskBoardMachineSummariesStorage: [TaskBoardMachineSummary]?
   var taskBoardUpdateError: (any Error)?
+  var taskBoardItemRevisionsStorage: [String: Int64] = [:]
+  var taskBoardItemsChangeSeqStorage: Int64 = 0
+  var taskBoardPositionError: (any Error)?
+  var taskBoardPositionErrorRemainingUses = 0
   var taskUpdateError: (any Error)?
   var taskBoardRuntimeConfigError: (any Error)?
   var taskBoardOrchestratorSettingsError: (any Error)?
