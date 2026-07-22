@@ -21,7 +21,9 @@ pub(crate) use recorder::GitHubUsageRecorder;
 pub(crate) use stability::{GitHubReadStabilityError, retry_stable_read};
 #[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use state::stable_data_revision_guard;
-pub(crate) use state::{begin_external_mutation, republish_current_data_change};
+pub(crate) use state::{
+    begin_external_mutation, refresh_read_generation, republish_current_data_change,
+};
 pub(crate) use types::{
     GitHubApiStatus, GitHubCachePolicy, GitHubDataChange, GitHubPriority,
     GitHubPullRequestSnapshot, GitHubRequestDescriptor, GitHubResponseProvenance,
