@@ -89,8 +89,11 @@ fn safe_target(link_path: &[u8], target: &[u8]) -> bool {
     for component in target.split(|byte| *byte == b'/') {
         match component {
             b"" | b"." => {}
-            b".." if resolved.pop().is_none() => return false,
-            b".." => {}
+            b".." => {
+                if resolved.pop().is_none() {
+                    return false;
+                }
+            }
             _ if super::is_git_administration_component(component) => return false,
             _ => resolved.push(component),
         }

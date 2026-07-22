@@ -112,13 +112,16 @@ impl GitBundleExportPlan {
         )?;
         let bytes = output.stdout;
         require_bounded_bundle(&self.worktree, &bytes, limits)?;
-        let staged = GitBundleStaging::prepare(&self.coordinates, &bytes, limits.max_bundle_bytes)?;
-        let staged_path = staged.path()?;
-        self.git_contract_bounded_with_input(
-            ["bundle", "verify", staged_path],
-            &[],
-            limits.max_bundle_bytes,
-        )?;
+        {
+            let staged =
+                GitBundleStaging::prepare(&self.coordinates, &bytes, limits.max_bundle_bytes)?;
+            let staged_path = staged.path()?;
+            self.git_contract_bounded_with_input(
+                ["bundle", "verify", staged_path],
+                &[],
+                limits.max_bundle_bytes,
+            )?;
+        }
         self.require_exact_head(&bytes)?;
         Ok(GitBundleExport {
             base_revision: self.base_revision.clone(),

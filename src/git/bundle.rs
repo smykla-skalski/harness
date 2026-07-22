@@ -125,9 +125,16 @@ impl GitBundleImportPlan {
         require_bounded_bundle(bundle, bytes, limits)?;
         let output_limit = u64::try_from(bytes.len())
             .map_err(|_| GitError::unsafe_state(bundle, "git bundle length overflowed"))?;
-        let staged = GitBundleStaging::prepare(&self.coordinates, bytes, limits.max_bundle_bytes)?;
-        let staged_path = staged.path()?;
-        self.git_contract_bounded_with_input(["bundle", "verify", staged_path], &[], output_limit)?;
+        {
+            let staged =
+                GitBundleStaging::prepare(&self.coordinates, bytes, limits.max_bundle_bytes)?;
+            let staged_path = staged.path()?;
+            self.git_contract_bounded_with_input(
+                ["bundle", "verify", staged_path],
+                &[],
+                output_limit,
+            )?;
+        }
         self.require_exact_advertised_head(bundle, bytes)?;
         let quarantine = GitBundleQuarantine::prepare(&self.coordinates, bytes, limits)?;
         let verified = (|| {

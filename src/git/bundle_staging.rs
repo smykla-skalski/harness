@@ -1,5 +1,5 @@
 use std::fs::{self, File, OpenOptions};
-use std::io::Write as _;
+use std::io::{self, Write as _};
 use std::path::{Path, PathBuf};
 
 use fs2::FileExt as _;
@@ -90,7 +90,7 @@ fn reset_staging(worktree: &Path, root: &Path) -> GitResult<()> {
     fs::create_dir_all(root).map_err(|error| GitError::read(worktree, error))
 }
 
-fn remove_staging(root: &Path) -> std::io::Result<()> {
+fn remove_staging(root: &Path) -> io::Result<()> {
     let Ok(metadata) = fs::symlink_metadata(root) else {
         return Ok(());
     };
