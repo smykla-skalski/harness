@@ -20,6 +20,10 @@ async fn public_position_mutations_audit_once_with_authenticated_actor_and_seque
         })
         .await
         .expect("set position");
+    assert_eq!(
+        set.item.lane_set_at.as_deref(),
+        Some(set.item.updated_at.as_str())
+    );
     let audit: (String, String, i64, i64) = query_as(
         "SELECT kind, actor, json_extract(payload_json, '$.items_change_seq'),
          json_extract(payload_json, '$.to.index') FROM audit_events WHERE subject = ?1",

@@ -70,8 +70,9 @@ impl AsyncDaemonDb {
         item.lane_origin = Some(TaskBoardLaneOrigin::Manual {
             actor: input.actor.clone(),
         });
-        item.lane_set_at = Some(utc_now());
-        item.updated_at = utc_now();
+        let now = utc_now();
+        item.lane_set_at = Some(now.clone());
+        item.updated_at = now;
         validate_lane_placement(&item).map_err(db_error)?;
         apply_task_board_item_status_transition_in_tx(&mut transaction, &item).await?;
         let write = replace_with_lane_transition_in_tx(
@@ -188,8 +189,9 @@ impl AsyncDaemonDb {
         }
         item.lane_position = Some(lane_position);
         item.lane_origin = Some(TaskBoardLaneOrigin::Automatic { producer });
-        item.lane_set_at = Some(utc_now());
-        item.updated_at = utc_now();
+        let now = utc_now();
+        item.lane_set_at = Some(now.clone());
+        item.updated_at = now;
         let write = replace_with_lane_transition_in_tx(
             &mut transaction,
             before,

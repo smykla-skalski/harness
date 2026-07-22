@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::json;
 use sqlx::{Sqlite, Transaction, query, query_as};
@@ -14,10 +14,6 @@ use crate::errors::CliErrorKind;
 use crate::task_board::{
     TaskBoardItem, TaskBoardLaneOrigin, TaskBoardStatus, sort_task_board_items,
 };
-
-const SELECT_LANE_REFS: &str =
-    "SELECT item_id, position, provider, external_id, url, sync_state_json
-    FROM task_board_external_refs WHERE item_id = ?1 ORDER BY position";
 
 #[derive(Debug, Clone)]
 pub(crate) struct TaskBoardItemsSnapshot {
@@ -461,19 +457,34 @@ async fn load_lane_entries_in_tx(
         "SELECT * FROM task_board_items
          WHERE deleted_at IS NULL AND (status = ?1 OR status = ?2)",
     )
-    .bind(first)
-    .bind(second)
+    .bind(&first)
+    .bind(&second)
     .fetch_all(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("load task-board lane rows: {error}")))?;
+    let refs = query_as::<_, ExternalRefRow>(
+        "SELECT refs.item_id, refs.position, refs.provider, refs.external_id, refs.url,
+                refs.sync_state_json
+         FROM task_board_external_refs AS refs
+         INNER JOIN task_board_items AS items ON items.item_id = refs.item_id
+         WHERE items.deleted_at IS NULL AND (items.status = ?1 OR items.status = ?2)
+         ORDER BY refs.item_id, refs.position",
+    )
+    .bind(&first)
+    .bind(&second)
+    .fetch_all(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("load task-board lane refs: {error}")))?;
+    let mut refs_by_item = BTreeMap::<String, Vec<ExternalRefRow>>::new();
+    for reference in refs {
+        refs_by_item
+            .entry(reference.item_id.clone())
+            .or_default()
+            .push(reference);
+    }
     let mut entries = Vec::with_capacity(rows.len());
     for row in rows {
-        let item_id = row.item_id.clone();
-        let refs = query_as::<_, ExternalRefRow>(SELECT_LANE_REFS)
-            .bind(&item_id)
-            .fetch_all(transaction.as_mut())
-            .await
-            .map_err(|error| db_error(format!("load task-board lane refs '{item_id}': {error}")))?;
+        let refs = refs_by_item.remove(&row.item_id).unwrap_or_default();
         let (item, revision) = item_from_rows(row, refs)?;
         entries.push(LaneEntry {
             before: item.clone(),

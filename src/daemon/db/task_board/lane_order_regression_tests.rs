@@ -1,3 +1,5 @@
+use crate::task_board::{ExternalRef, ExternalRefProvider};
+
 use super::*;
 
 #[tokio::test]
@@ -11,10 +13,15 @@ async fn same_lane_default_anchor_compacts_before_inserting_the_requested_slot()
     db.create_task_board_item(automatic)
         .await
         .expect("create automatic anchor");
-    db.place_task_board_item_automatically("b", 1, "provider-sync".into())
+    let automatic_write = db
+        .place_task_board_item_automatically("b", 1, "provider-sync".into())
         .await
         .expect("place automatic anchor")
         .expect("automatic anchor result");
+    assert_eq!(
+        automatic_write.item.lane_set_at.as_deref(),
+        Some(automatic_write.item.updated_at.as_str())
+    );
     let before = db.task_board_items_snapshot(None).await.expect("snapshot");
     assert_positions(&before, &["a", "b"]);
     let b_revision = revision(&before, "b");
@@ -53,4 +60,39 @@ async fn same_lane_default_anchor_compacts_before_inserting_the_requested_slot()
         .await
         .expect("restored snapshot");
     assert_positions(&restored, &["a", "b"]);
+}
+
+#[tokio::test]
+async fn lane_batch_loader_preserves_external_refs_per_item() {
+    let (_directory, db) = connect().await;
+    let mut a = item("a", "2026-07-22T10:00:00Z");
+    a.external_refs = vec![external_ref("a-1"), external_ref("a-2")];
+    let mut b = item("b", "2026-07-22T10:01:00Z");
+    b.external_refs = vec![external_ref("b-1")];
+    db.create_task_board_item(a).await.expect("create a");
+    db.create_task_board_item(b).await.expect("create b");
+
+    anchor(&db, "b", 0).await;
+    let snapshot = db.task_board_items_snapshot(None).await.expect("snapshot");
+    assert_eq!(
+        item_from(&snapshot, "a")
+            .external_refs
+            .iter()
+            .map(|reference| reference.external_id.as_str())
+            .collect::<Vec<_>>(),
+        ["a-1", "a-2"]
+    );
+    assert_eq!(
+        item_from(&snapshot, "b").external_refs[0].external_id,
+        "b-1"
+    );
+}
+
+fn external_ref(external_id: &str) -> ExternalRef {
+    ExternalRef {
+        provider: ExternalRefProvider::GitHub,
+        external_id: external_id.into(),
+        url: None,
+        sync_state: None,
+    }
 }
