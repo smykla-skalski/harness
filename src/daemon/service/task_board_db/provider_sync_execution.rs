@@ -7,11 +7,14 @@ use crate::task_board::external::{
     load_external_create_recovery_work, prepare_external_create_recovery,
     sync_external_tasks_scoped_with_recovery,
 };
-use crate::task_board::{ExternalSyncClient, configured_sync_clients_without_review_requests};
+use crate::task_board::{
+    ExternalProvider, ExternalSyncClient, ExternalSyncDirection,
+    configured_sync_clients_without_review_requests,
+};
 
 use super::TaskBoardSyncRunContext;
 use super::provider_sync_context_store::ProviderSyncRunStore;
-use super::sync_audit::SyncExecutionMetrics;
+use super::sync_audit::{SyncExecutionMetrics, TaskBoardSyncAuditTrigger};
 
 pub(super) async fn execute(
     db: &AsyncDaemonDb,
@@ -60,6 +63,21 @@ pub(super) async fn execute(
             return finish_blocked(metrics, blocked_external_create_recovery(prepared, error));
         }
     };
+    // A user-pressed Sync must reflect edits made directly on GitHub (a new
+    // assignee, a review request); those never bump the read generation, so cached
+    // searches up to an hour old would hide them. Advance it once so every GitHub
+    // read this sync makes hits the API. Background reconciles skip this Requested
+    // branch and keep their cache; only the reconcile right after a manual Sync
+    // refetches once.
+    if context.trigger() == TaskBoardSyncAuditTrigger::Requested
+        && matches!(
+            options.direction,
+            ExternalSyncDirection::Pull | ExternalSyncDirection::Both
+        )
+        && config.token_for(ExternalProvider::GitHub).is_some()
+    {
+        crate::github_api::refresh_read_generation().await;
+    }
     let mut clients =
         match configured_sync_clients_without_review_requests(&config, request.provider) {
             Ok(clients) => clients,

@@ -125,7 +125,7 @@ async fn refresh_read_generation_advances_the_read_generation() {
     let _budget_guard = super::acquire_global_budget_test_lock().await;
     let initial_revision = GitHubProtectedClient::data_revision();
 
-    super::refresh_read_generation();
+    super::refresh_read_generation().await;
 
     assert_eq!(
         GitHubProtectedClient::data_revision(),

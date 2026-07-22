@@ -139,11 +139,14 @@ impl GitHubApiState {
         });
     }
 
-    /// Advance the read generation without broadcasting a data change, so a
-    /// user-requested sync's GitHub reads miss the cache and surface edits made
-    /// directly on GitHub (a new assignee, a review request). Stays silent on
-    /// purpose: no client-facing mutation happened, only a forced refresh.
-    pub(super) fn refresh_read_generation(&self) {
+    /// Advance the read generation so a user-requested sync's GitHub reads miss the
+    /// cache and surface edits made directly on GitHub (a new assignee, a review
+    /// request). Holds the mutation barrier while bumping, exactly as a real
+    /// mutation does, so a projection holding `stable_data_revision_guard` never
+    /// observes the revision move under it. Stays silent - no data-change broadcast,
+    /// because a manual refresh is not a client-facing mutation.
+    pub(super) async fn refresh_read_generation(&self) {
+        let _barrier = self.mutation_barrier.lock().await;
         let _guard = self
             .data_revision_write
             .lock()
@@ -189,8 +192,8 @@ pub(crate) fn republish_current_data_change(operation: &str) {
     global_state().republish_current_data_change(operation);
 }
 
-pub(crate) fn refresh_read_generation() {
-    global_state().refresh_read_generation();
+pub(crate) async fn refresh_read_generation() {
+    global_state().refresh_read_generation().await;
 }
 
 pub(crate) async fn stable_data_revision_guard(
