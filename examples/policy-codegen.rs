@@ -3939,7 +3939,7 @@ pub struct Drop { pub other: String }
 
     #[test]
     fn hand_model_defaults_keep_listed_automation_settings_optional() {
-        let source = r#"
+        let source = r"
             #[derive(Serialize, Deserialize)]
             pub struct TaskBoardOrchestratorSettings {
                 #[serde(default)]
@@ -3950,7 +3950,7 @@ pub struct Drop { pub other: String }
                 pub reviewers: TaskBoardReviewerSettings,
                 pub policy_version: String,
             }
-        "#;
+        ";
         let symbols = build_symbol_table(&[source]);
         let defaults = DefaultLiterals::new();
         let file = syn::parse_file(source).expect("source parses");
