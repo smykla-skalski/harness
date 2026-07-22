@@ -8,8 +8,8 @@ use crate::task_board::external::{
     sync_external_tasks_scoped_with_recovery,
 };
 use crate::task_board::{
-    ExternalProvider, ExternalSyncClient, ExternalSyncDirection,
-    configured_sync_clients_without_review_requests,
+    ExternalProvider, ExternalSyncClient, ExternalSyncConfig, ExternalSyncDirection,
+    ExternalSyncOptions, configured_sync_clients_without_review_requests,
 };
 
 use super::TaskBoardSyncRunContext;
@@ -69,13 +69,7 @@ pub(super) async fn execute(
     // read this sync makes hits the API. Background reconciles skip this Requested
     // branch and keep their cache; only the reconcile right after a manual Sync
     // refetches once.
-    if context.trigger() == TaskBoardSyncAuditTrigger::Requested
-        && matches!(
-            options.direction,
-            ExternalSyncDirection::Pull | ExternalSyncDirection::Both
-        )
-        && config.token_for(ExternalProvider::GitHub).is_some()
-    {
+    if requested_github_read(context, &options, &config) {
         crate::github_api::refresh_read_generation().await;
     }
     let mut clients =
@@ -126,6 +120,20 @@ pub(super) async fn execute(
     Ok(summary)
 }
 
+fn requested_github_read(
+    context: &TaskBoardSyncRunContext,
+    options: &ExternalSyncOptions,
+    config: &ExternalSyncConfig,
+) -> bool {
+    context.trigger() == TaskBoardSyncAuditTrigger::Requested
+        && matches!(options.provider, None | Some(ExternalProvider::GitHub))
+        && matches!(
+            options.direction,
+            ExternalSyncDirection::Pull | ExternalSyncDirection::Both
+        )
+        && config.token_for(ExternalProvider::GitHub).is_some()
+}
+
 fn combine_follow_up_error(existing: Option<CliError>, follow_up: CliError) -> CliError {
     let Some(existing) = existing else {
         return follow_up;
@@ -156,9 +164,60 @@ mod tests {
     use super::*;
     use crate::daemon::protocol::HarnessMonitorAuditEventsRequest;
     use crate::task_board::{
-        ExternalCreateOutcome, ExternalProvider, ExternalRefSyncState, ExternalSyncDirection,
-        ExternalTaskRef, TaskBoardExternalCreateBegin, TaskBoardItem, TaskBoardStatus,
+        ExternalCreateOutcome, ExternalProvider, ExternalRefSyncState, ExternalSyncConfig,
+        ExternalSyncDirection, ExternalSyncOptions, ExternalTaskRef, TaskBoardExternalCreateBegin,
+        TaskBoardItem, TaskBoardStatus,
     };
+
+    #[test]
+    fn requested_github_read_gates_the_read_refresh() {
+        let github = ExternalSyncConfig::default().with_github_token_override(Some("token"));
+        let pull = ExternalSyncOptions {
+            direction: ExternalSyncDirection::Pull,
+            ..ExternalSyncOptions::default()
+        };
+        let requested = TaskBoardSyncRunContext::requested();
+
+        assert!(
+            requested_github_read(&requested, &pull, &github),
+            "a requested GitHub pull with a token must refresh"
+        );
+        assert!(
+            !requested_github_read(
+                &TaskBoardSyncRunContext::orchestrator(None, None, None),
+                &pull,
+                &github,
+            ),
+            "orchestrator syncs keep their cache"
+        );
+        assert!(
+            !requested_github_read(
+                &requested,
+                &ExternalSyncOptions {
+                    provider: Some(ExternalProvider::Todoist),
+                    direction: ExternalSyncDirection::Pull,
+                    ..ExternalSyncOptions::default()
+                },
+                &github,
+            ),
+            "a Todoist-only pull must not refresh GitHub even with a token set"
+        );
+        assert!(
+            !requested_github_read(
+                &requested,
+                &ExternalSyncOptions {
+                    direction: ExternalSyncDirection::Push,
+                    ..ExternalSyncOptions::default()
+                },
+                &github,
+            ),
+            "push syncs perform no reads"
+        );
+        assert!(
+            !requested_github_read(&requested, &pull, &ExternalSyncConfig::default()),
+            "no GitHub token means nothing to read"
+        );
+    }
 
     #[tokio::test]
     async fn config_failure_reports_create_once_and_acks_the_follow_up() {
