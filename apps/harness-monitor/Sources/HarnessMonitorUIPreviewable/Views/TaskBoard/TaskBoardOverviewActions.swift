@@ -229,6 +229,28 @@ public struct TaskBoardOverviewActions: Equatable {
     )
   }
 
+  func reorderTaskBoardItem(_ plan: TaskBoardCardReorderPlan) {
+    guard let store else { return }
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Reordering task board item") {
+        await store.reorderTaskBoardItem(
+          id: plan.itemID,
+          status: plan.status,
+          lanePosition: plan.lanePosition
+        )
+      }
+    )
+  }
+
+  func resetTaskBoardItemPosition(_ item: TaskBoardItem) {
+    guard let store else { return }
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Resetting task board position") {
+        await store.resetTaskBoardItemManualPosition(id: item.id)
+      }
+    )
+  }
+
   func moveTaskBoardItems(_ updates: [TaskBoardItemStatusUpdate]) {
     guard let store else { return }
     HarnessMonitorAsyncWorkQueue.shared.submit(

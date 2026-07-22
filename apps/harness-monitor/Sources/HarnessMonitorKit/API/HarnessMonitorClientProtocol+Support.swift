@@ -95,6 +95,16 @@ public enum HarnessMonitorAPIError: Error, LocalizedError, Equatable {
     return Self.normalizedServerMessage(from: message)
   }
 
+  /// True for an HTTP 409 from any transport (HTTP, WebSocket, or the
+  /// preview fixture all funnel a CAS mismatch into this same case), the
+  /// shape a task-board lane-position conflict always takes.
+  public var isServerConflict: Bool {
+    guard case .server(let code, _) = self else {
+      return false
+    }
+    return code == 409
+  }
+
   public var serverSemanticCode: String? {
     guard case .server(_, let message) = self else {
       return nil
