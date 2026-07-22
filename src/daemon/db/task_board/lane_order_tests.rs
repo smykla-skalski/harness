@@ -508,3 +508,6 @@ mod regressions;
 
 #[path = "lane_order_position_contract_tests.rs"]
 mod position_contracts;
+
+#[path = "lane_order_revision_overflow_tests.rs"]
+mod revision_overflow;

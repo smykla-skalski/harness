@@ -66,14 +66,21 @@ pub(super) async fn replace_with_lane_transition_in_tx(
     item: TaskBoardItem,
     transition: LaneTransitionKind,
 ) -> Result<LaneTransitionWrite, CliError> {
+    let item_revision = next_item_revision(before_revision)?;
     write_lane_transition_in_tx(
         transaction,
         Some((before, before_revision)),
         item,
-        before_revision + 1,
+        item_revision,
         transition,
     )
     .await
+}
+
+fn next_item_revision(revision: i64) -> Result<i64, CliError> {
+    revision
+        .checked_add(1)
+        .ok_or_else(|| db_error("task board item revision is out of range"))
 }
 
 pub(super) async fn record_lane_transition_audit_in_tx(
@@ -188,10 +195,11 @@ async fn write_lane_transition_in_tx(
         .iter_mut()
         .filter(|entry| entry.before != entry.item)
     {
-        replace_item_in_tx(transaction, &entry.item, entry.revision + 1).await?;
+        let item_revision = next_item_revision(entry.revision)?;
+        replace_item_in_tx(transaction, &entry.item, item_revision).await?;
         shifted.push(TaskBoardLaneShift {
             item_id: entry.item.id.clone(),
-            item_revision: entry.revision + 1,
+            item_revision,
         });
     }
     let placement_changed = placement_changed(previous, &item, &shifted);
