@@ -39,7 +39,14 @@ private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
     "revision": .number(7),
     "instance_id": .string("task-board-instance-1"),
   ]),
-  .taskBoardList: .object(["items": .array([.object(sampleTaskBoardItemJSON)])]),
+  .taskBoardList: .object([
+    "items": .array([.object(sampleTaskBoardItemJSON)]),
+    "items_change_seq": .number(42),
+    "item_revisions": .object(["board-1": .number(7)]),
+  ]),
+  .taskBoardPositionGet: .object(sampleTaskBoardPositionSnapshotJSON),
+  .taskBoardPositionSet: .object(sampleTaskBoardPositionMutationJSON),
+  .taskBoardPositionReset: .object(sampleTaskBoardPositionMutationJSON),
   .taskBoardCreate: .object(sampleTaskBoardItemJSON),
   .taskBoardGet: .object(sampleTaskBoardItemJSON),
   .taskBoardUpdate: .object(sampleTaskBoardItemJSON),
@@ -172,7 +179,14 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
   private static let responseBodies: [Route: String] = [
     Route("/v1/task-board/capabilities", method: "GET"):
       #"{"storage":"database","revision":7,"instance_id":"task-board-instance-1"}"#,
-    Route("/v1/task-board/items", method: "GET"): #"{"items":[\#(sampleTaskBoardItemJSONString)]}"#,
+    Route("/v1/task-board/items", method: "GET"):
+      #"{"items":[\#(sampleTaskBoardItemJSONString)],"items_change_seq":42,"item_revisions":{"board-1":7}}"#,
+    Route("/v1/task-board/items/board-1/position", method: "GET"):
+      sampleTaskBoardPositionSnapshotText,
+    Route("/v1/task-board/items/board-1/position", method: "PUT"):
+      sampleTaskBoardPositionMutationText,
+    Route("/v1/task-board/items/board-1/position/reset", method: "POST"):
+      sampleTaskBoardPositionMutationText,
     Route("/v1/task-board/items/board-1/planning/begin"): sampleTaskBoardPlanningResponseText,
     Route("/v1/task-board/items/board-1/planning/submit"): sampleTaskBoardPlanningResponseText,
     Route("/v1/task-board/items/board-1/planning/approve"): sampleTaskBoardPlanningResponseText,

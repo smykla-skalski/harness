@@ -2,10 +2,106 @@ import Foundation
 
 extension PreviewHarnessClientState {
   func currentTaskBoardItems(status: TaskBoardStatus?) -> [TaskBoardItem] {
-    guard let status else {
-      return taskBoardItems
+    let expectedStatus = status?.canonicalPersistedStatus
+    let items = taskBoardItems.filter { item in
+      item.deletedAt == nil
+        && (expectedStatus == nil || item.status.canonicalPersistedStatus == expectedStatus)
     }
-    return taskBoardItems.filter { $0.status == status }
+    return canonicalMaterializedTaskBoardItems(items)
+  }
+
+  func materializedLanePosition(for item: TaskBoardItem, in status: TaskBoardStatus) -> UInt32? {
+    let lane = currentTaskBoardItems(status: status)
+    guard let index = lane.firstIndex(where: { $0.id == item.id }) else {
+      return nil
+    }
+    return UInt32(exactly: index)
+  }
+
+  private func canonicalMaterializedTaskBoardItems(_ items: [TaskBoardItem]) -> [TaskBoardItem] {
+    guard items.contains(where: { $0.lanePosition != nil }) else {
+      return items.sorted(by: legacyTaskBoardItemOrder)
+    }
+    let lanes = Dictionary(grouping: items, by: { $0.status.canonicalPersistedStatus })
+    return lanes.keys
+      .sorted(by: taskBoardStatusOrder)
+      .flatMap { status in
+        let lane = lanes[status, default: []]
+        return materializedLaneItems(lane) ?? lane.sorted(by: legacyTaskBoardItemOrder)
+      }
+  }
+
+  private func materializedLaneItems(_ items: [TaskBoardItem]) -> [TaskBoardItem]? {
+    var anchors: [UInt32: TaskBoardItem] = [:]
+    var defaults: [TaskBoardItem] = []
+    for item in items {
+      guard let position = item.lanePosition else {
+        defaults.append(item)
+        continue
+      }
+      guard Int(position) < items.count, anchors[position] == nil else {
+        return nil
+      }
+      anchors[position] = item
+    }
+    defaults.sort(by: legacyWithinLaneOrder)
+    var defaultIndex = 0
+    var ordered: [TaskBoardItem] = []
+    for slot in 0..<items.count {
+      guard let position = UInt32(exactly: slot) else {
+        return nil
+      }
+      if let anchor = anchors.removeValue(forKey: position) {
+        ordered.append(anchor)
+      } else {
+        guard defaultIndex < defaults.count else {
+          return nil
+        }
+        ordered.append(defaults[defaultIndex])
+        defaultIndex += 1
+      }
+    }
+    return ordered
+  }
+
+  private func legacyTaskBoardItemOrder(_ left: TaskBoardItem, _ right: TaskBoardItem) -> Bool {
+    let leftStatus = left.status.canonicalPersistedStatus
+    let rightStatus = right.status.canonicalPersistedStatus
+    if leftStatus != rightStatus {
+      return taskBoardStatusOrder(leftStatus, rightStatus)
+    }
+    return legacyWithinLaneOrder(left, right)
+  }
+
+  private func legacyWithinLaneOrder(_ left: TaskBoardItem, _ right: TaskBoardItem) -> Bool {
+    let leftPriority = taskBoardLanePriority(left.priority)
+    let rightPriority = taskBoardLanePriority(right.priority)
+    if leftPriority != rightPriority {
+      return leftPriority > rightPriority
+    }
+    if left.createdAt != right.createdAt {
+      return left.createdAt < right.createdAt
+    }
+    return left.id < right.id
+  }
+
+  private func taskBoardStatusOrder(_ left: TaskBoardStatus, _ right: TaskBoardStatus) -> Bool {
+    let leftIndex = TaskBoardStatus.allCases.firstIndex(of: left) ?? TaskBoardStatus.allCases.count
+    let rightIndex =
+      TaskBoardStatus.allCases.firstIndex(of: right) ?? TaskBoardStatus.allCases.count
+    if leftIndex != rightIndex {
+      return leftIndex < rightIndex
+    }
+    return left.rawValue < right.rawValue
+  }
+
+  private func taskBoardLanePriority(_ priority: TaskBoardPriority) -> Int {
+    switch priority {
+    case .low: 0
+    case .medium: 1
+    case .high: 2
+    case .critical: 3
+    }
   }
 
   func currentTaskBoardItem(id: String) throws -> TaskBoardItem {
@@ -38,25 +134,20 @@ extension PreviewHarnessClientState {
       deletedAt: nil
     )
     taskBoardItems.append(item)
+    taskBoardItemRevisions[item.id] = 1
+    taskBoardItemsChangeSeq += 1
     return item
   }
 
   func updateTaskBoardItem(id: String, request: TaskBoardUpdateItemRequest) throws
     -> TaskBoardItem
   {
-    guard let index = taskBoardItems.firstIndex(where: { $0.id == id }) else {
-      throw taskBoardItemUnavailable()
-    }
-    let updated = taskBoardItems[index].applyingPreviewUpdate(request)
-    taskBoardItems[index] = updated
-    return updated
+    let current = try currentTaskBoardItem(id: id)
+    return replaceTaskBoardItemWithLaneTransition(current.applyingPreviewUpdate(request))
   }
 
   func deleteTaskBoardItem(id: String) throws -> TaskBoardItem {
-    guard let index = taskBoardItems.firstIndex(where: { $0.id == id }) else {
-      throw taskBoardItemUnavailable()
-    }
-    return taskBoardItems.remove(at: index)
+    try deleteTaskBoardItemWithLaneTransition(id: id)
   }
 
   func beginTaskBoardPlan(id: String) throws -> TaskBoardPlanningResponse {
@@ -131,13 +222,13 @@ extension PreviewHarnessClientState {
     let plans = matchingTaskBoardItems(status: request.status, itemId: request.itemId).map { item in
       let updated = item.applyingPreviewDispatch()
       if !request.dryRun {
-        replaceTaskBoardItem(updated)
+        let appliedItem = replaceTaskBoardItemWithLaneTransition(updated)
         applied.append(
           TaskBoardDispatchAppliedTask(
-            boardItemId: updated.id,
-            sessionId: updated.sessionId ?? "preview-session-\(updated.id)",
-            workItemId: updated.workItemId ?? "preview-task-\(updated.id)",
-            item: updated
+            boardItemId: appliedItem.id,
+            sessionId: appliedItem.sessionId ?? "preview-session-\(appliedItem.id)",
+            workItemId: appliedItem.workItemId ?? "preview-task-\(appliedItem.id)",
+            item: appliedItem
           )
         )
       }
@@ -293,7 +384,7 @@ extension PreviewHarnessClientState {
   ) throws -> TaskBoardPlanningResponse {
     let current = try currentTaskBoardItem(id: id)
     let updated = current.applyingPreviewPlanning(status: toStatus, planning: planning)
-    replaceTaskBoardItem(updated)
+    let appliedItem = replaceTaskBoardItemWithLaneTransition(updated)
     return TaskBoardPlanningResponse(
       transition: TaskBoardPlanningTransition(
         boardItemId: id,
@@ -301,7 +392,7 @@ extension PreviewHarnessClientState {
         toStatus: toStatus,
         planning: planning
       ),
-      item: updated
+      item: appliedItem
     )
   }
 
@@ -310,7 +401,10 @@ extension PreviewHarnessClientState {
     itemId: String?
   ) -> [TaskBoardItem] {
     taskBoardItems.filter { item in
-      (status == nil || item.status == status) && (itemId == nil || item.id == itemId)
+      item.deletedAt == nil
+        && (status == nil
+          || item.status.canonicalPersistedStatus == status?.canonicalPersistedStatus)
+        && (itemId == nil || item.id == itemId)
     }
   }
 
@@ -329,23 +423,19 @@ extension PreviewHarnessClientState {
       workflowStatus: workflowStatus
     )
     if updated && !dryRun {
-      replaceTaskBoardItem(evaluated)
+      let appliedItem = replaceTaskBoardItemWithLaneTransition(evaluated)
+      return appliedItem.previewEvaluationRecord(
+        outcome: boardStatus.previewEvaluationOutcome,
+        updated: true
+      )
     }
     return evaluated.previewEvaluationRecord(
       outcome: boardStatus.previewEvaluationOutcome,
-      updated: updated && !dryRun
+      updated: false
     )
   }
 
-  private func replaceTaskBoardItem(_ item: TaskBoardItem) {
-    guard let index = taskBoardItems.firstIndex(where: { $0.id == item.id }) else {
-      taskBoardItems.append(item)
-      return
-    }
-    taskBoardItems[index] = item
-  }
-
-  private func taskBoardItemUnavailable() -> HarnessMonitorAPIError {
+  func taskBoardItemUnavailable() -> HarnessMonitorAPIError {
     HarnessMonitorAPIError.server(code: 404, message: "Task board item unavailable")
   }
 

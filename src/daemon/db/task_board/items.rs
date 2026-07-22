@@ -1,12 +1,12 @@
 use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 use super::ITEMS_CHANGE_SCOPE;
+use super::lane_order::{
+    LaneTransitionKind, insert_with_lane_transition_in_tx, record_lane_transition_audit_in_tx,
+    replace_with_lane_transition_in_tx,
+};
 use super::mapper::{item_from_rows, label, to_json};
 use super::rows::{ExternalRefRow, ItemRow};
-use super::lane_order::{
-    LaneTransitionKind, insert_with_lane_transition_in_tx,
-    record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
-};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::errors::CliErrorKind;
 use crate::infra::io;
@@ -17,11 +17,9 @@ use crate::task_board::{
 
 #[path = "items_lifecycle.rs"]
 mod lifecycle;
+use lifecycle::ensure_estimates_are_editable_in_tx;
 pub(super) use lifecycle::{
     apply_task_board_item_status_transition_in_tx, ensure_workflow_item_mutation_allowed_in_tx,
-};
-use lifecycle::{
-    ensure_estimates_are_editable_in_tx,
 };
 
 #[path = "items_parent.rs"]
@@ -437,7 +435,11 @@ pub(super) async fn items_change_sequence_in_tx(
         .bind(ITEMS_CHANGE_SCOPE)
         .fetch_optional(transaction.as_mut())
         .await
-        .map_err(|error| db_error(format!("read task-board item sequence in transaction: {error}")))
+        .map_err(|error| {
+            db_error(format!(
+                "read task-board item sequence in transaction: {error}"
+            ))
+        })
         .map(|sequence| sequence.unwrap_or(0))
 }
 

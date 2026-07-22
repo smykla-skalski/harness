@@ -130,7 +130,10 @@ async fn imported_explicit_lane_anchor_survives_restart_and_records_the_item_seq
     let restarted = AsyncDaemonDb::connect(&database.path().join("harness.db"))
         .await
         .expect("restart database");
-    let restored = restarted.task_board_item(&item.id).await.expect("restored item");
+    let restored = restarted
+        .task_board_item(&item.id)
+        .await
+        .expect("restored item");
     assert_eq!(restored.lane_position, Some(0));
     assert!(matches!(
         restored.lane_origin,
@@ -151,7 +154,11 @@ async fn import_materializes_reverse_filename_anchors_before_persistence() {
     write_legacy_metadata(legacy.path());
     let snapshot = LegacyTaskBoardSnapshot::load(legacy.path()).expect("load snapshot");
     assert_eq!(
-        snapshot.items.iter().map(|item| item.id.as_str()).collect::<Vec<_>>(),
+        snapshot
+            .items
+            .iter()
+            .map(|item| item.id.as_str())
+            .collect::<Vec<_>>(),
         ["a", "b"],
         "legacy load is filename ordered"
     );
@@ -188,7 +195,10 @@ async fn import_materializes_reverse_filename_anchors_before_persistence() {
     let restarted = AsyncDaemonDb::connect(&database.path().join("harness.db"))
         .await
         .expect("restart database");
-    let restored = restarted.task_board_items_snapshot(None).await.expect("restored snapshot");
+    let restored = restarted
+        .task_board_items_snapshot(None)
+        .await
+        .expect("restored snapshot");
     assert_eq!(
         restored
             .items
@@ -204,7 +214,10 @@ async fn import_rejects_duplicate_and_out_of_range_lane_anchors() {
     for (name, items, expected) in [
         (
             "duplicate",
-            vec![anchored_item("duplicate-a", 0), anchored_item("duplicate-b", 0)],
+            vec![
+                anchored_item("duplicate-a", 0),
+                anchored_item("duplicate-b", 0),
+            ],
             "unique",
         ),
         (

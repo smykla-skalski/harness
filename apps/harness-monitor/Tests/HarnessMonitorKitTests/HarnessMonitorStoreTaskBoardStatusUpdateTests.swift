@@ -393,10 +393,51 @@ struct HarnessMonitorStoreTaskBoardStatusUpdateTests {
     #expect(store.globalTaskBoardItems.first(where: { $0.id == "board-1" })?.kind == .umbrella)
   }
 
+  @Test("Delayed optimistic move preserves placement metadata")
+  func delayedOptimisticMovePreservesPlacementMetadata() async {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardItems([
+      taskBoardItem(
+        id: "board-1",
+        status: .todo,
+        lanePosition: 2,
+        laneOrigin: .automatic(producer: "daemon"),
+        laneSetAt: "2026-07-22T14:00:00Z"
+      )
+    ])
+    client.configureMutationDelay(.milliseconds(200))
+    let store = await makeBootstrappedStore(client: client)
+
+    let mutation = Task { @MainActor in
+      await store.updateTaskBoardItemStatuses([
+        TaskBoardItemStatusUpdate(id: "board-1", status: .inProgress)
+      ])
+    }
+
+    var optimisticItem: TaskBoardItem?
+    for _ in 0..<50 {
+      if let item = store.globalTaskBoardItems.first(where: { $0.id == "board-1" }),
+        item.status == .inProgress
+      {
+        optimisticItem = item
+        break
+      }
+      await Task.yield()
+    }
+    _ = await mutation.value
+
+    #expect(optimisticItem?.lanePosition == 2)
+    #expect(optimisticItem?.laneOrigin == .automatic(producer: "daemon"))
+    #expect(optimisticItem?.laneSetAt == "2026-07-22T14:00:00Z")
+  }
+
   private func taskBoardItem(
     id: String,
     status: TaskBoardStatus,
-    kind: TaskBoardItemKind = .task
+    kind: TaskBoardItemKind = .task,
+    lanePosition: UInt32? = nil,
+    laneOrigin: TaskBoardLaneOrigin? = nil,
+    laneSetAt: String? = nil
   ) -> TaskBoardItem {
     TaskBoardItem(
       schemaVersion: 1,
@@ -415,6 +456,9 @@ struct HarnessMonitorStoreTaskBoardStatusUpdateTests {
       sessionId: nil,
       workItemId: nil,
       usage: TaskBoardUsage(),
+      lanePosition: lanePosition,
+      laneOrigin: laneOrigin,
+      laneSetAt: laneSetAt,
       createdAt: "2026-05-14T10:00:00Z",
       updatedAt: "2026-05-14T10:01:00Z",
       deletedAt: nil

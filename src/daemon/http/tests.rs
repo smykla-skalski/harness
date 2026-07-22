@@ -68,6 +68,7 @@ mod task_board_dispatch_pick;
 mod task_board_managed_worker_assertions;
 mod task_board_parity;
 mod task_board_policy_grant_route_parity;
+mod task_board_position_parity;
 mod task_board_route_parity;
 mod task_board_route_parity_support;
 mod task_board_support;
@@ -104,6 +105,33 @@ async fn map_json_maps_session_scope_denied_to_403() {
 
     assert_eq!(status, StatusCode::FORBIDDEN);
     assert_eq!(body["error"]["code"], "SESSION_SCOPE_DENIED");
+}
+
+#[test]
+fn task_board_position_conflicts_map_to_409() {
+    for (error, code) in [
+        (
+            CliErrorKind::concurrent_modification("position sequence changed").into(),
+            "WORKFLOW_CONCURRENT",
+        ),
+        (
+            CliErrorKind::task_board_lane_capacity("lane is full").into(),
+            "TASK_BOARD_LANE_CAPACITY",
+        ),
+    ] {
+        let (status, body) = super::response::error_status_and_body(&error);
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(body["error"]["code"], code);
+    }
+}
+
+#[test]
+fn task_board_position_state_rejections_map_to_400() {
+    let error = CliErrorKind::invalid_transition("position is no longer explicit").into();
+    let (status, body) = super::response::error_status_and_body(&error);
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(body["error"]["code"], "KSRCLI084");
 }
 
 #[test]

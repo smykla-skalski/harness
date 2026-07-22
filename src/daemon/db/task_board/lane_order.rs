@@ -15,7 +15,8 @@ use crate::task_board::{
     TaskBoardItem, TaskBoardLaneOrigin, TaskBoardStatus, sort_task_board_items,
 };
 
-const SELECT_LANE_REFS: &str = "SELECT item_id, position, provider, external_id, url, sync_state_json
+const SELECT_LANE_REFS: &str =
+    "SELECT item_id, position, provider, external_id, url, sync_state_json
     FROM task_board_external_refs WHERE item_id = ?1 ORDER BY position";
 
 #[derive(Debug, Clone)]
@@ -43,6 +44,12 @@ pub(super) enum LaneTransitionKind {
     Generic,
     Manual,
     Automatic,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TaskBoardLanePositionAuditKind {
+    Set,
+    Reset,
 }
 
 pub(super) async fn insert_with_lane_transition_in_tx(
@@ -145,14 +152,17 @@ async fn write_lane_transition_in_tx(
             .is_some_and(TaskBoardLaneOrigin::is_manual)
     {
         return Ok(LaneTransitionWrite {
-            item: previous.cloned().expect("automatic transition has prior item"),
+            item: previous
+                .cloned()
+                .expect("automatic transition has prior item"),
             item_revision: before.as_ref().map_or(1, |(_, revision)| *revision),
             shifted: Vec::new(),
             changed: false,
         });
     }
 
-    let allow_generic_cross_lane_clamp = is_generic_cross_lane_placement(previous, &item, transition);
+    let allow_generic_cross_lane_clamp =
+        is_generic_cross_lane_placement(previous, &item, transition);
     let source_status = previous
         .filter(|prior| prior.deleted_at.is_none())
         .map(|prior| prior.status.canonical_persisted_status());
@@ -160,7 +170,8 @@ async fn write_lane_transition_in_tx(
         .deleted_at
         .is_none()
         .then_some(item.status.canonical_persisted_status());
-    let mut entries = load_lane_entries_in_tx(transaction, source_status, destination_status).await?;
+    let mut entries =
+        load_lane_entries_in_tx(transaction, source_status, destination_status).await?;
     normalize_lane_entries(
         &mut entries,
         previous,
@@ -173,7 +184,10 @@ async fn write_lane_transition_in_tx(
 
     let mut shifted = Vec::new();
     clear_changed_anchors_in_tx(transaction, &entries, previous, &item).await?;
-    for entry in entries.iter_mut().filter(|entry| entry.before != entry.item) {
+    for entry in entries
+        .iter_mut()
+        .filter(|entry| entry.before != entry.item)
+    {
         replace_item_in_tx(transaction, &entry.item, entry.revision + 1).await?;
         shifted.push(TaskBoardLaneShift {
             item_id: entry.item.id.clone(),
@@ -205,7 +219,8 @@ fn normalize_lane_entries(
 ) -> Result<(), CliError> {
     entries.retain(|entry| entry.before.id != item.id);
     if let Some(prior) = previous.filter(|prior| prior.deleted_at.is_none()) {
-        let position = source_removal_position(source_status, destination_status, prior, item, entries);
+        let position =
+            source_removal_position(source_status, destination_status, prior, item, entries);
         if let Some(position) = position {
             shift_left_after_removal(entries, prior.status, position);
         }
@@ -231,9 +246,14 @@ fn source_removal_position(
     item: &TaskBoardItem,
     entries: &[LaneEntry],
 ) -> Option<u32> {
-    let placement_changed = source_status != destination_status || prior.lane_position != item.lane_position;
+    let placement_changed =
+        source_status != destination_status || prior.lane_position != item.lane_position;
     placement_changed
-        .then(|| prior.lane_position.or_else(|| default_position_before_removal(entries, prior)))
+        .then(|| {
+            prior
+                .lane_position
+                .or_else(|| default_position_before_removal(entries, prior))
+        })
         .flatten()
 }
 
@@ -255,7 +275,8 @@ fn placement_changed(
         != item.status.canonical_persisted_status()
         || previous.deleted_at.is_some() != item.deleted_at.is_some();
     placement_tuple_changed
-        || (membership_changed && (previous.lane_position.is_some() || item.lane_position.is_some()))
+        || (membership_changed
+            && (previous.lane_position.is_some() || item.lane_position.is_some()))
 }
 
 fn default_position_before_removal(entries: &[LaneEntry], prior: &TaskBoardItem) -> Option<u32> {
@@ -302,7 +323,11 @@ fn is_generic_cross_lane_placement(
 
 fn shift_left_after_removal(entries: &mut [LaneEntry], status: TaskBoardStatus, position: u32) {
     for entry in entries {
-        if entry.item.status == status && entry.item.lane_position.is_some_and(|current| current > position)
+        if entry.item.status == status
+            && entry
+                .item
+                .lane_position
+                .is_some_and(|current| current > position)
         {
             entry.item.lane_position = entry.item.lane_position.map(|current| current - 1);
         }
@@ -345,12 +370,18 @@ fn place_in_destination(
             .collect::<BTreeSet<_>>();
         let target = (requested..=max_position)
             .find(|position| !occupied.contains(position))
-            .ok_or_else(|| CliErrorKind::task_board_lane_capacity("automatic lane has no free slot"))?;
+            .ok_or_else(|| {
+                CliErrorKind::task_board_lane_capacity("automatic lane has no free slot")
+            })?;
         item.lane_position = Some(target);
         return Ok(());
     }
     for entry in entries {
-        if entry.item.status == status && entry.item.lane_position.is_some_and(|current| current >= requested)
+        if entry.item.status == status
+            && entry
+                .item
+                .lane_position
+                .is_some_and(|current| current >= requested)
         {
             entry.item.lane_position = entry
                 .item
@@ -414,16 +445,19 @@ async fn load_lane_entries_in_tx(
         return Ok(Vec::new());
     }
     let first = label(statuses[0], "task-board lane status")?;
-    let second = label(*statuses.get(1).unwrap_or(&statuses[0]), "task-board lane status")?;
+    let second = label(
+        *statuses.get(1).unwrap_or(&statuses[0]),
+        "task-board lane status",
+    )?;
     let rows = query_as::<_, ItemRow>(
         "SELECT * FROM task_board_items
          WHERE deleted_at IS NULL AND (status = ?1 OR status = ?2)",
     )
     .bind(first)
     .bind(second)
-        .fetch_all(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("load task-board lane rows: {error}")))?;
+    .fetch_all(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("load task-board lane rows: {error}")))?;
     let mut entries = Vec::with_capacity(rows.len());
     for row in rows {
         let item_id = row.item_id.clone();

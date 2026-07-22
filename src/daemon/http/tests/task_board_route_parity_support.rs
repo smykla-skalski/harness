@@ -73,7 +73,7 @@ pub(super) async fn ws_result(base_url: &str, id: &str, method: &str, params: Va
     response["result"].clone()
 }
 
-async fn ws_rpc(base_url: &str, id: &str, method: &str, params: Value) -> Value {
+pub(super) async fn ws_rpc(base_url: &str, id: &str, method: &str, params: Value) -> Value {
     let ws_url = format!(
         "{}{}",
         base_url.replacen("http://", "ws://", 1),

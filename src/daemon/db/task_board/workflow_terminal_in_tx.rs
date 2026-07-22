@@ -9,11 +9,11 @@ use crate::daemon::db::task_board::ITEMS_CHANGE_SCOPE;
 use crate::daemon::db::task_board::admission_lifecycle::{
     ensure_item_admission_can_terminate_in_tx, release_managed_worker_admission_in_tx,
 };
-use crate::daemon::db::task_board::lane_order::{
-    LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
-};
 use crate::daemon::db::task_board::items::{
     bump_change_in_tx, items_change_sequence_in_tx, load_item_in_tx,
+};
+use crate::daemon::db::task_board::lane_order::{
+    LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
 };
 use crate::daemon::db::{CliError, db_error, utc_now};
 use crate::task_board::TaskBoardWorkflowExecutionRecord;

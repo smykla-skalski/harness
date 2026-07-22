@@ -474,7 +474,7 @@ pub(in super::super) fn authenticated_request(
     Ok((start, request_id))
 }
 
-fn authenticated_task_board_read(
+pub(in super::super) fn authenticated_task_board_read(
     headers: &HeaderMap,
     state: &DaemonHttpState,
 ) -> Result<(Instant, String, bool), Box<Response>> {

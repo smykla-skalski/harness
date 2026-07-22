@@ -292,6 +292,9 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
   public let usage: TaskBoardUsage
   public let parentItemId: String?
   public let childOrder: UInt32
+  public let lanePosition: UInt32?
+  public let laneOrigin: TaskBoardLaneOrigin?
+  public let laneSetAt: String?
   public let createdAt: String
   public let updatedAt: String
   public let deletedAt: String?
@@ -318,6 +321,9 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
     usage: TaskBoardUsage,
     parentItemId: String? = nil,
     childOrder: UInt32 = 0,
+    lanePosition: UInt32? = nil,
+    laneOrigin: TaskBoardLaneOrigin? = nil,
+    laneSetAt: String? = nil,
     createdAt: String,
     updatedAt: String,
     deletedAt: String?
@@ -343,6 +349,9 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
     self.usage = usage
     self.parentItemId = parentItemId
     self.childOrder = childOrder
+    self.lanePosition = lanePosition
+    self.laneOrigin = laneOrigin
+    self.laneSetAt = laneSetAt
     self.createdAt = createdAt
     self.updatedAt = updatedAt
     self.deletedAt = deletedAt
@@ -372,6 +381,9 @@ extension TaskBoardItem {
     case usage
     case parentItemId
     case childOrder
+    case lanePosition
+    case laneOrigin
+    case laneSetAt
     case createdAt
     case updatedAt
     case deletedAt
@@ -407,6 +419,9 @@ extension TaskBoardItem {
     self.usage = try container.decode(TaskBoardUsage.self, forKey: .usage)
     self.parentItemId = try container.decodeIfPresent(String.self, forKey: .parentItemId)
     self.childOrder = try container.decodeIfPresent(UInt32.self, forKey: .childOrder) ?? 0
+    self.lanePosition = try container.decodeIfPresent(UInt32.self, forKey: .lanePosition)
+    self.laneOrigin = try container.decodeIfPresent(TaskBoardLaneOrigin.self, forKey: .laneOrigin)
+    self.laneSetAt = try container.decodeIfPresent(String.self, forKey: .laneSetAt)
     self.createdAt = try container.decode(String.self, forKey: .createdAt)
     self.updatedAt = try container.decode(String.self, forKey: .updatedAt)
     self.deletedAt = try container.decodeIfPresent(String.self, forKey: .deletedAt)

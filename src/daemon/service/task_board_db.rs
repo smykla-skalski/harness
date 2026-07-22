@@ -31,6 +31,7 @@ mod estimate_validation;
 #[cfg(test)]
 mod external_ref_tests;
 mod list_items;
+mod positions;
 mod provider_sync_context_store;
 mod provider_sync_execution;
 mod provider_sync_store;
@@ -40,6 +41,10 @@ mod sync_run_context;
 
 use estimate_validation::{validate_estimate, validate_update_estimates};
 pub(crate) use list_items::list_task_board_items_db;
+pub(crate) use positions::{
+    get_task_board_item_position_snapshot_db, reset_task_board_item_position_db,
+    set_task_board_item_position_db,
+};
 pub(crate) use reviews_sync::reconcile_shared_review_items_db;
 use reviews_sync::shared_review_request_clients;
 use sync_audit::SyncExecutionMetrics;

@@ -9,11 +9,12 @@ use super::{
     ObserveSessionRequest, RoleChangeRequest, SessionArchiveRequest, SessionEndRequest,
     SignalCancelRequest, SignalSendRequest, TaskArbitrateRequest, TaskAssignRequest,
     TaskBoardDispatchRequest, TaskBoardEvaluateRequest, TaskBoardOrchestratorRunOnceRequest,
-    TaskBoardPlanApproveRequest, TaskBoardPlanRevokeRequest, TaskCheckpointRequest,
-    TaskClaimReviewRequest, TaskCreateRequest, TaskDeleteRequest, TaskDropRequest,
-    TaskQueuePolicyRequest, TaskRespondReviewRequest, TaskSubmitForReviewRequest,
-    TaskSubmitReviewRequest, TaskUpdateRequest, VoiceAudioChunkRequest, VoiceSessionFinishRequest,
-    VoiceSessionStartRequest, VoiceTranscriptUpdateRequest,
+    TaskBoardPlanApproveRequest, TaskBoardPlanRevokeRequest, TaskBoardResetItemPositionRequest,
+    TaskBoardSetItemPositionRequest, TaskCheckpointRequest, TaskClaimReviewRequest,
+    TaskCreateRequest, TaskDeleteRequest, TaskDropRequest, TaskQueuePolicyRequest,
+    TaskRespondReviewRequest, TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
+    TaskUpdateRequest, VoiceAudioChunkRequest, VoiceSessionFinishRequest, VoiceSessionStartRequest,
+    VoiceTranscriptUpdateRequest,
 };
 
 /// Rebind actor-bearing daemon requests to the authenticated control-plane
@@ -241,6 +242,18 @@ impl ControlPlaneActorRequest for TaskBoardPlanRevokeRequest {
     }
 }
 
+impl ControlPlaneActorRequest for TaskBoardSetItemPositionRequest {
+    fn bind_control_plane_actor(&mut self) {
+        bind_required_control_plane_actor(&mut self.actor);
+    }
+}
+
+impl ControlPlaneActorRequest for TaskBoardResetItemPositionRequest {
+    fn bind_control_plane_actor(&mut self) {
+        bind_required_control_plane_actor(&mut self.actor);
+    }
+}
+
 impl ControlPlaneActorRequest for TaskBoardEvaluateRequest {
     fn bind_control_plane_actor(&mut self) {
         // Evaluate carries no actor; authorize via the trait for parity.
@@ -298,6 +311,30 @@ mod tests {
         };
         request.bind_control_plane_actor();
         assert_eq!(request.actor.as_deref(), Some(CONTROL_PLANE_ACTOR_ID));
+    }
+
+    #[test]
+    fn actor_binding_position_set_overwrites_caller_actor() {
+        let mut request = TaskBoardSetItemPositionRequest {
+            status: crate::task_board::TaskBoardStatus::Todo,
+            lane_position: 0,
+            expected_item_revision: 1,
+            expected_items_change_seq: 1,
+            actor: "attacker".into(),
+        };
+        request.bind_control_plane_actor();
+        assert_eq!(request.actor, CONTROL_PLANE_ACTOR_ID);
+    }
+
+    #[test]
+    fn actor_binding_position_reset_overwrites_caller_actor() {
+        let mut request = TaskBoardResetItemPositionRequest {
+            expected_item_revision: 1,
+            expected_items_change_seq: 1,
+            actor: "attacker".into(),
+        };
+        request.bind_control_plane_actor();
+        assert_eq!(request.actor, CONTROL_PLANE_ACTOR_ID);
     }
 
     #[tokio::test]

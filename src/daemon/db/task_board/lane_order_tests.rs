@@ -1,14 +1,12 @@
-use tempfile::tempdir;
 use sqlx::query_scalar;
+use tempfile::tempdir;
 
-use super::super::{
-    TaskBoardLanePositionInput, TaskBoardLaneResetInput,
-};
+use super::super::{TaskBoardLanePositionInput, TaskBoardLaneResetInput};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::{
-    TaskBoardItem, TaskBoardLaneOrigin, TaskBoardPriority, TaskBoardStatus,
-    TaskBoardSyncStore, build_dispatch_plans_with_policy,
+    TaskBoardItem, TaskBoardLaneOrigin, TaskBoardPriority, TaskBoardStatus, TaskBoardSyncStore,
+    build_dispatch_plans_with_policy,
 };
 
 #[tokio::test]
@@ -57,6 +55,7 @@ async fn explicit_slots_shift_collisions_then_reset_and_tombstone_compacts() {
     let reset = db
         .reset_task_board_lane_position(TaskBoardLaneResetInput {
             item_id: "b".into(),
+            actor: "control-user".into(),
             expected_item_revision: revision(&shifted, "b"),
             expected_items_change_seq: shifted.items_change_seq,
         })
@@ -68,7 +67,10 @@ async fn explicit_slots_shift_collisions_then_reset_and_tombstone_compacts() {
     assert_eq!(item_from(&reset_snapshot, "a").lane_position, Some(0));
 
     db.delete_task_board_item("a").await.expect("tombstone a");
-    let live = db.task_board_items_snapshot(None).await.expect("live snapshot");
+    let live = db
+        .task_board_items_snapshot(None)
+        .await
+        .expect("live snapshot");
     assert_positions(&live, &["b"]);
     let tombstone = db.task_board_item("a").await.expect("tombstone");
     assert_eq!(tombstone.lane_position, None);
@@ -101,7 +103,10 @@ async fn removing_a_default_card_compacts_an_explicit_source_anchor_once() {
     assert!(invalid.to_string().contains("capacity"));
     let after_rejection = db.task_board_items_snapshot(None).await.expect("snapshot");
     assert_eq!(after_rejection.items_change_seq, before.items_change_seq);
-    assert_eq!(revision(&after_rejection, "anchor"), revision(&before, "anchor"));
+    assert_eq!(
+        revision(&after_rejection, "anchor"),
+        revision(&before, "anchor")
+    );
     assert_eq!(item_from(&after_rejection, "anchor").lane_position, Some(1));
 
     db.delete_task_board_item("default")
@@ -151,7 +156,10 @@ async fn generic_cross_lane_move_preserves_an_explicit_slot_and_manual_wins_over
     .await
     .expect("provider update");
     assert_eq!(synced.lane_position, Some(0));
-    assert!(matches!(synced.lane_origin, Some(TaskBoardLaneOrigin::Manual { .. })));
+    assert!(matches!(
+        synced.lane_origin,
+        Some(TaskBoardLaneOrigin::Manual { .. })
+    ));
     db.create_task_board_item(item("automatic", "2026-07-22T10:01:00Z"))
         .await
         .expect("create automatic item");
@@ -167,7 +175,13 @@ async fn generic_cross_lane_move_preserves_an_explicit_slot_and_manual_wins_over
         .expect("repeat automatic placement")
         .expect("automatic placement result");
     assert_eq!(repeated.item.lane_position, Some(1));
-    assert_eq!(db.task_board_item("a").await.expect("manual anchor").lane_position, Some(0));
+    assert_eq!(
+        db.task_board_item("a")
+            .await
+            .expect("manual anchor")
+            .lane_position,
+        Some(0)
+    );
     db.update_task_board_item("a", |item| {
         item.status = TaskBoardStatus::Done;
         Ok(true)
@@ -177,12 +191,16 @@ async fn generic_cross_lane_move_preserves_an_explicit_slot_and_manual_wins_over
     let moved = db.task_board_item("a").await.expect("moved item");
     assert_eq!(moved.status, TaskBoardStatus::Done);
     assert_eq!(moved.lane_position, Some(0));
-    assert!(matches!(moved.lane_origin, Some(TaskBoardLaneOrigin::Manual { .. })));
-    assert!(db
-        .place_task_board_item_automatically("a", 0, "provider-sync".into())
-        .await
-        .expect("automatic placement")
-        .is_none());
+    assert!(matches!(
+        moved.lane_origin,
+        Some(TaskBoardLaneOrigin::Manual { .. })
+    ));
+    assert!(
+        db.place_task_board_item_automatically("a", 0, "provider-sync".into())
+            .await
+            .expect("automatic placement")
+            .is_none()
+    );
 }
 
 #[tokio::test]
@@ -204,7 +222,10 @@ async fn cross_lane_position_transition_runs_terminal_dispatch_cleanup() {
     db.link_and_enqueue_task_board_dispatch("active", "session", "work", &lifecycle)
         .await
         .expect("activate item");
-    let active = db.task_board_items_snapshot(None).await.expect("active snapshot");
+    let active = db
+        .task_board_items_snapshot(None)
+        .await
+        .expect("active snapshot");
     let moved = db
         .set_task_board_lane_position(TaskBoardLanePositionInput {
             item_id: "active".into(),
@@ -217,13 +238,12 @@ async fn cross_lane_position_transition_runs_terminal_dispatch_cleanup() {
         .await
         .expect("terminal cross-lane placement");
     assert_eq!(moved.item.status, TaskBoardStatus::Done);
-    let dispatch_status: String = query_scalar(
-        "SELECT status FROM task_board_dispatch_intents WHERE item_id = ?1",
-    )
-    .bind("active")
-    .fetch_one(db.pool())
-    .await
-    .expect("terminal dispatch state");
+    let dispatch_status: String =
+        query_scalar("SELECT status FROM task_board_dispatch_intents WHERE item_id = ?1")
+            .bind("active")
+            .fetch_one(db.pool())
+            .await
+            .expect("terminal dispatch state");
     assert_eq!(dispatch_status, "failed");
     let active_admissions: i64 = query_scalar(
         "SELECT COUNT(*) FROM task_board_dispatch_admission_ledger
@@ -234,7 +254,10 @@ async fn cross_lane_position_transition_runs_terminal_dispatch_cleanup() {
     .fetch_one(db.pool())
     .await
     .expect("active admissions");
-    assert_eq!(active_admissions, 0, "terminal move leaves no live admission");
+    assert_eq!(
+        active_admissions, 0,
+        "terminal move leaves no live admission"
+    );
 }
 
 #[tokio::test]
@@ -269,6 +292,7 @@ async fn stale_cas_and_malformed_provenance_leave_the_sequence_and_rows_unchange
     let stale = db
         .reset_task_board_lane_position(TaskBoardLaneResetInput {
             item_id: "a".into(),
+            actor: "control-user".into(),
             expected_item_revision: revision(&before, "a"),
             expected_items_change_seq: before.items_change_seq,
         })
@@ -352,10 +376,7 @@ async fn reorder_invalidates_a_todo_pick_snapshot_before_dispatch_can_return_it(
 #[tokio::test]
 async fn dispatch_transitions_shift_anchors_once_and_emit_one_audit_per_transition() {
     let (_directory, db) = connect().await;
-    for (id, created_at) in [
-        ("a", "2026-07-22T10:00:00Z"),
-        ("b", "2026-07-22T10:01:00Z"),
-    ] {
+    for (id, created_at) in [("a", "2026-07-22T10:00:00Z"), ("b", "2026-07-22T10:01:00Z")] {
         db.create_task_board_item(item(id, created_at))
             .await
             .expect("create item");
@@ -407,7 +428,19 @@ async fn dispatch_transitions_shift_anchors_once_and_emit_one_audit_per_transiti
     .fetch_one(db.pool())
     .await
     .expect("lane audits");
-    assert_eq!(audits, 3, "set, dispatch, and rollback each audit once");
+    assert_eq!(audits, 2, "dispatch and rollback each audit once");
+    let position_sets: i64 = query_scalar(
+        "SELECT COUNT(*) FROM audit_events
+         WHERE subject = ?1 AND kind = 'task_board.item.position_set'",
+    )
+    .bind("b")
+    .fetch_one(db.pool())
+    .await
+    .expect("position set audit");
+    assert_eq!(
+        position_sets, 1,
+        "manual set emits one semantic audit event"
+    );
 }
 
 async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {
@@ -472,3 +505,6 @@ fn assert_positions(snapshot: &super::lane_order::TaskBoardItemsSnapshot, expect
 
 #[path = "lane_order_regression_tests.rs"]
 mod regressions;
+
+#[path = "lane_order_position_contract_tests.rs"]
+mod position_contracts;

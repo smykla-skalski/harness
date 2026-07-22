@@ -56,6 +56,28 @@ pub struct TaskBoardGetItemRequest {
     pub id: String,
 }
 
+/// Request an explicit manual position in a canonical task-board lane.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardSetItemPositionRequest {
+    pub status: TaskBoardStatus,
+    pub lane_position: u32,
+    pub expected_item_revision: i64,
+    pub expected_items_change_seq: i64,
+    /// Bound to the authenticated control-plane principal at the transport edge.
+    #[serde(default)]
+    pub actor: String,
+}
+
+/// Reset an item from an explicit position to its derived default placement.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardResetItemPositionRequest {
+    pub expected_item_revision: i64,
+    pub expected_items_change_seq: i64,
+    /// Bound to the authenticated control-plane principal at the transport edge.
+    #[serde(default)]
+    pub actor: String,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TaskBoardUpdateItemRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]

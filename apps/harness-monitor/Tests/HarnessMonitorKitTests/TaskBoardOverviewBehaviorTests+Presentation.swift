@@ -67,21 +67,24 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(presentation.aggregateOpenCount == 0)
   }
 
-  @Test("Step Mode target is the top Todo item and never another lane")
+  @Test("Step Mode targets the daemon's first Todo item and never another lane")
   func stepModeTargetIsTopTodoItem() async {
     let worker = TaskBoardOverviewPresentationWorker()
     let backlog = taskBoardItem(id: "backlog-item", status: .backlog)
-    let todo = taskBoardItem(id: "ready", status: .todo)
+    let todo = taskBoardItem(id: "ready-low", status: .todo, priority: .low)
+    let laterHigherPriority = taskBoardItem(
+      id: "later-critical", status: .todo, priority: .critical)
 
     let presentation = await worker.compute(
       input: TaskBoardOverviewPresentationInput(
         snapshot: TaskBoardInboxSnapshot(),
-        taskBoardItems: [backlog, todo],
+        taskBoardItems: [backlog, todo, laterHigherPriority],
         decisionItems: [],
         scopeSessionID: nil
       )
     )
-    #expect(presentation.stepRailTargetItem?.id == "ready")
+    #expect(presentation.apiItems(in: .todo).map(\.id) == ["ready-low", "later-critical"])
+    #expect(presentation.stepRailTargetItem?.id == "ready-low")
 
     let backlogOnly = await worker.compute(
       input: TaskBoardOverviewPresentationInput(

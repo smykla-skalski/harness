@@ -1177,6 +1177,7 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // daemon decode. The adopted TaskBoardStatus/Priority/AgentMode are referenced
     // bare; ExternalRefProvider/TaskBoardWorkflowStatus take the suffix.
     "TaskBoardItem",
+    "TaskBoardLaneOrigin",
     "ExternalRef",
     "ExternalRefSyncState",
     "ExternalRefProvider",
@@ -1190,6 +1191,9 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // task_board.rs items-list response wrapper (Swift hand TaskBoardListItemsResponse);
     // wraps [TaskBoardItemWire] for the /v1/task-board/items decode reroute.
     "TaskBoardListItemsResponse",
+    "TaskBoardItemPositionSnapshot",
+    "TaskBoardShiftedItemRevision",
+    "TaskBoardItemPositionMutationResponse",
     // task_board planning.rs transition + its protocol response wrapper (the response
     // carries the rerouted TaskBoardItemWire); Swift hands are TaskBoardPlanningTransition
     // /TaskBoardPlanningResponse.
@@ -2533,6 +2537,7 @@ const WEBSOCKET_EMIT_ONLY: &[&str] = &[
 const SESSION_TASKS_SOURCE: &str = include_str!("../src/session/types/tasks.rs");
 const TASK_BOARD_PROTOCOL_SOURCE: &str = include_str!("../src/daemon/protocol/task_board.rs");
 const TASK_BOARD_TYPES_SOURCE: &str = include_str!("../src/task_board/types.rs");
+const TASK_BOARD_LANE_SOURCE: &str = include_str!("../src/task_board/lane.rs");
 const TASK_BOARD_PROGRESS_ROLLUP_SOURCE: &str =
     include_str!("../src/task_board/progress_rollup.rs");
 const TASK_BOARD_ENUMS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardEnums.generated.swift";
@@ -2556,12 +2561,13 @@ const TASK_BOARD_SUMMARY_EMIT_ONLY: &[&str] = &[
 ];
 const TASK_BOARD_ITEM_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardItemWireTypes.generated.swift";
 // The core TaskBoardItem and its nested structs/enums from types.rs, plus the
-// items-list response wrapper from the protocol facade. References the adopted
+// items-list and explicit-position response wrappers from the protocol facade. References the adopted
 // TaskBoardStatus/TaskBoardPriority/TaskBoardAgentMode enums bare; the two closed
 // enums here (ExternalRefProvider, TaskBoardWorkflowStatus) take the suffix. The
 // *Wire types own the faithful daemon decode; the rich hand models keep their shape.
 const TASK_BOARD_ITEM_EMIT_ONLY: &[&str] = &[
     "TaskBoardItem",
+    "TaskBoardLaneOrigin",
     "ExternalRef",
     "ExternalRefSyncState",
     "ExternalRefProvider",
@@ -2571,6 +2577,9 @@ const TASK_BOARD_ITEM_EMIT_ONLY: &[&str] = &[
     "TaskUsage",
     "TaskBoardProgressRollup",
     "TaskBoardListItemsResponse",
+    "TaskBoardItemPositionSnapshot",
+    "TaskBoardShiftedItemRevision",
+    "TaskBoardItemPositionMutationResponse",
 ];
 const TASK_BOARD_MACHINES_SOURCE: &str = include_str!("../src/task_board/machines.rs");
 const TASK_BOARD_MACHINES_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardMachineWireTypes.generated.swift";
@@ -3079,10 +3088,11 @@ fn modules() -> Vec<GeneratedModule> {
         },
         GeneratedModule {
             output: TASK_BOARD_ITEM_OUTPUT,
-            description: "the Rust task-board item, its nested graph and the items-list response",
+            description: "the Rust task-board item, placement and list responses",
             defaults: &[],
             sources: &[
                 TASK_BOARD_TYPES_SOURCE,
+                TASK_BOARD_LANE_SOURCE,
                 TASK_BOARD_PROTOCOL_SOURCE,
                 TASK_BOARD_PROGRESS_ROLLUP_SOURCE,
             ],

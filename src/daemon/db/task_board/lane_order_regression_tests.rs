@@ -37,7 +37,7 @@ async fn same_lane_default_anchor_compacts_before_inserting_the_requested_slot()
     assert_eq!(revision(&after, "b"), b_revision);
     let shifted_count: i64 = query_scalar(
         "SELECT json_array_length(payload_json, '$.shifted') FROM audit_events
-         WHERE subject = ?1 AND kind = 'task_board.item.lane_position_changed'",
+         WHERE subject = ?1 AND kind = 'task_board.item.position_set'",
     )
     .bind("a")
     .fetch_one(db.pool())
@@ -48,6 +48,9 @@ async fn same_lane_default_anchor_compacts_before_inserting_the_requested_slot()
     let restarted = AsyncDaemonDb::connect(&directory.path().join("harness.db"))
         .await
         .expect("restart database");
-    let restored = restarted.task_board_items_snapshot(None).await.expect("restored snapshot");
+    let restored = restarted
+        .task_board_items_snapshot(None)
+        .await
+        .expect("restored snapshot");
     assert_positions(&restored, &["a", "b"]);
 }

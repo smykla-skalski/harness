@@ -55,26 +55,32 @@ private enum TaskBoardHTTPRouteCatalogError: Error, CustomStringConvertible {
 }
 
 private func daemonTaskBoardHTTPRoutes() throws -> [TaskBoardHTTPRoute] {
-  let relativePath = "src/daemon/protocol/api_contract/routes_task_board.rs"
-  let source = try repoFileContents(relativePath: relativePath)
+  let relativePaths = [
+    "src/daemon/protocol/api_contract/routes_task_board.rs",
+    "src/daemon/protocol/api_contract/routes_task_board_positions.rs",
+  ]
   let pathConstants = try daemonHTTPPathConstants()
-  let blocks = source.components(separatedBy: "HttpApiRouteContract {").dropFirst()
   var routes: [TaskBoardHTTPRoute] = []
 
-  for block in blocks where block.contains("swift_client_exposed: true") {
-    let method = try firstCapture(in: block, pattern: "method:\\s*HttpRouteMethod::([A-Za-z]+)")
-    let pathConstant = try firstCapture(in: block, pattern: "path:\\s*http_paths::([A-Z0-9_]+)")
-    guard let path = pathConstants[pathConstant] else {
-      throw TaskBoardHTTPRouteCatalogError.missingPathConstant(pathConstant)
+  for relativePath in relativePaths {
+    let source = try repoFileContents(relativePath: relativePath)
+    let blocks = source.components(separatedBy: "HttpApiRouteContract {").dropFirst()
+    for block in blocks where block.contains("swift_client_exposed: true") {
+      let method = try firstCapture(in: block, pattern: "method:\\s*HttpRouteMethod::([A-Za-z]+)")
+      let pathConstant = try firstCapture(in: block, pattern: "path:\\s*http_paths::([A-Z0-9_]+)")
+      guard let path = pathConstants[pathConstant] else {
+        throw TaskBoardHTTPRouteCatalogError.missingPathConstant(pathConstant)
+      }
+      guard path.hasPrefix("/v1/task-board/") else {
+        continue
+      }
+      routes.append(TaskBoardHTTPRoute(method: method.uppercased(), path: path))
     }
-    guard path.hasPrefix("/v1/task-board/") else {
-      continue
-    }
-    routes.append(TaskBoardHTTPRoute(method: method.uppercased(), path: path))
   }
 
   guard routes.isEmpty == false else {
-    throw TaskBoardHTTPRouteCatalogError.noRoutes(relativePath: relativePath)
+    throw TaskBoardHTTPRouteCatalogError.noRoutes(
+      relativePath: relativePaths.joined(separator: ", "))
   }
   return routes.sorted()
 }
@@ -90,7 +96,8 @@ private func daemonHTTPPathConstants() throws -> [String: String] {
 
 private func swiftTaskBoardHTTPRoutes() throws -> [TaskBoardHTTPRoute] {
   let relativePaths = [
-    "apps/harness-monitor/Sources/HarnessMonitorKit/API/HarnessMonitorAPIClient+TaskBoard.swift"
+    "apps/harness-monitor/Sources/HarnessMonitorKit/API/HarnessMonitorAPIClient+TaskBoard.swift",
+    "apps/harness-monitor/Sources/HarnessMonitorKit/API/HarnessMonitorAPIClient+TaskBoardPosition.swift",
   ]
   let routes = try relativePaths.flatMap { relativePath in
     let source = try repoFileContents(relativePath: relativePath)
@@ -114,7 +121,7 @@ private func swiftTaskBoardHTTPRoutes() throws -> [TaskBoardHTTPRoute] {
       relativePath: relativePaths.joined(separator: ", ")
     )
   }
-  return routes.sorted()
+  return Array(Set(routes)).sorted()
 }
 
 private func daemonReviewsHTTPRoutes() throws -> [TaskBoardHTTPRoute] {

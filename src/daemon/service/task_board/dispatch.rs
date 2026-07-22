@@ -159,7 +159,9 @@ pub async fn pick_task_board_dispatch_async(
         actor: None,
     };
     for _ in 0..PICK_REVALIDATION_ATTEMPTS {
-        let snapshot = db.task_board_items_snapshot(Some(TaskBoardStatus::Todo)).await?;
+        let snapshot = db
+            .task_board_items_snapshot(Some(TaskBoardStatus::Todo))
+            .await?;
         let items = snapshot
             .items
             .iter()
@@ -173,7 +175,9 @@ pub async fn pick_task_board_dispatch_async(
             .items
             .iter()
             .find(|snapshot| snapshot.item.id == plan.board_item_id)
-            .ok_or_else(|| CliErrorKind::concurrent_modification("picked task-board item left snapshot"))?;
+            .ok_or_else(|| {
+                CliErrorKind::concurrent_modification("picked task-board item left snapshot")
+            })?;
         if db
             .task_board_item_snapshot_is_current(
                 &chosen.item.id,

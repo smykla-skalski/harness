@@ -19,50 +19,50 @@ pub(super) fn item_from_rows(
     let lane_origin = lane_origin_from_row(&row)?;
     let lane_set_at = row.lane_set_at.clone();
     let item = TaskBoardItem {
-            schema_version,
-            id: row.item_id,
-            title: row.title,
-            body: row.body,
-            status: parse_label(&row.status, "task board status")?,
-            priority: parse_label(&row.priority, "task board priority")?,
-            tags: parse_json(&row.tags_json, "task board tags")?,
-            project_id: row.project_id,
-            target_project_types: parse_json(
-                &row.target_project_types_json,
-                "task board project types",
-            )?,
-            agent_mode: parse_label(&row.agent_mode, "task board agent mode")?,
-            workflow_kind: parse_label(&row.workflow_kind, "task board workflow kind")?,
-            kind: parse_label(&row.kind, "task board kind")?,
-            execution_repository: row.execution_repository,
-            estimated_tokens: optional_u64(row.estimated_tokens, "task board estimated tokens")?,
-            estimated_cost_microusd: optional_u64(
-                row.estimated_cost_microusd,
-                "task board estimated cost",
-            )?,
-            external_refs: external_refs
-                .into_iter()
-                .map(external_ref_from_row)
-                .collect::<Result<Vec<_>, _>>()?,
-            imported_from_provider: row
-                .imported_from_provider
-                .as_deref()
-                .map(|value| parse_label(value, "task board imported provider"))
-                .transpose()?,
-            planning: parse_json(&row.planning_json, "task board planning state")?,
-            workflow: parse_json(&row.workflow_json, "task board workflow state")?,
-            session_id: row.session_id,
-            work_item_id: row.work_item_id,
-            usage: parse_json(&row.usage_json, "task board usage")?,
-            parent_item_id: row.parent_item_id,
-            child_order: u32::try_from(row.child_order)
-                .map_err(|error| db_error(format!("parse task board child order: {error}")))?,
-            lane_position,
-            lane_origin,
-            lane_set_at,
-            created_at: row.created_at,
-            updated_at: row.updated_at,
-            deleted_at: row.deleted_at,
+        schema_version,
+        id: row.item_id,
+        title: row.title,
+        body: row.body,
+        status: parse_label(&row.status, "task board status")?,
+        priority: parse_label(&row.priority, "task board priority")?,
+        tags: parse_json(&row.tags_json, "task board tags")?,
+        project_id: row.project_id,
+        target_project_types: parse_json(
+            &row.target_project_types_json,
+            "task board project types",
+        )?,
+        agent_mode: parse_label(&row.agent_mode, "task board agent mode")?,
+        workflow_kind: parse_label(&row.workflow_kind, "task board workflow kind")?,
+        kind: parse_label(&row.kind, "task board kind")?,
+        execution_repository: row.execution_repository,
+        estimated_tokens: optional_u64(row.estimated_tokens, "task board estimated tokens")?,
+        estimated_cost_microusd: optional_u64(
+            row.estimated_cost_microusd,
+            "task board estimated cost",
+        )?,
+        external_refs: external_refs
+            .into_iter()
+            .map(external_ref_from_row)
+            .collect::<Result<Vec<_>, _>>()?,
+        imported_from_provider: row
+            .imported_from_provider
+            .as_deref()
+            .map(|value| parse_label(value, "task board imported provider"))
+            .transpose()?,
+        planning: parse_json(&row.planning_json, "task board planning state")?,
+        workflow: parse_json(&row.workflow_json, "task board workflow state")?,
+        session_id: row.session_id,
+        work_item_id: row.work_item_id,
+        usage: parse_json(&row.usage_json, "task board usage")?,
+        parent_item_id: row.parent_item_id,
+        child_order: u32::try_from(row.child_order)
+            .map_err(|error| db_error(format!("parse task board child order: {error}")))?,
+        lane_position,
+        lane_origin,
+        lane_set_at,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        deleted_at: row.deleted_at,
     };
     validate_lane_placement(&item).map_err(db_error)?;
     Ok((item, revision))
@@ -78,11 +78,9 @@ fn lane_origin_from_row(row: &ItemRow) -> Result<Option<TaskBoardLaneOrigin>, Cl
         (Some("manual"), Some(actor), None) => Ok(Some(TaskBoardLaneOrigin::Manual {
             actor: actor.to_owned(),
         })),
-        (Some("automatic"), None, Some(producer)) => {
-            Ok(Some(TaskBoardLaneOrigin::Automatic {
-                producer: producer.to_owned(),
-            }))
-        }
+        (Some("automatic"), None, Some(producer)) => Ok(Some(TaskBoardLaneOrigin::Automatic {
+            producer: producer.to_owned(),
+        })),
         _ => Err(db_error("parse task board lane provenance")),
     }
 }
@@ -142,6 +140,8 @@ fn optional_u64(value: Option<i64>, context: &str) -> Result<Option<u64>, CliErr
 
 fn optional_u32(value: Option<i64>, context: &str) -> Result<Option<u32>, CliError> {
     value
-        .map(|value| u32::try_from(value).map_err(|error| db_error(format!("parse {context}: {error}"))))
+        .map(|value| {
+            u32::try_from(value).map_err(|error| db_error(format!("parse {context}: {error}")))
+        })
         .transpose()
 }

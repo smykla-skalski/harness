@@ -358,14 +358,16 @@ impl AsyncDaemonDb {
             item.session_id = None;
             item.work_item_id = None;
             item.updated_at = utc_now();
-            lane_write = Some(replace_with_lane_transition_in_tx(
-                &mut transaction,
-                before,
-                revision,
-                item,
-                LaneTransitionKind::Generic,
-            )
-            .await?);
+            lane_write = Some(
+                replace_with_lane_transition_in_tx(
+                    &mut transaction,
+                    before,
+                    revision,
+                    item,
+                    LaneTransitionKind::Generic,
+                )
+                .await?,
+            );
         }
         let now = utc_now();
         let changed = query(

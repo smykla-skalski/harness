@@ -149,14 +149,67 @@ struct TaskBoardItemWireDecodingTests {
 
   @Test("maps the items-list response wrapper")
   func mapsListResponseWrapper() throws {
-    let json = #"{"items": [\#(fullItemPayloadFixture)]}"#
+    let json =
+      #"{"items": [\#(fullItemPayloadFixture)], "items_change_seq": 7, "item_revisions": {"task-1": 3}}"#
     let wire = try decoder.decode(
       TaskBoardListItemsResponseWire.self, from: Data(json.utf8)
     )
-    let items = wire.items.map(TaskBoardItem.init(wire:))
-    #expect(items.count == 1)
-    #expect(items.first?.id == "task-1")
-    #expect(items.first?.workflow?.status == .running)
+    let snapshot = TaskBoardListItemsSnapshot(wire: wire)
+    #expect(snapshot.items.count == 1)
+    #expect(snapshot.items.first?.id == "task-1")
+    #expect(snapshot.items.first?.workflow?.status == .running)
+    #expect(snapshot.itemsChangeSeq == 7)
+    #expect(snapshot.itemRevisions == ["task-1": 3])
+  }
+
+  @Test("maps optional manual lane placement into the hand model")
+  func mapsLanePlacement() throws {
+    let wire = try decoder.decode(
+      TaskBoardItemWire.self,
+      from: Data(
+        #"{"schema_version":1,"id":"placed","title":"Placed","lane_position":2,"lane_origin":{"kind":"manual","actor":"control"},"lane_set_at":"now","created_at":"a","updated_at":"b"}"#
+          .utf8)
+    )
+    let item = TaskBoardItem(wire: wire)
+    #expect(item.lanePosition == 2)
+    #expect(item.laneOrigin == .manual(actor: "control"))
+    #expect(item.laneSetAt == "now")
+  }
+
+  @Test("decodes server JSON and round-trips tagged lane origins through cache coding")
+  func decodesServerItemAndRoundTripsLaneOrigins() throws {
+    let serverDecoder = JSONDecoder()
+    serverDecoder.keyDecodingStrategy = .convertFromSnakeCase
+    let item = try serverDecoder.decode(TaskBoardItem.self, from: Data(fullItemPayloadFixture.utf8))
+    #expect(item.lanePosition == 2)
+    #expect(item.laneOrigin == .manual(actor: "daemon-control"))
+
+    let cacheEncoder = JSONEncoder()
+    cacheEncoder.keyEncodingStrategy = .convertToSnakeCase
+    let cached = try serverDecoder.decode(TaskBoardItem.self, from: cacheEncoder.encode(item))
+    #expect(cached == item)
+
+    let manual = TaskBoardLaneOrigin.manual(actor: "daemon-control")
+    let encodedManual = try #require(
+      JSONSerialization.jsonObject(with: cacheEncoder.encode(manual)) as? [String: String]
+    )
+    #expect(encodedManual == ["kind": "manual", "actor": "daemon-control"])
+
+    let serverAutomatic = try serverDecoder.decode(
+      TaskBoardLaneOrigin.self,
+      from: Data(#"{"kind":"automatic","producer":"provider-sync"}"#.utf8)
+    )
+    #expect(serverAutomatic == .automatic(producer: "provider-sync"))
+    let automatic = TaskBoardLaneOrigin.automatic(producer: "provider-sync")
+    let encodedAutomatic = try #require(
+      JSONSerialization.jsonObject(with: cacheEncoder.encode(automatic)) as? [String: String]
+    )
+    #expect(encodedAutomatic == ["kind": "automatic", "producer": "provider-sync"])
+    let decodedAutomatic = try serverDecoder.decode(
+      TaskBoardLaneOrigin.self,
+      from: cacheEncoder.encode(automatic)
+    )
+    #expect(decodedAutomatic == automatic)
   }
 
   @Test("accepts the legacy GitHub provider spelling")
@@ -202,6 +255,9 @@ private let fullItemPayloadFixture = """
     "session_id": "sig-1",
     "work_item_id": "wi-1",
     "usage": { "input_tokens": 100, "output_tokens": 50, "cost_usd": 0.25 },
+    "lane_position": 2,
+    "lane_origin": { "kind": "manual", "actor": "daemon-control" },
+    "lane_set_at": "2026-06-17T10:30:00Z",
     "created_at": "2026-06-17T08:00:00Z",
     "updated_at": "2026-06-17T11:00:00Z"
   }

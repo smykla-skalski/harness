@@ -5,9 +5,10 @@ use super::items::{
     apply_task_board_item_status_transition_in_tx, bump_change_in_tx, load_item_in_tx,
 };
 use super::lane_order::{
-    LaneTransitionKind, TaskBoardLaneShift, record_lane_transition_audit_in_tx,
-    replace_with_lane_transition_in_tx,
+    LaneTransitionKind, TaskBoardLanePositionAuditKind, TaskBoardLaneShift,
+    record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
 };
+use super::lane_order_audit::record_lane_position_audit_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::errors::CliErrorKind;
 use crate::task_board::{
@@ -27,6 +28,7 @@ pub(crate) struct TaskBoardLanePositionInput {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TaskBoardLaneResetInput {
     pub(crate) item_id: String,
+    pub(crate) actor: String,
     pub(crate) expected_item_revision: i64,
     pub(crate) expected_items_change_seq: i64,
 }
@@ -54,15 +56,20 @@ impl AsyncDaemonDb {
             .ok_or_else(|| db_error(format!("task-board item '{}' not found", input.item_id)))?;
         ensure_expected_revision(&item.id, revision, input.expected_item_revision)?;
         if item.deleted_at.is_some() {
-            return Err(db_error("cannot place a deleted task-board item"));
+            return Err(
+                CliErrorKind::invalid_transition("cannot place a deleted task-board item").into(),
+            );
         }
         let before = item.clone();
+        let audit_before = before.clone();
         item.status = input
             .status
             .unwrap_or(item.status)
             .canonical_persisted_status();
         item.lane_position = Some(input.lane_position);
-        item.lane_origin = Some(TaskBoardLaneOrigin::Manual { actor: input.actor });
+        item.lane_origin = Some(TaskBoardLaneOrigin::Manual {
+            actor: input.actor.clone(),
+        });
         item.lane_set_at = Some(utc_now());
         item.updated_at = utc_now();
         validate_lane_placement(&item).map_err(db_error)?;
@@ -76,7 +83,15 @@ impl AsyncDaemonDb {
         )
         .await?;
         let items_change_seq = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
-        record_lane_transition_audit_in_tx(&mut transaction, &write, items_change_seq).await?;
+        record_lane_position_audit_in_tx(
+            &mut transaction,
+            &audit_before,
+            &write,
+            items_change_seq,
+            &input.actor,
+            TaskBoardLanePositionAuditKind::Set,
+        )
+        .await?;
         transaction
             .commit()
             .await
@@ -102,7 +117,19 @@ impl AsyncDaemonDb {
             .await?
             .ok_or_else(|| db_error(format!("task-board item '{}' not found", input.item_id)))?;
         ensure_expected_revision(&item.id, revision, input.expected_item_revision)?;
+        if item.deleted_at.is_some() {
+            return Err(
+                CliErrorKind::invalid_transition("cannot reset a deleted task-board item").into(),
+            );
+        }
+        if item.lane_position.is_none() {
+            return Err(CliErrorKind::invalid_transition(
+                "task-board item has no explicit position to reset",
+            )
+            .into());
+        }
         let before = item.clone();
+        let audit_before = before.clone();
         clear_placement(&mut item);
         item.updated_at = utc_now();
         let write = replace_with_lane_transition_in_tx(
@@ -114,7 +141,15 @@ impl AsyncDaemonDb {
         )
         .await?;
         let items_change_seq = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
-        record_lane_transition_audit_in_tx(&mut transaction, &write, items_change_seq).await?;
+        record_lane_position_audit_in_tx(
+            &mut transaction,
+            &audit_before,
+            &write,
+            items_change_seq,
+            &input.actor,
+            TaskBoardLanePositionAuditKind::Reset,
+        )
+        .await?;
         transaction
             .commit()
             .await
@@ -146,10 +181,9 @@ impl AsyncDaemonDb {
             .as_ref()
             .is_some_and(TaskBoardLaneOrigin::is_manual)
         {
-            transaction
-                .commit()
-                .await
-                .map_err(|error| db_error(format!("commit preserved manual lane position: {error}")))?;
+            transaction.commit().await.map_err(|error| {
+                db_error(format!("commit preserved manual lane position: {error}"))
+            })?;
             return Ok(None);
         }
         item.lane_position = Some(lane_position);

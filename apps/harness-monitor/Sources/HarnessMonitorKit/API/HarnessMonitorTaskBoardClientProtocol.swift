@@ -3,7 +3,13 @@ import Foundation
 public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
   func taskBoardCapabilities() async throws -> TaskBoardCapabilities
   func taskBoardItems(status: TaskBoardStatus?) async throws -> [TaskBoardItem]
+  func taskBoardItemsSnapshot(status: TaskBoardStatus?) async throws -> TaskBoardListItemsSnapshot
   func taskBoardItem(id: String) async throws -> TaskBoardItem
+  func taskBoardItemPositionSnapshot(id: String) async throws -> TaskBoardItemPositionSnapshot
+  func setTaskBoardItemPosition(id: String, request: TaskBoardSetItemPositionRequest) async throws
+    -> TaskBoardItemPositionMutationResponse
+  func resetTaskBoardItemPosition(id: String, request: TaskBoardResetItemPositionRequest)
+    async throws -> TaskBoardItemPositionMutationResponse
   func createTaskBoardItem(request: TaskBoardCreateItemRequest) async throws -> TaskBoardItem
   func updateTaskBoardItem(
     id: String,

@@ -32,6 +32,26 @@ let sampleTaskBoardItemJSON: [String: JSONValue] = [
   "deleted_at": .null,
 ]
 
+let sampleTaskBoardPositionSnapshotJSON: [String: JSONValue] = [
+  "item": .object(sampleTaskBoardItemJSON),
+  "item_revision": .number(7),
+  "items_change_seq": .number(42),
+]
+
+let sampleTaskBoardPositionMutationJSON: [String: JSONValue] = [
+  "snapshot": .object([
+    "item": .object(sampleTaskBoardItemJSON),
+    "item_revision": .number(8),
+    "items_change_seq": .number(43),
+  ]),
+  "shifted": .array([
+    .object([
+      "item_id": .string("shifted-item"),
+      "item_revision": .number(9),
+    ])
+  ]),
+]
+
 let sampleTaskBoardDispatchSummaryJSON: [String: JSONValue] = [
   "plans": .array([
     .object([

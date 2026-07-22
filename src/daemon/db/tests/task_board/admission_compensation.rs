@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use crate::daemon::db::{AsyncDaemonDb, NewApprovalGrant, TaskBoardLanePositionInput};
 use crate::daemon::db::task_board::write_workflow_fixture::{
     approved_write_item, complete_write_preparation,
 };
+use crate::daemon::db::{AsyncDaemonDb, NewApprovalGrant, TaskBoardLanePositionInput};
 use crate::daemon::protocol::CodexRunStatus;
 use crate::task_board::{
     PolicyAction, PolicyReasonCode, SpawnGateSwitches, TaskBoardItem, TaskBoardLaneOrigin,
@@ -27,7 +27,9 @@ async fn prepare_compensation_lane_shift(db: &AsyncDaemonDb) -> (String, String)
         actor: "control-user".into(),
     });
     item.lane_set_at = Some("2026-07-17T10:00:00Z".into());
-    db.create_task_board_item(item).await.expect("create target");
+    db.create_task_board_item(item)
+        .await
+        .expect("create target");
     db.create_task_board_item(TaskBoardItem::new(
         "compensation-lane-anchor".into(),
         "Compensation lane anchor".into(),
@@ -37,8 +39,7 @@ async fn prepare_compensation_lane_shift(db: &AsyncDaemonDb) -> (String, String)
     .await
     .expect("create anchor");
     let plan = build_dispatch_plans_with_policy(
-        &[db
-            .task_board_item("compensation-lane-target")
+        &[db.task_board_item("compensation-lane-target")
             .await
             .expect("load target")],
         None,
@@ -165,7 +166,10 @@ async fn compensation_lane_shift_uses_one_final_sequence_and_matching_audit() {
     )
     .await
     .expect("begin compensation");
-    let before = db.task_board_items_snapshot(None).await.expect("before finalization");
+    let before = db
+        .task_board_items_snapshot(None)
+        .await
+        .expect("before finalization");
     db.finalize_task_board_dispatch_compensation(
         &intent,
         &claim_token,
@@ -174,7 +178,10 @@ async fn compensation_lane_shift_uses_one_final_sequence_and_matching_audit() {
     )
     .await
     .expect("finalize compensation");
-    let after = db.task_board_items_snapshot(None).await.expect("after finalization");
+    let after = db
+        .task_board_items_snapshot(None)
+        .await
+        .expect("after finalization");
     assert_eq!(after.items_change_seq, before.items_change_seq + 1);
     assert_eq!(
         after

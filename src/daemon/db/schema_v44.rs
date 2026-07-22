@@ -51,8 +51,11 @@ pub(super) fn shape_needs_repair(conn: &Connection) -> Result<bool, CliError> {
     }
     require_lane_column_shape(conn)?;
     require_lane_data_coherence(conn)?;
-    if !index_matches(conn, "task_board_items_live_lane_position", POSITION_INDEX_SQL)?
-        || !index_matches(conn, "task_board_items_live_lane_order", ORDER_INDEX_SQL)?
+    if !index_matches(
+        conn,
+        "task_board_items_live_lane_position",
+        POSITION_INDEX_SQL,
+    )? || !index_matches(conn, "task_board_items_live_lane_order", ORDER_INDEX_SQL)?
     {
         return Ok(true);
     }
@@ -74,7 +77,11 @@ fn add_column_if_missing(conn: &Connection, column: &str) -> Result<(), CliError
         "lane_actor" => ADD_LANE_ACTOR_SQL,
         "lane_producer" => ADD_LANE_PRODUCER_SQL,
         "lane_set_at" => ADD_LANE_SET_AT_SQL,
-        _ => return Err(db_error(format!("unknown task-board lane column: {column}"))),
+        _ => {
+            return Err(db_error(format!(
+                "unknown task-board lane column: {column}"
+            )));
+        }
     };
     conn.execute(sql, [])
         .map(|_| ())
@@ -183,10 +190,16 @@ fn rebuild_coherence_triggers(conn: &Connection) -> Result<(), CliError> {
         .ok_or_else(|| db_error("parse task-board lane migration SQL"))?
         .split("CREATE TRIGGER")
         .skip(1)
-        .map(|trigger| format!("CREATE TRIGGER{trigger}"))
-        .collect::<String>();
-    conn.execute_batch(&trigger_sql)
-        .map_err(|error| db_error(format!("create task-board lane coherence triggers: {error}")))
+        .fold(String::new(), |mut sql, trigger| {
+            sql.push_str("CREATE TRIGGER");
+            sql.push_str(trigger);
+            sql
+        });
+    conn.execute_batch(&trigger_sql).map_err(|error| {
+        db_error(format!(
+            "create task-board lane coherence triggers: {error}"
+        ))
+    })
 }
 
 fn column_exists(conn: &Connection, column: &str) -> Result<bool, CliError> {

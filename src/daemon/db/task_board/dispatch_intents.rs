@@ -318,8 +318,14 @@ impl AsyncDaemonDb {
         )
         .await?;
         let item = write.item.clone();
-        insert_started_workflow_in_tx(&mut transaction, &item, write.item_revision, intent_id, &applied)
-            .await?;
+        insert_started_workflow_in_tx(
+            &mut transaction,
+            &item,
+            write.item_revision,
+            intent_id,
+            &applied,
+        )
+        .await?;
         let change_sequence = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
         record_lane_transition_audit_in_tx(&mut transaction, &write, change_sequence).await?;
         let now = utc_now();

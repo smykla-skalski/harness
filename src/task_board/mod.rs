@@ -4,8 +4,8 @@ pub mod evaluation;
 pub mod external;
 mod external_create_intents;
 pub mod git_identity_defaults;
-pub mod lane;
 pub mod github;
+pub mod lane;
 #[allow(dead_code)]
 #[cfg(feature = "daemon-runtime")]
 pub(crate) mod legacy_import;

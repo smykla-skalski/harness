@@ -58,6 +58,7 @@ mod routes_reviews;
 mod routes_sessions_infra;
 mod routes_task_board;
 mod routes_task_board_orchestrator;
+mod routes_task_board_positions;
 mod routes_tasks_agents_voice;
 #[cfg(test)]
 mod tests;
@@ -84,6 +85,7 @@ pub fn mapped_ws_methods() -> Vec<&'static str> {
 pub fn task_board_mcp_methods() -> Vec<&'static str> {
     routes_task_board::ROUTES
         .iter()
+        .chain(routes_task_board_positions::ROUTES)
         .map(|route| {
             route
                 .parity

@@ -80,7 +80,10 @@ pub fn validate_task_board_lane_order(items: &[TaskBoardItem]) -> Result<(), &'s
             let Some(position) = item.lane_position else {
                 continue;
             };
-            if usize::try_from(position).ok().is_none_or(|position| position >= lane.len()) {
+            if usize::try_from(position)
+                .ok()
+                .is_none_or(|position| position >= lane.len())
+            {
                 return Err("lane position is outside the live lane cardinality");
             }
             if occupied.insert(position, item.id.as_str()).is_some() {
@@ -227,7 +230,10 @@ mod tests {
         sort_task_board_items(&mut items);
 
         assert_eq!(
-            items.iter().map(|item| item.id.as_str()).collect::<Vec<_>>(),
+            items
+                .iter()
+                .map(|item| item.id.as_str())
+                .collect::<Vec<_>>(),
             ["highest", "anchor", "normal"]
         );
     }

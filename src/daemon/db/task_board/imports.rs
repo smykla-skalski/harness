@@ -15,10 +15,10 @@ use super::{
     POLICY_RUNTIME_CHANGE_SCOPE, RUNTIME_CONFIG_CHANGE_SCOPE,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
+use crate::task_board::legacy_import::LegacyTaskBoardSnapshot;
 use crate::task_board::{
     TaskBoardGitRuntimeConfig, sort_task_board_items, validate_task_board_lane_order,
 };
-use crate::task_board::legacy_import::LegacyTaskBoardSnapshot;
 
 pub(crate) const LEGACY_GLOBAL_SOURCE: &str = "legacy_global_board";
 pub(crate) const EMPTY_DATABASE_SOURCE: &str = "empty_database";
@@ -147,12 +147,8 @@ impl AsyncDaemonDb {
             change_revision = bump_change_in_tx(&mut transaction, scope).await?;
             if scope == ITEMS_CHANGE_SCOPE {
                 for write in lane_writes.iter().filter(|write| write.changed) {
-                    record_lane_transition_audit_in_tx(
-                        &mut transaction,
-                        write,
-                        change_revision,
-                    )
-                    .await?;
+                    record_lane_transition_audit_in_tx(&mut transaction, write, change_revision)
+                        .await?;
                 }
             }
         }

@@ -53,11 +53,10 @@ impl AsyncDaemonDb {
         item_revision: i64,
         items_change_seq: i64,
     ) -> Result<bool, CliError> {
-        let mut transaction = self
-            .pool()
-            .begin()
-            .await
-            .map_err(|error| db_error(format!("begin task board pick revalidation: {error}")))?;
+        let mut transaction =
+            self.pool().begin().await.map_err(|error| {
+                db_error(format!("begin task board pick revalidation: {error}"))
+            })?;
         let current_sequence = query_scalar::<_, i64>(
             "SELECT COALESCE(change_seq, 0) FROM change_tracking WHERE scope = ?1",
         )
@@ -72,7 +71,11 @@ impl AsyncDaemonDb {
         .bind(item_id)
         .fetch_optional(transaction.as_mut())
         .await
-        .map_err(|error| db_error(format!("read task-board pick revision '{item_id}': {error}")))?;
+        .map_err(|error| {
+            db_error(format!(
+                "read task-board pick revision '{item_id}': {error}"
+            ))
+        })?;
         transaction
             .commit()
             .await
@@ -95,7 +98,10 @@ impl AsyncDaemonDb {
             .await
             .map_err(|error| db_error(format!("commit task board item list: {error}")))?;
         sort_item_snapshots(&mut snapshots);
-        Ok(snapshots.into_iter().map(|snapshot| snapshot.item).collect())
+        Ok(snapshots
+            .into_iter()
+            .map(|snapshot| snapshot.item)
+            .collect())
     }
 }
 

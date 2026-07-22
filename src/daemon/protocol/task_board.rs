@@ -73,6 +73,29 @@ pub struct TaskBoardListItemsResponse {
     pub progress_rollups: HashMap<String, TaskBoardProgressRollup>,
 }
 
+/// A coherent item revision and task-board list sequence observation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardItemPositionSnapshot {
+    pub item: TaskBoardItem,
+    pub item_revision: i64,
+    pub items_change_seq: i64,
+}
+
+/// A shifted item revision produced by an explicit lane-position mutation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskBoardShiftedItemRevision {
+    pub item_id: String,
+    pub item_revision: i64,
+}
+
+/// Result of an explicit position set or reset under one list-sequence CAS.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardItemPositionMutationResponse {
+    pub snapshot: TaskBoardItemPositionSnapshot,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub shifted: Vec<TaskBoardShiftedItemRevision>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskBoardCapabilitiesResponse {
     pub storage: String,

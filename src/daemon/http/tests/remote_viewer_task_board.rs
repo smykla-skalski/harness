@@ -41,6 +41,8 @@ async fn run_remote_viewer_projection_flow() {
     let viewer_list =
         get_http_json(&client, &base_url, http_paths::TASK_BOARD_ITEMS, VIEWER_ID).await;
     assert_viewer_projection(&viewer_list["items"][0]);
+    assert!(viewer_list["items_change_seq"].is_i64());
+    assert!(viewer_list["item_revisions"][ITEM_ID].is_i64());
     let viewer_item = get_http_json(
         &client,
         &base_url,
@@ -49,6 +51,16 @@ async fn run_remote_viewer_projection_flow() {
     )
     .await;
     assert_viewer_projection(&viewer_item);
+    let viewer_position = get_http_json(
+        &client,
+        &base_url,
+        &http_paths::TASK_BOARD_ITEM_POSITION.replace("{item_id}", ITEM_ID),
+        VIEWER_ID,
+    )
+    .await;
+    assert_viewer_position_snapshot(&viewer_position);
+
+    assert_viewer_position_mutations_are_denied(&client, &base_url).await;
 
     let operator_list = get_http_json(
         &client,
@@ -76,6 +88,30 @@ async fn run_remote_viewer_projection_flow() {
     )
     .await;
     assert_viewer_projection(&viewer_ws_item["result"]);
+    let viewer_ws_position = ws_rpc(
+        &mut viewer_socket,
+        "viewer-position-get",
+        ws_methods::TASK_BOARD_POSITION_GET,
+        json!({ "id": ITEM_ID }),
+    )
+    .await;
+    assert_viewer_position_snapshot(&viewer_ws_position["result"]);
+    let viewer_ws_set = ws_rpc(
+        &mut viewer_socket,
+        "viewer-position-set",
+        ws_methods::TASK_BOARD_POSITION_SET,
+        position_set_params(),
+    )
+    .await;
+    assert_remote_write_denied(&viewer_ws_set);
+    let viewer_ws_reset = ws_rpc(
+        &mut viewer_socket,
+        "viewer-position-reset",
+        ws_methods::TASK_BOARD_POSITION_RESET,
+        position_reset_params(),
+    )
+    .await;
+    assert_remote_write_denied(&viewer_ws_reset);
 
     let mut operator_socket = connect_remote_ws(&base_url, OPERATOR_ID).await;
     let operator_ws_list = ws_rpc(
@@ -102,6 +138,9 @@ async fn seed_sensitive_item(state: &crate::daemon::http::DaemonHttpState) {
         ),
         "status": "todo",
         "priority": "high",
+        "lane_position": 0,
+        "lane_origin": { "kind": "manual", "actor": "sensitive-position-actor" },
+        "lane_set_at": "2026-07-13T00:00:30Z",
         "tags": ["github_pat_abcdefghijklmnopqrstuvwxyz123456"],
         "project_id": "https://user:password@example.com/repo",
         "target_project_types": ["github"],
@@ -149,6 +188,7 @@ fn assert_viewer_projection(item: &Value) {
             "body",
             "created_at",
             "id",
+            "lane_position",
             "priority",
             "project_id",
             "schema_version",
@@ -178,6 +218,77 @@ fn assert_viewer_projection(item: &Value) {
         assert!(!serialized.contains(secret), "viewer item exposed {secret}");
     }
     assert!(serialized.contains("[redacted]"));
+}
+
+fn assert_viewer_position_snapshot(snapshot: &Value) {
+    assert_viewer_projection(&snapshot["item"]);
+    assert!(snapshot["item_revision"].is_i64());
+    assert!(snapshot["items_change_seq"].is_i64());
+    let serialized = serde_json::to_string(snapshot).expect("serialize viewer position snapshot");
+    assert!(!serialized.contains("sensitive-position-actor"));
+    assert!(!serialized.contains("lane_origin"));
+    assert!(!serialized.contains("lane_set_at"));
+}
+
+async fn assert_viewer_position_mutations_are_denied(client: &reqwest::Client, base_url: &str) {
+    let position_path = http_paths::TASK_BOARD_ITEM_POSITION.replace("{item_id}", ITEM_ID);
+    for (request, params) in [
+        (
+            client.put(format!("{base_url}{position_path}")),
+            position_set_params(),
+        ),
+        (
+            client.post(format!(
+                "{base_url}{}",
+                http_paths::TASK_BOARD_ITEM_POSITION_RESET.replace("{item_id}", ITEM_ID)
+            )),
+            position_reset_params(),
+        ),
+    ] {
+        let response = request
+            .header(
+                crate::daemon::remote_auth::REMOTE_CLIENT_ID_HEADER,
+                VIEWER_ID,
+            )
+            .bearer_auth("remote-token-secret-viewer-task-board")
+            .json(&params)
+            .send()
+            .await
+            .expect("send viewer position mutation");
+        let status = response.status();
+        let body = response
+            .json::<Value>()
+            .await
+            .expect("viewer mutation body");
+        assert_eq!(status, reqwest::StatusCode::FORBIDDEN);
+        assert_eq!(body["error"]["code"], "REMOTE_AUTH");
+    }
+}
+
+fn assert_remote_write_denied(response: &Value) {
+    assert_eq!(response["result"], Value::Null);
+    assert_eq!(response["error"]["code"], "REMOTE_AUTH");
+    assert_eq!(response["error"]["status_code"], 403);
+}
+
+fn position_set_params() -> Value {
+    json!({
+        "id": ITEM_ID,
+        "status": "todo",
+        "lane_position": 0,
+        "expected_item_revision": 1,
+        "expected_items_change_seq": 1,
+        "actor": "spoofed-viewer",
+    })
+}
+
+fn position_reset_params() -> Value {
+    json!({
+        "id": ITEM_ID,
+        "expected_item_revision": 1,
+        "expected_items_change_seq": 1,
+        "actor": "spoofed-viewer",
+    })
 }
 
 fn assert_full_item(item: &Value) {
