@@ -255,7 +255,7 @@ actor TaskBoardAutomationInspectorPresentationWorker {
     ]
   }
 
-  private static func controlAvailability(
+  static func controlAvailability(
     _ input: TaskBoardAutomationPresentationInput
   ) -> TaskBoardAutomationControlAvailability {
     let isStale = snapshotIsStale(input)

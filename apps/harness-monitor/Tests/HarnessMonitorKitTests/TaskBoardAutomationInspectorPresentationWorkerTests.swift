@@ -114,6 +114,63 @@ struct TaskBoardAutomationPresentationTests {
     #expect(earlier != later)
   }
 
+  @Test("Presentation freshness ignores harmless clock updates and closes on stale heartbeat")
+  func presentationFreshnessHandlesClockUpdatesSafely() {
+    let worker = TaskBoardAutomationInspectorPresentationWorker.self
+    let presented = input(snapshot: snapshot())
+    let nextMinute = input(
+      snapshot: snapshot(),
+      referenceDate: Date(timeIntervalSince1970: 60)
+    )
+    let offline = input(snapshot: snapshot(), isOnline: false)
+    let presentedAvailability = worker.controlAvailability(presented)
+
+    #expect(
+      presented.remainsCurrent(
+        comparedWith: nextMinute,
+        cachedAvailability: presentedAvailability,
+        currentAvailability: worker.controlAvailability(nextMinute)
+      )
+    )
+    #expect(
+      !presented.remainsCurrent(
+        comparedWith: offline,
+        cachedAvailability: presentedAvailability,
+        currentAvailability: worker.controlAvailability(offline)
+      )
+    )
+
+    let continuous = snapshot(desiredMode: .continuous, admissionState: .accepting)
+    let heartbeatFresh = input(snapshot: continuous)
+    let heartbeatStale = input(
+      snapshot: continuous,
+      referenceDate: Date(timeIntervalSince1970: 181)
+    )
+    let freshAvailability = worker.controlAvailability(heartbeatFresh)
+    let staleAvailability = worker.controlAvailability(heartbeatStale)
+    #expect(freshAvailability.controlBlockedReason == nil)
+    #expect(staleAvailability.controlBlockedReason != nil)
+    #expect(
+      !heartbeatFresh.remainsCurrent(
+        comparedWith: heartbeatStale,
+        cachedAvailability: freshAvailability,
+        currentAvailability: staleAvailability
+      )
+    )
+  }
+
+  @Test("Timestamp parser accepts daemon precision and preserves invalid values")
+  func timestampParserAcceptsDaemonPrecision() {
+    let worker = TaskBoardAutomationInspectorPresentationWorker.self
+    #expect(worker.parseTimestamp("1970-01-01T00:00:00Z") == Date(timeIntervalSince1970: 0))
+    #expect(worker.parseTimestamp("1970-01-01T00:00:00.500Z") == Date(timeIntervalSince1970: 0.5))
+    #expect(worker.parseTimestamp("invalid") == nil)
+    #expect(
+      worker.relativeTimestamp("invalid", referenceDate: Date(timeIntervalSince1970: 0))
+        == "invalid"
+    )
+  }
+
   @MainActor
   @Test("Disconnect clears remote history and rejects stale completions")
   func disconnectClearsRemoteInspectorState() throws {
@@ -170,6 +227,7 @@ struct TaskBoardAutomationPresentationTests {
   private func input(
     snapshot: TaskBoardAutomationSnapshot?,
     metrics: TaskBoardAutomationMetrics? = nil,
+    referenceDate: Date = Date(timeIntervalSince1970: 0),
     isOnline: Bool = true,
     isWriteAuthorized: Bool = true,
     isGloballyBusy: Bool = false
@@ -180,7 +238,7 @@ struct TaskBoardAutomationPresentationTests {
       selectedRunID: nil,
       detail: nil,
       metrics: metrics,
-      referenceDate: Date(timeIntervalSince1970: 0),
+      referenceDate: referenceDate,
       reconcileIntervalSeconds: 60,
       isOnline: isOnline,
       isWriteAuthorized: isWriteAuthorized,

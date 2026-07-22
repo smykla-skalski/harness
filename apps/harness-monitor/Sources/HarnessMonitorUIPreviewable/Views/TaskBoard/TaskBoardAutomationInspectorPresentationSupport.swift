@@ -48,8 +48,7 @@ extension TaskBoardAutomationInspectorPresentationWorker {
   }
 
   static func parseTimestamp(_ value: String) -> Date? {
-    (try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(value))
-      ?? (try? Date.ISO8601FormatStyle().parse(value))
+    TaskBoardAutomationTimestampParser.parse(value)
   }
 
   static func scopeTitle(_ scope: TaskBoardAutomationScope) -> String {
@@ -151,5 +150,14 @@ extension TaskBoardAutomationInspectorPresentationWorker {
     default:
       .neutral
     }
+  }
+}
+
+private enum TaskBoardAutomationTimestampParser {
+  private static let fractional = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+  private static let standard = Date.ISO8601FormatStyle()
+
+  static func parse(_ value: String) -> Date? {
+    (try? fractional.parse(value)) ?? (try? standard.parse(value))
   }
 }

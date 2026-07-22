@@ -83,6 +83,27 @@ struct TaskBoardAutomationPresentationInput: Equatable, Sendable {
   let isOnline: Bool
   let isWriteAuthorized: Bool
   let isGloballyBusy: Bool
+
+  func remainsCurrent(
+    comparedWith current: Self,
+    cachedAvailability: TaskBoardAutomationControlAvailability,
+    currentAvailability: TaskBoardAutomationControlAvailability
+  ) -> Bool {
+    hasSameNonTimeInputs(as: current)
+      && cachedAvailability == currentAvailability
+  }
+
+  private func hasSameNonTimeInputs(as other: Self) -> Bool {
+    snapshot == other.snapshot
+      && runs == other.runs
+      && selectedRunID == other.selectedRunID
+      && detail == other.detail
+      && metrics == other.metrics
+      && reconcileIntervalSeconds == other.reconcileIntervalSeconds
+      && isOnline == other.isOnline
+      && isWriteAuthorized == other.isWriteAuthorized
+      && isGloballyBusy == other.isGloballyBusy
+  }
 }
 
 struct TaskBoardAutomationPresentation: Equatable, Sendable {

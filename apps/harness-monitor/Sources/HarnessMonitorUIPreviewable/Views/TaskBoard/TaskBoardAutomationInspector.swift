@@ -60,12 +60,23 @@ struct TaskBoardAutomationInspector: View {
     )
   }
 
-  var isPresentationCurrent: Bool {
-    isActive && presentedInput == presentationInput
+  private func presentationIsCurrent(
+    for input: TaskBoardAutomationPresentationInput
+  ) -> Bool {
+    guard let presentedInput else { return false }
+    let currentAvailability =
+      TaskBoardAutomationInspectorPresentationWorker.controlAvailability(input)
+    return isActive
+      && presentedInput.remainsCurrent(
+        comparedWith: input,
+        cachedAvailability: cachedPresentation.controlAvailability,
+        currentAvailability: currentAvailability
+      )
   }
 
   var body: some View {
     let input = presentationInput
+    let isPresentationCurrent = presentationIsCurrent(for: input)
     let presentationTrigger = TaskBoardAutomationPresentationTrigger(
       isActive: isActive,
       snapshotRevision: input.snapshot?.revision,
@@ -93,7 +104,7 @@ struct TaskBoardAutomationInspector: View {
         }
       }
 
-      surfaceContent(isPresentationCurrent: presentedInput == input && isActive)
+      surfaceContent(isPresentationCurrent: isPresentationCurrent)
     }
     .environment(
       \.taskBoardOperationsRowLabelFont,
