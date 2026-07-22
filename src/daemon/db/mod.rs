@@ -107,6 +107,7 @@ mod schema_v40;
 mod schema_v41;
 mod schema_v42;
 mod schema_v43;
+mod schema_v44;
 #[allow(dead_code)]
 mod task_board;
 #[cfg(test)]
@@ -139,16 +140,17 @@ pub(crate) use task_board::{
     TaskBoardAdmissionMissingRunRecovery, TaskBoardAdmissionWorkerRecovery,
     TaskBoardAutomationControlRecord, TaskBoardAutomationRunAdmission, TaskBoardAutomationRunFence,
     TaskBoardAutomationRunLease, TaskBoardAutomationRunStage, TaskBoardDispatchClaimAction,
-    TaskBoardImportMarker, TaskBoardItemSnapshot, TaskBoardRemoteArtifact,
-    TaskBoardRemoteAssignmentRecord, TaskBoardRemoteControllerOperationToken,
-    TaskBoardRemoteControllerScanItem, TaskBoardRemoteControllerScanStep,
-    TaskBoardRemoteExecutorIdentity, TaskBoardRemoteExecutorScan,
-    TaskBoardRemoteExecutorStartAuthority, TaskBoardRemoteExecutorStartIoPermit,
-    TaskBoardRemoteExecutorStartIoPermitOutcome, TaskBoardRemoteExecutorStopAuthority,
-    TaskBoardRemoteExecutorStopPending, TaskBoardRemoteExecutorStopReason,
-    TaskBoardRemoteHostSelection, TaskBoardRemoteHostTrustFence, TaskBoardRemoteIoAuthority,
-    TaskBoardRemoteLifecycleTrustSnapshot, TaskBoardRemoteMutationOutcome,
-    TaskBoardRemoteOfferOutcome, TaskBoardRemoteOfferReceipt,
+    TaskBoardImportMarker, TaskBoardItemSnapshot, TaskBoardItemsSnapshot,
+    TaskBoardLaneMutationResult, TaskBoardLanePositionInput, TaskBoardLaneResetInput,
+    TaskBoardLaneShift, TaskBoardRemoteArtifact, TaskBoardRemoteAssignmentRecord,
+    TaskBoardRemoteControllerOperationToken, TaskBoardRemoteControllerScanItem,
+    TaskBoardRemoteControllerScanStep, TaskBoardRemoteExecutorIdentity,
+    TaskBoardRemoteExecutorScan, TaskBoardRemoteExecutorStartAuthority,
+    TaskBoardRemoteExecutorStartIoPermit, TaskBoardRemoteExecutorStartIoPermitOutcome,
+    TaskBoardRemoteExecutorStopAuthority, TaskBoardRemoteExecutorStopPending,
+    TaskBoardRemoteExecutorStopReason, TaskBoardRemoteHostSelection, TaskBoardRemoteHostTrustFence,
+    TaskBoardRemoteIoAuthority, TaskBoardRemoteLifecycleTrustSnapshot,
+    TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome, TaskBoardRemoteOfferReceipt,
     TaskBoardRemoteOfferReceiptDisposition, TaskBoardRemoteOperationKind,
     TaskBoardRemoteOperationTrustFence, TaskBoardRemotePriorPhaseBundle,
     TaskBoardRemoteRecoveryBatch, TaskBoardRemoteRecoveryFailure,
@@ -359,7 +361,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-pub(crate) const SCHEMA_VERSION: &str = "43";
+pub(crate) const SCHEMA_VERSION: &str = "44";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]

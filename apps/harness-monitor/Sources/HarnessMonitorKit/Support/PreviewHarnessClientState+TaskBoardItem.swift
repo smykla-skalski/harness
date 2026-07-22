@@ -22,6 +22,11 @@ extension TaskBoardItem {
       sessionId: request.clearSessionId ? nil : request.sessionId ?? sessionId,
       workItemId: request.clearWorkItemId ? nil : request.workItemId ?? workItemId,
       usage: usage,
+      parentItemId: parentItemId,
+      childOrder: childOrder,
+      lanePosition: lanePosition,
+      laneOrigin: laneOrigin,
+      laneSetAt: laneSetAt,
       createdAt: createdAt,
       updatedAt: PreviewHarnessClientState.mutationTimestamp,
       deletedAt: deletedAt

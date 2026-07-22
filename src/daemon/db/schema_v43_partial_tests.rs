@@ -30,7 +30,7 @@ async fn async_upgrade_repairs_partial_v40_admission_before_pool_open() {
 
     assert_eq!(
         async_db.schema_version().await.expect("schema version"),
-        "43"
+        crate::daemon::db::SCHEMA_VERSION
     );
     let admission_tables: i64 = query_scalar(
         "SELECT COUNT(*) FROM sqlite_master

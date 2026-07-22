@@ -17,14 +17,15 @@ use crate::daemon::protocol::{
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitHubTokensSyncResponse, TaskBoardGitRuntimeConfig,
     TaskBoardGitRuntimeConfigResponse, TaskBoardHostListResponse, TaskBoardHostLocalResponse,
     TaskBoardHostSetProjectTypesRequest, TaskBoardHostSetProjectTypesResponse,
+    TaskBoardItemPositionMutationResponse, TaskBoardItemPositionSnapshot,
     TaskBoardListItemsRequest, TaskBoardListItemsResponse, TaskBoardMachinesResponse,
     TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorRunOnceResponse,
     TaskBoardOrchestratorSettingsResponse, TaskBoardOrchestratorSettingsUpdateRequest,
     TaskBoardOrchestratorStatusResponse, TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest,
     TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse,
-    TaskBoardProjectsResponse, TaskBoardSyncRequest, TaskBoardSyncResponse,
-    TaskBoardTodoistTokenSyncRequest, TaskBoardTodoistTokenSyncResponse,
-    TaskBoardUpdateItemRequest, http_paths,
+    TaskBoardProjectsResponse, TaskBoardResetItemPositionRequest, TaskBoardSetItemPositionRequest,
+    TaskBoardSyncRequest, TaskBoardSyncResponse, TaskBoardTodoistTokenSyncRequest,
+    TaskBoardTodoistTokenSyncResponse, TaskBoardUpdateItemRequest, http_paths,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::{TaskBoardItem, TaskBoardStatus};
@@ -67,6 +68,29 @@ impl DaemonClient {
 
     pub fn get_task_board_item(&self, item_id: &str) -> Result<TaskBoardItem, CliError> {
         self.get(&item_path(item_id))
+    }
+
+    pub fn get_task_board_item_position_snapshot(
+        &self,
+        item_id: &str,
+    ) -> Result<TaskBoardItemPositionSnapshot, CliError> {
+        self.get(&item_action_path(item_id, "position"))
+    }
+
+    pub fn set_task_board_item_position(
+        &self,
+        item_id: &str,
+        request: &TaskBoardSetItemPositionRequest,
+    ) -> Result<TaskBoardItemPositionMutationResponse, CliError> {
+        self.put(&item_action_path(item_id, "position"), request)
+    }
+
+    pub fn reset_task_board_item_position(
+        &self,
+        item_id: &str,
+        request: &TaskBoardResetItemPositionRequest,
+    ) -> Result<TaskBoardItemPositionMutationResponse, CliError> {
+        self.post(&item_action_path(item_id, "position/reset"), request)
     }
 
     pub fn update_task_board_item(

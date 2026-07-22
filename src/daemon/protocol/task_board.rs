@@ -61,10 +61,39 @@ pub struct TaskBoardPlanRevokeRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskBoardListItemsResponse {
     pub items: Vec<TaskBoardItem>,
+    /// Sequence observed with `items`; clients use this to reject stale picks.
+    #[serde(default)]
+    pub items_change_seq: i64,
+    /// Per-item revisions observed with `items`, keyed by item id.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub item_revisions: HashMap<String, i64>,
     /// Keyed by umbrella item id, computed fresh from the full live item set
     /// at read time regardless of any `status` filter applied to `items`.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub progress_rollups: HashMap<String, TaskBoardProgressRollup>,
+}
+
+/// A coherent item revision and task-board list sequence observation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardItemPositionSnapshot {
+    pub item: TaskBoardItem,
+    pub item_revision: i64,
+    pub items_change_seq: i64,
+}
+
+/// A shifted item revision produced by an explicit lane-position mutation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskBoardShiftedItemRevision {
+    pub item_id: String,
+    pub item_revision: i64,
+}
+
+/// Result of an explicit position set or reset under one list-sequence CAS.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardItemPositionMutationResponse {
+    pub snapshot: TaskBoardItemPositionSnapshot,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub shifted: Vec<TaskBoardShiftedItemRevision>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -33,6 +33,23 @@ let sampleTaskBoardItemJSONString =
   }
   """
 
+let sampleTaskBoardPositionSnapshotText =
+  """
+  {"item": \(sampleTaskBoardItemJSONString), "item_revision": 7, "items_change_seq": 42}
+  """
+
+let sampleTaskBoardPositionMutationText =
+  """
+  {
+    "snapshot": {
+      "item": \(sampleTaskBoardItemJSONString),
+      "item_revision": 8,
+      "items_change_seq": 43
+    },
+    "shifted": [{"item_id":"shifted-item","item_revision":9}]
+  }
+  """
+
 let sampleTaskBoardEvaluationSummaryText =
   """
   {

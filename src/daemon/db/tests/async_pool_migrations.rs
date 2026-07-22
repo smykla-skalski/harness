@@ -69,7 +69,7 @@ async fn connect_upgrades_applied_original_v34_migration() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        (1..=37).collect::<Vec<i64>>()
+        (1..=38).collect::<Vec<i64>>()
     );
     let requires_live = query_scalar::<_, bool>(
         "SELECT spawn_requires_live_policy FROM policy_workspace WHERE singleton = 1",
@@ -206,6 +206,10 @@ const SHIPPED_MIGRATION_CHECKSUMS: &[(&str, &str)] = &[
     (
         "0037_daemon_v43_task_board_remote_execution.sql",
         "F125288DF483846801C2E50E4B5313747ED4817A91E87675B1040CE2D661806957E44B8F3953530077670F0B2DCF4083",
+    ),
+    (
+        "0038_daemon_v44_task_board_lane_order.sql",
+        "4DEA33ABAE80ACA81B3644E575B82D940F04382703BD81FE3BFE8E413F95D4F637DBB827A02936E9FED7C87F4B7F3F6E",
     ),
 ];
 

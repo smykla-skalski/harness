@@ -10,7 +10,10 @@ use crate::daemon::db::task_board::admission_lifecycle::{
     ensure_item_admission_can_terminate_in_tx, release_managed_worker_admission_in_tx,
 };
 use crate::daemon::db::task_board::items::{
-    bump_change_in_tx, load_item_in_tx, replace_item_in_tx,
+    bump_change_in_tx, items_change_sequence_in_tx, load_item_in_tx,
+};
+use crate::daemon::db::task_board::lane_order::{
+    LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
 };
 use crate::daemon::db::{CliError, db_error, utc_now};
 use crate::task_board::TaskBoardWorkflowExecutionRecord;
@@ -38,18 +41,30 @@ pub(in crate::daemon::db::task_board) async fn project_terminal_execution_in_tx(
         });
     }
     let target = terminal_target(execution)?;
+    let before = item.clone();
     let item_changed = apply_terminal_target(&mut item, &target);
     let committed_released = release_managed_worker_admission_in_tx(transaction, &owner).await?;
     let admission_released = prepared.admission_released || committed_released;
     ensure_item_admission_can_terminate_in_tx(transaction, &execution.item_id).await?;
     let projected_revision = if item_changed {
         item.updated_at = utc_now();
-        let projected_revision = item_revision.saturating_add(1);
-        replace_item_in_tx(transaction, &item, projected_revision).await?;
-        if !committed_released {
-            bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
-        }
-        projected_revision
+        let write = replace_with_lane_transition_in_tx(
+            transaction,
+            before,
+            item_revision,
+            item,
+            LaneTransitionKind::Generic,
+        )
+        .await?;
+        let sequence = if committed_released {
+            items_change_sequence_in_tx(transaction).await?
+        } else {
+            bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?
+        };
+        record_lane_transition_audit_in_tx(transaction, &write, sequence).await?;
+        let updated_revision = write.item_revision;
+        item = write.item;
+        updated_revision
     } else {
         if prepared.changed && !committed_released {
             bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;

@@ -1,18 +1,73 @@
 use std::collections::HashMap;
 
-use crate::daemon::db::NewApprovalGrant;
 use crate::daemon::db::task_board::write_workflow_fixture::{
     approved_write_item, complete_write_preparation,
 };
+use crate::daemon::db::{AsyncDaemonDb, NewApprovalGrant, TaskBoardLanePositionInput};
 use crate::daemon::protocol::CodexRunStatus;
 use crate::task_board::{
-    PolicyAction, PolicyReasonCode, SpawnGateSwitches, TaskBoardItem,
+    PolicyAction, PolicyReasonCode, SpawnGateSwitches, TaskBoardItem, TaskBoardLaneOrigin,
     build_dispatch_plans_with_policy,
 };
 
 use super::admission_dispatch::{
     admission_policy, configure_policy, ledger_kind_state, preparing_intent, test_db,
 };
+
+async fn prepare_compensation_lane_shift(db: &AsyncDaemonDb) -> (String, String) {
+    configure_policy(db, admission_policy(1)).await;
+    let mut item = approved_write_item(TaskBoardItem::new(
+        "compensation-lane-target".into(),
+        "Compensation lane target".into(),
+        "Body".into(),
+        "2026-07-17T10:00:00Z".into(),
+    ));
+    item.lane_position = Some(0);
+    item.lane_origin = Some(TaskBoardLaneOrigin::Manual {
+        actor: "control-user".into(),
+    });
+    item.lane_set_at = Some("2026-07-17T10:00:00Z".into());
+    db.create_task_board_item(item)
+        .await
+        .expect("create target");
+    db.create_task_board_item(TaskBoardItem::new(
+        "compensation-lane-anchor".into(),
+        "Compensation lane anchor".into(),
+        "Body".into(),
+        "2026-07-17T10:01:00Z".into(),
+    ))
+    .await
+    .expect("create anchor");
+    let plan = build_dispatch_plans_with_policy(
+        &[db.task_board_item("compensation-lane-target")
+            .await
+            .expect("load target")],
+        None,
+        None,
+        SpawnGateSwitches::default(),
+        &HashMap::new(),
+    )
+    .remove(0);
+    let intent = preparing_intent(
+        db.reserve_task_board_dispatch(&plan, "control-plane", Some("/tmp/project"), false)
+            .await
+            .expect("reserve dispatch"),
+    );
+    let preparation = db
+        .claim_task_board_dispatch_preparation(&intent)
+        .await
+        .expect("claim preparation")
+        .expect("pending preparation");
+    complete_write_preparation(db, &preparation, "branch", "/tmp/worktree")
+        .await
+        .expect("complete preparation");
+    let claim = db
+        .claim_task_board_dispatch("compensation-lane-target")
+        .await
+        .expect("claim dispatch")
+        .expect("pending dispatch");
+    (intent, claim.claim_token)
+}
 
 #[tokio::test]
 async fn missing_worker_compensation_commits_usage_and_releases_concurrency() {
@@ -79,6 +134,74 @@ async fn missing_worker_compensation_commits_usage_and_releases_concurrency() {
         "released"
     );
     assert_eq!(ledger_kind_state(&db, &intent, "rate").await, "committed");
+}
+
+#[tokio::test]
+async fn compensation_lane_shift_uses_one_final_sequence_and_matching_audit() {
+    let db = test_db().await;
+    let (intent, claim_token) = prepare_compensation_lane_shift(&db).await;
+    let anchored = db.task_board_items_snapshot(None).await.expect("snapshot");
+    let anchor_revision = anchored
+        .items
+        .iter()
+        .find(|snapshot| snapshot.item.id == "compensation-lane-anchor")
+        .expect("anchor snapshot")
+        .item_revision;
+    db.set_task_board_lane_position(TaskBoardLanePositionInput {
+        item_id: "compensation-lane-anchor".into(),
+        status: None,
+        lane_position: 0,
+        actor: "control-user".into(),
+        expected_item_revision: anchor_revision,
+        expected_items_change_seq: anchored.items_change_seq,
+    })
+    .await
+    .expect("anchor Todo lane");
+    let worker_id = "codex-compensation-lane";
+    db.begin_task_board_dispatch_compensation(
+        &intent,
+        &claim_token,
+        worker_id,
+        "dispatch completion failed",
+    )
+    .await
+    .expect("begin compensation");
+    let before = db
+        .task_board_items_snapshot(None)
+        .await
+        .expect("before finalization");
+    db.finalize_task_board_dispatch_compensation(
+        &intent,
+        &claim_token,
+        worker_id,
+        "dispatch completion failed",
+    )
+    .await
+    .expect("finalize compensation");
+    let after = db
+        .task_board_items_snapshot(None)
+        .await
+        .expect("after finalization");
+    assert_eq!(after.items_change_seq, before.items_change_seq + 1);
+    assert_eq!(
+        after
+            .items
+            .iter()
+            .find(|snapshot| snapshot.item.id == "compensation-lane-anchor")
+            .expect("shifted anchor")
+            .item
+            .lane_position,
+        Some(1)
+    );
+    let audit_sequence: i64 = sqlx::query_scalar(
+        "SELECT MAX(CAST(json_extract(payload_json, '$.items_change_seq') AS INTEGER)) FROM audit_events
+         WHERE subject = ?1 AND kind = 'task_board.item.lane_position_changed'",
+    )
+    .bind("compensation-lane-target")
+    .fetch_one(db.pool())
+    .await
+    .expect("compensation lane audit");
+    assert_eq!(audit_sequence, after.items_change_seq);
 }
 
 #[tokio::test]

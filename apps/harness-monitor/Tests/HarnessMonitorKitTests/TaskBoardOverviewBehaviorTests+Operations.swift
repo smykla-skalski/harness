@@ -51,7 +51,7 @@ extension TaskBoardOverviewBehaviorTests {
       )
     )
 
-    #expect(presentation.dispatchableItems.map(\.id) == ["high", "low"])
+    #expect(presentation.dispatchableItems.map(\.id) == ["low", "high"])
     #expect(!presentation.didFilterOut)
   }
 

@@ -10,6 +10,7 @@ mod items;
 mod policy;
 mod policy_io;
 mod policy_spawn_gate;
+mod positions;
 
 pub(super) use self::items::{authenticated_request, authorized_control_request_parts};
 
@@ -25,6 +26,10 @@ use self::items::{
 use self::policy::merge_policy_routes;
 use self::policy_io::merge_policy_io_routes;
 use self::policy_spawn_gate::merge_policy_spawn_gate_routes;
+use self::positions::{
+    get_task_board_item_position_snapshot, post_task_board_item_position_reset,
+    put_task_board_item_position,
+};
 
 fn task_board_host_routes() -> Router<DaemonHttpState> {
     Router::new()
@@ -57,6 +62,14 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
             get(get_task_board_item)
                 .put(put_task_board_item)
                 .delete(delete_task_board_item),
+        )
+        .route(
+            http_paths::TASK_BOARD_ITEM_POSITION,
+            get(get_task_board_item_position_snapshot).put(put_task_board_item_position),
+        )
+        .route(
+            http_paths::TASK_BOARD_ITEM_POSITION_RESET,
+            post(post_task_board_item_position_reset),
         )
         .route(
             http_paths::TASK_BOARD_PLAN_BEGIN,

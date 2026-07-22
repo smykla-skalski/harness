@@ -14,6 +14,12 @@ mod held_dispatch;
 mod import_lifecycle;
 mod imports;
 mod items;
+mod items_reads;
+mod lane_order;
+mod lane_order_api;
+mod lane_order_audit;
+#[cfg(test)]
+mod lane_order_tests;
 mod mapper;
 mod policy_queues;
 mod policy_runs;
@@ -226,6 +232,10 @@ pub(crate) use dispatch_preparations::{
 pub(crate) use imports::{TaskBoardImportMarker, TaskBoardImportResult};
 #[allow(unused_imports)]
 pub(crate) use items::{TaskBoardItemSnapshot, TaskBoardMutation};
+pub(crate) use lane_order::{TaskBoardItemsSnapshot, TaskBoardLaneShift};
+pub(crate) use lane_order_api::{
+    TaskBoardLaneMutationResult, TaskBoardLanePositionInput, TaskBoardLaneResetInput,
+};
 #[allow(unused_imports)]
 pub(crate) use remote_artifacts::TaskBoardRemoteArtifact;
 pub(crate) use remote_assignment_controller_scan::{

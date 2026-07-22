@@ -50,7 +50,8 @@ struct TaskBoardOverviewActionsTests {
       Self.makeAPIItem(id: "item-umbrella", status: .todo, kind: .umbrella)
     ]
     let actions = TaskBoardOverviewActions(store: store, scope: .dashboard)
-    let dragItem = TaskBoardCardDragItem.api(itemID: "item-umbrella", status: .todo, kind: .umbrella)
+    let dragItem = TaskBoardCardDragItem.api(
+      itemID: "item-umbrella", status: .todo, kind: .umbrella)
 
     #expect(
       actions.moveCards(

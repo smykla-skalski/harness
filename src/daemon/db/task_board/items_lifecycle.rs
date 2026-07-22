@@ -5,6 +5,23 @@ use crate::daemon::db::{CliError, db_error, utc_now};
 use crate::errors::CliErrorKind;
 use crate::task_board::{TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowStatus};
 
+use super::super::admission_lifecycle::{
+    ensure_item_admission_can_terminate_in_tx, release_item_admission_in_tx,
+};
+
+pub(crate) async fn apply_task_board_item_status_transition_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    item: &TaskBoardItem,
+) -> Result<(), CliError> {
+    ensure_workflow_item_mutation_allowed_in_tx(transaction, &item.id).await?;
+    if task_board_item_is_terminal(item) {
+        ensure_item_admission_can_terminate_in_tx(transaction, &item.id).await?;
+        cancel_prestart_dispatch_for_terminal_item_in_tx(transaction, &item.id).await?;
+        release_item_admission_in_tx(transaction, &item.id).await?;
+    }
+    Ok(())
+}
+
 pub(super) async fn ensure_estimates_are_editable_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     item_id: &str,

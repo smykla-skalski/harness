@@ -332,7 +332,7 @@ extension HarnessMonitorAPIClient {
     )
   }
 
-  private func taskBoardQueryItems(status: TaskBoardStatus?) -> [URLQueryItem] {
+  func taskBoardQueryItems(status: TaskBoardStatus?) -> [URLQueryItem] {
     guard let status else {
       return []
     }

@@ -3,11 +3,12 @@ use crate::daemon::protocol::{
     TaskBoardCapabilitiesResponse, TaskBoardCatalogRequest, TaskBoardCreateItemRequest,
     TaskBoardDeleteItemRequest, TaskBoardGetItemRequest, TaskBoardHostListResponse,
     TaskBoardHostLocalResponse, TaskBoardHostSetProjectTypesRequest,
-    TaskBoardHostSetProjectTypesResponse, TaskBoardListItemsRequest, TaskBoardListItemsResponse,
+    TaskBoardHostSetProjectTypesResponse, TaskBoardItemPositionMutationResponse,
+    TaskBoardItemPositionSnapshot, TaskBoardListItemsRequest, TaskBoardListItemsResponse,
     TaskBoardMachinesResponse, TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest,
     TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse,
-    TaskBoardProjectsResponse, TaskBoardSyncRequest, TaskBoardSyncResponse,
-    TaskBoardUpdateItemRequest,
+    TaskBoardProjectsResponse, TaskBoardResetItemPositionRequest, TaskBoardSetItemPositionRequest,
+    TaskBoardSyncRequest, TaskBoardSyncResponse, TaskBoardUpdateItemRequest,
 };
 use crate::daemon::service;
 use crate::errors::CliError;
@@ -47,6 +48,43 @@ pub(crate) async fn get_item(
     request: &TaskBoardGetItemRequest,
 ) -> Result<TaskBoardItem, CliError> {
     service::get_task_board_item_db(require_async_db(state, "task board get")?, request).await
+}
+
+pub(crate) async fn get_item_position_snapshot(
+    state: &DaemonHttpState,
+    item_id: &str,
+) -> Result<TaskBoardItemPositionSnapshot, CliError> {
+    service::get_task_board_item_position_snapshot_db(
+        require_async_db(state, "task board position snapshot")?,
+        item_id,
+    )
+    .await
+}
+
+pub(crate) async fn set_item_position(
+    state: &DaemonHttpState,
+    item_id: &str,
+    request: &TaskBoardSetItemPositionRequest,
+) -> Result<TaskBoardItemPositionMutationResponse, CliError> {
+    service::set_task_board_item_position_db(
+        require_async_db(state, "task board position set")?,
+        item_id,
+        request,
+    )
+    .await
+}
+
+pub(crate) async fn reset_item_position(
+    state: &DaemonHttpState,
+    item_id: &str,
+    request: &TaskBoardResetItemPositionRequest,
+) -> Result<TaskBoardItemPositionMutationResponse, CliError> {
+    service::reset_task_board_item_position_db(
+        require_async_db(state, "task board position reset")?,
+        item_id,
+        request,
+    )
+    .await
 }
 
 pub(crate) async fn update_item(

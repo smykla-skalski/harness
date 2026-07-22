@@ -172,6 +172,11 @@ extension TaskBoardItem {
       sessionId: sessionId,
       workItemId: workItemId,
       usage: usage,
+      parentItemId: parentItemId,
+      childOrder: childOrder,
+      lanePosition: lanePosition,
+      laneOrigin: laneOrigin,
+      laneSetAt: laneSetAt,
       createdAt: createdAt,
       updatedAt: updatedAt,
       deletedAt: deletedAt

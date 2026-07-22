@@ -89,6 +89,267 @@ struct PreviewHarnessClientTaskBoardTests {
     #expect(approved.item.planning.approvedBy == "preview-user")
   }
 
+  @Test("Preview client applies a CAS position set and reset")
+  func previewClientAppliesPositionMutations() async throws {
+    let client = PreviewHarnessClient(fixtures: .taskBoardBoardOnly, isLaunchAgentInstalled: true)
+    let item = try #require(try await client.taskBoardItems(status: .backlog).first)
+    let before = try await client.taskBoardItemPositionSnapshot(id: item.id)
+    let set = try await client.setTaskBoardItemPosition(
+      id: item.id,
+      request: TaskBoardSetItemPositionRequest(
+        status: .todo, lanePosition: 0, expectedItemRevision: before.itemRevision,
+        expectedItemsChangeSeq: before.itemsChangeSeq
+      )
+    )
+    #expect(set.snapshot.item.lanePosition == 0)
+    let reset = try await client.resetTaskBoardItemPosition(
+      id: item.id,
+      request: TaskBoardResetItemPositionRequest(
+        expectedItemRevision: set.snapshot.itemRevision,
+        expectedItemsChangeSeq: set.snapshot.itemsChangeSeq
+      )
+    )
+    #expect(reset.snapshot.item.lanePosition == nil)
+  }
+
+  @Test("Preview positions compact source and reset lanes with one sequence per mutation")
+  func previewPositionMutationsCompactSourceAndResetLanes() async throws {
+    let client = PreviewHarnessClient(fixtures: .taskBoardBoardOnly, isLaunchAgentInstalled: true)
+    var created: [TaskBoardItem] = []
+    for title in ["a", "b", "c"] {
+      created.append(
+        try await client.createTaskBoardItem(request: TaskBoardCreateItemRequest(title: title)))
+    }
+    for (slot, item) in created.enumerated() {
+      let snapshot = try await client.taskBoardItemPositionSnapshot(id: item.id)
+      _ = try await client.setTaskBoardItemPosition(
+        id: item.id,
+        request: TaskBoardSetItemPositionRequest(
+          status: .todo, lanePosition: UInt32(slot), expectedItemRevision: snapshot.itemRevision,
+          expectedItemsChangeSeq: snapshot.itemsChangeSeq
+        )
+      )
+    }
+    let beforeMove = try await client.taskBoardItemPositionSnapshot(id: created[0].id)
+    let moved = try await client.setTaskBoardItemPosition(
+      id: created[0].id,
+      request: TaskBoardSetItemPositionRequest(
+        status: .planning, lanePosition: 0, expectedItemRevision: beforeMove.itemRevision,
+        expectedItemsChangeSeq: beforeMove.itemsChangeSeq
+      )
+    )
+    #expect(moved.snapshot.itemsChangeSeq == beforeMove.itemsChangeSeq + 1)
+    let secondAfterMove = try await client.taskBoardItem(id: created[1].id)
+    let thirdAfterMove = try await client.taskBoardItem(id: created[2].id)
+    #expect(secondAfterMove.lanePosition == 0)
+    #expect(thirdAfterMove.lanePosition == 1)
+
+    let beforeReset = try await client.taskBoardItemPositionSnapshot(id: created[1].id)
+    let reset = try await client.resetTaskBoardItemPosition(
+      id: created[1].id,
+      request: TaskBoardResetItemPositionRequest(
+        expectedItemRevision: beforeReset.itemRevision,
+        expectedItemsChangeSeq: beforeReset.itemsChangeSeq
+      )
+    )
+    #expect(reset.snapshot.itemsChangeSeq == beforeReset.itemsChangeSeq + 1)
+    let thirdAfterReset = try await client.taskBoardItem(id: created[2].id)
+    #expect(thirdAfterReset.lanePosition == 0)
+  }
+
+  @Test("Preview position set compacts a materialized default source slot")
+  func previewPositionSetCompactsMaterializedDefaultSourceSlot() async throws {
+    let client = PreviewHarnessClient(fixtures: .taskBoardBoardOnly, isLaunchAgentInstalled: true)
+    let source = try #require(try await client.taskBoardItems(status: .backlog).first)
+    let sourceAnchor = try await client.createTaskBoardItem(
+      request: TaskBoardCreateItemRequest(title: "Source anchor")
+    )
+    let sourceAnchorSnapshot = try await client.taskBoardItemPositionSnapshot(id: sourceAnchor.id)
+    _ = try await client.setTaskBoardItemPosition(
+      id: sourceAnchor.id,
+      request: TaskBoardSetItemPositionRequest(
+        status: .backlog, lanePosition: 1,
+        expectedItemRevision: sourceAnchorSnapshot.itemRevision,
+        expectedItemsChangeSeq: sourceAnchorSnapshot.itemsChangeSeq
+      )
+    )
+    let destinationAnchor = try await client.createTaskBoardItem(
+      request: TaskBoardCreateItemRequest(title: "Destination anchor")
+    )
+    let destinationAnchorSnapshot = try await client.taskBoardItemPositionSnapshot(
+      id: destinationAnchor.id
+    )
+    _ = try await client.setTaskBoardItemPosition(
+      id: destinationAnchor.id,
+      request: TaskBoardSetItemPositionRequest(
+        status: .planning, lanePosition: 0,
+        expectedItemRevision: destinationAnchorSnapshot.itemRevision,
+        expectedItemsChangeSeq: destinationAnchorSnapshot.itemsChangeSeq
+      )
+    )
+    let unrelatedAnchor = try await client.createTaskBoardItem(
+      request: TaskBoardCreateItemRequest(title: "Unrelated anchor")
+    )
+    let unrelatedAnchorSnapshot = try await client.taskBoardItemPositionSnapshot(
+      id: unrelatedAnchor.id
+    )
+    _ = try await client.setTaskBoardItemPosition(
+      id: unrelatedAnchor.id,
+      request: TaskBoardSetItemPositionRequest(
+        status: .inProgress, lanePosition: 0,
+        expectedItemRevision: unrelatedAnchorSnapshot.itemRevision,
+        expectedItemsChangeSeq: unrelatedAnchorSnapshot.itemsChangeSeq
+      )
+    )
+
+    let sourceSnapshot = try await client.taskBoardItemPositionSnapshot(id: source.id)
+    _ = try await client.setTaskBoardItemPosition(
+      id: source.id,
+      request: TaskBoardSetItemPositionRequest(
+        status: .planning, lanePosition: 0,
+        expectedItemRevision: sourceSnapshot.itemRevision,
+        expectedItemsChangeSeq: sourceSnapshot.itemsChangeSeq
+      )
+    )
+
+    let sourceAfterMove = try await client.taskBoardItem(id: sourceAnchor.id)
+    let destinationAfterMove = try await client.taskBoardItem(id: destinationAnchor.id)
+    let unrelatedAfterMove = try await client.taskBoardItem(id: unrelatedAnchor.id)
+    #expect(sourceAfterMove.lanePosition == 0)
+    #expect(destinationAfterMove.lanePosition == 1)
+    #expect(unrelatedAfterMove.lanePosition == 0)
+  }
+
+  @Test("Preview list and snapshot materialize canonical lane order")
+  func previewPositionListAndSnapshotUseCanonicalMaterializedLaneOrder() async throws {
+    let client = PreviewHarnessClient(fixtures: .taskBoardBoardOnly, isLaunchAgentInstalled: true)
+    let higherPriority = try await client.createTaskBoardItem(
+      request: TaskBoardCreateItemRequest(title: "Higher priority", priority: .high)
+    )
+    let lowerPriority = try await client.createTaskBoardItem(
+      request: TaskBoardCreateItemRequest(title: "Lower priority", priority: .low)
+    )
+    let position = try await client.taskBoardItemPositionSnapshot(id: lowerPriority.id)
+    _ = try await client.setTaskBoardItemPosition(
+      id: lowerPriority.id,
+      request: TaskBoardSetItemPositionRequest(
+        status: .todo, lanePosition: 0, expectedItemRevision: position.itemRevision,
+        expectedItemsChangeSeq: position.itemsChangeSeq
+      )
+    )
+
+    let list = try await client.taskBoardItems(status: .todo)
+    let snapshot = try await client.taskBoardItemsSnapshot(status: .todo)
+    #expect(list.first?.id == lowerPriority.id)
+    #expect(snapshot.items.first?.id == lowerPriority.id)
+    #expect(list.map(\.id) == snapshot.items.map(\.id))
+    let lowerIndex = try #require(list.firstIndex(where: { $0.id == lowerPriority.id }))
+    let higherIndex = try #require(list.firstIndex(where: { $0.id == higherPriority.id }))
+    #expect(lowerIndex < higherIndex)
+  }
+
+  @Test("Preview position set compacts same-lane slots in both directions")
+  func previewPositionSetCompactsSameLaneSlotsInBothDirections() async throws {
+    let client = PreviewHarnessClient(fixtures: .taskBoardBoardOnly, isLaunchAgentInstalled: true)
+    var items: [TaskBoardItem] = []
+    for title in ["a", "b", "c"] {
+      items.append(
+        try await client.createTaskBoardItem(request: TaskBoardCreateItemRequest(title: title)))
+    }
+    for (slot, item) in items.enumerated() {
+      let snapshot = try await client.taskBoardItemPositionSnapshot(id: item.id)
+      _ = try await client.setTaskBoardItemPosition(
+        id: item.id,
+        request: TaskBoardSetItemPositionRequest(
+          status: .todo, lanePosition: UInt32(slot), expectedItemRevision: snapshot.itemRevision,
+          expectedItemsChangeSeq: snapshot.itemsChangeSeq, actor: "initial-position"
+        )
+      )
+    }
+    let unrelated = try await client.createTaskBoardItem(
+      request: TaskBoardCreateItemRequest(title: "Unrelated lane")
+    )
+    let unrelatedSnapshot = try await client.taskBoardItemPositionSnapshot(id: unrelated.id)
+    _ = try await client.setTaskBoardItemPosition(
+      id: unrelated.id,
+      request: TaskBoardSetItemPositionRequest(
+        status: .planning, lanePosition: 0, expectedItemRevision: unrelatedSnapshot.itemRevision,
+        expectedItemsChangeSeq: unrelatedSnapshot.itemsChangeSeq, actor: "unrelated-position"
+      )
+    )
+    let beforeForward = try await client.taskBoardItemPositionSnapshot(id: items[0].id)
+    let shiftedBeforeForward = try await client.taskBoardItem(id: items[1].id)
+    _ = try await client.setTaskBoardItemPosition(
+      id: items[0].id,
+      request: TaskBoardSetItemPositionRequest(
+        status: .todo, lanePosition: 2, expectedItemRevision: beforeForward.itemRevision,
+        expectedItemsChangeSeq: beforeForward.itemsChangeSeq, actor: "forward-actor"
+      )
+    )
+    let firstAfterForward = try await client.taskBoardItem(id: items[0].id)
+    let secondAfterForward = try await client.taskBoardItem(id: items[1].id)
+    let thirdAfterForward = try await client.taskBoardItem(id: items[2].id)
+    #expect(firstAfterForward.lanePosition == 2)
+    #expect(firstAfterForward.laneOrigin == .manual(actor: "forward-actor"))
+    #expect(secondAfterForward.lanePosition == 0)
+    #expect(thirdAfterForward.lanePosition == 1)
+    #expect(secondAfterForward.laneOrigin == shiftedBeforeForward.laneOrigin)
+    #expect(secondAfterForward.laneSetAt == shiftedBeforeForward.laneSetAt)
+    #expect(secondAfterForward.updatedAt == shiftedBeforeForward.updatedAt)
+    #expect((try await client.taskBoardItem(id: unrelated.id)).lanePosition == 0)
+
+    let beforeBackward = try await client.taskBoardItemPositionSnapshot(id: items[0].id)
+    _ = try await client.setTaskBoardItemPosition(
+      id: items[0].id,
+      request: TaskBoardSetItemPositionRequest(
+        status: .todo, lanePosition: 0, expectedItemRevision: beforeBackward.itemRevision,
+        expectedItemsChangeSeq: beforeBackward.itemsChangeSeq, actor: "backward-actor"
+      )
+    )
+    #expect((try await client.taskBoardItem(id: items[0].id)).lanePosition == 0)
+    #expect(
+      (try await client.taskBoardItem(id: items[0].id)).laneOrigin
+        == .manual(actor: "backward-actor"))
+    #expect((try await client.taskBoardItem(id: items[1].id)).lanePosition == 1)
+    #expect((try await client.taskBoardItem(id: items[2].id)).lanePosition == 2)
+    #expect((try await client.taskBoardItem(id: unrelated.id)).lanePosition == 0)
+  }
+
+  @Test("Preview position reset rejects default placement with the public state error")
+  func previewPositionResetRejectsDefaultPlacement() async throws {
+    let client = PreviewHarnessClient(fixtures: .taskBoardBoardOnly, isLaunchAgentInstalled: true)
+    let item = try #require(try await client.taskBoardItems(status: .backlog).first)
+    let snapshot = try await client.taskBoardItemPositionSnapshot(id: item.id)
+
+    do {
+      _ = try await client.resetTaskBoardItemPosition(
+        id: item.id,
+        request: TaskBoardResetItemPositionRequest(
+          expectedItemRevision: snapshot.itemRevision,
+          expectedItemsChangeSeq: snapshot.itemsChangeSeq
+        )
+      )
+      Issue.record("Expected default placement reset to fail")
+    } catch let error as HarnessMonitorAPIError {
+      #expect(error == .server(code: 400, message: "Task board item has no explicit position"))
+    }
+  }
+
+  @Test("Preview non-position updates preserve placement metadata")
+  func previewNonPositionUpdatePreservesPlacementMetadata() {
+    let item = taskBoardItem(
+      externalRefs: [],
+      lanePosition: 3,
+      laneOrigin: .manual(actor: "daemon-control"),
+      laneSetAt: "2026-07-22T14:00:00Z"
+    )
+    let updated = item.applyingPreviewUpdate(TaskBoardUpdateItemRequest(priority: .critical))
+
+    #expect(updated.lanePosition == 3)
+    #expect(updated.laneOrigin == .manual(actor: "daemon-control"))
+    #expect(updated.laneSetAt == "2026-07-22T14:00:00Z")
+  }
+
   @Test("Preview client returns task board audit and catalog summaries")
   func previewClientReturnsTaskBoardAuditAndCatalogSummaries() async throws {
     let client = PreviewHarnessClient(
@@ -195,7 +456,12 @@ struct PreviewHarnessClientTaskBoardTests {
     #expect(cleared.externalRefs.isEmpty)
   }
 
-  private func taskBoardItem(externalRefs: [TaskBoardExternalRef]) -> TaskBoardItem {
+  private func taskBoardItem(
+    externalRefs: [TaskBoardExternalRef],
+    lanePosition: UInt32? = nil,
+    laneOrigin: TaskBoardLaneOrigin? = nil,
+    laneSetAt: String? = nil
+  ) -> TaskBoardItem {
     TaskBoardItem(
       schemaVersion: 1,
       id: "preview-external-ref-item",
@@ -212,6 +478,9 @@ struct PreviewHarnessClientTaskBoardTests {
       sessionId: nil,
       workItemId: nil,
       usage: TaskBoardUsage(),
+      lanePosition: lanePosition,
+      laneOrigin: laneOrigin,
+      laneSetAt: laneSetAt,
       createdAt: "2026-07-13T10:00:00Z",
       updatedAt: "2026-07-13T10:01:00Z",
       deletedAt: nil

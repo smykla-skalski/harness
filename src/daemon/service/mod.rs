@@ -396,10 +396,12 @@ pub(crate) use task_board_automation_runtime::{
 pub(crate) use task_board_db::{
     approve_task_board_plan_db, audit_task_board_db, begin_task_board_planning_db,
     create_task_board_item_db, delete_task_board_item_db, get_task_board_item_db,
-    list_task_board_items_db, list_task_board_machines_db, list_task_board_projects_db,
-    revoke_task_board_plan_db, submit_task_board_plan_db, sync_task_board_db,
-    task_board_host_list_db, task_board_host_local_db, task_board_host_set_project_types_db,
-    touch_task_board_host_local_db, update_task_board_item_db,
+    get_task_board_item_position_snapshot_db, list_task_board_items_db,
+    list_task_board_machines_db, list_task_board_projects_db, reset_task_board_item_position_db,
+    revoke_task_board_plan_db, set_task_board_item_position_db, submit_task_board_plan_db,
+    sync_task_board_db, task_board_host_list_db, task_board_host_local_db,
+    task_board_host_set_project_types_db, touch_task_board_host_local_db,
+    update_task_board_item_db,
 };
 #[cfg(test)]
 pub use task_board_evaluation::evaluate_task_board;

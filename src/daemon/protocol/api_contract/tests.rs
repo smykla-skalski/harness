@@ -225,6 +225,45 @@ fn remote_viewer_scope_is_read_only() {
 }
 
 #[test]
+fn task_board_position_remote_scopes_keep_viewers_read_only() {
+    let route_scope = |method, path| {
+        let route = HTTP_API_CONTRACT
+            .iter()
+            .find(|route| route.method == method && route.path == path)
+            .unwrap_or_else(|| panic!("missing task-board position route {method:?} {path}"));
+        remote_http_scopes(route)
+    };
+
+    assert_eq!(
+        route_scope(HttpRouteMethod::Get, http_paths::TASK_BOARD_ITEM_POSITION),
+        Some(&[RemoteAccessScope::Read][..])
+    );
+    assert_eq!(
+        route_scope(HttpRouteMethod::Put, http_paths::TASK_BOARD_ITEM_POSITION),
+        Some(&[RemoteAccessScope::Write][..])
+    );
+    assert_eq!(
+        route_scope(
+            HttpRouteMethod::Post,
+            http_paths::TASK_BOARD_ITEM_POSITION_RESET
+        ),
+        Some(&[RemoteAccessScope::Write][..])
+    );
+    assert_eq!(
+        remote_ws_scopes(ws_methods::TASK_BOARD_POSITION_GET),
+        Some(&[RemoteAccessScope::Read][..])
+    );
+    assert_eq!(
+        remote_ws_scopes(ws_methods::TASK_BOARD_POSITION_SET),
+        Some(&[RemoteAccessScope::Write][..])
+    );
+    assert_eq!(
+        remote_ws_scopes(ws_methods::TASK_BOARD_POSITION_RESET),
+        Some(&[RemoteAccessScope::Write][..])
+    );
+}
+
+#[test]
 fn reviews_pull_request_resolve_remote_scope_is_read_only() {
     let route = HTTP_API_CONTRACT
         .iter()

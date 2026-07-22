@@ -9,7 +9,10 @@ use super::dispatch_intents::{
 };
 use super::dispatch_workflow_launch::rebind_write_launch;
 use super::dispatch_workflow_start::workflow_start_fence;
-use super::items::{bump_change_in_tx, load_item_in_tx, replace_item_in_tx};
+use super::items::{bump_change_in_tx, load_item_in_tx};
+use super::lane_order::{
+    LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
+};
 use crate::daemon::db::policy::{
     consume_approval_grant_in_tx_at, live_approval_grant_in_tx_at, load_workspace_in_tx,
 };
@@ -93,6 +96,7 @@ impl AsyncDaemonDb {
         let (mut item, revision) = load_item_in_tx(&mut transaction, board_item_id)
             .await?
             .ok_or_else(|| db_error(format!("task-board item '{board_item_id}' not found")))?;
+        let before = item.clone();
         ensure_held_linkage(&applied, &item)?;
         validate_held_workflow_claim_revision(&applied, revision)?;
         ensure_dispatch_item_startable(
@@ -134,10 +138,16 @@ impl AsyncDaemonDb {
             item.workflow.push_policy_trace_id(decision_id);
         }
         item.updated_at.clone_from(&now);
-        let delivered_item_revision = revision
-            .checked_add(1)
-            .ok_or_else(|| db_error("task-board item revision is out of range"))?;
-        replace_item_in_tx(&mut transaction, &item, delivered_item_revision).await?;
+        let write = replace_with_lane_transition_in_tx(
+            &mut transaction,
+            before,
+            revision,
+            item,
+            LaneTransitionKind::Generic,
+        )
+        .await?;
+        let delivered_item_revision = write.item_revision;
+        let item = write.item.clone();
         advance_held_workflow_launch(&mut applied, &item, delivered_item_revision)?;
         applied.item = item;
         let payload = serde_json::to_string(&applied)
@@ -158,7 +168,8 @@ impl AsyncDaemonDb {
         .execute(transaction.as_mut())
         .await
         .map_err(|error| db_error(format!("claim held task board dispatch: {error}")))?;
-        bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
+        let change_sequence = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
+        record_lane_transition_audit_in_tx(&mut transaction, &write, change_sequence).await?;
         transaction
             .commit()
             .await

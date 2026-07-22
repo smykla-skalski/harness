@@ -416,13 +416,7 @@ fn normalize_legacy_status(value: &mut serde_json::Value) {
 
 #[cfg(test)]
 fn sort_items(items: &mut [TaskBoardItem]) {
-    items.sort_by(|left, right| {
-        left.status
-            .cmp(&right.status)
-            .then_with(|| right.priority.cmp(&left.priority))
-            .then_with(|| left.created_at.cmp(&right.created_at))
-            .then_with(|| left.id.cmp(&right.id))
-    });
+    super::lane::sort_task_board_items(items);
 }
 
 #[cfg(test)]

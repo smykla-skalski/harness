@@ -8,8 +8,8 @@ use crate::daemon::protocol::{
     TaskBoardDispatchPickRequest, TaskBoardDispatchRequest, TaskBoardEvaluateRequest,
     TaskBoardGitSigningVerifyRequest, TaskBoardHostSetProjectTypesRequest,
     TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest,
-    TaskBoardPlanSubmitRequest, TaskBoardSyncRequest, TaskBoardUpdateItemRequest, WsRequest,
-    WsResponse, ws_methods,
+    TaskBoardPlanSubmitRequest, TaskBoardResetItemPositionRequest, TaskBoardSetItemPositionRequest,
+    TaskBoardSyncRequest, TaskBoardUpdateItemRequest, WsRequest, WsResponse, ws_methods,
 };
 use crate::errors::CliError;
 use serde::de::DeserializeOwned;
@@ -45,6 +45,15 @@ pub(crate) async fn dispatch_task_board_method(
         }
         ws_methods::TASK_BOARD_GET => {
             Some(read::dispatch_task_board_get(request, state, connection).await)
+        }
+        ws_methods::TASK_BOARD_POSITION_GET => {
+            Some(read::dispatch_task_board_position_get(request, state, connection).await)
+        }
+        ws_methods::TASK_BOARD_POSITION_SET => {
+            Some(dispatch_task_board_position_set(request, state).await)
+        }
+        ws_methods::TASK_BOARD_POSITION_RESET => {
+            Some(dispatch_task_board_position_reset(request, state).await)
         }
         ws_methods::TASK_BOARD_UPDATE => Some(dispatch_task_board_update(request, state).await),
         ws_methods::TASK_BOARD_DELETE => Some(dispatch_task_board_delete(request, state).await),
@@ -149,6 +158,38 @@ async fn dispatch_task_board_update(request: &WsRequest, state: &DaemonHttpState
     )
     .await;
     dispatch_query_result(&request.id, result)
+}
+
+async fn dispatch_task_board_position_set(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Some(item_id) = request.params.get("id").and_then(serde_json::Value::as_str) else {
+        return error_response(&request.id, "MISSING_PARAM", "missing id");
+    };
+    let Ok(body) = parse_control_plane_params::<TaskBoardSetItemPositionRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::set_item_position(state, item_id, &body).await,
+    )
+}
+
+async fn dispatch_task_board_position_reset(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Some(item_id) = request.params.get("id").and_then(serde_json::Value::as_str) else {
+        return error_response(&request.id, "MISSING_PARAM", "missing id");
+    };
+    let Ok(body) = parse_control_plane_params::<TaskBoardResetItemPositionRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::reset_item_position(state, item_id, &body).await,
+    )
 }
 
 async fn dispatch_task_board_delete(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {

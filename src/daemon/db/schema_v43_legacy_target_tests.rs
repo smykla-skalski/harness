@@ -28,12 +28,18 @@ fn sync_v43_upgrade_persists_exact_legacy_marker_across_reopen() {
     drop(legacy);
 
     let upgraded = DaemonDb::open(&path).expect("upgrade legacy target synchronously");
-    assert_eq!(upgraded.schema_version().expect("schema version"), "43");
+    assert_eq!(
+        upgraded.schema_version().expect("schema version"),
+        crate::daemon::db::SCHEMA_VERSION
+    );
     assert_sync_legacy_marker(upgraded.connection());
     drop(upgraded);
 
     let reopened = DaemonDb::open(&path).expect("reopen upgraded legacy target");
-    assert_eq!(reopened.schema_version().expect("schema version"), "43");
+    assert_eq!(
+        reopened.schema_version().expect("schema version"),
+        crate::daemon::db::SCHEMA_VERSION
+    );
     assert_sync_legacy_marker(reopened.connection());
 }
 

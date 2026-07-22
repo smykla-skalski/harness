@@ -29,6 +29,8 @@ pub enum WorkflowError {
     SessionScopeDenied { detail: Cow<'static, str> },
     #[error("item not dispatchable: {detail}")]
     ItemNotDispatchable { detail: Cow<'static, str> },
+    #[error("task-board lane capacity exceeded: {detail}")]
+    TaskBoardLaneCapacity { detail: Cow<'static, str> },
 }
 
 impl WorkflowError {
@@ -48,6 +50,7 @@ impl WorkflowError {
             Self::AcpDisabled => "ACP_DISABLED",
             Self::SessionScopeDenied { .. } => "SESSION_SCOPE_DENIED",
             Self::ItemNotDispatchable { .. } => "KSRCLI094",
+            Self::TaskBoardLaneCapacity { .. } => "TASK_BOARD_LANE_CAPACITY",
         }
     }
 
@@ -139,6 +142,13 @@ impl WorkflowError {
     #[must_use]
     pub fn item_not_dispatchable(detail: impl Into<Cow<'static, str>>) -> Self {
         Self::ItemNotDispatchable {
+            detail: detail.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn task_board_lane_capacity(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::TaskBoardLaneCapacity {
             detail: detail.into(),
         }
     }

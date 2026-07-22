@@ -21,6 +21,8 @@ actor PreviewHarnessClientState {
   var taskBoardOpenRouterToken: TaskBoardOpenRouterTokenSyncRequest
   var taskBoardGitIdentityDefaults: TaskBoardGitIdentityDefaults
   var taskBoardItems: [TaskBoardItem]
+  var taskBoardItemsChangeSeq: Int64
+  var taskBoardItemRevisions: [String: Int64]
   var reviewItems: [ReviewItem]
   var taskBoardHostRegistry: [TaskBoardHostMachine]
   var nextAgentTuiSequence: Int
@@ -63,6 +65,10 @@ actor PreviewHarnessClientState {
     self.taskBoardOpenRouterToken = TaskBoardOpenRouterTokenSyncRequest(token: nil)
     self.taskBoardGitIdentityDefaults = fixtures.taskBoardGitIdentityDefaults
     self.taskBoardItems = fixtures.taskBoardItems
+    self.taskBoardItemsChangeSeq = 0
+    self.taskBoardItemRevisions = Dictionary(
+      uniqueKeysWithValues: fixtures.taskBoardItems.map { ($0.id, 1) }
+    )
     self.reviewItems = fixtures.reviewsResponse.items
     self.taskBoardHostRegistry = [
       TaskBoardHostMachine(

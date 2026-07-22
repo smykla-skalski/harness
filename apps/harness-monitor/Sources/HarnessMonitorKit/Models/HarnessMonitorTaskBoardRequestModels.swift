@@ -54,6 +54,44 @@ public struct TaskBoardListItemsRequest: Codable, Equatable, Sendable {
   }
 }
 
+public struct TaskBoardSetItemPositionRequest: Codable, Equatable, Sendable {
+  public let status: TaskBoardStatus
+  public let lanePosition: UInt32
+  public let expectedItemRevision: Int64
+  public let expectedItemsChangeSeq: Int64
+  public let actor: String
+
+  public init(
+    status: TaskBoardStatus,
+    lanePosition: UInt32,
+    expectedItemRevision: Int64,
+    expectedItemsChangeSeq: Int64,
+    actor: String = "Harness Monitor"
+  ) {
+    self.status = status.canonicalPersistedStatus
+    self.lanePosition = lanePosition
+    self.expectedItemRevision = expectedItemRevision
+    self.expectedItemsChangeSeq = expectedItemsChangeSeq
+    self.actor = actor
+  }
+}
+
+public struct TaskBoardResetItemPositionRequest: Codable, Equatable, Sendable {
+  public let expectedItemRevision: Int64
+  public let expectedItemsChangeSeq: Int64
+  public let actor: String
+
+  public init(
+    expectedItemRevision: Int64,
+    expectedItemsChangeSeq: Int64,
+    actor: String = "Harness Monitor"
+  ) {
+    self.expectedItemRevision = expectedItemRevision
+    self.expectedItemsChangeSeq = expectedItemsChangeSeq
+    self.actor = actor
+  }
+}
+
 public struct TaskBoardStatusFilterRequest: Codable, Equatable, Sendable {
   public let status: TaskBoardStatus?
 

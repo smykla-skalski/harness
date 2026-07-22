@@ -29,6 +29,11 @@ pub(super) struct ItemRow {
     pub(super) deleted_at: Option<String>,
     pub(super) revision: i64,
     pub(super) kind: String,
+    pub(super) lane_position: Option<i64>,
+    pub(super) lane_origin: Option<String>,
+    pub(super) lane_actor: Option<String>,
+    pub(super) lane_producer: Option<String>,
+    pub(super) lane_set_at: Option<String>,
 }
 
 #[derive(Debug, FromRow)]

@@ -73,6 +73,16 @@ extension TaskBoardUsage {
   }
 }
 
+extension TaskBoardLaneOrigin {
+  public init(wire: TaskBoardLaneOriginWire) {
+    self =
+      switch wire {
+      case .manual(let actor): .manual(actor: actor)
+      case .automatic(let producer): .automatic(producer: producer)
+      }
+  }
+}
+
 extension TaskBoardItem {
   public init(wire: TaskBoardItemWire) {
     self.init(
@@ -97,9 +107,43 @@ extension TaskBoardItem {
       usage: TaskBoardUsage(wire: wire.usage),
       parentItemId: wire.parentItemId,
       childOrder: wire.childOrder,
+      lanePosition: wire.lanePosition,
+      laneOrigin: wire.laneOrigin.map(TaskBoardLaneOrigin.init(wire:)),
+      laneSetAt: wire.laneSetAt,
       createdAt: wire.createdAt,
       updatedAt: wire.updatedAt,
       deletedAt: wire.deletedAt
+    )
+  }
+}
+
+extension TaskBoardListItemsSnapshot {
+  public init(wire: TaskBoardListItemsResponseWire) {
+    self.init(
+      items: wire.items.map(TaskBoardItem.init(wire:)),
+      itemsChangeSeq: wire.itemsChangeSeq,
+      itemRevisions: wire.itemRevisions
+    )
+  }
+}
+
+extension TaskBoardItemPositionSnapshot {
+  public init(wire: TaskBoardItemPositionSnapshotWire) {
+    self.init(
+      item: TaskBoardItem(wire: wire.item),
+      itemRevision: wire.itemRevision,
+      itemsChangeSeq: wire.itemsChangeSeq
+    )
+  }
+}
+
+extension TaskBoardItemPositionMutationResponse {
+  public init(wire: TaskBoardItemPositionMutationResponseWire) {
+    self.init(
+      snapshot: TaskBoardItemPositionSnapshot(wire: wire.snapshot),
+      shifted: wire.shifted.map {
+        TaskBoardShiftedItemRevision(itemId: $0.itemId, itemRevision: $0.itemRevision)
+      }
     )
   }
 }

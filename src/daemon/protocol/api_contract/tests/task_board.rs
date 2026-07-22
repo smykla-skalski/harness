@@ -4,6 +4,7 @@ use super::*;
 fn task_board_routes_have_complete_ws_parity() {
     let actual: Vec<_> = super::routes_task_board::ROUTES
         .iter()
+        .chain(super::routes_task_board_positions::ROUTES)
         .chain(super::routes_task_board_orchestrator::ROUTES)
         .map(|route| {
             let ws_method = route
@@ -401,6 +402,24 @@ fn task_board_routes_have_complete_ws_parity() {
             ),
             (
                 HttpRouteMethod::Get,
+                http_paths::TASK_BOARD_ITEM_POSITION,
+                ws_methods::TASK_BOARD_POSITION_GET,
+                true,
+            ),
+            (
+                HttpRouteMethod::Put,
+                http_paths::TASK_BOARD_ITEM_POSITION,
+                ws_methods::TASK_BOARD_POSITION_SET,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_ITEM_POSITION_RESET,
+                ws_methods::TASK_BOARD_POSITION_RESET,
+                true,
+            ),
+            (
+                HttpRouteMethod::Get,
                 http_paths::TASK_BOARD_ORCHESTRATOR_RUNS,
                 ws_methods::TASK_BOARD_ORCHESTRATOR_RUNS,
                 false,
@@ -421,6 +440,7 @@ fn task_board_routes_have_complete_ws_parity() {
     );
     let expected_mcp_methods: Vec<_> = super::routes_task_board::ROUTES
         .iter()
+        .chain(super::routes_task_board_positions::ROUTES)
         .map(|route| {
             route
                 .parity

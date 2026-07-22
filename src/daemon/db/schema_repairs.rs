@@ -213,6 +213,9 @@ pub(super) fn current_schema_shape_needs_repair(
     if super::schema_repairs_remote_execution::shape_needs_repair(conn)? {
         return Ok(true);
     }
+    if super::schema_v44::shape_needs_repair(conn)? {
+        return Ok(true);
+    }
     Ok(false)
 }
 
@@ -251,6 +254,7 @@ pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError>
     super::schema_v41::run(&db.conn)?;
     super::schema_v42::run(&db.conn)?;
     super::schema_v43::run(&db.conn)?;
+    super::schema_v44::run(&db.conn)?;
     super::schema_repairs_external_creates::require_complete_shape(&db.conn)?;
     super::schema_repairs_wake_events::require_complete_shape(&db.conn)?;
     super::schema_repairs_admission::require_complete_shape(&db.conn)?;

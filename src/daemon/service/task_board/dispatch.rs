@@ -150,6 +150,7 @@ fn reject_explicit_kind_block(
 pub async fn pick_task_board_dispatch_async(
     db: &AsyncDaemonDb,
 ) -> Result<TaskBoardDispatchPickResponse, CliError> {
+    const PICK_REVALIDATION_ATTEMPTS: usize = 3;
     let request = TaskBoardDispatchRequest {
         item_id: None,
         status: Some(TaskBoardStatus::Todo),
@@ -157,16 +158,46 @@ pub async fn pick_task_board_dispatch_async(
         project_dir: None,
         actor: None,
     };
-    let plans = build_dispatch_plans_for_request_async(db, &request).await?;
-    let selection = if let Some(plan) = plans.into_iter().find(DispatchPlan::is_ready) {
-        Some(TaskBoardDispatchPickSelection {
-            item: db.task_board_item(&plan.board_item_id).await?,
-            plan,
-        })
-    } else {
-        None
-    };
-    Ok(TaskBoardDispatchPickResponse { selection })
+    for _ in 0..PICK_REVALIDATION_ATTEMPTS {
+        let snapshot = db
+            .task_board_items_snapshot(Some(TaskBoardStatus::Todo))
+            .await?;
+        let items = snapshot
+            .items
+            .iter()
+            .map(|snapshot| snapshot.item.clone())
+            .collect::<Vec<_>>();
+        let plans = build_dispatch_plans_for_items_async(db, items, &request).await?;
+        let Some(plan) = plans.into_iter().find(DispatchPlan::is_ready) else {
+            return Ok(TaskBoardDispatchPickResponse { selection: None });
+        };
+        let chosen = snapshot
+            .items
+            .iter()
+            .find(|snapshot| snapshot.item.id == plan.board_item_id)
+            .ok_or_else(|| {
+                CliErrorKind::concurrent_modification("picked task-board item left snapshot")
+            })?;
+        if db
+            .task_board_item_snapshot_is_current(
+                &chosen.item.id,
+                chosen.item_revision,
+                snapshot.items_change_seq,
+            )
+            .await?
+        {
+            return Ok(TaskBoardDispatchPickResponse {
+                selection: Some(TaskBoardDispatchPickSelection {
+                    item: chosen.item.clone(),
+                    plan,
+                }),
+            });
+        }
+    }
+    Err(CliErrorKind::concurrent_modification(
+        "task-board ordering changed while selecting a dispatch candidate",
+    )
+    .into())
 }
 
 #[cfg(test)]
@@ -366,6 +397,14 @@ async fn build_dispatch_plans_for_request_async(
     } else {
         db.list_task_board_items(request.status).await?
     };
+    build_dispatch_plans_for_items_async(db, items, request).await
+}
+
+async fn build_dispatch_plans_for_items_async(
+    db: &AsyncDaemonDb,
+    items: Vec<TaskBoardItem>,
+    _request: &TaskBoardDispatchRequest,
+) -> Result<Vec<DispatchPlan>, CliError> {
     let machine = task_board_host_local_db(db).await.ok();
     let (kept, rejected) = filter_for_machine(items, machine.as_ref());
     let workspace = db.load_policy_workspace().await?;
