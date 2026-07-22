@@ -4,7 +4,7 @@ extension HarnessMonitorTaskBoardClientProtocol {
   public func taskBoardItemsSnapshot(status _: TaskBoardStatus?) async throws
     -> TaskBoardListItemsSnapshot
   {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Task board positions unavailable")
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board item snapshot unavailable")
   }
 
   public func taskBoardItemPositionSnapshot(id _: String) async throws

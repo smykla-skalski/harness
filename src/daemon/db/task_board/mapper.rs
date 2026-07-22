@@ -81,7 +81,29 @@ fn lane_origin_from_row(row: &ItemRow) -> Result<Option<TaskBoardLaneOrigin>, Cl
         (Some("automatic"), None, Some(producer)) => Ok(Some(TaskBoardLaneOrigin::Automatic {
             producer: producer.to_owned(),
         })),
-        _ => Err(db_error("parse task board lane provenance")),
+        _ => Err(db_error(format!(
+            "parse task board lane provenance: origin={}, actor={}, producer={}",
+            lane_origin_state(row.lane_origin.as_deref()),
+            optional_text_state(row.lane_actor.as_deref()),
+            optional_text_state(row.lane_producer.as_deref())
+        ))),
+    }
+}
+
+fn lane_origin_state(value: Option<&str>) -> &'static str {
+    match value {
+        None => "missing",
+        Some("manual") => "manual",
+        Some("automatic") => "automatic",
+        Some(_) => "unsupported",
+    }
+}
+
+fn optional_text_state(value: Option<&str>) -> &'static str {
+    match value {
+        None => "missing",
+        Some(value) if value.trim().is_empty() => "empty",
+        Some(_) => "present",
     }
 }
 
@@ -144,4 +166,15 @@ fn optional_u32(value: Option<i64>, context: &str) -> Result<Option<u32>, CliErr
             u32::try_from(value).map_err(|error| db_error(format!("parse {context}: {error}")))
         })
         .transpose()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{lane_origin_state, optional_text_state};
+
+    #[test]
+    fn lane_provenance_diagnostics_classify_without_echoing_values() {
+        assert_eq!(lane_origin_state(Some("unexpected-origin")), "unsupported");
+        assert_eq!(optional_text_state(Some("sensitive-actor")), "present");
+    }
 }
