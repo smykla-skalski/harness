@@ -8,6 +8,7 @@ pub enum RemoteRole {
     Admin,
     Operator,
     Viewer,
+    ExecutionCoordinator,
 }
 
 impl RemoteRole {
@@ -17,6 +18,7 @@ impl RemoteRole {
             Self::Admin => "admin",
             Self::Operator => "operator",
             Self::Viewer => "viewer",
+            Self::ExecutionCoordinator => "execution_coordinator",
         }
     }
 }
@@ -26,6 +28,7 @@ pub enum RemoteAccessScope {
     Read,
     Write,
     Admin,
+    Execute,
 }
 
 impl RemoteAccessScope {
@@ -35,6 +38,7 @@ impl RemoteAccessScope {
             Self::Read => "read",
             Self::Write => "write",
             Self::Admin => "admin",
+            Self::Execute => "execute",
         }
     }
 }
@@ -42,6 +46,7 @@ impl RemoteAccessScope {
 const READ_SCOPES: &[RemoteAccessScope] = &[RemoteAccessScope::Read];
 const WRITE_SCOPES: &[RemoteAccessScope] = &[RemoteAccessScope::Write];
 const ADMIN_SCOPES: &[RemoteAccessScope] = &[RemoteAccessScope::Admin];
+const EXECUTION_SCOPES: &[RemoteAccessScope] = &[RemoteAccessScope::Execute];
 const ADMIN_ROLE_SCOPES: &[RemoteAccessScope] = &[
     RemoteAccessScope::Read,
     RemoteAccessScope::Write,
@@ -56,6 +61,7 @@ pub const fn scopes_for_role(role: RemoteRole) -> &'static [RemoteAccessScope] {
         RemoteRole::Admin => ADMIN_ROLE_SCOPES,
         RemoteRole::Operator => OPERATOR_ROLE_SCOPES,
         RemoteRole::Viewer => READ_SCOPES,
+        RemoteRole::ExecutionCoordinator => EXECUTION_SCOPES,
     }
 }
 

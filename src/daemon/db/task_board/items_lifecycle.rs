@@ -13,7 +13,7 @@ pub(super) async fn ensure_estimates_are_editable_in_tx(
         "SELECT EXISTS(
              SELECT 1 FROM task_board_dispatch_intents
              WHERE item_id = ?1
-               AND status IN ('starting', 'completed')
+               AND status IN ('starting', 'workflow_prepared', 'completed')
          )",
     )
     .bind(item_id)
@@ -36,7 +36,7 @@ pub(crate) async fn ensure_workflow_item_mutation_allowed_in_tx(
     let side_effect_claimed = query_scalar::<_, bool>(
         "SELECT EXISTS(
              SELECT 1 FROM task_board_dispatch_intents
-             WHERE item_id = ?1 AND status = 'starting'
+             WHERE item_id = ?1 AND status IN ('starting', 'workflow_prepared')
                AND (json_type(payload_json, '$.read_only_workflow') = 'object'
                     OR json_type(payload_json, '$.write_workflow') = 'object')
              UNION ALL
@@ -67,7 +67,8 @@ pub(super) async fn cancel_prestart_dispatch_for_terminal_item_in_tx(
     let claimed = query_scalar::<_, bool>(
         "SELECT EXISTS(
              SELECT 1 FROM task_board_dispatch_intents
-             WHERE item_id = ?1 AND status IN ('preparing_claimed', 'starting')
+             WHERE item_id = ?1
+               AND status IN ('preparing_claimed', 'starting', 'workflow_prepared')
          )",
     )
     .bind(item_id)

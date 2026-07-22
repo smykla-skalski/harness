@@ -11,11 +11,32 @@ use crate::daemon::protocol::StreamEvent;
 use crate::daemon::remote_pairing_expiry_loop::spawn_remote_pairing_expiry_loop;
 use crate::daemon::websocket::{PreparedBroadcast, ReplayBuffer, run_broadcast_fanout};
 
+#[path = "task_board_automation_loop.rs"]
+mod task_board_automation_loop;
+#[path = "task_board_dispatch_loop.rs"]
+mod task_board_dispatch_loop;
+#[path = "task_board_orchestrator_loop.rs"]
+mod task_board_orchestrator_loop;
+#[path = "task_board_remote_executor_loop.rs"]
+mod task_board_remote_executor_loop;
+#[path = "task_board_remote_recovery_loop.rs"]
+mod task_board_remote_recovery_loop;
+
 use super::acp_inspect_publisher::spawn_acp_inspect_publisher;
 use super::github_data_change_publisher::spawn_github_data_change_publisher;
 use super::machine_heartbeat_loop::spawn_machine_heartbeat_loop;
-use super::task_board_dispatch_loop::spawn_task_board_dispatch_loop;
-use super::task_board_orchestrator_loop::spawn_task_board_orchestrator_loop;
+use task_board_dispatch_loop::spawn_task_board_dispatch_loop;
+use task_board_orchestrator_loop::spawn_task_board_orchestrator_loop;
+use task_board_remote_executor_loop::spawn_task_board_remote_executor_loop;
+#[cfg(test)]
+pub(crate) use task_board_remote_executor_loop::{
+    RuntimeSeamScope, install_deterministic_runtime_seam, reconcile_task_board_remote_executor_tick,
+};
+use task_board_remote_recovery_loop::spawn_task_board_remote_recovery_loop;
+pub(crate) use task_board_remote_recovery_loop::{
+    recover_remote_assignments_at_startup_with_controller,
+    recover_remote_assignments_before_local_work,
+};
 
 /// Spawn the single broadcast fan-out task and return the prepared-event
 /// channel that connection relays and SSE streams subscribe to. The task is the
@@ -41,6 +62,8 @@ pub(super) struct BackgroundTaskHandles {
     pub _remote_pairing_expiry: Option<JoinHandle<()>>,
     pub _task_board_dispatch_loop: Option<JoinHandle<()>>,
     pub _task_board_orchestrator_loop: Option<JoinHandle<()>>,
+    pub _task_board_remote_executor_loop: Option<JoinHandle<()>>,
+    pub _task_board_remote_recovery_loop: Option<JoinHandle<()>>,
 }
 
 pub(super) fn spawn_background_tasks(
@@ -49,6 +72,9 @@ pub(super) fn spawn_background_tasks(
     shutdown_rx: tokio_watch::Receiver<bool>,
 ) -> BackgroundTaskHandles {
     let async_db = app_state.async_db.get().cloned();
+    let remote_recovery = async_db.as_ref().map(|_| {
+        spawn_task_board_remote_recovery_loop(app_state.clone(), poll_interval, shutdown_rx.clone())
+    });
     let remote_pairing_expiry = if app_state.auth_mode == DaemonHttpAuthMode::Remote {
         async_db
             .as_ref()
@@ -74,7 +100,20 @@ pub(super) fn spawn_background_tasks(
             .as_ref()
             .map(|_| spawn_task_board_dispatch_loop(app_state.clone(), shutdown_rx.clone())),
         _task_board_orchestrator_loop: async_db.map(|db| {
-            spawn_task_board_orchestrator_loop(app_state.clone(), db, poll_interval, shutdown_rx)
+            spawn_task_board_orchestrator_loop(
+                app_state.clone(),
+                db,
+                poll_interval,
+                shutdown_rx.clone(),
+            )
         }),
+        _task_board_remote_executor_loop: app_state.async_db.get().map(|_| {
+            spawn_task_board_remote_executor_loop(
+                app_state.clone(),
+                poll_interval,
+                shutdown_rx.clone(),
+            )
+        }),
+        _task_board_remote_recovery_loop: remote_recovery,
     }
 }

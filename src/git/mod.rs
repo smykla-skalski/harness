@@ -6,9 +6,20 @@ use std::path::{Path, PathBuf};
 
 use thiserror::Error;
 
+pub(crate) mod bundle;
+pub(crate) mod bundle_contract;
+pub(crate) mod bundle_export;
+mod bundle_quarantine;
+mod command;
 pub(crate) mod identity;
 pub(crate) mod mutation;
+#[cfg(test)]
+mod quarantine_test_support;
 pub(crate) mod read;
+mod repository_coordinates;
+pub(crate) mod source_bundle_export;
+pub(crate) mod source_bundle_import;
+mod source_repository_identity;
 
 pub(crate) use read::GitRepository;
 
@@ -22,6 +33,8 @@ pub(crate) enum GitError {
     Open { path: PathBuf, message: String },
     #[error("git read failed for {path}: {message}")]
     Read { path: PathBuf, message: String },
+    #[error("git state is unsafe for {path}: {message}")]
+    Unsafe { path: PathBuf, message: String },
     #[error("git mutation failed for {path}: {message}")]
     Mutation { path: PathBuf, message: String },
 }
@@ -43,6 +56,13 @@ impl GitError {
 
     pub(crate) fn read(path: &Path, error: impl Display) -> Self {
         Self::Read {
+            path: path.to_path_buf(),
+            message: error.to_string(),
+        }
+    }
+
+    pub(crate) fn unsafe_state(path: &Path, error: impl Display) -> Self {
+        Self::Unsafe {
             path: path.to_path_buf(),
             message: error.to_string(),
         }

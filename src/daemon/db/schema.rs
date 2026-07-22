@@ -7,16 +7,13 @@ use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, Instant};
 
-#[cfg(test)]
-use std::sync::Arc;
+#[path = "schema_test_support.rs"]
+mod test_support;
 
 #[cfg(test)]
-type SchemaInitHook = dyn Fn() + Send + Sync + 'static;
+pub(crate) use test_support::set_schema_init_hook;
 
 static SCHEMA_MIGRATION_LOCK: Mutex<()> = Mutex::new(());
-
-#[cfg(test)]
-static SCHEMA_INIT_HOOK: Mutex<Option<Arc<SchemaInitHook>>> = Mutex::new(None);
 
 impl DaemonDb {
     /// Open the daemon database at `path`, applying pragmas and running any
@@ -116,11 +113,16 @@ impl DaemonDb {
         self.apply_pending_migrations(parse_and_check_schema_version(version)?)
     }
 
+    fn apply_pending_migrations(&self, version_number: u8) -> Result<(), CliError> {
+        self.apply_pending_migrations_v8_to_v24(version_number)?;
+        self.apply_pending_migrations_v25_to_v43(version_number)
+    }
+
     #[expect(
         clippy::cognitive_complexity,
         reason = "sequential migration chain has one if-guard per schema version step"
     )]
-    fn apply_pending_migrations(&self, version_number: u8) -> Result<(), CliError> {
+    fn apply_pending_migrations_v8_to_v24(&self, version_number: u8) -> Result<(), CliError> {
         if version_number <= 7 {
             self.migrate_v7_to_v8()?;
         }
@@ -172,6 +174,14 @@ impl DaemonDb {
         if version_number <= 23 {
             self.migrate_v23_to_v24()?;
         }
+        Ok(())
+    }
+
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "sequential migration chain has one if-guard per schema version step"
+    )]
+    fn apply_pending_migrations_v25_to_v43(&self, version_number: u8) -> Result<(), CliError> {
         if version_number <= 24 {
             self.migrate_v24_to_v25()?;
         }
@@ -225,6 +235,9 @@ impl DaemonDb {
         }
         if version_number <= 41 {
             self.migrate_v41_to_v42()?;
+        }
+        if version_number <= 42 {
+            self.migrate_v42_to_v43()?;
         }
         Ok(())
     }
@@ -386,6 +399,10 @@ impl DaemonDb {
     fn migrate_v41_to_v42(&self) -> Result<(), CliError> {
         super::schema_v42::run(&self.conn)
     }
+
+    fn migrate_v42_to_v43(&self) -> Result<(), CliError> {
+        super::schema_v43::run(&self.conn)
+    }
 }
 
 fn schema_exists(conn: &Connection) -> Result<bool, CliError> {
@@ -400,27 +417,9 @@ fn schema_exists(conn: &Connection) -> Result<bool, CliError> {
 
 fn create_schema(conn: &Connection) -> Result<(), CliError> {
     emit_schema_init_info();
-    run_schema_init_hook();
+    test_support::run_schema_init_hook();
     conn.execute_batch(CREATE_SCHEMA)
         .map_err(|error| db_error(format!("create daemon database schema: {error}")))
-}
-
-#[cfg(test)]
-pub(crate) fn set_schema_init_hook(hook: Option<Arc<SchemaInitHook>>) {
-    *SCHEMA_INIT_HOOK
-        .lock()
-        .expect("schema init hook mutex poisoned") = hook;
-}
-
-fn run_schema_init_hook() {
-    #[cfg(test)]
-    if let Some(hook) = SCHEMA_INIT_HOOK
-        .lock()
-        .expect("schema init hook mutex poisoned")
-        .clone()
-    {
-        hook();
-    }
 }
 
 fn reclaim_unused_pages(conn: &Connection) -> Result<(), CliError> {

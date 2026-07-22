@@ -10,10 +10,7 @@ use crate::task_board::{
 use super::TaskBoardWorkflowExecutionValidationError;
 
 pub(super) fn is_write_workflow(kind: TaskBoardWorkflowKind) -> bool {
-    matches!(
-        kind,
-        TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
-    )
+    kind.is_write()
 }
 
 pub(super) fn validate_write_frozen_contract(

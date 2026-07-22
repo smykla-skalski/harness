@@ -221,7 +221,6 @@ fn log_sandbox_startup(sandboxed: bool) {
 
 use crate::daemon::db;
 use crate::daemon::protocol;
-use crate::daemon::voice;
 use crate::daemon::{is_local_websocket_endpoint, is_loopback_host};
 
 mod adopt;
@@ -258,6 +257,12 @@ mod sync_support;
 mod task_board;
 pub(crate) use task_board::{validate_read_only_workflow_launch, validate_write_workflow_launch};
 mod task_board_automation_runtime;
+mod task_board_remote_result_import;
+pub(crate) use task_board_remote_result_import::{
+    cleanup_task_board_remote_result_import,
+    import_and_adopt_task_board_remote_implementation_result,
+    import_task_board_remote_implementation_result,
+};
 mod task_board_completion;
 mod task_board_db;
 mod task_board_evaluation;
@@ -275,6 +280,7 @@ pub(crate) mod task_board_read_only_coordinator;
 #[cfg(test)]
 mod task_board_read_only_coordinator_tests;
 mod task_board_read_only_runtime;
+pub(crate) mod task_board_remote_controller;
 mod task_board_runtime;
 #[cfg(test)]
 mod task_board_sync_tests;
@@ -351,7 +357,9 @@ pub use reviews_files::{
 pub use reviews_thread_resolve::set_review_thread_resolved;
 pub use reviews_timeline::{clear_reviews_caches_with_timeline, fetch_review_timeline};
 pub use serve::serve;
-pub(crate) use serve::{ShutdownSignalGuard, serve_remote_https};
+pub(crate) use serve::{
+    ShutdownSignalGuard, recover_remote_assignments_before_local_work, serve_remote_https,
+};
 pub use sessions::{
     list_projects, list_sessions, session_detail, session_detail_core, session_extensions,
     session_timeline,

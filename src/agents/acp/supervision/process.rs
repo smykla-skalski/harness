@@ -30,10 +30,7 @@ impl SupervisedProcess {
     /// A process identified by explicit ids rather than a live `Child` handle.
     #[must_use]
     pub const fn new(pid: u32, process_group: i32) -> Self {
-        Self {
-            pid,
-            process_group,
-        }
+        Self { pid, process_group }
     }
 
     /// A remote agent the daemon connects to but never spawned. The pid and

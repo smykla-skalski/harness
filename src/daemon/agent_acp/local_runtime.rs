@@ -315,7 +315,7 @@ impl AcpAgentManagerHandle {
             || context.permissions.mode(PERMISSION_RESPONSE_DEADLINE),
             |log_path| PermissionMode::Recording { log_path },
         );
-        spawn_protocol_task(
+        Ok(spawn_protocol_task(
             transport,
             SpawnProtocolInput {
                 request: input.request,
@@ -323,7 +323,11 @@ impl AcpAgentManagerHandle {
                     input.request,
                     input.descriptor,
                 ),
-                resume_session_id: self.resume_target(input.request, input.session_id, &input.descriptor.id),
+                resume_session_id: self.resume_target(
+                    input.request,
+                    input.session_id,
+                    &input.descriptor.id,
+                ),
                 acp_id: input.acp_id,
                 session_id: input.session_id,
                 agent_name: context.display_name.clone(),
@@ -335,14 +339,7 @@ impl AcpAgentManagerHandle {
                 manager: self.clone(),
                 credential,
             },
-        )
-        .map_err(|error| {
-            CliErrorKind::workflow_io(format!(
-                "attach ACP protocol for '{}': {error}",
-                input.descriptor.id
-            ))
-            .into()
-        })
+        ))
     }
 
     fn register_started_orchestration_agent(

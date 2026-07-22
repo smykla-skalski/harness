@@ -1,15 +1,15 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 use crate::daemon::db::{AsyncDaemonDb, workflow_owner};
 use crate::task_board::{
-    AgentMode, ExternalRef, ExternalRefProvider, SpawnGateSwitches,
+    AgentMode, ExternalRef, ExternalRefProvider, TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE,
+    TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE, TASK_BOARD_EXECUTION_TARGET_RESOURCE,
     TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardAttemptState,
-    TaskBoardExecutionAttemptRecord, TaskBoardExecutionOwnership, TaskBoardExecutionState,
-    TaskBoardFailureClass, TaskBoardItem, TaskBoardOrchestratorSettings,
-    TaskBoardPullRequestIdentity, TaskBoardReadOnlyRunContext, TaskBoardReadOnlyWorkflowLaunch,
-    TaskBoardWorkflowExecutionArtifacts, TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
-    TaskBoardWorkflowSnapshot, TaskBoardWorkflowStatus, TaskBoardWorkflowTransitionState,
-    build_dispatch_plans_with_policy, resolve_task_board_reviewers,
+    TaskBoardExecutionAttemptRecord, TaskBoardExecutionOwnership, TaskBoardExecutionPhase,
+    TaskBoardExecutionState, TaskBoardFailureClass, TaskBoardItem, TaskBoardOrchestratorSettings,
+    TaskBoardPullRequestIdentity, TaskBoardReadOnlyRunContext, TaskBoardWorkflowExecutionArtifacts,
+    TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind, TaskBoardWorkflowSnapshot,
+    TaskBoardWorkflowStatus, TaskBoardWorkflowTransitionState,
 };
 
 use super::super::task_board_workflow_test_support::{TestDatabase, reviewers};
@@ -177,6 +177,8 @@ async fn seed_execution_in_database(
         .await
         .expect("load settings snapshot");
     let pull_request = pull_request(workflow_kind);
+    let resources =
+        seeded_execution_resources(&execution_id, phase, attempt.as_ref(), &resolved_reviewers);
     let execution = TaskBoardWorkflowExecutionRecord {
         execution_id: execution_id.clone(),
         item_id: item_id.clone(),
@@ -213,7 +215,7 @@ async fn seed_execution_in_database(
         ownership: TaskBoardExecutionOwnership {
             host_id: None,
             fencing_epoch: 0,
-            resources: BTreeMap::from([("admission_owner".into(), workflow_owner(&execution_id))]),
+            resources,
         },
         available_at: None,
         blocked_reason: None,
@@ -230,6 +232,36 @@ async fn seed_execution_in_database(
     }
     insert_committed_admission(db, &item_id, &execution_id, mutation.item_revision).await;
     (item_id, execution_id)
+}
+
+fn seeded_execution_resources(
+    execution_id: &str,
+    phase: TaskBoardExecutionPhase,
+    attempt: Option<&AttemptSeed>,
+    resolved_reviewers: &crate::task_board::TaskBoardResolvedReviewer,
+) -> BTreeMap<String, String> {
+    let mut resources = BTreeMap::from([("admission_owner".into(), workflow_owner(execution_id))]);
+    // A seeded Starting attempt models a completed target selection; carry the resources that
+    // selection would have written so the side-effect claim finds its exact local target.
+    if attempt.is_some_and(|seed| seed.state == TaskBoardAttemptState::Starting)
+        && matches!(
+            phase,
+            TaskBoardExecutionPhase::Implementation
+                | TaskBoardExecutionPhase::Review
+                | TaskBoardExecutionPhase::Evaluate
+        )
+    {
+        resources.insert(TASK_BOARD_EXECUTION_TARGET_RESOURCE.into(), "local".into());
+        resources.insert(
+            TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE.into(),
+            format!("review:{}", resolved_reviewers.profiles[0].id),
+        );
+        resources.insert(
+            TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE.into(),
+            "1".into(),
+        );
+    }
+    resources
 }
 
 fn prepare_item(
@@ -258,7 +290,7 @@ fn prepare_item(
     }
 }
 
-async fn seed_settings(db: &AsyncDaemonDb) {
+pub(super) async fn seed_settings(db: &AsyncDaemonDb) {
     if db
         .task_board_configuration_revision()
         .await
@@ -404,116 +436,4 @@ pub(super) async fn seed_publish_attempt(
         .await
         .expect("seed publish attempt");
     fixture
-}
-
-pub(super) async fn seed_dispatched_initial_report(label: &str) -> Fixture {
-    let test = TestDatabase::open().await;
-    seed_settings(&test.db).await;
-    let item_id = format!("coordinator-{label}");
-    let mut item = TaskBoardItem::new(
-        item_id.clone(),
-        format!("Read-only workflow {label}"),
-        "Inspect the exact frozen revision".into(),
-        NOW.into(),
-    );
-    item.agent_mode = AgentMode::Evaluate;
-    item.workflow_kind = TaskBoardWorkflowKind::Review;
-    test.db
-        .create_task_board_item(item.clone())
-        .await
-        .expect("create dispatched report item");
-    let plan = build_dispatch_plans_with_policy(
-        &[item],
-        None,
-        None,
-        SpawnGateSwitches::default(),
-        &HashMap::new(),
-    )
-    .remove(0);
-    let intent_id = match test
-        .db
-        .reserve_task_board_dispatch(&plan, "control-plane", Some("/tmp/project"), false)
-        .await
-        .expect("reserve dispatched report")
-    {
-        crate::daemon::db::ReservedTaskBoardDispatch::Preparing { intent_id, .. } => intent_id,
-        other => panic!("unexpected dispatched report reservation: {other:?}"),
-    };
-    let preparation = test
-        .db
-        .claim_task_board_dispatch_preparation(&intent_id)
-        .await
-        .expect("claim dispatched report preparation")
-        .expect("pending dispatched report preparation");
-    let snapshot = test
-        .db
-        .task_board_item_snapshot(&item_id)
-        .await
-        .expect("dispatched report source item");
-    let settings = test
-        .db
-        .task_board_orchestrator_settings_snapshot()
-        .await
-        .expect("dispatched report settings");
-    let launch = TaskBoardReadOnlyWorkflowLaunch {
-        workflow_kind: TaskBoardWorkflowKind::Review,
-        execution_repository: None,
-        configuration_revision: u64::try_from(settings.row_revision).expect("settings revision"),
-        policy_version: settings.settings.policy_version,
-        resolved_reviewers: resolve_task_board_reviewers(
-            &settings.settings.reviewers,
-            TaskBoardWorkflowKind::Review,
-            None,
-        )
-        .expect("dispatched report reviewers"),
-        source_item_revision: snapshot.item_revision,
-        prepared_item_revision: snapshot.item_revision,
-        run_context: TaskBoardReadOnlyRunContext {
-            schema_version: TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
-            session_id: preparation.preparation.session_id.clone(),
-            title: snapshot.item.title,
-            body: snapshot.item.body,
-            tags: snapshot.item.tags,
-            worktree: "/tmp/read-only-worktree".into(),
-        },
-        provider_revision: None,
-        pull_request: None,
-        exact_head_revision: FROZEN_HEAD.into(),
-    };
-    let applied = test
-        .db
-        .complete_task_board_dispatch_preparation_with_workflow(
-            &preparation,
-            "branch",
-            "/tmp/read-only-worktree",
-            Some(launch),
-            None,
-        )
-        .await
-        .expect("complete dispatched report preparation");
-    let execution_id = applied
-        .item
-        .workflow
-        .execution_id
-        .clone()
-        .expect("dispatched report execution id");
-    let claim = test
-        .db
-        .claim_task_board_dispatch(&item_id)
-        .await
-        .expect("claim dispatched report")
-        .expect("pending dispatched report");
-    test.db
-        .complete_task_board_dispatch(
-            &intent_id,
-            &claim.claim_token,
-            &workflow_owner(&execution_id),
-        )
-        .await
-        .expect("persist dispatched report workflow before worker start");
-    Fixture {
-        test,
-        item_id,
-        execution_id,
-    }
 }

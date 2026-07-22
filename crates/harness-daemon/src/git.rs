@@ -1,15 +1,35 @@
+#![allow(dead_code)]
+
 use std::error::Error as StdError;
 use std::fmt::Display;
 use std::path::{Path, PathBuf};
 
 use thiserror::Error;
 
+#[path = "../../../src/git/bundle.rs"]
+pub(crate) mod bundle;
+#[path = "../../../src/git/bundle_contract.rs"]
+pub(crate) mod bundle_contract;
+#[path = "../../../src/git/bundle_export.rs"]
+pub(crate) mod bundle_export;
+#[path = "../../../src/git/bundle_quarantine.rs"]
+mod bundle_quarantine;
+#[path = "../../../src/git/command.rs"]
+mod command;
 #[path = "../../../src/git/identity.rs"]
 pub(crate) mod identity;
 #[path = "../../../src/git/mutation.rs"]
 pub(crate) mod mutation;
 #[path = "../../../src/git/read.rs"]
-mod read;
+pub(crate) mod read;
+#[path = "../../../src/git/repository_coordinates.rs"]
+mod repository_coordinates;
+#[path = "../../../src/git/source_bundle_export.rs"]
+pub(crate) mod source_bundle_export;
+#[path = "../../../src/git/source_bundle_import.rs"]
+pub(crate) mod source_bundle_import;
+#[path = "../../../src/git/source_repository_identity.rs"]
+mod source_repository_identity;
 
 pub(crate) use read::GitRepository;
 
@@ -23,6 +43,8 @@ pub(crate) enum GitError {
     Open { path: PathBuf, message: String },
     #[error("git read failed for {path}: {message}")]
     Read { path: PathBuf, message: String },
+    #[error("git state is unsafe for {path}: {message}")]
+    Unsafe { path: PathBuf, message: String },
     #[error("git mutation failed for {path}: {message}")]
     Mutation { path: PathBuf, message: String },
 }
@@ -44,6 +66,13 @@ impl GitError {
 
     pub(crate) fn read(path: &Path, error: impl Display) -> Self {
         Self::Read {
+            path: path.to_path_buf(),
+            message: error.to_string(),
+        }
+    }
+
+    pub(crate) fn unsafe_state(path: &Path, error: impl Display) -> Self {
+        Self::Unsafe {
             path: path.to_path_buf(),
             message: error.to_string(),
         }

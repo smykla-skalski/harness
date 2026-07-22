@@ -1,8 +1,6 @@
 use std::error::Error;
 use std::fmt;
 
-use base64::Engine as _;
-use base64::engine::general_purpose::STANDARD;
 use chrono::{DateTime, Utc};
 use rustls::pki_types::CertificateDer;
 use rustls::pki_types::pem::PemObject as _;
@@ -11,6 +9,7 @@ use x509_parser::certificate::X509Certificate;
 use x509_parser::parse_x509_certificate;
 
 use super::remote_acme::RemoteCertificateBundle;
+use crate::task_board::remote_spki_pin;
 
 #[derive(Clone, PartialEq, Eq)]
 pub(crate) struct RemotePrivateKeyPem(String);
@@ -60,8 +59,15 @@ pub(crate) fn spki_sha256_pin(
     bundle: &RemoteCertificateBundle,
 ) -> Result<String, RemoteCertificateIdentityError> {
     inspect_leaf_certificate(bundle, |certificate| {
-        let digest = Sha256::digest(certificate.public_key().raw);
-        format!("sha256/{}", STANDARD.encode(digest))
+        remote_spki_pin::encode(Sha256::digest(certificate.public_key().raw).into())
+    })
+}
+
+pub(crate) fn spki_sha256_digest_from_der(
+    certificate_der: &[u8],
+) -> Result<[u8; 32], RemoteCertificateIdentityError> {
+    inspect_certificate_der(certificate_der, |certificate| {
+        Sha256::digest(certificate.public_key().raw).into()
     })
 }
 
@@ -93,10 +99,19 @@ where
         .map_err(|error| {
             RemoteCertificateIdentityError::InvalidCertificatePem(error.to_string())
         })?;
-    let (remainder, certificate) =
-        parse_x509_certificate(certificate.as_ref()).map_err(|error| {
-            RemoteCertificateIdentityError::InvalidCertificateDer(error.to_string())
-        })?;
+    inspect_certificate_der(certificate.as_ref(), inspect)
+}
+
+fn inspect_certificate_der<T, Inspect>(
+    certificate_der: &[u8],
+    inspect: Inspect,
+) -> Result<T, RemoteCertificateIdentityError>
+where
+    Inspect: FnOnce(&X509Certificate<'_>) -> T,
+{
+    let (remainder, certificate) = parse_x509_certificate(certificate_der).map_err(|error| {
+        RemoteCertificateIdentityError::InvalidCertificateDer(error.to_string())
+    })?;
     if !remainder.is_empty() {
         return Err(RemoteCertificateIdentityError::InvalidCertificateDer(
             "trailing certificate data".to_string(),

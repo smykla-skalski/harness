@@ -32,8 +32,7 @@ fn minimal_state() -> DaemonHttpState {
         remote_domain: None,
         remote_request_limits: None,
         remote_pairing_limiter: crate::daemon::http::default_remote_pairing_limiter(),
-        remote_pairing_status_limiter:
-            crate::daemon::http::default_remote_pairing_status_limiter(),
+        remote_pairing_status_limiter: crate::daemon::http::default_remote_pairing_status_limiter(),
         sender: sender.clone(),
         prepared_sender: broadcast::channel(8).0,
         manifest,
@@ -162,8 +161,7 @@ async fn acp_start_route_rejects_missing_session_before_spawn() {
         ],
         async {
             let (base_url, server) =
-                spawn_managed_agent_server(super::super::tests::test_http_state_with_db())
-                    .await;
+                spawn_managed_agent_server(super::super::tests::test_http_state_with_db()).await;
             let response = reqwest::Client::new()
                 .post(format!(
                     "{base_url}/v1/sessions/11111111-1111-4111-8111-111111111111/managed-agents/acp"
@@ -184,7 +182,9 @@ async fn acp_start_route_rejects_missing_session_before_spawn() {
             assert_eq!(body["error"]["code"], "KSRCLI090");
             assert!(
                 body["error"]["message"].as_str().is_some_and(|message| {
-                    message.contains("harness session '11111111-1111-4111-8111-111111111111' not found")
+                    message.contains(
+                        "harness session '11111111-1111-4111-8111-111111111111' not found",
+                    )
                 }),
                 "unexpected error body: {body}"
             );

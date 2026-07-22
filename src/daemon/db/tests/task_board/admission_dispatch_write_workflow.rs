@@ -44,7 +44,7 @@ async fn write_dispatch_atomically_starts_approved_implementation() {
     );
     assert_eq!(
         execution.transition.execution_state,
-        TaskBoardExecutionState::Running
+        TaskBoardExecutionState::Preparing
     );
     assert_eq!(execution.snapshot.item_revision, source_revision + 2);
     assert_eq!(
@@ -57,6 +57,10 @@ async fn write_dispatch_atomically_starts_approved_implementation() {
     );
     assert_eq!(execution.attempts.len(), 1);
     assert_eq!(execution.attempts[0].action_key, "implementation:1");
+    assert_eq!(
+        execution.attempts[0].state,
+        crate::task_board::TaskBoardAttemptState::Preparing
+    );
     assert_eq!(
         execution.attempts[0].idempotency_key,
         format!("codex-{intent}")
@@ -162,19 +166,23 @@ async fn reserved_write(
     ClaimedTaskBoardDispatchPreparation,
     TaskBoardWriteWorkflowLaunch,
 ) {
-    let db = test_db().await;
-    configure_policy(&db, admission_policy(1)).await;
-    let item_id = format!("admission-write-{label}");
-    let mut item = TaskBoardItem::new(
-        item_id.clone(),
-        "Implement approved plan".into(),
-        "Focused tests pass".into(),
-        APPROVED_AT.into(),
-    );
-    item.planning.summary = Some("# Plan\n\nImplement the requested change.".into());
-    item.planning.approved_by = Some("lead".into());
-    item.planning.approved_at = Some(APPROVED_AT.into());
-    db.create_task_board_item(item).await.expect("create item");
+    reserved_write_at(label, None, "/tmp/worktree", "head-base", false).await
+}
+
+pub(super) async fn reserved_write_at(
+    label: &str,
+    execution_repository: Option<&str>,
+    worktree: &str,
+    base_head_revision: &str,
+    configure_remote: bool,
+) -> (
+    TestDb,
+    String,
+    ClaimedTaskBoardDispatchPreparation,
+    TaskBoardWriteWorkflowLaunch,
+) {
+    let (db, item_id) =
+        prepare_reserved_write_item(label, execution_repository, configure_remote).await;
     let plan = create_plan_for_existing(&db, &item_id).await;
     let intent = preparing_intent(
         db.reserve_task_board_dispatch(&plan, "control-plane", Some("/tmp/project"), false)
@@ -197,12 +205,12 @@ async fn reserved_write(
     let reviewers = resolve_task_board_reviewers(
         &settings.settings.reviewers,
         TaskBoardWorkflowKind::DefaultTask,
-        None,
+        execution_repository,
     )
     .expect("resolved reviewers");
     let workflow_snapshot = TaskBoardWorkflowSnapshot {
         workflow_kind: TaskBoardWorkflowKind::DefaultTask,
-        execution_repository: None,
+        execution_repository: execution_repository.map(str::to_owned),
         item_revision: snapshot.item_revision,
         configuration_revision: u64::try_from(settings.row_revision).expect("settings revision"),
         policy_version: settings.settings.policy_version,
@@ -227,7 +235,7 @@ async fn reserved_write(
     .expect("bind plan approval");
     let launch = TaskBoardWriteWorkflowLaunch {
         workflow_kind: TaskBoardWorkflowKind::DefaultTask,
-        execution_repository: None,
+        execution_repository: execution_repository.map(str::to_owned),
         configuration_revision: workflow_snapshot.configuration_revision,
         policy_version: workflow_snapshot.policy_version,
         resolved_reviewers: reviewers,
@@ -240,26 +248,52 @@ async fn reserved_write(
             title: snapshot.item.title.clone(),
             body: snapshot.item.body.clone(),
             tags: snapshot.item.tags.clone(),
-            worktree: "/tmp/worktree".into(),
+            worktree: worktree.into(),
         },
         provider_revision: None,
         pull_request: None,
-        base_head_revision: "head-base".into(),
+        base_head_revision: base_head_revision.into(),
         planning_result,
         plan_approval,
     };
     (db, intent, preparation, launch)
 }
 
-async fn publish_write(
+async fn prepare_reserved_write_item(
+    label: &str,
+    execution_repository: Option<&str>,
+    configure_remote: bool,
+) -> (TestDb, String) {
+    let db = test_db().await;
+    configure_policy(&db, admission_policy(1)).await;
+    if configure_remote {
+        super::completion_evidence_tests::configure_remote_implementation_controller(&db).await;
+    }
+    let item_id = format!("admission-write-{label}");
+    let mut item = TaskBoardItem::new(
+        item_id.clone(),
+        "Implement approved plan".into(),
+        "Focused tests pass".into(),
+        APPROVED_AT.into(),
+    );
+    item.planning.summary = Some("# Plan\n\nImplement the requested change.".into());
+    item.planning.approved_by = Some("lead".into());
+    item.planning.approved_at = Some(APPROVED_AT.into());
+    item.execution_repository = execution_repository.map(str::to_owned);
+    db.create_task_board_item(item).await.expect("create item");
+    (db, item_id)
+}
+
+pub(super) async fn publish_write(
     db: &AsyncDaemonDb,
     preparation: &ClaimedTaskBoardDispatchPreparation,
     launch: TaskBoardWriteWorkflowLaunch,
 ) -> DispatchAppliedTask {
+    let worktree = launch.run_context.worktree.clone();
     db.complete_task_board_dispatch_preparation_with_workflow(
         preparation,
         "branch",
-        "/tmp/worktree",
+        &worktree,
         None,
         Some(Box::new(launch)),
     )

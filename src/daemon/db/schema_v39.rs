@@ -11,7 +11,7 @@ mod tests {
     use rusqlite::{Connection, Result as SqlResult, params};
 
     use super::run;
-    use crate::daemon::db::DaemonDb;
+    use crate::daemon::db::{DaemonDb, SCHEMA_VERSION};
 
     const NOW: &str = "2026-07-17T10:00:00Z";
     const LATER: &str = "2026-07-17T10:15:00Z";
@@ -20,7 +20,7 @@ mod tests {
     fn current_schema_contains_task_board_admission_storage() {
         let db = DaemonDb::open_in_memory().expect("open daemon db");
 
-        assert_eq!(db.schema_version().expect("schema version"), "42");
+        assert_eq!(db.schema_version().expect("schema version"), SCHEMA_VERSION);
         for column in ["estimated_tokens", "estimated_cost_microusd"] {
             let exists: i64 = db
                 .connection()
@@ -80,6 +80,7 @@ mod tests {
     #[test]
     fn migration_is_restart_safe_and_preserves_existing_settings() {
         let db = DaemonDb::open_in_memory().expect("open daemon db");
+        crate::daemon::db::schema_v43::restore_legacy_v40_for_test(&db);
         db.connection()
             .execute_batch(
                 "UPDATE task_board_orchestrator_settings

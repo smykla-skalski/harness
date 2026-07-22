@@ -1,5 +1,6 @@
 mod fixture;
 mod lifecycle_recovery;
+mod prepared_report_fixture;
 mod publish_claim_races;
 mod quorum;
 mod recovery;

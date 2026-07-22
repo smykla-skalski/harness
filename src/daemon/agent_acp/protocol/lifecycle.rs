@@ -102,10 +102,7 @@ fn require_capability(
     capability: &str,
     supported: impl Fn(&AcpAgentHandshake) -> bool,
 ) -> ProtocolCommandResult<()> {
-    if supervisor
-        .handshake()
-        .is_some_and(supported)
-    {
+    if supervisor.handshake().is_some_and(supported) {
         return Ok(());
     }
     Err(format!(

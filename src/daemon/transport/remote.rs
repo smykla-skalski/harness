@@ -373,6 +373,8 @@ pub enum DaemonRemoteRole {
     Operator,
     #[value(name = "viewer")]
     Viewer,
+    #[value(name = "execution-coordinator")]
+    ExecutionCoordinator,
 }
 
 impl DaemonRemoteRole {
@@ -382,6 +384,7 @@ impl DaemonRemoteRole {
             Self::Admin => "admin",
             Self::Operator => "operator",
             Self::Viewer => "viewer",
+            Self::ExecutionCoordinator => "execution-coordinator",
         }
     }
 }
@@ -392,6 +395,7 @@ impl From<DaemonRemoteRole> for RemoteRole {
             DaemonRemoteRole::Admin => Self::Admin,
             DaemonRemoteRole::Operator => Self::Operator,
             DaemonRemoteRole::Viewer => Self::Viewer,
+            DaemonRemoteRole::ExecutionCoordinator => Self::ExecutionCoordinator,
         }
     }
 }
@@ -404,6 +408,8 @@ pub enum DaemonRemoteScope {
     Write,
     #[value(name = "admin")]
     Admin,
+    #[value(name = "execute")]
+    Execute,
 }
 
 impl DaemonRemoteScope {
@@ -413,6 +419,7 @@ impl DaemonRemoteScope {
             Self::Read => "read",
             Self::Write => "write",
             Self::Admin => "admin",
+            Self::Execute => "execute",
         }
     }
 }
@@ -423,6 +430,7 @@ impl From<DaemonRemoteScope> for RemoteAccessScope {
             DaemonRemoteScope::Read => Self::Read,
             DaemonRemoteScope::Write => Self::Write,
             DaemonRemoteScope::Admin => Self::Admin,
+            DaemonRemoteScope::Execute => Self::Execute,
         }
     }
 }

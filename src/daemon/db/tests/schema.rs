@@ -158,6 +158,7 @@ fn all_tables_exist() {
         "task_board_orchestrator_wake_events",
         "task_board_provider_scope_state",
         "task_board_remote_assignments",
+        "task_board_remote_host_quarantines",
         "task_board_runtime_config",
         "task_board_sync_conflicts",
         "task_board_workflow_executions",

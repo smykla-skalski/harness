@@ -25,17 +25,16 @@ fn session_inputs(
     config: &AcpSessionRequestConfig,
     handshake: Option<&AcpAgentHandshake>,
 ) -> SessionInputs {
-    let additional_directories = if handshake.is_some_and(|handshake| {
-        handshake.supports_additional_directories
-    }) {
-        config
-            .additional_directories()
-            .iter()
-            .map(PathBuf::from)
-            .collect::<Vec<_>>()
-    } else {
-        Vec::new()
-    };
+    let additional_directories =
+        if handshake.is_some_and(|handshake| handshake.supports_additional_directories) {
+            config
+                .additional_directories()
+                .iter()
+                .map(PathBuf::from)
+                .collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
     SessionInputs {
         additional_directories,
         mcp_servers: config

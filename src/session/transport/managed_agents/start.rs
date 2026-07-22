@@ -225,7 +225,7 @@ impl Execute for AcpAgentStartArgs {
 /// environment variable name, not its value: the daemon resolves it at connect
 /// time so a token never crosses the start request.
 fn build_endpoint(url: &str, header_env: &[String]) -> Result<AcpEndpoint, CliError> {
-    let mut headers_env: BTreeMap<String, String> = BTreeMap::new();
+    let mut endpoint_headers: BTreeMap<String, String> = BTreeMap::new();
     for entry in header_env {
         let (name, var) = entry
             .split_once('=')
@@ -235,7 +235,7 @@ fn build_endpoint(url: &str, header_env: &[String]) -> Result<AcpEndpoint, CliEr
             })?;
         // HTTP header names are case-insensitive, so reject a repeat under any
         // casing rather than let the later one silently win.
-        if headers_env
+        if endpoint_headers
             .keys()
             .any(|existing| existing.eq_ignore_ascii_case(name))
         {
@@ -244,11 +244,11 @@ fn build_endpoint(url: &str, header_env: &[String]) -> Result<AcpEndpoint, CliEr
             ))
             .into());
         }
-        headers_env.insert(name.to_string(), var.to_string());
+        endpoint_headers.insert(name.to_string(), var.to_string());
     }
     Ok(AcpEndpoint {
         url: url.to_string(),
-        headers_env,
+        headers_env: endpoint_headers,
     })
 }
 

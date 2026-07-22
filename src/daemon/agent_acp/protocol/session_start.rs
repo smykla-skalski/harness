@@ -174,7 +174,9 @@ fn pickup_target<'a>(
     supervisor: &AcpSessionSupervisor,
     resume_session_id: Option<&'a str>,
 ) -> Option<(SessionPickup, &'a str)> {
-    let prior_session_id = resume_session_id.map(str::trim).filter(|id| !id.is_empty())?;
+    let prior_session_id = resume_session_id
+        .map(str::trim)
+        .filter(|id| !id.is_empty())?;
     let handshake = supervisor.handshake()?;
     if handshake.supports_session_resume {
         return Some((SessionPickup::Resume, prior_session_id));

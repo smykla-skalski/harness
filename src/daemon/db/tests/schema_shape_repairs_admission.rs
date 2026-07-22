@@ -44,9 +44,13 @@ async fn async_connect_repairs_missing_dispatch_compensation_marker() {
     let tmp = tempdir().expect("tempdir");
     let db_path = tmp.path().join("harness.db");
     let sync_db = DaemonDb::open(&db_path).expect("open sync daemon db");
+    crate::daemon::db::schema_v43::restore_legacy_v40_for_test(&sync_db);
     sync_db
         .connection()
-        .execute_batch("ALTER TABLE task_board_dispatch_intents DROP COLUMN compensation_pending")
+        .execute_batch(
+            "ALTER TABLE task_board_dispatch_intents DROP COLUMN compensation_pending;
+             UPDATE schema_meta SET value = '38' WHERE key = 'version';",
+        )
         .expect("remove compensation marker");
     drop(sync_db);
 

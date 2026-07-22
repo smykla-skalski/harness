@@ -6,16 +6,16 @@ mod binary_stamp;
 mod config;
 mod github_data_change_publisher;
 mod legacy_migration;
+mod local_listener;
 mod machine_heartbeat_loop;
 mod manifest;
 mod open_db;
 mod policy_bootstrap;
 mod remote;
 mod shutdown_signals;
-mod task_board_automation_loop;
-mod task_board_dispatch_loop;
 mod task_board_migration;
-mod task_board_orchestrator_loop;
+#[cfg(test)]
+pub(crate) mod test_support;
 
 pub(crate) use shutdown_signals::ShutdownSignalGuard;
 
@@ -26,17 +26,19 @@ pub(crate) use remote::serve_remote_https;
 use super::{
     AgentTuiManagerHandle, Arc, CliError, CliErrorKind, CodexControllerHandle, DaemonHttpState,
     DaemonObserveRuntime, DaemonServeConfig, Duration, Mutex, OBSERVE_RUNTIME, OnceLock, Path,
-    ReplayBuffer, SHUTDOWN_SIGNAL, SessionStatus, TcpListener, bridge, broadcast, http, index,
-    log_sandbox_startup, process_id, state, tokio_watch, watch,
+    ReplayBuffer, SHUTDOWN_SIGNAL, SessionStatus, bridge, broadcast, http, index, process_id,
+    state, tokio_watch, watch,
 };
 use crate::agents::acp::probe::schedule_probe_cache_refresh;
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::http::AsyncDaemonDbSlot;
 use crate::telemetry::current_trace_id;
-use crate::workspace::orphan_cleanup::run_startup_sweep;
-use background_tasks::spawn_background_tasks;
-use legacy_migration::log_legacy_daemon_root_migration;
-use manifest::{build_manifest, persist_manifest};
+pub(crate) use background_tasks::recover_remote_assignments_before_local_work;
+use background_tasks::{
+    recover_remote_assignments_at_startup_with_controller, spawn_background_tasks,
+};
+use local_listener::{bind_local_listener_and_build_manifest, prepare_local_daemon_environment};
+use manifest::persist_manifest;
 use std::time::Instant;
 use tracing::Instrument as _;
 use tracing::field::{Empty, display};
@@ -50,25 +52,11 @@ use tracing::field::{Empty, display};
     reason = "daemon serve wires startup, runtime, and teardown in one lifecycle path"
 )]
 pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
-    validate_serve_config(&config)?;
-    log_sandbox_startup(config.sandboxed);
-    run_startup_sweep();
-
-    let legacy_migration_report = state::migrate_legacy_daemon_root_for_current_process()?;
-    log_legacy_daemon_root_migration(&legacy_migration_report);
-    state::ensure_daemon_dirs()?;
-    super::voice::cleanup_abandoned_sessions()?;
+    prepare_local_daemon_environment(&config)?;
     let daemon_lock = state::acquire_singleton_lock()?;
     let token = state::ensure_auth_token()?;
 
-    let listener = TcpListener::bind((config.host.as_str(), config.port))
-        .await
-        .map_err(|error| CliErrorKind::workflow_io(format!("bind daemon listener: {error}")))?;
-    let local_addr = listener.local_addr().map_err(|error| {
-        CliErrorKind::workflow_io(format!("read daemon listener addr: {error}"))
-    })?;
-    let endpoint = format!("http://{local_addr}");
-    let manifest = build_manifest(&endpoint, config.sandboxed)?;
+    let (listener, endpoint, manifest) = bind_local_listener_and_build_manifest(&config).await?;
 
     let (sender, _) = broadcast::channel(256);
     let (shutdown_tx, shutdown_rx) = tokio_watch::channel(false);
@@ -104,9 +92,6 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         async_db.clone(),
         config.sandboxed,
     );
-    codex_controller
-        .reconcile_task_board_admission_workers_after_restart()
-        .await?;
     let agent_tui_manager = AgentTuiManagerHandle::new_with_async_db(
         sender.clone(),
         db.clone(),
@@ -137,6 +122,13 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         managed_agent_mutation_locks: http::ManagedAgentMutationLocks::default(),
         recovery_snapshot: Arc::default(),
     };
+    if let Some(async_db) = app_state.async_db.get() {
+        recover_remote_assignments_at_startup_with_controller(&app_state, async_db).await?;
+    }
+    app_state
+        .codex_controller
+        .reconcile_task_board_admission_workers_after_restart()
+        .await?;
     let _background = spawn_background_tasks(&app_state, config.poll_interval, shutdown_rx.clone());
 
     let serve_result = http::serve(listener, app_state, shutdown_rx).await;

@@ -9,7 +9,7 @@ pub(super) fn run(conn: &Connection) -> Result<(), CliError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+    use crate::daemon::db::{AsyncDaemonDb, DaemonDb, SCHEMA_VERSION};
     use sqlx::query_scalar;
     use tempfile::tempdir;
 
@@ -90,7 +90,10 @@ mod tests {
             .connection()
             .execute("DROP TABLE task_board_reconciliation_cursors", [])
             .expect("drop current cursor table");
-        assert_eq!(sync_db.schema_version().expect("schema version"), "42");
+        assert_eq!(
+            sync_db.schema_version().expect("schema version"),
+            SCHEMA_VERSION
+        );
         drop(sync_db);
 
         let async_db = AsyncDaemonDb::connect(&path)
@@ -132,7 +135,10 @@ mod tests {
                  VALUES ('read_only_recoverable', 'execution-a', 'keep');",
             )
             .expect("seed malformed current cursor table");
-        assert_eq!(sync_db.schema_version().expect("schema version"), "42");
+        assert_eq!(
+            sync_db.schema_version().expect("schema version"),
+            SCHEMA_VERSION
+        );
         drop(sync_db);
 
         let error = AsyncDaemonDb::connect(&path)

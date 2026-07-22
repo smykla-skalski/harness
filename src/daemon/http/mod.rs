@@ -68,7 +68,7 @@ mod tests;
 mod voice;
 
 pub use auth::DaemonHttpAuthMode;
-pub(crate) use auth::authenticated_remote_client;
+pub(crate) use auth::{authenticated_remote_client, require_execution_remote_client};
 pub(crate) use managed_agents::{
     acp_inspect_response, acp_transcript_response, ensure_acp_agent, ensure_acp_enabled,
     ensure_codex_agent, ensure_terminal_agent_async, managed_agent_list_response_async,
@@ -410,6 +410,7 @@ fn daemon_http_router(state: DaemonHttpState) -> Router<()> {
         .merge(openrouter_models::openrouter_model_routes())
         .merge(remote_clients::remote_client_routes())
         .merge(remote_pairing::remote_pairing_routes())
+        .merge(crate::daemon::task_board_remote_transport::routes::execution_routes())
         .merge(signals::signal_routes())
         .merge(voice::voice_routes())
         .layer(middleware::from_fn_with_state(

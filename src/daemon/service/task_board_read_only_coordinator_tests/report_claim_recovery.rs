@@ -1,10 +1,12 @@
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
-    TaskBoardAttemptState, TaskBoardExecutionState, TaskBoardFailureClass, TaskBoardWorkflowKind,
+    TASK_BOARD_EXECUTION_TARGET_RESOURCE, TaskBoardAttemptState, TaskBoardExecutionState,
+    TaskBoardFailureClass, TaskBoardWorkflowKind,
 };
 
-use super::fixture::{AttemptSeed, NOW, RETRY_AT, seed_dispatched_initial_report, seed_execution};
+use super::fixture::{AttemptSeed, NOW, RETRY_AT, seed_execution};
 use super::load_execution;
+use super::prepared_report_fixture::seed_dispatched_initial_report;
 use super::runtime::{FakeReadOnlyRuntime, PlannedReport};
 
 #[tokio::test]
@@ -187,91 +189,87 @@ async fn failed_start_with_durable_run_reconciles_without_duplicate() {
 }
 
 #[tokio::test]
-async fn initial_dispatched_report_grace_survives_restart_before_worker_start() {
+async fn prepared_initial_report_survives_restart_and_starts_once() {
     let fixture = seed_dispatched_initial_report("initial-report-grace").await;
     let before = load_execution(&fixture).await;
-    let attempt = &before.attempts[0];
-    assert_eq!(attempt.state, TaskBoardAttemptState::Running);
-    let deadline = chrono::DateTime::parse_from_rfc3339(
-        attempt
-            .available_at
-            .as_deref()
-            .expect("persisted initial report deadline"),
-    )
-    .expect("parse initial report deadline");
-    let started = chrono::DateTime::parse_from_rfc3339(&attempt.started_at)
-        .expect("parse initial report start");
-    assert_eq!(
-        deadline.signed_duration_since(started),
-        chrono::Duration::seconds(crate::task_board::TASK_BOARD_SIDE_EFFECT_CLAIM_GRACE_SECONDS)
+    assert_eq!(before.attempts[0].state, TaskBoardAttemptState::Preparing);
+    assert!(before.attempts[0].available_at.is_none());
+    assert!(
+        !before
+            .ownership
+            .resources
+            .contains_key(TASK_BOARD_EXECUTION_TARGET_RESOURCE)
     );
     assert_eq!(codex_run_count(&fixture.test.db).await, 0);
-
-    let runtime = FakeReadOnlyRuntime::new([]);
-    let first = super::super::task_board_read_only_coordinator::
-        reconcile_task_board_read_only_workflows_with_runtime(
-            &fixture.test.db,
-            &runtime,
-            &attempt.started_at,
-            8,
-        )
-        .await
-        .expect("reconcile before initial report deadline");
-    assert!(first.failures.is_empty());
-    assert_eq!(load_execution(&fixture).await, before);
-    assert_eq!(runtime.start_count(), 0);
+    let (intent_id, intent_state) = workflow_intent(&fixture.test.db, &fixture.execution_id).await;
+    assert_eq!(intent_state, "workflow_prepared");
+    assert_eq!(
+        admission_states(&fixture.test.db, &intent_id).await,
+        vec![("concurrency".into(), "reserved".into())]
+    );
+    let observed_at = before.attempts[0].started_at.clone();
 
     let restarted = AsyncDaemonDb::connect(&fixture.test.path)
         .await
         .expect("reopen workflow database after simulated restart");
-    let restarted_runtime = FakeReadOnlyRuntime::new([]);
-    let second = super::super::task_board_read_only_coordinator::
+    let restarted_runtime = FakeReadOnlyRuntime::new([PlannedReport::running_review()])
+        .with_durable_db(restarted.clone());
+    let first = super::super::task_board_read_only_coordinator::
         reconcile_task_board_read_only_workflows_with_runtime(
             &restarted,
             &restarted_runtime,
-            &attempt.started_at,
+            &observed_at,
             8,
         )
         .await
-        .expect("reconcile restarted workflow before deadline");
-    assert!(second.failures.is_empty());
-    assert_eq!(
-        restarted
-            .task_board_workflow_execution(&fixture.execution_id)
-            .await
-            .expect("load restarted workflow")
-            .expect("restarted workflow"),
-        before
-    );
-
-    let expired = (deadline + chrono::Duration::seconds(1)).to_rfc3339();
-    let after = super::super::task_board_read_only_coordinator::
-        reconcile_task_board_read_only_workflows_with_runtime(
-            &restarted,
-            &restarted_runtime,
-            &expired,
-            8,
-        )
-        .await
-        .expect("settle expired initial report claim");
-    assert!(after.failures.is_empty());
-    let settled = restarted
+        .expect("start prepared report after restart");
+    assert!(first.failures.is_empty(), "{:?}", first.failures);
+    assert_eq!(restarted_runtime.start_count(), 1);
+    let started = restarted
         .task_board_workflow_execution(&fixture.execution_id)
         .await
-        .expect("load settled workflow")
-        .expect("settled workflow");
-    assert_eq!(settled.attempts.len(), 1);
-    assert_eq!(settled.attempts[0].state, TaskBoardAttemptState::Unknown);
+        .expect("load restarted workflow")
+        .expect("restarted workflow");
+    assert_eq!(started.attempts[0].state, TaskBoardAttemptState::Running);
     assert_eq!(
-        settled.attempts[0].failure_class,
-        Some(TaskBoardFailureClass::UnknownOutcome)
+        started
+            .ownership
+            .resources
+            .get(TASK_BOARD_EXECUTION_TARGET_RESOURCE)
+            .map(String::as_str),
+        Some("local")
+    );
+    assert_eq!(codex_run_count(&restarted).await, 1);
+    assert_eq!(
+        workflow_intent(&restarted, &fixture.execution_id).await.1,
+        "completed"
     );
     assert_eq!(
-        settled.transition.execution_state,
-        TaskBoardExecutionState::HumanRequired
+        admission_states(&restarted, &intent_id).await,
+        vec![("concurrency".into(), "committed".into())]
     );
-    assert_eq!(restarted_runtime.start_count(), 0);
-    assert_eq!(codex_run_count(&restarted).await, 0);
+
+    let replay = super::super::task_board_read_only_coordinator::
+        reconcile_task_board_read_only_workflows_with_runtime(
+            &restarted,
+            &restarted_runtime,
+            &observed_at,
+            8,
+        )
+        .await
+        .expect("replay prepared report recovery");
+    assert!(replay.failures.is_empty(), "{:?}", replay.failures);
+    assert_eq!(restarted_runtime.start_count(), 1);
+    assert_eq!(codex_run_count(&restarted).await, 1);
+    assert_eq!(load_execution(&fixture).await, started);
+    assert_eq!(
+        workflow_intent(&restarted, &fixture.execution_id).await.1,
+        "completed"
+    );
+    assert_eq!(
+        admission_states(&restarted, &intent_id).await,
+        vec![("concurrency".into(), "committed".into())]
+    );
 }
 
 async fn codex_run_count(db: &AsyncDaemonDb) -> i64 {
@@ -279,6 +277,34 @@ async fn codex_run_count(db: &AsyncDaemonDb) -> i64 {
         .fetch_one(db.pool())
         .await
         .expect("count Codex runs")
+}
+
+async fn workflow_intent(db: &AsyncDaemonDb, execution_id: &str) -> (String, String) {
+    sqlx::query_as(
+        "SELECT intent_id, status FROM task_board_dispatch_intents
+         WHERE workflow_execution_id = ?1",
+    )
+    .bind(execution_id)
+    .fetch_one(db.pool())
+    .await
+    .expect("load workflow dispatch intent")
+}
+
+async fn admission_states(db: &AsyncDaemonDb, intent_id: &str) -> Vec<(String, String)> {
+    sqlx::query_as(
+        "SELECT l.kind, l.state
+         FROM task_board_dispatch_admission_ledger AS l
+         INNER JOIN task_board_dispatch_admission_decisions AS d
+                 ON d.decision_id = l.decision_id
+                AND d.intent_id = l.intent_id
+                AND d.generation = l.generation
+         WHERE l.intent_id = ?1 AND d.is_current = 1
+         ORDER BY l.kind",
+    )
+    .bind(intent_id)
+    .fetch_all(db.pool())
+    .await
+    .expect("load workflow admission states")
 }
 
 const fn starting_attempt() -> AttemptSeed {

@@ -2,9 +2,9 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{CodexRunRequest, CodexRunSnapshot};
 use crate::errors::CliError;
 use crate::task_board::{
-    TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardAttemptResultArtifact,
     TaskBoardAttemptState, TaskBoardExecutionAttemptRecord, TaskBoardFailureClass,
     TaskBoardLocalAttemptResult, TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionRecord,
+    task_board_local_attempt_result_expectation, validate_task_board_local_attempt_result,
 };
 
 use super::attempts::invalid_transition;
@@ -94,70 +94,14 @@ pub(super) fn parse_attempt_result(
         .ok_or_else(|| invalid_transition("completed Codex run has no final message"))?;
     let result = serde_json::from_str::<TaskBoardLocalAttemptResult>(message.trim())
         .map_err(|error| invalid_transition(format!("parse workflow attempt result: {error}")))?;
-    let frozen_head = result_identity_head(execution, &result.artifact);
-    let identity_matches = result.schema_version == TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION
-        && result.execution_id == attempt.execution_id
-        && result.action_key == attempt.action_key
-        && result.attempt == attempt.attempt
-        && result.idempotency_key == attempt.idempotency_key
-        && frozen_head == Some(result.exact_head_revision.as_str());
-    if !identity_matches || !artifact_matches(execution, attempt, &result.artifact) {
-        return Err(invalid_transition(
+    let expected =
+        task_board_local_attempt_result_expectation(execution, attempt).map_err(|_| {
+            invalid_transition("workflow attempt phase has no valid frozen result contract")
+        })?;
+    validate_task_board_local_attempt_result(&result, &expected).map_err(|_| {
+        invalid_transition(
             "workflow attempt result does not match its frozen identity or artifact contract",
-        ));
-    }
+        )
+    })?;
     Ok(result)
-}
-
-fn artifact_matches(
-    execution: &TaskBoardWorkflowExecutionRecord,
-    attempt: &TaskBoardExecutionAttemptRecord,
-    artifact: &TaskBoardAttemptResultArtifact,
-) -> bool {
-    match artifact {
-        TaskBoardAttemptResultArtifact::Review(outcome) => {
-            attempt.action_key == format!("review:{}", outcome.profile_id)
-                && execution.transition.exact_head_revision.as_deref()
-                    == Some(outcome.result.head_revision.as_str())
-        }
-        TaskBoardAttemptResultArtifact::Implementation(result) => {
-            let cycle = execution.artifacts.current_revision_cycle;
-            attempt.action_key == format!("implementation:{cycle}")
-                && result.revision_cycle == cycle
-                && execution.transition.exact_head_revision.as_deref()
-                    == Some(result.base_head_revision.as_str())
-                && result.head_revision != result.base_head_revision
-                && !result.summary.is_empty()
-                && result.summary.trim() == result.summary
-        }
-        TaskBoardAttemptResultArtifact::Evaluation(result) => {
-            let cycle = execution.artifacts.current_revision_cycle;
-            if matches!(
-                execution.snapshot.workflow_kind,
-                crate::task_board::TaskBoardWorkflowKind::DefaultTask
-                    | crate::task_board::TaskBoardWorkflowKind::PrFix
-            ) {
-                attempt.action_key == format!("evaluate:{cycle}")
-                    && result.head_revision.as_deref()
-                        == execution.transition.exact_head_revision.as_deref()
-                    && result.revision_cycle == Some(cycle)
-            } else {
-                attempt.action_key == "evaluate"
-                    && result.head_revision.is_none()
-                    && result.revision_cycle.is_none()
-            }
-        }
-        TaskBoardAttemptResultArtifact::Lifecycle(_)
-        | TaskBoardAttemptResultArtifact::Planning(_) => false,
-    }
-}
-
-fn result_identity_head<'a>(
-    execution: &'a TaskBoardWorkflowExecutionRecord,
-    artifact: &'a TaskBoardAttemptResultArtifact,
-) -> Option<&'a str> {
-    match artifact {
-        TaskBoardAttemptResultArtifact::Implementation(result) => Some(&result.head_revision),
-        _ => execution.transition.exact_head_revision.as_deref(),
-    }
 }

@@ -2,8 +2,8 @@ use axum::http::{HeaderMap, HeaderValue, StatusCode, header::AUTHORIZATION};
 
 use super::{
     REMOTE_CLIENT_ID_HEADER, RemoteAuthError, RemoteAuthTarget, RemoteBearerCredentials,
-    authorize_remote_http_route, authorize_remote_ws_handshake, authorize_remote_ws_method,
-    remote_ws_handshake_scope,
+    authorize_remote_execution_operation, authorize_remote_http_route,
+    authorize_remote_ws_handshake, authorize_remote_ws_method, remote_ws_handshake_scope,
 };
 use crate::daemon::protocol::{
     HTTP_API_CONTRACT, HttpApiRouteContract, HttpRouteMethod, HttpRouteParity, http_paths,
@@ -287,6 +287,83 @@ fn remote_authz_fails_closed_when_scope_contract_is_missing() {
 
     assert_eq!(error, RemoteAuthError::MissingScopeContract);
     assert_eq!(typed_status(error.status_code()), StatusCode::FORBIDDEN);
+}
+
+#[test]
+fn execution_scope_authorizes_only_private_executor_operations() {
+    let executor = remote_client(
+        "executor",
+        RemoteRole::ExecutionCoordinator,
+        &[RemoteAccessScope::Execute],
+    );
+
+    let decision = authorize_remote_execution_operation(&executor, "offer")
+        .expect("dedicated executor operation");
+    assert_eq!(decision.required_scope, RemoteAccessScope::Execute);
+    assert_eq!(
+        decision.target,
+        RemoteAuthTarget::Execution { operation: "offer" }
+    );
+    assert_eq!(
+        authorize_remote_http_route(&executor, http_route(http_paths::READY))
+            .expect_err("executor must not read daemon routes"),
+        RemoteAuthError::InsufficientScope
+    );
+
+    for (role, scopes) in [
+        (RemoteRole::Viewer, vec![RemoteAccessScope::Read]),
+        (
+            RemoteRole::Operator,
+            vec![RemoteAccessScope::Read, RemoteAccessScope::Write],
+        ),
+        (
+            RemoteRole::Admin,
+            vec![
+                RemoteAccessScope::Read,
+                RemoteAccessScope::Write,
+                RemoteAccessScope::Admin,
+            ],
+        ),
+    ] {
+        let client = remote_client(role.as_str(), role, &scopes);
+        assert_eq!(
+            authorize_remote_execution_operation(&client, "claim")
+                .expect_err("generic daemon role must not execute"),
+            RemoteAuthError::InsufficientScope
+        );
+    }
+}
+
+#[test]
+fn revoked_execution_coordinator_token_cannot_be_reauthenticated() {
+    let db = crate::daemon::db::DaemonDb::open_in_memory().expect("daemon database");
+    let registration = crate::daemon::remote_identity::RemoteClientRegistration::new_for_tests(
+        "executor-revoked",
+        "Remote executor",
+        "linux",
+        RemoteRole::ExecutionCoordinator,
+        &[],
+        "executor-token-secret",
+        "2026-07-19T12:00:00Z",
+    )
+    .expect("executor registration");
+    db.register_remote_client(&registration)
+        .expect("register executor");
+    assert!(
+        db.verify_remote_client_token("executor-revoked", "executor-token-secret")
+            .expect("verify active executor")
+            .is_some()
+    );
+
+    assert!(
+        db.revoke_remote_client("executor-revoked", "2026-07-19T12:01:00Z")
+            .expect("revoke executor")
+    );
+    assert!(
+        db.verify_remote_client_token("executor-revoked", "executor-token-secret")
+            .expect("verify revoked executor")
+            .is_none()
+    );
 }
 
 fn typed_status(status: StatusCode) -> StatusCode {

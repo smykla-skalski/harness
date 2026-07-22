@@ -2,11 +2,20 @@
 // library test target for `--all-targets` even when Cargo marks it disabled.
 #![cfg(not(test))]
 #![deny(unsafe_code)]
+// The standalone wrapper unifies the full remote-controller feature graph.
+// Boxing each propagated await solely for this lint would add allocations to
+// production lifecycle paths; size-focused async refactoring belongs in a
+// dedicated follow-up.
+#![allow(clippy::large_futures)]
 
 use tracing::Level;
 
 pub mod agents;
 pub mod app;
+// This crate re-includes the daemon subtree without its test targets (cfg
+// not(test) above), so items reached only from the root crate's tests or a
+// not-yet-wired feature path read as dead here; the root crate lints them.
+#[allow(dead_code, unused_imports)]
 #[path = "../../../src/daemon/mod.rs"]
 pub mod daemon;
 #[path = "../../../src/errors/mod.rs"]

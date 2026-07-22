@@ -7,12 +7,15 @@ use serde::de::DeserializeOwned;
 use sqlx::{Sqlite, Transaction, query, query_as};
 
 use super::mapper::{machine_from_row, parse_json, to_json};
+use super::remote_assignment_start_authority::refuse_settings_replacement_during_executor_start_io;
+use super::remote_hosts::sync_remote_hosts_in_tx;
 use super::rows::MachineRow;
 use super::{MACHINES_CHANGE_SCOPE, ORCHESTRATOR_CHANGE_SCOPE, RUNTIME_CONFIG_CHANGE_SCOPE};
 use crate::daemon::db::task_board::items::bump_change_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::task_board::{
     Machine, TaskBoardGitRuntimeConfig, TaskBoardOrchestratorSettings, TaskBoardOrchestratorState,
+    validate_local_execution_host_config, validate_remote_execution_configuration,
 };
 
 pub(super) struct TaskBoardOrchestratorSettingsMutation {
@@ -269,6 +272,9 @@ pub(super) async fn replace_orchestrator_settings_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     settings: &TaskBoardOrchestratorSettings,
 ) -> Result<TaskBoardOrchestratorSettingsMutation, CliError> {
+    validate_remote_execution_configuration(&settings.execution_hosts, &settings.repositories)?;
+    validate_local_execution_host_config(&settings.local_execution_host)?;
+    refuse_settings_replacement_during_executor_start_io(transaction).await?;
     query(
         "INSERT INTO task_board_orchestrator_settings (
             singleton, settings_json, revision, updated_at
@@ -289,6 +295,7 @@ pub(super) async fn replace_orchestrator_settings_in_tx(
     .await
     .map(|row| row.0)
     .map_err(|error| db_error(format!("read orchestrator settings revision: {error}")))?;
+    sync_remote_hosts_in_tx(transaction, settings, row_revision).await?;
     let change_revision = bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
     Ok(TaskBoardOrchestratorSettingsMutation {
         row_revision,

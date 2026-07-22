@@ -14,7 +14,9 @@ use crate::agents::acp::permission::recording_log_path_for_session;
 use crate::agents::acp::supervision::{AcpSessionSupervisor, SupervisedProcess, SupervisionConfig};
 use crate::errors::{CliError, CliErrorKind};
 
-use super::super::active::{ActiveAcpProcess, ActiveAcpTasks, SharedStderrTail, spawn_event_forwarder};
+use super::super::active::{
+    ActiveAcpProcess, ActiveAcpTasks, SharedStderrTail, spawn_event_forwarder,
+};
 use super::super::manager::{AcpAgentManagerHandle, AcpAgentSnapshot};
 use super::super::permission_bridge::PermissionBridgeHandle;
 use super::super::prompt_gate::PromptGate;
@@ -113,7 +115,10 @@ impl AcpAgentManagerHandle {
         Ok(snapshot)
     }
 
-    fn build_remote_process_context(&self, input: DescriptorStartInput<'_>) -> StartedProcessContext {
+    fn build_remote_process_context(
+        &self,
+        input: DescriptorStartInput<'_>,
+    ) -> StartedProcessContext {
         let supervisor = Arc::new(AcpSessionSupervisor::with_process(
             SupervisedProcess::remote(),
             SupervisionConfig::default()
@@ -247,16 +252,13 @@ mod tests {
 
     #[test]
     fn resolves_header_env_and_builds_the_client() {
-        temp_env::with_vars(
-            [("HARNESS_TEST_ACP_TOKEN", Some("secret-value"))],
-            || {
-                build_http_client(&endpoint(
-                    "https://acp.example.test",
-                    &[("Authorization", "HARNESS_TEST_ACP_TOKEN")],
-                ))
-                .expect("client builds from a resolved env header");
-            },
-        );
+        temp_env::with_vars([("HARNESS_TEST_ACP_TOKEN", Some("secret-value"))], || {
+            build_http_client(&endpoint(
+                "https://acp.example.test",
+                &[("Authorization", "HARNESS_TEST_ACP_TOKEN")],
+            ))
+            .expect("client builds from a resolved env header");
+        });
     }
 
     #[test]

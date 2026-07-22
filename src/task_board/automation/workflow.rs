@@ -15,6 +15,15 @@ pub enum TaskBoardWorkflowKind {
     Review,
 }
 
+impl TaskBoardWorkflowKind {
+    /// Write workflows perform publishing side effects, so they require Headless
+    /// dispatch and configured publication automation; other kinds are read-only.
+    #[must_use]
+    pub const fn is_write(self) -> bool {
+        matches!(self, Self::DefaultTask | Self::PrFix)
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskBoardExecutionPhase {

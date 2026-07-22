@@ -8,8 +8,8 @@ use super::super::types::{TaskBoardStatus, TaskBoardWorkflowStatus};
 use super::super::{
     TaskBoardAutomationPolicy, TaskBoardAutomationRetrySettings,
     TaskBoardAutomationSchedulingSettings, TaskBoardExecutionHostConfig,
-    TaskBoardPolicyCompilationError, TaskBoardRepositoryAutomationConfig,
-    TaskBoardReviewerSettings, validate_task_board_policy,
+    TaskBoardLocalExecutionHostConfig, TaskBoardPolicyCompilationError,
+    TaskBoardRepositoryAutomationConfig, TaskBoardReviewerSettings, validate_task_board_policy,
 };
 
 pub use crate::task_board::github::GitHubProjectConfig as TaskBoardGitHubProjectConfig;
@@ -59,6 +59,8 @@ pub struct TaskBoardOrchestratorSettings {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub execution_hosts: Vec<TaskBoardExecutionHostConfig>,
     #[serde(default)]
+    pub local_execution_host: TaskBoardLocalExecutionHostConfig,
+    #[serde(default)]
     pub admission_policy: TaskBoardAutomationPolicy,
     #[serde(default = "default_policy_version")]
     pub policy_version: String,
@@ -96,6 +98,8 @@ pub struct TaskBoardOrchestratorSettingsUpdateRequest {
     pub repositories: Option<Vec<TaskBoardRepositoryAutomationConfig>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_hosts: Option<Vec<TaskBoardExecutionHostConfig>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub local_execution_host: Option<TaskBoardLocalExecutionHostConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub admission_policy: Option<TaskBoardAutomationPolicy>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -261,6 +265,7 @@ impl Default for TaskBoardOrchestratorSettings {
             reviewers: TaskBoardReviewerSettings::default(),
             repositories: Vec::new(),
             execution_hosts: Vec::new(),
+            local_execution_host: TaskBoardLocalExecutionHostConfig::default(),
             admission_policy: TaskBoardAutomationPolicy::default(),
             policy_version: default_policy_version(),
         }

@@ -76,7 +76,10 @@ pub(super) async fn active_reservation(
     let row = query_as::<_, (String, String, String)>(
         "SELECT intent_id, status, payload_json FROM task_board_dispatch_intents
          WHERE item_id = ?1
-           AND status IN ('preparing', 'preparing_claimed', 'held', 'pending', 'starting')
+           AND status IN (
+               'preparing', 'preparing_claimed', 'held', 'pending', 'starting',
+               'workflow_prepared'
+           )
          ORDER BY created_at DESC LIMIT 1",
     )
     .bind(item_id)

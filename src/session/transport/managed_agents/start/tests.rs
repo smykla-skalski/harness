@@ -187,7 +187,10 @@ fn build_endpoint_maps_header_names_to_env_vars() {
     .expect("build endpoint");
     assert_eq!(endpoint.url, "https://acp.example.test");
     assert_eq!(
-        endpoint.headers_env.get("Authorization").map(String::as_str),
+        endpoint
+            .headers_env
+            .get("Authorization")
+            .map(String::as_str),
         Some("REMOTE_ACP_TOKEN"),
         "the map records the env var name, not the token"
     );

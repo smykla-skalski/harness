@@ -1,10 +1,12 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::time::Duration;
 
 use async_trait::async_trait;
 use tokio::sync::Semaphore;
 
+use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{CodexRunRequest, CodexRunSnapshot, CodexRunStatus};
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::{
@@ -76,6 +78,7 @@ enum HeadBehavior {
 }
 
 pub(super) struct FakeReadOnlyRuntime {
+    durable_db: Option<AsyncDaemonDb>,
     reports: Mutex<VecDeque<PlannedReport>>,
     runs: Mutex<BTreeMap<String, CodexRunSnapshot>>,
     head: Mutex<HeadBehavior>,
@@ -100,6 +103,7 @@ pub(super) struct FakeReadOnlyRuntime {
 impl FakeReadOnlyRuntime {
     pub(super) fn new(reports: impl IntoIterator<Item = PlannedReport>) -> Self {
         Self {
+            durable_db: None,
             reports: Mutex::new(reports.into_iter().collect()),
             runs: Mutex::new(BTreeMap::new()),
             head: Mutex::new(HeadBehavior::Exact(FROZEN_HEAD.into())),
@@ -120,6 +124,11 @@ impl FakeReadOnlyRuntime {
             verification_error: Mutex::new(None),
             verifications: AtomicUsize::new(0),
         }
+    }
+
+    pub(super) fn with_durable_db(mut self, db: AsyncDaemonDb) -> Self {
+        self.durable_db = Some(db);
+        self
     }
 
     pub(super) fn set_head(&self, head: &str) {
@@ -166,9 +175,9 @@ impl FakeReadOnlyRuntime {
     }
 
     pub(super) async fn wait_for_report_start(&self) {
-        self.report_entered
-            .acquire()
+        tokio::time::timeout(Duration::from_secs(5), self.report_entered.acquire())
             .await
+            .expect("timed out waiting for report entry")
             .expect("report entry semaphore")
             .forget();
     }
@@ -186,9 +195,9 @@ impl FakeReadOnlyRuntime {
     }
 
     pub(super) async fn wait_for_publish(&self) {
-        self.publish_entered
-            .acquire()
+        tokio::time::timeout(Duration::from_secs(5), self.publish_entered.acquire())
             .await
+            .expect("timed out waiting for publish entry")
             .expect("publish entry semaphore")
             .forget();
     }
@@ -223,6 +232,9 @@ impl TaskBoardReadOnlyRuntime for FakeReadOnlyRuntime {
     ) -> Result<Option<CodexRunSnapshot>, CliError> {
         if let Some(detail) = self.load_error.lock().expect("load error lock").take() {
             return Err(CliErrorKind::workflow_io(detail).into());
+        }
+        if let Some(db) = &self.durable_db {
+            return db.codex_run(run_id).await;
         }
         Ok(self.runs.lock().expect("runs lock").get(run_id).cloned())
     }
@@ -270,7 +282,23 @@ impl TaskBoardReadOnlyRuntime for FakeReadOnlyRuntime {
             exact_head_revision: FROZEN_HEAD.into(),
             artifact: plan.artifact,
         };
-        let run = planned_run(session_id, request, run_id, &result, status)?;
+        let project_dir = if let Some(db) = &self.durable_db {
+            db.resolve_session(session_id)
+                .await?
+                .ok_or_else(|| {
+                    CliError::from(CliErrorKind::session_not_found(session_id.to_string()))
+                })?
+                .state
+                .worktree_path
+                .to_string_lossy()
+                .into_owned()
+        } else {
+            "/tmp/read-only-worktree".into()
+        };
+        let run = planned_run(session_id, request, run_id, &project_dir, &result, status)?;
+        if let Some(db) = &self.durable_db {
+            db.save_codex_run(&run).await?;
+        }
         self.runs
             .lock()
             .expect("runs lock")
@@ -383,6 +411,7 @@ fn planned_run(
     session_id: &str,
     request: &CodexRunRequest,
     run_id: &str,
+    project_dir: &str,
     result: &TaskBoardLocalAttemptResult,
     status: CodexRunStatus,
 ) -> Result<CodexRunSnapshot, CliError> {
@@ -394,7 +423,7 @@ fn planned_run(
         workflow_execution_id: request.workflow_execution_id.clone(),
         session_agent_id: Some(format!("agent-{run_id}")),
         display_name: request.name.clone(),
-        project_dir: "/tmp/read-only-worktree".into(),
+        project_dir: project_dir.into(),
         thread_id: Some(format!("thread-{run_id}")),
         turn_id: Some(format!("turn-{run_id}")),
         mode: request.mode,

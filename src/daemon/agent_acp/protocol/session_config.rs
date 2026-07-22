@@ -1,8 +1,7 @@
 use agent_client_protocol::schema::v1::{
-    SessionConfigKind, SessionConfigOption, SessionConfigOptionCategory,
-    SessionConfigOptionValue, SessionConfigSelect, SessionConfigSelectGroup,
-    SessionConfigSelectOption, SessionConfigSelectOptions, SessionId,
-    SetSessionConfigOptionRequest,
+    SessionConfigKind, SessionConfigOption, SessionConfigOptionCategory, SessionConfigOptionValue,
+    SessionConfigSelect, SessionConfigSelectGroup, SessionConfigSelectOption,
+    SessionConfigSelectOptions, SessionId, SetSessionConfigOptionRequest,
 };
 use agent_client_protocol::{
     Agent, ConnectionTo, Error as AcpError, Result as AcpResult, UntypedMessage,
@@ -12,8 +11,8 @@ use crate::agents::acp::catalog::{
     AcpAgentDescriptor, AcpSessionConfigOptionBinding, AcpSessionConfiguration,
     AcpSessionEffortTransport, AcpSessionModelTransport,
 };
-use crate::daemon::agent_acp::AcpMcpServer;
 use crate::agents::acp::supervision::AcpSessionSupervisor;
+use crate::daemon::agent_acp::AcpMcpServer;
 use crate::daemon::agent_acp::manager::AcpAgentStartRequest;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

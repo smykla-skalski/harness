@@ -40,17 +40,7 @@ where
         }
         None if !allow_start => return Ok(false),
         None => {
-            let starting = transition_attempt(
-                db,
-                attempt,
-                TaskBoardAttemptState::Starting,
-                now,
-                None,
-                None,
-                None,
-            )
-            .await?;
-            let Some(claimed) = claim_report_side_effect(db, &starting, now).await? else {
+            let Some(claimed) = claim_report_side_effect(db, attempt, now).await? else {
                 return Ok(true);
             };
             let session_id = super::requests::run_context(execution)?.session_id.as_str();
@@ -85,6 +75,8 @@ where
         mark_unknown(db, execution, &durable_attempt, now, &error.to_string()).await?;
         return Ok(true);
     }
+    db.complete_task_board_workflow_dispatch_start(&execution.execution_id)
+        .await?;
     handle_run_status(db, execution, &durable_attempt, run, now).await?;
     Ok(true)
 }
@@ -168,31 +160,52 @@ where
 
 async fn claim_report_side_effect(
     db: &AsyncDaemonDb,
-    starting: &TaskBoardExecutionAttemptRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
     now: &str,
 ) -> Result<Option<TaskBoardExecutionAttemptRecord>, CliError> {
-    let execution = db
-        .task_board_workflow_execution(&starting.execution_id)
-        .await?
-        .ok_or_else(|| invalid_transition("workflow execution disappeared before report claim"))?;
-    let current = execution
-        .attempts
-        .iter()
-        .find(|attempt| {
-            attempt.action_key == starting.action_key && attempt.attempt == starting.attempt
-        })
-        .ok_or_else(|| invalid_transition("workflow attempt disappeared before report claim"))?;
-    let mut claimed = current.clone();
-    claimed.state = TaskBoardAttemptState::Running;
-    claimed.updated_at = now.to_string();
-    claimed.available_at = Some(report_claim_deadline(now)?);
-    db.claim_task_board_workflow_side_effect(
-        &TaskBoardWorkflowExecutionCas::from(&execution),
-        &TaskBoardExecutionAttemptCas::from(current),
-        &claimed,
-        now,
-    )
-    .await
+    loop {
+        let execution = db
+            .task_board_workflow_execution(&attempt.execution_id)
+            .await?
+            .ok_or_else(|| {
+                invalid_transition("workflow execution disappeared before report claim")
+            })?;
+        let current = execution
+            .attempts
+            .iter()
+            .find(|current| {
+                current.action_key == attempt.action_key && current.attempt == attempt.attempt
+            })
+            .ok_or_else(|| {
+                invalid_transition("workflow attempt disappeared before report claim")
+            })?;
+        // The claim needs an execution target; when the remote controller has not selected one,
+        // the coordinator selects local itself (a no-op once targeted or fenced by a remote
+        // assignment). Selection advances the attempt to Starting, so reload before the claim.
+        if current.state == TaskBoardAttemptState::Preparing
+            && db
+                .select_task_board_local_execution_target(
+                    &TaskBoardWorkflowExecutionCas::from(&execution),
+                    &TaskBoardExecutionAttemptCas::from(current),
+                    now,
+                )
+                .await?
+        {
+            continue;
+        }
+        let mut claimed = current.clone();
+        claimed.state = TaskBoardAttemptState::Running;
+        claimed.updated_at = now.to_string();
+        claimed.available_at = Some(report_claim_deadline(now)?);
+        return db
+            .claim_task_board_workflow_side_effect(
+                &TaskBoardWorkflowExecutionCas::from(&execution),
+                &TaskBoardExecutionAttemptCas::from(current),
+                &claimed,
+                now,
+            )
+            .await;
+    }
 }
 
 fn report_claim_deadline(now: &str) -> Result<String, CliError> {

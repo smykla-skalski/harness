@@ -16,6 +16,7 @@ pub mod policy_graph;
 #[cfg(feature = "daemon-runtime")]
 pub mod policy_runtime;
 pub mod progress_rollup;
+pub(crate) mod remote_spki_pin;
 pub mod runtime_config;
 pub mod store;
 pub mod summary;

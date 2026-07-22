@@ -8,9 +8,9 @@ use crate::daemon::state::{self, HostBridgeCapabilityManifest};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::write_text;
 
+use super::codex_process::{spawn_codex_monitor, spawn_codex_process};
 use super::core::{BridgeActiveTui, BridgeCodexProcess, ResolvedBridgeConfig};
 use super::helpers::{launch_agent_plist_path, render_launch_agent_plist, stringify_metadata_map};
-use super::codex_process::{spawn_codex_monitor, spawn_codex_process};
 use super::server::BridgeServer;
 use super::types::{
     BRIDGE_CAPABILITY_ACP, BRIDGE_CAPABILITY_AGENT_TUI, BRIDGE_CAPABILITY_CODEX, BridgeCapability,

@@ -44,10 +44,7 @@ pub(super) fn blocked(reason: DispatchBlockReason) -> DispatchReadiness {
 }
 
 const fn is_write_workflow(kind: TaskBoardWorkflowKind) -> bool {
-    matches!(
-        kind,
-        TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
-    )
+    kind.is_write()
 }
 
 fn mode_block(policy: &PolicyDecision) -> PolicyDecision {

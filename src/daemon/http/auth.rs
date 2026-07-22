@@ -10,9 +10,11 @@ use crate::daemon::protocol::{
     with_control_plane_actor,
 };
 use crate::daemon::remote_auth::{
-    REMOTE_CLIENT_ID_HEADER, RemoteAuthError, RemoteBearerCredentials, authorize_remote_http_route,
+    REMOTE_CLIENT_ID_HEADER, RemoteAuthError, RemoteBearerCredentials,
+    authorize_remote_execution_operation, authorize_remote_http_route,
 };
 use crate::daemon::remote_identity::RemoteStoredClient;
+use crate::daemon::task_board_remote_transport::routes::execution_operation;
 
 use super::auth_audit::RemoteHttpAuditContext;
 use super::{DaemonHttpState, auth_audit};
@@ -30,9 +32,43 @@ pub enum DaemonHttpAuthMode {
     Remote,
 }
 
+#[derive(Clone, Copy)]
+enum RemoteHttpAuthorizationTarget {
+    Contract(&'static HttpApiRouteContract),
+    Execution { operation: &'static str },
+}
+
+impl RemoteHttpAuthorizationTarget {
+    fn resolve(method: &Method, path: &str) -> Option<Self> {
+        if let Some(operation) = execution_operation(method, path) {
+            return Some(Self::Execution { operation });
+        }
+        http_route_contract(method, path).map(Self::Contract)
+    }
+
+    fn audit_context(
+        self,
+        request: &Request<Body>,
+    ) -> Result<RemoteHttpAuditContext, RemoteAuthError> {
+        match self {
+            Self::Contract(route) => RemoteHttpAuditContext::from_request(request, route),
+            Self::Execution { .. } => Ok(RemoteHttpAuditContext::from_execution_request(request)),
+        }
+    }
+
+    fn authorize(self, client: &RemoteStoredClient) -> Result<(), RemoteAuthError> {
+        match self {
+            Self::Contract(route) => authorize_remote_http_route(client, route).map(|_| ()),
+            Self::Execution { operation } => {
+                authorize_remote_execution_operation(client, operation).map(|_| ())
+            }
+        }
+    }
+}
+
 pub(super) struct RemoteHttpLimitAudit {
     context: RemoteHttpAuditContext,
-    route: &'static HttpApiRouteContract,
+    target: RemoteHttpAuthorizationTarget,
     headers: HeaderMap,
 }
 
@@ -41,12 +77,12 @@ impl RemoteHttpLimitAudit {
         request: &Request<Body>,
         state: &DaemonHttpState,
     ) -> Result<Option<Self>, Box<Response>> {
-        let Some((context, route)) = remote_http_limit_audit_target(request, state)? else {
+        let Some((context, target)) = remote_http_limit_audit_target(request, state)? else {
             return Ok(None);
         };
         Ok(Some(Self {
             context,
-            route,
+            target,
             headers: remote_limit_auth_headers(request.headers()),
         }))
     }
@@ -60,7 +96,7 @@ impl RemoteHttpLimitAudit {
             &self.context,
             &self.headers,
             state,
-            self.route,
+            self.target,
             error_detail,
         )
         .await
@@ -109,6 +145,21 @@ pub(crate) fn authenticated_remote_client(
     }
 }
 
+pub(crate) fn require_execution_remote_client(
+    headers: &HeaderMap,
+    state: &DaemonHttpState,
+    operation: &'static str,
+) -> Result<RemoteStoredClient, Box<Response>> {
+    let client = authenticated_remote_client(headers, state)?.ok_or_else(|| {
+        Box::new(remote_auth_error_response(
+            RemoteAuthError::InsufficientScope,
+        ))
+    })?;
+    authorize_remote_execution_operation(&client, operation)
+        .map(|_| client)
+        .map_err(|error| Box::new(remote_auth_error_response(error)))
+}
+
 #[cfg(test)]
 pub(crate) fn authorize_http_route(
     headers: &HeaderMap,
@@ -149,25 +200,20 @@ async fn authorize_remote_http_request_inner(
     if is_public_remote_http_route(request.method(), route_path) {
         return next.run(request).await;
     }
-    let Some(route) = http_route_contract(request.method(), route_path) else {
+    let Some(target) = RemoteHttpAuthorizationTarget::resolve(request.method(), route_path) else {
         return remote_auth_error_response(RemoteAuthError::MissingScopeContract);
     };
-    let audit = match RemoteHttpAuditContext::from_request(&request, route) {
+    let audit = match target.audit_context(&request) {
         Ok(audit) => audit,
         Err(error) => return remote_auth_error_response(error),
     };
     let verification = verify_remote_client(request.headers(), state);
-    let client = match authenticate_and_audit_remote_http_request(
-        &audit,
-        verification,
-        state,
-        route,
-    )
-    .await
-    {
-        Ok(client) => client,
-        Err(response) => return *response,
-    };
+    let client =
+        match authenticate_and_audit_remote_http_request(&audit, verification, state, target).await
+        {
+            Ok(client) => client,
+            Err(response) => return *response,
+        };
     let actor = client.control_plane_actor_id();
     let response = REMOTE_HTTP_CLIENT
         .scope(client, with_control_plane_actor(actor, next.run(request)))
@@ -195,7 +241,7 @@ async fn authenticate_and_audit_remote_http_request(
     audit: &RemoteHttpAuditContext,
     verification: Result<RemoteStoredClient, Box<Response>>,
     state: &DaemonHttpState,
-    route: &HttpApiRouteContract,
+    target: RemoteHttpAuthorizationTarget,
 ) -> Result<RemoteStoredClient, Box<Response>> {
     let client = match verification {
         Ok(client) => client,
@@ -205,7 +251,7 @@ async fn authenticate_and_audit_remote_http_request(
             ));
         }
     };
-    authorize_and_audit_remote_http_client(audit, state, route, client).await
+    authorize_and_audit_remote_http_client(audit, state, target, client).await
 }
 
 async fn audit_verification_failure(
@@ -223,10 +269,10 @@ async fn audit_verification_failure(
 async fn authorize_and_audit_remote_http_client(
     audit: &RemoteHttpAuditContext,
     state: &DaemonHttpState,
-    route: &HttpApiRouteContract,
+    target: RemoteHttpAuthorizationTarget,
     client: RemoteStoredClient,
 ) -> Result<RemoteStoredClient, Box<Response>> {
-    if let Err(error) = authorize_remote_http_route(&client, route) {
+    if let Err(error) = target.authorize(&client) {
         return match audit
             .record_denied(state, Some(&client.client_id), &error.to_string())
             .await
@@ -276,7 +322,7 @@ fn is_public_remote_http_route(method: &Method, route_path: &str) -> bool {
 fn remote_http_limit_audit_target(
     request: &Request<Body>,
     state: &DaemonHttpState,
-) -> Result<Option<(RemoteHttpAuditContext, &'static HttpApiRouteContract)>, Box<Response>> {
+) -> Result<Option<(RemoteHttpAuditContext, RemoteHttpAuthorizationTarget)>, Box<Response>> {
     if state.auth_mode == DaemonHttpAuthMode::Local {
         return Ok(None);
     }
@@ -290,21 +336,23 @@ fn remote_http_limit_audit_target(
     if is_public_remote_http_route(request.method(), route_path) {
         return Ok(None);
     }
-    let route = http_route_contract(request.method(), route_path).ok_or_else(|| {
-        Box::new(remote_auth_error_response(
-            RemoteAuthError::MissingScopeContract,
-        ))
-    })?;
-    let context = RemoteHttpAuditContext::from_request(request, route)
+    let target =
+        RemoteHttpAuthorizationTarget::resolve(request.method(), route_path).ok_or_else(|| {
+            Box::new(remote_auth_error_response(
+                RemoteAuthError::MissingScopeContract,
+            ))
+        })?;
+    let context = target
+        .audit_context(request)
         .map_err(|error| Box::new(remote_auth_error_response(error)))?;
-    Ok(Some((context, route)))
+    Ok(Some((context, target)))
 }
 
 async fn record_remote_http_limit_rejection(
     audit: &RemoteHttpAuditContext,
     headers: &HeaderMap,
     state: &DaemonHttpState,
-    route: &HttpApiRouteContract,
+    target: RemoteHttpAuthorizationTarget,
     error_detail: &str,
 ) -> Result<(), Box<Response>> {
     match audit.amend_recorded_failure(state, error_detail).await {
@@ -313,7 +361,7 @@ async fn record_remote_http_limit_rejection(
         Err(error) => return Err(Box::new(auth_audit::unavailable_response(&error))),
     }
     let result = match verify_remote_client(headers, state) {
-        Ok(client) if authorize_remote_http_route(&client, route).is_ok() => {
+        Ok(client) if target.authorize(&client).is_ok() => {
             audit
                 .record_allowed_failure(state, &client.client_id, error_detail)
                 .await

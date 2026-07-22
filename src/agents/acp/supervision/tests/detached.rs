@@ -2,9 +2,7 @@
 //! works from an explicit `SupervisedProcess`, which is what a transport that
 //! did not spawn the agent supplies.
 
-use super::super::{
-    AcpSessionSupervisor, SupervisedProcess, SupervisionConfig, WatchdogState,
-};
+use super::super::{AcpSessionSupervisor, SupervisedProcess, SupervisionConfig, WatchdogState};
 
 #[tokio::test(start_paused = true)]
 async fn a_supervisor_built_without_a_child_reports_its_process() {

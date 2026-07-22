@@ -48,6 +48,10 @@ pub(crate) async fn dispatch(
     request: TaskBoardDispatchRequest,
 ) -> Result<TaskBoardDispatchResponse, CliError> {
     let async_db = require_async_db(state, "task board dispatch")?;
+    Box::pin(service::recover_remote_assignments_before_local_work(
+        state, async_db,
+    ))
+    .await?;
     let result = service::dispatch_task_board_async(&request, async_db).await;
     handle_dispatch_result(state, result, async_db).await
 }
@@ -57,6 +61,10 @@ pub(crate) async fn deliver(
     request: &TaskBoardDispatchDeliverRequest,
 ) -> Result<TaskBoardDispatchDeliverResponse, CliError> {
     let db = require_async_db(state, "task board dispatch deliver")?;
+    Box::pin(service::recover_remote_assignments_before_local_work(
+        state, db,
+    ))
+    .await?;
     if request.dry_run {
         let held = db.held_task_board_dispatch(&request.item_id).await?;
         return Ok(TaskBoardDispatchDeliverResponse {
@@ -73,7 +81,7 @@ pub(crate) async fn deliver(
         intent_id: claim.intent_id,
         applied: claim.applied,
         rendered_prompt: prompt,
-        started_agent: Some(agent),
+        started_agent: agent,
     })
 }
 
@@ -81,6 +89,10 @@ pub(crate) async fn pick(
     state: &DaemonHttpState,
 ) -> Result<TaskBoardDispatchPickResponse, CliError> {
     let db = require_async_db(state, "task board dispatch pick")?;
+    Box::pin(service::recover_remote_assignments_before_local_work(
+        state, db,
+    ))
+    .await?;
     service::pick_task_board_dispatch_async(db).await
 }
 
@@ -114,6 +126,10 @@ pub(crate) async fn run_once_with_trigger(
     trigger: TaskBoardAutomationRunTrigger,
 ) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
     let async_db = require_async_db(state, "task board orchestrator run once")?;
+    Box::pin(service::recover_remote_assignments_before_local_work(
+        state, async_db,
+    ))
+    .await?;
     if task_board_automation_v2_enabled_from_env() {
         return Box::pin(automation_run::run_once_durable(
             state, async_db, request, trigger,

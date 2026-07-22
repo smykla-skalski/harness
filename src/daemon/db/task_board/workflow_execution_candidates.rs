@@ -9,6 +9,14 @@ const SELECT_READY_EXECUTIONS: &str = "SELECT * FROM task_board_workflow_executi
     WHERE workflow_kind IN ('default_task', 'pr_fix', 'review', 'pr_review')
       AND completed_at IS NULL
       AND (state = 'pending' OR (state = 'retry_wait' AND available_at <= ?1))
+      AND NOT EXISTS (
+          SELECT 1 FROM task_board_remote_assignments AS remote
+          JOIN task_board_execution_hosts AS host USING (host_id)
+          WHERE remote.execution_id = task_board_workflow_executions.execution_id
+            AND host.host_role = 'controller_remote'
+            AND remote.legacy_migrated = 0
+            AND remote.state IN ('offered', 'claimed', 'started', 'running', 'unknown')
+      )
     ORDER BY COALESCE(available_at, created_at), updated_at, execution_id
     LIMIT ?2";
 const SELECT_PROJECTABLE_EXECUTIONS: &str = "SELECT execution.*

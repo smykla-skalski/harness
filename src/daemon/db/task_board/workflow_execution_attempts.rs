@@ -2,6 +2,8 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
+use super::remote_assignment_model::concurrent;
+use super::remote_assignment_stop_fence::{RemoteTargetStopPlan, remote_target_stop_plan_in_tx};
 use super::workflow_execution_rows::{ExecutionAttemptRow, attempt_artifact_json, label};
 use super::workflow_executions::{
     cas_mismatch, ensure_terminal_transition_has_no_active_side_effect, load_execution_in_tx,
@@ -9,12 +11,14 @@ use super::workflow_executions::{
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
-    TaskBoardAttemptResultArtifact, TaskBoardAttemptState, TaskBoardExecutionAttemptCas,
-    TaskBoardExecutionAttemptCasOutcome, TaskBoardExecutionAttemptCreateOutcome,
-    TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase, TaskBoardExecutionState,
-    TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
-    validate_task_board_attempt_update, validate_task_board_execution_attempt,
-    validate_task_board_execution_update, validate_task_board_workflow_execution,
+    TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE, TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
+    TASK_BOARD_EXECUTION_TARGET_RESOURCE, TaskBoardAttemptResultArtifact, TaskBoardAttemptState,
+    TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptCasOutcome,
+    TaskBoardExecutionAttemptCreateOutcome, TaskBoardExecutionAttemptRecord,
+    TaskBoardExecutionPhase, TaskBoardExecutionState, TaskBoardWorkflowExecutionCas,
+    TaskBoardWorkflowExecutionRecord, validate_task_board_attempt_update,
+    validate_task_board_execution_attempt, validate_task_board_execution_update,
+    validate_task_board_workflow_execution,
 };
 
 const SELECT_ATTEMPTS: &str = "SELECT * FROM task_board_execution_attempts
@@ -125,6 +129,7 @@ impl AsyncDaemonDb {
             })?;
             return Ok(TaskBoardExecutionAttemptCasOutcome::Stale(Some(current)));
         }
+        reject_active_remote_target_mutation(&parent, &current)?;
         validate_task_board_attempt_update(&current, updated)
             .map_err(|error| db_error(format!("validate execution attempt CAS: {error}")))?;
         validate_attempt_phase(&parent, updated)?;
@@ -192,6 +197,22 @@ impl AsyncDaemonDb {
             updated_attempt,
             &combined,
         )?;
+        match remote_target_stop_plan_in_tx(&mut transaction, &current, &combined).await? {
+            RemoteTargetStopPlan::PersistCancelIntent(parent) => {
+                update_execution_in_tx(&mut transaction, expected_execution, &parent).await?;
+                bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+                transaction.commit().await.map_err(|error| {
+                    db_error(format!("commit deferred remote cancellation CAS: {error}"))
+                })?;
+                return Ok(Some(parent));
+            }
+            RemoteTargetStopPlan::ReplayedCancelIntent(parent) => {
+                commit_atomic_cas_noop(transaction, "replayed remote cancellation").await?;
+                return Ok(Some(parent));
+            }
+            RemoteTargetStopPlan::ApplyRequested => {}
+        }
+        reject_active_remote_target_mutation(&current, &current_attempt)?;
         update_execution_in_tx(&mut transaction, expected_execution, &combined).await?;
         update_attempt_in_tx(&mut transaction, expected_attempt, updated_attempt).await?;
         bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
@@ -201,6 +222,31 @@ impl AsyncDaemonDb {
             ))
         })?;
         Ok(Some(combined))
+    }
+}
+
+fn reject_active_remote_target_mutation(
+    parent: &TaskBoardWorkflowExecutionRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
+) -> Result<(), CliError> {
+    let resources = &parent.ownership.resources;
+    let exact_remote = resources
+        .get(TASK_BOARD_EXECUTION_TARGET_RESOURCE)
+        .is_some_and(|target| target.starts_with("remote:"))
+        && resources.get(TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE) == Some(&attempt.action_key)
+        && resources
+            .get(TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE)
+            .is_some_and(|number| number == &attempt.attempt.to_string())
+        && matches!(
+            attempt.state,
+            TaskBoardAttemptState::Starting | TaskBoardAttemptState::Running
+        );
+    if exact_remote {
+        Err(concurrent(
+            "active remote attempt requires the dedicated remote lifecycle CAS",
+        ))
+    } else {
+        Ok(())
     }
 }
 

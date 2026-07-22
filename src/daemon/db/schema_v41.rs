@@ -62,7 +62,7 @@ mod tests {
     fn current_schema_has_parent_link_columns_and_index() {
         let db = DaemonDb::open_in_memory().expect("open daemon db");
 
-        assert_eq!(db.schema_version().expect("schema version"), "42");
+        assert_eq!(db.schema_version().expect("schema version"), "43");
         for column in ["parent_item_id", "child_order"] {
             let exists: i64 = db
                 .connection()

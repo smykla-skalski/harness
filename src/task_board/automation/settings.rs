@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-use crate::task_board::{AgentMode, TaskBoardOrchestratorWorkflow};
+use crate::task_board::{
+    AgentMode, TaskBoardOrchestratorWorkflow, TaskBoardPhaseCapabilityProfile,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskBoardAutomationSchedulingSettings {
@@ -106,6 +108,8 @@ pub struct TaskBoardRepositoryAutomationConfig {
     pub workflows: Vec<TaskBoardOrchestratorWorkflow>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preferred_host_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_checkout_path: Option<String>,
 }
 
 impl Default for TaskBoardRepositoryAutomationConfig {
@@ -115,18 +119,45 @@ impl Default for TaskBoardRepositoryAutomationConfig {
             enabled: true,
             workflows: Vec::new(),
             preferred_host_id: None,
+            execution_checkout_path: None,
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TaskBoardExecutionHostConfig {
     pub host_id: String,
     pub endpoint: String,
+    /// Canonical `sha256/<base64>` SPKI continuity pin emitted by remote pairing.
     pub certificate_fingerprint: String,
     pub credential_reference: String,
     #[serde(default = "default_true")]
     pub enabled: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TaskBoardLocalExecutionRepositoryConfig {
+    pub repository: String,
+    pub checkout_path: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TaskBoardLocalExecutionHostConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub host_id: String,
+    #[serde(default)]
+    pub capacity: u32,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub repositories: Vec<TaskBoardLocalExecutionRepositoryConfig>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub runtimes: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub capabilities: Vec<TaskBoardPhaseCapabilityProfile>,
 }
 
 const fn default_true() -> bool {

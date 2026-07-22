@@ -95,6 +95,9 @@ async fn prepare_lifecycle_attempt(
     attempt: &TaskBoardExecutionAttemptRecord,
     now: &str,
 ) -> Result<TaskBoardExecutionAttemptRecord, CliError> {
+    if execution.transition.phase == Some(TaskBoardExecutionPhase::Publish) {
+        return Ok(attempt.clone());
+    }
     let starting = if attempt.state == TaskBoardAttemptState::Preparing {
         transition_attempt(
             db,
@@ -135,7 +138,10 @@ async fn reconcile_publish<R>(
 where
     R: TaskBoardReadOnlyRuntime,
 {
-    if attempt.state == TaskBoardAttemptState::Starting {
+    if matches!(
+        attempt.state,
+        TaskBoardAttemptState::Preparing | TaskBoardAttemptState::Starting
+    ) {
         let Some(claimed) = claim_lifecycle_attempt(db, execution, attempt, now, true).await?
         else {
             return Ok(());
@@ -289,7 +295,10 @@ async fn claim_lifecycle_attempt(
                 current.action_key == attempt.action_key && current.attempt == attempt.attempt
             })
             .ok_or_else(|| invalid_transition("publish attempt disappeared before claim"))?;
-        if current.state != TaskBoardAttemptState::Starting {
+        if !matches!(
+            current.state,
+            TaskBoardAttemptState::Preparing | TaskBoardAttemptState::Starting
+        ) {
             return Ok(None);
         }
         claimed = current.clone();
@@ -456,8 +465,5 @@ where
 }
 
 const fn is_write(kind: TaskBoardWorkflowKind) -> bool {
-    matches!(
-        kind,
-        TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
-    )
+    kind.is_write()
 }

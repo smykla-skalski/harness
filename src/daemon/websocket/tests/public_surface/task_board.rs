@@ -11,9 +11,24 @@ mod policy;
 
 #[test]
 fn websocket_task_board_dispatch_evaluate_and_run_once_use_real_state() {
+    // The full dispatch + evaluate + run-once chain is a deep async future whose unoptimized debug
+    // state machine exceeds the default test stack, so run it on a larger stack.
+    std::thread::Builder::new()
+        .stack_size(32 * 1024 * 1024)
+        .spawn(dispatch_evaluate_and_run_once_flow)
+        .expect("spawn large-stack test thread")
+        .join()
+        .expect("large-stack test thread");
+}
+
+fn dispatch_evaluate_and_run_once_flow() {
     let sandbox = tempdir().expect("tempdir");
     with_isolated_harness_env(sandbox.path(), || {
-        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .thread_stack_size(32 * 1024 * 1024)
+            .build()
+            .expect("runtime");
         runtime.block_on(async {
             let project_dir = sandbox.path().join("project");
             init_git_project(&project_dir);

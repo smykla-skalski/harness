@@ -73,10 +73,5 @@ fn require_expected_shape(stored_sql: &str) -> Result<(), CliError> {
 }
 
 fn normalize_sql(sql: &str) -> String {
-    sql.split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .replace("IF NOT EXISTS ", "")
-        .replace("if not exists ", "")
-        .to_ascii_lowercase()
+    super::schema_repairs::normalize_schema_sql(sql)
 }
