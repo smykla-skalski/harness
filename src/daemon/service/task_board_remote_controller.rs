@@ -51,12 +51,16 @@ pub(crate) struct TaskBoardRemoteControllerReport {
     blocked_host_ids: BTreeSet<String>,
 }
 
+#[expect(
+    clippy::large_futures,
+    reason = "boxing controller phases would allocate on every recovery-loop drive"
+)]
 pub(crate) async fn drive_task_board_remote_controller(
     db: &AsyncDaemonDb,
 ) -> Result<TaskBoardRemoteControllerReport, CliError> {
     let driver = CONTROLLER_DRIVER.lock().await;
     let mut report = TaskBoardRemoteControllerReport::default();
-    Box::pin(scan::progress_existing_assignments(db, &mut report)).await?;
+    scan::progress_existing_assignments(db, &mut report).await?;
     let blocked_hosts = report.blocked_host_ids.iter().cloned().collect();
     drop(driver);
     if report.scan_blocked {
@@ -66,7 +70,7 @@ pub(crate) async fn drive_task_board_remote_controller(
     if !report.scan_incomplete {
         refresh_hosts(db, &mut report).await?;
         let _driver = CONTROLLER_DRIVER.lock().await;
-        Box::pin(offer_remote_candidates(db, &mut report)).await?;
+        offer_remote_candidates(db, &mut report).await?;
     }
     Ok(report)
 }

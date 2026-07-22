@@ -187,15 +187,11 @@ impl RemoteRequestLimits {
     pub(crate) fn admit_unauthenticated_audit(
         &self,
         remote_addr: &str,
-    ) -> Result<RemoteUnauthenticatedAuditAdmission, CliError> {
+    ) -> RemoteUnauthenticatedAuditAdmission {
         self.unauthenticated_audit_limiter
             .lock()
-            .map_err(|_| {
-                CliError::from(CliErrorKind::workflow_io(
-                    "remote unauthenticated audit limiter is unavailable",
-                ))
-            })
-            .map(|mut limiter| limiter.admit(remote_addr))
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .admit(remote_addr)
     }
 
     #[must_use]
@@ -438,9 +434,11 @@ fn with_retry_after(mut response: Response) -> Response {
     if response.status() != StatusCode::TOO_MANY_REQUESTS {
         return response;
     }
-    response
-        .headers_mut()
-        .insert(RETRY_AFTER, HeaderValue::from_static("1"));
+    if !response.headers().contains_key(RETRY_AFTER) {
+        response
+            .headers_mut()
+            .insert(RETRY_AFTER, HeaderValue::from_static("1"));
+    }
     response
 }
 

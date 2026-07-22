@@ -37,6 +37,8 @@ pub(super) const HOST_INSTANCE: &str = "executor-acceptance-a";
 pub(super) const TOKEN_ENV: &str = "HARNESS_REMOTE_ACCEPTANCE_TOKEN";
 pub(super) const TOKEN: &str = "remote-acceptance-token-abcdefghijklmnopqrstuvwxyz";
 pub(super) const REPOSITORY: &str = "example/harness";
+pub(super) const FORK_REPOSITORY: &str = "contributor/harness";
+pub(super) const FORK_BRANCH: &str = "acceptance/fork";
 const SESSION_ID: &str = "remote-acceptance-session";
 const EXECUTION_ID: &str = "remote-acceptance-execution";
 const ITEM_ID: &str = "remote-acceptance-item";
@@ -47,7 +49,9 @@ pub(super) struct AcceptanceFixture {
     pub(super) controller_path: PathBuf,
     pub(super) executor_path: PathBuf,
     pub(super) controller_worktree: PathBuf,
+    pub(super) controller_fork_worktree: PathBuf,
     pub(super) executor_checkout: PathBuf,
+    pub(super) executor_fork_checkout: PathBuf,
 }
 
 pub(super) struct SeededExecution {
@@ -61,8 +65,10 @@ impl AcceptanceFixture {
         let controller_dir = tempfile::tempdir().expect("controller acceptance tempdir");
         let executor_dir = tempfile::tempdir().expect("executor acceptance tempdir");
         let controller_worktree = controller_dir.path().join("controller-worktree");
+        let controller_fork_worktree = controller_dir.path().join("controller-fork-worktree");
         let executor_checkout = executor_dir.path().join("executor-checkout");
-        init_repository(&controller_worktree, "controller source\n");
+        let executor_fork_checkout = executor_dir.path().join("executor-fork-checkout");
+        init_repository(&controller_worktree, REPOSITORY, "controller source\n");
         git(
             &controller_worktree,
             &["branch", "-f", &format!("harness/{SESSION_ID}"), "HEAD"],
@@ -71,18 +77,44 @@ impl AcceptanceFixture {
             &controller_worktree,
             &["switch", "--quiet", &format!("harness/{SESSION_ID}")],
         );
-        init_repository(&executor_checkout, "executor placeholder\n");
+        init_repository(
+            &controller_fork_worktree,
+            FORK_REPOSITORY,
+            "controller fork source\n",
+        );
+        git(
+            &controller_fork_worktree,
+            &["branch", "-f", FORK_BRANCH, "HEAD"],
+        );
+        git(
+            &controller_fork_worktree,
+            &["switch", "--quiet", FORK_BRANCH],
+        );
+        clone_repository(&controller_worktree, &executor_checkout, REPOSITORY);
+        clone_repository(
+            &controller_fork_worktree,
+            &executor_fork_checkout,
+            FORK_REPOSITORY,
+        );
         let controller_worktree = controller_worktree
             .canonicalize()
             .expect("canonical controller worktree");
+        let controller_fork_worktree = controller_fork_worktree
+            .canonicalize()
+            .expect("canonical controller fork worktree");
         let executor_checkout = executor_checkout
             .canonicalize()
             .expect("canonical executor checkout");
+        let executor_fork_checkout = executor_fork_checkout
+            .canonicalize()
+            .expect("canonical executor fork checkout");
         Self {
             controller_path: controller_dir.path().join("controller.db"),
             executor_path: executor_dir.path().join("executor.db"),
             controller_worktree,
+            controller_fork_worktree,
             executor_checkout,
+            executor_fork_checkout,
             _controller_dir: controller_dir,
             _executor_dir: executor_dir,
         }
@@ -445,7 +477,7 @@ fn implementation_attempt(now: &str) -> TaskBoardExecutionAttemptRecord {
     }
 }
 
-fn init_repository(path: &Path, content: &str) {
+fn init_repository(path: &Path, repository: &str, content: &str) {
     std::fs::create_dir_all(path).expect("create acceptance repository");
     git(path, &["init", "-q", "-b", "main"]);
     git(path, &["config", "user.name", "Harness Acceptance"]);
@@ -459,10 +491,29 @@ fn init_repository(path: &Path, content: &str) {
             "remote",
             "add",
             "origin",
-            "https://github.com/example/harness.git",
+            &format!("https://github.com/{repository}.git"),
         ],
     );
     std::fs::write(path.join("source.txt"), content).expect("write acceptance source");
     git(path, &["add", "source.txt"]);
     git(path, &["commit", "-qm", "source"]);
+}
+
+fn clone_repository(source: &Path, target: &Path, repository: &str) {
+    let output = Command::new("git")
+        .args(["clone", "--quiet"])
+        .arg(source)
+        .arg(target)
+        .output()
+        .expect("clone acceptance repository");
+    assert!(output.status.success(), "git clone failed: {output:?}");
+    git(
+        target,
+        &[
+            "remote",
+            "set-url",
+            "origin",
+            &format!("https://github.com/{repository}.git"),
+        ],
+    );
 }

@@ -44,6 +44,42 @@ fn unauthenticated_audit_retry_after_rounds_up_to_the_full_window() {
 }
 
 #[test]
+fn unauthenticated_audit_limiter_recovers_from_mutex_poisoning() {
+    let limits = RemoteRequestLimits::default();
+    let limiter = Arc::clone(&limits.unauthenticated_audit_limiter);
+    let poisoned = std::panic::catch_unwind(move || {
+        let _guard = limiter.lock().expect("lock limiter before poisoning");
+        panic!("poison the test limiter");
+    });
+
+    assert!(poisoned.is_err());
+    assert_eq!(
+        limits.admit_unauthenticated_audit("127.0.0.1"),
+        RemoteUnauthenticatedAuditAdmission::Audit,
+    );
+}
+
+#[test]
+fn concurrency_rejection_preserves_a_longer_audit_retry_interval() {
+    let response = Response::builder()
+        .status(StatusCode::TOO_MANY_REQUESTS)
+        .header(axum::http::header::RETRY_AFTER, "60")
+        .body(Body::empty())
+        .expect("rate-limited response");
+
+    let response = RemoteHttpLimitRejection::with_retry_after(
+        StatusCode::TOO_MANY_REQUESTS,
+        "remote request concurrency limit reached",
+    )
+    .with_response_headers(response);
+
+    assert_eq!(
+        response.headers().get(axum::http::header::RETRY_AFTER),
+        Some(&HeaderValue::from_static("60")),
+    );
+}
+
+#[test]
 fn remote_http_body_limit_uses_exact_route_contracts_and_operator_ceiling() {
     assert_eq!(
         effective_remote_http_body_limit(
@@ -145,7 +181,7 @@ async fn remote_http_admission_fails_closed_without_runtime_limits() {
 
     stop_server(server).await;
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
-    assert_eq!(body["error"]["code"], REMOTE_LIMIT_ERROR_CODE);
+    assert_eq!(body["error"]["code"], "REMOTE_AUDIT");
 }
 
 #[tokio::test]

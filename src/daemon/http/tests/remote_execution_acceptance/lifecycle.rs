@@ -70,13 +70,31 @@ where
         .expect("join deep acceptance test thread");
 }
 async fn run_default_task_implementation_lifecycle(tls: &TestTlsMaterial) {
+    let baseline = prepare_default_task_prior_phase_baseline(tls).await;
+    baseline.server.stop().await;
+}
+
+pub(super) struct DefaultTaskPriorPhaseBaseline {
+    _fixture: AcceptanceFixture,
+    pub(super) executor: crate::daemon::http::DaemonHttpState,
+    pub(super) controller: crate::daemon::http::DaemonHttpState,
+    pub(super) server: TlsRouterServer,
+    pub(super) execution_id: String,
+    pub(super) base_revision: String,
+    pub(super) result_head: String,
+}
+
+pub(super) async fn prepare_default_task_prior_phase_baseline(
+    tls: &TestTlsMaterial,
+) -> DefaultTaskPriorPhaseBaseline {
     let fixture = AcceptanceFixture::new();
     let executor = fixture.executor_state(HOST_INSTANCE, true).await;
+    fixture.configure_matrix_executor(&executor).await;
     let executor_db = executor.async_db.get().expect("executor async database");
     let server = TlsRouterServer::start(executor.clone(), tls.server_config()).await;
     let controller = fixture.controller_state("controller-acceptance-a");
     fixture
-        .configure_controller(&controller, server.endpoint(), tls)
+        .configure_matrix_controller(&controller, server.endpoint(), tls)
         .await;
     let controller_db = controller
         .async_db
@@ -95,7 +113,15 @@ async fn run_default_task_implementation_lifecycle(tls: &TestTlsMaterial) {
         &result,
     )
     .await;
-    server.stop().await;
+    DefaultTaskPriorPhaseBaseline {
+        _fixture: fixture,
+        executor,
+        controller,
+        server,
+        execution_id: seeded.execution_id,
+        base_revision: seeded.base_revision,
+        result_head: result.result_head,
+    }
 }
 struct ExecutorResult {
     session_id: String,

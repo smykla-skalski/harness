@@ -153,7 +153,7 @@ impl RemoteHttpAuditContext {
                 ))
             })?;
             (
-                limits.admit_unauthenticated_audit(self.unauthenticated_admission_key())?,
+                limits.admit_unauthenticated_audit(self.unauthenticated_admission_key()),
                 limits.unauthenticated_audit_retry_after_seconds(),
             )
         };
