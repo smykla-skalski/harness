@@ -20,31 +20,34 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::workspace::utc_now;
 
-#[path = "task_board_remote_executor_loop/source.rs"]
-mod source;
+#[path = "task_board_remote_executor_loop/adoption.rs"]
+mod adoption;
 #[path = "task_board_remote_executor_loop/cleanup.rs"]
 mod cleanup;
-#[path = "task_board_remote_executor_loop/source_bundle.rs"]
-mod source_bundle;
-#[path = "task_board_remote_executor_loop/scan.rs"]
-mod scan;
+#[path = "task_board_remote_executor_loop/fences.rs"]
+mod fences;
 #[path = "task_board_remote_executor_loop/runtime.rs"]
 mod runtime;
+#[path = "task_board_remote_executor_loop/scan.rs"]
+mod scan;
+#[path = "task_board_remote_executor_loop/source.rs"]
+mod source;
+#[path = "task_board_remote_executor_loop/source_bundle.rs"]
+mod source_bundle;
 #[path = "task_board_remote_executor_loop/stop.rs"]
 mod stop;
 #[path = "task_board_remote_executor_loop/terminal.rs"]
 mod terminal;
-#[path = "task_board_remote_executor_loop/adoption.rs"]
-mod adoption;
+use adoption::execute_and_reconcile_remote_worker;
+use adoption::reconcile_persisted_start_without_run;
+use cleanup::{cleanup_unstarted_executor_provisioning, reconcile_settled_executor_cleanup};
+use fences::{concurrent, invalid_transition, require_executor_identity, shutdown_observed};
+#[cfg(test)]
+use runtime::remote_codex_request;
 use runtime::{
     PreparedRemoteWorkerAction, RemoteWorkerAction, start_window_is_open, stop_codex_run,
     validate_run_identity, worker_action,
 };
-#[cfg(test)]
-use runtime::remote_codex_request;
-use adoption::execute_and_reconcile_remote_worker;
-use adoption::reconcile_persisted_start_without_run;
-use cleanup::{cleanup_unstarted_executor_provisioning, reconcile_settled_executor_cleanup};
 use scan::executor_assignment_ids;
 use source::prepare_remote_workspace;
 use stop::{reconcile_stop_pending, settle_lifecycle_settings_drift};
@@ -66,7 +69,9 @@ pub(super) fn spawn_task_board_remote_executor_loop(
             if *shutdown_rx.borrow() {
                 break;
             }
-            if let Err(error) = reconcile_remote_executor_assignments(&state, Some(&shutdown_rx)).await {
+            if let Err(error) =
+                reconcile_remote_executor_assignments(&state, Some(&shutdown_rx)).await
+            {
                 tracing::warn!(%error, "remote Task Board executor scan failed");
             }
             tokio::select! {
@@ -93,7 +98,10 @@ async fn reconcile_remote_executor_assignments(
     let assignment_ids = executor_assignment_ids(db.as_ref()).await?;
     for assignment_id in assignment_ids {
         if let Err(error) = reconcile_remote_executor_assignment_with_shutdown(
-            state, db.as_ref(), &assignment_id, shutdown_rx,
+            state,
+            db.as_ref(),
+            &assignment_id,
+            shutdown_rx,
         )
         .await
         {
@@ -168,7 +176,9 @@ async fn reconcile_active_remote_worker(
     require_executor_identity(&record)?;
     let offer = record.require_offer()?.clone();
     if offer.launch.runtime != "codex" {
-        return Err(invalid_transition("remote executor supports only the Codex runtime"));
+        return Err(invalid_transition(
+            "remote executor supports only the Codex runtime",
+        ));
     }
     let existing = db.codex_run(&identity.run_id).await?;
     let action = worker_action(record.state, existing.as_ref().map(|run| run.status));
@@ -180,9 +190,9 @@ async fn reconcile_active_remote_worker(
     };
     record = owned.record;
     if owned.stop_only {
-        let snapshot = existing.as_ref().ok_or_else(|| {
-            concurrent("launch-drifted remote executor has no durable run")
-        })?;
+        let snapshot = existing
+            .as_ref()
+            .ok_or_else(|| concurrent("launch-drifted remote executor has no durable run"))?;
         return settle_lifecycle_settings_drift(state, db, &record, snapshot).await;
     }
     let Some(prepared) = prepare_active_remote_worker(
@@ -231,7 +241,9 @@ async fn prepare_active_remote_worker(
         return prepare_recovery(db, record, identity, action, persisted_permit).await;
     }
     // Only this no-permit, no-run path may provision and Start.
-    if shutdown_observed(shutdown_rx) { return Ok(None); }
+    if shutdown_observed(shutdown_rx) {
+        return Ok(None);
+    }
     let persisted_authority = executor_start_authority(record)?;
     // The wall-clock window gates only a fresh claim; authorized generations
     // still reconcile after it closes so expired provisioning cannot leak.
@@ -256,7 +268,9 @@ async fn prepare_active_remote_worker(
     else {
         return Ok(None);
     };
-    if shutdown_observed(shutdown_rx) { return Ok(None); }
+    if shutdown_observed(shutdown_rx) {
+        return Ok(None);
+    }
     if record.claimed_host_instance_id.as_deref() != Some(daemon_epoch) {
         cleanup_predecessor_remote_start(db, Some(&authority), daemon_epoch).await?;
         return Ok(None);
@@ -265,7 +279,9 @@ async fn prepare_active_remote_worker(
     else {
         return Ok(None);
     };
-    if shutdown_observed(shutdown_rx) { return Ok(None); }
+    if shutdown_observed(shutdown_rx) {
+        return Ok(None);
+    }
     let workspace = match prepare_remote_workspace(db, record, offer, identity, true).await {
         Ok(workspace) => workspace,
         Err(error) => {
@@ -278,22 +294,20 @@ async fn prepare_active_remote_worker(
             return Err(error);
         }
     };
-    if shutdown_observed(shutdown_rx) { return Ok(None); }
+    if shutdown_observed(shutdown_rx) {
+        return Ok(None);
+    }
     match claim_or_cleanup_remote_start_io(db, Some(&authority), &workspace).await? {
-        TaskBoardRemoteExecutorStartIoPermitOutcome::Acquired(permit) => Ok(Some(
-            PreparedRemoteWorker {
+        TaskBoardRemoteExecutorStartIoPermitOutcome::Acquired(permit) => {
+            Ok(Some(PreparedRemoteWorker {
                 workspace,
                 action: PreparedRemoteWorkerAction::Start(permit),
-            },
-        )),
+            }))
+        }
         // A fresh-path replay or stale outcome never starts.
         TaskBoardRemoteExecutorStartIoPermitOutcome::Replayed(_)
         | TaskBoardRemoteExecutorStartIoPermitOutcome::Stale => Ok(None),
     }
-}
-
-fn shutdown_observed(shutdown_rx: Option<&watch::Receiver<bool>>) -> bool {
-    shutdown_rx.is_some_and(|receiver| *receiver.borrow())
 }
 
 /// Recovery from a durable permit or run never provisions or launches Start.
@@ -412,7 +426,8 @@ async fn claim_active_lifecycle_owner(
     else {
         return Ok(None);
     };
-    let record = db.task_board_remote_assignment(&record.assignment_id)
+    let record = db
+        .task_board_remote_assignment(&record.assignment_id)
         .await?
         .ok_or_else(|| concurrent("remote executor assignment disappeared after ownership"))?;
     Ok(Some(ActiveLifecycleOwner {
@@ -475,44 +490,27 @@ async fn stop_terminal_remote_worker(
     stop_codex_run(state, &run_id).await
 }
 
-fn require_executor_identity(record: &TaskBoardRemoteAssignmentRecord) -> Result<(), CliError> {
-    if record.target_host_instance_id.is_none()
-        || record.target_host_instance_id != record.claimed_host_instance_id
-    {
-        return Err(concurrent("remote assignment is bound to another executor process"));
-    }
-    Ok(())
-}
-
-fn concurrent(message: &'static str) -> CliError {
-    CliErrorKind::concurrent_modification(message.to_string()).into()
-}
-
-fn invalid_transition(message: impl Into<String>) -> CliError {
-    CliErrorKind::invalid_transition(message.into()).into()
-}
-
-#[cfg(test)]
-#[path = "task_board_remote_executor_loop_tests.rs"]
-mod tests;
 #[cfg(test)]
 #[path = "task_board_remote_executor_loop/disabled_tests.rs"]
 mod disabled_tests;
 #[cfg(test)]
-#[path = "task_board_remote_executor_loop/settings_lifecycle_tests.rs"]
-mod settings_lifecycle_tests;
-#[cfg(test)]
 #[path = "task_board_remote_executor_loop/restart_cleanup_tests.rs"]
 mod restart_cleanup_tests;
+#[cfg(test)]
+#[path = "task_board_remote_executor_loop/runtime_seam_tests.rs"]
+mod runtime_seam_tests;
+#[cfg(test)]
+#[path = "task_board_remote_executor_loop/settings_lifecycle_tests.rs"]
+mod settings_lifecycle_tests;
 #[cfg(test)]
 #[path = "task_board_remote_executor_loop/start_io_permit_tests.rs"]
 mod start_io_permit_tests;
 #[cfg(test)]
-#[path = "task_board_remote_executor_loop/test_seam.rs"]
-mod test_seam;
-#[cfg(test)]
 #[path = "task_board_remote_executor_loop/start_permit_state_machine_tests.rs"]
 mod start_permit_state_machine_tests;
 #[cfg(test)]
-#[path = "task_board_remote_executor_loop/runtime_seam_tests.rs"]
-mod runtime_seam_tests;
+#[path = "task_board_remote_executor_loop/test_seam.rs"]
+mod test_seam;
+#[cfg(test)]
+#[path = "task_board_remote_executor_loop_tests.rs"]
+mod tests;

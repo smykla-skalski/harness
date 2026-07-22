@@ -46,11 +46,7 @@ async fn start_receipt_survives_lease_rotation_and_owner_takeover() {
     let renewed = adopted
         .fixture
         .db
-        .renew_task_board_remote_assignment_lease(
-            &renewal,
-            PRINCIPAL,
-            "2026-07-19T10:00:30Z",
-        )
+        .renew_task_board_remote_assignment_lease(&renewal, PRINCIPAL, "2026-07-19T10:00:30Z")
         .await
         .expect("renew after start");
     assert!(matches!(

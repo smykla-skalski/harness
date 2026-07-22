@@ -1,17 +1,16 @@
 use crate::daemon::db::{
-    REMOTE_EXECUTOR_PRINCIPAL, TaskBoardRemoteAssignmentRecord,
-    TaskBoardRemoteMutationOutcome,
+    REMOTE_EXECUTOR_PRINCIPAL, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome,
 };
 use crate::daemon::task_board_remote_transport::wire::RemoteAssignmentWireState;
 use crate::task_board::{TaskBoardFailureClass, TaskBoardRemoteAssignmentState};
 
-use super::require_unadopted_stop_cleanup;
 use super::super::disabled_tests::executor_state;
 use super::super::reconcile_remote_executor_assignment;
+use super::require_unadopted_stop_cleanup;
 use super::tests::{SETTLED_AT, STARTED_AT, active_count};
 use super::unadopted_tests::{
-    claimed_executor_workspace, failed_at_claimed_status, load_assignment,
-    run_deep_cleanup_async, terminal_settlement, with_isolated_sessions,
+    claimed_executor_workspace, failed_at_claimed_status, load_assignment, run_deep_cleanup_async,
+    terminal_settlement, with_isolated_sessions,
 };
 
 #[test]
@@ -51,7 +50,11 @@ async fn failed_at_claimed_cleanup_requires_a_validated_receipt_body() {
         };
         let error = require_unadopted_stop_cleanup(&raw_failed)
             .expect_err("raw Failed-at-Claimed evidence must not clean up");
-        assert!(error.to_string().contains("lacks exact stopped-run evidence"));
+        assert!(
+            error
+                .to_string()
+                .contains("lacks exact stopped-run evidence")
+        );
         assert!(workspace.exists());
         let settlement = terminal_settlement(&failed, RemoteAssignmentWireState::Failed);
         fixture

@@ -94,7 +94,10 @@ async fn offline_terminal_cleanup_retry_does_not_block_foreground_driver() {
         .await
         .expect("load terminal cleanup assignment")
         .expect("terminal cleanup assignment remains durable");
-    assert_eq!(durable.state, crate::task_board::TaskBoardRemoteAssignmentState::Cancelled);
+    assert_eq!(
+        durable.state,
+        crate::task_board::TaskBoardRemoteAssignmentState::Cancelled
+    );
     assert!(durable.cleanup_completed_at.is_none());
     assert_eq!(
         fixture

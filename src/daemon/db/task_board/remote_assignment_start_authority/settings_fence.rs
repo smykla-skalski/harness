@@ -15,10 +15,8 @@ use crate::daemon::db::task_board::remote_assignment_model::{
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 
-const SETTINGS_CHANGED_BEFORE_START: &str =
-    "remote executor settings changed before worker start";
-const EXECUTOR_RESTARTED_BEFORE_START: &str =
-    "remote executor restarted before worker start";
+const SETTINGS_CHANGED_BEFORE_START: &str = "remote executor settings changed before worker start";
+const EXECUTOR_RESTARTED_BEFORE_START: &str = "remote executor restarted before worker start";
 
 pub(crate) async fn refuse_settings_replacement_during_executor_start_io(
     transaction: &mut Transaction<'_, Sqlite>,
@@ -32,7 +30,7 @@ pub(crate) async fn refuse_settings_replacement_during_executor_start_io(
     )
     .fetch_optional(transaction.as_mut())
     .await
-        .map_err(|error| db_error(format!("fence executor Start I/O settings: {error}")))?;
+    .map_err(|error| db_error(format!("fence executor Start I/O settings: {error}")))?;
     if let Some(assignment_id) = active {
         return Err(concurrent(format!(
             "remote executor assignment '{assignment_id}' owns Start I/O; settings replacement is fenced"
@@ -102,7 +100,11 @@ impl AsyncDaemonDb {
         }
         if executor_start_io_permit(&record)?.is_some() {
             let replay = authority.clone();
-            commit_noop(transaction, "replayed permitted remote executor provisioning").await?;
+            commit_noop(
+                transaction,
+                "replayed permitted remote executor provisioning",
+            )
+            .await?;
             return Ok(Some(replay));
         }
         let settings_match = executor_settings_still_match(&mut transaction, &record).await?;
@@ -190,7 +192,9 @@ impl AsyncDaemonDb {
         .map_err(|error| db_error(format!("revoke remote executor Start I/O: {error}")))?
         .rows_affected();
         if rows != 1 {
-            return Err(concurrent("remote executor Start I/O revocation lost its fence"));
+            return Err(concurrent(
+                "remote executor Start I/O revocation lost its fence",
+            ));
         }
         finish_mutation(
             transaction,
@@ -270,20 +274,18 @@ async fn require_empty_provisioning(
     transaction: &mut Transaction<'_, Sqlite>,
     authority: &TaskBoardRemoteExecutorStartAuthority,
 ) -> Result<(), CliError> {
-    let run_exists = query_scalar::<_, bool>(
-        "SELECT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?1)",
-    )
-    .bind(&authority.identity.run_id)
-    .fetch_one(transaction.as_mut())
-    .await
-    .map_err(|error| db_error(format!("check pre-Start executor run: {error}")))?;
-    let session_exists = query_scalar::<_, bool>(
-        "SELECT EXISTS(SELECT 1 FROM sessions WHERE session_id = ?1)",
-    )
-    .bind(&authority.identity.session_id)
-    .fetch_one(transaction.as_mut())
-    .await
-    .map_err(|error| db_error(format!("check pre-Start executor session: {error}")))?;
+    let run_exists =
+        query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?1)")
+            .bind(&authority.identity.run_id)
+            .fetch_one(transaction.as_mut())
+            .await
+            .map_err(|error| db_error(format!("check pre-Start executor run: {error}")))?;
+    let session_exists =
+        query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM sessions WHERE session_id = ?1)")
+            .bind(&authority.identity.session_id)
+            .fetch_one(transaction.as_mut())
+            .await
+            .map_err(|error| db_error(format!("check pre-Start executor session: {error}")))?;
     if run_exists || session_exists {
         Err(concurrent(
             "remote executor Start cleanup found durable provisioning evidence",

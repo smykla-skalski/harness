@@ -2,15 +2,13 @@ use chrono::{DateTime, Duration, SecondsFormat, Utc};
 use sha2::{Digest, Sha256};
 
 use crate::daemon::db::{
-    TaskBoardRemoteAssignmentRecord, TaskBoardRemoteHostSelection,
-    TaskBoardRemotePriorPhaseBundle,
+    TaskBoardRemoteAssignmentRecord, TaskBoardRemoteHostSelection, TaskBoardRemotePriorPhaseBundle,
 };
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteArtifactEntry, RemoteArtifactFetchRequest, RemoteArtifactManifest,
-    RemoteAssignmentWireState, RemoteAttemptBinding, RemoteClaimRequest,
-    RemoteCodexLaunchEnvelope, RemoteLeaseRenewRequest, RemoteOfferRequest,
-    RemoteSettledRequest, RemoteSourceMaterial, RemoteStatusRequest,
-    TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
+    RemoteAssignmentWireState, RemoteAttemptBinding, RemoteClaimRequest, RemoteCodexLaunchEnvelope,
+    RemoteLeaseRenewRequest, RemoteOfferRequest, RemoteSettledRequest, RemoteSourceMaterial,
+    RemoteStatusRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::daemon::task_board_remote_transport::wire_cleanup::RemoteCleanupObservationRequest;
 use crate::errors::{CliError, CliErrorKind};
@@ -69,7 +67,7 @@ pub(super) fn prepare_offer(
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding,
         lease_seconds: REMOTE_LEASE_SECONDS,
-        deadline_at: canonical( deadline_at),
+        deadline_at: canonical(deadline_at),
         launch: RemoteCodexLaunchEnvelope::from_codex_request("codex", &launch)
             .map_err(|error| invalid(format!("freeze remote Codex launch: {error}")))?,
         source,
@@ -345,7 +343,9 @@ fn initial_repository_source(
         .execution_repository
         .as_deref()
         .ok_or_else(|| invalid("remote workflow has no execution repository"))?;
-    Ok(RemoteSourceMaterial::repository_revision(repository, revision))
+    Ok(RemoteSourceMaterial::repository_revision(
+        repository, revision,
+    ))
 }
 
 fn initial_snapshot_required(
@@ -404,10 +404,9 @@ fn prior_implementation(
     phase: TaskBoardExecutionPhase,
 ) -> Result<&TaskBoardImplementationResult, CliError> {
     let cycle = match phase {
-        TaskBoardExecutionPhase::Implementation => execution
-            .artifacts
-            .current_revision_cycle
-            .checked_sub(1),
+        TaskBoardExecutionPhase::Implementation => {
+            execution.artifacts.current_revision_cycle.checked_sub(1)
+        }
         TaskBoardExecutionPhase::Review | TaskBoardExecutionPhase::Evaluate => {
             Some(execution.artifacts.current_revision_cycle)
         }

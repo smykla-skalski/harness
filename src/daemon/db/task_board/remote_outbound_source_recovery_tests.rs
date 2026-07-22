@@ -1,7 +1,7 @@
+use super::remote_assignment_model::insert_assignment_in_tx;
 use super::remote_assignment_test_support::{
     DEADLINE, HOST, LEASE_EXPIRES, NOW, PRINCIPAL, SOURCE_REVISION, detached_offer,
 };
-use super::remote_assignment_model::insert_assignment_in_tx;
 use super::remote_outbound_source_tests::{
     enable_implementation, snapshot_offer, source_recovery_owns,
 };
@@ -15,8 +15,8 @@ use crate::daemon::task_board_remote_transport::wire::{
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION, test_codex_launch,
 };
 use crate::task_board::{
-    TASK_BOARD_EXECUTION_TARGET_RESOURCE, TaskBoardExecutionAttemptCas,
-    TaskBoardExecutionPhase, TaskBoardRemoteAssignmentState, TaskBoardWorkflowExecutionCas,
+    TASK_BOARD_EXECUTION_TARGET_RESOURCE, TaskBoardExecutionAttemptCas, TaskBoardExecutionPhase,
+    TaskBoardRemoteAssignmentState, TaskBoardWorkflowExecutionCas,
 };
 
 #[tokio::test]
@@ -33,11 +33,7 @@ async fn generic_expiry_defers_exact_source_owner_until_conclusive_rejection() {
     let restarted = prepared.db.reopen().await;
     assert_recovery_defers(&restarted, &offer, "2026-07-19T10:02:01Z").await;
     restarted
-        .claim_task_board_remote_offer_io_authority(
-            &offer,
-            HOST,
-            "2026-07-19T10:00:01Z",
-        )
+        .claim_task_board_remote_offer_io_authority(&offer, HOST, "2026-07-19T10:00:01Z")
         .await
         .expect("claim exact offer authority")
         .expect("offer remains active");
@@ -214,7 +210,10 @@ async fn protected_source_backlog_never_starves_later_expiry_after_restart() {
         .await
         .expect("recover later actionable expiry");
     assert_eq!(batch.recovered.len(), 1);
-    assert_eq!(batch.recovered[0].assignment_id, actionable.binding.assignment_id);
+    assert_eq!(
+        batch.recovered[0].assignment_id,
+        actionable.binding.assignment_id
+    );
     assert!(!batch.incomplete);
     assert!(batch.failures.is_empty());
     let protected = first_protected.expect("first protected offer");

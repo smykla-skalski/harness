@@ -75,8 +75,7 @@ impl AsyncDaemonDb {
             .fetch_all(self.pool())
             .await
             .map_err(|error| db_error(format!("load materialized prior-phase bundle: {error}")))?;
-        rows
-            .into_iter()
+        rows.into_iter()
             .map(|row| row.into_bundle(identity))
             .collect()
     }
@@ -95,10 +94,9 @@ fn prior_implementation_identity(
     phase: TaskBoardExecutionPhase,
 ) -> Result<PriorImplementationIdentity, CliError> {
     let cycle = match phase {
-        TaskBoardExecutionPhase::Implementation => execution
-            .artifacts
-            .current_revision_cycle
-            .checked_sub(1),
+        TaskBoardExecutionPhase::Implementation => {
+            execution.artifacts.current_revision_cycle.checked_sub(1)
+        }
         TaskBoardExecutionPhase::Review | TaskBoardExecutionPhase::Evaluate => {
             Some(execution.artifacts.current_revision_cycle)
         }
@@ -258,7 +256,10 @@ pub(super) fn consistent_bundle(
     let Some(first) = bundles.pop() else {
         return Ok(None);
     };
-    if bundles.iter().any(|candidate| !same_bundle(candidate, &first)) {
+    if bundles
+        .iter()
+        .any(|candidate| !same_bundle(candidate, &first))
+    {
         return Err(concurrent(
             "prior-phase source copies disagree on exact portable content",
         ));

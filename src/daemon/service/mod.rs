@@ -277,10 +277,10 @@ mod task_board_orchestrator_run_lease;
 mod task_board_orchestrator_settings;
 mod task_board_orchestrator_step_mode;
 pub(crate) mod task_board_read_only_coordinator;
-pub(crate) mod task_board_remote_controller;
 #[cfg(test)]
 mod task_board_read_only_coordinator_tests;
 mod task_board_read_only_runtime;
+pub(crate) mod task_board_remote_controller;
 mod task_board_runtime;
 #[cfg(test)]
 mod task_board_sync_tests;

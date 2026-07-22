@@ -29,16 +29,12 @@ async fn due_active_poll_observes_completed_and_failed_before_renewal() {
             &assignment,
             move |_| {
                 status_probe.fetch_add(1, Ordering::SeqCst);
-                ready(Ok(TaskBoardRemoteMutationOutcome::Updated(
-                    terminal_record,
-                )))
+                ready(Ok(TaskBoardRemoteMutationOutcome::Updated(terminal_record)))
             },
             || ready(Ok(true)),
             move |_| {
                 renew_probe.fetch_add(1, Ordering::SeqCst);
-                ready(Ok(TaskBoardRemoteMutationOutcome::Updated(
-                    renewal_record,
-                )))
+                ready(Ok(TaskBoardRemoteMutationOutcome::Updated(renewal_record)))
             },
             move |_| ready(Ok(TaskBoardRemoteMutationOutcome::Updated(replay_record))),
             || "2026-07-19T10:00:30Z".into(),
@@ -71,9 +67,7 @@ async fn disabled_active_poll_observes_status_without_renewal() {
         || ready(Ok(false)),
         move |_| {
             renew_probe.fetch_add(1, Ordering::SeqCst);
-            ready(Ok(TaskBoardRemoteMutationOutcome::Updated(
-                renewal_record,
-            )))
+            ready(Ok(TaskBoardRemoteMutationOutcome::Updated(renewal_record)))
         },
         move |_| ready(Ok(TaskBoardRemoteMutationOutcome::Updated(replay_record))),
         || "2026-07-19T10:00:30Z".into(),
@@ -131,9 +125,7 @@ async fn pending_cancel_observes_status_without_renewal() {
         || ready(Ok(true)),
         move |_| {
             renew_probe.fetch_add(1, Ordering::SeqCst);
-            ready(Ok(TaskBoardRemoteMutationOutcome::Updated(
-                renewal_record,
-            )))
+            ready(Ok(TaskBoardRemoteMutationOutcome::Updated(renewal_record)))
         },
         move |_| ready(Ok(TaskBoardRemoteMutationOutcome::Updated(replay_record))),
         || "2026-07-19T10:00:30Z".into(),
@@ -164,11 +156,7 @@ async fn disabled_pending_renew_replays_before_status() {
             ready(Ok(TaskBoardRemoteMutationOutcome::Updated(status_record)))
         },
         || ready(Ok(false)),
-        move |_| {
-            ready(Ok(TaskBoardRemoteMutationOutcome::Stale(
-                ordinary_renewal,
-            )))
-        },
+        move |_| ready(Ok(TaskBoardRemoteMutationOutcome::Stale(ordinary_renewal))),
         move |_| {
             assert_eq!(renew_stage.load(Ordering::SeqCst), 0);
             renew_stage.store(1, Ordering::SeqCst);

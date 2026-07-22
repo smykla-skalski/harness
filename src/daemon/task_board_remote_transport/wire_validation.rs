@@ -11,8 +11,7 @@ use super::wire::{
     require_version,
 };
 use super::wire_limits::{
-    MAX_REMOTE_LIFECYCLE_JSON_BYTES, MAX_REMOTE_RECEIPT_JSON_BYTES,
-    require_serialized_size,
+    MAX_REMOTE_LIFECYCLE_JSON_BYTES, MAX_REMOTE_RECEIPT_JSON_BYTES, require_serialized_size,
 };
 
 impl RemoteLease {
@@ -52,11 +51,7 @@ impl RemoteOfferResponse {
                 )?;
             }
         }
-        require_serialized_size(
-            "offer_response",
-            self,
-            MAX_REMOTE_RECEIPT_JSON_BYTES,
-        )
+        require_serialized_size("offer_response", self, MAX_REMOTE_RECEIPT_JSON_BYTES)
     }
 }
 
@@ -83,11 +78,7 @@ impl RemoteClaimResponse {
         )?;
         self.lease.validate()?;
         require_canonical_time("claimed_at", &self.claimed_at)?;
-        require_serialized_size(
-            "claim_response",
-            self,
-            MAX_REMOTE_RECEIPT_JSON_BYTES,
-        )
+        require_serialized_size("claim_response", self, MAX_REMOTE_RECEIPT_JSON_BYTES)
     }
 }
 
@@ -104,11 +95,7 @@ impl RemoteLeaseRenewResponse {
             &expected.offer_request_sha256,
         )?;
         self.lease.validate()?;
-        require_serialized_size(
-            "lease_renew_response",
-            self,
-            MAX_REMOTE_RECEIPT_JSON_BYTES,
-        )
+        require_serialized_size("lease_renew_response", self, MAX_REMOTE_RECEIPT_JSON_BYTES)
     }
 }
 
@@ -172,11 +159,7 @@ impl RemoteStatusResponse {
             }
         }
         validate_status_digest(self)?;
-        require_serialized_size(
-            "status_response",
-            self,
-            MAX_REMOTE_LIFECYCLE_JSON_BYTES,
-        )
+        require_serialized_size("status_response", self, MAX_REMOTE_LIFECYCLE_JSON_BYTES)
     }
 
     pub(crate) fn confirms_cancel(&self, expected: &RemoteCancelRequest) -> bool {
@@ -230,11 +213,7 @@ impl RemoteCancelResponse {
             &(&expected.request_sha256, &unsigned),
         )?;
         if digest == self.cancel_response_sha256 {
-            require_serialized_size(
-                "cancel_response",
-                self,
-                MAX_REMOTE_RECEIPT_JSON_BYTES,
-            )
+            require_serialized_size("cancel_response", self, MAX_REMOTE_RECEIPT_JSON_BYTES)
         } else {
             Err(RemoteWireError::DigestMismatch("cancel_response_sha256"))
         }
@@ -296,11 +275,7 @@ impl RemoteSettledResponse {
             return Err(RemoteWireError::DigestMismatch("settlement_request_sha256"));
         }
         require_canonical_time("settled_at", &self.settled_at)?;
-        require_serialized_size(
-            "settled_response",
-            self,
-            MAX_REMOTE_RECEIPT_JSON_BYTES,
-        )
+        require_serialized_size("settled_response", self, MAX_REMOTE_RECEIPT_JSON_BYTES)
     }
 }
 

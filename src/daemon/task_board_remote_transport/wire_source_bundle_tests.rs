@@ -12,8 +12,8 @@ const STORED_AT: &str = "2026-07-20T12:00:00Z";
 #[test]
 fn source_bundle_upload_round_trips_exact_generation_and_bytes() {
     let (offer, content) = bundle_offer();
-    let upload = RemoteSourceBundleUploadRequest::seal(offer, content)
-        .expect("seal source bundle upload");
+    let upload =
+        RemoteSourceBundleUploadRequest::seal(offer, content).expect("seal source bundle upload");
     assert_eq!(upload.validate().expect("validate upload"), content);
     let response = RemoteSourceBundleUploadResponse::seal(&upload, STORED_AT.into())
         .expect("seal upload response");
@@ -30,24 +30,27 @@ fn source_bundle_upload_round_trips_exact_generation_and_bytes() {
 #[test]
 fn source_bundle_upload_rejects_content_and_generation_tampering() {
     let (offer, content) = bundle_offer();
-    let upload = RemoteSourceBundleUploadRequest::seal(offer, content)
-        .expect("seal source bundle upload");
+    let upload =
+        RemoteSourceBundleUploadRequest::seal(offer, content).expect("seal source bundle upload");
 
     let mut content_tampered = upload.clone();
     content_tampered.content_base64.replace_range(..1, "A");
     assert!(content_tampered.validate().is_err());
 
     let mut offer_tampered = upload;
-    let RemoteSourceMaterial::PriorPhaseBundle {
-        advertised_ref, ..
-    } = &mut offer_tampered.offer.source
+    let RemoteSourceMaterial::PriorPhaseBundle { advertised_ref, .. } =
+        &mut offer_tampered.offer.source
     else {
         unreachable!("bundle source")
     };
-    *advertised_ref = "refs/harness/task-board/results/ffffffffffffffffffffffffffffffffffffffff".into();
+    *advertised_ref =
+        "refs/harness/task-board/results/ffffffffffffffffffffffffffffffffffffffff".into();
     offer_tampered.offer.request_sha256.clear();
     assert_eq!(
-        offer_tampered.offer.seal().and_then(|offer| offer.validate().map(|()| offer)),
+        offer_tampered
+            .offer
+            .seal()
+            .and_then(|offer| offer.validate().map(|()| offer)),
         Err(RemoteWireError::InvalidSourceMaterial)
     );
 }
@@ -69,12 +72,8 @@ fn bundle_offer() -> (super::wire::RemoteOfferRequest, &'static [u8]) {
         "review:reviewer",
         "Review the frozen revision.",
     );
-    offer.source = RemoteSourceMaterial::prior_phase_bundle(
-        "org/repo",
-        BASE,
-        RESULT,
-        bundle.clone(),
-    );
+    offer.source =
+        RemoteSourceMaterial::prior_phase_bundle("org/repo", BASE, RESULT, bundle.clone());
     offer.artifacts = RemoteArtifactManifest {
         entries: vec![bundle],
     };

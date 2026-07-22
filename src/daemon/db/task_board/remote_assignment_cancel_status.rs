@@ -8,11 +8,11 @@ use super::remote_assignment_io_authority::{
     TaskBoardRemoteIoAuthorityKind, require_authority_parent,
 };
 use super::remote_assignment_model::{TaskBoardRemoteAssignmentRecord, concurrent};
+use super::remote_assignment_status_persistence::{persist_status, status_update_allowed};
 use super::remote_operation_trust::{
     TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence,
     claim_controller_operation_trust_in_tx, consume_controller_operation_trust_in_tx,
 };
-use super::remote_assignment_status_persistence::{persist_status, status_update_allowed};
 use crate::daemon::db::CliError;
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteStatusRequest, RemoteStatusResponse,
@@ -64,8 +64,7 @@ pub(super) fn exact_cancel_status_evidence(
         && response.offer_request_sha256 == cancel.offer_request_sha256
         && response.lease.as_ref().is_some_and(|lease| {
             lease.lease_id == cancel.lease_id
-                &&
-            assignment.lease_expires_at.as_deref() == Some(lease.expires_at.as_str())
+                && assignment.lease_expires_at.as_deref() == Some(lease.expires_at.as_str())
         })
         && response.claimed_at == assignment.claimed_at
         && response.started_at == assignment.started_at

@@ -14,8 +14,8 @@ use super::routes_support::{
 use super::wire::{
     RemoteArtifactFetchRequest, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
     RemoteHeartbeatRequest, RemoteHeartbeatResponse, RemoteLeaseRenewRequest,
-    RemoteLeaseRenewResponse, RemoteOfferRequest, RemoteSettledRequest, RemoteStatusRequest,
-    RemoteSourceBundleUploadRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
+    RemoteLeaseRenewResponse, RemoteOfferRequest, RemoteSettledRequest,
+    RemoteSourceBundleUploadRequest, RemoteStatusRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use super::wire_conversion::host_wire_advertisement;
 use super::wire_limits::{
@@ -41,8 +41,7 @@ pub(crate) const SOURCE_BUNDLE_RECEIPT_PATH: &str =
 pub(crate) const SOURCE_BUNDLE_ABANDON_PATH: &str =
     "/v1/task-board-execution/source-bundles/abandon";
 pub(crate) const OFFER_HTTP_BODY_LIMIT_BYTES: usize = MAX_REMOTE_OFFER_JSON_BYTES;
-pub(crate) const SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES: usize =
-    MAX_REMOTE_SOURCE_BUNDLE_JSON_BYTES;
+pub(crate) const SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES: usize = MAX_REMOTE_SOURCE_BUNDLE_JSON_BYTES;
 pub(crate) const SOURCE_BUNDLE_ABANDON_HTTP_BODY_LIMIT_BYTES: usize =
     MAX_REMOTE_SOURCE_ABANDON_JSON_BYTES;
 
@@ -69,10 +68,9 @@ pub(crate) fn execution_routes() -> Router<DaemonHttpState> {
         )
         .route(
             SOURCE_BUNDLE_ABANDON_PATH,
-            post(super::routes_source_bundle::abandon_source_bundle)
-                .layer(DefaultBodyLimit::max(
-                    SOURCE_BUNDLE_ABANDON_HTTP_BODY_LIMIT_BYTES,
-                )),
+            post(super::routes_source_bundle::abandon_source_bundle).layer(DefaultBodyLimit::max(
+                SOURCE_BUNDLE_ABANDON_HTTP_BODY_LIMIT_BYTES,
+            )),
         )
         .route(
             CLAIM_PATH,
@@ -119,9 +117,7 @@ pub(crate) fn execution_operation(method: &Method, path: &str) -> Option<&'stati
         (&Method::POST, CANCEL_PATH) => Some("cancel"),
         (&Method::POST, SETTLED_PATH) => Some("settled"),
         (&Method::POST, ARTIFACT_PATH) => Some("fetch_artifact"),
-        (&Method::POST, super::routes_cleanup::CLEANUP_OBSERVATION_PATH) => {
-            Some("observe_cleanup")
-        }
+        (&Method::POST, super::routes_cleanup::CLEANUP_OBSERVATION_PATH) => Some("observe_cleanup"),
         _ => None,
     }
 }

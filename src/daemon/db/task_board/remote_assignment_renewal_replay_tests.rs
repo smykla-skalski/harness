@@ -156,7 +156,10 @@ async fn renew_token_survives_recovery_so_a_late_renewal_response_unstrands() {
         .await
         .expect("load recovered assignment")
         .expect("recovered assignment");
-    assert_eq!(after_recovery.state, TaskBoardRemoteAssignmentState::Unknown);
+    assert_eq!(
+        after_recovery.state,
+        TaskBoardRemoteAssignmentState::Unknown
+    );
     assert!(
         after_recovery
             .controller_operation

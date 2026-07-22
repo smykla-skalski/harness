@@ -44,9 +44,10 @@ pub(super) async fn mark_manual_required(
     .await?;
     if record.state == TaskBoardRemoteResultImportState::ManualRequired {
         require_manual_replay(&mut transaction, &record, &detail).await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit replayed manual result import: {error}"))
-        })?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit replayed manual result import: {error}")))?;
         return Ok(record);
     }
     if !matches!(
@@ -63,17 +64,17 @@ pub(super) async fn mark_manual_required(
     let parent = load_execution_in_tx(&mut transaction, &record.execution_id)
         .await?
         .ok_or_else(|| concurrent("manual result import execution disappeared"))?;
-    let (attempt_index, current_attempt) =
-        require_active_import(&record, &assignment, &parent)?;
+    let (attempt_index, current_attempt) = require_active_import(&record, &assignment, &parent)?;
     let failed_attempt = failed_attempt(&current_attempt, &detail, failed_at)?;
     let mut stopped_parent = parent.clone();
     stopped_parent.transition.execution_state = TaskBoardExecutionState::HumanRequired;
     stopped_parent.available_at = None;
     stopped_parent.blocked_reason = Some(BLOCKED_REASON.into());
     stopped_parent.updated_at = monotonic_time(&parent.updated_at, failed_at)?;
-    stopped_parent.ownership.resources.remove(
-        TASK_BOARD_REMOTE_RESULT_IMPORT_AUTHORITY_RESOURCE,
-    );
+    stopped_parent
+        .ownership
+        .resources
+        .remove(TASK_BOARD_REMOTE_RESULT_IMPORT_AUTHORITY_RESOURCE);
     stopped_parent.artifacts.terminal_outcome = Some(TaskBoardTerminalOutcome {
         kind: TaskBoardTerminalOutcomeKind::HumanRequired,
         summary: format!("remote result import requires manual recovery: {detail}"),
@@ -120,8 +121,7 @@ fn require_active_import(
     let exact_generation = assignment.fencing_epoch == record.fencing_epoch
         && assignment.execution_id == record.execution_id
         && active_target_matches(parent, assignment)
-        && TaskBoardWorkflowExecutionCas::from(parent).record_sha256
-            == record.parent_record_sha256
+        && TaskBoardWorkflowExecutionCas::from(parent).record_sha256 == record.parent_record_sha256
         && parent
             .ownership
             .resources

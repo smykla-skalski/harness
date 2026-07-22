@@ -40,12 +40,7 @@ pub(super) async fn claim_and_settle_invalid_remote_run(
     reason: TaskBoardRemoteExecutorStopReason,
 ) -> Result<(), CliError> {
     let pending = db
-        .claim_task_board_remote_executor_stop_pending(
-            authority,
-            snapshot,
-            reason,
-            &utc_now(),
-        )
+        .claim_task_board_remote_executor_stop_pending(authority, snapshot, reason, &utc_now())
         .await?
         .ok_or_else(|| concurrent("remote executor stop authority lost its source fence"))?;
     reconcile_stop_pending(state, db, &pending).await
@@ -61,7 +56,9 @@ pub(super) async fn reconcile_stop_pending(
         .await?
         .ok_or_else(|| concurrent("stop-pending remote executor run disappeared"))?;
     if !stop_pending_snapshot_matches(pending, &snapshot) {
-        return Err(concurrent("stop-pending remote executor run identity changed"));
+        return Err(concurrent(
+            "stop-pending remote executor run identity changed",
+        ));
     }
     if snapshot.status.is_active() {
         stop_codex_run(state, &pending.run_id).await?;

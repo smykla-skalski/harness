@@ -16,9 +16,9 @@ use crate::daemon::task_board_remote_transport::wire::{
 use crate::task_board::{
     TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardAttemptResultArtifact,
     TaskBoardAttemptState, TaskBoardExecutionState, TaskBoardFailureClass,
-    TaskBoardLocalAttemptResult, TaskBoardRemoteAssignmentState, TaskBoardReviewResult,
-    TaskBoardReviewerOutcome, TaskBoardStatus, TaskBoardWorkflowExecutionCas,
-    TaskBoardWorkflowStatus, TaskBoardPhaseVerdict,
+    TaskBoardLocalAttemptResult, TaskBoardPhaseVerdict, TaskBoardRemoteAssignmentState,
+    TaskBoardReviewResult, TaskBoardReviewerOutcome, TaskBoardStatus,
+    TaskBoardWorkflowExecutionCas, TaskBoardWorkflowStatus,
 };
 
 const HANDOFF_AT: &str = "2026-07-19T10:00:19Z";
@@ -60,14 +60,16 @@ async fn detached_completed_or_failed_cannot_record_terminal_cleanup_or_settleme
                 .expect("reload rejected handoff sequence"),
             sequence
         );
-        assert!(!fixture
-            .db
-            .task_board_remote_assignment_has_settlement_handoff(
-                &assignment.assignment_id,
-                assignment.fencing_epoch,
-            )
-            .await
-            .expect("reject settlement handoff"));
+        assert!(
+            !fixture
+                .db
+                .task_board_remote_assignment_has_settlement_handoff(
+                    &assignment.assignment_id,
+                    assignment.fencing_epoch,
+                )
+                .await
+                .expect("reject settlement handoff")
+        );
         let error = fixture
             .db
             .claim_task_board_remote_settlement_io_authority(
@@ -161,14 +163,16 @@ async fn recovered_unknown_definitive_evidence_handoff_is_exact_and_replayable()
         .await
         .expect("reload definitive assignment")
         .expect("definitive assignment exists");
-    assert!(fixture
-        .db
-        .task_board_remote_assignment_has_settlement_handoff(
-            &assignment.assignment_id,
-            assignment.fencing_epoch,
-        )
-        .await
-        .expect("accept exact evidence-only settlement handoff"));
+    assert!(
+        fixture
+            .db
+            .task_board_remote_assignment_has_settlement_handoff(
+                &assignment.assignment_id,
+                assignment.fencing_epoch,
+            )
+            .await
+            .expect("accept exact evidence-only settlement handoff")
+    );
     assert!(matches!(
         fixture
             .db
@@ -196,7 +200,8 @@ async fn set_item_to_active_remote_execution(fixture: &ControllerFixture) {
 #[tokio::test]
 async fn result_adopted_handoff_is_exact_and_replayable() {
     let fixture = controller_fixture(1).await;
-    let assignment = detached_terminal_assignment(&fixture, TaskBoardRemoteAssignmentState::Failed).await;
+    let assignment =
+        detached_terminal_assignment(&fixture, TaskBoardRemoteAssignmentState::Failed).await;
     let parent = load_parent(&fixture).await;
 
     assert!(matches!(
@@ -211,14 +216,16 @@ async fn result_adopted_handoff_is_exact_and_replayable() {
             .expect("adopt exact failed remote result"),
         super::TaskBoardRemoteResultAdoptionOutcome::Updated(_)
     ));
-    assert!(fixture
-        .db
-        .task_board_remote_assignment_has_settlement_handoff(
-            &assignment.assignment_id,
-            assignment.fencing_epoch,
-        )
-        .await
-        .expect("load result-adopted settlement handoff"));
+    assert!(
+        fixture
+            .db
+            .task_board_remote_assignment_has_settlement_handoff(
+                &assignment.assignment_id,
+                assignment.fencing_epoch,
+            )
+            .await
+            .expect("load result-adopted settlement handoff")
+    );
     assert!(matches!(
         fixture
             .db
@@ -299,15 +306,18 @@ fn terminal_status(
                         attempt: request.binding.attempt,
                         idempotency_key: request.binding.idempotency_key.clone(),
                         exact_head_revision: "1111111111111111111111111111111111111111".into(),
-                        artifact: TaskBoardAttemptResultArtifact::Review(TaskBoardReviewerOutcome {
-                            profile_id: "reviewer".into(),
-                            result: TaskBoardReviewResult {
-                                verdict: TaskBoardPhaseVerdict::Pass,
-                                head_revision: "1111111111111111111111111111111111111111".into(),
-                                summary: "review passed".into(),
-                                findings: Vec::new(),
+                        artifact: TaskBoardAttemptResultArtifact::Review(
+                            TaskBoardReviewerOutcome {
+                                profile_id: "reviewer".into(),
+                                result: TaskBoardReviewResult {
+                                    verdict: TaskBoardPhaseVerdict::Pass,
+                                    head_revision: "1111111111111111111111111111111111111111"
+                                        .into(),
+                                    summary: "review passed".into(),
+                                    findings: Vec::new(),
+                                },
                             },
-                        }),
+                        ),
                     },
                     request.request_sha256.clone(),
                 )
@@ -332,7 +342,10 @@ fn terminal_status(
         status_sha256: String::new(),
         lease: Some(RemoteLease {
             lease_id: assignment.lease_id.clone().expect("terminal lease"),
-            expires_at: assignment.lease_expires_at.clone().expect("terminal lease expiry"),
+            expires_at: assignment
+                .lease_expires_at
+                .clone()
+                .expect("terminal lease expiry"),
         }),
         result,
         output_artifacts: RemoteArtifactManifest::default(),
@@ -359,7 +372,13 @@ pub(crate) async fn restore_parent_to_targetless_preparing(fixture: &ControllerF
          WHERE execution_id = ?1",
     )
     .bind(&restored.execution_id)
-    .bind(label(TaskBoardExecutionState::Preparing, "workflow execution state").expect("state"))
+    .bind(
+        label(
+            TaskBoardExecutionState::Preparing,
+            "workflow execution state",
+        )
+        .expect("state"),
+    )
     .bind(diagnostics)
     .bind(ownership)
     .bind(NOW)
@@ -418,7 +437,10 @@ async fn assert_no_cleanup_authority(
 
 async fn assert_unknown_terminal_projection(fixture: &ControllerFixture) {
     let parent = load_parent(fixture).await;
-    assert_eq!(parent.transition.execution_state, TaskBoardExecutionState::HumanRequired);
+    assert_eq!(
+        parent.transition.execution_state,
+        TaskBoardExecutionState::HumanRequired
+    );
     assert_eq!(parent.attempts[0].state, TaskBoardAttemptState::Unknown);
     let item = fixture
         .db
@@ -427,7 +449,10 @@ async fn assert_unknown_terminal_projection(fixture: &ControllerFixture) {
         .expect("load recovered unknown item");
     assert_eq!(item.status, TaskBoardStatus::HumanRequired);
     assert_eq!(item.workflow.status, TaskBoardWorkflowStatus::Paused);
-    assert_eq!(item.workflow.execution_id.as_deref(), Some(parent.execution_id.as_str()));
+    assert_eq!(
+        item.workflow.execution_id.as_deref(),
+        Some(parent.execution_id.as_str())
+    );
 }
 
 fn failed_status(
@@ -442,7 +467,10 @@ fn failed_status(
         status_sha256: String::new(),
         lease: Some(RemoteLease {
             lease_id: request.lease_id.clone(),
-            expires_at: assignment.lease_expires_at.clone().expect("terminal lease expiry"),
+            expires_at: assignment
+                .lease_expires_at
+                .clone()
+                .expect("terminal lease expiry"),
         }),
         result: None,
         output_artifacts: RemoteArtifactManifest::default(),

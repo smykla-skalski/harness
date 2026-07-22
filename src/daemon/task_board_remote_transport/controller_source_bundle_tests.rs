@@ -9,9 +9,7 @@ use super::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteSourceBundleUploadRequest,
     RemoteSourceBundleUploadResponse, RemoteSourceMaterial,
 };
-use crate::daemon::db::{
-    REMOTE_EXECUTOR_CLAIMED_AT, remote_controller_fixture,
-};
+use crate::daemon::db::{REMOTE_EXECUTOR_CLAIMED_AT, remote_controller_fixture};
 use crate::task_board::TaskBoardWorkflowKind;
 
 const BASE: &str = "1111111111111111111111111111111111111111";
@@ -36,11 +34,9 @@ async fn controller_upload_replays_immutable_receipt_without_a_second_request() 
         .expect("insert controller source offer");
     let request = RemoteSourceBundleUploadRequest::seal(offer, &content)
         .expect("seal controller source upload");
-    let response = RemoteSourceBundleUploadResponse::seal(
-        &request,
-        REMOTE_EXECUTOR_CLAIMED_AT.into(),
-    )
-    .expect("seal executor upload response");
+    let response =
+        RemoteSourceBundleUploadResponse::seal(&request, REMOTE_EXECUTOR_CLAIMED_AT.into())
+            .expect("seal executor upload response");
     let tls = test_tls_material();
     let BarrierServer {
         endpoint,
@@ -53,9 +49,8 @@ async fn controller_upload_replays_immutable_receipt_without_a_second_request() 
     )
     .await;
     let controller = Arc::new(pinned_controller(&endpoint, &tls));
-    let (first, replay) = temp_env::async_with_vars(
-        [(TOKEN_ENV, Some("authority-secret"))],
-        async {
+    let (first, replay) =
+        temp_env::async_with_vars([(TOKEN_ENV, Some("authority-secret"))], async {
             let pending_controller = Arc::clone(&controller);
             let pending_db = fixture.db.clone();
             let pending_request = request.clone();
@@ -75,9 +70,8 @@ async fn controller_upload_replays_immutable_receipt_without_a_second_request() 
                 .await
                 .expect("replay source upload receipt");
             (first, replay)
-        },
-    )
-    .await;
+        })
+        .await;
     assert_eq!(
         serde_json::to_vec(&first).expect("first response JSON"),
         serde_json::to_vec(&replay).expect("replay response JSON")
@@ -110,26 +104,21 @@ async fn controller_upload_replay_rejects_wrong_principal_and_digest_without_net
         .expect("load source upload trust");
     fixture
         .db
-        .claim_task_board_remote_source_bundle_upload_io_authority_fenced(
-            &request, HOST_ID, &trust,
-        )
+        .claim_task_board_remote_source_bundle_upload_io_authority_fenced(&request, HOST_ID, &trust)
         .await
         .expect("claim source upload authority");
-    let response = RemoteSourceBundleUploadResponse::seal(
-        &request,
-        REMOTE_EXECUTOR_CLAIMED_AT.into(),
-    )
-    .expect("seal source upload response");
+    let response =
+        RemoteSourceBundleUploadResponse::seal(&request, REMOTE_EXECUTOR_CLAIMED_AT.into())
+            .expect("seal source upload response");
     fixture
         .db
-        .record_task_board_remote_source_bundle_upload_response(
-            &request, &response, HOST_ID,
-        )
+        .record_task_board_remote_source_bundle_upload_response(&request, &response, HOST_ID)
         .await
         .expect("store source upload receipt");
 
     let tls = test_tls_material();
-    let (endpoint, requests) = super::controller_authority_test_support::spawn_probe_server(&tls).await;
+    let (endpoint, requests) =
+        super::controller_authority_test_support::spawn_probe_server(&tls).await;
     let wrong_host = pinned_controller_for_host(&endpoint, &tls, "executor-b");
     let mut wrong_digest = request.clone();
     change_digest(&mut wrong_digest.request_sha256);
@@ -163,12 +152,8 @@ fn bundle_offer(
     offer.binding.workflow_kind = TaskBoardWorkflowKind::DefaultTask;
     // Prior-phase base must match the bundle's advertised result revision.
     offer.binding.base_revision = RESULT.into();
-    offer.source = RemoteSourceMaterial::prior_phase_bundle(
-        "example/harness",
-        BASE,
-        RESULT,
-        artifact.clone(),
-    );
+    offer.source =
+        RemoteSourceMaterial::prior_phase_bundle("example/harness", BASE, RESULT, artifact.clone());
     offer.artifacts = RemoteArtifactManifest {
         entries: vec![artifact],
     };

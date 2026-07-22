@@ -110,6 +110,10 @@ mod schema_v43;
 #[allow(dead_code)]
 mod task_board;
 #[cfg(test)]
+pub(crate) use task_board::remote_assignment_terminal_handoff_tests::{
+    detached_terminal_assignment, restore_parent_to_targetless_preparing,
+};
+#[cfg(test)]
 #[allow(unused_imports)]
 pub(crate) use task_board::remote_assignment_test_support::{
     CLAIMED_AT as REMOTE_EXECUTOR_CLAIMED_AT, ControllerFixture as RemoteControllerFixture,
@@ -119,18 +123,6 @@ pub(crate) use task_board::remote_assignment_test_support::{
     claim_request as remote_executor_claim_request,
     controller_fixture as remote_controller_fixture, executor_fixture as remote_executor_fixture,
 };
-#[cfg(test)]
-pub(crate) use task_board::{
-    accept_controller as accept_remote_controller,
-    claim_controller as claim_remote_controller,
-    running_status as remote_controller_running_status,
-    status_request as remote_controller_status_request,
-};
-#[cfg(test)]
-pub(crate) use task_board::remote_assignment_terminal_handoff_tests::{
-    detached_terminal_assignment, restore_parent_to_targetless_preparing,
-};
-pub(crate) use task_board::{exact_active_remote_target, parent_points_to_assignment};
 pub(crate) use task_board::workflow_owner;
 #[cfg(test)]
 pub(crate) use task_board::write_workflow_fixture::{
@@ -138,36 +130,41 @@ pub(crate) use task_board::write_workflow_fixture::{
 };
 #[allow(unused_imports)]
 pub(crate) use task_board::{
-    ClaimedTaskBoardDispatch, ClaimedTaskBoardDispatchPreparation, ReservedTaskBoardDispatch,
+    ClaimedTaskBoardDispatch, ClaimedTaskBoardDispatchPreparation,
+    REMOTE_IMPLEMENTATION_BUNDLE_MEDIA_TYPE, REMOTE_IMPLEMENTATION_BUNDLE_PATH,
+    REMOTE_RESULT_ARTIFACT_MEDIA_TYPE, REMOTE_RESULT_ARTIFACT_PATH,
+    REMOTE_START_INTERRUPTED_WITHOUT_RUN_ERROR_CODE,
+    REMOTE_START_INTERRUPTED_WITHOUT_RUN_FAILURE_CLASS, REMOTE_START_PREFLIGHT_ERROR_CODE,
+    REMOTE_START_PREFLIGHT_FAILURE_CLASS, ReservedTaskBoardDispatch,
     TaskBoardAdmissionMissingRunRecovery, TaskBoardAdmissionWorkerRecovery,
     TaskBoardAutomationControlRecord, TaskBoardAutomationRunAdmission, TaskBoardAutomationRunFence,
     TaskBoardAutomationRunLease, TaskBoardAutomationRunStage, TaskBoardDispatchClaimAction,
-    TaskBoardImportMarker, TaskBoardItemSnapshot, TaskBoardRemoteAssignmentRecord,
-    TaskBoardRemoteControllerOperationToken, TaskBoardRemoteControllerScanItem,
-    TaskBoardRemoteControllerScanStep,
-    TaskBoardRemoteHostSelection,
-    TaskBoardRemoteArtifact,
+    TaskBoardImportMarker, TaskBoardItemSnapshot, TaskBoardRemoteArtifact,
+    TaskBoardRemoteAssignmentRecord, TaskBoardRemoteControllerOperationToken,
+    TaskBoardRemoteControllerScanItem, TaskBoardRemoteControllerScanStep,
     TaskBoardRemoteExecutorIdentity, TaskBoardRemoteExecutorScan,
     TaskBoardRemoteExecutorStartAuthority, TaskBoardRemoteExecutorStartIoPermit,
-    TaskBoardRemoteExecutorStartIoPermitOutcome,
-    TaskBoardRemoteExecutorStopAuthority,
+    TaskBoardRemoteExecutorStartIoPermitOutcome, TaskBoardRemoteExecutorStopAuthority,
     TaskBoardRemoteExecutorStopPending, TaskBoardRemoteExecutorStopReason,
-    TaskBoardRemoteTerminalArtifact, REMOTE_IMPLEMENTATION_BUNDLE_MEDIA_TYPE,
-    REMOTE_IMPLEMENTATION_BUNDLE_PATH, REMOTE_RESULT_ARTIFACT_MEDIA_TYPE,
-    REMOTE_RESULT_ARTIFACT_PATH, REMOTE_START_INTERRUPTED_WITHOUT_RUN_ERROR_CODE,
-    REMOTE_START_INTERRUPTED_WITHOUT_RUN_FAILURE_CLASS, REMOTE_START_PREFLIGHT_ERROR_CODE,
-    REMOTE_START_PREFLIGHT_FAILURE_CLASS,
-    TaskBoardRemoteHostTrustFence, TaskBoardRemoteIoAuthority, TaskBoardRemoteMutationOutcome,
-    TaskBoardRemoteOfferOutcome, TaskBoardRemoteOfferReceipt, TaskBoardRemoteOfferReceiptDisposition,
-    TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence, TaskBoardRemoteRecoveryBatch,
-    TaskBoardRemoteRecoveryFailure, TaskBoardRemoteResultAdoptionOutcome,
-    TaskBoardRemoteResultImportRecord, TaskBoardRemoteResultImportRequest,
-    TaskBoardRemoteResultImportState,
-    TaskBoardRemoteSettlementReceipt, TaskBoardRemoteSourceBundle, TaskBoardRunAcquireRequest,
-    TaskBoardRemoteLifecycleTrustSnapshot, TaskBoardRemotePriorPhaseBundle,
-    executor_start_authority, executor_start_io_permit,
+    TaskBoardRemoteHostSelection, TaskBoardRemoteHostTrustFence, TaskBoardRemoteIoAuthority,
+    TaskBoardRemoteLifecycleTrustSnapshot, TaskBoardRemoteMutationOutcome,
+    TaskBoardRemoteOfferOutcome, TaskBoardRemoteOfferReceipt,
+    TaskBoardRemoteOfferReceiptDisposition, TaskBoardRemoteOperationKind,
+    TaskBoardRemoteOperationTrustFence, TaskBoardRemotePriorPhaseBundle,
+    TaskBoardRemoteRecoveryBatch, TaskBoardRemoteRecoveryFailure,
+    TaskBoardRemoteResultAdoptionOutcome, TaskBoardRemoteResultImportRecord,
+    TaskBoardRemoteResultImportRequest, TaskBoardRemoteResultImportState,
+    TaskBoardRemoteSettlementReceipt, TaskBoardRemoteSourceBundle, TaskBoardRemoteTerminalArtifact,
+    TaskBoardRunAcquireRequest, executor_start_authority, executor_start_io_permit,
     remote_executor_identity, remote_executor_identity_from_parts, stop_pending_snapshot_matches,
 };
+#[cfg(test)]
+pub(crate) use task_board::{
+    accept_controller as accept_remote_controller, claim_controller as claim_remote_controller,
+    running_status as remote_controller_running_status,
+    status_request as remote_controller_status_request,
+};
+pub(crate) use task_board::{exact_active_remote_target, parent_points_to_assignment};
 mod session_data;
 mod signals;
 mod summaries;

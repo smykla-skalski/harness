@@ -1,7 +1,7 @@
-use crate::daemon::db::{CliError, db_error};
 use crate::daemon::db::task_board::remote_lifecycle_trust::{
     TaskBoardRemoteLifecycleTrustSnapshot, decode_lifecycle_trust,
 };
+use crate::daemon::db::{CliError, db_error};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TaskBoardRemoteControllerOperationToken {
@@ -24,9 +24,8 @@ pub(super) fn decode(
             validate_kind(&kind)?;
             validate_sha256(&request_sha256, "controller operation request")?;
             validate_sha256(&trust_sha256, "controller operation trust")?;
-            let fence = decode_lifecycle_trust(fence_json, fence_sha256)?.ok_or_else(|| {
-                db_error("controller operation has no immutable lifecycle fence")
-            })?;
+            let fence = decode_lifecycle_trust(fence_json, fence_sha256)?
+                .ok_or_else(|| db_error("controller operation has no immutable lifecycle fence"))?;
             Ok(Some(TaskBoardRemoteControllerOperationToken {
                 kind,
                 request_sha256,

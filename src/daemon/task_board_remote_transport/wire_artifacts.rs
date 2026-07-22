@@ -60,8 +60,8 @@ pub(super) fn valid_artifact_path(path: &str) -> bool {
         !component.is_empty()
             && component != "."
             && component != ".."
-            && component.bytes().all(|byte| {
-                byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-')
-            })
+            && component
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
     })
 }

@@ -20,19 +20,24 @@ const CLEANED_AT: &str = "2026-07-19T10:00:30Z";
 const CHANGED_PARENT_AT: &str = "2026-07-19T10:00:21Z";
 const HANDOFF_AT: &str = "2026-07-19T10:00:19Z";
 
+#[path = "remote_assignment_cleanup_handoff_tests/corruption.rs"]
+mod corruption;
+
 #[tokio::test]
 async fn exact_cleanup_handoff_releases_a_detached_terminal_generation_once() {
     let fixture = controller_fixture(1).await;
     let cancelled = cancel_controller_assignment(&fixture).await;
     let settlement = settle_controller_assignment(&fixture, &cancelled).await;
-    assert!(fixture
-        .db
-        .task_board_remote_assignment_has_settlement_handoff(
-            &cancelled.assignment_id,
-            cancelled.fencing_epoch,
-        )
-        .await
-        .expect("terminal projection grants settlement authority"));
+    assert!(
+        fixture
+            .db
+            .task_board_remote_assignment_has_settlement_handoff(
+                &cancelled.assignment_id,
+                cancelled.fencing_epoch,
+            )
+            .await
+            .expect("terminal projection grants settlement authority")
+    );
 
     let cleanup = RemoteCleanupObservationRequest::for_settlement(&settlement)
         .expect("seal cleanup observation request");
@@ -56,11 +61,11 @@ async fn exact_cleanup_handoff_releases_a_detached_terminal_generation_once() {
          SET updated_at = ?2, completed_at = ?2
          WHERE execution_id = ?1",
     )
-        .bind(&fixture.execution.execution_id)
-        .bind(CHANGED_PARENT_AT)
-        .execute(fixture.db.pool())
-        .await
-        .expect("advance parent after cleanup authority claim");
+    .bind(&fixture.execution.execution_id)
+    .bind(CHANGED_PARENT_AT)
+    .execute(fixture.db.pool())
+    .await
+    .expect("advance parent after cleanup authority claim");
 
     assert!(matches!(
         fixture
@@ -90,12 +95,14 @@ async fn terminal_cleanup_handoff_survives_parent_deletion_after_exact_settlemen
         .task_board_remote_host_trust_fence(HOST)
         .await
         .expect("load superseded cleanup trust");
-    assert!(fixture
-        .db
-        .claim_task_board_remote_cleanup_observation_fenced(&cleanup, HOST, &trust)
-        .await
-        .expect("claim cleanup before parent deletion")
-        .is_none());
+    assert!(
+        fixture
+            .db
+            .claim_task_board_remote_cleanup_observation_fenced(&cleanup, HOST, &trust)
+            .await
+            .expect("claim cleanup before parent deletion")
+            .is_none()
+    );
     query("DELETE FROM task_board_workflow_executions WHERE execution_id = ?1")
         .bind(&fixture.execution.execution_id)
         .execute(fixture.db.pool())
@@ -113,67 +120,6 @@ async fn terminal_cleanup_handoff_survives_parent_deletion_after_exact_settlemen
     ));
     assert_terminal_cleanup_handoff(&fixture).await;
     assert_cleanup_replay_is_noop(&fixture, &cleanup, &response, &trust).await;
-}
-
-#[tokio::test]
-async fn cleanup_handoff_bypasses_an_undecodable_parent_but_no_handoff_fails_closed() {
-    let fixture = controller_fixture(1).await;
-    let superseded = superseded_detached_controller_assignment(&fixture).await;
-    record_pending_cleanup_handoff(&fixture, &superseded).await;
-    let settlement = settle_controller_assignment(&fixture, &superseded).await;
-    let cleanup = RemoteCleanupObservationRequest::for_settlement(&settlement)
-        .expect("seal cleanup request");
-    let response = RemoteCleanupObservationResponse::for_completed(&cleanup, CLEANED_AT.into())
-        .expect("seal cleanup response");
-    let trust = fixture
-        .db
-        .task_board_remote_host_trust_fence(HOST)
-        .await
-        .expect("load cleanup trust");
-    corrupt_parent_json(&fixture).await;
-    assert!(fixture
-        .db
-        .claim_task_board_remote_cleanup_observation_fenced(&cleanup, HOST, &trust)
-        .await
-        .expect("claim cleanup without decoding an immutable-handoff parent")
-        .is_none());
-    assert!(matches!(
-        fixture
-            .db
-            .record_task_board_remote_cleanup_observation(&cleanup, &response, HOST, &trust)
-            .await
-            .expect("record cleanup without decoding an immutable-handoff parent"),
-        TaskBoardRemoteMutationOutcome::Updated(_)
-    ));
-
-    for missing_parent in [false, true] {
-        let fixture = controller_fixture(1).await;
-        let superseded = superseded_detached_controller_assignment(&fixture).await;
-        record_pending_cleanup_handoff(&fixture, &superseded).await;
-        let settlement = settle_controller_assignment(&fixture, &superseded).await;
-        let cleanup = RemoteCleanupObservationRequest::for_settlement(&settlement)
-            .expect("seal no-handoff cleanup request");
-        let trust = fixture
-            .db
-            .task_board_remote_host_trust_fence(HOST)
-            .await
-            .expect("load no-handoff cleanup trust");
-        clear_handoff_for_explicit_corruption(&fixture, &superseded.assignment_id).await;
-        if missing_parent {
-            query("DELETE FROM task_board_workflow_executions WHERE execution_id = ?1")
-                .bind(&fixture.execution.execution_id)
-                .execute(fixture.db.pool())
-                .await
-                .expect("delete no-handoff parent");
-        } else {
-            corrupt_parent_json(&fixture).await;
-        }
-        assert!(fixture
-            .db
-            .claim_task_board_remote_cleanup_observation_fenced(&cleanup, HOST, &trust)
-            .await
-            .is_err());
-    }
 }
 
 async fn record_pending_cleanup_handoff(
@@ -475,11 +421,13 @@ async fn corrupt_parent_json(fixture: &ControllerFixture) {
         .execute("PRAGMA ignore_check_constraints = ON")
         .await
         .expect("allow explicit undecodable-parent corruption");
-    query("UPDATE task_board_workflow_executions SET diagnostics_json = '{' WHERE execution_id = ?1")
-        .bind(&fixture.execution.execution_id)
-        .execute(&mut *connection)
-        .await
-        .expect("persist deliberately undecodable parent row");
+    query(
+        "UPDATE task_board_workflow_executions SET diagnostics_json = '{' WHERE execution_id = ?1",
+    )
+    .bind(&fixture.execution.execution_id)
+    .execute(&mut *connection)
+    .await
+    .expect("persist deliberately undecodable parent row");
     connection
         .execute("PRAGMA ignore_check_constraints = OFF")
         .await

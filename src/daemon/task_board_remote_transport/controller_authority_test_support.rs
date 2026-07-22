@@ -326,10 +326,7 @@ pub(super) fn pinned_controller_for_trust_with_times(
     let client = RemoteExecutionHttpClient::new_with_roots(config, vec![tls.ca_der.clone()])
         .expect("authority pinned client");
     RemoteExecutionControllerClient::new_for_tests_with_retained_trust_and_times(
-        &host_id,
-        client,
-        trust,
-        times,
+        &host_id, client, trust, times,
     )
 }
 

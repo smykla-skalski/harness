@@ -70,14 +70,7 @@ async fn scan_class_page(
         .map_err(|_| db_error("remote executor scan limit is out of range"))?;
     let mut rows = match cursor.as_ref() {
         Some((updated_at, assignment_id)) => {
-            select_after_cursor(
-                transaction,
-                class,
-                updated_at,
-                assignment_id,
-                limit,
-            )
-            .await?
+            select_after_cursor(transaction, class, updated_at, assignment_id, limit).await?
         }
         None => select_canonical(transaction, class, limit).await?,
     };
@@ -86,14 +79,8 @@ async fn scan_class_page(
     {
         let remaining = i64::try_from(SCAN_LIMIT - rows.len())
             .map_err(|_| db_error("remote executor wrap limit is out of range"))?;
-        let mut wrapped = select_through_cursor(
-            transaction,
-            class,
-            updated_at,
-            assignment_id,
-            remaining,
-        )
-        .await?;
+        let mut wrapped =
+            select_through_cursor(transaction, class, updated_at, assignment_id, remaining).await?;
         rows.append(&mut wrapped);
     }
     if let Some(last) = rows.last() {

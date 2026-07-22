@@ -4,16 +4,11 @@ use super::*;
 async fn lifecycle_stop_intent_survives_ambiguity_and_fences_every_owner() {
     let fixture = executor_fixture(1).await;
     let accepted = claim_executor(&fixture).await;
-    let started = match authorize_and_start_executor(
-        &fixture,
-        &accepted.assignment_id,
-        STARTED_AT,
-    )
-    .await
-    {
-        TaskBoardRemoteMutationOutcome::Updated(record) => record,
-        other => panic!("expected started executor, got {other:?}"),
-    };
+    let started =
+        match authorize_and_start_executor(&fixture, &accepted.assignment_id, STARTED_AT).await {
+            TaskBoardRemoteMutationOutcome::Updated(record) => record,
+            other => panic!("expected started executor, got {other:?}"),
+        };
     let owner = started
         .executor_lifecycle_owner
         .clone()
@@ -66,10 +61,7 @@ async fn lifecycle_stop_intent_survives_ambiguity_and_fences_every_owner() {
         .expect("persist stopped executor run");
     let settled = fixture
         .db
-        .settle_task_board_remote_executor_stop_pending(
-            &pending,
-            "2026-07-19T10:00:24Z",
-        )
+        .settle_task_board_remote_executor_stop_pending(&pending, "2026-07-19T10:00:24Z")
         .await
         .expect("settle lifecycle stop authority");
     assert!(matches!(
@@ -83,10 +75,7 @@ async fn lifecycle_stop_intent_survives_ambiguity_and_fences_every_owner() {
     assert!(matches!(
         fixture
             .db
-            .settle_task_board_remote_executor_stop_pending(
-                &pending,
-                "2026-07-19T10:00:25Z",
-            )
+            .settle_task_board_remote_executor_stop_pending(&pending, "2026-07-19T10:00:25Z",)
             .await
             .expect("replay lifecycle stop settlement"),
         TaskBoardRemoteMutationOutcome::Replayed(_)
@@ -173,20 +162,12 @@ async fn assert_other_executor_mutations_are_stale(
     .expect("seal stop-only cancellation");
     let renewal = fixture
         .db
-        .renew_task_board_remote_assignment_lease(
-            &renewal,
-            PRINCIPAL,
-            "2026-07-19T10:00:22Z",
-        )
+        .renew_task_board_remote_assignment_lease(&renewal, PRINCIPAL, "2026-07-19T10:00:22Z")
         .await
         .expect("stop-only renewal");
     let cancellation = fixture
         .db
-        .cancel_task_board_remote_assignment(
-            &cancel,
-            PRINCIPAL,
-            "2026-07-19T10:00:22Z",
-        )
+        .cancel_task_board_remote_assignment(&cancel, PRINCIPAL, "2026-07-19T10:00:22Z")
         .await
         .expect("stop-only cancellation");
     let unknown = fixture

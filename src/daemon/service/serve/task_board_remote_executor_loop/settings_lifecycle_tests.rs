@@ -4,16 +4,15 @@ use chrono::{SecondsFormat, Utc};
 use sqlx::query;
 
 use super::disabled_tests::{
-    EXECUTOR_INSTANCE, EXECUTOR_START_AT, SettingsDrift, claim_start_authority,
-    codex_run_count, configure_checkout, drift_executor_settings, executor_state,
-    git_repository, load_assignment, persist_exact_run, request_for_revision,
+    EXECUTOR_INSTANCE, EXECUTOR_START_AT, SettingsDrift, claim_start_authority, codex_run_count,
+    configure_checkout, drift_executor_settings, executor_state, git_repository, load_assignment,
+    persist_exact_run, request_for_revision,
 };
 use super::{prepare_remote_workspace, reconcile_remote_executor_assignment};
 use crate::daemon::db::{
-    TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorStartIoPermit,
+    RemoteExecutorFixture, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorStartIoPermit,
     TaskBoardRemoteExecutorStopAuthority, TaskBoardRemoteExecutorStopReason,
-    TaskBoardRemoteMutationOutcome, RemoteExecutorFixture, remote_executor_fixture,
-    remote_executor_identity,
+    TaskBoardRemoteMutationOutcome, remote_executor_fixture, remote_executor_identity,
 };
 use crate::daemon::protocol::CodexRunStatus;
 use crate::task_board::TaskBoardRemoteAssignmentState;
@@ -24,14 +23,12 @@ async fn compatible_settings_changes_reconcile_started_workers_through_terminal(
         for owner_instance in [EXECUTOR_INSTANCE, "restarted-instance"] {
             let (fixture, _, started, authority, _) = adopted_worker().await;
             drift_executor_settings(&fixture.db, drift).await;
-            query(
-                "UPDATE codex_runs SET status = 'cancelled', updated_at = ?2 WHERE run_id = ?1",
-            )
-            .bind(&authority.identity.run_id)
-            .bind("2026-07-19T10:00:40Z")
-            .execute(fixture.db.pool())
-            .await
-            .expect("persist terminal executor snapshot");
+            query("UPDATE codex_runs SET status = 'cancelled', updated_at = ?2 WHERE run_id = ?1")
+                .bind(&authority.identity.run_id)
+                .bind("2026-07-19T10:00:40Z")
+                .execute(fixture.db.pool())
+                .await
+                .expect("persist terminal executor snapshot");
             let state = executor_state(&fixture.db, owner_instance);
 
             reconcile_remote_executor_assignment(&state, &fixture.db, &started.assignment_id)
@@ -181,7 +178,9 @@ async fn post_adoption_replay_requires_the_current_lifecycle_owner() {
         .await
         .expect("terminal replay performs no second executor mutation");
     assert_eq!(
-        load_assignment(&fixture.db, &started.assignment_id).await.state,
+        load_assignment(&fixture.db, &started.assignment_id)
+            .await
+            .state,
         TaskBoardRemoteAssignmentState::Failed,
     );
     assert_eq!(codex_run_count(&fixture.db).await, 1);
@@ -257,11 +256,7 @@ async fn adopted_worker() -> (
         .expect("unchanged settings authorize Start");
     let permit = fixture
         .db
-        .claim_task_board_remote_executor_start_io_permit(
-            &authority,
-            &workspace,
-            EXECUTOR_START_AT,
-        )
+        .claim_task_board_remote_executor_start_io_permit(&authority, &workspace, EXECUTOR_START_AT)
         .await
         .expect("claim exact Start I/O permit")
         .expect_acquired("unchanged settings permit Start");

@@ -55,13 +55,12 @@ impl AsyncDaemonDb {
         }
         let receipt = start_failure_receipt(&record, permit, response)?;
         let (receipt_json, receipt_sha256) = start_failure_receipt_values(&receipt)?;
-        let run_exists = query_scalar::<_, bool>(
-            "SELECT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?1)",
-        )
-        .bind(&permit.identity.run_id)
-        .fetch_one(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("reread Start-failure run: {error}")))?;
+        let run_exists =
+            query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?1)")
+                .bind(&permit.identity.run_id)
+                .fetch_one(transaction.as_mut())
+                .await
+                .map_err(|error| db_error(format!("reread Start-failure run: {error}")))?;
         if run_exists {
             return Err(concurrent(
                 "remote executor Start failure observed a durable run",

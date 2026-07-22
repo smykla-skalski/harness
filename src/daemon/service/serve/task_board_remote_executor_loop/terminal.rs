@@ -79,9 +79,9 @@ pub(super) async fn persist_terminal_snapshot(
     {
         TaskBoardRemoteMutationOutcome::Updated(_)
         | TaskBoardRemoteMutationOutcome::Replayed(_) => Ok(()),
-        TaskBoardRemoteMutationOutcome::Stale(_) => {
-            Err(concurrent("remote terminal persistence lost its exact owner"))
-        }
+        TaskBoardRemoteMutationOutcome::Stale(_) => Err(concurrent(
+            "remote terminal persistence lost its exact owner",
+        )),
     }
 }
 
@@ -160,7 +160,9 @@ async fn implementation_bundle(
         offer.binding.base_revision.clone(),
         typed.result.exact_head_revision.clone(),
     )
-    .map_err(|error| invalid_transition(format!("validate remote implementation result: {error}")))?;
+    .map_err(|error| {
+        invalid_transition(format!("validate remote implementation result: {error}"))
+    })?;
     let bundle = spawn_blocking(move || plan.export(MAX_TERMINAL_ARTIFACT_BYTES))
         .await
         .map_err(|error| workflow_io(format!("join remote Git bundle export: {error}")))?
@@ -205,7 +207,10 @@ fn terminal_response(
         TerminalEvidence::Completed { result, artifacts } => (
             RemoteAssignmentWireState::Completed,
             Some(result.clone()),
-            artifacts.iter().map(|artifact| artifact.entry.clone()).collect(),
+            artifacts
+                .iter()
+                .map(|artifact| artifact.entry.clone())
+                .collect(),
             None,
             None,
         ),

@@ -23,9 +23,7 @@ impl TaskBoardRemoteExecutorStopReason {
             Self::StartEvidenceInvalid => "remote Codex start evidence failed validation",
             Self::StartAdoptionFenceLost => "remote Codex start adoption lost its fence",
             Self::StartAdoptionFailed => "remote Codex start adoption failed",
-            Self::LifecycleEvidenceInvalid => {
-                "remote Codex lifecycle evidence failed validation"
-            }
+            Self::LifecycleEvidenceInvalid => "remote Codex lifecycle evidence failed validation",
         }
     }
 }

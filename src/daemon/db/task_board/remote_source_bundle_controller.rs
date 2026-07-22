@@ -11,8 +11,8 @@ use super::remote_operation_trust::{
     claim_controller_operation_trust_in_tx, consume_controller_operation_trust_in_tx,
 };
 use super::remote_source_bundles::{
-    TaskBoardRemoteSourceBundle, insert_source_bundle_in_tx,
-    load_source_bundle_collisions_in_tx, load_source_bundle_in_tx,
+    TaskBoardRemoteSourceBundle, insert_source_bundle_in_tx, load_source_bundle_collisions_in_tx,
+    load_source_bundle_in_tx,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::task_board_remote_transport::wire::{
@@ -30,15 +30,17 @@ impl AsyncDaemonDb {
             .validate()
             .map_err(|error| db_error(format!("validate source upload replay: {error}")))?;
         nonblank(authenticated_principal, "source upload replay principal")?;
-        let mut transaction = self.pool().begin().await.map_err(|error| {
-            db_error(format!("begin source upload receipt replay: {error}"))
-        })?;
-        let collisions = load_source_bundle_collisions_in_tx(&mut transaction, &request.offer)
-            .await?;
+        let mut transaction =
+            self.pool().begin().await.map_err(|error| {
+                db_error(format!("begin source upload receipt replay: {error}"))
+            })?;
+        let collisions =
+            load_source_bundle_collisions_in_tx(&mut transaction, &request.offer).await?;
         let result = exact_receipt(collisions, request, authenticated_principal)?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit source upload receipt replay: {error}"))
-        })?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit source upload receipt replay: {error}")))?;
         Ok(result)
     }
 
@@ -55,8 +57,8 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board remote source upload authority")
             .await?;
-        let collisions = load_source_bundle_collisions_in_tx(&mut transaction, &request.offer)
-            .await?;
+        let collisions =
+            load_source_bundle_collisions_in_tx(&mut transaction, &request.offer).await?;
         if exact_receipt(collisions, request, authenticated_principal)?.is_some() {
             transaction.commit().await.map_err(|error| {
                 db_error(format!("commit replayed source upload authority: {error}"))
@@ -73,11 +75,8 @@ impl AsyncDaemonDb {
                 "source upload authority belongs to an abandoned generation",
             ));
         }
-        let assignment = require_assignment(
-            &mut transaction,
-            &request.offer.binding.assignment_id,
-        )
-        .await?;
+        let assignment =
+            require_assignment(&mut transaction, &request.offer.binding.assignment_id).await?;
         require_upload_assignment(&assignment, request, authenticated_principal)?;
         claim_controller_operation_trust_in_tx(
             &mut transaction,
@@ -87,9 +86,10 @@ impl AsyncDaemonDb {
             Some(trust),
         )
         .await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit source upload authority: {error}"))
-        })?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit source upload authority: {error}")))?;
         Ok(true)
     }
 
@@ -106,8 +106,8 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board remote source upload response")
             .await?;
-        let collisions = load_source_bundle_collisions_in_tx(&mut transaction, &request.offer)
-            .await?;
+        let collisions =
+            load_source_bundle_collisions_in_tx(&mut transaction, &request.offer).await?;
         if let Some(existing) = exact_receipt(collisions, request, authenticated_principal)? {
             if existing.response != *response {
                 return Err(concurrent(
@@ -129,11 +129,8 @@ impl AsyncDaemonDb {
                 "source upload response belongs to an abandoned generation",
             ));
         }
-        let assignment = require_assignment(
-            &mut transaction,
-            &request.offer.binding.assignment_id,
-        )
-        .await?;
+        let assignment =
+            require_assignment(&mut transaction, &request.offer.binding.assignment_id).await?;
         require_upload_assignment(&assignment, request, authenticated_principal)?;
         consume_controller_operation_trust_in_tx(
             &mut transaction,
@@ -142,13 +139,8 @@ impl AsyncDaemonDb {
             &request.request_sha256,
         )
         .await?;
-        insert_source_bundle_in_tx(
-            &mut transaction,
-            request,
-            authenticated_principal,
-            response,
-        )
-        .await?;
+        insert_source_bundle_in_tx(&mut transaction, request, authenticated_principal, response)
+            .await?;
         bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
         let stored = load_source_bundle_in_tx(
             &mut transaction,
@@ -157,9 +149,10 @@ impl AsyncDaemonDb {
         )
         .await?
         .ok_or_else(|| db_error("persisted controller source upload receipt disappeared"))?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit source upload response: {error}"))
-        })?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit source upload response: {error}")))?;
         Ok(stored)
     }
 }
@@ -206,9 +199,7 @@ fn exact_receipt(
 ) -> Result<Option<TaskBoardRemoteSourceBundle>, CliError> {
     match collisions.as_slice() {
         [] => Ok(None),
-        [stored] if stored.is_exact_replay(request, principal) => {
-            Ok(Some(stored.clone()))
-        }
+        [stored] if stored.is_exact_replay(request, principal) => Ok(Some(stored.clone())),
         _ => Err(concurrent(
             "source upload identity, generation, principal, or digest conflicts",
         )),

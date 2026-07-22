@@ -8,8 +8,7 @@ use crate::task_board::{
     TaskBoardOrchestratorSettings, remote_spki_pin, validate_execution_host_configs,
 };
 
-const LEGACY_LEAF_SHA256: &str =
-    "1111111111111111111111111111111111111111111111111111111111111111";
+const LEGACY_LEAF_SHA256: &str = "1111111111111111111111111111111111111111111111111111111111111111";
 const CURRENT_HOST_ID: &str = "executor-b";
 
 #[test]
@@ -119,7 +118,9 @@ fn assert_sync_quarantine(db: &DaemonDb) -> String {
              FROM task_board_execution_hosts ORDER BY host_id",
         )
         .expect("prepare migrated host query")
-        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)))
+        .query_map([], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })
         .expect("query migrated hosts")
         .collect::<Result<_, _>>()
         .expect("decode migrated hosts");
@@ -223,7 +224,11 @@ fn assert_quarantine_json(settings_json: &str) {
 // Rows are (host_id, reason, source_settings_revision, source_settings_updated_at,
 // legacy_endpoint, legacy_leaf_sha256, legacy_credential_reference, legacy_enabled).
 fn assert_quarantine_ledger(rows: &[(String, String, i64, String, String, String, String, i64)]) {
-    assert_eq!(rows.len(), 1, "durable quarantine ledger must retain the exact host");
+    assert_eq!(
+        rows.len(),
+        1,
+        "durable quarantine ledger must retain the exact host"
+    );
     assert_eq!(rows[0].0, "executor-a");
     assert_eq!(rows[0].1, "legacy_leaf_certificate_sha256_requires_repair");
     assert_eq!(rows[0].2, 7);
@@ -248,7 +253,10 @@ fn assert_current_hosts(hosts: &[(String, String, i64, String)]) {
     assert_eq!(hosts[0].0, "executor-a");
     assert_eq!(hosts[0].1, "legacy_tombstone");
     assert_eq!(hosts[0].2, 0, "legacy tombstone must stay disabled");
-    assert_eq!(hosts[0].3, "", "legacy tombstone must carry no trust material");
+    assert_eq!(
+        hosts[0].3, "",
+        "legacy tombstone must carry no trust material"
+    );
     // executor-b: the current, selectable controller host retains its exact pin.
     assert_eq!(hosts[1].0, CURRENT_HOST_ID);
     assert_eq!(hosts[1].1, "controller_remote");

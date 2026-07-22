@@ -11,14 +11,12 @@ use crate::daemon::db::{
 };
 use crate::daemon::protocol::{CodexRunSnapshot, CodexRunStatus};
 use crate::daemon::task_board_remote_transport::wire::{
-    RemoteArtifactEntry, RemoteArtifactManifest, RemoteAssignmentWireState,
-    RemoteOfferRequest, RemoteSettledRequest, RemoteSourceBundleUploadRequest,
-    RemoteSourceMaterial, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
+    RemoteArtifactEntry, RemoteArtifactManifest, RemoteAssignmentWireState, RemoteOfferRequest,
+    RemoteSettledRequest, RemoteSourceBundleUploadRequest, RemoteSourceMaterial,
+    TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::git::bundle_export::GitBundleExportPlan;
-use crate::task_board::{
-    TaskBoardLocalExecutionRepositoryConfig, TaskBoardWorkflowKind,
-};
+use crate::task_board::{TaskBoardLocalExecutionRepositoryConfig, TaskBoardWorkflowKind};
 
 const CLAIMED_AT: &str = "2026-07-19T10:00:10Z";
 const AUTHORITY_AT: &str = "2026-07-19T10:00:20Z";
@@ -62,7 +60,10 @@ async fn prior_phase_import_ref_is_cleaned_before_durable_cleanup_marker() {
             )
             .await
             .expect("apply prior-phase bundle");
-            assert_eq!(super::git(&workspace, &["rev-parse", "HEAD"]), source.result);
+            assert_eq!(
+                super::git(&workspace, &["rev-parse", "HEAD"]),
+                source.result
+            );
             let import_ref = format!(
                 "refs/harness/task-board/imports/{}/{bundle_sha256}",
                 offer.request_sha256
@@ -84,10 +85,7 @@ async fn prior_phase_import_ref_is_cleaned_before_durable_cleanup_marker() {
             )
             .await;
             super::super::reconcile_remote_executor_assignment(
-                &super::super::disabled_tests::executor_state(
-                    &fixture.db,
-                    "restarted-instance",
-                ),
+                &super::super::disabled_tests::executor_state(&fixture.db, "restarted-instance"),
                 &fixture.db,
                 &unknown.assignment_id,
             )
@@ -172,8 +170,7 @@ impl BundleSource {
             repository.path(),
             &["config", "user.email", "harness@example.com"],
         );
-        std::fs::write(repository.path().join("result.txt"), "base\n")
-            .expect("write bundle base");
+        std::fs::write(repository.path().join("result.txt"), "base\n").expect("write bundle base");
         super::git(repository.path(), &["add", "result.txt"]);
         super::git(repository.path(), &["commit", "-qm", "base"]);
         let base = super::git(repository.path(), &["rev-parse", "HEAD"]);
@@ -181,14 +178,11 @@ impl BundleSource {
             .expect("write bundle result");
         super::git(repository.path(), &["commit", "-qam", "result"]);
         let result = super::git(repository.path(), &["rev-parse", "HEAD"]);
-        let export = GitBundleExportPlan::for_result(
-            repository.path(),
-            base.clone(),
-            result.clone(),
-        )
-        .expect("plan prior-phase export")
-        .export(1024 * 1024)
-        .expect("export prior-phase bundle");
+        let export =
+            GitBundleExportPlan::for_result(repository.path(), base.clone(), result.clone())
+                .expect("plan prior-phase export")
+                .export(1024 * 1024)
+                .expect("export prior-phase bundle");
         Self {
             repository,
             base,
@@ -258,8 +252,8 @@ async fn upload_bundle(
     offer: &RemoteOfferRequest,
     content: &[u8],
 ) {
-    let upload = RemoteSourceBundleUploadRequest::seal(offer.clone(), content)
-        .expect("seal bundle upload");
+    let upload =
+        RemoteSourceBundleUploadRequest::seal(offer.clone(), content).expect("seal bundle upload");
     fixture
         .db
         .store_task_board_remote_source_bundle(
@@ -404,13 +398,9 @@ async fn settle_unknown(db: &AsyncDaemonDb, record: &TaskBoardRemoteAssignmentRe
     }
     .seal()
     .expect("seal source-backed settlement");
-    db.settle_task_board_remote_assignment(
-        &settlement,
-        REMOTE_EXECUTOR_PRINCIPAL,
-        EXPIRED_AT,
-    )
-    .await
-    .expect("settle source-backed assignment");
+    db.settle_task_board_remote_assignment(&settlement, REMOTE_EXECUTOR_PRINCIPAL, EXPIRED_AT)
+        .await
+        .expect("settle source-backed assignment");
 }
 
 fn git_ref_exists(repository: &Path, reference: &str) -> bool {

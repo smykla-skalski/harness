@@ -1,10 +1,6 @@
 use super::*;
-use crate::daemon::task_board_remote_transport::wire::{
-    TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
-};
-use crate::task_board::{
-    TaskBoardExecutionPhase, TaskBoardWorkflowKind,
-};
+use crate::daemon::task_board_remote_transport::wire::TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION;
+use crate::task_board::{TaskBoardExecutionPhase, TaskBoardWorkflowKind};
 
 const COMPLETED_AT: &str = "2026-07-20T12:00:00Z";
 
@@ -12,7 +8,9 @@ const COMPLETED_AT: &str = "2026-07-20T12:00:00Z";
 fn cleanup_observation_seals_exact_generation_and_settlement() {
     let request = cleanup_request();
     let response = cleanup_response(&request);
-    response.validate(&request).expect("validate cleanup response");
+    response
+        .validate(&request)
+        .expect("validate cleanup response");
 
     let replay = cleanup_response(&request);
     assert_eq!(replay, response);
@@ -95,9 +93,7 @@ fn binding() -> RemoteAttemptBinding {
     }
 }
 
-fn cleanup_response(
-    request: &RemoteCleanupObservationRequest,
-) -> RemoteCleanupObservationResponse {
+fn cleanup_response(request: &RemoteCleanupObservationRequest) -> RemoteCleanupObservationResponse {
     RemoteCleanupObservationResponse {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: request.binding.clone(),

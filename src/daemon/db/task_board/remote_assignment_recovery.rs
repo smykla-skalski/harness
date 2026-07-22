@@ -281,16 +281,16 @@ async fn due_assignment(
                          OR json_type(executions.resource_ownership_json,
                                       '$.resources.remote_cancel_intent_at') IS NOT NULL))";
     query_as(STATEMENT)
-    .bind(now)
-    .bind(&candidate.assignment_id)
-    .bind(candidate.fencing_epoch)
-    .bind(&candidate.assignment_state)
-    .bind(&candidate.assignment_updated_at)
-    .bind(&candidate.request_sha256)
-    .bind(&candidate.lease_id)
-    .fetch_optional(transaction.as_mut())
-    .await
-    .map_err(|error| db_error(format!("reload recoverable remote assignment: {error}")))
+        .bind(now)
+        .bind(&candidate.assignment_id)
+        .bind(candidate.fencing_epoch)
+        .bind(&candidate.assignment_state)
+        .bind(&candidate.assignment_updated_at)
+        .bind(&candidate.request_sha256)
+        .bind(&candidate.lease_id)
+        .fetch_optional(transaction.as_mut())
+        .await
+        .map_err(|error| db_error(format!("reload recoverable remote assignment: {error}")))
 }
 
 async fn recover_one(

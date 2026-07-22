@@ -11,16 +11,15 @@ use super::remote_offer_receipts::load_offer_receipt_collisions_in_tx;
 use super::remote_source_bundles::load_source_bundle_collisions_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::task_board_remote_transport::wire::{
-    RemoteAttemptBinding, RemoteSourceBundleAbandonRequest,
-    RemoteSourceBundleAbandonResponse,
+    RemoteAttemptBinding, RemoteSourceBundleAbandonRequest, RemoteSourceBundleAbandonResponse,
     RemoteSourceBundleReceiptVerificationResponse, RemoteSourceBundleUploadRequest,
 };
 
 #[path = "remote_source_bundle_abandonment/storage.rs"]
 mod storage;
 pub(super) use storage::{
-    insert_abandonment_in_tx, load_abandonment_collisions_in_tx,
-    load_abandonment_in_tx, source_offer_is_abandoned_in_tx,
+    insert_abandonment_in_tx, load_abandonment_collisions_in_tx, load_abandonment_in_tx,
+    source_offer_is_abandoned_in_tx,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -70,10 +69,15 @@ impl AsyncDaemonDb {
         upload
             .validate()
             .map_err(|error| db_error(format!("validate source abandonment lookup: {error}")))?;
-        nonblank(authenticated_principal, "source abandonment lookup principal")?;
-        let mut transaction = self.pool().begin().await.map_err(|error| {
-            db_error(format!("begin source abandonment lookup: {error}"))
-        })?;
+        nonblank(
+            authenticated_principal,
+            "source abandonment lookup principal",
+        )?;
+        let mut transaction = self
+            .pool()
+            .begin()
+            .await
+            .map_err(|error| db_error(format!("begin source abandonment lookup: {error}")))?;
         let collisions = load_abandonment_collisions_in_tx(
             &mut transaction,
             &upload.offer,
@@ -81,9 +85,10 @@ impl AsyncDaemonDb {
         )
         .await?;
         let stored = exact_upload_abandonment(collisions, upload, authenticated_principal)?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit source abandonment lookup: {error}"))
-        })?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit source abandonment lookup: {error}")))?;
         Ok(stored)
     }
 
@@ -103,9 +108,11 @@ impl AsyncDaemonDb {
         request
             .validate()
             .map_err(|error| db_error(format!("validate source receipt verification: {error}")))?;
-        let mut transaction = self.pool().begin().await.map_err(|error| {
-            db_error(format!("begin source receipt verification: {error}"))
-        })?;
+        let mut transaction = self
+            .pool()
+            .begin()
+            .await
+            .map_err(|error| db_error(format!("begin source receipt verification: {error}")))?;
         require_current_local_host_in_tx(
             &mut transaction,
             &request.offer.binding.host_id,
@@ -118,19 +125,19 @@ impl AsyncDaemonDb {
             &request.request_sha256,
         )
         .await?;
-        if let Some(stored) = exact_upload_abandonment(
-            abandonments,
-            request,
-            authenticated_principal,
-        )? {
+        if let Some(stored) =
+            exact_upload_abandonment(abandonments, request, authenticated_principal)?
+        {
             let verification = stored.request.verified_absence;
             transaction.commit().await.map_err(|error| {
-                db_error(format!("commit replayed source absence verification: {error}"))
+                db_error(format!(
+                    "commit replayed source absence verification: {error}"
+                ))
             })?;
             return Ok(verification);
         }
-        let collisions = load_source_bundle_collisions_in_tx(&mut transaction, &request.offer)
-            .await?;
+        let collisions =
+            load_source_bundle_collisions_in_tx(&mut transaction, &request.offer).await?;
         let receipt = match collisions.as_slice() {
             [] => None,
             [stored] if stored.is_exact_replay(request, authenticated_principal) => {
@@ -149,9 +156,10 @@ impl AsyncDaemonDb {
             receipt,
         )
         .map_err(|error| db_error(format!("seal source receipt verification: {error}")))?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit source receipt verification: {error}"))
-        })?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit source receipt verification: {error}")))?;
         Ok(response)
     }
 
@@ -191,11 +199,7 @@ impl AsyncDaemonDb {
             &request.upload_request_sha256,
         )
         .await?;
-        if let Some(existing) = exact_abandonment(
-            abandonments,
-            request,
-            authenticated_principal,
-        )? {
+        if let Some(existing) = exact_abandonment(abandonments, request, authenticated_principal)? {
             transaction.commit().await.map_err(|error| {
                 db_error(format!("commit replayed source abandonment: {error}"))
             })?;
@@ -234,9 +238,10 @@ impl AsyncDaemonDb {
         )
         .await?
         .ok_or_else(|| db_error("persisted source abandonment disappeared"))?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit source abandonment: {error}"))
-        })?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit source abandonment: {error}")))?;
         Ok(stored)
     }
 }
@@ -321,11 +326,7 @@ fn exact_abandonment(
 ) -> Result<Option<TaskBoardRemoteSourceBundleAbandonment>, CliError> {
     match collisions.as_slice() {
         [] => Ok(None),
-        [stored]
-            if stored.is_exact_replay(request, principal) =>
-        {
-            Ok(Some(stored.clone()))
-        }
+        [stored] if stored.is_exact_replay(request, principal) => Ok(Some(stored.clone())),
         _ => Err(concurrent(
             "source abandonment identity, generation, principal, or digest conflicts",
         )),

@@ -94,13 +94,25 @@ async fn durable_git_coordinate_drift_projects_manual_required_before_mutation()
         .await
         .expect("load failed result import")
         .expect("failed result import journal");
-    assert_eq!(journal.state, TaskBoardRemoteResultImportState::ManualRequired);
-    assert!(journal.last_error.as_deref().is_some_and(|detail| {
-        detail.contains("differs from its exact Git worktree")
-    }));
+    assert_eq!(
+        journal.state,
+        TaskBoardRemoteResultImportState::ManualRequired
+    );
+    assert!(
+        journal
+            .last_error
+            .as_deref()
+            .is_some_and(|detail| { detail.contains("differs from its exact Git worktree") })
+    );
     let parent = load_parent(&candidate.prepared).await;
-    assert_eq!(parent.transition.execution_state, TaskBoardExecutionState::HumanRequired);
-    assert_eq!(git(&candidate.git.controller, &["rev-parse", "HEAD"]), candidate.git.base);
+    assert_eq!(
+        parent.transition.execution_state,
+        TaskBoardExecutionState::HumanRequired
+    );
+    assert_eq!(
+        git(&candidate.git.controller, &["rev-parse", "HEAD"]),
+        candidate.git.base
+    );
     assert!(git(&candidate.git.controller, &["status", "--porcelain"]).is_empty());
 }
 
@@ -120,13 +132,15 @@ async fn import_refuses_a_non_session_branch_before_git_mutation() {
         .await
         .expect_err("non-session branch must not gain import authority");
 
-    assert!(candidate
-        .prepared
-        .db
-        .task_board_remote_result_import(&candidate.prepared.offer.binding.assignment_id, 1)
-        .await
-        .expect("load refused import journal")
-        .is_none());
+    assert!(
+        candidate
+            .prepared
+            .db
+            .task_board_remote_result_import(&candidate.prepared.offer.binding.assignment_id, 1)
+            .await
+            .expect("load refused import journal")
+            .is_none()
+    );
     assert_eq!(
         git(&candidate.git.controller, &["symbolic-ref", "HEAD"]),
         candidate.git.branch_ref
@@ -180,23 +194,25 @@ async fn journal_evidence_drift_cannot_advance_git_or_import_state() {
         let journal = candidate
             .prepared
             .db
-            .task_board_remote_result_import(
-                &candidate.prepared.offer.binding.assignment_id,
-                1,
-            )
+            .task_board_remote_result_import(&candidate.prepared.offer.binding.assignment_id, 1)
             .await
             .expect("load manual import journal")
             .expect("manual import journal");
-        assert_eq!(journal.state, TaskBoardRemoteResultImportState::ManualRequired);
+        assert_eq!(
+            journal.state,
+            TaskBoardRemoteResultImportState::ManualRequired
+        );
         let current = load_parent(&candidate.prepared).await;
         assert_eq!(
             current.transition.execution_state,
             TaskBoardExecutionState::HumanRequired
         );
-        assert!(!current
-            .ownership
-            .resources
-            .contains_key(TASK_BOARD_REMOTE_RESULT_IMPORT_AUTHORITY_RESOURCE));
+        assert!(
+            !current
+                .ownership
+                .resources
+                .contains_key(TASK_BOARD_REMOTE_RESULT_IMPORT_AUTHORITY_RESOURCE)
+        );
         assert_eq!(
             git(&candidate.git.controller, &["rev-parse", "HEAD"]),
             candidate.git.base
@@ -210,11 +226,7 @@ async fn noncanonical_durable_import_row_fails_restart_decode() {
     for (label, column, value) in [
         ("relative", "worktree_path", "relative/path"),
         ("duplicate-root", "worktree_path", "//tmp/result-import"),
-        (
-            "trailing-separator",
-            "worktree_path",
-            "/tmp/result-import/",
-        ),
+        ("trailing-separator", "worktree_path", "/tmp/result-import/"),
         ("branch-dotdot", "branch_ref", "refs/heads/../other"),
     ] {
         let candidate = import_candidate(&format!("result-import-corrupt-{label}")).await;
@@ -272,12 +284,17 @@ async fn implementation_adoption_consumes_applied_journal_atomically() {
         panic!("applied implementation result was not adopted")
     };
 
-    assert_eq!(adopted.transition.execution_state, TaskBoardExecutionState::Running);
+    assert_eq!(
+        adopted.transition.execution_state,
+        TaskBoardExecutionState::Running
+    );
     assert_eq!(adopted.attempts[0].state, TaskBoardAttemptState::Completed);
-    assert!(!adopted
-        .ownership
-        .resources
-        .contains_key(TASK_BOARD_REMOTE_RESULT_IMPORT_AUTHORITY_RESOURCE));
+    assert!(
+        !adopted
+            .ownership
+            .resources
+            .contains_key(TASK_BOARD_REMOTE_RESULT_IMPORT_AUTHORITY_RESOURCE)
+    );
     let journal = candidate
         .prepared
         .db
@@ -309,7 +326,10 @@ async fn implementation_adoption_consumes_applied_journal_atomically() {
     .await
     .expect("clean adopted private import ref after restart");
     assert!(
-        !git_succeeds(&candidate.git.controller, &["rev-parse", "--verify", IMPORT_REF]),
+        !git_succeeds(
+            &candidate.git.controller,
+            &["rev-parse", "--verify", IMPORT_REF]
+        ),
         "adopted private import ref remained after exact cleanup"
     );
     let after_cleanup = candidate.prepared.db.reopen().await;
@@ -322,10 +342,7 @@ async fn implementation_adoption_consumes_applied_journal_atomically() {
     .expect("replay cleanup after a lost completion response");
     assert_eq!(
         after_cleanup
-            .task_board_remote_result_import(
-                &candidate.prepared.offer.binding.assignment_id,
-                1,
-            )
+            .task_board_remote_result_import(&candidate.prepared.offer.binding.assignment_id, 1,)
             .await
             .expect("load import journal after replayed cleanup")
             .expect("adopted import journal after replayed cleanup")
@@ -441,14 +458,14 @@ async fn manual_import_artifacts_remain_subject_to_bounded_retention() {
     let journal = candidate
         .prepared
         .db
-        .task_board_remote_result_import(
-            &candidate.prepared.offer.binding.assignment_id,
-            1,
-        )
+        .task_board_remote_result_import(&candidate.prepared.offer.binding.assignment_id, 1)
         .await
         .expect("load manual import journal")
         .expect("manual import journal");
-    assert_eq!(journal.state, TaskBoardRemoteResultImportState::ManualRequired);
+    assert_eq!(
+        journal.state,
+        TaskBoardRemoteResultImportState::ManualRequired
+    );
 
     assert_eq!(prune_old_artifacts(&candidate).await, 2);
     assert_eq!(artifact_count(&candidate).await, 0);

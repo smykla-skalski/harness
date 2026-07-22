@@ -145,7 +145,10 @@ async fn renewed_leaf_with_the_same_spki_remains_pinned() {
         .expect("SPKI-pinned client");
 
     temp_env::async_with_vars(
-        [("HARNESS_REMOTE_RENEWED_TLS_TEST_TOKEN", Some("executor-secret"))],
+        [(
+            "HARNESS_REMOTE_RENEWED_TLS_TEST_TOKEN",
+            Some("executor-secret"),
+        )],
         async {
             client
                 .advertise()
@@ -235,10 +238,8 @@ fn test_tls_material_from_leaf(
         .with_no_client_auth()
         .with_single_cert(vec![leaf_der.clone(), ca_der.clone()], key)
         .expect("server TLS config");
-    let bundle = RemoteCertificateBundle::new_for_tests(
-        leaf.pem().as_str(),
-        &leaf_key.serialize_pem(),
-    );
+    let bundle =
+        RemoteCertificateBundle::new_for_tests(leaf.pem().as_str(), &leaf_key.serialize_pem());
     TestTlsMaterial {
         server: Arc::new(server),
         ca_der,

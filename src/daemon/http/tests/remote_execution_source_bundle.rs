@@ -26,59 +26,34 @@ async fn source_bundle_route_is_authenticated_durable_and_required_before_offer(
     let client = Client::new();
     let content = vec![b'b'; 3 * 1024 * 1024];
     let offer = bundle_offer(&content);
-    let upload = RemoteSourceBundleUploadRequest::seal(offer.clone(), &content)
-        .expect("seal source upload");
+    let upload =
+        RemoteSourceBundleUploadRequest::seal(offer.clone(), &content).expect("seal source upload");
 
     let premature = authenticated_post(&client, &base_url, OFFER_PATH, HOST_ID, &offer).await;
     assert_eq!(premature.status(), StatusCode::CONFLICT);
 
-    let denied = authenticated_post(
-        &client,
-        &base_url,
-        SOURCE_BUNDLE_PATH,
-        OPERATOR,
-        &upload,
-    )
-    .await;
+    let denied =
+        authenticated_post(&client, &base_url, SOURCE_BUNDLE_PATH, OPERATOR, &upload).await;
     assert_eq!(denied.status(), StatusCode::FORBIDDEN);
 
     let mut tampered = upload.clone();
     tampered.content_base64.replace_range(..1, "A");
-    let rejected = authenticated_post(
-        &client,
-        &base_url,
-        SOURCE_BUNDLE_PATH,
-        HOST_ID,
-        &tampered,
-    )
-    .await;
+    let rejected =
+        authenticated_post(&client, &base_url, SOURCE_BUNDLE_PATH, HOST_ID, &tampered).await;
     assert_eq!(rejected.status(), StatusCode::BAD_REQUEST);
 
-    let first = authenticated_post(
-        &client,
-        &base_url,
-        SOURCE_BUNDLE_PATH,
-        HOST_ID,
-        &upload,
-    )
-    .await;
+    let first = authenticated_post(&client, &base_url, SOURCE_BUNDLE_PATH, HOST_ID, &upload).await;
     assert_eq!(first.status(), StatusCode::OK);
     let first = first
         .json::<RemoteSourceBundleUploadResponse>()
         .await
         .expect("decode source upload response");
     first.validate(&upload).expect("validate source receipt");
-    let replay = authenticated_post(
-        &client,
-        &base_url,
-        SOURCE_BUNDLE_PATH,
-        HOST_ID,
-        &upload,
-    )
-    .await
-    .json::<RemoteSourceBundleUploadResponse>()
-    .await
-    .expect("decode replayed source response");
+    let replay = authenticated_post(&client, &base_url, SOURCE_BUNDLE_PATH, HOST_ID, &upload)
+        .await
+        .json::<RemoteSourceBundleUploadResponse>()
+        .await
+        .expect("decode replayed source response");
     assert_eq!(replay, first);
 
     let accepted = authenticated_post(&client, &base_url, OFFER_PATH, HOST_ID, &offer).await;

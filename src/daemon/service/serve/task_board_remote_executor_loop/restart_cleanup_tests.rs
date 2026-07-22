@@ -2,13 +2,13 @@ use std::path::PathBuf;
 
 use super::disabled_tests::{
     EXECUTOR_INSTANCE, SettingsDrift, claim_start_authority, codex_run_count, configure_checkout,
-    drift_executor_settings, executor_session_count, executor_state, git_repository, load_assignment,
-    request_for_revision,
+    drift_executor_settings, executor_session_count, executor_state, git_repository,
+    load_assignment, request_for_revision,
 };
 use super::{prepare_remote_workspace, reconcile_remote_executor_assignment};
 use crate::daemon::db::{
-    RemoteExecutorFixture, TaskBoardRemoteAssignmentRecord,
-    TaskBoardRemoteExecutorStartAuthority, remote_executor_fixture, remote_executor_identity,
+    RemoteExecutorFixture, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorStartAuthority,
+    remote_executor_fixture, remote_executor_identity,
 };
 use crate::task_board::TaskBoardRemoteAssignmentState;
 
@@ -80,7 +80,10 @@ async fn predecessor_partial_workspace() -> (
     let (accepted, authority) = claim_start_authority(&fixture, &request).await;
     let claimed = load_assignment(&fixture.db, &accepted.assignment_id).await;
     let identity = remote_executor_identity(&claimed).expect("remote executor identity");
-    assert_eq!(claimed.claimed_host_instance_id.as_deref(), Some(EXECUTOR_INSTANCE));
+    assert_eq!(
+        claimed.claimed_host_instance_id.as_deref(),
+        Some(EXECUTOR_INSTANCE)
+    );
     let workspace = prepare_remote_workspace(
         &fixture.db,
         &claimed,

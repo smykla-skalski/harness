@@ -1,7 +1,9 @@
 use sha2::{Digest, Sha256};
 use sqlx::query;
 
-use super::super::completion_evidence_tests::{accepted_offer, remote_status, remote_status_request};
+use super::super::completion_evidence_tests::{
+    accepted_offer, remote_status, remote_status_request,
+};
 use super::super::remote_start_tests::{
     PreparedRemoteOffer, offer_remote, prepare_remote_offer_with_policy,
     prepare_remote_offer_with_retry,

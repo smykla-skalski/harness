@@ -39,10 +39,8 @@ pub(crate) enum TaskBoardLocalAttemptResultValidationError {
 pub(crate) fn task_board_local_attempt_result_expectation<'a>(
     execution: &'a TaskBoardWorkflowExecutionRecord,
     attempt: &'a TaskBoardExecutionAttemptRecord,
-) -> Result<
-    TaskBoardLocalAttemptResultExpectation<'a>,
-    TaskBoardLocalAttemptResultValidationError,
-> {
+) -> Result<TaskBoardLocalAttemptResultExpectation<'a>, TaskBoardLocalAttemptResultValidationError>
+{
     let head = execution
         .transition
         .exact_head_revision

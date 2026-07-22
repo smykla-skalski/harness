@@ -17,7 +17,10 @@ use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 use super::handlers::{ClientHandlers, connect_with_client_handlers};
 
 pub(in crate::daemon::agent_acp) enum AcpTransport {
-    Stdio { stdin: ChildStdin, stdout: ChildStdout },
+    Stdio {
+        stdin: ChildStdin,
+        stdout: ChildStdout,
+    },
     /// A remote agent reached over HTTP or WebSocket. Only the daemon runtime
     /// links the HTTP transport crate; bridge-runtime speaks stdio only.
     #[cfg(feature = "daemon-runtime")]

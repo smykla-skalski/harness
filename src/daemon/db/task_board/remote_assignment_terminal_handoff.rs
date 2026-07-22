@@ -73,7 +73,7 @@ impl AsyncDaemonDb {
         let mut transaction =
             self.pool().begin().await.map_err(|error| {
                 db_error(format!("begin remote settlement handoff read: {error}"))
-        })?;
+            })?;
         let assignment = require_assignment(&mut transaction, assignment_id).await?;
         let recorded = assignment.fencing_epoch == fencing_epoch
             && terminal_handoff_digest_in_tx(&mut transaction, &assignment)
@@ -108,13 +108,11 @@ pub(super) async fn terminal_handoff_digest_in_tx(
             ("result_adopted", Some("evidence_only"), None)
         }
         TaskBoardRemoteAssignmentState::Unknown => ("evidence_only", None, None),
-        TaskBoardRemoteAssignmentState::Cancelled => {
-            (
-                "evidence_only",
-                Some("terminal_cleanup"),
-                Some("terminal_projection"),
-            )
-        }
+        TaskBoardRemoteAssignmentState::Cancelled => (
+            "evidence_only",
+            Some("terminal_cleanup"),
+            Some("terminal_projection"),
+        ),
         TaskBoardRemoteAssignmentState::Superseded => {
             ("terminal_cleanup", Some("terminal_projection"), None)
         }

@@ -296,7 +296,11 @@ async fn a_replayed_notification_is_not_forwarded() {
 
     let mut child = Command::new("sleep").arg("60").spawn().expect("child");
     let supervisor = AcpSessionSupervisor::new(&child, SupervisionConfig::default());
-    let manager = protocol_manager("fake", "agent-acp-1", "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e");
+    let manager = protocol_manager(
+        "fake",
+        "agent-acp-1",
+        "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e",
+    );
     let (notification_tx, mut notifications) = mpsc::channel(1);
 
     let Ok(()) = route_session_notification(
@@ -333,7 +337,11 @@ async fn session_state_is_applied_during_a_replay() {
 
     let mut child = Command::new("sleep").arg("60").spawn().expect("child");
     let supervisor = AcpSessionSupervisor::new(&child, SupervisionConfig::default());
-    let manager = protocol_manager("fake", "agent-acp-1", "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e");
+    let manager = protocol_manager(
+        "fake",
+        "agent-acp-1",
+        "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e",
+    );
     let (notification_tx, mut notifications) = mpsc::channel(1);
 
     let update = SessionUpdate::AvailableCommandsUpdate(AvailableCommandsUpdate::new(vec![
@@ -374,7 +382,11 @@ async fn a_notification_after_the_replay_is_forwarded() {
 
     let mut child = Command::new("sleep").arg("60").spawn().expect("child");
     let supervisor = AcpSessionSupervisor::new(&child, SupervisionConfig::default());
-    let manager = protocol_manager("fake", "agent-acp-1", "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e");
+    let manager = protocol_manager(
+        "fake",
+        "agent-acp-1",
+        "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e",
+    );
     let (notification_tx, mut notifications) = mpsc::channel(1);
 
     let Ok(()) = route_session_notification(
@@ -411,7 +423,11 @@ async fn a_replay_only_suppresses_its_own_session() {
 
     let mut child = Command::new("sleep").arg("60").spawn().expect("child");
     let supervisor = AcpSessionSupervisor::new(&child, SupervisionConfig::default());
-    let manager = protocol_manager("fake", "agent-acp-1", "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e");
+    let manager = protocol_manager(
+        "fake",
+        "agent-acp-1",
+        "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e",
+    );
     let (notification_tx, mut notifications) = mpsc::channel(1);
 
     let Ok(()) = route_session_notification(
@@ -435,7 +451,9 @@ async fn a_replay_only_suppresses_its_own_session() {
 }
 
 fn message_chunk(text: &str) -> SessionUpdate {
-    SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::Text(TextContent::new(text))))
+    SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::Text(TextContent::new(
+        text,
+    ))))
 }
 
 fn route_target(session_id: &str) -> RouteTarget {

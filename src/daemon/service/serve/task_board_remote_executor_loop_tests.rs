@@ -165,11 +165,8 @@ fn fork_repository_and_prior_phase_bundle_expose_their_initial_revision() {
     forked.binding.workflow_kind = TaskBoardWorkflowKind::PrFix;
     // The binding repository tracks the fork even for a PR-fix source branch.
     forked.binding.repository = "contributor/repo".into();
-    forked.source = RemoteSourceMaterial::repository_branch(
-        "contributor/repo",
-        "feature/fix",
-        REVISION,
-    );
+    forked.source =
+        RemoteSourceMaterial::repository_branch("contributor/repo", "feature/fix", REVISION);
     forked = forked.seal().expect("seal fork repository offer");
     assert_eq!(
         super::source::initial_source_revision(&forked).expect("resolve fork revision"),
@@ -192,8 +189,7 @@ fn fork_repository_and_prior_phase_bundle_expose_their_initial_revision() {
     );
     bundled = bundled.seal().expect("seal bundle offer");
     assert_eq!(
-        super::source::initial_source_revision(&bundled)
-            .expect("resolve bundle base revision"),
+        super::source::initial_source_revision(&bundled).expect("resolve bundle base revision"),
         "2222222222222222222222222222222222222222"
     );
 }
@@ -217,18 +213,15 @@ fn probe_accepts_a_legitimate_implementation_head_advance() {
     std::fs::write(checkout.path().join("result.txt"), "implementation\n")
         .expect("write implementation");
     git(checkout.path(), &["commit", "-qam", "implementation"]);
-    assert!(
-        super::source::validate_remote_worktree_head(checkout.path(), &base, true).is_err()
-    );
+    assert!(super::source::validate_remote_worktree_head(checkout.path(), &base, true).is_err());
     super::source::validate_remote_worktree_head(checkout.path(), &base, false)
         .expect("probe accepts the worker output head");
 }
 
 #[test]
 fn phase_selects_the_narrow_codex_mode() {
-    let implementation = remote_codex_request(&repository_offer(
-        TaskBoardExecutionPhase::Implementation,
-    ));
+    let implementation =
+        remote_codex_request(&repository_offer(TaskBoardExecutionPhase::Implementation));
     assert_eq!(implementation.mode, CodexRunMode::WorkspaceWrite);
 
     let mut review = repository_offer(TaskBoardExecutionPhase::Review);
@@ -258,7 +251,10 @@ fn phase_selects_the_narrow_codex_mode() {
     let request = remote_codex_request(&review);
     assert_eq!(request.mode, CodexRunMode::Report);
     assert_eq!(request.capabilities, review.launch.capabilities);
-    assert_eq!(request.name.as_deref(), Some("Task Board Review: Remote contract"));
+    assert_eq!(
+        request.name.as_deref(),
+        Some("Task Board Review: Remote contract")
+    );
     assert_eq!(request.persona.as_deref(), Some("security-reviewer"));
     assert_eq!(request.model.as_deref(), Some("gpt-5.4"));
     assert_eq!(request.effort.as_deref(), Some("high"));
@@ -266,8 +262,8 @@ fn phase_selects_the_narrow_codex_mode() {
 }
 
 fn repository_offer(phase: TaskBoardExecutionPhase) -> RemoteOfferRequest {
-    let expected_head_revision = (!matches!(phase, TaskBoardExecutionPhase::Implementation))
-        .then(|| REVISION.to_string());
+    let expected_head_revision =
+        (!matches!(phase, TaskBoardExecutionPhase::Implementation)).then(|| REVISION.to_string());
     RemoteOfferRequest {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: RemoteAttemptBinding {

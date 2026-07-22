@@ -1,12 +1,10 @@
+use axum::Json;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::Json;
 
 use super::routes_support::{assignment_route, map_route_result, wire_error};
-use super::wire::{
-    RemoteSourceBundleAbandonRequest, RemoteSourceBundleUploadRequest,
-};
+use super::wire::{RemoteSourceBundleAbandonRequest, RemoteSourceBundleUploadRequest};
 use crate::daemon::db::utc_now;
 use crate::daemon::http::DaemonHttpState;
 

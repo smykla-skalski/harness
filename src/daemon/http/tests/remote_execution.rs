@@ -17,9 +17,9 @@ use crate::daemon::task_board_remote_transport::wire::{
     RemoteAttemptBinding, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
     RemoteClaimResponse, RemoteHostAdvertisement, RemoteLeaseRenewRequest,
     RemoteLeaseRenewResponse, RemoteOfferDisposition, RemoteOfferRequest, RemoteOfferResponse,
-    RemoteSettledRequest, RemoteSettledResponse, RemoteSourceMaterial, RemoteStatusRequest,
-    RemoteStatusResponse, RemoteSourceBundleUploadRequest, RemoteSourceBundleUploadResponse,
-    TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION, test_codex_launch,
+    RemoteSettledRequest, RemoteSettledResponse, RemoteSourceBundleUploadRequest,
+    RemoteSourceBundleUploadResponse, RemoteSourceMaterial, RemoteStatusRequest,
+    RemoteStatusResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION, test_codex_launch,
 };
 use crate::task_board::{
     TaskBoardExecutionPhase, TaskBoardLocalExecutionHostConfig,
@@ -35,10 +35,10 @@ const OPERATOR: &str = "operator";
 const HOST_INSTANCE: &str = "instance-a";
 const REPOSITORY: &str = "example/harness";
 
-#[path = "remote_execution_source_bundle.rs"]
-mod source_bundle;
 #[path = "remote_execution_cleanup.rs"]
 mod cleanup;
+#[path = "remote_execution_source_bundle.rs"]
+mod source_bundle;
 
 #[tokio::test]
 async fn private_executor_routes_require_exact_execution_identity() {

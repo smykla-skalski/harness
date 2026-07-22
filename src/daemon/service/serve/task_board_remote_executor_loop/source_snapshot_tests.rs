@@ -4,9 +4,8 @@ use std::process::Command;
 use sha2::{Digest as _, Sha256};
 
 use crate::daemon::db::{
-    AsyncDaemonDb, REMOTE_EXECUTOR_PRINCIPAL, RemoteExecutorFixture,
-    accept_remote_executor, remote_executor_claim_request, remote_executor_fixture,
-    remote_executor_identity,
+    AsyncDaemonDb, REMOTE_EXECUTOR_PRINCIPAL, RemoteExecutorFixture, accept_remote_executor,
+    remote_executor_claim_request, remote_executor_fixture, remote_executor_identity,
 };
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteOfferRequest,
@@ -51,7 +50,9 @@ async fn snapshot_import_survives_restart_then_creates_exact_session_and_cleans_
             .await
             .expect("materialize snapshot before simulated crash")
             .expect("snapshot import plan");
-            imported.require_imported().expect("durable private snapshot ref");
+            imported
+                .require_imported()
+                .expect("durable private snapshot ref");
 
             let db_path = fixture._temp.path().join("executor.db");
             let RemoteExecutorFixture { db, _temp, .. } = fixture;
@@ -76,7 +77,10 @@ async fn snapshot_import_survives_restart_then_creates_exact_session_and_cleans_
             .expect("replay import and create exact snapshot session");
 
             assert_eq!(git(&workspace, &["rev-parse", "HEAD"]), source.revision);
-            assert!(!git_ref_exists(&target, &snapshot_import_ref(&offer, &source)));
+            assert!(!git_ref_exists(
+                &target,
+                &snapshot_import_ref(&offer, &source)
+            ));
             let replay = super::super::source::ensure_remote_session(
                 &reopened,
                 &assignment,
@@ -88,7 +92,10 @@ async fn snapshot_import_survives_restart_then_creates_exact_session_and_cleans_
             .await
             .expect("replay exact snapshot session");
             assert_eq!(replay, workspace);
-            assert!(!git_ref_exists(&target, &snapshot_import_ref(&offer, &source)));
+            assert!(!git_ref_exists(
+                &target,
+                &snapshot_import_ref(&offer, &source)
+            ));
         },
     )
     .await;

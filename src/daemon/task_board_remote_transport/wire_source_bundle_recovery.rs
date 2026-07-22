@@ -13,10 +13,8 @@ use super::wire_limits::{
 
 const RECEIPT_VERIFICATION_DOMAIN: &str =
     "harness.task-board.remote-source-bundle-receipt-verification.v1";
-const ABANDON_REQUEST_DOMAIN: &str =
-    "harness.task-board.remote-source-bundle-abandon-request.v1";
-const ABANDON_RESPONSE_DOMAIN: &str =
-    "harness.task-board.remote-source-bundle-abandon-response.v1";
+const ABANDON_REQUEST_DOMAIN: &str = "harness.task-board.remote-source-bundle-abandon-request.v1";
+const ABANDON_RESPONSE_DOMAIN: &str = "harness.task-board.remote-source-bundle-abandon-response.v1";
 
 pub(crate) const SOURCE_BUNDLE_ABANDON_REASON: &str = "executor_instance_replaced";
 
@@ -176,10 +174,7 @@ impl RemoteSourceBundleAbandonRequest {
             "source_bundle_abandon_upload_request_sha256",
             &self.upload_request_sha256,
         )?;
-        require_digest(
-            "source_bundle_abandon_request_sha256",
-            &self.request_sha256,
-        )?;
+        require_digest("source_bundle_abandon_request_sha256", &self.request_sha256)?;
         if self.reason != SOURCE_BUNDLE_ABANDON_REASON
             || self.verified_absence.receipt.is_some()
             || self.verified_absence.binding != self.offer.binding

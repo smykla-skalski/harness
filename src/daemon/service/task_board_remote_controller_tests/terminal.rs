@@ -5,8 +5,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use sqlx::query;
 
 use crate::daemon::db::{
-    detached_terminal_assignment, restore_parent_to_targetless_preparing,
-    remote_controller_fixture, TaskBoardRemoteAssignmentRecord,
+    TaskBoardRemoteAssignmentRecord, detached_terminal_assignment, remote_controller_fixture,
+    restore_parent_to_targetless_preparing,
 };
 use crate::errors::CliError;
 use crate::task_board::{
@@ -139,15 +139,17 @@ async fn result_adopted_handoff_settles_after_parent_deletion_without_fetch_or_a
     let cleanup_count = Arc::clone(&cleanups);
     let settlement_count = Arc::clone(&settlements);
 
-    assert!(super::super::terminal::finish_terminal_assignment_with(
-        &fixture.db,
-        &assignment,
-        move || counted_terminal_operation(fetch_count),
-        move |_| counted_terminal_operation(cleanup_count),
-        move |_| counted_terminal_operation(settlement_count),
-    )
-    .await
-    .expect("settle immutable result-adopted handoff after parent deletion"));
+    assert!(
+        super::super::terminal::finish_terminal_assignment_with(
+            &fixture.db,
+            &assignment,
+            move || counted_terminal_operation(fetch_count),
+            move |_| counted_terminal_operation(cleanup_count),
+            move |_| counted_terminal_operation(settlement_count),
+        )
+        .await
+        .expect("settle immutable result-adopted handoff after parent deletion")
+    );
     assert_eq!(fetches.load(Ordering::SeqCst), 0);
     assert_eq!(cleanups.load(Ordering::SeqCst), 0);
     assert_eq!(settlements.load(Ordering::SeqCst), 1);
@@ -184,18 +186,20 @@ async fn corrupt_active_target_proof(
         ActiveTargetCorruption::Host => parent.ownership.host_id = Some("wrong-host".into()),
         ActiveTargetCorruption::Epoch => parent.ownership.fencing_epoch += 1,
         ActiveTargetCorruption::Action => {
-            parent
-                .ownership
-                .resources
-                .insert(TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE.into(), "wrong-action".into());
+            parent.ownership.resources.insert(
+                TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE.into(),
+                "wrong-action".into(),
+            );
         }
         ActiveTargetCorruption::Attempt => {
-            parent
-                .ownership
-                .resources
-                .insert(TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE.into(), "99".into());
+            parent.ownership.resources.insert(
+                TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE.into(),
+                "99".into(),
+            );
         }
-        ActiveTargetCorruption::Idempotency | ActiveTargetCorruption::AttemptState => unreachable!(),
+        ActiveTargetCorruption::Idempotency | ActiveTargetCorruption::AttemptState => {
+            unreachable!()
+        }
     }
     let ownership = serde_json::to_string(&parent.ownership).expect("encode corrupt ownership");
     query(
@@ -247,7 +251,9 @@ async fn corrupt_active_attempt(
     }
 }
 
-fn counted_terminal_operation(calls: Arc<AtomicUsize>) -> impl std::future::Future<Output = Result<(), CliError>> {
+fn counted_terminal_operation(
+    calls: Arc<AtomicUsize>,
+) -> impl std::future::Future<Output = Result<(), CliError>> {
     calls.fetch_add(1, Ordering::SeqCst);
     ready(Ok(()))
 }

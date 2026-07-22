@@ -6,8 +6,8 @@ use tokio::sync::Barrier;
 
 use super::remote_assignment_test_support::*;
 use super::{
-    TaskBoardRemoteExecutorStopAuthority, TaskBoardRemoteExecutorStopReason,
-    TaskBoardRemoteExecutorStartAuthority, TaskBoardRemoteMutationOutcome,
+    TaskBoardRemoteExecutorStartAuthority, TaskBoardRemoteExecutorStopAuthority,
+    TaskBoardRemoteExecutorStopReason, TaskBoardRemoteMutationOutcome,
 };
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteLeaseRenewRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
@@ -33,11 +33,7 @@ async fn renewed_claim_can_acquire_exact_start_authority_once() {
     .expect("seal renewal");
     let renewed = match fixture
         .db
-        .renew_task_board_remote_assignment_lease(
-            &renewal,
-            PRINCIPAL,
-            "2026-07-19T10:00:30Z",
-        )
+        .renew_task_board_remote_assignment_lease(&renewal, PRINCIPAL, "2026-07-19T10:00:30Z")
         .await
         .expect("renew before executor start")
     {
@@ -49,13 +45,8 @@ async fn renewed_claim_can_acquire_exact_start_authority_once() {
 
     let authority = replay_start_authority(&fixture, &accepted.assignment_id).await;
 
-    let (project_dir, permit) = persist_executor_run(
-        &fixture,
-        &renewed,
-        &authority,
-        "2026-07-19T10:00:40Z",
-    )
-    .await;
+    let (project_dir, permit) =
+        persist_executor_run(&fixture, &renewed, &authority, "2026-07-19T10:00:40Z").await;
     assert!(matches!(
         fixture
             .db
@@ -110,7 +101,10 @@ async fn recovery_winner_prevents_a_late_start_authority() {
         .await
         .expect("expire claim before authority");
     assert_eq!(recovered.recovered.len(), 1);
-    assert_eq!(recovered.recovered[0].state, TaskBoardRemoteAssignmentState::Unknown);
+    assert_eq!(
+        recovered.recovered[0].state,
+        TaskBoardRemoteAssignmentState::Unknown
+    );
     assert!(
         fixture
             .db
@@ -138,11 +132,7 @@ async fn concurrent_recovery_and_start_authority_have_one_atomic_winner() {
     let authority = tokio::spawn(async move {
         authority_barrier.wait().await;
         authority_db
-            .claim_task_board_remote_executor_start_authority(
-                &assignment_id,
-                INSTANCE,
-                STARTED_AT,
-            )
+            .claim_task_board_remote_executor_start_authority(&assignment_id, INSTANCE, STARTED_AT)
             .await
     });
     let recovery = tokio::spawn(async move {
@@ -152,8 +142,14 @@ async fn concurrent_recovery_and_start_authority_have_one_atomic_winner() {
             .await
     });
     barrier.wait().await;
-    let authority = authority.await.expect("join authority").expect("authority result");
-    let recovery = recovery.await.expect("join recovery").expect("recovery result");
+    let authority = authority
+        .await
+        .expect("join authority")
+        .expect("authority result");
+    let recovery = recovery
+        .await
+        .expect("join recovery")
+        .expect("recovery result");
     let durable = load_assignment(&fixture, &accepted.assignment_id).await;
     match authority {
         Some(authority) => {
@@ -246,30 +242,36 @@ async fn start_authority_digest_rejects_claim_evidence_tampering() {
             .expect("claim authority")
             .expect("authority");
         let result = match column {
-            "authenticated_principal" => query(
-                "UPDATE task_board_remote_assignments SET authenticated_principal = ?2
+            "authenticated_principal" => {
+                query(
+                    "UPDATE task_board_remote_assignments SET authenticated_principal = ?2
                  WHERE assignment_id = ?1",
-            )
-            .bind(&accepted.assignment_id)
-            .bind(value)
-            .execute(fixture.db.pool())
-            .await,
-            "claimed_at" => query(
-                "UPDATE task_board_remote_assignments SET claimed_at = ?2
+                )
+                .bind(&accepted.assignment_id)
+                .bind(value)
+                .execute(fixture.db.pool())
+                .await
+            }
+            "claimed_at" => {
+                query(
+                    "UPDATE task_board_remote_assignments SET claimed_at = ?2
                  WHERE assignment_id = ?1",
-            )
-            .bind(&accepted.assignment_id)
-            .bind(value)
-            .execute(fixture.db.pool())
-            .await,
-            "lease_expires_at" => query(
-                "UPDATE task_board_remote_assignments SET lease_expires_at = ?2
+                )
+                .bind(&accepted.assignment_id)
+                .bind(value)
+                .execute(fixture.db.pool())
+                .await
+            }
+            "lease_expires_at" => {
+                query(
+                    "UPDATE task_board_remote_assignments SET lease_expires_at = ?2
                  WHERE assignment_id = ?1",
-            )
-            .bind(&accepted.assignment_id)
-            .bind(value)
-            .execute(fixture.db.pool())
-            .await,
+                )
+                .bind(&accepted.assignment_id)
+                .bind(value)
+                .execute(fixture.db.pool())
+                .await
+            }
             _ => unreachable!("fixed test evidence column"),
         };
         if let Err(error) = result {
@@ -311,7 +313,11 @@ async fn adoption_rejects_pre_token_and_mismatched_launch_evidence() {
             .expect("claim authority")
             .expect("authority");
         let assignment = load_assignment(&fixture, &accepted.assignment_id).await;
-        let run_at = if mismatch == "pre_token" { CLAIMED_AT } else { STARTED_AT };
+        let run_at = if mismatch == "pre_token" {
+            CLAIMED_AT
+        } else {
+            STARTED_AT
+        };
         let (project_dir, permit) =
             persist_executor_run(&fixture, &assignment, &authority, STARTED_AT).await;
         if mismatch == "pre_token" {
@@ -361,8 +367,7 @@ async fn a_successfully_stopped_invalid_run_clears_only_the_exact_token() {
         .expect("claim authority")
         .expect("authority");
     let assignment = load_assignment(&fixture, &accepted.assignment_id).await;
-    let (_, permit) =
-        persist_executor_run(&fixture, &assignment, &authority, STARTED_AT).await;
+    let (_, permit) = persist_executor_run(&fixture, &assignment, &authority, STARTED_AT).await;
     query("UPDATE codex_runs SET display_name = 'invalid launch evidence' WHERE run_id = ?1")
         .bind(&authority.identity.run_id)
         .execute(fixture.db.pool())

@@ -181,7 +181,10 @@ fn additional_directories_are_sent_when_advertised() {
         Some(&handshake(false, false, true)),
     );
 
-    assert_eq!(request.additional_directories, vec![PathBuf::from("/extra")]);
+    assert_eq!(
+        request.additional_directories,
+        vec![PathBuf::from("/extra")]
+    );
 }
 
 #[test]
@@ -261,7 +264,10 @@ fn per_start_server_replaces_the_descriptor_server_of_the_same_name() {
     let session = new_session_request(
         PathBuf::from("/work"),
         &merged_config(
-            vec![stdio_server(), named_stdio_server("other", "/usr/bin/other")],
+            vec![
+                stdio_server(),
+                named_stdio_server("other", "/usr/bin/other"),
+            ],
             Vec::new(),
             &request,
         ),

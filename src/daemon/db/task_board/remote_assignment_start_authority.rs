@@ -8,24 +8,24 @@ mod settings_fence;
 mod start_adoption;
 mod start_io_permit;
 
+pub(super) use evidence::start_authority_digest;
+pub(crate) use evidence::{
+    executor_lifecycle_settings_still_compatible, executor_settings_still_match,
+};
 pub(crate) use evidence::{remote_executor_identity, remote_executor_identity_from_parts};
 pub(crate) use failed_at_claimed::{
     REMOTE_START_INTERRUPTED_WITHOUT_RUN_ERROR_CODE,
     REMOTE_START_INTERRUPTED_WITHOUT_RUN_FAILURE_CLASS, REMOTE_START_PREFLIGHT_ERROR_CODE,
     REMOTE_START_PREFLIGHT_FAILURE_CLASS,
 };
-pub(crate) use evidence::{
-    executor_lifecycle_settings_still_compatible, executor_settings_still_match,
-};
 pub(super) use settings_fence::refuse_settings_replacement_during_executor_start_io;
+use settings_fence::revoke_unpermitted_start_in_tx;
+use start_adoption::persist_start_adoption_in_tx;
+pub(super) use start_io_permit::start_io_permit_digest_from_evidence;
 pub(crate) use start_io_permit::{
     TaskBoardRemoteExecutorStartIoPermit, TaskBoardRemoteExecutorStartIoPermitOutcome,
     executor_start_io_permit,
 };
-pub(super) use evidence::start_authority_digest;
-pub(super) use start_io_permit::start_io_permit_digest_from_evidence;
-use settings_fence::revoke_unpermitted_start_in_tx;
-use start_adoption::persist_start_adoption_in_tx;
 
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
@@ -90,13 +90,7 @@ impl AsyncDaemonDb {
         }
         let identity = remote_executor_identity(&record)?;
         if !executor_settings_still_match(&mut transaction, &record).await? {
-            revoke_unpermitted_start_in_tx(
-                transaction,
-                &record,
-                &identity,
-                authority_at,
-            )
-            .await?;
+            revoke_unpermitted_start_in_tx(transaction, &record, &identity, authority_at).await?;
             return Ok(None);
         }
         let sha256 = start_authority_digest(&record, &identity, authority_at)?;
@@ -178,7 +172,10 @@ impl AsyncDaemonDb {
         owner_at: &str,
     ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
         let started = canonical_time(started_at, "remote executor durable start time")?;
-        nonblank(owner_instance_id, "remote executor lifecycle owner instance")?;
+        nonblank(
+            owner_instance_id,
+            "remote executor lifecycle owner instance",
+        )?;
         let owner_at_time = canonical_time(owner_at, "remote executor lifecycle owner time")?;
         let project_dir = project_dir.to_string_lossy().into_owned();
         let mut transaction = self
@@ -186,17 +183,15 @@ impl AsyncDaemonDb {
             .await?;
         let record = require_assignment(&mut transaction, &permit.assignment_id).await?;
         if record.executor_stop_pending.is_some() {
-            commit_noop(transaction, "remote executor start is permanently stop-only").await?;
+            commit_noop(
+                transaction,
+                "remote executor start is permanently stop-only",
+            )
+            .await?;
             return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
         }
-        if start_adoption_replays(
-            &record,
-            permit,
-            &project_dir,
-            started_at,
-            &mut transaction,
-        )
-        .await?
+        if start_adoption_replays(&record, permit, &project_dir, started_at, &mut transaction)
+            .await?
         {
             commit_noop(transaction, "replayed remote executor start adoption").await?;
             return Ok(TaskBoardRemoteMutationOutcome::Replayed(record));
@@ -210,16 +205,21 @@ impl AsyncDaemonDb {
             return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
         }
         if !executor_settings_still_match(&mut transaction, &record).await? {
-            commit_noop(transaction, "remote executor settings changed before start adoption")
-                .await?;
+            commit_noop(
+                transaction,
+                "remote executor settings changed before start adoption",
+            )
+            .await?;
             return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
         }
-        let authority_at = canonical_time(
-            &permit.permitted_at,
-            "remote executor start authority time",
-        )?;
+        let authority_at =
+            canonical_time(&permit.permitted_at, "remote executor start authority time")?;
         if started < authority_at || owner_at_time < started {
-            commit_noop(transaction, "stale durable remote executor start chronology").await?;
+            commit_noop(
+                transaction,
+                "stale durable remote executor start chronology",
+            )
+            .await?;
             return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
         }
         let owner_expires_at = lifecycle_owner_expiry(owner_at)?;
@@ -247,7 +247,12 @@ impl AsyncDaemonDb {
             &owner_expires_at,
         )
         .await?;
-        finish_mutation(transaction, &record.assignment_id, "executor start adoption").await
+        finish_mutation(
+            transaction,
+            &record.assignment_id,
+            "executor start adoption",
+        )
+        .await
     }
 
     pub(crate) async fn expire_task_board_remote_executor_start_without_run(
@@ -288,20 +293,20 @@ impl AsyncDaemonDb {
             commit_noop(transaction, "early remote executor start expiry").await?;
             return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
         }
-        let run_exists = query_scalar::<_, bool>(
-            "SELECT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?1)",
-        )
-        .bind(&authority.identity.run_id)
-        .fetch_one(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("check remote executor start run: {error}")))?;
-        let session_exists = query_scalar::<_, bool>(
-            "SELECT EXISTS(SELECT 1 FROM sessions WHERE session_id = ?1)",
-        )
-        .bind(&authority.identity.session_id)
-        .fetch_one(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("check remote executor start session: {error}")))?;
+        let run_exists =
+            query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?1)")
+                .bind(&authority.identity.run_id)
+                .fetch_one(transaction.as_mut())
+                .await
+                .map_err(|error| db_error(format!("check remote executor start run: {error}")))?;
+        let session_exists =
+            query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM sessions WHERE session_id = ?1)")
+                .bind(&authority.identity.session_id)
+                .fetch_one(transaction.as_mut())
+                .await
+                .map_err(|error| {
+                    db_error(format!("check remote executor start session: {error}"))
+                })?;
         if run_exists || session_exists {
             return Err(concurrent(
                 "remote executor start authority has durable provisioning evidence",
@@ -460,6 +465,8 @@ async fn start_adoption_replays(
     let Some(receipt) = record.start_receipt.as_ref() else {
         return Ok(false);
     };
-    Ok(receipt_matches_permit(receipt, permit, project_dir, started_at)
-        && durable_start_receipt_run_matches(transaction, record, receipt).await?)
+    Ok(
+        receipt_matches_permit(receipt, permit, project_dir, started_at)
+            && durable_start_receipt_run_matches(transaction, record, receipt).await?,
+    )
 }

@@ -7,8 +7,7 @@ use super::wire::{
 };
 use super::wire_limits::{
     MAX_REMOTE_OFFER_JSON_BYTES, MAX_REMOTE_RECEIPT_JSON_BYTES,
-    MAX_REMOTE_SOURCE_BUNDLE_JSON_BYTES,
-    require_serialized_size,
+    MAX_REMOTE_SOURCE_BUNDLE_JSON_BYTES, require_serialized_size,
 };
 use super::wire_tests::offer_request;
 
@@ -82,11 +81,8 @@ fn canonical_source_receipt_stays_bounded_and_escaped_aliases_are_rejected() {
     let offer = offer.seal().expect("maximum canonical source offer");
     let upload = RemoteSourceBundleUploadRequest::seal(offer, content)
         .expect("maximum canonical source upload");
-    let response = RemoteSourceBundleUploadResponse::seal(
-        &upload,
-        "2026-07-19T12:00:00Z".into(),
-    )
-    .expect("bounded canonical source receipt");
+    let response = RemoteSourceBundleUploadResponse::seal(&upload, "2026-07-19T12:00:00Z".into())
+        .expect("bounded canonical source receipt");
     require_serialized_size(
         "source_bundle_upload_response",
         &response,

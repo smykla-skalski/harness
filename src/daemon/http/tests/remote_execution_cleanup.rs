@@ -35,16 +35,12 @@ async fn cleanup_observation_is_pending_then_byte_exact_across_restart() {
     .await;
     assert_eq!(denied.status(), StatusCode::FORBIDDEN);
 
-    let completed_at = (Utc::now() + Duration::seconds(1))
-        .to_rfc3339_opts(SecondsFormat::AutoSi, true);
+    let completed_at =
+        (Utc::now() + Duration::seconds(1)).to_rfc3339_opts(SecondsFormat::AutoSi, true);
     assert!(matches!(
-        db.complete_task_board_remote_assignment_cleanup(
-            &settlement,
-            HOST_ID,
-            &completed_at,
-        )
-        .await
-        .expect("persist exact executor cleanup"),
+        db.complete_task_board_remote_assignment_cleanup(&settlement, HOST_ID, &completed_at,)
+            .await
+            .expect("persist exact executor cleanup"),
         TaskBoardRemoteMutationOutcome::Updated(_)
     ));
     let first = authenticated_post(

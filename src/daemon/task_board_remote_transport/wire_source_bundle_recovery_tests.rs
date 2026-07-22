@@ -19,15 +19,12 @@ fn absent_source_receipt_seals_one_exact_abandonment_chain() {
     )
     .expect("seal absence verification");
     absent.validate(&upload).expect("validate absence");
-    let abandon = RemoteSourceBundleAbandonRequest::seal(&upload, absent)
-        .expect("seal abandonment request");
+    let abandon =
+        RemoteSourceBundleAbandonRequest::seal(&upload, absent).expect("seal abandonment request");
     abandon.validate().expect("validate abandonment request");
-    let response = RemoteSourceBundleAbandonResponse::seal(
-        &abandon,
-        "executor-restarted".into(),
-        NOW.into(),
-    )
-    .expect("seal abandonment response");
+    let response =
+        RemoteSourceBundleAbandonResponse::seal(&abandon, "executor-restarted".into(), NOW.into())
+            .expect("seal abandonment response");
     response
         .validate(&abandon)
         .expect("validate abandonment response");
@@ -69,8 +66,8 @@ fn change_digest(value: &mut String) {
 #[test]
 fn present_source_receipt_cannot_be_recast_as_abandoned() {
     let upload = upload_request();
-    let receipt = RemoteSourceBundleUploadResponse::seal(&upload, NOW.into())
-        .expect("seal upload receipt");
+    let receipt =
+        RemoteSourceBundleUploadResponse::seal(&upload, NOW.into()).expect("seal upload receipt");
     let present = RemoteSourceBundleReceiptVerificationResponse::seal(
         &upload,
         "executor-restarted".into(),

@@ -112,10 +112,7 @@ pub(crate) fn validate_task_board_remote_failure_handoff(
         .iter()
         .all(|key| !updated.ownership.resources.contains_key(*key));
     let paired_state = matches!(
-        (
-            updated.transition.execution_state,
-            settled_attempt.state
-        ),
+        (updated.transition.execution_state, settled_attempt.state),
         (
             TaskBoardExecutionState::RetryWait,
             TaskBoardAttemptState::RetryWait
@@ -150,9 +147,7 @@ fn non_target_resources_changed(
     expected != updated.ownership.resources
 }
 
-fn invalid(
-    detail: &'static str,
-) -> Result<(), TaskBoardWorkflowExecutionValidationError> {
+fn invalid(detail: &'static str) -> Result<(), TaskBoardWorkflowExecutionValidationError> {
     Err(TaskBoardWorkflowExecutionValidationError::InvalidField {
         field: "ownership.remote_result_handoff",
         detail: detail.into(),

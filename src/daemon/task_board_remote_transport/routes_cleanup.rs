@@ -1,23 +1,20 @@
 //! Authenticated read of exact executor cleanup completion evidence.
 
+use axum::Json;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::Response;
-use axum::Json;
 
 use super::routes_support::{
-    assignment_route, concurrent, load_assignment, map_route_error, map_route_result,
-    route_error, wire_error,
+    assignment_route, concurrent, load_assignment, map_route_error, map_route_result, route_error,
+    wire_error,
 };
 use super::wire::RemoteAssignmentWireState;
-use super::wire_cleanup::{
-    RemoteCleanupObservationRequest, RemoteCleanupObservationResponse,
-};
+use super::wire_cleanup::{RemoteCleanupObservationRequest, RemoteCleanupObservationResponse};
 use crate::daemon::db::TaskBoardRemoteAssignmentRecord;
 use crate::daemon::http::DaemonHttpState;
 
-pub(crate) const CLEANUP_OBSERVATION_PATH: &str =
-    "/v1/task-board-execution/cleanup/observe";
+pub(crate) const CLEANUP_OBSERVATION_PATH: &str = "/v1/task-board-execution/cleanup/observe";
 
 pub(super) async fn observe_cleanup(
     headers: HeaderMap,
@@ -83,6 +80,6 @@ fn cleanup_response(
         ));
     }
     RemoteCleanupObservationResponse::for_completed(request, cleanup_completed_at)
-    .map(Some)
-    .map_err(wire_error)
+        .map(Some)
+        .map_err(wire_error)
 }

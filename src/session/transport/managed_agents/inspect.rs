@@ -137,25 +137,37 @@ mod tests {
     #[test]
     fn current_agent_has_no_freshness_notes() {
         let notes = freshness_notes(&handshake(1, Some("codex-acp"), Some("0.16.0")));
-        assert!(notes.is_empty(), "current agent should have no notes: {notes:?}");
+        assert!(
+            notes.is_empty(),
+            "current agent should have no notes: {notes:?}"
+        );
     }
 
     #[test]
     fn pre_release_protocol_is_flagged() {
         let notes = freshness_notes(&handshake(0, Some("old"), Some("0.1.0")));
-        assert!(notes.iter().any(|note| note.contains("v0")), "notes: {notes:?}");
+        assert!(
+            notes.iter().any(|note| note.contains("v0")),
+            "notes: {notes:?}"
+        );
     }
 
     #[test]
     fn missing_agent_info_is_flagged() {
         let notes = freshness_notes(&handshake(1, None, None));
-        assert!(notes.iter().any(|note| note.contains("agentInfo")), "notes: {notes:?}");
+        assert!(
+            notes.iter().any(|note| note.contains("agentInfo")),
+            "notes: {notes:?}"
+        );
     }
 
     #[test]
     fn missing_version_alone_is_flagged() {
         let notes = freshness_notes(&handshake(1, Some("agent"), None));
-        assert!(notes.iter().any(|note| note.contains("agentInfo")), "notes: {notes:?}");
+        assert!(
+            notes.iter().any(|note| note.contains("agentInfo")),
+            "notes: {notes:?}"
+        );
     }
 
     #[test]
@@ -174,7 +186,11 @@ mod tests {
     #[test]
     fn render_shows_protocol_and_agent_info() {
         let text = render_inspect(&response(
-            vec![snapshot(Some(handshake(1, Some("codex-acp"), Some("0.16.0"))))],
+            vec![snapshot(Some(handshake(
+                1,
+                Some("codex-acp"),
+                Some("0.16.0"),
+            )))],
             true,
         ));
         assert!(text.contains("protocol: v1"), "text: {text}");

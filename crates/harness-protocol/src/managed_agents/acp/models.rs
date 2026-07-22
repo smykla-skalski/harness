@@ -473,4 +473,3 @@ pub(super) const fn default_acp_inspect_available() -> bool {
 pub(super) fn is_false(value: &bool) -> bool {
     !*value
 }
-

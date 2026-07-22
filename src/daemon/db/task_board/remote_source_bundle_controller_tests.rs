@@ -109,7 +109,11 @@ async fn controller_source_upload_receipt_rejects_generation_principal_and_diges
             .is_err()
     );
     let mut wrong_assignment = request.clone();
-    wrong_assignment.offer.binding.assignment_id.push_str("-other");
+    wrong_assignment
+        .offer
+        .binding
+        .assignment_id
+        .push_str("-other");
     assert!(wrong_assignment.validate().is_err());
     let mut wrong_digest = request;
     change_digest(&mut wrong_digest.request_sha256);
@@ -148,12 +152,8 @@ fn bundle_offer(
     offer.binding.workflow_kind = TaskBoardWorkflowKind::DefaultTask;
     // Prior-phase base must match the bundle's advertised result revision.
     offer.binding.base_revision = RESULT.into();
-    offer.source = RemoteSourceMaterial::prior_phase_bundle(
-        REPOSITORY,
-        BASE,
-        RESULT,
-        artifact.clone(),
-    );
+    offer.source =
+        RemoteSourceMaterial::prior_phase_bundle(REPOSITORY, BASE, RESULT, artifact.clone());
     offer.artifacts = RemoteArtifactManifest {
         entries: vec![artifact],
     };

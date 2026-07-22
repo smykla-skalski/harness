@@ -25,8 +25,7 @@ use crate::workspace::utc_now;
 static START_CALLS: AtomicUsize = AtomicUsize::new(0);
 static PROVISION_CALLS: AtomicUsize = AtomicUsize::new(0);
 
-static RUNTIME_SEAM: OnceLock<Mutex<Option<Arc<AsyncMutex<RuntimeSeamState>>>>> =
-    OnceLock::new();
+static RUNTIME_SEAM: OnceLock<Mutex<Option<Arc<AsyncMutex<RuntimeSeamState>>>>> = OnceLock::new();
 static RUNTIME_SEAM_SERIAL: OnceLock<Arc<AsyncMutex<()>>> = OnceLock::new();
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -191,11 +190,9 @@ async fn record_runtime_call(
             }
             RuntimeSeamOutcome::Start
         }
-        RuntimeSeamAction::Probe { .. } => {
-            RuntimeSeamOutcome::Probe {
-                final_message: state.completed_runs.get(&identity.run_id).cloned(),
-            }
-        }
+        RuntimeSeamAction::Probe { .. } => RuntimeSeamOutcome::Probe {
+            final_message: state.completed_runs.get(&identity.run_id).cloned(),
+        },
     };
     state.calls.push(RuntimeSeamCall {
         offer: offer.clone(),
@@ -212,7 +209,12 @@ async fn disarm_completed_probe(
     final_message: &str,
 ) {
     let mut state = seam.lock().await;
-    if state.completed_runs.get(&identity.run_id).map(String::as_str) == Some(final_message) {
+    if state
+        .completed_runs
+        .get(&identity.run_id)
+        .map(String::as_str)
+        == Some(final_message)
+    {
         state.completed_runs.remove(&identity.run_id);
     }
 }
@@ -245,7 +247,10 @@ async fn runtime_snapshot(
 impl RuntimeSeamOutcome {
     fn armed_final_message(&self) -> Option<&str> {
         match self {
-            Self::Start | Self::Probe { final_message: None } => None,
+            Self::Start
+            | Self::Probe {
+                final_message: None,
+            } => None,
             Self::Probe {
                 final_message: Some(message),
             } => Some(message),

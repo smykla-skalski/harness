@@ -44,7 +44,10 @@ impl RemoteCodexLaunchEnvelope {
         let launch = Self {
             schema_version: REMOTE_CODEX_LAUNCH_SCHEMA_VERSION,
             runtime: runtime.to_owned(),
-            actor: request.actor.clone().ok_or(RemoteWireError::MissingField("actor"))?,
+            actor: request
+                .actor
+                .clone()
+                .ok_or(RemoteWireError::MissingField("actor"))?,
             prompt: request.prompt.clone(),
             mode: request.mode,
             role: request.role,
@@ -74,10 +77,7 @@ impl RemoteCodexLaunchEnvelope {
         Ok(launch)
     }
 
-    pub(crate) fn validate(
-        &self,
-        binding: &RemoteAttemptBinding,
-    ) -> Result<(), RemoteWireError> {
+    pub(crate) fn validate(&self, binding: &RemoteAttemptBinding) -> Result<(), RemoteWireError> {
         self.validate_common()?;
         if self.workflow_execution_id != binding.execution_id
             || !phase_launch_matches(binding.phase, self)
@@ -143,7 +143,10 @@ impl RemoteCodexLaunchEnvelope {
     }
 }
 
-fn phase_launch_matches(phase: TaskBoardExecutionPhase, launch: &RemoteCodexLaunchEnvelope) -> bool {
+fn phase_launch_matches(
+    phase: TaskBoardExecutionPhase,
+    launch: &RemoteCodexLaunchEnvelope,
+) -> bool {
     match phase {
         TaskBoardExecutionPhase::Implementation => {
             launch.mode == CodexRunMode::WorkspaceWrite

@@ -1,6 +1,6 @@
 [package]
 name = "harness-mcp"
-version = "49.3.0"
+version = "49.4.0"
 edition = "2024"
 rust-version = "1.94"
 
@@ -13,9 +13,9 @@ async-trait = "0.1.83"
 base64 = "0.22.1"
 clap = { version = "4.6.0", features = ["derive", "env"] }
 futures-util = "0.3.31"
-harness-daemon-client = { path = "../harness-daemon-client", version = "49.3.0" }
-harness-protocol = { path = "../harness-protocol", version = "49.3.0" }
-harness-telemetry = { path = "../harness-telemetry", version = "49.3.0" }
+harness-daemon-client = { path = "../harness-daemon-client", version = "49.4.0" }
+harness-protocol = { path = "../harness-protocol", version = "49.4.0" }
+harness-telemetry = { path = "../harness-telemetry", version = "49.4.0" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 thiserror = "2.0.18"
@@ -26,7 +26,7 @@ uuid = { version = "1.18.1", features = ["v4"] }
 
 [dev-dependencies]
 axum = { version = "=0.8.9", features = ["ws"] }
-harness-daemon-client = { path = "../harness-daemon-client", version = "49.3.0", features = ["test-support"] }
+harness-daemon-client = { path = "../harness-daemon-client", version = "49.4.0", features = ["test-support"] }
 temp-env = { version = "=0.3.6", features = ["async_closure"] }
 tempfile = "=3.27.0"
 

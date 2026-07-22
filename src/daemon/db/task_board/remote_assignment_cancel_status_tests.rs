@@ -140,11 +140,7 @@ async fn wrong_cancel_status_evidence_performs_zero_mutation() {
     assert!(matches!(
         fixture
             .db
-            .record_task_board_remote_assignment_status(
-                &wrong_epoch_request,
-                &wrong_epoch,
-                HOST,
-            )
+            .record_task_board_remote_assignment_status(&wrong_epoch_request, &wrong_epoch, HOST,)
             .await
             .expect("reject wrong cancel epoch"),
         TaskBoardRemoteMutationOutcome::Stale(_)

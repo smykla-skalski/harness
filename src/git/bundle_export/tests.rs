@@ -16,7 +16,13 @@ fn exports_one_exact_bounded_descendant_and_cleans_the_private_ref() {
     assert_eq!(bundle.advertised_ref, fixture.result_ref());
     assert!(bundle.bytes.starts_with(b"# v2 git bundle\n"));
     assert!(bundle.bytes.len() < 4 * 1024 * 1024);
-    assert!(optional_git(&fixture.worktree, &["rev-parse", "--verify", "--quiet", &fixture.result_ref()]).is_none());
+    assert!(
+        optional_git(
+            &fixture.worktree,
+            &["rev-parse", "--verify", "--quiet", &fixture.result_ref()]
+        )
+        .is_none()
+    );
 }
 
 #[test]
@@ -30,30 +36,53 @@ fn rejects_dirty_wrong_head_non_descendant_and_too_small_limit() {
     assert!(fixture.plan_result().is_err());
     git(&fixture.worktree, &["checkout", "main"]);
 
-    let unrelated = git(&fixture.worktree, &["commit-tree", "HEAD^{tree}", "-m", "unrelated"]);
+    let unrelated = git(
+        &fixture.worktree,
+        &["commit-tree", "HEAD^{tree}", "-m", "unrelated"],
+    );
     assert!(
-        GitBundleExportPlan::for_result(
-            &fixture.worktree,
-            fixture.result.clone(),
-            unrelated,
-        )
-        .is_err()
+        GitBundleExportPlan::for_result(&fixture.worktree, fixture.result.clone(), unrelated,)
+            .is_err()
     );
     assert!(fixture.plan().export(1).is_err());
-    assert!(optional_git(&fixture.worktree, &["rev-parse", "--verify", "--quiet", &fixture.result_ref()]).is_none());
+    assert!(
+        optional_git(
+            &fixture.worktree,
+            &["rev-parse", "--verify", "--quiet", &fixture.result_ref()]
+        )
+        .is_none()
+    );
 }
 
 #[test]
 fn replayed_private_ref_must_match_and_is_removed_exactly() {
     let fixture = Fixture::new();
     let result_ref = fixture.result_ref();
-    git(&fixture.worktree, &["update-ref", &result_ref, &fixture.result]);
-    fixture.plan().export(4 * 1024 * 1024).expect("resume exact export ref");
-    assert!(optional_git(&fixture.worktree, &["rev-parse", "--verify", "--quiet", &result_ref]).is_none());
+    git(
+        &fixture.worktree,
+        &["update-ref", &result_ref, &fixture.result],
+    );
+    fixture
+        .plan()
+        .export(4 * 1024 * 1024)
+        .expect("resume exact export ref");
+    assert!(
+        optional_git(
+            &fixture.worktree,
+            &["rev-parse", "--verify", "--quiet", &result_ref]
+        )
+        .is_none()
+    );
 
-    git(&fixture.worktree, &["update-ref", &result_ref, &fixture.base]);
+    git(
+        &fixture.worktree,
+        &["update-ref", &result_ref, &fixture.base],
+    );
     assert!(fixture.plan().export(4 * 1024 * 1024).is_err());
-    assert_eq!(git(&fixture.worktree, &["rev-parse", &result_ref]), fixture.base);
+    assert_eq!(
+        git(&fixture.worktree, &["rev-parse", &result_ref]),
+        fixture.base
+    );
 }
 
 #[test]
@@ -61,16 +90,28 @@ fn symbolic_result_ref_never_mutates_its_direct_target() {
     let fixture = Fixture::new();
     let result_ref = fixture.result_ref();
     let target_ref = "refs/harness/task-board/export-target";
-    git(&fixture.worktree, &["update-ref", target_ref, &fixture.result]);
-    git(&fixture.worktree, &["symbolic-ref", &result_ref, target_ref]);
+    git(
+        &fixture.worktree,
+        &["update-ref", target_ref, &fixture.result],
+    );
+    git(
+        &fixture.worktree,
+        &["symbolic-ref", &result_ref, target_ref],
+    );
 
     fixture
         .plan()
         .export(4 * 1024 * 1024)
         .expect_err("symbolic export ref must fail closed");
 
-    assert_eq!(git(&fixture.worktree, &["rev-parse", target_ref]), fixture.result);
-    assert_eq!(git(&fixture.worktree, &["symbolic-ref", &result_ref]), target_ref);
+    assert_eq!(
+        git(&fixture.worktree, &["rev-parse", target_ref]),
+        fixture.result
+    );
+    assert_eq!(
+        git(&fixture.worktree, &["symbolic-ref", &result_ref]),
+        target_ref
+    );
 }
 
 #[test]
@@ -79,16 +120,32 @@ fn symbolic_result_ref_never_deletes_its_direct_target_during_cleanup() {
     let plan = fixture.plan();
     let result_ref = fixture.result_ref();
     let target_ref = "refs/harness/task-board/export-cleanup-target";
-    plan.create_or_verify_result_ref().expect("create exact direct result ref");
-    git(&fixture.worktree, &["update-ref", "-d", &result_ref, &fixture.result]);
-    git(&fixture.worktree, &["update-ref", target_ref, &fixture.result]);
-    git(&fixture.worktree, &["symbolic-ref", &result_ref, target_ref]);
+    plan.create_or_verify_result_ref()
+        .expect("create exact direct result ref");
+    git(
+        &fixture.worktree,
+        &["update-ref", "-d", &result_ref, &fixture.result],
+    );
+    git(
+        &fixture.worktree,
+        &["update-ref", target_ref, &fixture.result],
+    );
+    git(
+        &fixture.worktree,
+        &["symbolic-ref", &result_ref, target_ref],
+    );
 
     plan.cleanup_result_ref()
         .expect_err("symbolic cleanup ref must fail closed");
 
-    assert_eq!(git(&fixture.worktree, &["rev-parse", target_ref]), fixture.result);
-    assert_eq!(git(&fixture.worktree, &["symbolic-ref", &result_ref]), target_ref);
+    assert_eq!(
+        git(&fixture.worktree, &["rev-parse", target_ref]),
+        fixture.result
+    );
+    assert_eq!(
+        git(&fixture.worktree, &["symbolic-ref", &result_ref]),
+        target_ref
+    );
 }
 
 struct Fixture {
@@ -126,11 +183,7 @@ impl Fixture {
     }
 
     fn plan_result(&self) -> crate::git::GitResult<GitBundleExportPlan> {
-        GitBundleExportPlan::for_result(
-            &self.worktree,
-            self.base.clone(),
-            self.result.clone(),
-        )
+        GitBundleExportPlan::for_result(&self.worktree, self.base.clone(), self.result.clone())
     }
 
     fn result_ref(&self) -> String {

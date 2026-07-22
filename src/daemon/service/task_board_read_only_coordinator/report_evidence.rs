@@ -94,9 +94,10 @@ pub(super) fn parse_attempt_result(
         .ok_or_else(|| invalid_transition("completed Codex run has no final message"))?;
     let result = serde_json::from_str::<TaskBoardLocalAttemptResult>(message.trim())
         .map_err(|error| invalid_transition(format!("parse workflow attempt result: {error}")))?;
-    let expected = task_board_local_attempt_result_expectation(execution, attempt).map_err(|_| {
-        invalid_transition("workflow attempt phase has no valid frozen result contract")
-    })?;
+    let expected =
+        task_board_local_attempt_result_expectation(execution, attempt).map_err(|_| {
+            invalid_transition("workflow attempt phase has no valid frozen result contract")
+        })?;
     validate_task_board_local_attempt_result(&result, &expected).map_err(|_| {
         invalid_transition(
             "workflow attempt result does not match its frozen identity or artifact contract",

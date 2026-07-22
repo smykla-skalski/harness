@@ -88,7 +88,10 @@ async fn real_controller_client_reaches_authenticated_executor_router() {
                 .refresh_observation(controller_db)
                 .await
                 .expect("authenticate against restarted executor router");
-            assert_eq!(observed.advertisement.host_instance_id, SUCCESSOR_HOST_INSTANCE);
+            assert_eq!(
+                observed.advertisement.host_instance_id,
+                SUCCESSOR_HOST_INSTANCE
+            );
         }
         server.stop().await;
     })

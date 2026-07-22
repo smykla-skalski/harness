@@ -18,9 +18,9 @@ use crate::daemon::task_board_remote_transport::wire::{
 use crate::task_board::{
     TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardAttemptResultArtifact,
     TaskBoardEvaluationResult, TaskBoardExecutionPhase, TaskBoardFailureClass,
-    TaskBoardImplementationResult, TaskBoardLocalAttemptResult,
-    TaskBoardPhaseCapabilityProfile, TaskBoardPhaseVerdict, TaskBoardRemoteAssignmentState,
-    TaskBoardReviewResult, TaskBoardReviewerOutcome, TaskBoardWorkflowKind,
+    TaskBoardImplementationResult, TaskBoardLocalAttemptResult, TaskBoardPhaseCapabilityProfile,
+    TaskBoardPhaseVerdict, TaskBoardRemoteAssignmentState, TaskBoardReviewResult,
+    TaskBoardReviewerOutcome, TaskBoardWorkflowKind,
 };
 
 pub(super) const TERMINAL_AT: &str = "2026-07-19T10:00:30Z";

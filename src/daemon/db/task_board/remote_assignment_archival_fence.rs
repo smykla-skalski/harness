@@ -42,7 +42,9 @@ pub(super) async fn require_no_archival_collision_in_tx(
         .fetch_optional(transaction.as_mut())
         .await
         .map_err(|error| {
-            db_error(format!("probe archival remote assignment collision: {error}"))
+            db_error(format!(
+                "probe archival remote assignment collision: {error}"
+            ))
         })?;
     if let Some((archived_id, _, _)) = archived {
         return Err(concurrent(format!(

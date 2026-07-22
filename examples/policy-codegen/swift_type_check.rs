@@ -122,7 +122,9 @@ fn collect_property_type(rest: &str, names: &mut BTreeSet<String>) {
         return;
     };
     // `public var id: String { rawValue }` - the computed body is not a type.
-    let type_expr = type_expr.split_once(" {").map_or(type_expr, |(head, _)| head);
+    let type_expr = type_expr
+        .split_once(" {")
+        .map_or(type_expr, |(head, _)| head);
     collect_type_identifiers(type_expr, names);
 }
 
@@ -138,9 +140,7 @@ fn collect_parameter_types(rest: &str, names: &mut BTreeSet<String>) {
     for argument in rest[start + 1..end].split(", ") {
         let type_expr = argument.split_once(": ").map_or(argument, |(_, ty)| ty);
         // `capabilities: [String] = []` - the default is not part of the type.
-        let type_expr = type_expr
-            .split_once(" = ")
-            .map_or(type_expr, |(ty, _)| ty);
+        let type_expr = type_expr.split_once(" = ").map_or(type_expr, |(ty, _)| ty);
         collect_type_identifiers(type_expr, names);
     }
 }
@@ -222,8 +222,7 @@ mod tests {
 
     #[test]
     fn reads_initializer_parameters_and_ignores_their_defaults() {
-        let generated =
-            "  public init(catalog: RuntimeModelCatalogWire? = nil, capabilities: [String] = [], probe: DoctorProbeWire) {\n";
+        let generated = "  public init(catalog: RuntimeModelCatalogWire? = nil, capabilities: [String] = [], probe: DoctorProbeWire) {\n";
 
         assert_eq!(
             referenced_types(generated),
@@ -233,7 +232,8 @@ mod tests {
 
     #[test]
     fn reads_tagged_enum_associated_values() {
-        let generated = "  case stdio(name: String, env: [AcpMcpEnvVariable])\n  case unknown(String)\n";
+        let generated =
+            "  case stdio(name: String, env: [AcpMcpEnvVariable])\n  case unknown(String)\n";
 
         assert_eq!(
             referenced_types(generated),

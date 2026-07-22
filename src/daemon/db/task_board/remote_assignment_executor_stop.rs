@@ -7,17 +7,13 @@ mod evidence;
 mod pending;
 
 use authority::{authority_assignment_id, source_matches};
-use evidence::{
-    durable_run_matches_snapshot, durable_stopped_run_matches, settled_stop_replays,
-};
+use evidence::{durable_run_matches_snapshot, durable_stopped_run_matches, settled_stop_replays};
 use pending::{stop_pending, stop_pending_values, stop_request_replays};
 
 pub(crate) use authority::{
     TaskBoardRemoteExecutorStopAuthority, TaskBoardRemoteExecutorStopReason,
 };
-pub(crate) use pending::{
-    TaskBoardRemoteExecutorStopPending, stop_pending_snapshot_matches,
-};
+pub(crate) use pending::{TaskBoardRemoteExecutorStopPending, stop_pending_snapshot_matches};
 pub(super) use pending::{decode_executor_stop_pending, stop_pending_digest};
 
 use super::ORCHESTRATOR_CHANGE_SCOPE;
@@ -49,7 +45,9 @@ impl AsyncDaemonDb {
                 commit_noop(transaction, "replayed remote executor stop authority").await?;
                 return Ok(Some(replay));
             }
-            return Err(concurrent("remote executor stop authority conflicts with durable intent"));
+            return Err(concurrent(
+                "remote executor stop authority conflicts with durable intent",
+            ));
         }
         if !source_matches(&record, authority, reason)?
             || !durable_run_matches_snapshot(&mut transaction, &record, snapshot).await?
@@ -80,9 +78,10 @@ impl AsyncDaemonDb {
             return Err(concurrent("remote executor stop authority lost its fence"));
         }
         bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit remote executor stop authority: {error}"))
-        })?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit remote executor stop authority: {error}")))?;
         Ok(Some(pending))
     }
 
@@ -139,6 +138,11 @@ impl AsyncDaemonDb {
         if rows != 1 {
             return Err(concurrent("remote executor stop settlement lost its fence"));
         }
-        finish_mutation(transaction, &record.assignment_id, "remote executor stop settlement").await
+        finish_mutation(
+            transaction,
+            &record.assignment_id,
+            "remote executor stop settlement",
+        )
+        .await
     }
 }

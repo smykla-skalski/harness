@@ -63,9 +63,10 @@ pub(super) async fn load_generation_lifecycle_trust_in_tx(
          WHERE assignment_id = ?1 AND fencing_epoch = ?2 AND legacy_migrated = 0",
     )
     .bind(assignment_id)
-    .bind(i64::try_from(fencing_epoch).map_err(|_| {
-        db_error("remote lifecycle trust assignment epoch is out of range")
-    })?)
+    .bind(
+        i64::try_from(fencing_epoch)
+            .map_err(|_| db_error("remote lifecycle trust assignment epoch is out of range"))?,
+    )
     .fetch_optional(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("load assignment lifecycle trust: {error}")))?
@@ -138,7 +139,9 @@ impl TaskBoardRemoteLifecycleTrustSnapshot {
         let json = serde_json::to_string(self)
             .map_err(|error| db_error(format!("serialize remote lifecycle trust: {error}")))?;
         if json.len() > MAX_LIFECYCLE_TRUST_JSON_BYTES {
-            return Err(db_error("remote lifecycle trust evidence exceeds its bound"));
+            return Err(db_error(
+                "remote lifecycle trust evidence exceeds its bound",
+            ));
         }
         Ok(json)
     }
@@ -212,10 +215,11 @@ impl TaskBoardRemoteLifecycleTrustSnapshot {
     }
 
     fn validate(&self) -> Result<(), CliError> {
-        if self.schema_version != LIFECYCLE_TRUST_SCHEMA_VERSION
-            || self.configuration_revision == 0
+        if self.schema_version != LIFECYCLE_TRUST_SCHEMA_VERSION || self.configuration_revision == 0
         {
-            return Err(db_error("remote lifecycle trust version or revision is invalid"));
+            return Err(db_error(
+                "remote lifecycle trust version or revision is invalid",
+            ));
         }
         validate_execution_host_config(&TaskBoardExecutionHostConfig {
             host_id: self.host_id.clone(),
@@ -240,7 +244,9 @@ impl TaskBoardRemoteLifecycleTrustSnapshot {
         if self.compute_digest() == self.snapshot_sha256 {
             Ok(())
         } else {
-            Err(db_error("remote lifecycle trust digest does not match its evidence"))
+            Err(db_error(
+                "remote lifecycle trust digest does not match its evidence",
+            ))
         }
     }
 
@@ -271,7 +277,9 @@ pub(super) fn decode_lifecycle_trust(
         (None, None) => Ok(None),
         (Some(json), Some(sha256)) => {
             if json.len() > MAX_LIFECYCLE_TRUST_JSON_BYTES {
-                return Err(db_error("remote lifecycle trust evidence exceeds its bound"));
+                return Err(db_error(
+                    "remote lifecycle trust evidence exceeds its bound",
+                ));
             }
             let snapshot = serde_json::from_str::<TaskBoardRemoteLifecycleTrustSnapshot>(&json)
                 .map_err(|error| db_error(format!("decode remote lifecycle trust: {error}")))?;
@@ -301,7 +309,9 @@ pub(super) fn require_sha256(value: &str, context: &str) -> Result<(), CliError>
     {
         Ok(())
     } else {
-        Err(db_error(format!("{context} is not canonical lowercase SHA-256")))
+        Err(db_error(format!(
+            "{context} is not canonical lowercase SHA-256"
+        )))
     }
 }
 

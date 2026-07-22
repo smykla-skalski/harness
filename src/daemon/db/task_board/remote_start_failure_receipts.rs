@@ -1,9 +1,7 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use super::remote_assignment_model::{
-    TaskBoardRemoteAssignmentRecord, canonical_time, nonblank,
-};
+use super::remote_assignment_model::{TaskBoardRemoteAssignmentRecord, canonical_time, nonblank};
 use super::remote_assignment_start_authority::{
     TaskBoardRemoteExecutorStartIoPermit, remote_executor_identity, start_authority_digest,
     start_io_permit_digest_from_evidence,
@@ -106,18 +104,25 @@ pub(super) fn decode_start_failure_receipt(
     let (receipt_json, receipt_sha256) = match (receipt_json, receipt_sha256) {
         (None, None) => return Ok(None),
         (Some(json), Some(sha256)) => (json, sha256),
-        _ => return Err(db_error("remote executor start failure receipt is incomplete")),
+        _ => {
+            return Err(db_error(
+                "remote executor start failure receipt is incomplete",
+            ));
+        }
     };
     if receipt_json.len() > MAX_START_FAILURE_RECEIPT_BYTES {
         return Err(db_error(
             "remote executor start failure receipt exceeds its size limit",
         ));
     }
-    let mut receipt =
-        serde_json::from_str::<TaskBoardRemoteExecutorStartFailureReceipt>(&receipt_json)
-            .map_err(|error| {
-                db_error(format!("decode remote executor start failure receipt: {error}"))
-            })?;
+    let mut receipt = serde_json::from_str::<TaskBoardRemoteExecutorStartFailureReceipt>(
+        &receipt_json,
+    )
+    .map_err(|error| {
+        db_error(format!(
+            "decode remote executor start failure receipt: {error}"
+        ))
+    })?;
     if canonical_json(&receipt)? != receipt_json {
         return Err(db_error(
             "remote executor start failure receipt is not canonical",
@@ -174,7 +179,10 @@ fn validate_failure_receipt_evidence(
             "remote executor start failure receipt contradicts immutable assignment evidence",
         ));
     }
-    nonblank(&receipt.error_code, "remote executor start failure error code")?;
+    nonblank(
+        &receipt.error_code,
+        "remote executor start failure error code",
+    )?;
     validate_embedded_status(record, receipt)?;
     validate_failure_receipt_times(receipt)
 }
@@ -219,9 +227,11 @@ fn validate_embedded_status(
 }
 
 fn required(value: &Option<String>, label: &str) -> Result<String, CliError> {
-    value
-        .clone()
-        .ok_or_else(|| db_error(format!("remote executor start failure receipt has no {label}")))
+    value.clone().ok_or_else(|| {
+        db_error(format!(
+            "remote executor start failure receipt has no {label}"
+        ))
+    })
 }
 
 fn validate_failure_receipt_times(
@@ -251,7 +261,9 @@ fn canonical_json(
     receipt: &TaskBoardRemoteExecutorStartFailureReceipt,
 ) -> Result<String, CliError> {
     serde_json::to_string(receipt).map_err(|error| {
-        db_error(format!("serialize remote executor start failure receipt: {error}"))
+        db_error(format!(
+            "serialize remote executor start failure receipt: {error}"
+        ))
     })
 }
 
@@ -271,7 +283,7 @@ fn lower_sha256(value: &str) -> bool {
     value.len() == 64
         && value
             .bytes()
-        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 #[cfg(test)]

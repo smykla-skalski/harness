@@ -1,7 +1,5 @@
 use super::controller::RemoteExecutionControllerClient;
-use super::controller_prepared_test_support::{
-    persist_claim, prepared_acceptance, status_request,
-};
+use super::controller_prepared_test_support::{persist_claim, prepared_acceptance, status_request};
 use super::controller_tests::{
     HOST_ID, ScriptedResponse, TOKEN_ENV, cancel_request, cancel_response, claimed_cancel_response,
     pinned_client, request_body, spawn_scripted_https_server, test_tls_material,
@@ -145,11 +143,9 @@ async fn two_lost_cancel_responses_reconcile_from_status_after_restart() {
     let state = prepared_acceptance("lost-cancel-status-reconciliation").await;
     let cancel = cancel_request(&state.prepared.offer, "lease-admission");
     let tls = test_tls_material();
-    let (cancel_endpoint, cancel_requests) = spawn_scripted_https_server(
-        &tls,
-        vec![ScriptedResponse::Drop, ScriptedResponse::Drop],
-    )
-    .await;
+    let (cancel_endpoint, cancel_requests) =
+        spawn_scripted_https_server(&tls, vec![ScriptedResponse::Drop, ScriptedResponse::Drop])
+            .await;
     let controller = RemoteExecutionControllerClient::new_for_tests_with_times(
         HOST_ID,
         pinned_client(&cancel_endpoint, &tls),
@@ -163,7 +159,10 @@ async fn two_lost_cancel_responses_reconcile_from_status_after_restart() {
             .expect_err("both cancel responses are lost");
     })
     .await;
-    assert_eq!(cancel_requests.await.expect("cancel request count").len(), 2);
+    assert_eq!(
+        cancel_requests.await.expect("cancel request count").len(),
+        2
+    );
     let pending = state
         .prepared
         .db
@@ -206,7 +205,10 @@ async fn two_lost_cancel_responses_reconcile_from_status_after_restart() {
         TaskBoardRemoteMutationOutcome::Updated(ref record)
             if record.state == TaskBoardRemoteAssignmentState::Cancelled
     ));
-    assert_eq!(status_requests.await.expect("status request count").len(), 1);
+    assert_eq!(
+        status_requests.await.expect("status request count").len(),
+        1
+    );
     let replayed = restarted
         .cancel(&state.prepared.db, &cancel)
         .await

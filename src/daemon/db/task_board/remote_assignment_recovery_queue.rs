@@ -184,13 +184,8 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("remote recovery quarantine")
             .await?;
-        quarantine_remote_recovery_failure_in_tx(
-            &mut transaction,
-            candidate,
-            now,
-            error.code(),
-        )
-        .await?;
+        quarantine_remote_recovery_failure_in_tx(&mut transaction, candidate, now, error.code())
+            .await?;
         transaction.commit().await.map_err(|commit_error| {
             db_error(format!("commit remote recovery quarantine: {commit_error}"))
         })

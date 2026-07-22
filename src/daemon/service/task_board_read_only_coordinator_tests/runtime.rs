@@ -295,14 +295,7 @@ impl TaskBoardReadOnlyRuntime for FakeReadOnlyRuntime {
         } else {
             "/tmp/read-only-worktree".into()
         };
-        let run = planned_run(
-            session_id,
-            request,
-            run_id,
-            &project_dir,
-            &result,
-            status,
-        )?;
+        let run = planned_run(session_id, request, run_id, &project_dir, &result, status)?;
         if let Some(db) = &self.durable_db {
             db.save_codex_run(&run).await?;
         }

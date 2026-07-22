@@ -64,8 +64,13 @@ impl AsyncDaemonDb {
         require_current_settlement_window(&assignment, settled_at)?;
         require_exact_terminal_assignment(&assignment, request, authenticated_principal)?;
         let response = settlement_response(request, settled_at)?;
-        insert_settlement_in_tx(&mut transaction, request, authenticated_principal, &response)
-            .await?;
+        insert_settlement_in_tx(
+            &mut transaction,
+            request,
+            authenticated_principal,
+            &response,
+        )
+        .await?;
         let receipt = load_settlement_in_tx(&mut transaction, &request.binding.assignment_id)
             .await?
             .ok_or_else(|| db_error("persisted remote settlement receipt disappeared"))?;

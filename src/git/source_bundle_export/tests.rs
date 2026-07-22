@@ -89,10 +89,7 @@ fn fork_or_hostile_origin_rejects_without_exporting_a_private_ref() {
             "repository mismatch must perform zero export mutation"
         );
     }
-    let oversized = format!(
-        "https://github.com/{}/widgets.git",
-        "attacker".repeat(1024)
-    );
+    let oversized = format!("https://github.com/{}/widgets.git", "attacker".repeat(1024));
     git(
         &fixture.worktree,
         &["remote", "set-url", "origin", &oversized],
@@ -162,8 +159,11 @@ fn in_progress_operation_performs_zero_source_export_mutation() {
 fn rejects_checkout_filter_without_invoking_it() {
     let fixture = Fixture::new();
     let marker = fixture._temp.path().join("filter-ran");
-    fs_err::write(fixture.worktree.join(".gitattributes"), "result.txt filter=unsafe\n")
-        .expect("write attributes");
+    fs_err::write(
+        fixture.worktree.join(".gitattributes"),
+        "result.txt filter=unsafe\n",
+    )
+    .expect("write attributes");
     git(&fixture.worktree, &["add", ".gitattributes"]);
     git(&fixture.worktree, &["commit", "-m", "attributes"]);
     let revision = git(&fixture.worktree, &["rev-parse", "HEAD"]);
@@ -176,12 +176,8 @@ fn rejects_checkout_filter_without_invoking_it() {
         ],
     );
 
-    GitSourceBundleExportPlan::for_revision(
-        &fixture.worktree,
-        REPOSITORY.into(),
-        revision,
-    )
-    .expect_err("external checkout filter must fail closed");
+    GitSourceBundleExportPlan::for_revision(&fixture.worktree, REPOSITORY.into(), revision)
+        .expect_err("external checkout filter must fail closed");
     assert!(!marker.exists(), "filter process must never run");
 }
 
@@ -190,16 +186,28 @@ fn symbolic_source_ref_never_mutates_or_deletes_its_target() {
     let fixture = Fixture::new();
     let source_ref = fixture.source_ref();
     let target_ref = "refs/harness/task-board/source-target";
-    git(&fixture.worktree, &["update-ref", target_ref, &fixture.revision]);
-    git(&fixture.worktree, &["symbolic-ref", &source_ref, target_ref]);
+    git(
+        &fixture.worktree,
+        &["update-ref", target_ref, &fixture.revision],
+    );
+    git(
+        &fixture.worktree,
+        &["symbolic-ref", &source_ref, target_ref],
+    );
 
     fixture
         .plan()
         .export(4 * 1024 * 1024)
         .expect_err("symbolic source ref must fail closed");
 
-    assert_eq!(git(&fixture.worktree, &["rev-parse", target_ref]), fixture.revision);
-    assert_eq!(git(&fixture.worktree, &["symbolic-ref", &source_ref]), target_ref);
+    assert_eq!(
+        git(&fixture.worktree, &["rev-parse", target_ref]),
+        fixture.revision
+    );
+    assert_eq!(
+        git(&fixture.worktree, &["symbolic-ref", &source_ref]),
+        target_ref
+    );
 }
 
 #[cfg(unix)]

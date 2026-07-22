@@ -25,7 +25,9 @@ fn typed_result_accepts_exact_serialized_limit_and_rejects_one_more_byte() {
         result: empty,
         result_sha256: "d".repeat(64),
     };
-    let fixed_bytes = serde_json::to_vec(&probe).expect("serialize result probe").len();
+    let fixed_bytes = serde_json::to_vec(&probe)
+        .expect("serialize result probe")
+        .len();
     let mut exact = probe;
     let TaskBoardAttemptResultArtifact::Implementation(artifact) = &mut exact.result.artifact
     else {
@@ -236,10 +238,7 @@ fn evaluation_result(
     }
 }
 
-fn evaluation_artifact(
-    cycle: Option<u32>,
-    head: Option<&str>,
-) -> TaskBoardAttemptResultArtifact {
+fn evaluation_artifact(cycle: Option<u32>, head: Option<&str>) -> TaskBoardAttemptResultArtifact {
     TaskBoardAttemptResultArtifact::Evaluation(TaskBoardEvaluationResult {
         verdict: TaskBoardPhaseVerdict::Pass,
         summary: "evaluated".into(),

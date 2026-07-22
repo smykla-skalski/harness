@@ -13,6 +13,8 @@ mod attach_tests;
 mod contract_tests;
 #[path = "quarantine_tests.rs"]
 mod quarantine_tests;
+#[path = "symbolic_ref_tests.rs"]
+mod symbolic_ref_tests;
 
 const OFFER_SHA: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const BUNDLE_SHA: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
@@ -24,7 +26,10 @@ fn imports_and_replays_each_crash_safe_git_boundary() {
 
     plan.verify_and_import_objects(&fixture.bundle)
         .expect("verify and import objects");
-    assert_eq!(plan.state().expect("base state"), GitBundleWorktreeState::AttachedBase);
+    assert_eq!(
+        plan.state().expect("base state"),
+        GitBundleWorktreeState::AttachedBase
+    );
 
     assert_eq!(
         plan.advance_one().expect("detach exact result"),
@@ -70,8 +75,7 @@ fn preserves_user_changes_after_a_detached_checkout_crash() {
         GitBundleWorktreeState::DetachedResultBranchBase
     );
     fs::write(fixture.controller.join("result.txt"), "user edit\n").expect("write tracked edit");
-    fs::write(fixture.controller.join("untracked.txt"), "keep me\n")
-        .expect("write untracked edit");
+    fs::write(fixture.controller.join("untracked.txt"), "keep me\n").expect("write untracked edit");
 
     fixture
         .plan()
@@ -86,8 +90,14 @@ fn preserves_user_changes_after_a_detached_checkout_crash() {
         fs::read_to_string(fixture.controller.join("untracked.txt")).expect("untracked edit"),
         "keep me\n"
     );
-    assert_eq!(git(&fixture.controller, &["rev-parse", "refs/heads/main"]), fixture.base);
-    assert_eq!(git(&fixture.controller, &["rev-parse", "HEAD"]), fixture.result);
+    assert_eq!(
+        git(&fixture.controller, &["rev-parse", "refs/heads/main"]),
+        fixture.base
+    );
+    assert_eq!(
+        git(&fixture.controller, &["rev-parse", "HEAD"]),
+        fixture.result
+    );
 }
 
 #[test]
@@ -97,7 +107,10 @@ fn exact_old_head_cas_refuses_an_interleaving_branch_advance() {
     plan.verify_and_import_objects(&fixture.bundle)
         .expect("import objects");
     plan.advance_one().expect("detach exact result");
-    let tree = git(&fixture.controller, &["rev-parse", &format!("{}^{{tree}}", fixture.base)]);
+    let tree = git(
+        &fixture.controller,
+        &["rev-parse", &format!("{}^{{tree}}", fixture.base)],
+    );
     let interloper = git_with_input(
         &fixture.controller,
         &["commit-tree", &tree, "-p", &fixture.base],
@@ -113,8 +126,14 @@ fn exact_old_head_cas_refuses_an_interleaving_branch_advance() {
         .advance_one()
         .expect_err("moved branch must fail exact replay");
 
-    assert_eq!(git(&fixture.controller, &["rev-parse", "refs/heads/main"]), interloper);
-    assert_eq!(git(&fixture.controller, &["rev-parse", "HEAD"]), fixture.result);
+    assert_eq!(
+        git(&fixture.controller, &["rev-parse", "refs/heads/main"]),
+        interloper
+    );
+    assert_eq!(
+        git(&fixture.controller, &["rev-parse", "HEAD"]),
+        fixture.result
+    );
     assert!(git(&fixture.controller, &["status", "--porcelain"]).is_empty());
 }
 
@@ -170,10 +189,16 @@ fn rejects_noncanonical_private_import_ref_before_bundle_mutation() {
 fn applied_replay_rejects_dirty_worktree_without_overwriting_bytes() {
     let fixture = Fixture::new(false);
     fixture.apply();
-    fs::write(fixture.controller.join("result.txt"), "local edit after import\n")
-        .expect("write local edit");
-    fs::write(fixture.controller.join("untracked.txt"), "preserve untracked\n")
-        .expect("write untracked file");
+    fs::write(
+        fixture.controller.join("result.txt"),
+        "local edit after import\n",
+    )
+    .expect("write local edit");
+    fs::write(
+        fixture.controller.join("untracked.txt"),
+        "preserve untracked\n",
+    )
+    .expect("write untracked file");
 
     let error = fixture
         .plan()
@@ -189,7 +214,10 @@ fn applied_replay_rejects_dirty_worktree_without_overwriting_bytes() {
         fs::read_to_string(fixture.controller.join("untracked.txt")).expect("read untracked"),
         "preserve untracked\n"
     );
-    assert_eq!(git(&fixture.controller, &["rev-parse", "HEAD"]), fixture.result);
+    assert_eq!(
+        git(&fixture.controller, &["rev-parse", "HEAD"]),
+        fixture.result
+    );
 }
 
 #[test]
@@ -235,7 +263,10 @@ fn applied_replay_rejects_branch_and_head_drift_without_ref_repair() {
         .require_applied()
         .expect_err("detached applied head must fail closed");
     assert!(matches!(error, GitError::Unsafe { .. }));
-    assert_eq!(git(&head_drift.controller, &["rev-parse", "HEAD"]), head_drift.result);
+    assert_eq!(
+        git(&head_drift.controller, &["rev-parse", "HEAD"]),
+        head_drift.result
+    );
     assert_eq!(
         git(&head_drift.controller, &["rev-parse", "refs/heads/main"]),
         head_drift.result
@@ -261,67 +292,9 @@ fn applied_replay_rejects_private_ref_drift_without_repair() {
         git(&fixture.controller, &["rev-parse", &import_ref()]),
         fixture.base
     );
-    assert_eq!(git(&fixture.controller, &["rev-parse", "HEAD"]), fixture.result);
-}
-
-#[test]
-fn symbolic_branch_ref_never_mutates_its_target() {
-    let fixture = Fixture::new(false);
-    run_git(
-        &fixture.controller,
-        &["update-ref", "refs/heads/actual", &fixture.base],
-    );
-    run_git(
-        &fixture.controller,
-        &["symbolic-ref", "refs/heads/main", "refs/heads/actual"],
-    );
-
-    let error = fixture
-        .plan()
-        .verify_and_import_objects(&fixture.bundle)
-        .expect_err("symbolic target branch must fail closed");
-
-    assert!(matches!(error, GitError::Unsafe { .. }));
     assert_eq!(
-        git(&fixture.controller, &["rev-parse", "refs/heads/actual"]),
-        fixture.base
-    );
-    assert!(git(&fixture.controller, &["status", "--porcelain"]).is_empty());
-}
-
-#[test]
-fn symbolic_private_ref_never_deletes_or_rewrites_its_target() {
-    let fixture = Fixture::new(false);
-    fixture.apply();
-    let private_ref = import_ref();
-    let target_ref = "refs/harness/task-board/import-target";
-    run_git(
-        &fixture.controller,
-        &["update-ref", "-d", &private_ref, &fixture.result],
-    );
-    run_git(
-        &fixture.controller,
-        &["update-ref", target_ref, &fixture.result],
-    );
-    run_git(
-        &fixture.controller,
-        &["symbolic-ref", &private_ref, target_ref],
-    );
-
-    let replay = fixture
-        .plan()
-        .require_applied()
-        .expect_err("symbolic private ref must fail exact replay");
-    assert!(matches!(replay, GitError::Unsafe { .. }));
-    let cleanup = fixture
-        .plan()
-        .cleanup_import_ref()
-        .expect_err("symbolic private ref must fail cleanup");
-    assert!(matches!(cleanup, GitError::Unsafe { .. }));
-    assert_eq!(git(&fixture.controller, &["rev-parse", target_ref]), fixture.result);
-    assert_eq!(
-        git(&fixture.controller, &["symbolic-ref", &private_ref]),
-        target_ref
+        git(&fixture.controller, &["rev-parse", "HEAD"]),
+        fixture.result
     );
 }
 
@@ -356,7 +329,13 @@ impl Fixture {
         let result_ref = result_ref();
         run_git(&source, &["update-ref", &result_ref, &result]);
         let bundle = temp.path().join("implementation.bundle");
-        let mut args = vec!["bundle", "create", "--version=2", path(&bundle), &result_ref];
+        let mut args = vec![
+            "bundle",
+            "create",
+            "--version=2",
+            path(&bundle),
+            &result_ref,
+        ];
         let extra_ref = format!("refs/harness/task-board/results/{BUNDLE_SHA}");
         if extra_head {
             // `^base` below excludes a base-targeted ref, so target the included result instead.
@@ -385,7 +364,10 @@ impl Fixture {
         run_git(&fixture.source, &["commit", "-m", "unrelated"]);
         fixture.result = git(&fixture.source, &["rev-parse", "HEAD"]);
         let result_ref = result_ref();
-        run_git(&fixture.source, &["update-ref", &result_ref, &fixture.result]);
+        run_git(
+            &fixture.source,
+            &["update-ref", &result_ref, &fixture.result],
+        );
         let excluded = format!("^{}", fixture.base);
         run_git(
             &fixture.source,
@@ -425,7 +407,10 @@ impl Fixture {
 
     fn assert_untouched(&self) {
         assert_eq!(git(&self.controller, &["rev-parse", "HEAD"]), self.base);
-        assert_eq!(git(&self.controller, &["rev-parse", "refs/heads/main"]), self.base);
+        assert_eq!(
+            git(&self.controller, &["rev-parse", "refs/heads/main"]),
+            self.base
+        );
         assert!(git(&self.controller, &["status", "--porcelain"]).is_empty());
         let import = Command::new("git")
             .arg("-C")

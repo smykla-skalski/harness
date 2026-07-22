@@ -3,9 +3,7 @@ use super::controller::{
     renewal_response_may_be_lost,
 };
 use super::wire::{RemoteLeaseRenewRequest, RemoteLeaseRenewResponse};
-use crate::daemon::db::{
-    AsyncDaemonDb, TaskBoardRemoteMutationOutcome,
-};
+use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteMutationOutcome};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 
 impl RemoteExecutionControllerClient {

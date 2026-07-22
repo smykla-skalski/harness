@@ -27,6 +27,9 @@ mod provider_sync_conflicts;
 mod remote_artifact_fetch_response;
 mod remote_artifacts;
 mod remote_assignment_active_fence;
+mod remote_assignment_archival_fence;
+#[cfg(test)]
+mod remote_assignment_archival_fence_tests;
 mod remote_assignment_authority_settlement;
 mod remote_assignment_cancel_journal;
 mod remote_assignment_cancel_response;
@@ -53,9 +56,6 @@ mod remote_assignment_executor_terminal_contract_tests;
 mod remote_assignment_executor_terminal_test_support;
 #[cfg(test)]
 mod remote_assignment_executor_terminal_tests;
-mod remote_assignment_archival_fence;
-#[cfg(test)]
-mod remote_assignment_archival_fence_tests;
 mod remote_assignment_inbox;
 mod remote_assignment_io_authority;
 mod remote_assignment_lease;
@@ -111,9 +111,9 @@ mod remote_source_bundle_reassignment;
 mod remote_source_bundle_reassignment_evidence;
 mod remote_source_bundle_recovery_controller;
 mod remote_source_bundles;
+mod remote_start_failure_receipts;
 #[cfg(test)]
 mod remote_start_receipt_hardening_tests;
-mod remote_start_failure_receipts;
 mod remote_start_receipts;
 mod rows;
 mod scheduler;
@@ -173,13 +173,13 @@ mod remote_assignment_chronology_tests;
 #[cfg(test)]
 mod remote_assignment_cleanup_handoff_tests;
 #[cfg(test)]
-pub(crate) mod remote_assignment_terminal_handoff_tests;
-#[cfg(test)]
 mod remote_assignment_cleanup_tests;
 #[cfg(test)]
 mod remote_assignment_fence_tests;
 #[cfg(test)]
 mod remote_assignment_generation_tests;
+#[cfg(test)]
+pub(crate) mod remote_assignment_terminal_handoff_tests;
 #[cfg(test)]
 pub(crate) use remote_assignment_generation_tests::{
     accept_controller, claim_controller, running_status, status_request,
@@ -205,9 +205,9 @@ mod remote_settlement_test_support;
 #[cfg(test)]
 mod remote_settlement_tests;
 #[cfg(test)]
-mod remote_source_bundle_controller_tests;
-#[cfg(test)]
 mod remote_source_bundle_archival_tests;
+#[cfg(test)]
+mod remote_source_bundle_controller_tests;
 #[cfg(test)]
 mod remote_source_bundle_offer_recovery_tests;
 #[cfg(test)]
@@ -264,11 +264,10 @@ pub(crate) use remote_assignment_result_adoption::TaskBoardRemoteResultAdoptionO
 pub(crate) use remote_assignment_start_authority::{
     REMOTE_START_INTERRUPTED_WITHOUT_RUN_ERROR_CODE,
     REMOTE_START_INTERRUPTED_WITHOUT_RUN_FAILURE_CLASS, REMOTE_START_PREFLIGHT_ERROR_CODE,
-    REMOTE_START_PREFLIGHT_FAILURE_CLASS,
-    TaskBoardRemoteExecutorIdentity, TaskBoardRemoteExecutorStartAuthority,
-    TaskBoardRemoteExecutorStartIoPermit, TaskBoardRemoteExecutorStartIoPermitOutcome,
-    executor_start_authority, executor_start_io_permit, remote_executor_identity,
-    remote_executor_identity_from_parts,
+    REMOTE_START_PREFLIGHT_FAILURE_CLASS, TaskBoardRemoteExecutorIdentity,
+    TaskBoardRemoteExecutorStartAuthority, TaskBoardRemoteExecutorStartIoPermit,
+    TaskBoardRemoteExecutorStartIoPermitOutcome, executor_start_authority,
+    executor_start_io_permit, remote_executor_identity, remote_executor_identity_from_parts,
 };
 #[allow(unused_imports)]
 pub(crate) use remote_evidence_retention::TaskBoardRemoteEvidencePruneResult;

@@ -4,9 +4,7 @@ use tokio::task::spawn_blocking;
 
 use super::{RemoteWorkerIdentity, concurrent, invalid_transition};
 use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteAssignmentRecord};
-use crate::daemon::task_board_remote_transport::wire::{
-    RemoteOfferRequest, RemoteSourceMaterial,
-};
+use crate::daemon::task_board_remote_transport::wire::{RemoteOfferRequest, RemoteSourceMaterial};
 use crate::errors::{CliError, CliErrorKind};
 use crate::git::bundle::{GitBundleImportPlan, GitBundleWorktreeState};
 use crate::git::source_bundle_import::GitSourceBundleImportPlan;
@@ -40,13 +38,11 @@ pub(super) async fn materialize_repository_snapshot(
     )
     .map_err(git_error)?;
     let import = plan.clone();
-    spawn_blocking(move || {
-        import
-            .verify_and_import_bytes(&content)
-            .map_err(git_error)
-    })
-    .await
-    .map_err(|error| CliErrorKind::workflow_io(format!("join remote source import: {error}")))??;
+    spawn_blocking(move || import.verify_and_import_bytes(&content).map_err(git_error))
+        .await
+        .map_err(|error| {
+            CliErrorKind::workflow_io(format!("join remote source import: {error}"))
+        })??;
     Ok(Some(plan))
 }
 
@@ -117,9 +113,10 @@ pub(super) async fn cleanup_prior_phase_import_ref(
         ..
     } = &offer.source
     {
-        let checkout = record.executor_checkout_path.as_deref().ok_or_else(|| {
-            concurrent("remote source cleanup has no frozen repository")
-        })?;
+        let checkout = record
+            .executor_checkout_path
+            .as_deref()
+            .ok_or_else(|| concurrent("remote source cleanup has no frozen repository"))?;
         let plan = GitSourceBundleImportPlan::new(
             Path::new(checkout),
             repository.clone(),
@@ -138,7 +135,8 @@ pub(super) async fn cleanup_prior_phase_import_ref(
         advertised_ref,
         bundle,
         ..
-    } = &offer.source else {
+    } = &offer.source
+    else {
         return Ok(());
     };
     let repository = workspace
@@ -177,8 +175,10 @@ async fn exact_materialized_request(
     db: &AsyncDaemonDb,
     record: &TaskBoardRemoteAssignmentRecord,
     offer: &RemoteOfferRequest,
-) -> Result<crate::daemon::task_board_remote_transport::wire::RemoteSourceBundleUploadRequest, CliError>
-{
+) -> Result<
+    crate::daemon::task_board_remote_transport::wire::RemoteSourceBundleUploadRequest,
+    CliError,
+> {
     let stored = db
         .task_board_remote_source_bundle(record)
         .await?

@@ -139,9 +139,7 @@ fn validate_migratable_host_configs(
     validate_execution_host_configs(&normalized)
 }
 
-fn validate_migratable_host_config(
-    host: &TaskBoardExecutionHostConfig,
-) -> Result<(), CliError> {
+fn validate_migratable_host_config(host: &TaskBoardExecutionHostConfig) -> Result<(), CliError> {
     validate_execution_host_config(&normalize_migratable_host_config(host))
 }
 

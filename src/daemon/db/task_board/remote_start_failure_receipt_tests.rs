@@ -1,6 +1,5 @@
 use sqlx::query;
 
-use super::{TaskBoardRemoteExecutorStartFailureReceipt, canonical_json, receipt_digest};
 use super::super::remote_assignment_test_support::{
     CLAIMED_AT, INSTANCE, PRINCIPAL, STARTED_AT, accept_executor, claim_request, executor_fixture,
     persist_executor_run,
@@ -9,6 +8,7 @@ use super::super::{
     TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorStartIoPermit,
     TaskBoardRemoteMutationOutcome,
 };
+use super::{TaskBoardRemoteExecutorStartFailureReceipt, canonical_json, receipt_digest};
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteArtifactManifest, RemoteAssignmentWireState, RemoteLease, RemoteStatusResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
@@ -81,10 +81,22 @@ async fn no_run_failure_rejects_a_durable_deterministic_run_without_mutation() {
         .expect("load after rejected no-run failure")
         .expect("assignment remains");
     assert_eq!(after.state, TaskBoardRemoteAssignmentState::Claimed);
-    assert_eq!(after.executor_start_io_permit_sha256, before.executor_start_io_permit_sha256);
-    assert_eq!(after.executor_start_io_permit_at, before.executor_start_io_permit_at);
-    assert_eq!(after.executor_start_authority_sha256, before.executor_start_authority_sha256);
-    assert_eq!(after.executor_start_authority_at, before.executor_start_authority_at);
+    assert_eq!(
+        after.executor_start_io_permit_sha256,
+        before.executor_start_io_permit_sha256
+    );
+    assert_eq!(
+        after.executor_start_io_permit_at,
+        before.executor_start_io_permit_at
+    );
+    assert_eq!(
+        after.executor_start_authority_sha256,
+        before.executor_start_authority_sha256
+    );
+    assert_eq!(
+        after.executor_start_authority_at,
+        before.executor_start_authority_at
+    );
     assert!(after.executor_start_failure_receipt_sha256.is_none());
 }
 
@@ -123,7 +135,11 @@ async fn pending_permit(keep_run: bool) -> PendingPermit {
         .expect("claimed assignment exists");
     let authority = fixture
         .db
-        .claim_task_board_remote_executor_start_authority(&accepted.assignment_id, INSTANCE, STARTED_AT)
+        .claim_task_board_remote_executor_start_authority(
+            &accepted.assignment_id,
+            INSTANCE,
+            STARTED_AT,
+        )
         .await
         .expect("claim start authority")
         .expect("start remains authorized");
@@ -165,7 +181,9 @@ async fn fail_without_run(pending: &PendingPermit) -> TaskBoardRemoteAssignmentR
     }
 }
 
-fn receipt_from(record: &TaskBoardRemoteAssignmentRecord) -> TaskBoardRemoteExecutorStartFailureReceipt {
+fn receipt_from(
+    record: &TaskBoardRemoteAssignmentRecord,
+) -> TaskBoardRemoteExecutorStartFailureReceipt {
     serde_json::from_str(
         record
             .executor_start_failure_receipt_json

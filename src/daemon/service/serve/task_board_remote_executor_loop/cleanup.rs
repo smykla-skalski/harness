@@ -7,14 +7,14 @@ use super::runtime::{stop_codex_run, validate_run_snapshot};
 use super::source_bundle::cleanup_prior_phase_import_ref;
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorStartAuthority,
-    TaskBoardRemoteMutationOutcome, TaskBoardRemoteExecutorStopReason,
+    TaskBoardRemoteExecutorStopReason, TaskBoardRemoteMutationOutcome,
 };
 use crate::daemon::http::DaemonHttpState;
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::storage as session_storage;
 use crate::workspace::layout::SessionLayout;
-use crate::workspace::worktree::WorktreeController;
 use crate::workspace::utc_now;
+use crate::workspace::worktree::WorktreeController;
 
 pub(super) async fn reconcile_settled_executor_cleanup(
     state: &DaemonHttpState,
@@ -59,9 +59,9 @@ pub(super) async fn reconcile_settled_executor_cleanup(
     {
         TaskBoardRemoteMutationOutcome::Updated(_)
         | TaskBoardRemoteMutationOutcome::Replayed(_) => Ok(true),
-        TaskBoardRemoteMutationOutcome::Stale(_) => {
-            Err(concurrent("remote executor cleanup lost its exact settlement fence"))
-        }
+        TaskBoardRemoteMutationOutcome::Stale(_) => Err(concurrent(
+            "remote executor cleanup lost its exact settlement fence",
+        )),
     }
 }
 
@@ -87,17 +87,16 @@ pub(super) async fn cleanup_unstarted_executor_provisioning(
         concurrent("remote executor provisioning cleanup has no frozen checkout path")
     })?);
     let resolved = db.resolve_session(&authority.identity.session_id).await?;
-    let layout = match resolved.as_ref() {
-        Some(session) => cleanup_layout(
-            session
-                .state
-                .worktree_path
-                .to_str()
-                .ok_or_else(|| concurrent("remote executor provisioning worktree is not UTF-8"))?,
-            &authority.identity.session_id,
-        )?,
-        None => deterministic_session_layout(&origin, &authority.identity.session_id)?,
-    };
+    let layout =
+        match resolved.as_ref() {
+            Some(session) => cleanup_layout(
+                session.state.worktree_path.to_str().ok_or_else(|| {
+                    concurrent("remote executor provisioning worktree is not UTF-8")
+                })?,
+                &authority.identity.session_id,
+            )?,
+            None => deterministic_session_layout(&origin, &authority.identity.session_id)?,
+        };
     if let Some(session) = resolved.as_ref() {
         validate_provisioning_session(&record, authority, &session.state, &layout)?;
     }
@@ -113,7 +112,8 @@ pub(super) async fn cleanup_unstarted_executor_provisioning(
         .await
         .map_err(|error| workflow_io(format!("join remote provisioning cleanup: {error}")))??;
     if resolved.is_some() {
-        db.delete_session_row(&authority.identity.session_id).await?;
+        db.delete_session_row(&authority.identity.session_id)
+            .await?;
     }
     Ok(true)
 }
@@ -198,9 +198,12 @@ async fn cleanup_executor_session(
         .unwrap_or_else(|| resolved.state.worktree_path.to_str().unwrap_or_default());
     let layout = cleanup_layout(project_dir, &identity.session_id)?;
     validate_cleanup_session(record, identity, &resolved.state, &layout)?;
-    let origin = PathBuf::from(record.executor_checkout_path.as_deref().ok_or_else(|| {
-        concurrent("remote executor cleanup has no frozen checkout path")
-    })?);
+    let origin = PathBuf::from(
+        record
+            .executor_checkout_path
+            .as_deref()
+            .ok_or_else(|| concurrent("remote executor cleanup has no frozen checkout path"))?,
+    );
     let layout_for_worker = layout.clone();
     spawn_blocking(move || destroy_executor_session(origin, layout_for_worker))
         .await
@@ -274,9 +277,12 @@ fn validate_executor_session_identity(
     state: &crate::session::types::SessionState,
     layout: &SessionLayout,
 ) -> Result<(), CliError> {
-    let expected_origin = PathBuf::from(record.executor_checkout_path.as_deref().ok_or_else(|| {
-        concurrent("remote executor cleanup has no frozen checkout path")
-    })?);
+    let expected_origin = PathBuf::from(
+        record
+            .executor_checkout_path
+            .as_deref()
+            .ok_or_else(|| concurrent("remote executor cleanup has no frozen checkout path"))?,
+    );
     let exact = state.session_id == identity.session_id
         && state.project_name == layout.project_name
         && state.worktree_path == layout.workspace()
@@ -310,10 +316,10 @@ fn require_unadopted_stop_cleanup(
     .into_iter()
     .any(|reason| record.error.as_deref() == Some(reason.message()));
     let start_expired = record.error.as_deref() == Some(super::REMOTE_START_EXPIRED_REASON);
-    let settings_changed = record.error.as_deref()
-        == Some("remote executor settings changed before worker start");
-    let executor_restarted = record.error.as_deref()
-        == Some("remote executor restarted before worker start");
+    let settings_changed =
+        record.error.as_deref() == Some("remote executor settings changed before worker start");
+    let executor_restarted =
+        record.error.as_deref() == Some("remote executor restarted before worker start");
     // Both terminals share the no-run "claimed, never started, cleanly finalized"
     // shape. Failed-at-Claimed must additionally carry the decoded receipt, not merely
     // resemble it, because a raw Failed row has no proof that external Start never ran.
@@ -327,7 +333,8 @@ fn require_unadopted_stop_cleanup(
     let stopped_unknown = record.state
         == crate::task_board::TaskBoardRemoteAssignmentState::Unknown
         && (stop_reason || start_expired || settings_changed || executor_restarted);
-    let failed_at_claimed = record.state == crate::task_board::TaskBoardRemoteAssignmentState::Failed
+    let failed_at_claimed = record.state
+        == crate::task_board::TaskBoardRemoteAssignmentState::Failed
         && record.start_failure_receipt.is_some();
     if unadopted_shape && (stopped_unknown || failed_at_claimed) {
         Ok(())
@@ -348,9 +355,10 @@ async fn cleanup_orphan_executor_session(
             "unstarted remote cleanup found an unowned deterministic session",
         ));
     }
-    let origin = PathBuf::from(record.executor_checkout_path.as_deref().ok_or_else(|| {
-        concurrent("remote executor orphan cleanup has no frozen checkout path")
-    })?);
+    let origin =
+        PathBuf::from(record.executor_checkout_path.as_deref().ok_or_else(|| {
+            concurrent("remote executor orphan cleanup has no frozen checkout path")
+        })?);
     let layout = if let Some(start) = record.start_receipt.as_ref() {
         cleanup_layout(&start.project_dir, &identity.session_id)?
     } else {
@@ -369,17 +377,14 @@ fn deterministic_session_layout(
     origin: &Path,
     session_id: &str,
 ) -> Result<SessionLayout, CliError> {
-    let canonical_origin = origin.canonicalize().map_err(|error| {
-        workflow_io(format!("canonicalize remote cleanup origin: {error}"))
-    })?;
-    let sessions_root = crate::workspace::layout::sessions_root(
-        &crate::workspace::harness_data_root(),
-    );
-    let project_name = crate::workspace::project_resolver::resolve_name(
-        &canonical_origin,
-        &sessions_root,
-    )
-    .map_err(|error| workflow_io(format!("resolve remote cleanup project: {error}")))?;
+    let canonical_origin = origin
+        .canonicalize()
+        .map_err(|error| workflow_io(format!("canonicalize remote cleanup origin: {error}")))?;
+    let sessions_root =
+        crate::workspace::layout::sessions_root(&crate::workspace::harness_data_root());
+    let project_name =
+        crate::workspace::project_resolver::resolve_name(&canonical_origin, &sessions_root)
+            .map_err(|error| workflow_io(format!("resolve remote cleanup project: {error}")))?;
     Ok(SessionLayout {
         sessions_root,
         project_name,
@@ -391,7 +396,11 @@ fn cleanup_layout(project_dir: &str, session_id: &str) -> Result<SessionLayout, 
     let workspace = Path::new(project_dir);
     let session_root = workspace
         .parent()
-        .filter(|_| workspace.file_name().is_some_and(|name| name == "workspace"))
+        .filter(|_| {
+            workspace
+                .file_name()
+                .is_some_and(|name| name == "workspace")
+        })
         .ok_or_else(|| concurrent("remote executor cleanup worktree path is not canonical"))?;
     if session_root.file_name().and_then(|name| name.to_str()) != Some(session_id) {
         return Err(concurrent(
@@ -444,11 +453,11 @@ fn workflow_io(message: impl Into<String>) -> CliError {
 }
 
 #[cfg(test)]
+#[path = "cleanup_failure_tests.rs"]
+mod failure_tests;
+#[cfg(test)]
 #[path = "cleanup_tests.rs"]
 mod tests;
 #[cfg(test)]
 #[path = "cleanup_unadopted_tests.rs"]
 mod unadopted_tests;
-#[cfg(test)]
-#[path = "cleanup_failure_tests.rs"]
-mod failure_tests;

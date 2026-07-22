@@ -96,7 +96,11 @@ fn client_side() -> ClientSide {
     let (notifications, _routed) = mpsc::channel(8);
     ClientSide {
         handlers: ClientHandlers {
-            context: ProtocolContext::new(client, Arc::clone(&supervisor), Arc::clone(&session_guard)),
+            context: ProtocolContext::new(
+                client,
+                Arc::clone(&supervisor),
+                Arc::clone(&session_guard),
+            ),
             session_guard,
             supervisor,
             manager: protocol_manager("remote", ACP_ID, DAEMON_SESSION),
@@ -121,24 +125,27 @@ async fn http_transport_completes_initialize_new_session_and_prompt() {
     let http = ok(HttpClient::new(format!("http://{addr}")), "http client");
 
     let outcome = AcpTransport::Http(http)
-        .connect(client.handlers, async move |connection: ConnectionTo<Agent>| {
-            connection
-                .send_request(InitializeRequest::new(ProtocolVersion::V1))
-                .block_task()
-                .await?;
-            let session: NewSessionResponse = connection
-                .send_request(NewSessionRequest::new(cwd))
-                .block_task()
-                .await?;
-            let prompt: PromptResponse = connection
-                .send_request(PromptRequest::new(
-                    session.session_id.clone(),
-                    vec![ContentBlock::Text(TextContent::new("ping"))],
-                ))
-                .block_task()
-                .await?;
-            Ok((session, prompt))
-        })
+        .connect(
+            client.handlers,
+            async move |connection: ConnectionTo<Agent>| {
+                connection
+                    .send_request(InitializeRequest::new(ProtocolVersion::V1))
+                    .block_task()
+                    .await?;
+                let session: NewSessionResponse = connection
+                    .send_request(NewSessionRequest::new(cwd))
+                    .block_task()
+                    .await?;
+                let prompt: PromptResponse = connection
+                    .send_request(PromptRequest::new(
+                        session.session_id.clone(),
+                        vec![ContentBlock::Text(TextContent::new("ping"))],
+                    ))
+                    .block_task()
+                    .await?;
+                Ok((session, prompt))
+            },
+        )
         .await;
 
     let (session, prompt) = ok(outcome, "http round-trip");

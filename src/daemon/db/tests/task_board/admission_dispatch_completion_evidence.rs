@@ -80,14 +80,8 @@ async fn read_only_dispatch_atomically_starts_workflow_with_exact_completion_evi
         .await
         .expect("commit read-only dispatch");
 
-    assert_prepared_read_only_dispatch(
-        &db,
-        &intent,
-        &execution_id,
-        &owner,
-        source_item_revision,
-    )
-    .await;
+    assert_prepared_read_only_dispatch(&db, &intent, &execution_id, &owner, source_item_revision)
+        .await;
 }
 
 async fn assert_prepared_read_only_dispatch(
@@ -313,10 +307,12 @@ pub(super) fn remote_status(
         offer_request_sha256: offer.request_sha256.clone(),
         status_sha256: String::new(),
         // A promoting status must echo the accepted lease to reconstruct a lost claim.
-        lease: Some(crate::daemon::task_board_remote_transport::wire::RemoteLease {
-            lease_id: "lease-admission".into(),
-            expires_at: "2026-07-19T10:01:00Z".into(),
-        }),
+        lease: Some(
+            crate::daemon::task_board_remote_transport::wire::RemoteLease {
+                lease_id: "lease-admission".into(),
+                expires_at: "2026-07-19T10:01:00Z".into(),
+            },
+        ),
         result: None,
         output_artifacts: RemoteArtifactManifest::default(),
         claimed_at: Some("2026-07-19T10:00:02Z".into()),

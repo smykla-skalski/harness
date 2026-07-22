@@ -23,8 +23,8 @@ mod remote_result_import_tests;
 mod remote_start_tests;
 #[path = "admission_dispatch_remote_status.rs"]
 mod remote_status_tests;
-pub(crate) use remote_start_tests::{PreparedRemoteOffer, prepare_remote_offer};
 pub(crate) use remote_result_import_tests::prepare_remote_implementation_offer;
+pub(crate) use remote_start_tests::{PreparedRemoteOffer, prepare_remote_offer};
 #[path = "admission_dispatch_startup_reconciliation.rs"]
 mod startup_reconciliation_tests;
 #[path = "admission_dispatch_write_workflow.rs"]

@@ -1,7 +1,7 @@
 use sqlx::{query, query_as};
 
 use super::remote_assignment_test_support::{
-    CLAIMED_AT, PRINCIPAL, ExecutorFixture, accept_executor, claim_request, detached_offer,
+    CLAIMED_AT, ExecutorFixture, PRINCIPAL, accept_executor, claim_request, detached_offer,
     executor_fixture,
 };
 use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteMutationOutcome};
@@ -42,13 +42,16 @@ async fn active_cursor_survives_reconnect_and_reaches_a_newer_claim() {
         .await
         .expect("scan first active page");
     assert_eq!(first.active_assignment_ids.len(), 64);
-    assert!(!first.active_assignment_ids.iter().any(|id| id.ends_with("064")));
+    assert!(
+        !first
+            .active_assignment_ids
+            .iter()
+            .any(|id| id.ends_with("064"))
+    );
 
     let database_path = fixture._temp.path().join("executor.db");
     let ExecutorFixture {
-        db,
-        _temp: temp,
-        ..
+        db, _temp: temp, ..
     } = fixture;
     drop(db);
     let restarted = AsyncDaemonDb::connect(&database_path)
@@ -88,13 +91,16 @@ async fn terminal_cursor_is_bounded_and_restart_fair() {
         .expect("scan first terminal page");
     assert!(first.active_assignment_ids.is_empty());
     assert_eq!(first.terminal_assignment_ids.len(), 64);
-    assert!(!first.terminal_assignment_ids.iter().any(|id| id.ends_with("064")));
+    assert!(
+        !first
+            .terminal_assignment_ids
+            .iter()
+            .any(|id| id.ends_with("064"))
+    );
 
     let database_path = fixture._temp.path().join("executor.db");
     let ExecutorFixture {
-        db,
-        _temp: temp,
-        ..
+        db, _temp: temp, ..
     } = fixture;
     drop(db);
     let restarted = AsyncDaemonDb::connect(&database_path)
@@ -147,12 +153,17 @@ async fn scan_wraps_and_revisits_a_row_after_durable_state_change() {
         .await
         .expect("scan changed assignment state");
     assert_eq!(changed.active_assignment_ids.len(), 2);
-    assert_eq!(changed.terminal_assignment_ids, vec![first.active_assignment_ids[0].clone()]);
+    assert_eq!(
+        changed.terminal_assignment_ids,
+        vec![first.active_assignment_ids[0].clone()]
+    );
 }
 
 // Each seeded assignment needs a distinct execution generation; the host inbox rejects
 // two offers that share (execution_id, action_key, attempt) or (execution_id, fencing_epoch).
-fn distinct_scan_offer(index: usize) -> crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest {
+fn distinct_scan_offer(
+    index: usize,
+) -> crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest {
     let execution_id = format!("execution-scan-active-{index:03}");
     let mut request = detached_offer(
         &format!("assignment-scan-active-{index:03}"),

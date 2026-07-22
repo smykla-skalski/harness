@@ -2,11 +2,11 @@
 
 use sqlx::{Sqlite, Transaction, query};
 
+use super::remote_assignment_io_authority::active_target_matches;
 use super::remote_assignment_io_authority::monotonic_time;
 use super::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, canonical_time, concurrent, to_i64,
 };
-use super::remote_assignment_io_authority::active_target_matches;
 use super::remote_operation_trust::TaskBoardRemoteOperationKind;
 use super::workflow_executions::load_execution_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
@@ -15,9 +15,8 @@ use crate::daemon::task_board_remote_transport::wire::{
 };
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::{
-    TASK_BOARD_REMOTE_CANCEL_INTENT_AT_RESOURCE,
-    TASK_BOARD_REMOTE_CANCEL_INTENT_REASON_RESOURCE, TASK_BOARD_REMOTE_CANCEL_INTENT_RESOURCE,
-    TaskBoardWorkflowExecutionRecord,
+    TASK_BOARD_REMOTE_CANCEL_INTENT_AT_RESOURCE, TASK_BOARD_REMOTE_CANCEL_INTENT_REASON_RESOURCE,
+    TASK_BOARD_REMOTE_CANCEL_INTENT_RESOURCE, TaskBoardWorkflowExecutionRecord,
 };
 
 impl AsyncDaemonDb {
@@ -25,14 +24,14 @@ impl AsyncDaemonDb {
         &self,
         assignment_id: &str,
     ) -> Result<Option<RemoteCancelRequest>, CliError> {
-        let mut transaction = self.pool().begin().await.map_err(|error| {
-            db_error(format!("begin remote cancel intent read: {error}"))
-        })?;
-        let Some(assignment) = super::remote_assignment_model::load_assignment_in_tx(
-            &mut transaction,
-            assignment_id,
-        )
-        .await?
+        let mut transaction = self
+            .pool()
+            .begin()
+            .await
+            .map_err(|error| db_error(format!("begin remote cancel intent read: {error}")))?;
+        let Some(assignment) =
+            super::remote_assignment_model::load_assignment_in_tx(&mut transaction, assignment_id)
+                .await?
         else {
             transaction.commit().await.map_err(|error| {
                 db_error(format!("commit missing remote cancel intent read: {error}"))
@@ -43,9 +42,10 @@ impl AsyncDaemonDb {
             .await?
             .ok_or_else(|| concurrent("remote cancel intent parent disappeared"))?;
         let request = cancel_intent_request_for_record(&parent, &assignment)?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit remote cancel intent read: {error}"))
-        })?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit remote cancel intent read: {error}")))?;
         Ok(request)
     }
 }
@@ -126,9 +126,10 @@ pub(super) fn pending_cancel_request_for_record(
         ));
     }
     canonical_time(
-        record.cancel_requested_at.as_deref().ok_or_else(|| {
-            concurrent("pending remote cancel journal has no request time")
-        })?,
+        record
+            .cancel_requested_at
+            .as_deref()
+            .ok_or_else(|| concurrent("pending remote cancel journal has no request time"))?,
         "pending remote cancel request time",
     )?;
     let reason = record
@@ -179,9 +180,10 @@ pub(super) async fn journal_pending_cancel_request_in_tx(
             ))
         };
     }
-    let operation = record.controller_operation.as_ref().ok_or_else(|| {
-        concurrent("pending remote cancel journal has no controller operation")
-    })?;
+    let operation = record
+        .controller_operation
+        .as_ref()
+        .ok_or_else(|| concurrent("pending remote cancel journal has no controller operation"))?;
     if operation.kind != TaskBoardRemoteOperationKind::Cancel.as_str()
         || operation.request_sha256 != request.request_sha256
         || record.cancel_requested_at.is_some()
@@ -209,7 +211,10 @@ pub(super) async fn journal_pending_cancel_request_in_tx(
     .bind(&request.request_sha256)
     .bind(&request.reason)
     .bind(updated_at)
-    .bind(to_i64(record.fencing_epoch, "pending cancel fencing epoch")?)
+    .bind(to_i64(
+        record.fencing_epoch,
+        "pending cancel fencing epoch",
+    )?)
     .bind(record.state.as_str())
     .bind(&request.offer_request_sha256)
     .bind(&request.lease_id)
@@ -238,12 +243,9 @@ pub(super) async fn journal_cancel_claim_in_tx(
     let Some(request) = request else {
         return Ok(());
     };
-    let record = super::remote_assignment_model::load_assignment_in_tx(
-        transaction,
-        assignment_id,
-    )
-    .await?
-    .ok_or_else(|| concurrent("pending remote cancel assignment disappeared"))?;
+    let record = super::remote_assignment_model::load_assignment_in_tx(transaction, assignment_id)
+        .await?
+        .ok_or_else(|| concurrent("pending remote cancel assignment disappeared"))?;
     journal_pending_cancel_request_in_tx(transaction, &record, request, requested_at).await
 }
 

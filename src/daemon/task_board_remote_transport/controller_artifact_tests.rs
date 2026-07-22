@@ -38,7 +38,10 @@ async fn durable_artifact_replay_skips_a_second_http_fetch() {
     let request = fixture.request.clone();
     let first = temp_env::async_with_vars([(TOKEN_ENV, Some("artifact-secret"))], async {
         let call = tokio::spawn(async move { controller.fetch_artifact(&db, &request).await });
-        server.seen.await.expect("artifact request reached executor");
+        server
+            .seen
+            .await
+            .expect("artifact request reached executor");
         server.release.send(()).expect("release artifact response");
         call.await
             .expect("artifact controller task")
@@ -89,9 +92,15 @@ async fn artifact_response_cannot_cross_a_host_trust_rotation() {
     let request = fixture.request.clone();
     temp_env::async_with_vars([(TOKEN_ENV, Some("artifact-secret"))], async {
         let call = tokio::spawn(async move { controller.fetch_artifact(&db, &request).await });
-        server.seen.await.expect("artifact request reached executor");
+        server
+            .seen
+            .await
+            .expect("artifact request reached executor");
         rotate_host_trust(&fixture.state.prepared.db).await;
-        server.release.send(()).expect("release stale artifact response");
+        server
+            .release
+            .send(())
+            .expect("release stale artifact response");
         let error = call
             .await
             .expect("artifact controller task")
@@ -127,7 +136,10 @@ async fn conflicting_immutable_artifact_preserves_fetch_authority() {
         .expect_err("immutable path conflict must fail closed");
     assert!(error.to_string().contains("immutable content evidence"));
     assert_fetch_authority(&fixture.state.prepared.db, &fixture.request).await;
-    assert_eq!(artifact_count(&fixture.state.prepared.db, &fixture.request).await, 1);
+    assert_eq!(
+        artifact_count(&fixture.state.prepared.db, &fixture.request).await,
+        1
+    );
 }
 
 #[tokio::test]

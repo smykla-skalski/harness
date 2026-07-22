@@ -15,7 +15,7 @@ use crate::daemon::task_board_remote_transport::wire::{
 use crate::task_board::{
     TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardAttemptResultArtifact,
     TaskBoardFailureClass, TaskBoardLocalAttemptResult, TaskBoardPhaseVerdict,
-    TaskBoardReviewResult, TaskBoardReviewerOutcome, TaskBoardRemoteAssignmentState,
+    TaskBoardRemoteAssignmentState, TaskBoardReviewResult, TaskBoardReviewerOutcome,
 };
 
 const OWNER: &str = "instance-a";
@@ -23,13 +23,10 @@ const OWNER: &str = "instance-a";
 #[tokio::test]
 async fn completed_review_persists_once_and_replays_after_restart() {
     let (fixture, record, snapshot) = completed_review_fixture().await;
-    let TerminalEvidence::Completed { artifacts, .. } = completed_evidence(
-        &record,
-        &snapshot,
-        Path::new(&snapshot.project_dir),
-    )
-    .await
-    .expect("build terminal review evidence")
+    let TerminalEvidence::Completed { artifacts, .. } =
+        completed_evidence(&record, &snapshot, Path::new(&snapshot.project_dir))
+            .await
+            .expect("build terminal review evidence")
     else {
         panic!("completed review produced failed evidence");
     };
@@ -103,8 +100,14 @@ async fn completed_run_without_a_result_fails_closed_without_artifacts() {
         .expect("failed remote assignment");
     assert_eq!(failed.state, TaskBoardRemoteAssignmentState::Failed);
     let response = failed.status_response.expect("sealed failed status");
-    assert_eq!(response.error_code.as_deref(), Some("executor_output_invalid"));
-    assert_eq!(response.failure_class, Some(TaskBoardFailureClass::Permanent));
+    assert_eq!(
+        response.error_code.as_deref(),
+        Some("executor_output_invalid")
+    );
+    assert_eq!(
+        response.failure_class,
+        Some(TaskBoardFailureClass::Permanent)
+    );
     assert!(response.output_artifacts.entries.is_empty());
     assert_eq!(artifact_count(&fixture.db, &record.assignment_id).await, 0);
 }
@@ -146,8 +149,14 @@ async fn oversized_completed_result_persists_only_small_failed_evidence() {
     let response = failed.status_response.expect("sealed failed status");
     assert_eq!(response.state, RemoteAssignmentWireState::Failed);
     assert!(response.result.is_none());
-    assert_eq!(response.error_code.as_deref(), Some("executor_output_invalid"));
-    assert_eq!(response.failure_class, Some(TaskBoardFailureClass::Permanent));
+    assert_eq!(
+        response.error_code.as_deref(),
+        Some("executor_output_invalid")
+    );
+    assert_eq!(
+        response.failure_class,
+        Some(TaskBoardFailureClass::Permanent)
+    );
     assert!(response.output_artifacts.entries.is_empty());
     assert!(
         serde_json::to_vec(&response)
@@ -177,12 +186,8 @@ async fn completed_review_fixture() -> (
             .expect("claim executor assignment"),
         TaskBoardRemoteMutationOutcome::Updated(_)
     ));
-    authorize_and_start_remote_executor(
-        &fixture,
-        &accepted.assignment_id,
-        "2026-07-19T10:00:20Z",
-    )
-    .await;
+    authorize_and_start_remote_executor(&fixture, &accepted.assignment_id, "2026-07-19T10:00:20Z")
+        .await;
     let record = fixture
         .db
         .task_board_remote_assignment(&accepted.assignment_id)
@@ -198,9 +203,8 @@ async fn completed_review_fixture() -> (
         .expect("load executor run")
         .expect("executor run");
     snapshot.status = CodexRunStatus::Completed;
-    snapshot.final_message = Some(
-        serde_json::to_string(&review_result(&record)).expect("serialize review result"),
-    );
+    snapshot.final_message =
+        Some(serde_json::to_string(&review_result(&record)).expect("serialize review result"));
     snapshot.updated_at = "2026-07-19T10:00:30Z".into();
     fixture
         .db
@@ -238,11 +242,9 @@ fn review_result(
 }
 
 async fn artifact_count(db: &AsyncDaemonDb, assignment_id: &str) -> i64 {
-    query_scalar(
-        "SELECT COUNT(*) FROM task_board_remote_artifacts WHERE assignment_id = ?1",
-    )
-    .bind(assignment_id)
-    .fetch_one(db.pool())
-    .await
-    .expect("count remote artifacts")
+    query_scalar("SELECT COUNT(*) FROM task_board_remote_artifacts WHERE assignment_id = ?1")
+        .bind(assignment_id)
+        .fetch_one(db.pool())
+        .await
+        .expect("count remote artifacts")
 }

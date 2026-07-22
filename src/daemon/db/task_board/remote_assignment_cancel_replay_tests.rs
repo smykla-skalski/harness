@@ -3,8 +3,7 @@ use super::remote_assignment_generation_tests::accept_controller;
 use super::remote_assignment_test_support::*;
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
-    RemoteClaimResponse, RemoteLease,
-    TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
+    RemoteClaimResponse, RemoteLease, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::TaskBoardRemoteAssignmentState;
 
@@ -19,11 +18,7 @@ async fn controller_cancel_response_is_fenced_and_exactly_replayed() {
     let response = cancel_response(&fixture, &request);
     fixture
         .db
-        .claim_task_board_remote_cancel_io_authority(
-            &request,
-            HOST,
-            "2026-07-19T10:00:02Z",
-        )
+        .claim_task_board_remote_cancel_io_authority(&request, HOST, "2026-07-19T10:00:02Z")
         .await
         .expect("claim cancel authority")
         .expect("cancel remains active");
@@ -58,11 +53,7 @@ async fn claimed_cancel_without_immutable_claim_receipt_is_stale_without_mutatio
     );
     fixture
         .db
-        .claim_task_board_remote_cancel_io_authority(
-            &request,
-            HOST,
-            "2026-07-19T10:00:02Z",
-        )
+        .claim_task_board_remote_cancel_io_authority(&request, HOST, "2026-07-19T10:00:02Z")
         .await
         .expect("claim cancel authority")
         .expect("cancel remains active");
@@ -72,7 +63,11 @@ async fn claimed_cancel_without_immutable_claim_receipt_is_stale_without_mutatio
         .await
         .expect("load assignment before invalid response")
         .expect("assignment exists");
-    let sequence = fixture.db.current_change_sequence().await.expect("sequence");
+    let sequence = fixture
+        .db
+        .current_change_sequence()
+        .await
+        .expect("sequence");
     let response = claimed_cancel_response(&fixture, &request);
 
     assert!(matches!(
@@ -98,7 +93,11 @@ async fn claimed_cancel_without_immutable_claim_receipt_is_stale_without_mutatio
         before
     );
     assert_eq!(
-        fixture.db.current_change_sequence().await.expect("sequence"),
+        fixture
+            .db
+            .current_change_sequence()
+            .await
+            .expect("sequence"),
         sequence
     );
 }
@@ -113,11 +112,7 @@ async fn claimed_cancel_with_immutable_claim_receipt_is_exactly_replayed() {
     let response = claimed_cancel_response(&fixture, &request);
     fixture
         .db
-        .claim_task_board_remote_cancel_io_authority(
-            &request,
-            HOST,
-            "2026-07-19T10:00:10Z",
-        )
+        .claim_task_board_remote_cancel_io_authority(&request, HOST, "2026-07-19T10:00:10Z")
         .await
         .expect("claim cancel authority")
         .expect("cancel remains active");
@@ -154,11 +149,7 @@ async fn claimed_cancel_response_preserves_durable_claim_evidence() {
     let response = cancel_response(&fixture, &request);
     fixture
         .db
-        .claim_task_board_remote_cancel_io_authority(
-            &request,
-            HOST,
-            "2026-07-19T10:00:10Z",
-        )
+        .claim_task_board_remote_cancel_io_authority(&request, HOST, "2026-07-19T10:00:10Z")
         .await
         .expect("claim omitted-evidence cancellation")
         .expect("omitted-evidence cancellation remains active");
@@ -194,11 +185,7 @@ async fn claimed_cancel_response_cannot_change_durable_run_evidence() {
     let request = cancel_request(&fixture, lease_id);
     fixture
         .db
-        .claim_task_board_remote_cancel_io_authority(
-            &request,
-            HOST,
-            "2026-07-19T10:00:10Z",
-        )
+        .claim_task_board_remote_cancel_io_authority(&request, HOST, "2026-07-19T10:00:10Z")
         .await
         .expect("claim conflicting-evidence cancellation")
         .expect("conflicting-evidence cancellation remains active");
@@ -219,7 +206,11 @@ async fn claimed_cancel_response_cannot_change_durable_run_evidence() {
         .task_board_item(&fixture.execution.item_id)
         .await
         .expect("load item");
-    let sequence = fixture.db.current_change_sequence().await.expect("sequence");
+    let sequence = fixture
+        .db
+        .current_change_sequence()
+        .await
+        .expect("sequence");
 
     for response in conflicting_cancel_responses(&fixture, &request) {
         assert!(matches!(
@@ -262,7 +253,14 @@ async fn claimed_cancel_response_cannot_change_durable_run_evidence() {
             .expect("reload item"),
         item_before
     );
-    assert_eq!(fixture.db.current_change_sequence().await.expect("sequence"), sequence);
+    assert_eq!(
+        fixture
+            .db
+            .current_change_sequence()
+            .await
+            .expect("sequence"),
+        sequence
+    );
 }
 
 fn cancel_request(fixture: &ControllerFixture, lease_id: &str) -> RemoteCancelRequest {
@@ -371,22 +369,13 @@ async fn persist_claim_receipt(fixture: &ControllerFixture, lease_id: &str) {
     };
     fixture
         .db
-        .claim_task_board_remote_claim_io_authority(
-            &request,
-            HOST,
-            "2026-07-19T10:00:02Z",
-        )
+        .claim_task_board_remote_claim_io_authority(&request, HOST, "2026-07-19T10:00:02Z")
         .await
         .expect("claim remote claim authority")
         .expect("claim remains active");
     fixture
         .db
-        .record_task_board_remote_assignment_claim(
-            &request,
-            &response,
-            HOST,
-            CLAIMED_AT,
-        )
+        .record_task_board_remote_assignment_claim(&request, &response, HOST, CLAIMED_AT)
         .await
         .expect("persist immutable claim receipt");
 }

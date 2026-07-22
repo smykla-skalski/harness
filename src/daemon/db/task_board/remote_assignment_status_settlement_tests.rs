@@ -3,8 +3,8 @@ use super::remote_assignment_generation_tests::{
     accept_controller, claim_controller, running_status, status_request,
 };
 use super::remote_assignment_test_support::{
-    AFTER_EXPIRY, CLAIMED_AT, ControllerFixture, HOST, STARTED_AT, controller_fixture,
-    controller_fixture_with_retry_attempts, claim_request,
+    AFTER_EXPIRY, CLAIMED_AT, ControllerFixture, HOST, STARTED_AT, claim_request,
+    controller_fixture, controller_fixture_with_retry_attempts,
 };
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::task_board_remote_transport::wire::{
@@ -178,7 +178,10 @@ async fn definitive_status_after_unknown_recovery_preserves_human_required() {
         retained_parent.transition.execution_state,
         TaskBoardExecutionState::HumanRequired
     );
-    assert_eq!(retained_parent.attempts[0].state, TaskBoardAttemptState::Unknown);
+    assert_eq!(
+        retained_parent.attempts[0].state,
+        TaskBoardAttemptState::Unknown
+    );
     assert!(
         retained_parent
             .ownership
@@ -294,11 +297,7 @@ async fn lost_claim_status_requires_the_exact_l1_lease() {
         let claim = claim_request(&fixture.request, &accepted);
         fixture
             .db
-            .claim_task_board_remote_claim_io_authority(
-                &claim,
-                HOST,
-                "2026-07-19T10:00:05Z",
-            )
+            .claim_task_board_remote_claim_io_authority(&claim, HOST, "2026-07-19T10:00:05Z")
             .await
             .expect("claim exact remote claim I/O authority")
             .expect("claim remains eligible");

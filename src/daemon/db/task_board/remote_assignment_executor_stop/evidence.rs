@@ -34,13 +34,8 @@ pub(super) async fn durable_run_matches_snapshot(
     if snapshot.run_id != identity.run_id || snapshot.session_id != identity.session_id {
         return Ok(false);
     }
-    let Some(stored) = stored_launch_evidence(
-        transaction,
-        &snapshot.run_id,
-        &snapshot.session_id,
-        false,
-    )
-    .await?
+    let Some(stored) =
+        stored_launch_evidence(transaction, &snapshot.run_id, &snapshot.session_id, false).await?
     else {
         return Ok(false);
     };
@@ -52,13 +47,8 @@ pub(super) async fn durable_stopped_run_matches(
     _record: &TaskBoardRemoteAssignmentRecord,
     pending: &TaskBoardRemoteExecutorStopPending,
 ) -> Result<bool, CliError> {
-    let Some(stored) = stored_launch_evidence(
-        transaction,
-        &pending.run_id,
-        &pending.session_id,
-        true,
-    )
-    .await?
+    let Some(stored) =
+        stored_launch_evidence(transaction, &pending.run_id, &pending.session_id, true).await?
     else {
         return Ok(false);
     };
@@ -96,7 +86,10 @@ pub(super) fn settled_stop_replays(
         && record.fencing_epoch == pending.fencing_epoch
         && offer.request_sha256 == pending.offer_request_sha256
         && claim.sha256 == pending.claim_receipt_sha256
-        && record.start_receipt.as_ref().map(|receipt| receipt.sha256.as_str())
+        && record
+            .start_receipt
+            .as_ref()
+            .map(|receipt| receipt.sha256.as_str())
             == pending.start_receipt_sha256.as_deref()
         && record.executor_start_authority_sha256.is_none()
         && record.executor_start_io_permit_sha256.is_none()

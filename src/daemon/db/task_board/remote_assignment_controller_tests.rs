@@ -1,5 +1,5 @@
-use super::remote_assignment_test_support::*;
 use super::remote_assignment_source::source_binding_matches;
+use super::remote_assignment_test_support::*;
 use super::{TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome};
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteOfferDisposition, RemoteOfferResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
@@ -7,15 +7,18 @@ use crate::daemon::task_board_remote_transport::wire::{
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE, TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TaskBoardAttemptState, TaskBoardExecutionState,
-    TaskBoardPullRequestHeadIdentity, TaskBoardPullRequestIdentity,
-    TaskBoardRemoteAssignmentState, TaskBoardWorkflowKind,
+    TaskBoardPullRequestHeadIdentity, TaskBoardPullRequestIdentity, TaskBoardRemoteAssignmentState,
+    TaskBoardWorkflowKind,
 };
 
 #[tokio::test]
 async fn controller_offer_atomically_binds_and_exact_replay_is_a_noop() {
     let fixture = controller_fixture(1).await;
 
-    assert_eq!(fixture.request.launch.persona.as_deref(), Some("security-reviewer"));
+    assert_eq!(
+        fixture.request.launch.persona.as_deref(),
+        Some("security-reviewer")
+    );
     assert_eq!(fixture.request.launch.model.as_deref(), Some("gpt-5.4"));
     assert_eq!(fixture.request.launch.effort.as_deref(), Some("high"));
     assert!(
@@ -25,7 +28,13 @@ async fn controller_offer_atomically_binds_and_exact_replay_is_a_noop() {
             .capabilities
             .contains(&"task-board:tag:security".to_string())
     );
-    assert!(!fixture.request.launch.prompt.contains("/tmp/controller-context-only"));
+    assert!(
+        !fixture
+            .request
+            .launch
+            .prompt
+            .contains("/tmp/controller-context-only")
+    );
     assert!(
         fixture
             .request
@@ -94,7 +103,10 @@ async fn tampered_launch_contract_is_rejected_before_remote_persistence() {
             request.launch.effort = Some("low".into());
         },
         |request: &mut crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest| {
-            request.launch.capabilities.push("unexpected-capability".into());
+            request
+                .launch
+                .capabilities
+                .push("unexpected-capability".into());
         },
         |request: &mut crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest| {
             request.launch.board_item_id = "other-item".into();
@@ -222,11 +234,12 @@ async fn frozen_pull_request_head_binds_fork_repository_branch_ref_and_revision(
     request.binding.workflow_kind = TaskBoardWorkflowKind::PrReview;
     // The binding repository tracks the fork source the offer freezes.
     request.binding.repository = "contributor/harness".into();
-    request.source = crate::daemon::task_board_remote_transport::wire::RemoteSourceMaterial::repository_branch(
-        "contributor/harness",
-        "feature/fix",
-        SOURCE_REVISION,
-    );
+    request.source =
+        crate::daemon::task_board_remote_transport::wire::RemoteSourceMaterial::repository_branch(
+            "contributor/harness",
+            "feature/fix",
+            SOURCE_REVISION,
+        );
     request.request_sha256.clear();
     request = request.seal().expect("seal frozen fork source");
     request.validate().expect("validate frozen fork source");

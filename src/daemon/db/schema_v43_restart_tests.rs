@@ -5,8 +5,7 @@ use tempfile::tempdir;
 use super::tests::legacy_v40_fixture_at;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 
-const LEGACY_LEAF_SHA256: &str =
-    "1111111111111111111111111111111111111111111111111111111111111111";
+const LEGACY_LEAF_SHA256: &str = "1111111111111111111111111111111111111111111111111111111111111111";
 const QUARANTINE_TABLE: &str = "task_board_remote_host_quarantines";
 
 #[test]
@@ -125,7 +124,11 @@ fn sync_current_v43_restart_refuses_dropped_immutability_trigger() {
         !trigger_exists(&path, "task_board_remote_host_quarantines_reject_delete"),
         "a refused restart must never recreate a dropped immutability trigger"
     );
-    assert_eq!(quarantine_evidence_rows(&path), 1, "the evidence row must survive");
+    assert_eq!(
+        quarantine_evidence_rows(&path),
+        1,
+        "the evidence row must survive"
+    );
 }
 
 #[test]
@@ -150,7 +153,8 @@ fn sync_current_v43_restart_refuses_noncanonical_immutability_trigger() {
         "unexpected error: {error}"
     );
     assert!(
-        trigger_body(&path, "task_board_remote_host_quarantines_reject_update").contains("tampered"),
+        trigger_body(&path, "task_board_remote_host_quarantines_reject_update")
+            .contains("tampered"),
         "a refused restart must leave the tampered trigger unrepaired"
     );
 }
@@ -177,7 +181,11 @@ async fn async_current_v43_restart_refuses_dropped_immutability_trigger() {
         !trigger_exists(&path, "task_board_remote_host_quarantines_reject_insert"),
         "a refused async restart must never recreate a dropped immutability trigger"
     );
-    assert_eq!(quarantine_evidence_rows(&path), 1, "the evidence row must survive");
+    assert_eq!(
+        quarantine_evidence_rows(&path),
+        1,
+        "the evidence row must survive"
+    );
 }
 
 #[tokio::test]
@@ -204,7 +212,8 @@ async fn async_current_v43_restart_refuses_noncanonical_immutability_trigger() {
         "unexpected error: {error}"
     );
     assert!(
-        trigger_body(&path, "task_board_remote_host_quarantines_reject_delete").contains("tampered"),
+        trigger_body(&path, "task_board_remote_host_quarantines_reject_delete")
+            .contains("tampered"),
         "a refused async restart must leave the tampered trigger unrepaired"
     );
 }
@@ -286,9 +295,11 @@ fn malformed_ledger_shape(path: &Path) -> (bool, i64) {
         )
         .expect("probe malformed sentinel column");
     let rows: i64 = conn
-        .query_row(&format!("SELECT COUNT(*) FROM {QUARANTINE_TABLE}"), [], |row| {
-            row.get(0)
-        })
+        .query_row(
+            &format!("SELECT COUNT(*) FROM {QUARANTINE_TABLE}"),
+            [],
+            |row| row.get(0),
+        )
         .expect("count surviving quarantine evidence rows");
     (sentinel > 0, rows)
 }

@@ -16,20 +16,13 @@ use crate::task_board::{
     TaskBoardPhaseCapabilityProfile,
 };
 
-const STATUS_SHA256: &str =
-    "1111111111111111111111111111111111111111111111111111111111111111";
-const CANCEL_SHA256: &str =
-    "2222222222222222222222222222222222222222222222222222222222222222";
-const SETTLE_SHA256: &str =
-    "3333333333333333333333333333333333333333333333333333333333333333";
-const FETCH_SHA256: &str =
-    "4444444444444444444444444444444444444444444444444444444444444444";
-const FRESH_SHA256: &str =
-    "5555555555555555555555555555555555555555555555555555555555555555";
-const CLEANUP_SHA256: &str =
-    "6666666666666666666666666666666666666666666666666666666666666666";
-const PARENT_SHA256: &str =
-    "7777777777777777777777777777777777777777777777777777777777777777";
+const STATUS_SHA256: &str = "1111111111111111111111111111111111111111111111111111111111111111";
+const CANCEL_SHA256: &str = "2222222222222222222222222222222222222222222222222222222222222222";
+const SETTLE_SHA256: &str = "3333333333333333333333333333333333333333333333333333333333333333";
+const FETCH_SHA256: &str = "4444444444444444444444444444444444444444444444444444444444444444";
+const FRESH_SHA256: &str = "5555555555555555555555555555555555555555555555555555555555555555";
+const CLEANUP_SHA256: &str = "6666666666666666666666666666666666666666666666666666666666666666";
+const PARENT_SHA256: &str = "7777777777777777777777777777777777777777777777777777777777777777";
 
 #[tokio::test]
 async fn disabled_r2_lifecycle_operations_use_the_frozen_generation_and_survive_restart() {
@@ -406,8 +399,13 @@ async fn assert_operation_fence(
         .expect("operation-fenced assignment")
         .controller_operation
         .expect("controller operation token");
-    let fence = operation.fence.expect("controller operation lifecycle fence");
-    assert_eq!(fence.configuration_revision, expected.host.configuration_revision);
+    let fence = operation
+        .fence
+        .expect("controller operation lifecycle fence");
+    assert_eq!(
+        fence.configuration_revision,
+        expected.host.configuration_revision
+    );
     assert_eq!(fence.enabled_at_capture, expected.host.config.enabled);
     assert_eq!(
         fence.observed_host_instance_id,

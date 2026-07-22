@@ -182,7 +182,10 @@ pub(super) async fn run_agent_recording_session_lifecycle(
             async move |initialize: InitializeRequest, responder, _connection| {
                 responder.respond(
                     InitializeResponse::new(initialize.protocol_version)
-                        .agent_info(Some(Implementation::new("session-lifecycle-agent", "1.0.0")))
+                        .agent_info(Some(Implementation::new(
+                            "session-lifecycle-agent",
+                            "1.0.0",
+                        )))
                         .agent_capabilities(
                             AgentCapabilities::new()
                                 .load_session(true)

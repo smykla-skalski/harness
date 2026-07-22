@@ -1,3 +1,4 @@
+use super::TaskBoardRemoteIoAuthority;
 use super::remote_assignment_io_authority::{
     TaskBoardRemoteIoAuthorityKind, require_authority_parent,
 };
@@ -7,7 +8,6 @@ use super::remote_operation_trust::{
     TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence,
     require_pending_operation_replay_trust_in_tx,
 };
-use super::TaskBoardRemoteIoAuthority;
 use crate::daemon::db::{AsyncDaemonDb, CliError, TaskBoardRemoteHostTrustFence};
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteCancelRequest, RemoteClaimRequest, RemoteLeaseRenewRequest, RemoteOfferRequest,
@@ -122,9 +122,7 @@ impl AsyncDaemonDb {
         trust: &TaskBoardRemoteHostTrustFence,
     ) -> Result<bool, CliError> {
         request.validate().map_err(|error| {
-            crate::daemon::db::db_error(format!(
-                "validate pending remote renewal replay: {error}"
-            ))
+            crate::daemon::db::db_error(format!("validate pending remote renewal replay: {error}"))
         })?;
         let mut transaction = self
             .begin_immediate_transaction("pending remote renewal replay authority")
@@ -140,9 +138,9 @@ impl AsyncDaemonDb {
             TaskBoardRemoteAssignmentState::Claimed
                 | TaskBoardRemoteAssignmentState::Started
                 | TaskBoardRemoteAssignmentState::Running
-        ) && assignment.offer.as_ref().map(|offer| &offer.binding) == Some(&request.binding)
-            && assignment.request_sha256.as_deref()
-                == Some(request.offer_request_sha256.as_str())
+        ) && assignment.offer.as_ref().map(|offer| &offer.binding)
+            == Some(&request.binding)
+            && assignment.request_sha256.as_deref() == Some(request.offer_request_sha256.as_str())
             && assignment.authenticated_principal.as_deref() == Some(authenticated_principal)
             && assignment.lease_id.as_deref() == Some(request.lease_id.as_str())
             && renew_request_for_record(&assignment)? == *request;

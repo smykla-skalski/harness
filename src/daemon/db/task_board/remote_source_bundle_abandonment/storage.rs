@@ -4,8 +4,8 @@ use super::TaskBoardRemoteSourceBundleAbandonment;
 use crate::daemon::db::task_board::remote_assignment_model::{nonblank, to_i64};
 use crate::daemon::db::{CliError, db_error};
 use crate::daemon::task_board_remote_transport::wire::{
-    RemoteOfferRequest, RemoteSourceBundleAbandonRequest,
-    RemoteSourceBundleAbandonResponse, RemoteSourceBundleReceiptVerificationResponse,
+    RemoteOfferRequest, RemoteSourceBundleAbandonRequest, RemoteSourceBundleAbandonResponse,
+    RemoteSourceBundleReceiptVerificationResponse,
 };
 
 #[derive(sqlx::FromRow)]
@@ -38,10 +38,11 @@ impl SourceBundleAbandonmentRow {
             &self.verified_absence_json,
         )
         .map_err(|error| db_error(format!("decode source absence verification: {error}")))?;
-        let response = serde_json::from_str::<RemoteSourceBundleAbandonResponse>(
-            &self.response_json,
-        )
-        .map_err(|error| db_error(format!("decode source abandonment response: {error}")))?;
+        let response =
+            serde_json::from_str::<RemoteSourceBundleAbandonResponse>(&self.response_json)
+                .map_err(|error| {
+                    db_error(format!("decode source abandonment response: {error}"))
+                })?;
         request
             .validate()
             .map_err(|error| db_error(format!("validate source abandonment request: {error}")))?;
@@ -49,13 +50,19 @@ impl SourceBundleAbandonmentRow {
             .validate(&request)
             .map_err(|error| db_error(format!("validate source abandonment response: {error}")))?;
         let canonical_verification = serde_json::to_string(&verification).map_err(|error| {
-            db_error(format!("encode canonical source absence verification: {error}"))
+            db_error(format!(
+                "encode canonical source absence verification: {error}"
+            ))
         })?;
         let canonical_request = serde_json::to_string(&request).map_err(|error| {
-            db_error(format!("encode canonical source abandonment request: {error}"))
+            db_error(format!(
+                "encode canonical source abandonment request: {error}"
+            ))
         })?;
         let canonical_response = serde_json::to_string(&response).map_err(|error| {
-            db_error(format!("encode canonical source abandonment response: {error}"))
+            db_error(format!(
+                "encode canonical source abandonment response: {error}"
+            ))
         })?;
         nonblank(
             &self.authenticated_principal,
@@ -142,7 +149,10 @@ pub(crate) async fn load_abandonment_collisions_in_tx(
         .bind(&offer.request_sha256)
         .bind(upload_request_sha256)
         .bind(&offer.binding.execution_id)
-        .bind(to_i64(offer.binding.fencing_epoch, "source abandonment fencing epoch")?)
+        .bind(to_i64(
+            offer.binding.fencing_epoch,
+            "source abandonment fencing epoch",
+        )?)
         .fetch_all(transaction.as_mut())
         .await
         .map_err(|error| db_error(format!("load source abandonment collision: {error}")))?
@@ -179,7 +189,10 @@ pub(crate) async fn source_offer_is_abandoned_in_tx(
     .bind(&offer.binding.assignment_id)
     .bind(&offer.request_sha256)
     .bind(&offer.binding.execution_id)
-    .bind(to_i64(offer.binding.fencing_epoch, "source abandonment fencing epoch")?)
+    .bind(to_i64(
+        offer.binding.fencing_epoch,
+        "source abandonment fencing epoch",
+    )?)
     .fetch_optional(transaction.as_mut())
     .await
     .map(|row| row.is_some())
@@ -212,7 +225,10 @@ pub(crate) async fn insert_abandonment_in_tx(
          )",
     )
     .bind(&binding.assignment_id)
-    .bind(to_i64(binding.fencing_epoch, "source abandonment insert epoch")?)
+    .bind(to_i64(
+        binding.fencing_epoch,
+        "source abandonment insert epoch",
+    )?)
     .bind(&binding.execution_id)
     .bind(&binding.action_key)
     .bind(i64::from(binding.attempt))

@@ -3,8 +3,8 @@ use super::completion_evidence_tests::{
 };
 use super::remote_start_tests::prepare_remote_offer_with_policy;
 use super::*;
-use crate::daemon::db::task_board::remote_assignment_test_support::claim_request;
 use crate::daemon::db::task_board::TaskBoardRemoteOperationKind;
+use crate::daemon::db::task_board::remote_assignment_test_support::claim_request;
 use crate::daemon::task_board_remote_transport::wire::RemoteAssignmentWireState;
 use crate::task_board::TaskBoardWorkflowExecutionCas;
 
@@ -18,11 +18,7 @@ async fn remote_claim_keeps_finite_admission_reserved_until_exact_start_evidence
         .db
         .record_task_board_remote_assignment_status(
             &status_request,
-            &remote_status(
-                &prepared.offer,
-                RemoteAssignmentWireState::Running,
-                true,
-            ),
+            &remote_status(&prepared.offer, RemoteAssignmentWireState::Running, true),
             "executor-a",
         )
         .await
@@ -110,11 +106,7 @@ async fn claimed_remote_without_start(label: &str) -> PreparedRemoteOffer {
         .db
         .record_task_board_remote_assignment_status(
             &remote_status_request(&prepared.offer),
-            &remote_status(
-                &prepared.offer,
-                RemoteAssignmentWireState::Claimed,
-                false,
-            ),
+            &remote_status(&prepared.offer, RemoteAssignmentWireState::Claimed, false),
             "executor-a",
         )
         .await
@@ -156,7 +148,10 @@ async fn assert_exact_start_commits_once(prepared: &PreparedRemoteOffer) {
             .await
             .expect("exact status already committed finite admission")
     );
-    assert_eq!(intent_status(&prepared.db, &prepared.intent).await, "completed");
+    assert_eq!(
+        intent_status(&prepared.db, &prepared.intent).await,
+        "completed"
+    );
     assert_eq!(
         ledger_kind_state(&prepared.db, &prepared.intent, "concurrency").await,
         "committed"

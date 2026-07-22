@@ -37,11 +37,12 @@ async fn persist_normal_runtime_thread(
     restarted: &RestartedExecutor,
     owner: &TaskBoardRemoteExecutorLifecycleOwner,
 ) {
-    let updated = query("UPDATE codex_runs SET thread_id = 'thread-normal-start' WHERE run_id = ?1")
-        .bind(&restarted.authority.identity.run_id)
-        .execute(restarted.db.pool())
-        .await
-        .expect("persist normal Codex thread");
+    let updated =
+        query("UPDATE codex_runs SET thread_id = 'thread-normal-start' WHERE run_id = ?1")
+            .bind(&restarted.authority.identity.run_id)
+            .execute(restarted.db.pool())
+            .await
+            .expect("persist normal Codex thread");
     assert_eq!(updated.rows_affected(), 1);
     let mut settings = restarted
         .db
@@ -94,7 +95,9 @@ async fn prepare_restarted_executor() -> RestartedExecutor {
     let request = fixture.request.clone();
     let temp = fixture._temp;
     drop(fixture.db);
-    let db = AsyncDaemonDb::connect(&path).await.expect("restart executor DB");
+    let db = AsyncDaemonDb::connect(&path)
+        .await
+        .expect("restart executor DB");
     let scan = db
         .scan_task_board_remote_executor_assignments()
         .await
@@ -105,7 +108,10 @@ async fn prepare_restarted_executor() -> RestartedExecutor {
         .await
         .expect("reload token assignment")
         .expect("token assignment");
-    assert_eq!(executor_start_authority(&reloaded).unwrap(), Some(authority.clone()));
+    assert_eq!(
+        executor_start_authority(&reloaded).unwrap(),
+        Some(authority.clone())
+    );
     RestartedExecutor {
         db,
         _temp: temp,

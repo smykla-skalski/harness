@@ -3,8 +3,8 @@ use sqlx::{query, query_scalar};
 use super::remote_assignment_active_fence::record_controller_reassignment_handoff_in_tx;
 use super::remote_assignment_model::{insert_assignment_in_tx, load_assignment_in_tx};
 use super::remote_assignment_test_support::{
-    CLAIMED_AT, DEADLINE, HOST, INSTANCE, LEASE_EXPIRES, NOW, PRINCIPAL, SOURCE_REVISION,
-    ExecutorFixture, accept_executor, claim_request, executor_fixture,
+    CLAIMED_AT, DEADLINE, ExecutorFixture, HOST, INSTANCE, LEASE_EXPIRES, NOW, PRINCIPAL,
+    SOURCE_REVISION, accept_executor, claim_request, executor_fixture,
 };
 use super::remote_outbound_source_tests::{
     enable_implementation, snapshot_offer, source_recovery_owns,
@@ -182,13 +182,8 @@ async fn remote_reassigned_predecessor_prunes_only_after_exact_successor_handoff
     persist_predecessor(&prepared, &predecessor_offer, &content).await;
     let successor_offer =
         persist_exact_successor_handoff(&prepared, &predecessor_offer, &content).await;
-    assert_reassigned_source_retention(
-        &prepared,
-        &predecessor_offer,
-        &successor_offer,
-        &content,
-    )
-    .await;
+    assert_reassigned_source_retention(&prepared, &predecessor_offer, &successor_offer, &content)
+        .await;
 }
 
 async fn persist_predecessor(
@@ -225,10 +220,11 @@ async fn persist_exact_successor_handoff(
         .begin_immediate_transaction("test exact remote reassignment handoff")
         .await
         .expect("begin remote reassignment");
-    let predecessor = load_assignment_in_tx(&mut transaction, &predecessor_offer.binding.assignment_id)
-        .await
-        .expect("load predecessor")
-        .expect("predecessor exists");
+    let predecessor =
+        load_assignment_in_tx(&mut transaction, &predecessor_offer.binding.assignment_id)
+            .await
+            .expect("load predecessor")
+            .expect("predecessor exists");
     let parent = load_execution_in_tx(&mut transaction, &prepared.execution_id)
         .await
         .expect("load predecessor parent")
@@ -260,7 +256,10 @@ async fn persist_exact_successor_handoff(
         &successor_parent,
     )
     .await;
-    transaction.commit().await.expect("commit remote reassignment");
+    transaction
+        .commit()
+        .await
+        .expect("commit remote reassignment");
     successor_offer
 }
 

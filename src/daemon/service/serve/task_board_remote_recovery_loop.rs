@@ -158,13 +158,8 @@ async fn maintain_remote_recovery_after_controller(
             (true, true)
         }
     };
-    maintain_remote_recovery_after_coverage(
-        db,
-        schedule,
-        controller_incomplete,
-        controller_retry,
-    )
-    .await;
+    maintain_remote_recovery_after_coverage(db, schedule, controller_incomplete, controller_retry)
+        .await;
 }
 
 async fn maintain_remote_recovery_after_coverage(

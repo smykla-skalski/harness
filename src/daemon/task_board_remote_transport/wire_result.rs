@@ -52,11 +52,8 @@ impl RemoteTypedResult {
             return Err(RemoteWireError::DigestMismatch("result_sha256"));
         }
         if self.offer_request_sha256 != expected_offer_request_sha256
-            || validate_task_board_local_attempt_result(
-                &self.result,
-                &result_expectation(binding)?,
-            )
-            .is_err()
+            || validate_task_board_local_attempt_result(&self.result, &result_expectation(binding)?)
+                .is_err()
         {
             return Err(RemoteWireError::ResultBindingMismatch);
         }
@@ -132,10 +129,7 @@ fn action_cycle(action_key: &str, prefix: &str) -> Result<u32, RemoteWireError> 
         .ok_or(RemoteWireError::ResultBindingMismatch)
 }
 
-fn action_suffix<'a>(
-    action_key: &'a str,
-    prefix: &str,
-) -> Result<&'a str, RemoteWireError> {
+fn action_suffix<'a>(action_key: &'a str, prefix: &str) -> Result<&'a str, RemoteWireError> {
     action_key
         .strip_prefix(prefix)
         .filter(|suffix| !suffix.is_empty())

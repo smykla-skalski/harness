@@ -50,7 +50,8 @@ impl AsyncDaemonDb {
         .await?;
         persist_renewal_response(&mut transaction, &record, request, response, recorded_at).await?;
         if window.settlement_only {
-            return finish_mutation(transaction, &record.assignment_id, "late renewal replay").await;
+            return finish_mutation(transaction, &record.assignment_id, "late renewal replay")
+                .await;
         }
         if recorded >= window.current_expiry
             || recorded >= renewed_expiry
@@ -114,12 +115,7 @@ fn replay_window(
         && response.lease.lease_id != request.lease_id
         && renewed_expiry > current_expiry
         && renewed_expiry <= deadline
-        && mutation_binding_matches(
-            record,
-            &request.binding,
-            principal,
-            &request.lease_id,
-        );
+        && mutation_binding_matches(record, &request.binding, principal, &request.lease_id);
     if !exact {
         return Err(concurrent(
             "pending remote renewal replay response is stale",

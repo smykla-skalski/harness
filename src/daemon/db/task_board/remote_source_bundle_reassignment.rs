@@ -8,13 +8,13 @@ mod storage;
 
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
+use super::remote_assignment_active_fence::record_controller_reassignment_handoff_in_tx;
 use super::remote_assignment_archival_fence::require_no_archival_collision_in_tx;
+use super::remote_assignment_authority_settlement::clear_offer_io_authority_in_tx;
 use super::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, TaskBoardRemoteOfferOutcome, canonical_time, concurrent,
     insert_assignment_in_tx, load_assignment_in_tx, nonblank,
 };
-use super::remote_assignment_active_fence::record_controller_reassignment_handoff_in_tx;
-use super::remote_assignment_authority_settlement::clear_offer_io_authority_in_tx;
 use super::remote_lifecycle_trust::{
     TaskBoardRemoteLifecycleTrustSnapshot, capture_lifecycle_trust_for_offer_in_tx,
 };
@@ -37,8 +37,8 @@ use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE, TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TASK_BOARD_REMOTE_OFFER_IO_AUTHORITY_RESOURCE,
     TaskBoardAttemptState, TaskBoardExecutionAttemptCas, TaskBoardExecutionState,
-    TaskBoardRemoteAssignmentState, TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
-    validate_task_board_remote_target_reassignment,
+    TaskBoardRemoteAssignmentState, TaskBoardWorkflowExecutionCas,
+    TaskBoardWorkflowExecutionRecord, validate_task_board_remote_target_reassignment,
 };
 use replay::replayed_replacement_in_tx;
 use storage::{require_no_replacement_collision_in_tx, supersede_predecessor_in_tx};
@@ -118,32 +118,35 @@ impl AsyncDaemonDb {
         .await?
         {
             transaction.commit().await.map_err(|error| {
-                db_error(format!("commit replayed source offer reassignment: {error}"))
+                db_error(format!(
+                    "commit replayed source offer reassignment: {error}"
+                ))
             })?;
             return Ok(TaskBoardRemoteOfferOutcome::Replayed(replayed));
         }
-        let parent = exact_parent_in_tx(
-            &mut transaction,
-            expected_execution,
-            expected_attempt,
-        )
-        .await?;
-        let predecessor = exact_predecessor_in_tx(
-            &mut transaction,
-            evidence,
-            authenticated_principal,
-            trust,
-        )
-        .await?;
         let parent =
-            settle_predecessor_offer_authority_in_tx(&mut transaction, &predecessor, &parent, offered_at)
+            exact_parent_in_tx(&mut transaction, expected_execution, expected_attempt).await?;
+        let predecessor =
+            exact_predecessor_in_tx(&mut transaction, evidence, authenticated_principal, trust)
                 .await?;
+        let parent = settle_predecessor_offer_authority_in_tx(
+            &mut transaction,
+            &predecessor,
+            &parent,
+            offered_at,
+        )
+        .await?;
         let source_content =
             exact_outbound_source_content_in_tx(&mut transaction, predecessor.require_offer()?)
                 .await?;
-        validate_replacement(&parent, &predecessor, expected_execution, replacement, trust)?;
-        require_no_replacement_collision_in_tx(&mut transaction, &predecessor, replacement)
-            .await?;
+        validate_replacement(
+            &parent,
+            &predecessor,
+            expected_execution,
+            replacement,
+            trust,
+        )?;
+        require_no_replacement_collision_in_tx(&mut transaction, &predecessor, replacement).await?;
         let lifecycle_trust =
             capture_lifecycle_trust_for_offer_in_tx(&mut transaction, replacement).await?;
         let created = persist_reassigned_offer_in_tx(
@@ -199,13 +202,8 @@ async fn persist_reassigned_offer_in_tx(
         Some(lifecycle_trust),
     )
     .await?;
-    persist_outbound_source_in_tx(
-        transaction,
-        replacement,
-        Some(source_content),
-        offered_at,
-    )
-    .await?;
+    persist_outbound_source_in_tx(transaction, replacement, Some(source_content), offered_at)
+        .await?;
     let created = load_assignment_in_tx(transaction, &replacement.binding.assignment_id)
         .await?
         .ok_or_else(|| db_error("replacement remote source offer disappeared"))?;
@@ -260,14 +258,8 @@ async fn exact_predecessor_in_tx(
         .await?
         .ok_or_else(|| concurrent("source reassignment predecessor disappeared"))?;
     require_preclaim_predecessor(&predecessor, offer, principal)?;
-    require_reassignment_evidence_in_tx(
-        transaction,
-        &predecessor,
-        evidence,
-        principal,
-        trust,
-    )
-    .await?;
+    require_reassignment_evidence_in_tx(transaction, &predecessor, evidence, principal, trust)
+        .await?;
     Ok(predecessor)
 }
 

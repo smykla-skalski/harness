@@ -90,11 +90,9 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board remote operation trust completion")
             .await?;
-        let assignment = super::remote_assignment_lease::require_assignment(
-            &mut transaction,
-            assignment_id,
-        )
-        .await?;
+        let assignment =
+            super::remote_assignment_lease::require_assignment(&mut transaction, assignment_id)
+                .await?;
         consume_controller_operation_trust_in_tx(
             &mut transaction,
             &assignment,
@@ -121,24 +119,18 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board lifecycle operation trust")
             .await?;
-        let assignment = super::remote_assignment_lease::require_assignment(
-            &mut transaction,
-            assignment_id,
-        )
-        .await?;
+        let assignment =
+            super::remote_assignment_lease::require_assignment(&mut transaction, assignment_id)
+                .await?;
         let generation = load_generation_lifecycle_trust_in_tx(
             &mut transaction,
             assignment_id,
             assignment.fencing_epoch,
         )
         .await?;
-        let fence = load_operation_fence_for_kind_in_tx(
-            &mut transaction,
-            &assignment,
-            kind,
-            &generation,
-        )
-        .await?;
+        let fence =
+            load_operation_fence_for_kind_in_tx(&mut transaction, &assignment, kind, &generation)
+                .await?;
         transaction
             .commit()
             .await
@@ -147,9 +139,7 @@ impl AsyncDaemonDb {
     }
 }
 
-pub(super) fn has_controller_operation_trust(
-    assignment: &TaskBoardRemoteAssignmentRecord,
-) -> bool {
+pub(super) fn has_controller_operation_trust(assignment: &TaskBoardRemoteAssignmentRecord) -> bool {
     assignment.controller_operation.is_some()
 }
 
@@ -231,15 +221,17 @@ pub(super) async fn consume_successor_recovery_operation_trust_in_tx(
 ) -> Result<(), CliError> {
     require_operation_fence_in_tx(transaction, current, false).await?;
     require_sha256(request_sha256, "successor recovery request digest")?;
-    let operation = assignment.controller_operation.as_ref().ok_or_else(|| {
-        concurrent("successor recovery lost its predecessor operation token")
-    })?;
+    let operation = assignment
+        .controller_operation
+        .as_ref()
+        .ok_or_else(|| concurrent("successor recovery lost its predecessor operation token"))?;
     let operation_fence = operation.fence.as_ref().ok_or_else(|| {
         concurrent("successor recovery operation has no immutable lifecycle fence")
     })?;
-    let predecessor = assignment.target_host_instance_id.as_deref().ok_or_else(|| {
-        concurrent("successor recovery predecessor instance is missing")
-    })?;
+    let predecessor = assignment
+        .target_host_instance_id
+        .as_deref()
+        .ok_or_else(|| concurrent("successor recovery predecessor instance is missing"))?;
     operation_fence.require_generation_binding(
         &assignment.host_id,
         assignment.configuration_revision,
@@ -310,7 +302,9 @@ fn require_sha256(value: &str, context: &str) -> Result<(), CliError> {
     {
         Ok(())
     } else {
-        Err(db_error(format!("{context} is not canonical lowercase SHA-256")))
+        Err(db_error(format!(
+            "{context} is not canonical lowercase SHA-256"
+        )))
     }
 }
 

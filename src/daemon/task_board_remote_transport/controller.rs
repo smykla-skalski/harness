@@ -245,11 +245,7 @@ impl RemoteExecutionControllerClient {
             )
             .await?;
         if !db
-            .claim_task_board_remote_status_io_authority_fenced(
-                request,
-                &self.host_id,
-                &trust,
-            )
+            .claim_task_board_remote_status_io_authority_fenced(request, &self.host_id, &trust)
             .await?
         {
             return Err(binding_error("remote status lost its assignment authority").into());

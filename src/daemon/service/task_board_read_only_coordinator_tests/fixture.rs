@@ -4,9 +4,9 @@ use crate::daemon::db::{AsyncDaemonDb, workflow_owner};
 use crate::task_board::{
     AgentMode, ExternalRef, ExternalRefProvider, TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE,
     TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE, TASK_BOARD_EXECUTION_TARGET_RESOURCE,
-    TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardAttemptState, TaskBoardExecutionAttemptRecord,
-    TaskBoardExecutionOwnership, TaskBoardExecutionPhase, TaskBoardExecutionState,
-    TaskBoardFailureClass, TaskBoardItem, TaskBoardOrchestratorSettings,
+    TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardAttemptState,
+    TaskBoardExecutionAttemptRecord, TaskBoardExecutionOwnership, TaskBoardExecutionPhase,
+    TaskBoardExecutionState, TaskBoardFailureClass, TaskBoardItem, TaskBoardOrchestratorSettings,
     TaskBoardPullRequestIdentity, TaskBoardReadOnlyRunContext, TaskBoardWorkflowExecutionArtifacts,
     TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind, TaskBoardWorkflowSnapshot,
     TaskBoardWorkflowStatus, TaskBoardWorkflowTransitionState,
@@ -177,12 +177,8 @@ async fn seed_execution_in_database(
         .await
         .expect("load settings snapshot");
     let pull_request = pull_request(workflow_kind);
-    let resources = seeded_execution_resources(
-        &execution_id,
-        phase,
-        attempt.as_ref(),
-        &resolved_reviewers,
-    );
+    let resources =
+        seeded_execution_resources(&execution_id, phase, attempt.as_ref(), &resolved_reviewers);
     let execution = TaskBoardWorkflowExecutionRecord {
         execution_id: execution_id.clone(),
         item_id: item_id.clone(),
@@ -260,7 +256,10 @@ fn seeded_execution_resources(
             TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE.into(),
             format!("review:{}", resolved_reviewers.profiles[0].id),
         );
-        resources.insert(TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE.into(), "1".into());
+        resources.insert(
+            TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE.into(),
+            "1".into(),
+        );
     }
     resources
 }

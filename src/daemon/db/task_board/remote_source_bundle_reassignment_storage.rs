@@ -1,8 +1,6 @@
 use sqlx::{Sqlite, Transaction, query, query_scalar};
 
-use super::super::remote_assignment_model::{
-    TaskBoardRemoteAssignmentRecord, concurrent, to_i64,
-};
+use super::super::remote_assignment_model::{TaskBoardRemoteAssignmentRecord, concurrent, to_i64};
 use crate::daemon::db::{CliError, db_error};
 use crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest;
 
@@ -86,7 +84,9 @@ pub(super) async fn require_no_replacement_collision_in_tx(
     .await
     .map_err(|error| db_error(format!("check replacement source collision: {error}")))?;
     if collision {
-        Err(concurrent("replacement source offer conflicts with durable state"))
+        Err(concurrent(
+            "replacement source offer conflicts with durable state",
+        ))
     } else {
         Ok(())
     }

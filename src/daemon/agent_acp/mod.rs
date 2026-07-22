@@ -68,9 +68,8 @@ mod spawn_credential;
 pub use harness_protocol::managed_agents::acp::{
     AcpAgentHandshake, AcpAgentInspectResponse, AcpAgentInspectSnapshot, AcpAgentSessionState,
     AcpAgentSnapshot, AcpAgentStartRequest, AcpEndpoint, AcpMcpEnvVariable, AcpMcpHttpHeader,
-    AcpMcpServer,
-    AcpPermissionBatch, AcpPermissionDecision, AcpPermissionItem, AcpPermissionOption,
-    AcpSessionConfigOptionState, AcpSessionListPage, AcpSessionSummary,
+    AcpMcpServer, AcpPermissionBatch, AcpPermissionDecision, AcpPermissionItem,
+    AcpPermissionOption, AcpSessionConfigOptionState, AcpSessionListPage, AcpSessionSummary,
 };
 #[cfg(feature = "daemon-runtime")]
 pub use manager::AcpWakePrompt;

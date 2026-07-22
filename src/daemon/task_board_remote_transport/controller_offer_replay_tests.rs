@@ -109,14 +109,9 @@ async fn persist_renewal(
             .expect("claim lease renewal authority")
             .is_some()
     );
-    db.record_task_board_remote_assignment_lease_renewal(
-        renewal,
-        response,
-        HOST_ID,
-        &utc_now(),
-    )
-    .await
-    .expect("persist renewal response");
+    db.record_task_board_remote_assignment_lease_renewal(renewal, response, HOST_ID, &utc_now())
+        .await
+        .expect("persist renewal response");
 }
 
 #[tokio::test]

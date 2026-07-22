@@ -15,7 +15,7 @@ use super::remote_operation_trust::{
 use super::workflow_executions::{load_execution_in_tx, update_execution_in_tx};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::task_board_remote_transport::wire::{
-    RemoteCancelRequest, RemoteAttemptBinding, RemoteLeaseRenewRequest,
+    RemoteAttemptBinding, RemoteCancelRequest, RemoteLeaseRenewRequest,
 };
 #[cfg(test)]
 use crate::daemon::task_board_remote_transport::wire::{RemoteClaimRequest, RemoteOfferRequest};
@@ -23,9 +23,9 @@ use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE, TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TASK_BOARD_REMOTE_CANCEL_IO_AUTHORITY_RESOURCE,
     TASK_BOARD_REMOTE_CLAIM_IO_AUTHORITY_RESOURCE, TASK_BOARD_REMOTE_OFFER_IO_AUTHORITY_RESOURCE,
-    TASK_BOARD_REMOTE_RENEW_IO_AUTHORITY_RESOURCE, TaskBoardAttemptState, TaskBoardExecutionState,
-    TASK_BOARD_REMOTE_RESULT_IMPORT_AUTHORITY_RESOURCE, TaskBoardRemoteAssignmentState,
-    TaskBoardWorkflowExecutionCas,
+    TASK_BOARD_REMOTE_RENEW_IO_AUTHORITY_RESOURCE,
+    TASK_BOARD_REMOTE_RESULT_IMPORT_AUTHORITY_RESOURCE, TaskBoardAttemptState,
+    TaskBoardExecutionState, TaskBoardRemoteAssignmentState, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionRecord, validate_task_board_workflow_execution,
 };
 
@@ -211,7 +211,10 @@ impl AsyncDaemonDb {
         )
         .await?;
         journal_cancel_claim_in_tx(
-            &mut transaction, &binding.assignment_id, cancel_request, authority_at,
+            &mut transaction,
+            &binding.assignment_id,
+            cancel_request,
+            authority_at,
         )
         .await?;
         let resource = authority_resource(kind);

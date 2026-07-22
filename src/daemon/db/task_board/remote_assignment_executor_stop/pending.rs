@@ -57,7 +57,9 @@ pub(in super::super) fn decode_executor_stop_pending(
         _ => return Err(db_error("remote executor stop authority is incomplete")),
     };
     if json.len() > MAX_STOP_PENDING_BYTES {
-        return Err(db_error("remote executor stop authority exceeds its size limit"));
+        return Err(db_error(
+            "remote executor stop authority exceeds its size limit",
+        ));
     }
     let mut pending = serde_json::from_str::<TaskBoardRemoteExecutorStopPending>(&json)
         .map_err(|error| db_error(format!("decode remote executor stop authority: {error}")))?;
@@ -99,7 +101,10 @@ pub(super) fn stop_pending(
             .ok_or_else(|| db_error("remote executor stop has no claim receipt"))?
             .sha256
             .clone(),
-        start_receipt_sha256: record.start_receipt.as_ref().map(|receipt| receipt.sha256.clone()),
+        start_receipt_sha256: record
+            .start_receipt
+            .as_ref()
+            .map(|receipt| receipt.sha256.clone()),
         authority_kind: authority.kind(),
         authority_sha256: authority.sha256().into(),
         authority_acquired_at: authority.acquired_at().into(),
@@ -139,8 +144,10 @@ fn validate_stop_pending(
                 .as_ref()
                 .ok_or_else(|| db_error("remote executor stop has no claim receipt"))?
                 .sha256
-        || pending.executor_configuration_revision != record.executor_configuration_revision
-            .ok_or_else(|| db_error("remote executor stop has no executor revision"))?
+        || pending.executor_configuration_revision
+            != record
+                .executor_configuration_revision
+                .ok_or_else(|| db_error("remote executor stop has no executor revision"))?
         || pending.executor_checkout_path != required(&record.executor_checkout_path, "checkout")?
         || pending.source != offer.source
         || pending.session_id != identity.session_id
@@ -160,7 +167,10 @@ fn validate_stop_pending(
             "remote executor stop authority contradicts mutation authority",
         ));
     }
-    nonblank(&pending.project_dir, "remote executor stop project directory")?;
+    nonblank(
+        &pending.project_dir,
+        "remote executor stop project directory",
+    )?;
     if pending.observed_launch_sha256.len() != 64
         || pending
             .observed_launch_sha256
@@ -171,7 +181,10 @@ fn validate_stop_pending(
             "remote executor stop observed launch digest is invalid",
         ));
     }
-    canonical_time(&pending.run_started_at, "remote executor stop run start time")?;
+    canonical_time(
+        &pending.run_started_at,
+        "remote executor stop run start time",
+    )?;
     let authority_at = canonical_time(
         &pending.authority_acquired_at,
         "remote executor stop source authority time",
@@ -179,7 +192,9 @@ fn validate_stop_pending(
     let acquired_at = canonical_time(&pending.acquired_at, "remote executor stop authority time")?;
     let run_started_at = canonical_time(&pending.run_started_at, "remote executor run start time")?;
     if acquired_at < authority_at || acquired_at < run_started_at {
-        return Err(db_error("remote executor stop authority chronology is invalid"));
+        return Err(db_error(
+            "remote executor stop authority chronology is invalid",
+        ));
     }
     if stop_pending_digest(pending)? != pending.sha256 && !pending.sha256.is_empty() {
         return Err(db_error("remote executor stop authority digest mismatched"));
@@ -194,7 +209,9 @@ fn stop_source_from_record(
     match pending.authority_kind {
         StopAuthorityKind::Start => {
             if pending.start_receipt_sha256.is_some() {
-                return Err(db_error("start stop authority unexpectedly has a start receipt"));
+                return Err(db_error(
+                    "start stop authority unexpectedly has a start receipt",
+                ));
             }
             executor_start_io_permit(record)?
                 .map(TaskBoardRemoteExecutorStopAuthority::Start)
@@ -221,7 +238,9 @@ fn stop_source_from_record(
                 .as_ref()
                 .ok_or_else(|| db_error("lifecycle stop authority has no start receipt"))?;
             if pending.start_receipt_sha256.as_deref() != Some(receipt.sha256.as_str()) {
-                return Err(db_error("lifecycle stop authority start receipt mismatched"));
+                return Err(db_error(
+                    "lifecycle stop authority start receipt mismatched",
+                ));
             }
             record
                 .executor_lifecycle_owner
@@ -251,7 +270,9 @@ pub(super) fn stop_pending_values(
 ) -> Result<(String, String), CliError> {
     let json = canonical_json(pending)?;
     if json.len() > MAX_STOP_PENDING_BYTES {
-        return Err(db_error("remote executor stop authority exceeds its size limit"));
+        return Err(db_error(
+            "remote executor stop authority exceeds its size limit",
+        ));
     }
     Ok((json, pending.sha256.clone()))
 }

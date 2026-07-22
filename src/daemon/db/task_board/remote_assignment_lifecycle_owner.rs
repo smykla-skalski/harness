@@ -131,19 +131,14 @@ pub(super) fn decode_executor_lifecycle_owner(
     expires_at: Option<String>,
     sha256: Option<String>,
 ) -> Result<Option<TaskBoardRemoteExecutorLifecycleOwner>, CliError> {
-    let (instance_id, owner_epoch, acquired_at, expires_at, sha256) = match (
-        instance_id,
-        owner_epoch,
-        acquired_at,
-        expires_at,
-        sha256,
-    ) {
-        (None, None, None, None, None) => return Ok(None),
-        (Some(instance), Some(epoch), Some(acquired), Some(expires), Some(sha)) => {
-            (instance, epoch, acquired, expires, sha)
-        }
-        _ => return Err(db_error("remote executor lifecycle owner is incomplete")),
-    };
+    let (instance_id, owner_epoch, acquired_at, expires_at, sha256) =
+        match (instance_id, owner_epoch, acquired_at, expires_at, sha256) {
+            (None, None, None, None, None) => return Ok(None),
+            (Some(instance), Some(epoch), Some(acquired), Some(expires), Some(sha)) => {
+                (instance, epoch, acquired, expires, sha)
+            }
+            _ => return Err(db_error("remote executor lifecycle owner is incomplete")),
+        };
     nonblank(&instance_id, "remote lifecycle owner instance")?;
     let owner_epoch = u64::try_from(owner_epoch)
         .ok()
@@ -152,15 +147,12 @@ pub(super) fn decode_executor_lifecycle_owner(
     let acquired = canonical_time(&acquired_at, "remote lifecycle owner acquisition time")?;
     let expires = canonical_time(&expires_at, "remote lifecycle owner expiry")?;
     if acquired >= expires {
-        return Err(db_error("remote lifecycle owner expiry is not after acquisition"));
+        return Err(db_error(
+            "remote lifecycle owner expiry is not after acquisition",
+        ));
     }
-    let expected = lifecycle_owner_digest(
-        record,
-        &instance_id,
-        owner_epoch,
-        &acquired_at,
-        &expires_at,
-    )?;
+    let expected =
+        lifecycle_owner_digest(record, &instance_id, owner_epoch, &acquired_at, &expires_at)?;
     if sha256 != expected {
         return Err(db_error(
             "remote executor lifecycle owner contradicts durable assignment evidence",

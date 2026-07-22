@@ -285,7 +285,10 @@ async fn disabled_is_rejected_as_an_observed_state_without_mutation() {
         .expect_err("operator-disabled state cannot be written as an observation");
 
     assert!(error.to_string().contains("cannot be observed"));
-    assert_eq!(observed_evidence(&db, "controller-a").await, (None, None, None));
+    assert_eq!(
+        observed_evidence(&db, "controller-a").await,
+        (None, None, None)
+    );
 }
 
 fn local_executor(host_id: &str) -> TaskBoardLocalExecutionHostConfig {

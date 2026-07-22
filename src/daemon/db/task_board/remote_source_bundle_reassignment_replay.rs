@@ -22,12 +22,10 @@ pub(super) async fn replayed_replacement_in_tx(
     match existing {
         None => Ok(None),
         Some(existing) if exact_offer_replay(&existing, replacement, principal) => {
-            let predecessor = load_assignment_in_tx(
-                transaction,
-                &evidence.offer().binding.assignment_id,
-            )
-            .await?
-            .ok_or_else(|| concurrent("replayed source predecessor disappeared"))?;
+            let predecessor =
+                load_assignment_in_tx(transaction, &evidence.offer().binding.assignment_id)
+                    .await?
+                    .ok_or_else(|| concurrent("replayed source predecessor disappeared"))?;
             require_reassignment_evidence_in_tx(
                 transaction,
                 &predecessor,

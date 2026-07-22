@@ -137,7 +137,10 @@ fn classified(result: std::io::Result<(ExitStatus, bool)>) -> ClassifiedChildOut
     ClassifiedChildOutcome { result }
 }
 
-pub(super) fn writer_failure_is_primary(failure: &WriterFailure, child_status_obtained: bool) -> bool {
+pub(super) fn writer_failure_is_primary(
+    failure: &WriterFailure,
+    child_status_obtained: bool,
+) -> bool {
     failure.error.kind() != std::io::ErrorKind::BrokenPipe || !child_status_obtained
 }
 

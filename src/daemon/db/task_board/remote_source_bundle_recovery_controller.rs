@@ -4,8 +4,7 @@ use super::remote_assignment_lease::require_assignment;
 use super::remote_assignment_model::{concurrent, nonblank};
 use super::remote_operation_trust::{
     TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence,
-    consume_controller_operation_trust_in_tx,
-    consume_successor_recovery_operation_trust_in_tx,
+    consume_controller_operation_trust_in_tx, consume_successor_recovery_operation_trust_in_tx,
     require_source_recovery_operation_fence_in_tx,
 };
 use super::remote_source_bundle_abandonment::{
@@ -13,16 +12,14 @@ use super::remote_source_bundle_abandonment::{
     load_abandonment_collisions_in_tx, load_abandonment_in_tx,
 };
 use super::remote_source_bundles::{
-    TaskBoardRemoteSourceBundle, insert_source_bundle_in_tx,
-    load_source_bundle_collisions_in_tx, load_source_bundle_in_tx,
+    TaskBoardRemoteSourceBundle, insert_source_bundle_in_tx, load_source_bundle_collisions_in_tx,
+    load_source_bundle_in_tx,
 };
-use crate::daemon::db::{
-    AsyncDaemonDb, CliError, TaskBoardRemoteOfferOutcome, db_error,
-};
+use crate::daemon::db::{AsyncDaemonDb, CliError, TaskBoardRemoteOfferOutcome, db_error};
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteOfferRequest, RemoteOfferResponse, RemoteSourceBundleAbandonRequest,
-    RemoteSourceBundleAbandonResponse,
-    RemoteSourceBundleReceiptVerificationResponse, RemoteSourceBundleUploadRequest,
+    RemoteSourceBundleAbandonResponse, RemoteSourceBundleReceiptVerificationResponse,
+    RemoteSourceBundleUploadRequest,
 };
 use crate::task_board::{TaskBoardExecutionAttemptCas, TaskBoardWorkflowExecutionCas};
 
@@ -47,13 +44,10 @@ impl AsyncDaemonDb {
             .begin_immediate_transaction("task board verified source upload receipt")
             .await?;
         require_source_recovery_operation_fence_in_tx(&mut transaction, trust).await?;
-        let collisions = load_source_bundle_collisions_in_tx(&mut transaction, &request.offer)
-            .await?;
-        if let Some(existing) = exact_source_receipt(
-            collisions,
-            request,
-            authenticated_principal,
-        )? {
+        let collisions =
+            load_source_bundle_collisions_in_tx(&mut transaction, &request.offer).await?;
+        if let Some(existing) = exact_source_receipt(collisions, request, authenticated_principal)?
+        {
             if verification.receipt.as_ref() != Some(&existing.response) {
                 return Err(concurrent(
                     "verified source receipt changed from controller evidence",
@@ -74,11 +68,8 @@ impl AsyncDaemonDb {
             })?;
             return Ok(Some(existing));
         }
-        let assignment = require_assignment(
-            &mut transaction,
-            &request.offer.binding.assignment_id,
-        )
-        .await?;
+        let assignment =
+            require_assignment(&mut transaction, &request.offer.binding.assignment_id).await?;
         super::remote_source_bundle_controller::require_upload_assignment(
             &assignment,
             request,
@@ -92,13 +83,8 @@ impl AsyncDaemonDb {
             return Ok(None);
         };
         consume_upload_operation(&mut transaction, &assignment, request, trust).await?;
-        insert_source_bundle_in_tx(
-            &mut transaction,
-            request,
-            authenticated_principal,
-            response,
-        )
-        .await?;
+        insert_source_bundle_in_tx(&mut transaction, request, authenticated_principal, response)
+            .await?;
         bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
         let stored = load_source_bundle_in_tx(
             &mut transaction,
@@ -134,11 +120,7 @@ impl AsyncDaemonDb {
             &request.upload_request_sha256,
         )
         .await?;
-        if let Some(existing) = exact_abandonment(
-            collisions,
-            request,
-            authenticated_principal,
-        )? {
+        if let Some(existing) = exact_abandonment(collisions, request, authenticated_principal)? {
             if existing.response != *response {
                 return Err(concurrent(
                     "source abandonment response changed after immutable storage",
@@ -155,7 +137,9 @@ impl AsyncDaemonDb {
                 bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
             }
             transaction.commit().await.map_err(|error| {
-                db_error(format!("commit replayed source abandonment response: {error}"))
+                db_error(format!(
+                    "commit replayed source abandonment response: {error}"
+                ))
             })?;
             return Ok(existing);
         }
@@ -167,11 +151,8 @@ impl AsyncDaemonDb {
                 "source abandonment conflicts with an immutable upload receipt",
             ));
         }
-        let assignment = require_assignment(
-            &mut transaction,
-            &request.offer.binding.assignment_id,
-        )
-        .await?;
+        let assignment =
+            require_assignment(&mut transaction, &request.offer.binding.assignment_id).await?;
         super::remote_source_bundle_controller::require_upload_assignment_without_content(
             &assignment,
             &request.offer,
@@ -179,13 +160,8 @@ impl AsyncDaemonDb {
         )?;
         require_upload_operation_for_abandonment(&assignment, request)?;
         consume_abandonment_operation(&mut transaction, &assignment, request, trust).await?;
-        insert_abandonment_in_tx(
-            &mut transaction,
-            request,
-            authenticated_principal,
-            response,
-        )
-        .await?;
+        insert_abandonment_in_tx(&mut transaction, request, authenticated_principal, response)
+            .await?;
         bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
         let stored = load_abandonment_in_tx(
             &mut transaction,
@@ -194,9 +170,10 @@ impl AsyncDaemonDb {
         )
         .await?
         .ok_or_else(|| db_error("persisted controller source abandonment disappeared"))?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit controller source abandonment: {error}"))
-        })?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit controller source abandonment: {error}")))?;
         Ok(stored)
     }
 
@@ -252,9 +229,7 @@ fn exact_abandonment(
 ) -> Result<Option<TaskBoardRemoteSourceBundleAbandonment>, CliError> {
     match collisions.as_slice() {
         [] => Ok(None),
-        [stored] if stored.is_exact_replay(request, principal) => {
-            Ok(Some(stored.clone()))
-        }
+        [stored] if stored.is_exact_replay(request, principal) => Ok(Some(stored.clone())),
         _ => Err(concurrent(
             "source abandonment identity or generation conflicts",
         )),
@@ -265,10 +240,13 @@ fn require_upload_operation(
     assignment: &super::TaskBoardRemoteAssignmentRecord,
     request: &RemoteSourceBundleUploadRequest,
 ) -> Result<(), CliError> {
-    let exact = assignment.controller_operation.as_ref().is_some_and(|operation| {
-        operation.kind == TaskBoardRemoteOperationKind::UploadSourceBundle.as_str()
-            && operation.request_sha256 == request.request_sha256
-    });
+    let exact = assignment
+        .controller_operation
+        .as_ref()
+        .is_some_and(|operation| {
+            operation.kind == TaskBoardRemoteOperationKind::UploadSourceBundle.as_str()
+                && operation.request_sha256 == request.request_sha256
+        });
     if exact {
         Ok(())
     } else {
@@ -282,10 +260,13 @@ fn require_upload_operation_for_abandonment(
     assignment: &super::TaskBoardRemoteAssignmentRecord,
     request: &RemoteSourceBundleAbandonRequest,
 ) -> Result<(), CliError> {
-    let exact = assignment.controller_operation.as_ref().is_some_and(|operation| {
-        operation.kind == TaskBoardRemoteOperationKind::UploadSourceBundle.as_str()
-            && operation.request_sha256 == request.upload_request_sha256
-    });
+    let exact = assignment
+        .controller_operation
+        .as_ref()
+        .is_some_and(|operation| {
+            operation.kind == TaskBoardRemoteOperationKind::UploadSourceBundle.as_str()
+                && operation.request_sha256 == request.upload_request_sha256
+        });
     if exact {
         Ok(())
     } else {

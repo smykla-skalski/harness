@@ -67,7 +67,14 @@ async fn settled_unknown_cleanup_releases_capacity_and_survives_restart() {
                 .expect("cleaned assignment");
             assert_eq!(active_count(&fixture).await, 0);
             assert!(cleaned.cleanup_completed_at.is_some());
-            assert!(fixture.db.codex_run(&identity.run_id).await.unwrap().is_none());
+            assert!(
+                fixture
+                    .db
+                    .codex_run(&identity.run_id)
+                    .await
+                    .unwrap()
+                    .is_none()
+            );
             assert!(
                 fixture
                     .db
@@ -123,11 +130,7 @@ async fn mark_and_settle_unknown(
     let settlement = unknown_settlement(&unknown);
     fixture
         .db
-        .settle_task_board_remote_assignment(
-            &settlement,
-            REMOTE_EXECUTOR_PRINCIPAL,
-            SETTLED_AT,
-        )
+        .settle_task_board_remote_assignment(&settlement, REMOTE_EXECUTOR_PRINCIPAL, SETTLED_AT)
         .await
         .expect("persist immutable settlement receipt");
     unknown
@@ -403,13 +406,11 @@ pub(super) async fn active_count(fixture: &RemoteExecutorFixture) -> u32 {
 }
 
 async fn artifact_count(fixture: &RemoteExecutorFixture, assignment_id: &str) -> i64 {
-    query_scalar(
-        "SELECT COUNT(*) FROM task_board_remote_artifacts WHERE assignment_id = ?1",
-    )
-    .bind(assignment_id)
-    .fetch_one(fixture.db.pool())
-    .await
-    .expect("count retained remote artifacts")
+    query_scalar("SELECT COUNT(*) FROM task_board_remote_artifacts WHERE assignment_id = ?1")
+        .bind(assignment_id)
+        .fetch_one(fixture.db.pool())
+        .await
+        .expect("count retained remote artifacts")
 }
 
 pub(super) fn git_repository(root: &Path) -> (PathBuf, String) {

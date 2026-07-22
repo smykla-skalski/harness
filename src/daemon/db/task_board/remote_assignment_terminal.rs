@@ -15,8 +15,7 @@ use super::remote_offer_receipts::{
 };
 use super::remote_operation_trust::{
     TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence,
-    consume_controller_operation_trust_in_tx,
-    consume_successor_recovery_operation_trust_in_tx,
+    consume_controller_operation_trust_in_tx, consume_successor_recovery_operation_trust_in_tx,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::task_board_remote_transport::wire::{

@@ -1,6 +1,4 @@
-use super::wire::{
-    RemoteAttemptBinding, RemoteCodexLaunchEnvelope, RemoteWireError,
-};
+use super::wire::{RemoteAttemptBinding, RemoteCodexLaunchEnvelope, RemoteWireError};
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest};
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole};
 use crate::task_board::{TaskBoardExecutionPhase, TaskBoardWorkflowKind};
@@ -45,25 +43,18 @@ fn implementation_launch_preserves_task_item_and_write_capabilities() {
 
 #[test]
 fn phase_and_custom_model_tampering_fail_closed() {
-    let mut launch = RemoteCodexLaunchEnvelope::from_codex_request(
-        "codex",
-        &report_request("review:security"),
-    )
-    .expect("freeze report launch");
+    let mut launch =
+        RemoteCodexLaunchEnvelope::from_codex_request("codex", &report_request("review:security"))
+            .expect("freeze report launch");
     launch.allow_custom_model = true;
     assert_eq!(
-        launch.validate(&binding(
-            TaskBoardExecutionPhase::Review,
-            "review:security"
-        )),
+        launch.validate(&binding(TaskBoardExecutionPhase::Review, "review:security")),
         Err(RemoteWireError::MissingField("canonical_codex_launch"))
     );
 
-    let mut implementation = RemoteCodexLaunchEnvelope::from_codex_request(
-        "codex",
-        &implementation_request(),
-    )
-    .expect("freeze implementation launch");
+    let mut implementation =
+        RemoteCodexLaunchEnvelope::from_codex_request("codex", &implementation_request())
+            .expect("freeze implementation launch");
     implementation.task_id = None;
     assert_eq!(
         implementation.validate(&binding(

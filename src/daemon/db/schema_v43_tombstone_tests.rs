@@ -6,8 +6,7 @@ use super::*;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::task_board::{TaskBoardExecutionHostConfig, remote_spki_pin};
 
-const LEGACY_LEAF_SHA256: &str =
-    "1111111111111111111111111111111111111111111111111111111111111111";
+const LEGACY_LEAF_SHA256: &str = "1111111111111111111111111111111111111111111111111111111111111111";
 
 /// The exact 8-column shape of a durable quarantine ledger row. Comparing the
 /// full tuple proves the ledger is byte-for-byte immutable across operations.
@@ -56,9 +55,11 @@ fn migration_pins_tombstone_and_ledger_for_zero_assignment_leaf() {
     assert_quarantine_evidence(&ledger);
     let ledger_rows: i64 = db
         .connection()
-        .query_row("SELECT COUNT(*) FROM task_board_remote_host_quarantines", [], |row| {
-            row.get(0)
-        })
+        .query_row(
+            "SELECT COUNT(*) FROM task_board_remote_host_quarantines",
+            [],
+            |row| row.get(0),
+        )
         .expect("count ledger rows");
     assert_eq!(ledger_rows, 1);
 }
@@ -90,8 +91,15 @@ async fn tombstone_repair_disable_remove_readd_keeps_immutable_ledger() {
         host_role_enabled(&db, "executor-a").await,
         ("controller_remote".into(), true)
     );
-    assert_eq!(configured_leaf(&db, "executor-a").await.as_deref(), Some(repaired_pin.as_str()));
-    assert_eq!(async_quarantine_row(&db).await, ledger, "re-pair mutated the immutable ledger");
+    assert_eq!(
+        configured_leaf(&db, "executor-a").await.as_deref(),
+        Some(repaired_pin.as_str())
+    );
+    assert_eq!(
+        async_quarantine_row(&db).await,
+        ledger,
+        "re-pair mutated the immutable ledger"
+    );
 
     // 2. Disable.
     replace_hosts(&db, vec![host_config("executor-a", &repaired_pin, false)]).await;
@@ -99,7 +107,11 @@ async fn tombstone_repair_disable_remove_readd_keeps_immutable_ledger() {
         host_role_enabled(&db, "executor-a").await,
         ("controller_remote".into(), false)
     );
-    assert_eq!(async_quarantine_row(&db).await, ledger, "disable mutated the immutable ledger");
+    assert_eq!(
+        async_quarantine_row(&db).await,
+        ledger,
+        "disable mutated the immutable ledger"
+    );
 
     // 3. Remove.
     replace_hosts(&db, Vec::new()).await;
@@ -107,7 +119,11 @@ async fn tombstone_repair_disable_remove_readd_keeps_immutable_ledger() {
         host_role_enabled(&db, "executor-a").await,
         ("controller_remote".into(), false)
     );
-    assert_eq!(async_quarantine_row(&db).await, ledger, "remove mutated the immutable ledger");
+    assert_eq!(
+        async_quarantine_row(&db).await,
+        ledger,
+        "remove mutated the immutable ledger"
+    );
 
     // 4. Re-add.
     replace_hosts(&db, vec![host_config("executor-a", &repaired_pin, true)]).await;
@@ -115,7 +131,11 @@ async fn tombstone_repair_disable_remove_readd_keeps_immutable_ledger() {
         host_role_enabled(&db, "executor-a").await,
         ("controller_remote".into(), true)
     );
-    assert_eq!(async_quarantine_row(&db).await, ledger, "re-add mutated the immutable ledger");
+    assert_eq!(
+        async_quarantine_row(&db).await,
+        ledger,
+        "re-add mutated the immutable ledger"
+    );
 
     // The quarantined leaf never becomes scheduling/trust evidence: the live
     // host's trust is the operator SPKI pin, never the ledger's legacy leaf, and
@@ -140,7 +160,11 @@ fn quarantine_ledger_rejects_every_runtime_write() {
     seed_zero_assignment_leaf(&db);
     run(db.connection()).expect("migrate zero-assignment legacy leaf pin");
     let before = quarantine_rows(db.connection());
-    assert_eq!(before.len(), 1, "fixture must persist exactly one ledger row");
+    assert_eq!(
+        before.len(),
+        1,
+        "fixture must persist exactly one ledger row"
+    );
 
     // INSERT would let a re-paired live host gain fabricated operator evidence.
     let insert = db
@@ -161,7 +185,10 @@ fn quarantine_ledger_rejects_every_runtime_write() {
     // Even a no-op UPDATE must abort.
     let update = db
         .connection()
-        .execute("UPDATE task_board_remote_host_quarantines SET reason = reason", [])
+        .execute(
+            "UPDATE task_board_remote_host_quarantines SET reason = reason",
+            [],
+        )
         .expect_err("no-op runtime update must abort");
     assert_immutable(&update);
 
@@ -209,26 +236,32 @@ fn assignment_only_tombstone_without_ledger_row_survives_reopen() {
     // Reopen must accept the assignment-only tombstone as a current schema.
     let reopened = DaemonDb::open(&path)
         .expect("reopen accepts an assignment-only tombstone without a ledger row");
-    let tombstone: (String, i64, Option<String>, Option<String>, Option<String>, Option<String>) =
-        reopened
-            .connection()
-            .query_row(
-                "SELECT host_role, enabled, configured_endpoint, configured_leaf_sha256,
+    let tombstone: (
+        String,
+        i64,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+    ) = reopened
+        .connection()
+        .query_row(
+            "SELECT host_role, enabled, configured_endpoint, configured_leaf_sha256,
                         configured_credential_reference, observed_host_instance_id
                  FROM task_board_execution_hosts WHERE host_id = 'ghost-host'",
-                [],
-                |row| {
-                    Ok((
-                        row.get(0)?,
-                        row.get(1)?,
-                        row.get(2)?,
-                        row.get(3)?,
-                        row.get(4)?,
-                        row.get(5)?,
-                    ))
-                },
-            )
-            .expect("load tombstone host");
+            [],
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                    row.get(5)?,
+                ))
+            },
+        )
+        .expect("load tombstone host");
     assert_eq!(
         tombstone,
         ("legacy_tombstone".into(), 0, None, None, None, None),
@@ -256,12 +289,20 @@ fn assignment_only_tombstone_without_ledger_row_survives_reopen() {
             |row| row.get(0),
         )
         .expect("count ledger rows for the tombstone host");
-    assert_eq!(ledger_rows, 0, "an assignment-only tombstone must carry no ledger row");
+    assert_eq!(
+        ledger_rows, 0,
+        "an assignment-only tombstone must carry no ledger row"
+    );
     let violations: i64 = reopened
         .connection()
-        .query_row("SELECT COUNT(*) FROM pragma_foreign_key_check", [], |row| row.get(0))
+        .query_row("SELECT COUNT(*) FROM pragma_foreign_key_check", [], |row| {
+            row.get(0)
+        })
         .expect("run foreign key check");
-    assert_eq!(violations, 0, "the archived assignment foreign key must remain intact");
+    assert_eq!(
+        violations, 0,
+        "the archived assignment foreign key must remain intact"
+    );
 }
 
 fn assert_immutable(error: &rusqlite::Error) {

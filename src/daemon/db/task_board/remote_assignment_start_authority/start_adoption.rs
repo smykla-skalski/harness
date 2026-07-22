@@ -1,9 +1,7 @@
 use sqlx::{Sqlite, Transaction, query};
 
 use super::super::remote_assignment_lifecycle_owner::lifecycle_owner;
-use super::super::remote_assignment_model::{
-    TaskBoardRemoteAssignmentRecord, concurrent, to_i64,
-};
+use super::super::remote_assignment_model::{TaskBoardRemoteAssignmentRecord, concurrent, to_i64};
 use super::super::remote_start_receipts::{
     TaskBoardRemoteExecutorStartReceipt, start_receipt_values,
 };

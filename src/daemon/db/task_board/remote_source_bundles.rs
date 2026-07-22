@@ -14,8 +14,12 @@ use super::remote_offer_receipts::load_offer_receipt_collisions_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteArtifactEntry, RemoteOfferRequest, RemoteSourceBundleUploadRequest,
-    RemoteSourceBundleUploadResponse, RemoteSourceMaterial,
+    RemoteSourceBundleUploadResponse,
 };
+
+#[path = "remote_source_bundles/coordinates.rs"]
+mod coordinates;
+pub(super) use coordinates::source_bundle_coordinates;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TaskBoardRemoteSourceBundle {
@@ -56,7 +60,12 @@ impl AsyncDaemonDb {
         host_instance_id: &str,
         stored_at: &str,
     ) -> Result<TaskBoardRemoteSourceBundle, CliError> {
-        validate_upload(request, authenticated_principal, host_instance_id, stored_at)?;
+        validate_upload(
+            request,
+            authenticated_principal,
+            host_instance_id,
+            stored_at,
+        )?;
         let mut transaction = self
             .begin_immediate_transaction("task board remote source bundle upload")
             .await?;
@@ -72,8 +81,8 @@ impl AsyncDaemonDb {
                 "remote source bundle generation was durably abandoned",
             ));
         }
-        let collisions = load_source_bundle_collisions_in_tx(&mut transaction, &request.offer)
-            .await?;
+        let collisions =
+            load_source_bundle_collisions_in_tx(&mut transaction, &request.offer).await?;
         if let [existing] = collisions.as_slice() {
             if existing.is_exact_replay(request, authenticated_principal) {
                 transaction.commit().await.map_err(|error| {
@@ -257,7 +266,11 @@ async fn require_no_offer_in_tx(
     .bind(&offer.binding.assignment_id)
     .fetch_one(transaction.as_mut())
     .await
-    .map_err(|error| db_error(format!("check remote source bundle offer collision: {error}")))?;
+    .map_err(|error| {
+        db_error(format!(
+            "check remote source bundle offer collision: {error}"
+        ))
+    })?;
     if exists {
         Err(concurrent(
             "remote source bundle cannot be introduced after offer settlement",
@@ -322,7 +335,9 @@ impl RemoteSourceBundleRow {
                 &self.upload_request_sha256,
                 &artifact,
             )
-            .map_err(|error| db_error(format!("validate remote source bundle response: {error}")))?;
+            .map_err(|error| {
+                db_error(format!("validate remote source bundle response: {error}"))
+            })?;
         nonblank(
             &self.authenticated_principal,
             "remote source bundle authenticated principal",
@@ -331,17 +346,21 @@ impl RemoteSourceBundleRow {
             None => {
                 let request = RemoteSourceBundleUploadRequest::seal(offer.clone(), &self.content)
                     .map_err(|error| {
-                        db_error(format!("validate remote source bundle bytes: {error}"))
-                    })?;
+                    db_error(format!("validate remote source bundle bytes: {error}"))
+                })?;
                 if request.request_sha256 != self.upload_request_sha256 {
-                    return Err(db_error("remote source bundle request digest is inconsistent"));
+                    return Err(db_error(
+                        "remote source bundle request digest is inconsistent",
+                    ));
                 }
                 Some(self.content)
             }
             Some(pruned_at) => {
                 canonical_time(pruned_at, "remote source bundle prune time")?;
                 if !self.content.is_empty() {
-                    return Err(db_error("pruned remote source bundle retained content bytes"));
+                    return Err(db_error(
+                        "pruned remote source bundle retained content bytes",
+                    ));
                 }
                 None
             }
@@ -430,7 +449,10 @@ pub(super) async fn insert_source_bundle_in_tx(
          )",
     )
     .bind(&binding.assignment_id)
-    .bind(to_i64(binding.fencing_epoch, "source bundle insert fencing epoch")?)
+    .bind(to_i64(
+        binding.fencing_epoch,
+        "source bundle insert fencing epoch",
+    )?)
     .bind(&binding.execution_id)
     .bind(&binding.action_key)
     .bind(i64::from(binding.attempt))
@@ -456,52 +478,4 @@ pub(super) async fn insert_source_bundle_in_tx(
     .await
     .map(|_| ())
     .map_err(|error| db_error(format!("persist remote source bundle: {error}")))
-}
-
-pub(super) struct SourceBundleCoordinates<'a> {
-    pub(super) kind: &'static str,
-    pub(super) repository: &'a str,
-    pub(super) base_revision: &'a str,
-    pub(super) result_revision: &'a str,
-    pub(super) advertised_ref: &'a str,
-    pub(super) bundle: &'a RemoteArtifactEntry,
-}
-
-pub(super) fn source_bundle_coordinates(
-    source: &RemoteSourceMaterial,
-) -> Result<SourceBundleCoordinates<'_>, CliError> {
-    match source {
-        RemoteSourceMaterial::PriorPhaseBundle {
-            repository,
-            base_revision,
-            revision,
-            advertised_ref,
-            bundle,
-            ..
-        } => Ok(SourceBundleCoordinates {
-            kind: "prior_phase_bundle",
-            repository,
-            base_revision,
-            result_revision: revision,
-            advertised_ref,
-            bundle,
-        }),
-        RemoteSourceMaterial::RepositorySnapshotBundle {
-            repository,
-            revision,
-            advertised_ref,
-            bundle,
-            ..
-        } => Ok(SourceBundleCoordinates {
-            kind: "repository_snapshot_bundle",
-            repository,
-            base_revision: revision,
-            result_revision: revision,
-            advertised_ref,
-            bundle,
-        }),
-        RemoteSourceMaterial::Repository { .. } => {
-            Err(db_error("remote source bundle upload has repository source"))
-        }
-    }
 }

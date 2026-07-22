@@ -1,6 +1,8 @@
 use super::chronology;
 use super::controller_operation;
-use super::decode::{decode_offer, decode_status, positive_u32, positive_u64, validate_offer_copies};
+use super::decode::{
+    decode_offer, decode_status, positive_u32, positive_u64, validate_offer_copies,
+};
 use super::failure_receipt::apply_start_failure_receipt;
 use super::{RemoteAssignmentRow, TaskBoardRemoteAssignmentRecord};
 use crate::daemon::db::{CliError, db_error};
@@ -43,14 +45,18 @@ pub(super) fn into_record(
 
 fn decode_row(row: &RemoteAssignmentRow) -> Result<DecodedRow, CliError> {
     if row.legacy_migrated {
-        return Err(db_error("legacy-migrated remote assignment is archival only"));
+        return Err(db_error(
+            "legacy-migrated remote assignment is archival only",
+        ));
     }
     let executor_configuration_revision = row
         .executor_configuration_revision
         .map(|value| positive_u64(value, "executor configuration revision"))
         .transpose()?;
     if executor_configuration_revision.is_some() != row.executor_checkout_path.is_some() {
-        return Err(db_error("executor assignment settings evidence is incomplete"));
+        return Err(db_error(
+            "executor assignment settings evidence is incomplete",
+        ));
     }
     chronology::validate_persisted_chronology(row)?;
     let offer = row.request_json.as_deref().map(decode_offer).transpose()?;
@@ -74,7 +80,10 @@ fn decode_row(row: &RemoteAssignmentRow) -> Result<DecodedRow, CliError> {
     })
 }
 
-fn decode_control_evidence(row: &RemoteAssignmentRow, decoded: &mut DecodedRow) -> Result<(), CliError> {
+fn decode_control_evidence(
+    row: &RemoteAssignmentRow,
+    decoded: &mut DecodedRow,
+) -> Result<(), CliError> {
     decoded.claim_receipt = super::super::remote_claim_receipts::decode_claim_receipt(
         &row.assignment_id,
         decoded.fencing_epoch,
@@ -222,11 +231,12 @@ fn attach_evidence(
         executor_lifecycle_owner: owner,
         ..record
     };
-    let executor_stop_pending = super::super::remote_assignment_executor_stop::decode_executor_stop_pending(
-        &record,
-        evidence.stop_pending_json,
-        evidence.stop_pending_sha256,
-    )?;
+    let executor_stop_pending =
+        super::super::remote_assignment_executor_stop::decode_executor_stop_pending(
+            &record,
+            evidence.stop_pending_json,
+            evidence.stop_pending_sha256,
+        )?;
     apply_start_failure_receipt(TaskBoardRemoteAssignmentRecord {
         executor_stop_pending,
         ..record

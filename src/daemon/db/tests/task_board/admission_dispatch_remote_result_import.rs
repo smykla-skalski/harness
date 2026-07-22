@@ -8,16 +8,13 @@ use tempfile::TempDir;
 use super::completion_evidence_tests::{
     accepted_offer, intent_status, remote_status, remote_status_request,
 };
-use super::remote_start_tests::{
-    PreparedRemoteOffer, offer_remote,
-};
+use super::remote_start_tests::{PreparedRemoteOffer, offer_remote};
 use super::*;
 use crate::daemon::db::task_board::remote_assignment_test_support::claim_request;
 use crate::daemon::db::task_board::{
     REMOTE_IMPLEMENTATION_BUNDLE_MEDIA_TYPE, REMOTE_IMPLEMENTATION_BUNDLE_PATH,
-    REMOTE_RESULT_ARTIFACT_MEDIA_TYPE, REMOTE_RESULT_ARTIFACT_PATH,
-    TaskBoardRemoteMutationOutcome, TaskBoardRemoteResultImportRequest,
-    TaskBoardRemoteResultImportState,
+    REMOTE_RESULT_ARTIFACT_MEDIA_TYPE, REMOTE_RESULT_ARTIFACT_PATH, TaskBoardRemoteMutationOutcome,
+    TaskBoardRemoteResultImportRequest, TaskBoardRemoteResultImportState,
 };
 use crate::daemon::service::import_task_board_remote_implementation_result;
 use crate::daemon::task_board_remote_transport::wire::{
@@ -33,8 +30,7 @@ use crate::task_board::{
 };
 
 const PRINCIPAL: &str = "executor-a";
-const IMPORT_REF: &str =
-    "refs/harness/task-board/imports/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const IMPORT_REF: &str = "refs/harness/task-board/imports/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
 #[path = "admission_dispatch_remote_result_import_support.rs"]
 mod support;
@@ -61,9 +57,18 @@ async fn import_candidate(label: &str) -> ImportCandidate {
     offer_and_accept(&prepared).await;
     let (response, result_entry) = terminal_response(&prepared, &git);
     record_terminal_status(&prepared, &response).await;
-    store_artifact(&prepared, &result_entry, &serde_json::to_vec(
-        response.result.as_ref().expect("typed implementation result"),
-    ).expect("serialize typed result")).await;
+    store_artifact(
+        &prepared,
+        &result_entry,
+        &serde_json::to_vec(
+            response
+                .result
+                .as_ref()
+                .expect("typed implementation result"),
+        )
+        .expect("serialize typed result"),
+    )
+    .await;
     let bundle_entry = response.output_artifacts.entries[1].clone();
     store_artifact(&prepared, &bundle_entry, &git.bundle).await;
     let parent = load_parent(&prepared).await;
@@ -185,13 +190,15 @@ fn terminal_response(
     };
     response.observed_at = "2026-07-19T10:00:05Z".into();
     response.status_sha256.clear();
-    (response.seal().expect("seal completed implementation status"), result_entry)
+    (
+        response
+            .seal()
+            .expect("seal completed implementation status"),
+        result_entry,
+    )
 }
 
-async fn record_terminal_status(
-    prepared: &PreparedRemoteOffer,
-    response: &RemoteStatusResponse,
-) {
+async fn record_terminal_status(prepared: &PreparedRemoteOffer, response: &RemoteStatusResponse) {
     assert!(matches!(
         prepared
             .db
@@ -289,7 +296,10 @@ impl ImportGitFixture {
         run_git(&source, &["add", "README.md"]);
         run_git(&source, &["commit", "-m", "base"]);
         let base = git(&source, &["rev-parse", "HEAD"]);
-        run_git(directory.path(), &["clone", path(&source), path(&controller)]);
+        run_git(
+            directory.path(),
+            &["clone", path(&source), path(&controller)],
+        );
         // Canonicalize the checked-out worktree so it matches the frozen run
         // context and the plan evidence (macOS /var vs /private/var); the import
         // target gate compares all three for exact equality.
@@ -371,7 +381,10 @@ impl ImportGitFixture {
             self.branch_ref
         );
         assert_eq!(git(&self.controller, &["rev-parse", "HEAD"]), self.result);
-        assert_eq!(git(&self.controller, &["rev-parse", IMPORT_REF]), self.result);
+        assert_eq!(
+            git(&self.controller, &["rev-parse", IMPORT_REF]),
+            self.result
+        );
         assert!(git(&self.controller, &["status", "--porcelain"]).is_empty());
     }
 
@@ -401,7 +414,11 @@ fn run_git(repository: &Path, args: &[&str]) {
         .args(args)
         .output()
         .expect("run git");
-    assert!(output.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "git {args:?}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 fn git(repository: &Path, args: &[&str]) -> String {
@@ -411,7 +428,11 @@ fn git(repository: &Path, args: &[&str]) -> String {
         .args(args)
         .output()
         .expect("run git");
-    assert!(output.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "git {args:?}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     String::from_utf8_lossy(&output.stdout).trim().to_owned()
 }
 

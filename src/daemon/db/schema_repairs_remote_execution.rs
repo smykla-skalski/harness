@@ -19,8 +19,7 @@ const OFFER_RECEIPT_TABLE: &str = "task_board_remote_offer_receipts";
 const SETTLEMENT_RECEIPT_TABLE: &str = "task_board_remote_settlement_receipts";
 const SOURCE_BUNDLE_TABLE: &str = "task_board_remote_source_bundles";
 const OUTBOUND_SOURCE_TABLE: &str = "task_board_remote_outbound_sources";
-const SOURCE_BUNDLE_ABANDONMENT_TABLE: &str =
-    "task_board_remote_source_bundle_abandonments";
+const SOURCE_BUNDLE_ABANDONMENT_TABLE: &str = "task_board_remote_source_bundle_abandonments";
 const ARTIFACT_TABLE: &str = "task_board_remote_artifacts";
 const RESULT_IMPORT_TABLE: &str = "task_board_remote_result_imports";
 const RECOVERY_QUARANTINE_TABLE: &str = "task_board_remote_recovery_quarantine";
@@ -373,7 +372,10 @@ fn classify_shape(conn: &Connection) -> Result<RemoteSchemaShape, CliError> {
         && table_current(&settlement_receipt_sql, SETTLEMENT_RECEIPT_TABLE)?
         && table_current(&source_bundle_sql, SOURCE_BUNDLE_TABLE)?
         && table_current(&outbound_source_sql, OUTBOUND_SOURCE_TABLE)?
-        && table_current(&source_bundle_abandonment_sql, SOURCE_BUNDLE_ABANDONMENT_TABLE)?
+        && table_current(
+            &source_bundle_abandonment_sql,
+            SOURCE_BUNDLE_ABANDONMENT_TABLE,
+        )?
         && table_current(&artifact_sql, ARTIFACT_TABLE)?
         && table_current(&result_import_sql, RESULT_IMPORT_TABLE)?
         && table_current(&recovery_quarantine_sql, RECOVERY_QUARANTINE_TABLE)?

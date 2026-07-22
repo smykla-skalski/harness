@@ -254,7 +254,9 @@ async fn lifecycle_call_against_a_wedged_agent_fails_on_its_deadline() {
         "error should report the deadline; got {message}"
     );
     assert!(
-        harness.recorded().contains(&"close:acp-session-7".to_string()),
+        harness
+            .recorded()
+            .contains(&"close:acp-session-7".to_string()),
         "the agent should have received the close before we gave up; got {:?}",
         harness.recorded()
     );
@@ -348,7 +350,9 @@ async fn close_session_sends_close_when_capability_advertised() {
     );
 
     assert!(
-        harness.recorded().contains(&"close:acp-session-7".to_string()),
+        harness
+            .recorded()
+            .contains(&"close:acp-session-7".to_string()),
         "agent should have received the close request; got {:?}",
         harness.recorded()
     );

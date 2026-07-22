@@ -8,8 +8,7 @@ use super::wire::{
     require_canonical_time, require_digest, require_version,
 };
 use super::wire_limits::{
-    MAX_REMOTE_RECEIPT_JSON_BYTES, MAX_REMOTE_SOURCE_BUNDLE_JSON_BYTES,
-    require_serialized_size,
+    MAX_REMOTE_RECEIPT_JSON_BYTES, MAX_REMOTE_SOURCE_BUNDLE_JSON_BYTES, require_serialized_size,
 };
 
 const SOURCE_BUNDLE_UPLOAD_DOMAIN: &str = "harness.task-board.remote-source-bundle-upload.v1";
@@ -37,10 +36,7 @@ pub(crate) struct RemoteSourceBundleUploadResponse {
 }
 
 impl RemoteSourceBundleUploadRequest {
-    pub(crate) fn seal(
-        offer: RemoteOfferRequest,
-        content: &[u8],
-    ) -> Result<Self, RemoteWireError> {
+    pub(crate) fn seal(offer: RemoteOfferRequest, content: &[u8]) -> Result<Self, RemoteWireError> {
         offer.validate()?;
         let artifact = source_bundle_entry(&offer)?;
         require_bundle_content(artifact, content)?;

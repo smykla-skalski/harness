@@ -295,9 +295,7 @@ async fn run_agent_recording_attach_config_order(
 
 /// Answers everything needed to open a session, then leaves `session/prompt`
 /// hanging so a caller that awaited it would visibly stall.
-async fn run_agent_never_answering_prompt(
-    transport: Channel,
-) -> agent_client_protocol::Result<()> {
+async fn run_agent_never_answering_prompt(transport: Channel) -> agent_client_protocol::Result<()> {
     Agent
         .builder()
         .name("silent-prompt-agent")

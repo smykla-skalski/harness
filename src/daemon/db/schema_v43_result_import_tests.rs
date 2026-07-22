@@ -155,15 +155,9 @@ fn result_import_journal_binds_assignment_generation_and_state_shape() {
         .expect_err("uppercase import digest must fail closed");
     assert!(digest_error.to_string().contains("CHECK constraint failed"));
 
-    let state_error = insert_result_import(
-        &db,
-        1,
-        "adopted",
-        None,
-        Some("2026-07-20T09:01:00Z"),
-        None,
-    )
-    .expect_err("adopted state requires both monotonic timestamps");
+    let state_error =
+        insert_result_import(&db, 1, "adopted", None, Some("2026-07-20T09:01:00Z"), None)
+            .expect_err("adopted state requires both monotonic timestamps");
     assert!(state_error.to_string().contains("CHECK constraint failed"));
 
     insert_result_import(

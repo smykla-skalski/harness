@@ -1,15 +1,13 @@
 use sqlx::{Sqlite, Transaction, query_scalar};
 
-use super::model::TaskBoardRemoteResultImportRequest;
 use super::super::remote_artifacts::{TaskBoardRemoteArtifact, load_artifact_in_tx};
 use super::super::remote_assignment_executor_terminal::{
     REMOTE_IMPLEMENTATION_BUNDLE_MEDIA_TYPE, REMOTE_IMPLEMENTATION_BUNDLE_PATH,
     REMOTE_RESULT_ARTIFACT_MEDIA_TYPE, REMOTE_RESULT_ARTIFACT_PATH,
 };
 use super::super::remote_assignment_io_authority::active_target_matches;
-use super::super::remote_assignment_model::{
-    TaskBoardRemoteAssignmentRecord, concurrent, to_i64,
-};
+use super::super::remote_assignment_model::{TaskBoardRemoteAssignmentRecord, concurrent, to_i64};
+use super::model::TaskBoardRemoteResultImportRequest;
 use crate::daemon::db::{CliError, db_error};
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteAssignmentWireState, RemoteTypedResult,
@@ -66,18 +64,10 @@ pub(super) async fn load_import_materials(
     }
     require_manifest(response)?;
     require_artifact_count(transaction, assignment, 2).await?;
-    let result_artifact = load_exact_artifact(
-        transaction,
-        assignment,
-        REMOTE_RESULT_ARTIFACT_PATH,
-    )
-    .await?;
-    let bundle_artifact = load_exact_artifact(
-        transaction,
-        assignment,
-        REMOTE_IMPLEMENTATION_BUNDLE_PATH,
-    )
-    .await?;
+    let result_artifact =
+        load_exact_artifact(transaction, assignment, REMOTE_RESULT_ARTIFACT_PATH).await?;
+    let bundle_artifact =
+        load_exact_artifact(transaction, assignment, REMOTE_IMPLEMENTATION_BUNDLE_PATH).await?;
     let parsed = serde_json::from_slice::<RemoteTypedResult>(&result_artifact.content)
         .map_err(|_| concurrent("fetched remote result bytes are invalid"))?;
     if parsed != typed {

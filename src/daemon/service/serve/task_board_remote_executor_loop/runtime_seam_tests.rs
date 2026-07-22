@@ -5,7 +5,6 @@ use super::disabled_tests::{
     request_for_revision,
 };
 use super::test_seam::{self, RuntimeSeamAction, RuntimeSeamCall};
-use chrono::{Duration, SecondsFormat, Utc};
 use crate::daemon::db::{
     REMOTE_EXECUTOR_PRINCIPAL, RemoteExecutorFixture, TaskBoardRemoteAssignmentRecord,
     TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome, remote_executor_claim_request,
@@ -13,14 +12,14 @@ use crate::daemon::db::{
 };
 use crate::daemon::protocol::CodexRunStatus;
 use crate::daemon::service::serve::test_support::{
-    RuntimeSeamScope, install_deterministic_runtime_seam,
-    reconcile_task_board_remote_executor_tick,
+    RuntimeSeamScope, install_deterministic_runtime_seam, reconcile_task_board_remote_executor_tick,
 };
 use crate::task_board::{
     TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardAttemptResultArtifact,
-    TaskBoardLocalAttemptResult, TaskBoardPhaseVerdict, TaskBoardReviewResult,
-    TaskBoardRemoteAssignmentState, TaskBoardReviewerOutcome,
+    TaskBoardLocalAttemptResult, TaskBoardPhaseVerdict, TaskBoardRemoteAssignmentState,
+    TaskBoardReviewResult, TaskBoardReviewerOutcome,
 };
+use chrono::{Duration, SecondsFormat, Utc};
 
 #[test]
 fn production_tick_uses_the_runtime_seam_for_start_then_active_probe() {
@@ -29,7 +28,10 @@ fn production_tick_uses_the_runtime_seam_for_start_then_active_probe() {
 
 async fn production_tick_uses_the_runtime_seam_for_start_then_active_probe_body() {
     let (fixture, before) = live_claimed_executor().await;
-    let offer = before.require_offer().expect("sealed executor offer").clone();
+    let offer = before
+        .require_offer()
+        .expect("sealed executor offer")
+        .clone();
     let identity = remote_executor_identity(&before).expect("deterministic executor identity");
     let state = executor_state(&fixture.db, EXECUTOR_INSTANCE);
     let scope: RuntimeSeamScope = install_deterministic_runtime_seam().await;
@@ -65,10 +67,12 @@ async fn production_tick_uses_the_runtime_seam_for_start_then_active_probe_body(
         .arm_completed(&identity.run_id, final_message.clone())
         .await
         .expect("arm the exact deterministic run");
-    assert!(scope
-        .arm_completed(&identity.run_id, "discarded duplicate final message".into())
-        .await
-        .is_err());
+    assert!(
+        scope
+            .arm_completed(&identity.run_id, "discarded duplicate final message".into())
+            .await
+            .is_err()
+    );
     reconcile_task_board_remote_executor_tick(&state)
         .await
         .expect("third production tick persists terminal seam evidence");
@@ -98,7 +102,9 @@ async fn production_tick_uses_the_runtime_seam_for_start_then_active_probe_body(
         Some(final_message.as_str())
     );
     assert_eq!(
-        load_assignment(&fixture.db, &before.assignment_id).await.state,
+        load_assignment(&fixture.db, &before.assignment_id)
+            .await
+            .state,
         TaskBoardRemoteAssignmentState::Completed
     );
     drop(scope);
@@ -140,7 +146,10 @@ fn assert_runtime_context(
 }
 
 fn completed_message(record: &TaskBoardRemoteAssignmentRecord) -> String {
-    let binding = &record.require_offer().expect("sealed executor offer").binding;
+    let binding = &record
+        .require_offer()
+        .expect("sealed executor offer")
+        .binding;
     let head = binding
         .expected_head_revision
         .clone()
@@ -195,7 +204,8 @@ async fn live_claimed_executor() -> (RemoteExecutorFixture, TaskBoardRemoteAssig
     let offered_at = (now - Duration::seconds(2)).to_rfc3339_opts(SecondsFormat::AutoSi, true);
     let claimed_at = (now - Duration::seconds(1)).to_rfc3339_opts(SecondsFormat::AutoSi, true);
     let mut request = request_for_revision(&fixture.request, &revision);
-    request.deadline_at = (now + Duration::minutes(10)).to_rfc3339_opts(SecondsFormat::AutoSi, true);
+    request.deadline_at =
+        (now + Duration::minutes(10)).to_rfc3339_opts(SecondsFormat::AutoSi, true);
     request.request_sha256.clear();
     let request = request.seal().expect("seal live executor offer");
     let accepted = match fixture

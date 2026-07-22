@@ -17,23 +17,22 @@ use crate::daemon::task_board_remote_transport::controller::{
 use crate::errors::CliError;
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptRecord,
-    TaskBoardExecutionPhase,
-    TaskBoardRemoteAssignmentState, TaskBoardWorkflowExecutionCas,
+    TaskBoardExecutionPhase, TaskBoardRemoteAssignmentState, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionRecord, task_board_remote_execution_target,
 };
 
-#[path = "task_board_remote_controller/requests.rs"]
-mod requests;
 #[path = "task_board_remote_controller/active_poll.rs"]
 mod active_poll;
+#[path = "task_board_remote_controller/requests.rs"]
+mod requests;
 #[cfg(test)]
 use active_poll::poll_active_assignment_with;
 #[path = "task_board_remote_controller/scan.rs"]
 mod scan;
-#[path = "task_board_remote_controller/terminal.rs"]
-mod terminal;
 #[path = "task_board_remote_controller/source_recovery.rs"]
 mod source_recovery;
+#[path = "task_board_remote_controller/terminal.rs"]
+mod terminal;
 
 const CONTROLLER_CANDIDATE_LIMIT: usize = 16;
 const CONTROLLER_SCAN_LIMIT: usize = 64;
@@ -150,7 +149,8 @@ async fn refresh_host_ids(
 
 async fn refresh_host(db: &AsyncDaemonDb, host_id: &str) -> Result<(), CliError> {
     let trust = db.task_board_remote_host_trust_fence(host_id).await?;
-    let client = RemoteExecutionControllerClient::connect(&trust).map_err(controller_database_error)?;
+    let client =
+        RemoteExecutionControllerClient::connect(&trust).map_err(controller_database_error)?;
     client
         .refresh_observation(db)
         .await
@@ -292,13 +292,7 @@ async fn offer_remote_candidates(
         };
         let source_repository = prepared_source.repository().to_owned();
         let host = db
-            .resolve_task_board_remote_host(
-                &execution,
-                &source_repository,
-                phase,
-                "codex",
-                &now,
-            )
+            .resolve_task_board_remote_host(&execution, &source_repository, phase, "codex", &now)
             .await?;
         let Some(host) = host else {
             select_local_target(db, &execution, attempt, &now).await?;
@@ -354,9 +348,7 @@ async fn prepare_candidate_source(
         let revision = identity.2.to_owned();
         let exported = tokio::task::spawn_blocking(move || {
             crate::git::source_bundle_export::GitSourceBundleExportPlan::for_revision(
-                &worktree,
-                repository,
-                revision,
+                &worktree, repository, revision,
             )?
             .export(crate::git::bundle_contract::MAX_REMOTE_GIT_BUNDLE_BYTES)
         })

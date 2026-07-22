@@ -114,11 +114,7 @@ async fn completed_evaluate_requires_only_the_canonical_result_artifact() {
         terminal
             .fixture
             .db
-            .complete_task_board_remote_executor_terminal(
-                &terminal.owner,
-                &response,
-                &artifacts,
-            )
+            .complete_task_board_remote_executor_terminal(&terminal.owner, &response, &artifacts,)
             .await
             .expect("replay evaluate terminal"),
         TaskBoardRemoteMutationOutcome::Replayed(_)

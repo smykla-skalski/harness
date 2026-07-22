@@ -25,8 +25,7 @@ use crate::task_board::{
 };
 
 const EXECUTOR_UNAVAILABLE: &str = "executor_unavailable";
-pub(super) const PREDECESSOR_OFFER_NOT_RECEIVED: &str =
-    "predecessor_offer_not_received";
+pub(super) const PREDECESSOR_OFFER_NOT_RECEIVED: &str = "predecessor_offer_not_received";
 
 enum HostOfferAdmission {
     Rejected(&'static str),
@@ -47,7 +46,12 @@ impl AsyncDaemonDb {
         host_instance_id: &str,
         accepted_at: &str,
     ) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
-        validate_host_offer(request, authenticated_principal, host_instance_id, accepted_at)?;
+        validate_host_offer(
+            request,
+            authenticated_principal,
+            host_instance_id,
+            accepted_at,
+        )?;
         let accepted = canonical_time(accepted_at, "remote host offer acceptance time")?;
         let mut transaction = self
             .begin_immediate_transaction("task board remote host inbox offer")
@@ -181,9 +185,7 @@ async fn admit_host_offer_in_tx(
         return Ok(HostOfferAdmission::Rejected(EXECUTOR_UNAVAILABLE));
     }
     if request.binding.host_instance_id != host_instance_id {
-        return Ok(HostOfferAdmission::Rejected(
-            PREDECESSOR_OFFER_NOT_RECEIVED,
-        ));
+        return Ok(HostOfferAdmission::Rejected(PREDECESSOR_OFFER_NOT_RECEIVED));
     }
     let deadline = canonical_time(&request.deadline_at, "remote assignment deadline")?;
     let lease_expires = accepted + Duration::seconds(i64::from(request.lease_seconds));

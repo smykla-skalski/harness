@@ -28,12 +28,12 @@ pub use bridge_state::{
     running_codex_capability, status_report,
 };
 pub use client::BridgeClient;
+#[cfg(feature = "daemon-runtime")]
+pub(crate) use codex_process::probe_codex_readiness;
 pub use commands::BridgeCommand;
 pub use control::{
     reconfigure_bridge, reconfigure_bridge_async, spawn_manifest_watcher, stop_bridge,
 };
-#[cfg(feature = "daemon-runtime")]
-pub(crate) use codex_process::probe_codex_readiness;
 pub use types::{
     AgentTuiStartSpec, BRIDGE_CAPABILITY_ACP, BRIDGE_CAPABILITY_AGENT_TUI, BRIDGE_CAPABILITY_CODEX,
     BRIDGE_LAUNCH_AGENT_LABEL, BridgeCapability, BridgeConfigArgs, BridgeInstallLaunchAgentArgs,

@@ -43,11 +43,10 @@ async fn controller_scan_replays_a_durable_active_generation_across_restart() {
     );
 
     drop(fixture.db);
-    let reopened = crate::daemon::db::AsyncDaemonDb::connect(
-        &fixture._temp.path().join("controller.db"),
-    )
-    .await
-    .expect("reopen controller database");
+    let reopened =
+        crate::daemon::db::AsyncDaemonDb::connect(&fixture._temp.path().join("controller.db"))
+            .await
+            .expect("reopen controller database");
     let replay = reopened
         .next_task_board_remote_controller_assignment(SCAN_AT)
         .await
@@ -60,10 +59,12 @@ async fn controller_scan_replays_a_durable_active_generation_across_restart() {
         replay.assignment.assignment_id,
         fixture.request.binding.assignment_id
     );
-    assert!(!reopened
-        .complete_task_board_remote_controller_assignment_scan(&replay, SCAN_AT)
-        .await
-        .expect("acknowledge replayed controller assignment"));
+    assert!(
+        !reopened
+            .complete_task_board_remote_controller_assignment_scan(&replay, SCAN_AT)
+            .await
+            .expect("acknowledge replayed controller assignment")
+    );
 }
 
 #[tokio::test]
@@ -275,7 +276,9 @@ async fn quarantined_local_fallback_with_retained_lease_does_not_block_progressi
     );
 }
 
-async fn late_accept_local_fallback(fixture: &ControllerFixture) -> TaskBoardRemoteAssignmentRecord {
+async fn late_accept_local_fallback(
+    fixture: &ControllerFixture,
+) -> TaskBoardRemoteAssignmentRecord {
     let _ = offer_controller(fixture).await;
     fixture
         .db

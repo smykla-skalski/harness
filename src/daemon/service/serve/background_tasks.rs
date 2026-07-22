@@ -28,15 +28,14 @@ use super::machine_heartbeat_loop::spawn_machine_heartbeat_loop;
 use task_board_dispatch_loop::spawn_task_board_dispatch_loop;
 use task_board_orchestrator_loop::spawn_task_board_orchestrator_loop;
 use task_board_remote_executor_loop::spawn_task_board_remote_executor_loop;
+#[cfg(test)]
+pub(crate) use task_board_remote_executor_loop::{
+    RuntimeSeamScope, install_deterministic_runtime_seam, reconcile_task_board_remote_executor_tick,
+};
 use task_board_remote_recovery_loop::spawn_task_board_remote_recovery_loop;
 pub(crate) use task_board_remote_recovery_loop::{
     recover_remote_assignments_at_startup_with_controller,
     recover_remote_assignments_before_local_work,
-};
-#[cfg(test)]
-pub(crate) use task_board_remote_executor_loop::{
-    RuntimeSeamScope, install_deterministic_runtime_seam,
-    reconcile_task_board_remote_executor_tick,
 };
 
 /// Spawn the single broadcast fan-out task and return the prepared-event
@@ -74,11 +73,7 @@ pub(super) fn spawn_background_tasks(
 ) -> BackgroundTaskHandles {
     let async_db = app_state.async_db.get().cloned();
     let remote_recovery = async_db.as_ref().map(|_| {
-        spawn_task_board_remote_recovery_loop(
-            app_state.clone(),
-            poll_interval,
-            shutdown_rx.clone(),
-        )
+        spawn_task_board_remote_recovery_loop(app_state.clone(), poll_interval, shutdown_rx.clone())
     });
     let remote_pairing_expiry = if app_state.auth_mode == DaemonHttpAuthMode::Remote {
         async_db
@@ -112,16 +107,13 @@ pub(super) fn spawn_background_tasks(
                 shutdown_rx.clone(),
             )
         }),
-        _task_board_remote_executor_loop: app_state
-            .async_db
-            .get()
-            .map(|_| {
-                spawn_task_board_remote_executor_loop(
-                    app_state.clone(),
-                    poll_interval,
-                    shutdown_rx.clone(),
-                )
-            }),
+        _task_board_remote_executor_loop: app_state.async_db.get().map(|_| {
+            spawn_task_board_remote_executor_loop(
+                app_state.clone(),
+                poll_interval,
+                shutdown_rx.clone(),
+            )
+        }),
         _task_board_remote_recovery_loop: remote_recovery,
     }
 }

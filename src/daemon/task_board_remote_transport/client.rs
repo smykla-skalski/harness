@@ -19,15 +19,15 @@ use super::routes::{
 #[cfg(test)]
 use super::tls_pin::pinned_client_config_with_roots;
 use super::tls_pin::{RemoteTlsPinError, pinned_platform_client_config};
-use super::wire_limits::MAX_REMOTE_LIFECYCLE_JSON_BYTES;
 use super::wire::{
     RemoteArtifactFetchRequest, RemoteArtifactFetchResponse, RemoteCancelRequest,
     RemoteCancelResponse, RemoteClaimRequest, RemoteClaimResponse, RemoteHeartbeatRequest,
     RemoteHeartbeatResponse, RemoteHostAdvertisement, RemoteLeaseRenewRequest,
     RemoteLeaseRenewResponse, RemoteOfferRequest, RemoteOfferResponse, RemoteSettledRequest,
-    RemoteSettledResponse, RemoteStatusRequest, RemoteStatusResponse, RemoteWireError,
-    RemoteSourceBundleUploadRequest, RemoteSourceBundleUploadResponse,
+    RemoteSettledResponse, RemoteSourceBundleUploadRequest, RemoteSourceBundleUploadResponse,
+    RemoteStatusRequest, RemoteStatusResponse, RemoteWireError,
 };
+use super::wire_limits::MAX_REMOTE_LIFECYCLE_JSON_BYTES;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
@@ -339,14 +339,8 @@ impl RemoteExecutionHttpClient {
         Request: Serialize,
         Response: DeserializeOwned,
     {
-        self.send_with_request_limit(
-            method,
-            path,
-            request,
-            MAX_REQUEST_BYTES,
-            max_response_bytes,
-        )
-        .await
+        self.send_with_request_limit(method, path, request, MAX_REQUEST_BYTES, max_response_bytes)
+            .await
     }
 
     pub(super) async fn send_with_request_limit<Request, Response>(

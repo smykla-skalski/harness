@@ -11,9 +11,8 @@ use super::workflow_execution_revisions::live_execution_revision_mismatch_in_tx;
 use super::workflow_execution_rows::{WorkflowExecutionRow, execution_json, label, phase_label};
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error};
 use crate::task_board::{
-    TASK_BOARD_REMOTE_CANCEL_INTENT_RESOURCE,
-    TaskBoardAttemptState, TaskBoardExecutionPhase, TaskBoardExecutionState,
-    TaskBoardWorkflowCasMismatch, TaskBoardWorkflowExecutionCas,
+    TASK_BOARD_REMOTE_CANCEL_INTENT_RESOURCE, TaskBoardAttemptState, TaskBoardExecutionPhase,
+    TaskBoardExecutionState, TaskBoardWorkflowCasMismatch, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionCasOutcome, TaskBoardWorkflowExecutionCreateOutcome,
     TaskBoardWorkflowExecutionRecord, advance_task_board_workflow,
     restart_task_board_workflow_revision, validate_task_board_execution_update,
@@ -157,18 +156,17 @@ impl AsyncDaemonDb {
             })?;
             return Ok(TaskBoardWorkflowExecutionCasOutcome::Unchanged(current));
         }
-        let persisted = match remote_target_stop_plan_in_tx(&mut transaction, &current, updated)
-            .await?
-        {
-            RemoteTargetStopPlan::ApplyRequested => updated.clone(),
-            RemoteTargetStopPlan::PersistCancelIntent(parent) => parent,
-            RemoteTargetStopPlan::ReplayedCancelIntent(parent) => {
-                transaction.commit().await.map_err(|error| {
-                    db_error(format!("commit replayed remote cancellation CAS: {error}"))
-                })?;
-                return Ok(TaskBoardWorkflowExecutionCasOutcome::Unchanged(parent));
-            }
-        };
+        let persisted =
+            match remote_target_stop_plan_in_tx(&mut transaction, &current, updated).await? {
+                RemoteTargetStopPlan::ApplyRequested => updated.clone(),
+                RemoteTargetStopPlan::PersistCancelIntent(parent) => parent,
+                RemoteTargetStopPlan::ReplayedCancelIntent(parent) => {
+                    transaction.commit().await.map_err(|error| {
+                        db_error(format!("commit replayed remote cancellation CAS: {error}"))
+                    })?;
+                    return Ok(TaskBoardWorkflowExecutionCasOutcome::Unchanged(parent));
+                }
+            };
         update_execution_in_tx(&mut transaction, expected, &persisted).await?;
         bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
         transaction.commit().await.map_err(|error| {

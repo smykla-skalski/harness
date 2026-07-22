@@ -34,7 +34,9 @@ use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::http::AsyncDaemonDbSlot;
 use crate::telemetry::current_trace_id;
 pub(crate) use background_tasks::recover_remote_assignments_before_local_work;
-use background_tasks::{recover_remote_assignments_at_startup_with_controller, spawn_background_tasks};
+use background_tasks::{
+    recover_remote_assignments_at_startup_with_controller, spawn_background_tasks,
+};
 use local_listener::{bind_local_listener_and_build_manifest, prepare_local_daemon_environment};
 use manifest::persist_manifest;
 use std::time::Instant;

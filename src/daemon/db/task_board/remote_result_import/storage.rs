@@ -2,13 +2,11 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use sqlx::{Sqlite, Transaction, query, query_as};
 
+use super::super::remote_assignment_model::{TaskBoardRemoteAssignmentRecord, concurrent, to_i64};
 use super::evidence::ImportMaterials;
 use super::model::{
     RemoteResultImportRow, TaskBoardRemoteResultImportRecord, TaskBoardRemoteResultImportRequest,
     TaskBoardRemoteResultImportState,
-};
-use super::super::remote_assignment_model::{
-    TaskBoardRemoteAssignmentRecord, concurrent, to_i64,
 };
 use crate::daemon::db::{CliError, db_error};
 use crate::task_board::{TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord};

@@ -2,21 +2,18 @@ use rusqlite::params;
 use sqlx::{Executor, query};
 use tempfile::tempdir;
 
-use crate::daemon::db::{
-    AsyncDaemonDb, DaemonDb, TaskBoardRemoteHostTrustFence,
-    TaskBoardRemoteLifecycleTrustSnapshot,
-};
-use crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest;
-use crate::task_board::TaskBoardExecutionHostConfig;
 use super::tests::{
     insert_strict_assignment, legacy_v40_fixture, legacy_v40_fixture_at, strict_request,
 };
 use super::*;
+use crate::daemon::db::{
+    AsyncDaemonDb, DaemonDb, TaskBoardRemoteHostTrustFence, TaskBoardRemoteLifecycleTrustSnapshot,
+};
+use crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest;
+use crate::task_board::TaskBoardExecutionHostConfig;
 
-const REQUEST_SHA256: &str =
-    "1111111111111111111111111111111111111111111111111111111111111111";
-const TRUST_SHA256: &str =
-    "2222222222222222222222222222222222222222222222222222222222222222";
+const REQUEST_SHA256: &str = "1111111111111111111111111111111111111111111111111111111111111111";
+const TRUST_SHA256: &str = "2222222222222222222222222222222222222222222222222222222222222222";
 
 #[test]
 fn fresh_schema_has_the_paired_controller_lifecycle_and_operation_tokens() {
@@ -147,14 +144,8 @@ async fn corrupt_controller_operation_tokens_fail_closed_after_reopen() {
             "partial",
             "controller operation trust evidence is incomplete",
         ),
-        (
-            "kind",
-            "controller operation kind is invalid",
-        ),
-        (
-            "digest",
-            "canonical lowercase SHA-256",
-        ),
+        ("kind", "controller operation kind is invalid"),
+        ("digest", "canonical lowercase SHA-256"),
         (
             "generation_digest",
             "lifecycle trust persistence is not canonical or digest-bound",
@@ -279,7 +270,11 @@ async fn seed_corrupt_assignment(path: &std::path::Path, corruption: &str) {
                      controller_operation_fence_sha256 = ?2
                  WHERE assignment_id = 'assignment-a'",
             )
-            .bind(successor.encoded().expect("encode successor operation fence"))
+            .bind(
+                successor
+                    .encoded()
+                    .expect("encode successor operation fence"),
+            )
             .bind(successor.snapshot_sha256)
         }
         "older_lifecycle_revision" => {

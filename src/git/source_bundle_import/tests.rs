@@ -19,17 +19,25 @@ fn imports_exact_self_contained_snapshot_and_replays_across_cleanup() {
     plan.verify_and_import_bytes(&fixture.bytes)
         .expect("import exact source snapshot");
     plan.require_imported().expect("require imported snapshot");
-    assert_eq!(git(&fixture.target, &["rev-parse", &fixture.import_ref]), fixture.revision);
+    assert_eq!(
+        git(&fixture.target, &["rev-parse", &fixture.import_ref]),
+        fixture.revision
+    );
 
     plan.verify_and_import_bytes(&fixture.bytes)
         .expect("replay exact source snapshot");
-    plan.cleanup_import_ref().expect("cleanup exact source import ref");
-    plan.cleanup_import_ref().expect("replay source import cleanup");
+    plan.cleanup_import_ref()
+        .expect("cleanup exact source import ref");
+    plan.cleanup_import_ref()
+        .expect("replay source import cleanup");
     assert!(!git_ref_exists(&fixture.target, &fixture.import_ref));
 
     plan.verify_and_import_bytes(&fixture.bytes)
         .expect("restart source snapshot import");
-    assert_eq!(git(&fixture.target, &["rev-parse", &fixture.revision]), fixture.revision);
+    assert_eq!(
+        git(&fixture.target, &["rev-parse", &fixture.revision]),
+        fixture.revision
+    );
 }
 
 #[test]
@@ -85,13 +93,22 @@ fn advertised_ref_and_symbolic_import_ref_fail_closed() {
     let target_ref = "refs/harness/task-board/source-target";
     let target_head = git(&fixture.target, &["rev-parse", "HEAD"]);
     git(&fixture.target, &["update-ref", target_ref, &target_head]);
-    git(&fixture.target, &["symbolic-ref", &fixture.import_ref, target_ref]);
+    git(
+        &fixture.target,
+        &["symbolic-ref", &fixture.import_ref, target_ref],
+    );
     fixture
         .import_plan()
         .verify_and_import_bytes(&fixture.bytes)
         .expect_err("symbolic source import ref must fail");
-    assert_eq!(git(&fixture.target, &["rev-parse", target_ref]), target_head);
-    assert_eq!(git(&fixture.target, &["symbolic-ref", &fixture.import_ref]), target_ref);
+    assert_eq!(
+        git(&fixture.target, &["rev-parse", target_ref]),
+        target_head
+    );
+    assert_eq!(
+        git(&fixture.target, &["symbolic-ref", &fixture.import_ref]),
+        target_ref
+    );
 }
 
 #[test]
@@ -130,22 +147,18 @@ impl Fixture {
         git(&source, &["add", "snapshot.txt"]);
         git(&source, &["commit", "-m", "snapshot"]);
         let revision = git(&source, &["rev-parse", "HEAD"]);
-        let export = GitSourceBundleExportPlan::for_revision(
-            &source,
-            REPOSITORY.into(),
-            revision.clone(),
-        )
-        .expect("source export plan")
-        .export(4 * 1024 * 1024)
-        .expect("source export");
+        let export =
+            GitSourceBundleExportPlan::for_revision(&source, REPOSITORY.into(), revision.clone())
+                .expect("source export plan")
+                .export(4 * 1024 * 1024)
+                .expect("source export");
 
         let target = temp.path().join("target");
         init_repository(&target, "https://github.com/example/widgets.git");
         let offer_sha256 = "a".repeat(64);
         let bundle_sha256 = hex::encode(Sha256::digest(&export.bytes));
-        let import_ref = format!(
-            "refs/harness/task-board/source-imports/{offer_sha256}/{bundle_sha256}"
-        );
+        let import_ref =
+            format!("refs/harness/task-board/source-imports/{offer_sha256}/{bundle_sha256}");
         Self {
             _temp: temp,
             target,

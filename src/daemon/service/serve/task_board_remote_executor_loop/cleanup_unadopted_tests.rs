@@ -15,11 +15,9 @@ use crate::daemon::task_board_remote_transport::wire::{
 use crate::task_board::{TaskBoardFailureClass, TaskBoardRemoteAssignmentState};
 
 use super::super::disabled_tests::executor_state;
-use super::super::source::ensure_remote_session;
 use super::super::reconcile_remote_executor_assignment;
-use super::tests::{
-    CLAIMED_AT, SETTLED_AT, STARTED_AT, UNKNOWN_AT, active_count, git_repository,
-};
+use super::super::source::ensure_remote_session;
+use super::tests::{CLAIMED_AT, SETTLED_AT, STARTED_AT, UNKNOWN_AT, active_count, git_repository};
 
 const EXPIRED_AT: &str = "2026-07-19T10:11:00Z";
 
@@ -29,76 +27,75 @@ fn invalid_unadopted_run_cleans_after_exact_stop_and_settlement() {
 }
 
 async fn invalid_unadopted_run_cleans_after_exact_stop_and_settlement_body() {
-    with_isolated_sessions(
-        "remote-unadopted-stop-cleanup",
-        async {
-            let (fixture, claimed, authority, identity, workspace) =
-                claimed_executor_workspace().await;
-            let permit = fixture
-                .db
-                .claim_task_board_remote_executor_start_io_permit(
-                    &authority,
-                    &workspace,
-                    STARTED_AT,
-                )
-                .await
-                .expect("claim exact Start I/O permit")
-                .expect_acquired("Start I/O remains permitted");
-            let mut invalid = run_snapshot(&claimed, &authority, &workspace);
-            invalid.prompt = "mismatched executor launch".into();
-            invalid.status = CodexRunStatus::Cancelled;
-            invalid.updated_at = UNKNOWN_AT.into();
-            fixture
-                .db
-                .save_codex_run(&invalid)
-                .await
-                .expect("persist invalid stopped executor run");
-            let pending = fixture
-                .db
-                .claim_task_board_remote_executor_stop_pending(
-                    &TaskBoardRemoteExecutorStopAuthority::Start(permit),
-                    &invalid,
-                    TaskBoardRemoteExecutorStopReason::StartEvidenceInvalid,
-                    UNKNOWN_AT,
-                )
-                .await
-                .expect("claim exact stop-only authority")
-                .expect("stop-only authority");
-            let TaskBoardRemoteMutationOutcome::Updated(unknown) = fixture
-                .db
-                .settle_task_board_remote_executor_stop_pending(&pending, UNKNOWN_AT)
-                .await
-                .expect("settle exact stopped run")
-            else {
-                panic!("stopped run did not become unknown");
-            };
-            settle_unknown(&fixture, &unknown).await;
-            assert_eq!(active_count(&fixture).await, 1);
-
-            reconcile_remote_executor_assignment(
-                &executor_state(&fixture.db, "successor-instance"),
-                &fixture.db,
-                &unknown.assignment_id,
+    with_isolated_sessions("remote-unadopted-stop-cleanup", async {
+        let (fixture, claimed, authority, identity, workspace) = claimed_executor_workspace().await;
+        let permit = fixture
+            .db
+            .claim_task_board_remote_executor_start_io_permit(&authority, &workspace, STARTED_AT)
+            .await
+            .expect("claim exact Start I/O permit")
+            .expect_acquired("Start I/O remains permitted");
+        let mut invalid = run_snapshot(&claimed, &authority, &workspace);
+        invalid.prompt = "mismatched executor launch".into();
+        invalid.status = CodexRunStatus::Cancelled;
+        invalid.updated_at = UNKNOWN_AT.into();
+        fixture
+            .db
+            .save_codex_run(&invalid)
+            .await
+            .expect("persist invalid stopped executor run");
+        let pending = fixture
+            .db
+            .claim_task_board_remote_executor_stop_pending(
+                &TaskBoardRemoteExecutorStopAuthority::Start(permit),
+                &invalid,
+                TaskBoardRemoteExecutorStopReason::StartEvidenceInvalid,
+                UNKNOWN_AT,
             )
             .await
-            .expect("clean stopped unadopted run");
+            .expect("claim exact stop-only authority")
+            .expect("stop-only authority");
+        let TaskBoardRemoteMutationOutcome::Updated(unknown) = fixture
+            .db
+            .settle_task_board_remote_executor_stop_pending(&pending, UNKNOWN_AT)
+            .await
+            .expect("settle exact stopped run")
+        else {
+            panic!("stopped run did not become unknown");
+        };
+        settle_unknown(&fixture, &unknown).await;
+        assert_eq!(active_count(&fixture).await, 1);
 
-            let cleaned = load_assignment(&fixture, &unknown.assignment_id).await;
-            assert_eq!(cleaned.state, TaskBoardRemoteAssignmentState::Unknown);
-            assert!(cleaned.cleanup_completed_at.is_some());
-            assert_eq!(active_count(&fixture).await, 0);
-            assert!(fixture.db.codex_run(&identity.run_id).await.unwrap().is_none());
-            assert!(!workspace.exists());
-            assert!(
-                fixture
-                    .db
-                    .task_board_remote_settlement_receipt(&unknown.assignment_id)
-                    .await
-                    .expect("load immutable settlement receipt")
-                    .is_some()
-            );
-        },
-    )
+        reconcile_remote_executor_assignment(
+            &executor_state(&fixture.db, "successor-instance"),
+            &fixture.db,
+            &unknown.assignment_id,
+        )
+        .await
+        .expect("clean stopped unadopted run");
+
+        let cleaned = load_assignment(&fixture, &unknown.assignment_id).await;
+        assert_eq!(cleaned.state, TaskBoardRemoteAssignmentState::Unknown);
+        assert!(cleaned.cleanup_completed_at.is_some());
+        assert_eq!(active_count(&fixture).await, 0);
+        assert!(
+            fixture
+                .db
+                .codex_run(&identity.run_id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(!workspace.exists());
+        assert!(
+            fixture
+                .db
+                .task_board_remote_settlement_receipt(&unknown.assignment_id)
+                .await
+                .expect("load immutable settlement receipt")
+                .is_some()
+        );
+    })
     .await;
 }
 
@@ -108,57 +105,53 @@ fn crash_after_session_files_before_db_row_cleans_exact_orphan() {
 }
 
 async fn crash_after_session_files_before_db_row_cleans_exact_orphan_body() {
-    with_isolated_sessions(
-        "remote-orphan-session-cleanup",
-        async {
-            let (fixture, claimed, authority, identity, workspace) =
-                claimed_executor_workspace().await;
-            assert!(workspace.exists());
-            assert!(
-                fixture
-                    .db
-                    .delete_session_row(&identity.session_id)
-                    .await
-                    .expect("remove crash-gap session row")
-            );
-            let TaskBoardRemoteMutationOutcome::Updated(unknown) = fixture
+    with_isolated_sessions("remote-orphan-session-cleanup", async {
+        let (fixture, claimed, authority, identity, workspace) = claimed_executor_workspace().await;
+        assert!(workspace.exists());
+        assert!(
+            fixture
                 .db
-                .expire_task_board_remote_executor_start_without_run(
-                    &authority,
-                    super::super::REMOTE_START_EXPIRED_REASON,
-                    EXPIRED_AT,
-                )
+                .delete_session_row(&identity.session_id)
                 .await
-                .expect("expire token with no durable run")
-            else {
-                panic!("token-owned crash gap did not expire");
-            };
-            assert_eq!(claimed.assignment_id, unknown.assignment_id);
-            settle_unknown(&fixture, &unknown).await;
-            assert_eq!(active_count(&fixture).await, 1);
-
-            reconcile_remote_executor_assignment(
-                &executor_state(&fixture.db, "restarted-instance"),
-                &fixture.db,
-                &unknown.assignment_id,
+                .expect("remove crash-gap session row")
+        );
+        let TaskBoardRemoteMutationOutcome::Updated(unknown) = fixture
+            .db
+            .expire_task_board_remote_executor_start_without_run(
+                &authority,
+                super::super::REMOTE_START_EXPIRED_REASON,
+                EXPIRED_AT,
             )
             .await
-            .expect("clean exact orphaned session tree");
+            .expect("expire token with no durable run")
+        else {
+            panic!("token-owned crash gap did not expire");
+        };
+        assert_eq!(claimed.assignment_id, unknown.assignment_id);
+        settle_unknown(&fixture, &unknown).await;
+        assert_eq!(active_count(&fixture).await, 1);
 
-            let cleaned = load_assignment(&fixture, &unknown.assignment_id).await;
-            assert!(cleaned.cleanup_completed_at.is_some());
-            assert_eq!(active_count(&fixture).await, 0);
-            assert!(!workspace.exists());
-            assert!(
-                fixture
-                    .db
-                    .resolve_session(&identity.session_id)
-                    .await
-                    .expect("reload orphaned session")
-                    .is_none()
-            );
-        },
-    )
+        reconcile_remote_executor_assignment(
+            &executor_state(&fixture.db, "restarted-instance"),
+            &fixture.db,
+            &unknown.assignment_id,
+        )
+        .await
+        .expect("clean exact orphaned session tree");
+
+        let cleaned = load_assignment(&fixture, &unknown.assignment_id).await;
+        assert!(cleaned.cleanup_completed_at.is_some());
+        assert_eq!(active_count(&fixture).await, 0);
+        assert!(!workspace.exists());
+        assert!(
+            fixture
+                .db
+                .resolve_session(&identity.session_id)
+                .await
+                .expect("reload orphaned session")
+                .is_none()
+        );
+    })
     .await;
 }
 
@@ -183,10 +176,7 @@ async fn preclaim_superseded_cleanup_is_restart_safe_and_mutation_free() {
     assert!(superseded.claim_receipt.is_none());
     assert_eq!(active_count(&fixture).await, 0);
     let identity = remote_executor_identity(&superseded).expect("preclaim executor identity");
-    let settlement = terminal_settlement(
-        &superseded,
-        RemoteAssignmentWireState::Superseded,
-    );
+    let settlement = terminal_settlement(&superseded, RemoteAssignmentWireState::Superseded);
     let database_path = fixture._temp.path().join("executor.db");
     let RemoteExecutorFixture { db, _temp, .. } = fixture;
     drop(db);
@@ -194,11 +184,7 @@ async fn preclaim_superseded_cleanup_is_restart_safe_and_mutation_free() {
         .await
         .expect("reopen before preclaim settlement");
     reopened
-        .settle_task_board_remote_assignment(
-            &settlement,
-            REMOTE_EXECUTOR_PRINCIPAL,
-            SETTLED_AT,
-        )
+        .settle_task_board_remote_assignment(&settlement, REMOTE_EXECUTOR_PRINCIPAL, SETTLED_AT)
         .await
         .expect("settle exact preclaim generation");
 
@@ -238,8 +224,17 @@ async fn preclaim_superseded_cleanup_is_restart_safe_and_mutation_free() {
         .await
         .expect("reload preclaim cleanup")
         .expect("replayed preclaim cleanup");
-    assert_eq!(replayed.cleanup_completed_at.as_deref(), Some(marker.as_str()));
-    assert!(reopened.codex_run(&identity.run_id).await.unwrap().is_none());
+    assert_eq!(
+        replayed.cleanup_completed_at.as_deref(),
+        Some(marker.as_str())
+    );
+    assert!(
+        reopened
+            .codex_run(&identity.run_id)
+            .await
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[test]
@@ -271,10 +266,19 @@ async fn non_codex_no_run_start_failure_settles_failed_at_claimed_body() {
         assert_eq!(failed.state, TaskBoardRemoteAssignmentState::Failed);
         assert_eq!(failed.error.as_deref(), Some("SANDBOX001"));
         assert_eq!(
-            failed.status_response.and_then(|status| status.failure_class),
+            failed
+                .status_response
+                .and_then(|status| status.failure_class),
             Some(TaskBoardFailureClass::Permanent)
         );
-        assert!(fixture.db.codex_run(&identity.run_id).await.unwrap().is_none());
+        assert!(
+            fixture
+                .db
+                .codex_run(&identity.run_id)
+                .await
+                .unwrap()
+                .is_none()
+        );
     })
     .await;
 }
@@ -346,23 +350,18 @@ pub(super) async fn claimed_executor_workspace() -> (
         .expect("start authority");
     let claimed = load_assignment(&fixture, &accepted.assignment_id).await;
     let identity = remote_executor_identity(&claimed).expect("executor identity");
-    let workspace = ensure_remote_session(
-        &fixture.db,
-        &claimed,
-        &identity,
-        &revision,
-        true,
-        true,
-    )
-    .await
-    .expect("create exact executor session");
+    let workspace = ensure_remote_session(&fixture.db, &claimed, &identity, &revision, true, true)
+        .await
+        .expect("create exact executor session");
     (fixture, claimed, authority, identity, workspace)
 }
 
 async fn configure_checkout(fixture: &RemoteExecutorFixture, origin: &Path) {
     // Session provisioning canonicalizes origin_path, so resolve macOS
     // /var -> /private/var or exact_provisioned_session never matches.
-    let origin = origin.canonicalize().unwrap_or_else(|_| origin.to_path_buf());
+    let origin = origin
+        .canonicalize()
+        .unwrap_or_else(|_| origin.to_path_buf());
     let mut settings = fixture
         .db
         .task_board_orchestrator_settings()
@@ -414,18 +413,11 @@ fn run_snapshot(
     }
 }
 
-async fn settle_unknown(
-    fixture: &RemoteExecutorFixture,
-    record: &TaskBoardRemoteAssignmentRecord,
-) {
+async fn settle_unknown(fixture: &RemoteExecutorFixture, record: &TaskBoardRemoteAssignmentRecord) {
     let request = terminal_settlement(record, RemoteAssignmentWireState::Unknown);
     fixture
         .db
-        .settle_task_board_remote_assignment(
-            &request,
-            REMOTE_EXECUTOR_PRINCIPAL,
-            SETTLED_AT,
-        )
+        .settle_task_board_remote_assignment(&request, REMOTE_EXECUTOR_PRINCIPAL, SETTLED_AT)
         .await
         .expect("persist immutable unknown settlement");
 }

@@ -240,7 +240,10 @@ async fn prepared_initial_report_survives_restart_and_starts_once() {
         Some("local")
     );
     assert_eq!(codex_run_count(&restarted).await, 1);
-    assert_eq!(workflow_intent(&restarted, &fixture.execution_id).await.1, "completed");
+    assert_eq!(
+        workflow_intent(&restarted, &fixture.execution_id).await.1,
+        "completed"
+    );
     assert_eq!(
         admission_states(&restarted, &intent_id).await,
         vec![("concurrency".into(), "committed".into())]
@@ -259,7 +262,10 @@ async fn prepared_initial_report_survives_restart_and_starts_once() {
     assert_eq!(restarted_runtime.start_count(), 1);
     assert_eq!(codex_run_count(&restarted).await, 1);
     assert_eq!(load_execution(&fixture).await, started);
-    assert_eq!(workflow_intent(&restarted, &fixture.execution_id).await.1, "completed");
+    assert_eq!(
+        workflow_intent(&restarted, &fixture.execution_id).await.1,
+        "completed"
+    );
     assert_eq!(
         admission_states(&restarted, &intent_id).await,
         vec![("concurrency".into(), "committed".into())]

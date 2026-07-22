@@ -4,10 +4,8 @@ use super::remote_start_tests::{
     prepare_remote_offer_with_retry,
 };
 use super::{AsyncDaemonDb, ledger_kind_state};
-use crate::daemon::db::task_board::{
-    TaskBoardRemoteMutationOutcome, TaskBoardRemoteOperationKind,
-};
 use crate::daemon::db::task_board::remote_assignment_test_support::claim_request;
+use crate::daemon::db::task_board::{TaskBoardRemoteMutationOutcome, TaskBoardRemoteOperationKind};
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteAssignmentWireState, RemoteOfferRequest, RemoteStatusResponse, RemoteTypedResult,
 };

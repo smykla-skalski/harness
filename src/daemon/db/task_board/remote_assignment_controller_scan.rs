@@ -1,8 +1,6 @@
 use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
-use super::remote_assignment_model::{
-    TaskBoardRemoteAssignmentRecord, canonical_time,
-};
+use super::remote_assignment_model::{TaskBoardRemoteAssignmentRecord, canonical_time};
 use super::remote_assignment_recovery_queue::{
     CONTROLLER_PROGRESSION_QUARANTINE_CODE, RawRecoveryCandidate,
     quarantine_remote_recovery_failure_in_tx,
@@ -69,26 +67,31 @@ impl AsyncDaemonDb {
         transaction.commit().await.map_err(|error| {
             db_error(format!("commit remote controller assignment scan: {error}"))
         })?;
-        match self.task_board_remote_assignment(&cursor.assignment_id).await {
+        match self
+            .task_board_remote_assignment(&cursor.assignment_id)
+            .await
+        {
             Ok(Some(assignment)) if assignment.offered_at == cursor.order_at => {
                 Ok(Some(TaskBoardRemoteControllerScanStep::Assignment(
                     TaskBoardRemoteControllerScanItem { assignment, cursor },
                 )))
             }
-            Ok(Some(_)) => {
-                self.quarantine_controller_scan_decode(cursor, now, db_error(
-                    "remote controller scan cursor contradicts immutable offer time",
-                ))
+            Ok(Some(_)) => self
+                .quarantine_controller_scan_decode(
+                    cursor,
+                    now,
+                    db_error("remote controller scan cursor contradicts immutable offer time"),
+                )
                 .await
-                .map(Some)
-            }
-            Ok(None) => {
-                self.quarantine_controller_scan_decode(cursor, now, db_error(
-                    "scanned remote controller assignment disappeared",
-                ))
+                .map(Some),
+            Ok(None) => self
+                .quarantine_controller_scan_decode(
+                    cursor,
+                    now,
+                    db_error("scanned remote controller assignment disappeared"),
+                )
                 .await
-                .map(Some)
-            }
+                .map(Some),
             Err(error) => self
                 .quarantine_controller_scan_decode(cursor, now, error)
                 .await
@@ -239,7 +242,9 @@ impl AsyncDaemonDb {
             .await?;
         let scan_incomplete = complete_scan_item_in_tx(&mut transaction, &cursor, now).await?;
         transaction.commit().await.map_err(|commit_error| {
-            db_error(format!("commit remote controller decode quarantine: {commit_error}"))
+            db_error(format!(
+                "commit remote controller decode quarantine: {commit_error}"
+            ))
         })?;
         Ok(TaskBoardRemoteControllerScanStep::Quarantined(
             TaskBoardRemoteControllerScanFailure {
@@ -313,10 +318,9 @@ async fn complete_scan_item_in_tx(
         ..ScanRow::cursor_only(String::new(), String::new())
     };
     let acknowledged = (cursor.order_at.clone(), cursor.assignment_id.clone());
-    let incomplete =
-        !select_cycle_page(transaction, now, Some(&acknowledged), &boundary, 1)
-            .await?
-            .is_empty();
+    let incomplete = !select_cycle_page(transaction, now, Some(&acknowledged), &boundary, 1)
+        .await?
+        .is_empty();
     if !incomplete {
         clear_cycle(transaction).await?;
     }
@@ -417,12 +421,7 @@ async fn require_pending_cursor(
     expected: &ScanRow,
 ) -> Result<(), CliError> {
     let pending = load_named_cursor(transaction, CONTROLLER_PENDING_QUEUE).await?;
-    if pending.as_ref()
-        == Some(&(
-            expected.order_at.clone(),
-            expected.assignment_id.clone(),
-        ))
-    {
+    if pending.as_ref() == Some(&(expected.order_at.clone(), expected.assignment_id.clone())) {
         Ok(())
     } else {
         Err(db_error(

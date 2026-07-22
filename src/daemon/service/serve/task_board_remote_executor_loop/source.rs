@@ -1,6 +1,6 @@
-use std::path::{Path, PathBuf};
 #[cfg(test)]
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 #[cfg(test)]
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -9,21 +9,16 @@ use sqlx::query_scalar;
 use tokio::sync::Barrier;
 use tokio::task::spawn_blocking;
 
+use super::source_bundle::{cleanup_repository_snapshot_import, materialize_repository_snapshot};
 use super::{RemoteWorkerIdentity, concurrent, invalid_transition};
-use super::source_bundle::{
-    cleanup_repository_snapshot_import, materialize_repository_snapshot,
-};
 use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, db_error};
 use crate::daemon::protocol::SessionStartRequest;
 use crate::daemon::service::start_session_direct_async;
-use crate::daemon::task_board_remote_transport::wire::{
-    RemoteOfferRequest, RemoteSourceMaterial,
-};
+use crate::daemon::task_board_remote_transport::wire::{RemoteOfferRequest, RemoteSourceMaterial};
 use crate::errors::{CliError, CliErrorKind};
 use crate::git::GitRepository;
 use crate::task_board::{
-    TaskBoardExecutionPhase, TaskBoardOrchestratorSettings,
-    validate_local_execution_host_config,
+    TaskBoardExecutionPhase, TaskBoardOrchestratorSettings, validate_local_execution_host_config,
 };
 
 use super::source_bundle::apply_prior_phase_bundle;
@@ -36,7 +31,9 @@ pub(super) async fn prepare_remote_workspace(
     starts_worker: bool,
 ) -> Result<PathBuf, CliError> {
     if starts_worker && !executor_settings_match(db, record, offer).await? {
-        return Err(concurrent("remote executor settings changed before worker start"));
+        return Err(concurrent(
+            "remote executor settings changed before worker start",
+        ));
     }
     let require_source_head =
         starts_worker || offer.binding.phase != TaskBoardExecutionPhase::Implementation;
@@ -74,8 +71,7 @@ pub(super) async fn ensure_remote_session(
         invalid_transition("remote executor assignment has no frozen checkout path")
     })?);
     let offer = record.require_offer()?;
-    let snapshot_import =
-        materialize_repository_snapshot(db, record, offer, &origin).await?;
+    let snapshot_import = materialize_repository_snapshot(db, record, offer, &origin).await?;
     let require_source_head = require_source_head
         || matches!(
             &offer.source,
@@ -183,8 +179,8 @@ async fn wait_after_remote_session_creation(record: &TaskBoardRemoteAssignmentRe
 async fn wait_after_remote_session_creation(_record: &TaskBoardRemoteAssignmentRecord) {}
 
 #[cfg(test)]
-fn session_creation_barriers(
-) -> &'static Mutex<HashMap<String, Arc<RemoteSessionCreationBarrier>>> {
+fn session_creation_barriers() -> &'static Mutex<HashMap<String, Arc<RemoteSessionCreationBarrier>>>
+{
     static BARRIERS: OnceLock<Mutex<HashMap<String, Arc<RemoteSessionCreationBarrier>>>> =
         OnceLock::new();
     BARRIERS.get_or_init(|| Mutex::new(HashMap::new()))
@@ -307,7 +303,9 @@ pub(super) fn validate_remote_worktree_head(
     if !require_source_head || head == revision {
         Ok(())
     } else {
-        Err(concurrent("remote executor worktree head drifted before start"))
+        Err(concurrent(
+            "remote executor worktree head drifted before start",
+        ))
     }
 }
 

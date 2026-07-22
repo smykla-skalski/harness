@@ -46,7 +46,11 @@ pub(super) async fn run_agent_recording_session_inputs(
                 operations
                     .lock()
                     .expect("record new session")
-                    .push(session_inputs_record("new", &request.mcp_servers, &request.additional_directories));
+                    .push(session_inputs_record(
+                        "new",
+                        &request.mcp_servers,
+                        &request.additional_directories,
+                    ));
                 responder.respond(NewSessionResponse::new("acp-session-1"))
             },
             agent_client_protocol::on_receive_request!(),
@@ -83,11 +87,14 @@ pub(super) async fn run_agent_recording_session_resume(
         )
         .on_receive_request(
             async move |request: NewSessionRequest, responder, _connection| {
-                new_operations.lock().expect("record new").push(session_inputs_record(
-                    "new",
-                    &request.mcp_servers,
-                    &request.additional_directories,
-                ));
+                new_operations
+                    .lock()
+                    .expect("record new")
+                    .push(session_inputs_record(
+                        "new",
+                        &request.mcp_servers,
+                        &request.additional_directories,
+                    ));
                 responder.respond(NewSessionResponse::new("acp-session-fresh"))
             },
             agent_client_protocol::on_receive_request!(),
@@ -179,9 +186,11 @@ pub(super) async fn run_agent_advertising_resume_and_load(
             async move |initialize: InitializeRequest, responder, _connection| {
                 responder.respond(
                     InitializeResponse::new(initialize.protocol_version).agent_capabilities(
-                        AgentCapabilities::new().load_session(true).session_capabilities(
-                            SessionCapabilities::new().resume(SessionResumeCapabilities::new()),
-                        ),
+                        AgentCapabilities::new()
+                            .load_session(true)
+                            .session_capabilities(
+                                SessionCapabilities::new().resume(SessionResumeCapabilities::new()),
+                            ),
                     ),
                 )
             },
@@ -232,11 +241,13 @@ pub(super) async fn run_agent_replaying_session_load(
             async move |initialize: InitializeRequest, responder, _connection| {
                 responder.respond(
                     InitializeResponse::new(initialize.protocol_version).agent_capabilities(
-                        AgentCapabilities::new().load_session(true).session_capabilities(
-                            SessionCapabilities::new().additional_directories(
-                                SessionAdditionalDirectoriesCapabilities::new(),
+                        AgentCapabilities::new()
+                            .load_session(true)
+                            .session_capabilities(
+                                SessionCapabilities::new().additional_directories(
+                                    SessionAdditionalDirectoriesCapabilities::new(),
+                                ),
                             ),
-                        ),
                     ),
                 )
             },
@@ -244,11 +255,14 @@ pub(super) async fn run_agent_replaying_session_load(
         )
         .on_receive_request(
             async move |request: NewSessionRequest, responder, _connection| {
-                new_operations.lock().expect("record new").push(session_inputs_record(
-                    "new",
-                    &request.mcp_servers,
-                    &request.additional_directories,
-                ));
+                new_operations
+                    .lock()
+                    .expect("record new")
+                    .push(session_inputs_record(
+                        "new",
+                        &request.mcp_servers,
+                        &request.additional_directories,
+                    ));
                 responder.respond(NewSessionResponse::new("acp-session-fresh"))
             },
             agent_client_protocol::on_receive_request!(),
@@ -307,11 +321,14 @@ pub(super) async fn run_agent_refusing_session_load(
         )
         .on_receive_request(
             async move |request: NewSessionRequest, responder, _connection| {
-                new_operations.lock().expect("record new").push(session_inputs_record(
-                    "new",
-                    &request.mcp_servers,
-                    &request.additional_directories,
-                ));
+                new_operations
+                    .lock()
+                    .expect("record new")
+                    .push(session_inputs_record(
+                        "new",
+                        &request.mcp_servers,
+                        &request.additional_directories,
+                    ));
                 responder.respond(NewSessionResponse::new("acp-session-fresh"))
             },
             agent_client_protocol::on_receive_request!(),

@@ -1,13 +1,13 @@
 use chrono::{DateTime, SecondsFormat, Utc};
 use sqlx::{Sqlite, Transaction, query_as};
 
+use super::remote_claim_receipts::TaskBoardRemoteClaimReceipt;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteAssignmentWireState, RemoteOfferRequest, RemoteStatusResponse,
 };
 use crate::errors::CliErrorKind;
 use crate::task_board::{TaskBoardExecutionPhase, TaskBoardRemoteAssignmentState};
-use super::remote_claim_receipts::TaskBoardRemoteClaimReceipt;
 
 mod chronology;
 mod controller_operation;
@@ -43,18 +43,14 @@ pub(crate) struct TaskBoardRemoteAssignmentRecord {
     pub(crate) executor_start_io_permit_at: Option<String>,
     pub(crate) executor_start_failure_receipt_json: Option<String>,
     pub(crate) executor_start_failure_receipt_sha256: Option<String>,
-    pub(crate) start_failure_receipt: Option<
-        super::remote_start_failure_receipts::TaskBoardRemoteExecutorStartFailureReceipt,
-    >,
-    pub(crate) start_receipt: Option<
-        super::remote_start_receipts::TaskBoardRemoteExecutorStartReceipt,
-    >,
-    pub(crate) executor_lifecycle_owner: Option<
-        super::remote_assignment_lifecycle_owner::TaskBoardRemoteExecutorLifecycleOwner,
-    >,
-    pub(crate) executor_stop_pending: Option<
-        super::remote_assignment_executor_stop::TaskBoardRemoteExecutorStopPending,
-    >,
+    pub(crate) start_failure_receipt:
+        Option<super::remote_start_failure_receipts::TaskBoardRemoteExecutorStartFailureReceipt>,
+    pub(crate) start_receipt:
+        Option<super::remote_start_receipts::TaskBoardRemoteExecutorStartReceipt>,
+    pub(crate) executor_lifecycle_owner:
+        Option<super::remote_assignment_lifecycle_owner::TaskBoardRemoteExecutorLifecycleOwner>,
+    pub(crate) executor_stop_pending:
+        Option<super::remote_assignment_executor_stop::TaskBoardRemoteExecutorStopPending>,
     pub(crate) execution_record_sha256: Option<String>,
     pub(crate) request_sha256: Option<String>,
     pub(crate) offer: Option<RemoteOfferRequest>,
@@ -278,7 +274,10 @@ pub(super) async fn load_offer_collision_in_tx(
         .bind(&request.binding.execution_id)
         .bind(&request.binding.action_key)
         .bind(i64::from(request.binding.attempt))
-        .bind(to_i64(request.binding.fencing_epoch, "offer collision fencing epoch")?)
+        .bind(to_i64(
+            request.binding.fencing_epoch,
+            "offer collision fencing epoch",
+        )?)
         .fetch_all(transaction.as_mut())
         .await
         .map_err(|error| db_error(format!("load remote assignment offer collision: {error}")))?

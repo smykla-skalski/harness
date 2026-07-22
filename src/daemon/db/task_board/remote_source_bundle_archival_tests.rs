@@ -6,8 +6,9 @@ use super::remote_assignment_test_support::{
 };
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::task_board_remote_transport::wire::{
-    RemoteArtifactEntry, RemoteArtifactManifest, RemoteOfferRequest, RemoteSourceBundleAbandonRequest,
-    RemoteSourceBundleUploadRequest, RemoteSourceMaterial, test_codex_launch,
+    RemoteArtifactEntry, RemoteArtifactManifest, RemoteOfferRequest,
+    RemoteSourceBundleAbandonRequest, RemoteSourceBundleUploadRequest, RemoteSourceMaterial,
+    test_codex_launch,
 };
 use crate::task_board::{TaskBoardExecutionPhase, TaskBoardWorkflowKind};
 
@@ -22,11 +23,16 @@ async fn source_upload_rejects_archival_identity_collision_without_bytes() {
     // A frozen legacy assignment already owns this offer's idempotency key. The
     // upload persists immutable bytes before any assignment exists, so without
     // the archival fence a new assignment id could strand bytes forever.
-    insert_archival_assignment(&fixture.db, "legacy-archived-upload", &offer.binding.idempotency_key).await;
+    insert_archival_assignment(
+        &fixture.db,
+        "legacy-archived-upload",
+        &offer.binding.idempotency_key,
+    )
+    .await;
     let before = sequence(&fixture.db).await;
 
-    let upload = RemoteSourceBundleUploadRequest::seal(offer, &content)
-        .expect("seal source bundle upload");
+    let upload =
+        RemoteSourceBundleUploadRequest::seal(offer, &content).expect("seal source bundle upload");
     let error = fixture
         .db
         .store_task_board_remote_source_bundle(&upload, PRINCIPAL, INSTANCE, NOW)
@@ -58,9 +64,30 @@ async fn source_upload_rejects_each_live_assignment_identity_in_isolation() {
     // regresses exactly one case.
     // (label, execution_id, action_key, attempt, idempotency_key, fencing_epoch).
     let cases: [(&str, &str, &str, u32, &str, u64); 3] = [
-        ("idempotency", "execution-rival", "review:rival", 9, "attempt-key-1", 9),
-        ("exact-attempt", "execution-detached", "review:reviewer", 1, "rival-key-2", 9),
-        ("execution-epoch", "execution-detached", "review:rival", 9, "rival-key-3", 1),
+        (
+            "idempotency",
+            "execution-rival",
+            "review:rival",
+            9,
+            "attempt-key-1",
+            9,
+        ),
+        (
+            "exact-attempt",
+            "execution-detached",
+            "review:reviewer",
+            1,
+            "rival-key-2",
+            9,
+        ),
+        (
+            "execution-epoch",
+            "execution-detached",
+            "review:rival",
+            9,
+            "rival-key-3",
+            1,
+        ),
     ];
     for (label, execution_id, action_key, attempt, idempotency_key, fencing_epoch) in cases {
         let fixture = executor_fixture(1).await;
@@ -132,8 +159,16 @@ async fn source_upload_rejects_a_rejected_offer_receipt_collision_without_bytes(
         error.contains("conflicts with a live assignment or receipt"),
         "unexpected error: {error}"
     );
-    assert_eq!(source_bundle_count(&fixture.db).await, 0, "no bytes on a refused upload");
-    assert_eq!(sequence(&fixture.db).await, before, "no sequence bump on a refused upload");
+    assert_eq!(
+        source_bundle_count(&fixture.db).await,
+        0,
+        "no bytes on a refused upload"
+    );
+    assert_eq!(
+        sequence(&fixture.db).await,
+        before,
+        "no sequence bump on a refused upload"
+    );
 }
 
 #[tokio::test]
@@ -154,19 +189,27 @@ async fn abandoned_generation_fences_aliased_upload_and_accept_across_restart() 
         )
         .await
         .expect("verify A source absence");
-    let abandon =
-        RemoteSourceBundleAbandonRequest::seal(&upload_a, verification).expect("seal A abandonment");
+    let abandon = RemoteSourceBundleAbandonRequest::seal(&upload_a, verification)
+        .expect("seal A abandonment");
     fixture
         .db
-        .abandon_task_board_remote_source_bundle(&abandon, PRINCIPAL, "instance-b", "2026-07-19T10:00:02Z")
+        .abandon_task_board_remote_source_bundle(
+            &abandon,
+            PRINCIPAL,
+            "instance-b",
+            "2026-07-19T10:00:02Z",
+        )
         .await
         .expect("abandon generation A");
 
     // Alias B: distinct assignments reusing A's (execution_id, fencing_epoch),
     // colliding on nothing else. Legitimate reassignment increments the epoch, so
     // same-generation aliasing must fail on both the upload and the inbox.
-    let (alias_upload, alias_content) =
-        alias_bundle_offer(&fixture.request, "assignment-alias-upload", "alias-upload-key");
+    let (alias_upload, alias_content) = alias_bundle_offer(
+        &fixture.request,
+        "assignment-alias-upload",
+        "alias-upload-key",
+    );
     let accept_alias = rival_offer(
         "assignment-alias-accept",
         "execution-detached",
@@ -199,15 +242,29 @@ async fn assert_aliases_fenced(
         .await
         .expect_err("an aliased upload must fail closed against the abandonment")
         .to_string();
-    assert!(upload_error.contains("durably abandoned"), "upload: {upload_error}");
+    assert!(
+        upload_error.contains("durably abandoned"),
+        "upload: {upload_error}"
+    );
     let accept_error = db
         .accept_task_board_remote_assignment_offer(accept_offer, PRINCIPAL, INSTANCE, NOW)
         .await
         .expect_err("an aliased accept must fail closed against the abandonment")
         .to_string();
-    assert!(accept_error.contains("durably abandoned"), "accept: {accept_error}");
-    assert_eq!(source_bundle_count(db).await, 0, "a fenced alias must persist no bytes");
-    assert_eq!(sequence(db).await, before, "a fenced alias must not mutate state");
+    assert!(
+        accept_error.contains("durably abandoned"),
+        "accept: {accept_error}"
+    );
+    assert_eq!(
+        source_bundle_count(db).await,
+        0,
+        "a fenced alias must persist no bytes"
+    );
+    assert_eq!(
+        sequence(db).await,
+        before,
+        "a fenced alias must not mutate state"
+    );
 }
 
 fn snapshot_offer(template: &RemoteOfferRequest) -> (RemoteOfferRequest, Vec<u8>) {
@@ -229,13 +286,19 @@ fn snapshot_offer(template: &RemoteOfferRequest) -> (RemoteOfferRequest, Vec<u8>
         &offer.binding.action_key,
         "Implement the frozen task plan.",
     );
-    offer.source =
-        RemoteSourceMaterial::repository_snapshot_bundle(REPOSITORY, SOURCE_REVISION, bundle.clone());
+    offer.source = RemoteSourceMaterial::repository_snapshot_bundle(
+        REPOSITORY,
+        SOURCE_REVISION,
+        bundle.clone(),
+    );
     offer.artifacts = RemoteArtifactManifest {
         entries: vec![bundle],
     };
     offer.request_sha256.clear();
-    (offer.seal().expect("seal repository snapshot offer"), content)
+    (
+        offer.seal().expect("seal repository snapshot offer"),
+        content,
+    )
 }
 
 fn alias_bundle_offer(
@@ -260,8 +323,12 @@ fn bundle_offer(template: &RemoteOfferRequest) -> (RemoteOfferRequest, Vec<u8>) 
     };
     let mut offer = template.clone();
     offer.binding.workflow_kind = TaskBoardWorkflowKind::DefaultTask;
-    offer.source =
-        RemoteSourceMaterial::prior_phase_bundle(REPOSITORY, PRIOR_BASE, SOURCE_REVISION, bundle.clone());
+    offer.source = RemoteSourceMaterial::prior_phase_bundle(
+        REPOSITORY,
+        PRIOR_BASE,
+        SOURCE_REVISION,
+        bundle.clone(),
+    );
     offer.artifacts = RemoteArtifactManifest {
         entries: vec![bundle],
     };
@@ -269,7 +336,11 @@ fn bundle_offer(template: &RemoteOfferRequest) -> (RemoteOfferRequest, Vec<u8>) 
     (offer.seal().expect("seal bundle offer"), content)
 }
 
-async fn insert_archival_assignment(db: &AsyncDaemonDb, assignment_id: &str, idempotency_key: &str) {
+async fn insert_archival_assignment(
+    db: &AsyncDaemonDb,
+    assignment_id: &str,
+    idempotency_key: &str,
+) {
     sqlx::query(
         "INSERT INTO task_board_remote_assignments (
              assignment_id, execution_id, phase, idempotency_key, host_id,

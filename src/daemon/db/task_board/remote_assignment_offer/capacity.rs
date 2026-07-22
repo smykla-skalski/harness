@@ -5,9 +5,7 @@ use super::super::remote_assignment_cleanup::active_remote_assignments_in_tx;
 use super::{canonical_time, remote_capability_for_phase, to_i64};
 use crate::daemon::db::{CliError, db_error};
 use crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest;
-use crate::task_board::{
-    TASK_BOARD_REMOTE_HEARTBEAT_TTL_SECONDS, TaskBoardPhaseCapabilityProfile,
-};
+use crate::task_board::{TASK_BOARD_REMOTE_HEARTBEAT_TTL_SECONDS, TaskBoardPhaseCapabilityProfile};
 
 pub(super) async fn host_has_capacity(
     transaction: &mut Transaction<'_, Sqlite>,
@@ -31,9 +29,8 @@ pub(super) async fn host_has_capacity(
     if !host.matches(request, now)? {
         return Ok(false);
     }
-    let active = i64::from(
-        active_remote_assignments_in_tx(transaction, &request.binding.host_id).await?,
-    );
+    let active =
+        i64::from(active_remote_assignments_in_tx(transaction, &request.binding.host_id).await?);
     Ok(active.max(host.observed_active_assignments.unwrap_or(0))
         < host.observed_capacity.unwrap_or(0))
 }

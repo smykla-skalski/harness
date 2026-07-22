@@ -61,10 +61,8 @@ pub(super) async fn execute_remote_worker_action(
     workspace: &Path,
 ) -> Result<CodexRunSnapshot, CliError> {
     #[cfg(test)]
-    if let Some(snapshot) = super::test_seam::execute_runtime_seam(
-        db, offer, identity, action, workspace,
-    )
-    .await?
+    if let Some(snapshot) =
+        super::test_seam::execute_runtime_seam(db, offer, identity, action, workspace).await?
     {
         return Ok(snapshot);
     }
@@ -97,7 +95,9 @@ fn parse_start_window_instant(value: &str) -> Result<chrono::DateTime<chrono::Ut
     chrono::DateTime::parse_from_rfc3339(value)
         .map(|instant| instant.with_timezone(&chrono::Utc))
         .map_err(|error| {
-            invalid_transition(format!("remote start window time is not canonical: {error}"))
+            invalid_transition(format!(
+                "remote start window time is not canonical: {error}"
+            ))
         })
 }
 
@@ -127,14 +127,13 @@ async fn probe_codex_run(
     .await
 }
 
-pub(super) async fn stop_codex_run(
-    state: &DaemonHttpState,
-    run_id: &str,
-) -> Result<(), CliError> {
+pub(super) async fn stop_codex_run(state: &DaemonHttpState, run_id: &str) -> Result<(), CliError> {
     let run_id = run_id.to_string();
-    run_codex_agent_blocking(state, "remote Task Board worker cancel", move |controller| {
-        controller.stop(&run_id)
-    })
+    run_codex_agent_blocking(
+        state,
+        "remote Task Board worker cancel",
+        move |controller| controller.stop(&run_id),
+    )
     .await
     .map(|_| ())
 }
@@ -147,7 +146,9 @@ pub(super) fn validate_run_snapshot(
 ) -> Result<(), CliError> {
     validate_run_identity(snapshot, offer, identity)?;
     if Path::new(&snapshot.project_dir) != workspace {
-        return Err(concurrent("remote Codex run uses a different executor worktree"));
+        return Err(concurrent(
+            "remote Codex run uses a different executor worktree",
+        ));
     }
     Ok(())
 }
@@ -189,8 +190,7 @@ pub(super) const fn worker_action(
         (TaskBoardRemoteAssignmentState::Claimed, None) => RemoteWorkerAction::Start,
         (TaskBoardRemoteAssignmentState::Claimed, Some(_)) => RemoteWorkerAction::Probe,
         (
-            TaskBoardRemoteAssignmentState::Started
-            | TaskBoardRemoteAssignmentState::Running,
+            TaskBoardRemoteAssignmentState::Started | TaskBoardRemoteAssignmentState::Running,
             Some(_),
         ) => RemoteWorkerAction::Probe,
         (TaskBoardRemoteAssignmentState::Cancelled, Some(status)) if status.is_active() => {

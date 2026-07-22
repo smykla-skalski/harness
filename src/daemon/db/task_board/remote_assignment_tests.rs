@@ -25,12 +25,7 @@ async fn fork_offer_requires_and_freezes_the_exact_source_repository_checkout() 
     assert!(matches!(
         base_only
             .db
-            .accept_task_board_remote_assignment_offer(
-                &rejected_request,
-                PRINCIPAL,
-                INSTANCE,
-                NOW,
-            )
+            .accept_task_board_remote_assignment_offer(&rejected_request, PRINCIPAL, INSTANCE, NOW,)
             .await
             .expect("reject fork offer without a fork checkout"),
         TaskBoardRemoteOfferOutcome::Rejected(_)
@@ -50,12 +45,13 @@ async fn fork_offer_requires_and_freezes_the_exact_source_repository_checkout() 
         .task_board_orchestrator_settings()
         .await
         .expect("load executor settings");
-    settings.local_execution_host.repositories.push(
-        TaskBoardLocalExecutionRepositoryConfig {
+    settings
+        .local_execution_host
+        .repositories
+        .push(TaskBoardLocalExecutionRepositoryConfig {
             repository: FORK_REPOSITORY.into(),
             checkout_path: FORK_CHECKOUT.into(),
-        },
-    );
+        });
     settings
         .local_execution_host
         .repositories
@@ -68,10 +64,17 @@ async fn fork_offer_requires_and_freezes_the_exact_source_repository_checkout() 
     let accepted_request = fork_offer("assignment-fork-accepted", "fork-accepted");
     let accepted = accept_executor(&configured, &accepted_request).await;
     assert_eq!(
-        accepted.require_offer().expect("sealed offer").binding.repository,
+        accepted
+            .require_offer()
+            .expect("sealed offer")
+            .binding
+            .repository,
         FORK_REPOSITORY
     );
-    assert_eq!(accepted.executor_checkout_path.as_deref(), Some(FORK_CHECKOUT));
+    assert_eq!(
+        accepted.executor_checkout_path.as_deref(),
+        Some(FORK_CHECKOUT)
+    );
     configured
         .db
         .claim_task_board_remote_assignment(
@@ -92,11 +95,8 @@ fn fork_offer(assignment_id: &str, idempotency_key: &str) -> RemoteOfferRequest 
     request.binding.workflow_kind = TaskBoardWorkflowKind::PrReview;
     // The binding repository tracks the fork source the checkout is frozen against.
     request.binding.repository = FORK_REPOSITORY.into();
-    request.source = RemoteSourceMaterial::repository_branch(
-        FORK_REPOSITORY,
-        "feature/fix",
-        SOURCE_REVISION,
-    );
+    request.source =
+        RemoteSourceMaterial::repository_branch(FORK_REPOSITORY, "feature/fix", SOURCE_REVISION);
     request.request_sha256.clear();
     request.seal().expect("seal fork offer")
 }

@@ -43,7 +43,6 @@ mod session_inputs;
 mod session_start;
 mod session_state;
 mod transport;
-pub(in crate::daemon::agent_acp) use transport::AcpTransport;
 pub(super) use commands::AcpProtocolHandle;
 use commands::{ProtocolCommand, run_protocol_command_loop};
 use context::ProtocolContext;
@@ -51,6 +50,7 @@ use handshake::harness_client_capabilities;
 pub(super) use session_config::AcpSessionRequestConfig;
 use session_config::{advertised_session_configuration, apply_requested_session_configuration};
 use session_guard::SessionRouteGuard;
+pub(in crate::daemon::agent_acp) use transport::AcpTransport;
 const ACP_DEADLINE_EXCEEDED: i32 = -32090;
 const SESSION_ROUTE_DRAIN_GRACE: Duration = Duration::from_millis(75);
 pub(super) struct SpawnedAcpProtocol {

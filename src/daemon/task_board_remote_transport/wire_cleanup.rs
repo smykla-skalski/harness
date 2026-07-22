@@ -4,8 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::wire::{
     RemoteAttemptBinding, RemoteSettledRequest, RemoteWireError, domain_digest,
-    require_canonical_time,
-    require_digest, require_text, require_version,
+    require_canonical_time, require_digest, require_text, require_version,
 };
 
 const CLEANUP_REQUEST_DOMAIN: &str = "harness.task-board.remote-cleanup-observation-request.v1";
@@ -49,10 +48,7 @@ impl RemoteCleanupObservationRequest {
         self.binding.validate()?;
         require_text("lease_id", &self.lease_id)?;
         require_digest("offer_request_sha256", &self.offer_request_sha256)?;
-        require_digest(
-            "settlement_request_sha256",
-            &self.settlement_request_sha256,
-        )?;
+        require_digest("settlement_request_sha256", &self.settlement_request_sha256)?;
         require_digest("request_sha256", &self.request_sha256)?;
         let mut unsigned = self.clone();
         unsigned.request_sha256.clear();
@@ -109,10 +105,7 @@ impl RemoteCleanupObservationResponse {
         require_version(self.schema_version)?;
         self.binding.validate()?;
         require_digest("offer_request_sha256", &self.offer_request_sha256)?;
-        require_digest(
-            "settlement_request_sha256",
-            &self.settlement_request_sha256,
-        )?;
+        require_digest("settlement_request_sha256", &self.settlement_request_sha256)?;
         require_canonical_time("cleanup_completed_at", &self.cleanup_completed_at)?;
         require_digest("response_sha256", &self.response_sha256)?;
         if self.binding != expected.binding

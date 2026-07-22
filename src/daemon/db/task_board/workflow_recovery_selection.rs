@@ -220,20 +220,13 @@ async fn select_workflow_execution_page(
     let effective_limit = limit.min(100);
     let sql_limit = i64::try_from(effective_limit)
         .map_err(|_| db_error(format!("{} limit is out of range", selection.context)))?;
-    let mut transaction = db
-        .begin_immediate_transaction(selection.context)
-        .await?;
+    let mut transaction = db.begin_immediate_transaction(selection.context).await?;
     let eligible_count = selection_eligible_count(&mut transaction, selection).await?;
     let rows = if eligible_count <= effective_limit {
         load_selection_canonical_page(&mut transaction, selection, sql_limit).await?
     } else {
-        load_selection_truncated_page(
-            &mut transaction,
-            selection,
-            effective_limit,
-            sql_limit,
-        )
-        .await?
+        load_selection_truncated_page(&mut transaction, selection, effective_limit, sql_limit)
+            .await?
     };
     let cursor = rows
         .last()
@@ -248,9 +241,10 @@ async fn select_workflow_execution_page(
         })?;
         store_selection_cursor(&mut transaction, selection, &updated_at, &execution_id).await?;
     }
-    transaction.commit().await.map_err(|error| {
-        db_error(format!("commit {} selection: {error}", selection.context))
-    })?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit {} selection: {error}", selection.context)))?;
     Ok(executions)
 }
 

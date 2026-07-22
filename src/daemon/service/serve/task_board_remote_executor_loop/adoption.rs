@@ -5,10 +5,9 @@ use std::path::Path;
 use crate::daemon::db::{
     AsyncDaemonDb, REMOTE_START_INTERRUPTED_WITHOUT_RUN_ERROR_CODE,
     REMOTE_START_INTERRUPTED_WITHOUT_RUN_FAILURE_CLASS, REMOTE_START_PREFLIGHT_ERROR_CODE,
-    REMOTE_START_PREFLIGHT_FAILURE_CLASS,
-    TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorStartIoPermit,
-    TaskBoardRemoteExecutorStopAuthority, TaskBoardRemoteExecutorStopReason,
-    TaskBoardRemoteMutationOutcome, executor_start_authority,
+    REMOTE_START_PREFLIGHT_FAILURE_CLASS, TaskBoardRemoteAssignmentRecord,
+    TaskBoardRemoteExecutorStartIoPermit, TaskBoardRemoteExecutorStopAuthority,
+    TaskBoardRemoteExecutorStopReason, TaskBoardRemoteMutationOutcome, executor_start_authority,
 };
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::CodexRunSnapshot;
@@ -37,26 +36,31 @@ pub(super) async fn execute_and_reconcile_remote_worker(
     action: PreparedRemoteWorkerAction,
     workspace: &Path,
 ) -> Result<(), CliError> {
-    let snapshot = match execute_remote_worker_action(state, db, offer, identity, &action, workspace).await {
-        Ok(snapshot) => snapshot,
-        Err(error) => {
-            return match action.fresh_start_permit() {
-                Some(permit) => reconcile_fresh_start_failure(db, &record, identity, permit, error).await,
-                // A probe (recovery) failure has launched nothing new: defer and
-                // let the next scan retry against fresh run evidence.
-                None => Err(error),
-            };
-        }
-    };
+    let snapshot =
+        match execute_remote_worker_action(state, db, offer, identity, &action, workspace).await {
+            Ok(snapshot) => snapshot,
+            Err(error) => {
+                return match action.fresh_start_permit() {
+                    Some(permit) => {
+                        reconcile_fresh_start_failure(db, &record, identity, permit, error).await
+                    }
+                    // A probe (recovery) failure has launched nothing new: defer and
+                    // let the next scan retry against fresh run evidence.
+                    None => Err(error),
+                };
+            }
+        };
     let permit = action.permit();
     if record.state == TaskBoardRemoteAssignmentState::Claimed && permit.is_none() {
         return stop_pre_permit_remote_run(state, db, &record, &snapshot).await;
     }
-    validate_or_stop(state, db, &record, offer, identity, permit, workspace, &snapshot).await?;
+    validate_or_stop(
+        state, db, &record, offer, identity, permit, workspace, &snapshot,
+    )
+    .await?;
     if record.state == TaskBoardRemoteAssignmentState::Claimed {
-        let permit = permit.ok_or_else(|| {
-            concurrent("claimed remote worker has no durable Start I/O permit")
-        })?;
+        let permit = permit
+            .ok_or_else(|| concurrent("claimed remote worker has no durable Start I/O permit"))?;
         let Some(started) = adopt_remote_start(state, db, permit, &snapshot, workspace).await?
         else {
             return Ok(());
@@ -70,14 +74,8 @@ pub(super) async fn execute_and_reconcile_remote_worker(
         }
     }
     if !snapshot.status.is_active() {
-        return persist_terminal_snapshot(
-            db,
-            &state.daemon_epoch,
-            &record,
-            &snapshot,
-            workspace,
-        )
-        .await;
+        return persist_terminal_snapshot(db, &state.daemon_epoch, &record, &snapshot, workspace)
+            .await;
     }
     mark_running_if_active(db, &record, &snapshot).await
 }
@@ -123,7 +121,8 @@ pub(super) async fn reconcile_persisted_start_without_run(
         .fail_task_board_remote_executor_start_without_run(permit, &response)
         .await?
     {
-        TaskBoardRemoteMutationOutcome::Updated(_) | TaskBoardRemoteMutationOutcome::Replayed(_) => Ok(()),
+        TaskBoardRemoteMutationOutcome::Updated(_)
+        | TaskBoardRemoteMutationOutcome::Replayed(_) => Ok(()),
         TaskBoardRemoteMutationOutcome::Stale(_) => Err(concurrent(
             "remote executor no-run recovery lost its claimed generation",
         )),
@@ -235,14 +234,8 @@ async fn validate_or_stop(
     };
     if let Some((stop_authority, reason)) = invalid_run_stop_source(record, permit)? {
         let validation_error = error.to_string();
-        if let Err(stop_error) = claim_and_settle_invalid_remote_run(
-            state,
-            db,
-            &stop_authority,
-            snapshot,
-            reason,
-        )
-        .await
+        if let Err(stop_error) =
+            claim_and_settle_invalid_remote_run(state, db, &stop_authority, snapshot, reason).await
         {
             return Err(CliErrorKind::workflow_io(format!(
                 "validate remote worker start: {validation_error}; stop invalid worker: {stop_error}"
@@ -367,11 +360,7 @@ async fn mark_running_if_active(
             .as_ref()
             .ok_or_else(|| concurrent("remote executor assignment has no lifecycle owner"))?;
         let _ = db
-            .mark_task_board_remote_assignment_running(
-                &record.assignment_id,
-                owner,
-                &utc_now(),
-            )
+            .mark_task_board_remote_assignment_running(&record.assignment_id, owner, &utc_now())
             .await?;
     }
     Ok(())

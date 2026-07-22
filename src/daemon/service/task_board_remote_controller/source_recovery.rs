@@ -5,17 +5,15 @@ use crate::daemon::db::{
 };
 use crate::daemon::task_board_remote_transport::controller::RemoteExecutionControllerClient;
 use crate::daemon::task_board_remote_transport::controller_offer_recovery::RemotePredecessorOfferRecoveryOutcome;
-use crate::daemon::task_board_remote_transport::controller_source_bundle::{
-    RemoteSourceBundleRecoveryOutcome,
-};
+use crate::daemon::task_board_remote_transport::controller_source_bundle::RemoteSourceBundleRecoveryOutcome;
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteOfferRequest, RemoteOfferResponse, RemoteSourceBundleAbandonRequest,
     RemoteSourceBundleAbandonResponse, RemoteSourceBundleUploadRequest,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::{
-    TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptRecord,
-    TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
+    TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptRecord, TaskBoardWorkflowExecutionCas,
+    TaskBoardWorkflowExecutionRecord,
 };
 
 pub(super) async fn progress_unclaimed_offer(
@@ -55,9 +53,7 @@ pub(super) async fn progress_unclaimed_offer(
             request,
             response,
             trust,
-        } => {
-            reassign_abandoned_source(db, assignment, &request, &response, &trust).await
-        }
+        } => reassign_abandoned_source(db, assignment, &request, &response, &trust).await,
     }
 }
 
@@ -155,9 +151,7 @@ async fn reassignment_context(
         })
         .cloned()
         .ok_or_else(|| {
-            CliErrorKind::concurrent_modification(
-                "remote source reassignment attempt disappeared",
-            )
+            CliErrorKind::concurrent_modification("remote source reassignment attempt disappeared")
         })?;
     if assignment.assignment_id != predecessor.binding.assignment_id {
         return Err(CliErrorKind::concurrent_modification(

@@ -27,27 +27,33 @@ async fn recovered_unknown_observation_settles_then_cleans_without_resuming_or_r
     let (fixture, unknown) = recovered_unknown_fixture().await;
     let calls = UnknownCalls::default();
 
-    assert!(drive_unknown_once(&fixture, &unknown, &calls)
-        .await
-        .expect("settle authenticated Unknown observation"));
+    assert!(
+        drive_unknown_once(&fixture, &unknown, &calls)
+            .await
+            .expect("settle authenticated Unknown observation")
+    );
     assert_eq!(calls.status.load(Ordering::SeqCst), 1);
     assert_eq!(calls.settle.load(Ordering::SeqCst), 1);
     assert_eq!(calls.cleanup.load(Ordering::SeqCst), 0);
     assert_recovered_unknown(&fixture).await;
 
     let settled = load_assignment(&fixture).await;
-    assert!(drive_unknown_once(&fixture, &settled, &calls)
-        .await
-        .expect("cleanup settled Unknown generation"));
+    assert!(
+        drive_unknown_once(&fixture, &settled, &calls)
+            .await
+            .expect("cleanup settled Unknown generation")
+    );
     assert_eq!(calls.status.load(Ordering::SeqCst), 1);
     assert_eq!(calls.settle.load(Ordering::SeqCst), 1);
     assert_eq!(calls.cleanup.load(Ordering::SeqCst), 1);
     assert_recovered_unknown(&fixture).await;
 
     let cleaned = load_assignment(&fixture).await;
-    assert!(!drive_unknown_once(&fixture, &cleaned, &calls)
-        .await
-        .expect("replay completed Unknown cleanup"));
+    assert!(
+        !drive_unknown_once(&fixture, &cleaned, &calls)
+            .await
+            .expect("replay completed Unknown cleanup")
+    );
     assert_eq!(calls.status.load(Ordering::SeqCst), 1);
     assert_eq!(calls.settle.load(Ordering::SeqCst), 1);
     assert_eq!(calls.cleanup.load(Ordering::SeqCst), 1);
@@ -66,17 +72,21 @@ async fn recovered_unknown_transient_status_failure_retries_before_any_settlemen
     .await
     .expect_err("transient Unknown status failure remains retryable");
     assert!(error.to_string().contains("temporary status failure"));
-    assert!(fixture
-        .db
-        .task_board_remote_settlement_receipt(&unknown.assignment_id)
-        .await
-        .expect("load premature settlement receipt")
-        .is_none());
+    assert!(
+        fixture
+            .db
+            .task_board_remote_settlement_receipt(&unknown.assignment_id)
+            .await
+            .expect("load premature settlement receipt")
+            .is_none()
+    );
     assert_eq!(calls.settle.load(Ordering::SeqCst), 0);
     assert_eq!(calls.cleanup.load(Ordering::SeqCst), 0);
-    assert!(drive_unknown_once(&fixture, &unknown, &calls)
-        .await
-        .expect("retry Unknown status after transient failure"));
+    assert!(
+        drive_unknown_once(&fixture, &unknown, &calls)
+            .await
+            .expect("retry Unknown status after transient failure")
+    );
     assert_eq!(calls.status.load(Ordering::SeqCst), 1);
     assert_eq!(calls.settle.load(Ordering::SeqCst), 1);
 }
@@ -88,11 +98,13 @@ async fn changed_unknown_observation_keeps_its_status_trust_unconsumed() {
     let mut response = unknown_status(&request, &unknown);
     response.workspace_ref = Some("changed-workspace".into());
     let response = response.seal().expect("reseal changed Unknown status");
-    assert!(fixture
-        .db
-        .claim_task_board_remote_status_io_authority(&request, HOST)
-        .await
-        .expect("claim changed Unknown status authority"));
+    assert!(
+        fixture
+            .db
+            .claim_task_board_remote_status_io_authority(&request, HOST)
+            .await
+            .expect("claim changed Unknown status authority")
+    );
     assert!(matches!(
         fixture
             .db
@@ -102,7 +114,10 @@ async fn changed_unknown_observation_keeps_its_status_trust_unconsumed() {
         TaskBoardRemoteMutationOutcome::Stale(_)
     ));
     let current = load_assignment(&fixture).await;
-    assert_eq!(current.state, crate::task_board::TaskBoardRemoteAssignmentState::Unknown);
+    assert_eq!(
+        current.state,
+        crate::task_board::TaskBoardRemoteAssignmentState::Unknown
+    );
     assert_eq!(
         current
             .controller_operation
@@ -110,12 +125,14 @@ async fn changed_unknown_observation_keeps_its_status_trust_unconsumed() {
             .map(|operation| operation.kind.as_str()),
         Some("status")
     );
-    assert!(fixture
-        .db
-        .task_board_remote_settlement_receipt(&unknown.assignment_id)
-        .await
-        .expect("load changed-evidence settlement receipt")
-        .is_none());
+    assert!(
+        fixture
+            .db
+            .task_board_remote_settlement_receipt(&unknown.assignment_id)
+            .await
+            .expect("load changed-evidence settlement receipt")
+            .is_none()
+    );
 }
 
 #[derive(Default)]
@@ -130,11 +147,13 @@ async fn recovered_unknown_fixture() -> (RemoteControllerFixture, TaskBoardRemot
     let accepted = accept_remote_controller(&fixture).await;
     let claimed = claim_remote_controller(&fixture, &accepted).await;
     let request = remote_controller_status_request(&fixture.request, &claimed);
-    assert!(fixture
-        .db
-        .claim_task_board_remote_status_io_authority(&request, HOST)
-        .await
-        .expect("claim running fixture status authority"));
+    assert!(
+        fixture
+            .db
+            .claim_task_board_remote_status_io_authority(&request, HOST)
+            .await
+            .expect("claim running fixture status authority")
+    );
     fixture
         .db
         .record_task_board_remote_assignment_status(
@@ -162,7 +181,10 @@ async fn recovered_unknown_fixture() -> (RemoteControllerFixture, TaskBoardRemot
         .expect("recover fixture to Unknown");
     assert!(recovery.failures.is_empty(), "{recovery:?}");
     let unknown = load_assignment(&fixture).await;
-    assert_eq!(unknown.state, crate::task_board::TaskBoardRemoteAssignmentState::Unknown);
+    assert_eq!(
+        unknown.state,
+        crate::task_board::TaskBoardRemoteAssignmentState::Unknown
+    );
     (fixture, unknown)
 }
 
@@ -183,7 +205,10 @@ async fn drive_unknown_once(
             let response = unknown_status(&request, &observed);
             async move {
                 status_calls.fetch_add(1, Ordering::SeqCst);
-                if !db.claim_task_board_remote_status_io_authority(&request, HOST).await? {
+                if !db
+                    .claim_task_board_remote_status_io_authority(&request, HOST)
+                    .await?
+                {
                     return Err(CliErrorKind::concurrent_modification(
                         "Unknown status lost its exact authority",
                     )
@@ -224,11 +249,15 @@ fn unknown_status(
     response.seal().expect("seal Unknown status")
 }
 
-async fn record_settlement(db: &crate::daemon::db::AsyncDaemonDb, request: &RemoteSettledRequest) -> Result<(), CliError> {
-    assert!(db
-        .claim_task_board_remote_settlement_io_authority(request, HOST, SETTLED_AT)
-        .await?
-        .is_none());
+async fn record_settlement(
+    db: &crate::daemon::db::AsyncDaemonDb,
+    request: &RemoteSettledRequest,
+) -> Result<(), CliError> {
+    assert!(
+        db.claim_task_board_remote_settlement_io_authority(request, HOST, SETTLED_AT)
+            .await?
+            .is_none()
+    );
     let response = RemoteSettledResponse {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: request.binding.clone(),
@@ -246,10 +275,11 @@ async fn record_cleanup(
     request: &RemoteCleanupObservationRequest,
 ) -> Result<(), CliError> {
     let trust = db.task_board_remote_host_trust_fence(HOST).await?;
-    assert!(db
-        .claim_task_board_remote_cleanup_observation_fenced(request, HOST, &trust)
-        .await?
-        .is_none());
+    assert!(
+        db.claim_task_board_remote_cleanup_observation_fenced(request, HOST, &trust)
+            .await?
+            .is_none()
+    );
     let response = RemoteCleanupObservationResponse::for_completed(request, CLEANED_AT.into())
         .map_err(|error| CliErrorKind::workflow_io(format!("seal cleanup response: {error}")))?;
     db.record_task_board_remote_cleanup_observation(request, &response, HOST, &trust)
@@ -278,7 +308,10 @@ async fn assert_recovered_unknown(fixture: &RemoteControllerFixture) {
         .task_board_item(&fixture.execution.item_id)
         .await
         .expect("load recovered Unknown item");
-    assert_eq!(parent.transition.execution_state, TaskBoardExecutionState::HumanRequired);
+    assert_eq!(
+        parent.transition.execution_state,
+        TaskBoardExecutionState::HumanRequired
+    );
     assert_eq!(parent.attempts[0].state, TaskBoardAttemptState::Unknown);
     assert_eq!(item.status, TaskBoardStatus::HumanRequired);
     assert_eq!(item.workflow.status, TaskBoardWorkflowStatus::Paused);

@@ -54,7 +54,9 @@ fn test_extra_roots() -> Result<Option<Vec<CertificateDer<'static>>>, RemoteTlsP
     let Some(encoded) = std::env::var_os(TEST_EXTRA_ROOTS_HEX_ENV) else {
         return Ok(None);
     };
-    let encoded = encoded.into_string().map_err(|_| RemoteTlsPinError::PlatformVerifier)?;
+    let encoded = encoded
+        .into_string()
+        .map_err(|_| RemoteTlsPinError::PlatformVerifier)?;
     let bytes = hex::decode(encoded).map_err(|_| RemoteTlsPinError::PlatformVerifier)?;
     if bytes.is_empty() {
         return Err(RemoteTlsPinError::PlatformVerifier);
@@ -83,8 +85,8 @@ fn pinned_client_config(
     verifier: Arc<dyn ServerCertVerifier>,
     provider: Arc<rustls::crypto::CryptoProvider>,
 ) -> Result<ClientConfig, RemoteTlsPinError> {
-    let expected = remote_spki_pin::decode(expected_spki_sha256)
-        .ok_or(RemoteTlsPinError::InvalidPin)?;
+    let expected =
+        remote_spki_pin::decode(expected_spki_sha256).ok_or(RemoteTlsPinError::InvalidPin)?;
     ClientConfig::builder_with_provider(provider)
         .with_safe_default_protocol_versions()
         .map_err(|_| RemoteTlsPinError::ClientConfiguration)

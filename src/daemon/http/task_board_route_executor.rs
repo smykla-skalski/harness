@@ -61,7 +61,10 @@ pub(crate) async fn deliver(
     request: &TaskBoardDispatchDeliverRequest,
 ) -> Result<TaskBoardDispatchDeliverResponse, CliError> {
     let db = require_async_db(state, "task board dispatch deliver")?;
-    Box::pin(service::recover_remote_assignments_before_local_work(state, db)).await?;
+    Box::pin(service::recover_remote_assignments_before_local_work(
+        state, db,
+    ))
+    .await?;
     if request.dry_run {
         let held = db.held_task_board_dispatch(&request.item_id).await?;
         return Ok(TaskBoardDispatchDeliverResponse {
@@ -86,7 +89,10 @@ pub(crate) async fn pick(
     state: &DaemonHttpState,
 ) -> Result<TaskBoardDispatchPickResponse, CliError> {
     let db = require_async_db(state, "task board dispatch pick")?;
-    Box::pin(service::recover_remote_assignments_before_local_work(state, db)).await?;
+    Box::pin(service::recover_remote_assignments_before_local_work(
+        state, db,
+    ))
+    .await?;
     service::pick_task_board_dispatch_async(db).await
 }
 

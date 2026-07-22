@@ -53,19 +53,22 @@ impl AsyncDaemonDb {
         assignment_id: &str,
         fencing_epoch: u64,
     ) -> Result<Option<RemoteSourceBundleUploadRequest>, CliError> {
-        let mut transaction = self.pool().begin().await.map_err(|error| {
-            db_error(format!("begin remote outbound source load: {error}"))
-        })?;
-        let source = load_outbound_source_in_tx(&mut transaction, assignment_id, fencing_epoch)
-            .await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit remote outbound source load: {error}"))
-        })?;
+        let mut transaction = self
+            .pool()
+            .begin()
+            .await
+            .map_err(|error| db_error(format!("begin remote outbound source load: {error}")))?;
+        let source =
+            load_outbound_source_in_tx(&mut transaction, assignment_id, fencing_epoch).await?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit remote outbound source load: {error}")))?;
         source
             .map(|source| {
-                source.upload.ok_or_else(|| {
-                    concurrent("remote outbound source bytes were durably pruned")
-                })
+                source
+                    .upload
+                    .ok_or_else(|| concurrent("remote outbound source bytes were durably pruned"))
             })
             .transpose()
     }
@@ -75,18 +78,20 @@ impl AsyncDaemonDb {
         assignment_id: &str,
         fencing_epoch: u64,
     ) -> Result<bool, CliError> {
-        let mut transaction = self.pool().begin().await.map_err(|error| {
-            db_error(format!("begin remote source ownership check: {error}"))
-        })?;
+        let mut transaction =
+            self.pool().begin().await.map_err(|error| {
+                db_error(format!("begin remote source ownership check: {error}"))
+            })?;
         let owned = source_recovery_owns_offered_generation_in_tx(
             &mut transaction,
             assignment_id,
             fencing_epoch,
         )
         .await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit remote source ownership check: {error}"))
-        })?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit remote source ownership check: {error}")))?;
         Ok(owned)
     }
 }
@@ -185,9 +190,7 @@ pub(super) async fn exact_outbound_source_content_in_tx(
     offer: &RemoteOfferRequest,
 ) -> Result<Vec<u8>, CliError> {
     if !offer.source.requires_upload() {
-        return Err(db_error(
-            "repository source has no durable outbound bundle",
-        ));
+        return Err(db_error("repository source has no durable outbound bundle"));
     }
     let source = load_outbound_source_in_tx(
         transaction,
@@ -233,7 +236,10 @@ async fn insert_outbound_source_in_tx(
          )",
     )
     .bind(&binding.assignment_id)
-    .bind(to_i64(binding.fencing_epoch, "outbound source fencing epoch")?)
+    .bind(to_i64(
+        binding.fencing_epoch,
+        "outbound source fencing epoch",
+    )?)
     .bind(&binding.execution_id)
     .bind(&binding.action_key)
     .bind(i64::from(binding.attempt))
@@ -301,10 +307,9 @@ impl OutboundSourceRow {
         }
         let upload = match self.content_pruned_at.as_deref() {
             None => {
-                let upload = RemoteSourceBundleUploadRequest::seal(offer, &self.content)
-                    .map_err(|error| {
-                        db_error(format!("validate remote outbound source bytes: {error}"))
-                    })?;
+                let upload = RemoteSourceBundleUploadRequest::seal(offer, &self.content).map_err(
+                    |error| db_error(format!("validate remote outbound source bytes: {error}")),
+                )?;
                 if upload.request_sha256 != self.upload_request_sha256 {
                     return Err(db_error(
                         "remote outbound source request digest is inconsistent",

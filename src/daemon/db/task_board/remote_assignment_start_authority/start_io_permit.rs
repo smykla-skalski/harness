@@ -11,17 +11,14 @@ use super::{
 };
 use crate::daemon::db::task_board::ORCHESTRATOR_CHANGE_SCOPE;
 use crate::daemon::db::task_board::items::bump_change_in_tx;
-use crate::daemon::db::task_board::remote_assignment_lease::{
-    commit_noop, require_assignment,
-};
+use crate::daemon::db::task_board::remote_assignment_lease::{commit_noop, require_assignment};
 use crate::daemon::db::task_board::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, canonical_time, concurrent, to_i64,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 
-const START_IO_PERMIT_DOMAIN: &str =
-    "harness.task-board.remote-executor-start-io-permit.v1";
+const START_IO_PERMIT_DOMAIN: &str = "harness.task-board.remote-executor-start-io-permit.v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TaskBoardRemoteExecutorStartIoPermit {
@@ -97,7 +94,9 @@ impl AsyncDaemonDb {
                 ));
             }
             commit_noop(transaction, "replayed remote executor Start I/O permit").await?;
-            return Ok(TaskBoardRemoteExecutorStartIoPermitOutcome::Replayed(permit));
+            return Ok(TaskBoardRemoteExecutorStartIoPermitOutcome::Replayed(
+                permit,
+            ));
         }
         let host_instance_id = record
             .claimed_host_instance_id
@@ -130,18 +129,15 @@ impl AsyncDaemonDb {
                 "remote executor Start I/O permit found a pre-authority run",
             ));
         }
-        let permit = persist_start_io_permit(
-            &mut transaction,
-            &record,
-            authority,
-            permitted_at,
-        )
-        .await?;
+        let permit =
+            persist_start_io_permit(&mut transaction, &record, authority, permitted_at).await?;
         bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
         transaction.commit().await.map_err(|error| {
             db_error(format!("commit remote executor Start I/O permit: {error}"))
         })?;
-        Ok(TaskBoardRemoteExecutorStartIoPermitOutcome::Acquired(permit))
+        Ok(TaskBoardRemoteExecutorStartIoPermitOutcome::Acquired(
+            permit,
+        ))
     }
 }
 
@@ -165,17 +161,19 @@ async fn persist_start_io_permit(
                AND executor_stop_pending_sha256 IS NULL",
     )
     .bind(&record.assignment_id)
-        .bind(&sha256)
-        .bind(permitted_at)
-        .bind(to_i64(record.fencing_epoch, "assignment fencing epoch")?)
-        .bind(&authority.sha256)
-        .bind(&authority.acquired_at)
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("claim remote executor Start I/O permit: {error}")))?
+    .bind(&sha256)
+    .bind(permitted_at)
+    .bind(to_i64(record.fencing_epoch, "assignment fencing epoch")?)
+    .bind(&authority.sha256)
+    .bind(&authority.acquired_at)
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("claim remote executor Start I/O permit: {error}")))?
     .rows_affected();
     if rows != 1 {
-        return Err(concurrent("remote executor Start I/O permit lost its fence"));
+        return Err(concurrent(
+            "remote executor Start I/O permit lost its fence",
+        ));
     }
     Ok(TaskBoardRemoteExecutorStartIoPermit {
         assignment_id: record.assignment_id.clone(),
@@ -228,7 +226,9 @@ pub(crate) fn executor_start_io_permit(
         "remote executor Start I/O deadline",
     )?;
     if permit_time < authority_time || permit_time >= lease_time || permit_time >= deadline_time {
-        return Err(db_error("remote executor Start I/O permit chronology is invalid"));
+        return Err(db_error(
+            "remote executor Start I/O permit chronology is invalid",
+        ));
     }
     if record.legacy_migrated
         || record.state != TaskBoardRemoteAssignmentState::Claimed
@@ -347,7 +347,11 @@ async fn exact_provisioned_session(
     .bind(format!("harness/{}", identity.session_id))
     .fetch_one(transaction.as_mut())
     .await
-    .map_err(|error| db_error(format!("verify provisioned remote executor session: {error}")))
+    .map_err(|error| {
+        db_error(format!(
+            "verify provisioned remote executor session: {error}"
+        ))
+    })
 }
 
 async fn deterministic_run_exists(
@@ -363,11 +367,13 @@ async fn deterministic_run_exists(
 
 fn canonical_project_dir(project_dir: &Path) -> Result<String, CliError> {
     if !project_dir.is_absolute()
-        || project_dir.components().any(|component| {
-            matches!(component, Component::CurDir | Component::ParentDir)
-        })
+        || project_dir
+            .components()
+            .any(|component| matches!(component, Component::CurDir | Component::ParentDir))
     {
-        return Err(db_error("remote executor Start I/O project path is not canonical"));
+        return Err(db_error(
+            "remote executor Start I/O project path is not canonical",
+        ));
     }
     project_dir
         .to_str()

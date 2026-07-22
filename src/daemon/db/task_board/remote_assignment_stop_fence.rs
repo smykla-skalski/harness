@@ -59,9 +59,12 @@ pub(super) async fn remote_target_stop_plan_in_tx(
     ) {
         return deferred_cancel_plan(current, updated, &assignment);
     }
-    if assignment.state != TaskBoardRemoteAssignmentState::Offered || assignment.claimed_at.is_some()
+    if assignment.state != TaskBoardRemoteAssignmentState::Offered
+        || assignment.claimed_at.is_some()
     {
-        return Err(concurrent("remote workflow target cannot be stopped safely"));
+        return Err(concurrent(
+            "remote workflow target cannot be stopped safely",
+        ));
     }
     let stopped_at = updated
         .completed_at

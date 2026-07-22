@@ -98,14 +98,17 @@ impl GitBundleExportPlan {
             ..GitBundleContentLimits::REMOTE_RESULT
         };
         let excluded = format!("^{}", self.base_revision);
-        let output = self.git_mutation_bounded_stdout([
-            "bundle",
-            "create",
-            "--version=2",
-            "-",
-            self.advertised_ref.as_str(),
-            excluded.as_str(),
-        ], limits.max_bundle_bytes)?;
+        let output = self.git_mutation_bounded_stdout(
+            [
+                "bundle",
+                "create",
+                "--version=2",
+                "-",
+                self.advertised_ref.as_str(),
+                excluded.as_str(),
+            ],
+            limits.max_bundle_bytes,
+        )?;
         let bytes = output.stdout;
         require_bounded_bundle(&self.worktree, &bytes, limits)?;
         // The result bundle always carries a `^base` prerequisite, and recent git
@@ -180,20 +183,18 @@ impl GitBundleExportPlan {
     }
 
     fn require_exact_head(&self, bytes: &[u8]) -> GitResult<()> {
-        let max_output = u64::try_from(bytes.len()).map_err(|_| {
-            GitError::unsafe_state(&self.worktree, "git bundle length overflowed")
-        })?;
-        let output = self.git_contract_bounded_with_input(
-            ["bundle", "list-heads", "-"],
-            bytes,
-            max_output,
-        )?;
+        let max_output = u64::try_from(bytes.len())
+            .map_err(|_| GitError::unsafe_state(&self.worktree, "git bundle length overflowed"))?;
+        let output =
+            self.git_contract_bounded_with_input(["bundle", "list-heads", "-"], bytes, max_output)?;
         let heads = stdout(&output);
-        let lines = heads.lines().filter(|line| !line.is_empty()).collect::<Vec<_>>();
+        let lines = heads
+            .lines()
+            .filter(|line| !line.is_empty())
+            .collect::<Vec<_>>();
         let exact = lines.first().and_then(|line| line.split_once(' '));
         if lines.len() == 1
-            && exact
-                == Some((self.result_revision.as_str(), self.advertised_ref.as_str()))
+            && exact == Some((self.result_revision.as_str(), self.advertised_ref.as_str()))
         {
             Ok(())
         } else {
@@ -235,7 +236,11 @@ impl GitBundleExportPlan {
     }
 
     fn revision(&self, revision: &str) -> GitResult<String> {
-        Ok(stdout(&self.git_read(["rev-parse", "--verify", revision])?))
+        Ok(stdout(&self.git_read([
+            "rev-parse",
+            "--verify",
+            revision,
+        ])?))
     }
 
     fn optional_revision(&self, revision: &str) -> GitResult<Option<String>> {
@@ -277,8 +282,7 @@ impl GitBundleExportPlan {
         input: &[u8],
         max_bytes: u64,
     ) -> GitResult<Output> {
-        GitCommandRunner::new(&self.worktree)
-            .contract_bounded_with_input(args, input, max_bytes)
+        GitCommandRunner::new(&self.worktree).contract_bounded_with_input(args, input, max_bytes)
     }
 
     fn git_probe<const N: usize>(&self, args: [&str; N]) -> GitResult<Output> {

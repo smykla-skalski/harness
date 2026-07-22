@@ -6,14 +6,14 @@ use crate::daemon::protocol::SessionStartRequest;
 use crate::daemon::service::start_session_direct_async;
 use crate::session::types::SessionState;
 use crate::task_board::{
-    AgentMode, SpawnGateSwitches, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
-    TaskBoardItem, TaskBoardPolicyLimit, TaskBoardPolicyScope, TaskBoardReadOnlyRunContext,
+    AgentMode, SpawnGateSwitches, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardItem,
+    TaskBoardPolicyLimit, TaskBoardPolicyScope, TaskBoardReadOnlyRunContext,
     TaskBoardReadOnlyWorkflowLaunch, TaskBoardWorkflowKind, build_dispatch_plans_with_policy,
     resolve_task_board_reviewers,
 };
 
-use super::fixture::{FROZEN_HEAD, Fixture, NOW, seed_settings};
 use super::super::task_board_workflow_test_support::TestDatabase;
+use super::fixture::{FROZEN_HEAD, Fixture, NOW, seed_settings};
 
 pub(super) async fn seed_dispatched_initial_report(label: &str) -> Fixture {
     let test = TestDatabase::open().await;
@@ -56,12 +56,8 @@ pub(super) async fn seed_dispatched_initial_report(label: &str) -> Fixture {
         .expect("claim dispatched report preparation")
         .expect("pending dispatched report preparation");
     let fixture_root = test.path.parent().expect("prepared report fixture root");
-    let session = start_dispatch_session(
-        &test.db,
-        fixture_root,
-        &preparation.preparation.session_id,
-    )
-    .await;
+    let session =
+        start_dispatch_session(&test.db, fixture_root, &preparation.preparation.session_id).await;
     let worktree = session.worktree_path.to_string_lossy().into_owned();
     let launch = launch(&test.db, &item_id, &session).await;
     let applied = test

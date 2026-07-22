@@ -43,24 +43,40 @@ async fn dirty_applied_replay_projects_manual_required_without_overwriting_workt
     let journal = candidate
         .prepared
         .db
-        .task_board_remote_result_import(
-            &candidate.prepared.offer.binding.assignment_id,
-            1,
-        )
+        .task_board_remote_result_import(&candidate.prepared.offer.binding.assignment_id, 1)
         .await
         .expect("load manual import journal")
         .expect("manual import journal");
-    assert_eq!(journal.state, TaskBoardRemoteResultImportState::ManualRequired);
-    assert!(journal.last_error.as_deref().is_some_and(|error| error.contains("unsafe")));
+    assert_eq!(
+        journal.state,
+        TaskBoardRemoteResultImportState::ManualRequired
+    );
+    assert!(
+        journal
+            .last_error
+            .as_deref()
+            .is_some_and(|error| error.contains("unsafe"))
+    );
     let parent = load_parent(&candidate.prepared).await;
-    assert_eq!(parent.transition.execution_state, TaskBoardExecutionState::HumanRequired);
-    assert_eq!(parent.blocked_reason.as_deref(), Some("remote_result_import_manual_required"));
+    assert_eq!(
+        parent.transition.execution_state,
+        TaskBoardExecutionState::HumanRequired
+    );
+    assert_eq!(
+        parent.blocked_reason.as_deref(),
+        Some("remote_result_import_manual_required")
+    );
     assert_eq!(parent.attempts[0].state, TaskBoardAttemptState::Failed);
-    assert_eq!(parent.attempts[0].failure_class, Some(TaskBoardFailureClass::Permanent));
-    assert!(!parent
-        .ownership
-        .resources
-        .contains_key(TASK_BOARD_REMOTE_RESULT_IMPORT_AUTHORITY_RESOURCE));
+    assert_eq!(
+        parent.attempts[0].failure_class,
+        Some(TaskBoardFailureClass::Permanent)
+    );
+    assert!(
+        !parent
+            .ownership
+            .resources
+            .contains_key(TASK_BOARD_REMOTE_RESULT_IMPORT_AUTHORITY_RESOURCE)
+    );
     assert_eq!(
         candidate
             .prepared
@@ -71,7 +87,10 @@ async fn dirty_applied_replay_projects_manual_required_without_overwriting_workt
             .status,
         TaskBoardStatus::HumanRequired
     );
-    assert_eq!(intent_status(&candidate.prepared.db, &candidate.prepared.intent).await, "completed");
+    assert_eq!(
+        intent_status(&candidate.prepared.db, &candidate.prepared.intent).await,
+        "completed"
+    );
     assert_eq!(
         ledger_kind_state(&candidate.prepared.db, &candidate.prepared.intent, "rate").await,
         "committed"

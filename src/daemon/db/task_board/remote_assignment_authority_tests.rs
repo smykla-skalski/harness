@@ -89,11 +89,7 @@ async fn io_authority_persists_the_canonical_monotonic_authority_time() {
     let _ = offer_controller(&fixture).await;
     fixture
         .db
-        .claim_task_board_remote_offer_io_authority(
-            &fixture.request,
-            HOST,
-            "2026-07-19T10:00:01Z",
-        )
+        .claim_task_board_remote_offer_io_authority(&fixture.request, HOST, "2026-07-19T10:00:01Z")
         .await
         .expect("claim offer authority")
         .expect("active offer authority");

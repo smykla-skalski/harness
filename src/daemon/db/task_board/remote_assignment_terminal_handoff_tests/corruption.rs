@@ -3,7 +3,7 @@ use sqlx::{Executor, query};
 use super::super::TaskBoardRemoteMutationOutcome;
 use super::super::remote_assignment_generation_tests::accept_controller;
 use super::super::remote_assignment_test_support::{
-    CLAIMED_AT, HOST, ControllerFixture, controller_fixture,
+    CLAIMED_AT, ControllerFixture, HOST, controller_fixture,
 };
 use super::{HANDOFF_AT as TERMINAL_HANDOFF_AT, restore_parent_to_targetless_preparing};
 use crate::daemon::task_board_remote_transport::wire::{
@@ -99,7 +99,12 @@ async fn same_target_cancelled_generation_without_handoff_cannot_create_cleanup_
         .expect("cancelled corruption authority remains active");
     let cancelled = match fixture
         .db
-        .record_task_board_remote_assignment_cancel(&request, &response, HOST, "2026-07-19T10:00:11Z")
+        .record_task_board_remote_assignment_cancel(
+            &request,
+            &response,
+            HOST,
+            "2026-07-19T10:00:11Z",
+        )
         .await
         .expect("persist cancelled corruption fixture")
     {
@@ -168,11 +173,8 @@ async fn uppercase_or_malformed_terminal_handoff_evidence_fails_closed() {
 #[tokio::test]
 async fn schema_valid_mismatched_terminal_handoff_kind_is_not_settlement_authority() {
     let fixture = controller_fixture(1).await;
-    let assignment = super::detached_terminal_assignment(
-        &fixture,
-        TaskBoardRemoteAssignmentState::Failed,
-    )
-    .await;
+    let assignment =
+        super::detached_terminal_assignment(&fixture, TaskBoardRemoteAssignmentState::Failed).await;
     let parent = fixture
         .db
         .task_board_workflow_execution(&fixture.execution.execution_id)
@@ -210,10 +212,7 @@ async fn schema_valid_mismatched_terminal_handoff_kind_is_not_settlement_authori
     );
 }
 
-async fn assert_no_handoff(
-    fixture: &ControllerFixture,
-    assignment_id: &str,
-) {
+async fn assert_no_handoff(fixture: &ControllerFixture, assignment_id: &str) {
     let assignment = fixture
         .db
         .task_board_remote_assignment(assignment_id)
@@ -222,14 +221,16 @@ async fn assert_no_handoff(
         .expect("rejected cleanup assignment exists");
     assert_eq!(assignment.state, TaskBoardRemoteAssignmentState::Superseded);
     assert!(assignment.cleanup_completed_at.is_none());
-    assert!(!fixture
-        .db
-        .task_board_remote_assignment_has_settlement_handoff(
-            assignment_id,
-            assignment.fencing_epoch,
-        )
-        .await
-        .expect("same-target rejection leaves no handoff"));
+    assert!(
+        !fixture
+            .db
+            .task_board_remote_assignment_has_settlement_handoff(
+                assignment_id,
+                assignment.fencing_epoch,
+            )
+            .await
+            .expect("same-target rejection leaves no handoff")
+    );
 }
 
 async fn assert_no_terminal_handoff(
@@ -237,15 +238,19 @@ async fn assert_no_terminal_handoff(
     assignment_id: &str,
     fencing_epoch: u64,
 ) {
-    assert!(!fixture
-        .db
-        .task_board_remote_assignment_has_settlement_handoff(assignment_id, fencing_epoch)
-        .await
-        .expect("same-target rejection leaves no terminal handoff"));
+    assert!(
+        !fixture
+            .db
+            .task_board_remote_assignment_has_settlement_handoff(assignment_id, fencing_epoch)
+            .await
+            .expect("same-target rejection leaves no terminal handoff")
+    );
 }
 
-async fn detached_superseded_handoff(
-) -> (ControllerFixture, super::super::TaskBoardRemoteAssignmentRecord) {
+async fn detached_superseded_handoff() -> (
+    ControllerFixture,
+    super::super::TaskBoardRemoteAssignmentRecord,
+) {
     let fixture = controller_fixture(1).await;
     let _ = accept_controller(&fixture).await;
     restore_parent_to_targetless_preparing(&fixture).await;

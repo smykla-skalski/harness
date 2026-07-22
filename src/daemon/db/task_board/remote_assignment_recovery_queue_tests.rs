@@ -96,11 +96,15 @@ async fn a_migrated_row_never_starves_or_is_mutated_by_current_recovery_across_r
         .await
         .expect("capture due recovery snapshot");
     assert!(
-        candidates.iter().any(|c| c.assignment_id == assignment.assignment_id),
+        candidates
+            .iter()
+            .any(|c| c.assignment_id == assignment.assignment_id),
         "the healthy current assignment must be recoverable alongside a migrated row"
     );
     assert!(
-        candidates.iter().all(|c| c.assignment_id != "legacy-superseded"),
+        candidates
+            .iter()
+            .all(|c| c.assignment_id != "legacy-superseded"),
         "a migrated row must never enter the recovery due page"
     );
     let current = candidates
@@ -129,7 +133,9 @@ async fn a_migrated_row_never_starves_or_is_mutated_by_current_recovery_across_r
         .await
         .expect("due recovery snapshot after restart");
     assert!(
-        after_restart.iter().all(|c| c.assignment_id != "legacy-superseded"),
+        after_restart
+            .iter()
+            .all(|c| c.assignment_id != "legacy-superseded"),
         "a migrated row must stay out of recovery across restart"
     );
 }

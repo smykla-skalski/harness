@@ -154,7 +154,10 @@ async fn require_artifact_count(
          WHERE assignment_id = ?1 AND fencing_epoch = ?2",
     )
     .bind(&assignment.assignment_id)
-    .bind(to_i64(assignment.fencing_epoch, "result adoption fencing epoch")?)
+    .bind(to_i64(
+        assignment.fencing_epoch,
+        "result adoption fencing epoch",
+    )?)
     .fetch_one(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("count fetched remote artifacts: {error}")))?;

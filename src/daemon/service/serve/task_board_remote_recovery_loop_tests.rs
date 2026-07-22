@@ -25,8 +25,8 @@ fn recovery_schedule_uses_earlier_remote_deadline_and_backs_off_failures() {
     let scheduled = next_deadline(Some(&deadline), fallback).expect("remote deadline");
     assert!(scheduled <= Instant::now() + Duration::from_secs(6));
 
-    let expired = (Utc::now() - ChronoDuration::seconds(5))
-        .to_rfc3339_opts(SecondsFormat::Secs, true);
+    let expired =
+        (Utc::now() - ChronoDuration::seconds(5)).to_rfc3339_opts(SecondsFormat::Secs, true);
     let expired_wake = next_deadline(Some(&expired), fallback).expect("expired remote deadline");
     assert!(expired_wake >= Instant::now() + Duration::from_millis(900));
     assert!(expired_wake <= Instant::now() + Duration::from_secs(2));

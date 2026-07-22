@@ -8,8 +8,8 @@ use crate::daemon::db::task_board::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, concurrent, to_i64,
 };
 use crate::daemon::db::task_board::remote_lifecycle_trust::{
-    TaskBoardRemoteLifecycleTrustSnapshot, digest_values,
-    load_generation_lifecycle_trust_in_tx, require_stable_configured_host_in_tx,
+    TaskBoardRemoteLifecycleTrustSnapshot, digest_values, load_generation_lifecycle_trust_in_tx,
+    require_stable_configured_host_in_tx,
 };
 use crate::daemon::db::{CliError, TaskBoardRemoteHostTrustFence, db_error};
 
@@ -27,13 +27,8 @@ pub(in crate::daemon::db::task_board) async fn claim_controller_operation_trust_
         assignment.fencing_epoch,
     )
     .await?;
-    let current = load_operation_fence_for_kind_in_tx(
-        transaction,
-        assignment,
-        kind,
-        &generation,
-    )
-    .await?;
+    let current =
+        load_operation_fence_for_kind_in_tx(transaction, assignment, kind, &generation).await?;
     if expected.is_some_and(|expected| *expected != current) {
         return Err(concurrent(
             "remote host trust changed before I/O authority claim",
@@ -55,7 +50,8 @@ pub(in crate::daemon::db::task_board) async fn claim_controller_operation_trust_
             )
             .await?;
         }
-        Some(operation) if operation_matches(operation, kind, request_sha256, &trust_sha256, &fence) => {}
+        Some(operation)
+            if operation_matches(operation, kind, request_sha256, &trust_sha256, &fence) => {}
         _ => {
             return Err(concurrent(
                 "remote assignment has another active controller operation",
@@ -77,20 +73,16 @@ pub(in crate::daemon::db::task_board) async fn consume_controller_operation_trus
         assignment.fencing_epoch,
     )
     .await?;
-    let current = load_operation_fence_for_kind_in_tx(
-        transaction,
-        assignment,
-        kind,
-        &generation,
-    )
-    .await?;
+    let current =
+        load_operation_fence_for_kind_in_tx(transaction, assignment, kind, &generation).await?;
     require_assignment_fence(assignment, &current, kind)?;
     generation.require_stable_transport(&current.host)?;
     let fence = operation_snapshot(&current)?;
     let trust_sha256 = operation_digest(assignment, kind, request_sha256, &fence);
-    let operation = assignment.controller_operation.as_ref().ok_or_else(|| {
-        concurrent("remote response lost its exact current host trust fence")
-    })?;
+    let operation = assignment
+        .controller_operation
+        .as_ref()
+        .ok_or_else(|| concurrent("remote response lost its exact current host trust fence"))?;
     if !operation_matches(operation, kind, request_sha256, &trust_sha256, &fence) {
         return Err(concurrent(
             "remote response lost its exact current host trust fence",
@@ -130,12 +122,14 @@ pub(in crate::daemon::db::task_board) async fn require_pending_operation_replay_
         assignment.target_host_instance_id.as_deref(),
     )?;
     generation.require_stable_transport(&current)?;
-    let operation = assignment.controller_operation.as_ref().ok_or_else(|| {
-        concurrent("pending operation replay lost its immutable operation token")
-    })?;
-    let fence = operation.fence.as_ref().ok_or_else(|| {
-        concurrent("pending operation replay has no immutable lifecycle fence")
-    })?;
+    let operation = assignment
+        .controller_operation
+        .as_ref()
+        .ok_or_else(|| concurrent("pending operation replay lost its immutable operation token"))?;
+    let fence = operation
+        .fence
+        .as_ref()
+        .ok_or_else(|| concurrent("pending operation replay has no immutable lifecycle fence"))?;
     fence.require_generation_binding(
         &assignment.host_id,
         assignment.configuration_revision,

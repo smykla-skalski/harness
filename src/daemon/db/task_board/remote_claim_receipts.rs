@@ -1,8 +1,6 @@
 use sha2::{Digest, Sha256};
 
-use super::remote_assignment_model::{
-    TaskBoardRemoteAssignmentRecord, concurrent, nonblank,
-};
+use super::remote_assignment_model::{TaskBoardRemoteAssignmentRecord, concurrent, nonblank};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteClaimRequest, RemoteClaimResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,

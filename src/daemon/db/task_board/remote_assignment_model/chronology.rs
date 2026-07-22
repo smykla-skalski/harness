@@ -3,9 +3,7 @@ use chrono::{DateTime, Utc};
 use super::{RemoteAssignmentRow, canonical_time};
 use crate::daemon::db::{CliError, db_error};
 
-pub(super) fn validate_persisted_chronology(
-    row: &RemoteAssignmentRow,
-) -> Result<(), CliError> {
+pub(super) fn validate_persisted_chronology(row: &RemoteAssignmentRow) -> Result<(), CliError> {
     canonical_time(&row.offered_at, "durable remote assignment offer time")?;
     canonical_time(&row.updated_at, "durable remote assignment update time")?;
     let claimed = optional_canonical_time(
@@ -44,7 +42,10 @@ pub(super) fn validate_persisted_chronology(
     ] {
         optional_canonical_time(value, field)?;
     }
-    if claimed.zip(started).is_some_and(|(claim, start)| start < claim) {
+    if claimed
+        .zip(started)
+        .is_some_and(|(claim, start)| start < claim)
+    {
         return Err(db_error(
             "durable remote assignment start time precedes claim time",
         ));

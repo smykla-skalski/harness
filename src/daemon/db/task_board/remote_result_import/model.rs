@@ -58,10 +58,7 @@ impl TaskBoardRemoteResultImportRequest {
             || !canonical_path(&self.git_dir)
             || !canonical_path(&self.common_git_dir)
             || !canonical_ref(&self.branch_ref, "refs/heads/")
-            || !canonical_ref(
-                &self.advertised_ref,
-                "refs/harness/task-board/results/",
-            )
+            || !canonical_ref(&self.advertised_ref, "refs/harness/task-board/results/")
             || !canonical_ref(&self.import_ref, "refs/harness/task-board/imports/")
             || self.advertised_ref == self.import_ref
         {
@@ -72,7 +69,11 @@ impl TaskBoardRemoteResultImportRequest {
         let oid_len = match self.object_format.as_str() {
             "sha1" => 40,
             "sha256" => 64,
-            _ => return Err(db_error("remote result import object format is unsupported")),
+            _ => {
+                return Err(db_error(
+                    "remote result import object format is unsupported",
+                ));
+            }
         };
         if !canonical_oid(&self.base_revision, oid_len)
             || !canonical_oid(&self.result_revision, oid_len)
@@ -346,9 +347,7 @@ fn canonical_ref(value: &str, prefix: &str) -> bool {
         && !value.contains("//")
         && !name.contains("@{")
         && name.split('/').all(|component| {
-            !component.is_empty()
-                && !component.starts_with('.')
-                && !component.ends_with(".lock")
+            !component.is_empty() && !component.starts_with('.') && !component.ends_with(".lock")
         })
 }
 

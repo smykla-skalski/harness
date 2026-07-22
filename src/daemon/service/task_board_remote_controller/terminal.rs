@@ -2,9 +2,7 @@ use std::future::Future;
 
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome,
-    TaskBoardRemoteResultAdoptionOutcome,
-    exact_active_remote_target,
-    parent_points_to_assignment,
+    TaskBoardRemoteResultAdoptionOutcome, exact_active_remote_target, parent_points_to_assignment,
 };
 use crate::daemon::service::import_and_adopt_task_board_remote_implementation_result;
 
@@ -13,8 +11,8 @@ use crate::daemon::task_board_remote_transport::controller::{
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::{
-    TaskBoardExecutionPhase, TaskBoardRemoteAssignmentState,
-    TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
+    TaskBoardExecutionPhase, TaskBoardRemoteAssignmentState, TaskBoardWorkflowExecutionCas,
+    TaskBoardWorkflowExecutionRecord,
 };
 
 use super::requests;
@@ -162,9 +160,8 @@ async fn classify_terminal_handoff(
         )
         .await?
     {
-        TaskBoardRemoteMutationOutcome::Updated(_) | TaskBoardRemoteMutationOutcome::Replayed(_) => {
-            Ok(TerminalHandoff::Ready)
-        }
+        TaskBoardRemoteMutationOutcome::Updated(_)
+        | TaskBoardRemoteMutationOutcome::Replayed(_) => Ok(TerminalHandoff::Ready),
         TaskBoardRemoteMutationOutcome::Stale(_) => Ok(TerminalHandoff::Reject),
     }
 }

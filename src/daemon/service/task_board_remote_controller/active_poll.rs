@@ -95,15 +95,14 @@ async fn poll_cancel_intent(
 
 fn require_cancel_progress(outcome: TaskBoardRemoteMutationOutcome) -> Result<(), CliError> {
     match outcome {
-        TaskBoardRemoteMutationOutcome::Updated(_) | TaskBoardRemoteMutationOutcome::Replayed(_) => {
-            Ok(())
-        }
-        TaskBoardRemoteMutationOutcome::Stale(_) => Err(
-            crate::errors::CliErrorKind::concurrent_modification(
+        TaskBoardRemoteMutationOutcome::Updated(_)
+        | TaskBoardRemoteMutationOutcome::Replayed(_) => Ok(()),
+        TaskBoardRemoteMutationOutcome::Stale(_) => {
+            Err(crate::errors::CliErrorKind::concurrent_modification(
                 "remote cancellation lost its exact generation",
             )
-            .into(),
-        ),
+            .into())
+        }
     }
 }
 

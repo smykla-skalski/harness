@@ -65,10 +65,11 @@ pub(crate) async fn executor_settings_still_match(
     validate_local_execution_host_config(&settings.local_execution_host)?;
     Ok(settings.local_execution_host.enabled
         && executor_launch_material_matches(
-        &settings.local_execution_host,
-        record,
-        expected_checkout,
-    ) && executor_host_row_matches(transaction, record, revision, true).await?)
+            &settings.local_execution_host,
+            record,
+            expected_checkout,
+        )
+        && executor_host_row_matches(transaction, record, revision, true).await?)
 }
 
 pub(crate) async fn executor_lifecycle_settings_still_compatible(
@@ -80,11 +81,10 @@ pub(crate) async fn executor_lifecycle_settings_still_compatible(
     };
     let (settings, revision) = load_executor_settings(transaction).await?;
     validate_local_execution_host_config(&settings.local_execution_host)?;
-    Ok(executor_launch_material_matches(
-        &settings.local_execution_host,
-        record,
-        expected_checkout,
-    ) && executor_host_row_matches(transaction, record, revision, false).await?)
+    Ok(
+        executor_launch_material_matches(&settings.local_execution_host, record, expected_checkout)
+            && executor_host_row_matches(transaction, record, revision, false).await?,
+    )
 }
 
 async fn load_executor_settings(

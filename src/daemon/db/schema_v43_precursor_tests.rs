@@ -90,7 +90,8 @@ fn seed_child_recovery_quarantine(conn: &Connection) {
 }
 
 fn count(conn: &Connection, sql: &str) -> i64 {
-    conn.query_row(sql, [], |row| row.get(0)).expect("count rows")
+    conn.query_row(sql, [], |row| row.get(0))
+        .expect("count rows")
 }
 
 // A precursor-shape database with a real assignment and a child row must reopen

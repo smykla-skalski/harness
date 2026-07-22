@@ -4,14 +4,14 @@ use uuid::Uuid;
 
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
-use super::remote_claim_receipts::{
-    claim_receipt_values, claim_response_for_record, exact_claim_response,
-};
+use super::remote_assignment_lifecycle_owner::TaskBoardRemoteExecutorLifecycleOwner;
 use super::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome, canonical_time, concurrent,
     load_assignment_in_tx, nonblank, to_i64,
 };
-use super::remote_assignment_lifecycle_owner::TaskBoardRemoteExecutorLifecycleOwner;
+use super::remote_claim_receipts::{
+    claim_receipt_values, claim_response_for_record, exact_claim_response,
+};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteAttemptBinding, RemoteClaimRequest, RemoteLeaseRenewRequest,

@@ -5,18 +5,15 @@ use chrono::{Duration, SecondsFormat, Utc};
 use sqlx::query_scalar;
 use tokio::sync::broadcast;
 
-use super::{
-    prepare_remote_workspace, reconcile_remote_executor_assignment,
-};
+use super::{prepare_remote_workspace, reconcile_remote_executor_assignment};
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::{
-    AsyncDaemonDb, DaemonDb, TaskBoardRemoteAssignmentRecord,
-    TaskBoardRemoteExecutorStartAuthority, TaskBoardRemoteMutationOutcome,
-    REMOTE_EXECUTOR_CLAIMED_AT, REMOTE_EXECUTOR_PRINCIPAL, RemoteExecutorFixture,
-    accept_remote_executor, remote_executor_claim_request, remote_executor_fixture,
-    remote_executor_identity,
+    AsyncDaemonDb, DaemonDb, REMOTE_EXECUTOR_CLAIMED_AT, REMOTE_EXECUTOR_PRINCIPAL,
+    RemoteExecutorFixture, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorStartAuthority,
+    TaskBoardRemoteMutationOutcome, accept_remote_executor, remote_executor_claim_request,
+    remote_executor_fixture, remote_executor_identity,
 };
 use crate::daemon::http::{
     AsyncDaemonDbSlot, DaemonHttpAuthMode, DaemonHttpState, ManagedAgentMutationLocks,
@@ -24,9 +21,7 @@ use crate::daemon::http::{
 };
 use crate::daemon::protocol::{CodexRunSnapshot, CodexRunStatus, StreamEvent};
 use crate::daemon::state::DaemonManifest;
-use crate::daemon::task_board_remote_transport::wire::{
-    RemoteOfferRequest, RemoteSourceMaterial,
-};
+use crate::daemon::task_board_remote_transport::wire::{RemoteOfferRequest, RemoteSourceMaterial};
 use crate::daemon::websocket::ReplayBuffer;
 use crate::task_board::TaskBoardRemoteAssignmentState;
 
@@ -47,13 +42,9 @@ async fn settings_winner_revokes_start_before_any_workspace_or_codex_io() {
         drift_executor_settings(&fixture.db, drift).await;
         let state = executor_state(&fixture.db, EXECUTOR_INSTANCE);
 
-        reconcile_remote_executor_assignment(
-            &state,
-            &fixture.db,
-            &accepted.assignment_id,
-        )
-        .await
-        .expect("settings winner settles the unstarted generation without executor I/O");
+        reconcile_remote_executor_assignment(&state, &fixture.db, &accepted.assignment_id)
+            .await
+            .expect("settings winner settles the unstarted generation without executor I/O");
         assert_eq!(codex_run_count(&fixture.db).await, 0);
         assert_eq!(executor_session_count(&fixture.db).await, 0);
         let revoked = load_assignment(&fixture.db, &accepted.assignment_id).await;
@@ -87,15 +78,13 @@ async fn start_authority_is_durable_before_checkout_io() {
     let (fixture, accepted) = live_claimed_fixture().await;
     let state = executor_state(&fixture.db, EXECUTOR_INSTANCE);
 
-    let error = reconcile_remote_executor_assignment(
-        &state,
-        &fixture.db,
-        &accepted.assignment_id,
-    )
-    .await
-    .expect_err("non-repository checkout must fail after authority acquisition");
+    let error = reconcile_remote_executor_assignment(&state, &fixture.db, &accepted.assignment_id)
+        .await
+        .expect_err("non-repository checkout must fail after authority acquisition");
     assert!(
-        error.to_string().contains("verify remote executor Git source"),
+        error
+            .to_string()
+            .contains("verify remote executor Git source"),
         "unexpected checkout error: {error}"
     );
     let authorized = load_assignment(&fixture.db, &accepted.assignment_id).await;
@@ -137,7 +126,10 @@ async fn expired_provisioning_permit_cleans_partial_workspace_before_unknown() {
     let expired = load_assignment(&fixture.db, &accepted.assignment_id).await;
     assert_eq!(expired.state, TaskBoardRemoteAssignmentState::Unknown);
     assert!(expired.executor_start_authority_sha256.is_none());
-    assert_eq!(expired.error.as_deref(), Some(super::REMOTE_START_EXPIRED_REASON));
+    assert_eq!(
+        expired.error.as_deref(),
+        Some(super::REMOTE_START_EXPIRED_REASON)
+    );
     assert!(!session_root.exists());
     assert_eq!(executor_session_count(&fixture.db).await, 0);
     assert_eq!(codex_run_count(&fixture.db).await, 0);
@@ -182,22 +174,17 @@ pub(super) async fn claim_start_authority(
     (accepted, authority)
 }
 
-async fn live_claimed_fixture() -> (
-    RemoteExecutorFixture,
-    TaskBoardRemoteAssignmentRecord,
-) {
+async fn live_claimed_fixture() -> (RemoteExecutorFixture, TaskBoardRemoteAssignmentRecord) {
     let fixture = remote_executor_fixture(1).await;
     let invalid_checkout = fixture._temp.path().join("not-a-repository");
     fs_err::create_dir_all(&invalid_checkout).expect("create non-repository checkout");
     configure_checkout(&fixture.db, &invalid_checkout).await;
     let now = Utc::now();
-    let offered_at = (now - Duration::seconds(2))
-        .to_rfc3339_opts(SecondsFormat::AutoSi, true);
-    let claimed_at = (now - Duration::seconds(1))
-        .to_rfc3339_opts(SecondsFormat::AutoSi, true);
+    let offered_at = (now - Duration::seconds(2)).to_rfc3339_opts(SecondsFormat::AutoSi, true);
+    let claimed_at = (now - Duration::seconds(1)).to_rfc3339_opts(SecondsFormat::AutoSi, true);
     let mut request = fixture.request.clone();
-    request.deadline_at = (now + Duration::minutes(10))
-        .to_rfc3339_opts(SecondsFormat::AutoSi, true);
+    request.deadline_at =
+        (now + Duration::minutes(10)).to_rfc3339_opts(SecondsFormat::AutoSi, true);
     request.request_sha256.clear();
     let request = request.seal().expect("seal live executor offer");
     let accepted = match fixture
@@ -244,7 +231,9 @@ pub(super) async fn configure_checkout(db: &AsyncDaemonDb, origin: &Path) {
     // Session provisioning canonicalizes origin_path (resolve_project_input ->
     // fs::canonicalize), so on macOS the frozen checkout must resolve the
     // /var -> /private/var symlink or exact_provisioned_session never matches.
-    let origin = origin.canonicalize().unwrap_or_else(|_| origin.to_path_buf());
+    let origin = origin
+        .canonicalize()
+        .unwrap_or_else(|_| origin.to_path_buf());
     let mut settings = db
         .task_board_orchestrator_settings()
         .await
@@ -263,8 +252,7 @@ pub(super) fn request_for_revision(
     let mut request = request.clone();
     request.binding.base_revision = revision.into();
     request.binding.expected_head_revision = Some(revision.into());
-    request.source =
-        RemoteSourceMaterial::repository_revision(EXECUTOR_REPOSITORY, revision);
+    request.source = RemoteSourceMaterial::repository_revision(EXECUTOR_REPOSITORY, revision);
     request.request_sha256.clear();
     request.seal().expect("seal exact source request")
 }
@@ -340,11 +328,7 @@ pub(super) fn executor_state(db: &AsyncDaemonDb, daemon_epoch: &str) -> DaemonHt
             async_db.clone(),
             false,
         ),
-        acp_agent_manager: AcpAgentManagerHandle::new_with_async_db(
-            sender,
-            db_slot,
-            async_db,
-        ),
+        acp_agent_manager: AcpAgentManagerHandle::new_with_async_db(sender, db_slot, async_db),
         managed_agent_mutation_locks: ManagedAgentMutationLocks::default(),
         recovery_snapshot: Arc::default(),
     }

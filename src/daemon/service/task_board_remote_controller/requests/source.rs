@@ -35,9 +35,7 @@ impl PreparedRemoteSource {
         if let RemoteSourceMaterial::RepositorySnapshotBundle { advertised_ref, .. } = &source
             && advertised_ref != &export.advertised_ref
         {
-            return Err(super::invalid(
-                "repository snapshot advertised ref changed",
-            ));
+            return Err(super::invalid("repository snapshot advertised ref changed"));
         }
         Ok(Self {
             source,

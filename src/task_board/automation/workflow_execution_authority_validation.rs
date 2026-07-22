@@ -1,10 +1,9 @@
 use super::{
     TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE, TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
-    TASK_BOARD_EXECUTION_TARGET_RESOURCE, TASK_BOARD_REMOTE_CANCEL_IO_AUTHORITY_RESOURCE,
-    TASK_BOARD_REMOTE_CANCEL_INTENT_AT_RESOURCE, TASK_BOARD_REMOTE_CANCEL_INTENT_REASON_RESOURCE,
-    TASK_BOARD_REMOTE_CANCEL_INTENT_RESOURCE,
-    TASK_BOARD_REMOTE_CLAIM_IO_AUTHORITY_RESOURCE, TASK_BOARD_REMOTE_OFFER_IO_AUTHORITY_RESOURCE,
-    TASK_BOARD_REMOTE_RENEW_IO_AUTHORITY_RESOURCE,
+    TASK_BOARD_EXECUTION_TARGET_RESOURCE, TASK_BOARD_REMOTE_CANCEL_INTENT_AT_RESOURCE,
+    TASK_BOARD_REMOTE_CANCEL_INTENT_REASON_RESOURCE, TASK_BOARD_REMOTE_CANCEL_INTENT_RESOURCE,
+    TASK_BOARD_REMOTE_CANCEL_IO_AUTHORITY_RESOURCE, TASK_BOARD_REMOTE_CLAIM_IO_AUTHORITY_RESOURCE,
+    TASK_BOARD_REMOTE_OFFER_IO_AUTHORITY_RESOURCE, TASK_BOARD_REMOTE_RENEW_IO_AUTHORITY_RESOURCE,
     TASK_BOARD_REMOTE_RESULT_IMPORT_AUTHORITY_RESOURCE, TaskBoardAttemptState,
     TaskBoardExecutionState, TaskBoardWorkflowExecutionRecord,
     TaskBoardWorkflowExecutionValidationError,
@@ -104,7 +103,10 @@ pub(super) fn validate_remote_io_authority(
     {
         return invalid("remote I/O authority requires the exact active remote target");
     }
-    if cancel.zip(cancel_intent.as_ref()).is_some_and(|(digest, intent)| digest != intent.0) {
+    if cancel
+        .zip(cancel_intent.as_ref())
+        .is_some_and(|(digest, intent)| digest != intent.0)
+    {
         return invalid("remote cancel authority must match its exact durable intent");
     }
     Ok(())

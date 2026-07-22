@@ -29,9 +29,7 @@ fn assignment_has_column(conn: &Connection, column: &str) -> Result<bool, CliErr
 
 fn assignment_column_names(conn: &Connection) -> Result<Vec<String>, CliError> {
     let mut statement = conn
-        .prepare(
-            "SELECT name FROM pragma_table_info('task_board_remote_assignments') ORDER BY cid",
-        )
+        .prepare("SELECT name FROM pragma_table_info('task_board_remote_assignments') ORDER BY cid")
         .map_err(|error| db_error(format!("read remote assignment columns: {error}")))?;
     let names = statement
         .query_map([], |row| row.get::<_, String>(0))
@@ -53,20 +51,28 @@ fn assignment_column_names(conn: &Connection) -> Result<Vec<String>, CliError> {
 pub(super) fn rebuild_prefailure_receipt_assignment(conn: &Connection) -> Result<(), CliError> {
     conn.execute_batch("PRAGMA foreign_keys = OFF; PRAGMA legacy_alter_table = ON")
         .map_err(|error| {
-            db_error(format!("suspend foreign keys for precursor rebuild: {error}"))
+            db_error(format!(
+                "suspend foreign keys for precursor rebuild: {error}"
+            ))
         })?;
     let rebuilt = rebuild_within_suspended_foreign_keys(conn);
     let restored = conn
         .execute_batch("PRAGMA legacy_alter_table = OFF; PRAGMA foreign_keys = ON")
         .map_err(|error| {
-            db_error(format!("restore foreign keys after precursor rebuild: {error}"))
+            db_error(format!(
+                "restore foreign keys after precursor rebuild: {error}"
+            ))
         });
     rebuilt.and(restored)
 }
 
 fn rebuild_within_suspended_foreign_keys(conn: &Connection) -> Result<(), CliError> {
-    let transaction = Transaction::new_unchecked(conn, TransactionBehavior::Immediate)
-        .map_err(|error| db_error(format!("begin precursor remote assignment rebuild: {error}")))?;
+    let transaction =
+        Transaction::new_unchecked(conn, TransactionBehavior::Immediate).map_err(|error| {
+            db_error(format!(
+                "begin precursor remote assignment rebuild: {error}"
+            ))
+        })?;
     let column_list = assignment_column_names(&transaction)?.join(", ");
     let create_sql = expected_table_sql(ASSIGNMENT_TABLE)?;
     transaction
@@ -78,15 +84,21 @@ fn rebuild_within_suspended_foreign_keys(conn: &Connection) -> Result<(), CliErr
                  SELECT {column_list} FROM task_board_remote_assignments_prefailure_receipt;
              DROP TABLE task_board_remote_assignments_prefailure_receipt;"
         ))
-        .map_err(|error| db_error(format!("rebuild precursor remote assignment ledger: {error}")))?;
+        .map_err(|error| {
+            db_error(format!(
+                "rebuild precursor remote assignment ledger: {error}"
+            ))
+        })?;
     transaction
         .execute_batch(INDEX_DDL)
         .map_err(|error| db_error(format!("restore remote execution indexes: {error}")))?;
     assert_no_foreign_key_violations(&transaction)?;
     require_complete_shape(&transaction)?;
-    transaction
-        .commit()
-        .map_err(|error| db_error(format!("commit precursor remote assignment rebuild: {error}")))
+    transaction.commit().map_err(|error| {
+        db_error(format!(
+            "commit precursor remote assignment rebuild: {error}"
+        ))
+    })
 }
 
 /// The rebuild ran with enforcement suspended, so verify no child row was

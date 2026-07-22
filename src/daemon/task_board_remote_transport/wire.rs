@@ -10,21 +10,22 @@ use crate::task_board::{
     normalize_repository_slug,
 };
 
+pub(super) use super::wire_artifacts::valid_artifact_path;
 pub(crate) use super::wire_artifacts::{
     MAX_REMOTE_ARTIFACT_BYTES, RemoteArtifactEntry, RemoteArtifactManifest,
 };
-pub(super) use super::wire_artifacts::valid_artifact_path;
 
 pub(crate) use super::wire_host::{
     RemoteHeartbeatRequest, RemoteHeartbeatResponse, RemoteHostAdvertisement,
 };
+pub(crate) use super::wire_launch::RemoteCodexLaunchEnvelope;
+#[cfg(test)]
+pub(crate) use super::wire_launch::test_codex_launch;
 pub(crate) use super::wire_lifecycle::{
     RemoteArtifactFetchRequest, RemoteArtifactFetchResponse, RemoteCancelRequest,
     RemoteCancelResponse, RemoteSettledRequest, RemoteSettledResponse,
 };
-pub(crate) use super::wire_launch::RemoteCodexLaunchEnvelope;
-#[cfg(test)]
-pub(crate) use super::wire_launch::test_codex_launch;
+pub(crate) use super::wire_result::{MAX_REMOTE_TYPED_RESULT_BYTES, RemoteTypedResult};
 pub(crate) use super::wire_source::{RemoteRepositorySelector, RemoteSourceMaterial};
 pub(crate) use super::wire_source_bundle::{
     RemoteSourceBundleUploadRequest, RemoteSourceBundleUploadResponse,
@@ -33,7 +34,6 @@ pub(crate) use super::wire_source_bundle_recovery::{
     RemoteSourceBundleAbandonRequest, RemoteSourceBundleAbandonResponse,
     RemoteSourceBundleReceiptVerificationResponse,
 };
-pub(crate) use super::wire_result::{MAX_REMOTE_TYPED_RESULT_BYTES, RemoteTypedResult};
 
 pub(crate) const TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION: u32 = 1;
 
@@ -94,7 +94,10 @@ impl fmt::Display for RemoteWireError {
             Self::ResultBindingMismatch => write!(formatter, "remote result binding mismatched"),
             Self::ResultTooLarge => write!(formatter, "remote typed result exceeds its size limit"),
             Self::EnvelopeTooLarge(field) => {
-                write!(formatter, "remote wire envelope '{field}' exceeds its size limit")
+                write!(
+                    formatter,
+                    "remote wire envelope '{field}' exceeds its size limit"
+                )
             }
             Self::Serialization => write!(formatter, "remote wire serialization failed"),
         }
@@ -167,8 +170,7 @@ impl RemoteAttemptBinding {
             return Err(RemoteWireError::InvalidWorkflowKind);
         }
         require_digest("execution_record_sha256", &self.execution_record_sha256)?;
-        if !valid_repository_slug(&self.repository) || !valid_revision(&self.base_revision)
-        {
+        if !valid_repository_slug(&self.repository) || !valid_revision(&self.base_revision) {
             return Err(RemoteWireError::InvalidSourceMaterial);
         }
         if let Some(head) = &self.expected_head_revision {
@@ -182,9 +184,9 @@ impl RemoteAttemptBinding {
 
 pub(super) fn valid_repository_slug(value: &str) -> bool {
     normalize_repository_slug(Some(value)).as_deref() == Some(value)
-        && value.bytes().all(|byte| {
-            byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'.' | b'_' | b'-')
-        })
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'.' | b'_' | b'-'))
 }
 
 fn valid_revision(value: &str) -> bool {

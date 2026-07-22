@@ -56,22 +56,28 @@ fn sync_v43_refuses_lost_dispatch_uniqueness_and_both_malformed_admission_tables
     let db = legacy_v40_fixture();
     run(db.connection()).expect("migrate strict remote execution ledger");
     db.connection()
-        .execute("DROP INDEX task_board_remote_assignments_identity_epoch", [])
+        .execute(
+            "DROP INDEX task_board_remote_assignments_identity_epoch",
+            [],
+        )
         .expect("drop an earlier repairable index");
     corrupt_dispatch_uniqueness(db.connection());
 
     let error = run(db.connection()).expect_err("lost dispatch uniqueness must be refused");
-    assert!(error.to_string().contains("incompatible remote execution index"));
+    assert!(
+        error
+            .to_string()
+            .contains("incompatible remote execution index")
+    );
 
     for table in ADMISSION_TABLES {
         let db = legacy_v40_fixture();
         run(db.connection()).expect("migrate strict remote execution ledger");
         corrupt_table(db.connection(), *table);
 
-        let error = crate::daemon::db::schema_repairs_remote_execution::repair_and_stamp(
-            db.connection(),
-        )
-        .expect_err("remote repair must fingerprint both admission tables");
+        let error =
+            crate::daemon::db::schema_repairs_remote_execution::repair_and_stamp(db.connection())
+                .expect_err("remote repair must fingerprint both admission tables");
         assert!(
             error
                 .to_string()
@@ -105,13 +111,12 @@ fn assert_indexes_sync(conn: &rusqlite::Connection) {
 
 async fn assert_indexes_async(db: &AsyncDaemonDb) {
     for name in DISPATCH_ADMISSION_INDEXES {
-        let count: i64 = query_scalar(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = ?1",
-        )
-        .bind(*name)
-        .fetch_one(db.pool())
-        .await
-        .expect("count dispatch admission index");
+        let count: i64 =
+            query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = ?1")
+                .bind(*name)
+                .fetch_one(db.pool())
+                .await
+                .expect("count dispatch admission index");
         assert_eq!(count, 1, "missing {name}");
     }
 }
@@ -162,8 +167,5 @@ async fn assert_async_corruption_refused(table: Option<&str>) {
         Ok(_) => panic!("corrupted v43 shape must be refused"),
         Err(error) => error,
     };
-    assert!(
-        error.to_string().contains("incompatible"),
-        "{error}"
-    );
+    assert!(error.to_string().contains("incompatible"), "{error}");
 }

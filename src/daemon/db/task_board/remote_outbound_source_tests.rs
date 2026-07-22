@@ -186,6 +186,7 @@ pub(super) async fn enable_implementation(db: &AsyncDaemonDb) -> Result<(), CliE
     let mut settings = db.task_board_orchestrator_settings().await?;
     settings.local_execution_host.capabilities =
         vec![crate::task_board::TaskBoardPhaseCapabilityProfile::ImplementationWrite];
-    db.replace_task_board_orchestrator_settings(&settings).await?;
+    db.replace_task_board_orchestrator_settings(&settings)
+        .await?;
     Ok(())
 }

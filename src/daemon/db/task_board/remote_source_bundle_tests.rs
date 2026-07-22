@@ -1,14 +1,14 @@
 use sha2::{Digest as _, Sha256};
 use sqlx::query_scalar;
 
+use super::TaskBoardRemoteOfferOutcome;
 use super::remote_assignment_test_support::{
     INSTANCE, NOW, PRINCIPAL, REPOSITORY, accept_executor, executor_fixture,
 };
-use super::TaskBoardRemoteOfferOutcome;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::task_board_remote_transport::wire::{
-    RemoteArtifactEntry, RemoteArtifactManifest, RemoteSourceBundleUploadRequest,
-    RemoteSourceBundleAbandonRequest, RemoteSourceMaterial, test_codex_launch,
+    RemoteArtifactEntry, RemoteArtifactManifest, RemoteSourceBundleAbandonRequest,
+    RemoteSourceBundleUploadRequest, RemoteSourceMaterial, test_codex_launch,
 };
 use crate::task_board::{
     TaskBoardExecutionPhase, TaskBoardPhaseCapabilityProfile, TaskBoardWorkflowKind,
@@ -91,7 +91,11 @@ async fn source_bundle_tamper_or_conflict_never_creates_an_assignment() {
     );
 
     let mut wrong_assignment = upload.clone();
-    wrong_assignment.offer.binding.assignment_id.push_str("-other");
+    wrong_assignment
+        .offer
+        .binding
+        .assignment_id
+        .push_str("-other");
     assert!(wrong_assignment.validate().is_err());
 
     let mut wrong_digest = upload.clone();
@@ -116,8 +120,8 @@ async fn source_bundle_tamper_or_conflict_never_creates_an_assignment() {
 async fn source_abandonment_reloads_exact_authority_and_replays_after_restart() {
     let fixture = executor_fixture(1).await;
     let (offer, content) = snapshot_offer(&fixture.request);
-    let upload = RemoteSourceBundleUploadRequest::seal(offer, &content)
-        .expect("seal absent source upload");
+    let upload =
+        RemoteSourceBundleUploadRequest::seal(offer, &content).expect("seal absent source upload");
     let verification = fixture
         .db
         .verify_task_board_remote_source_bundle_receipt(
@@ -163,11 +167,8 @@ async fn source_abandonment_reloads_exact_authority_and_replays_after_restart() 
         .await
         .expect("replay immutable source absence verification");
     assert_eq!(replayed_verification, verification);
-    let replay_request = RemoteSourceBundleAbandonRequest::seal(
-        &upload,
-        replayed_verification,
-    )
-    .expect("reseal exact abandonment request");
+    let replay_request = RemoteSourceBundleAbandonRequest::seal(&upload, replayed_verification)
+        .expect("reseal exact abandonment request");
     assert_eq!(replay_request, request);
     let replay = restarted
         .abandon_task_board_remote_source_bundle(
@@ -292,8 +293,8 @@ async fn lost_offer_response_replays_acceptance_after_restart_and_forbids_reassi
         .await
         .expect("enable implementation capability");
     let (offer, content) = snapshot_offer(&fixture.request);
-    let upload = RemoteSourceBundleUploadRequest::seal(offer.clone(), &content)
-        .expect("seal source upload");
+    let upload =
+        RemoteSourceBundleUploadRequest::seal(offer.clone(), &content).expect("seal source upload");
     fixture
         .db
         .store_task_board_remote_source_bundle(&upload, PRINCIPAL, INSTANCE, NOW)
@@ -369,14 +370,14 @@ async fn rejected_orphan_source_prunes_bytes_but_replays_compact_receipt_after_r
         .await
         .expect("restart executor before old-instance offer");
     let rejected = restarted
-            .accept_task_board_remote_assignment_offer(
-                &offer,
-                PRINCIPAL,
-                "instance-b",
-                "2026-07-19T10:00:01Z",
-            )
-            .await
-            .expect("durably reject old-instance offer");
+        .accept_task_board_remote_assignment_offer(
+            &offer,
+            PRINCIPAL,
+            "instance-b",
+            "2026-07-19T10:00:01Z",
+        )
+        .await
+        .expect("durably reject old-instance offer");
     let TaskBoardRemoteOfferOutcome::Rejected(rejected) = rejected else {
         panic!("old-instance offer did not persist a rejection tombstone");
     };
@@ -433,12 +434,8 @@ fn bundle_offer(
     // A prior-phase attempt starts from the prior phase's sealed head, so the
     // binding base must be the bundle's advertised result revision.
     offer.binding.base_revision = RESULT.into();
-    offer.source = RemoteSourceMaterial::prior_phase_bundle(
-        REPOSITORY,
-        BASE,
-        RESULT,
-        bundle.clone(),
-    );
+    offer.source =
+        RemoteSourceMaterial::prior_phase_bundle(REPOSITORY, BASE, RESULT, bundle.clone());
     offer.artifacts = RemoteArtifactManifest {
         entries: vec![bundle],
     };
@@ -480,7 +477,10 @@ fn snapshot_offer(
         entries: vec![bundle],
     };
     offer.request_sha256.clear();
-    (offer.seal().expect("seal repository snapshot offer"), content)
+    (
+        offer.seal().expect("seal repository snapshot offer"),
+        content,
+    )
 }
 
 async fn assignment_count(db: &AsyncDaemonDb) -> i64 {

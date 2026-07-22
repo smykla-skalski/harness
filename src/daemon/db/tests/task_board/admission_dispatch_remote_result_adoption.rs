@@ -32,7 +32,10 @@ async fn completed_result_adopts_once_and_settles_prepared_start_before_target_c
     else {
         panic!("completed result was not adopted")
     };
-    assert_eq!(adopted.transition.execution_state, TaskBoardExecutionState::Running);
+    assert_eq!(
+        adopted.transition.execution_state,
+        TaskBoardExecutionState::Running
+    );
     assert_eq!(adopted.attempts[0].state, TaskBoardAttemptState::Completed);
     assert_eq!(
         adopted.attempts[0].artifact.as_ref(),
@@ -43,10 +46,12 @@ async fn completed_result_adopts_once_and_settles_prepared_start_before_target_c
             .map(|result| &result.result.artifact)
     );
     assert!(adopted.ownership.host_id.is_none());
-    assert!(!adopted
-        .ownership
-        .resources
-        .contains_key(TASK_BOARD_EXECUTION_TARGET_RESOURCE));
+    assert!(
+        !adopted
+            .ownership
+            .resources
+            .contains_key(TASK_BOARD_EXECUTION_TARGET_RESOURCE)
+    );
     assert_eq!(
         intent_status(&candidate.prepared.db, &candidate.prepared.intent).await,
         "completed"
@@ -56,7 +61,12 @@ async fn completed_result_adopts_once_and_settles_prepared_start_before_target_c
         "committed"
     );
     assert_eq!(
-        ledger_kind_state(&candidate.prepared.db, &candidate.prepared.intent, "concurrency").await,
+        ledger_kind_state(
+            &candidate.prepared.db,
+            &candidate.prepared.intent,
+            "concurrency"
+        )
+        .await,
         "committed"
     );
     let sequence = candidate
@@ -108,11 +118,14 @@ async fn stale_parent_epoch_and_divergent_target_mutate_nothing() {
     store_result(&candidate).await;
     let expected = TaskBoardWorkflowExecutionCas::from(&candidate.parent);
     let mut sibling_changed = candidate.parent.clone();
-    sibling_changed.artifacts.diagnostics.push(TaskBoardExecutionDiagnostic {
-        code: "concurrent_evidence".into(),
-        message: "sibling evidence changed before adoption".into(),
-        recorded_at: "2026-07-19T10:00:06Z".into(),
-    });
+    sibling_changed
+        .artifacts
+        .diagnostics
+        .push(TaskBoardExecutionDiagnostic {
+            code: "concurrent_evidence".into(),
+            message: "sibling evidence changed before adoption".into(),
+            recorded_at: "2026-07-19T10:00:06Z".into(),
+        });
     sibling_changed.updated_at = "2026-07-19T10:00:06Z".into();
     candidate
         .prepared
@@ -232,7 +245,10 @@ async fn failed_result_adopts_retry_and_all_nontransient_terminal_classes_once()
     else {
         panic!("transient failure was not adopted")
     };
-    assert_eq!(retrying.transition.execution_state, TaskBoardExecutionState::RetryWait);
+    assert_eq!(
+        retrying.transition.execution_state,
+        TaskBoardExecutionState::RetryWait
+    );
     assert_eq!(retrying.attempts[0].state, TaskBoardAttemptState::RetryWait);
     assert!(retrying.ownership.host_id.is_none());
     let reopened = retry.prepared.db.reopen().await;
@@ -271,15 +287,22 @@ async fn failed_result_adopts_retry_and_all_nontransient_terminal_classes_once()
         else {
             panic!("nontransient failure was not adopted")
         };
-        assert_eq!(stopped.transition.execution_state, TaskBoardExecutionState::HumanRequired);
+        assert_eq!(
+            stopped.transition.execution_state,
+            TaskBoardExecutionState::HumanRequired
+        );
         assert_eq!(stopped.attempts[0].state, TaskBoardAttemptState::Failed);
         assert_eq!(
             stopped.blocked_reason.as_deref(),
             Some("remote_attempt_non_retryable")
         );
         assert_eq!(
-            ledger_kind_state(&candidate.prepared.db, &candidate.prepared.intent, "concurrency")
-                .await,
+            ledger_kind_state(
+                &candidate.prepared.db,
+                &candidate.prepared.intent,
+                "concurrency"
+            )
+            .await,
             "released"
         );
     }

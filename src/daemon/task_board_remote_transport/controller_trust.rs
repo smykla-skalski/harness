@@ -205,10 +205,16 @@ impl RemoteExecutionControllerClient {
             .as_ref()
             .is_some_and(|retained| retained != current)
         {
-            return Err(binding_error("remote execution client trust configuration is stale").into());
+            return Err(
+                binding_error("remote execution client trust configuration is stale").into(),
+            );
         }
-        if self.retained_trust.is_some() && !self.client.has_config(&client_config(&current.config)?) {
-            return Err(binding_error("remote execution client trust configuration is stale").into());
+        if self.retained_trust.is_some()
+            && !self.client.has_config(&client_config(&current.config)?)
+        {
+            return Err(
+                binding_error("remote execution client trust configuration is stale").into(),
+            );
         }
         Ok(())
     }

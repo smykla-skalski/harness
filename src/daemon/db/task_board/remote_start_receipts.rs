@@ -4,9 +4,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::{Sqlite, Transaction, query_scalar};
 
-use super::remote_assignment_model::{
-    TaskBoardRemoteAssignmentRecord, canonical_time, nonblank,
-};
+use super::remote_assignment_model::{TaskBoardRemoteAssignmentRecord, canonical_time, nonblank};
 use super::remote_assignment_start_authority::{
     TaskBoardRemoteExecutorStartIoPermit, remote_executor_identity,
     start_io_permit_digest_from_evidence,
@@ -88,9 +86,9 @@ pub(super) fn start_receipt(
         workspace_ref: permit.identity.workspace_ref.clone(),
         project_dir: project_dir.into(),
         started_at: started_at.into(),
-        executor_configuration_revision: record.executor_configuration_revision.ok_or_else(
-            || db_error("remote executor start receipt has no executor revision"),
-        )?,
+        executor_configuration_revision: record
+            .executor_configuration_revision
+            .ok_or_else(|| db_error("remote executor start receipt has no executor revision"))?,
         executor_checkout_path: required(&record.executor_checkout_path, "checkout")?,
         source: offer.source.clone(),
         initial_owner_instance_id: owner_instance_id.into(),
@@ -109,7 +107,9 @@ pub(super) fn start_receipt_values(
 ) -> Result<(String, String), CliError> {
     let json = canonical_json(receipt)?;
     if json.len() > MAX_START_RECEIPT_BYTES {
-        return Err(db_error("remote executor start receipt exceeds its size limit"));
+        return Err(db_error(
+            "remote executor start receipt exceeds its size limit",
+        ));
     }
     Ok((json, receipt.sha256.clone()))
 }
@@ -130,7 +130,9 @@ pub(super) fn decode_start_receipt(
         _ => return Err(db_error("remote executor start receipt is incomplete")),
     };
     if receipt_json.len() > MAX_START_RECEIPT_BYTES {
-        return Err(db_error("remote executor start receipt exceeds its size limit"));
+        return Err(db_error(
+            "remote executor start receipt exceeds its size limit",
+        ));
     }
     let mut receipt = serde_json::from_str::<TaskBoardRemoteExecutorStartReceipt>(&receipt_json)
         .map_err(|error| db_error(format!("decode remote executor start receipt: {error}")))?;
@@ -239,10 +241,11 @@ fn validate_receipt_evidence(
                 .as_ref()
                 .ok_or_else(|| db_error("remote executor start receipt has no claim receipt"))?
                 .sha256
-        || receipt.executor_configuration_revision != record.executor_configuration_revision
-            .ok_or_else(|| db_error("remote executor start receipt has no executor revision"))?
-        || receipt.executor_checkout_path
-            != required(&record.executor_checkout_path, "checkout")?
+        || receipt.executor_configuration_revision
+            != record
+                .executor_configuration_revision
+                .ok_or_else(|| db_error("remote executor start receipt has no executor revision"))?
+        || receipt.executor_checkout_path != required(&record.executor_checkout_path, "checkout")?
         || receipt.source != offer.source
         || !lower_sha256(&receipt.start_authority_sha256)
         || !lower_sha256(&receipt.start_io_permit_sha256)
@@ -282,22 +285,22 @@ fn validate_receipt_identity(
     }
     let path = Path::new(&receipt.project_dir);
     if !path.is_absolute()
-        || path.components().any(|component| {
-            matches!(component, Component::CurDir | Component::ParentDir)
-        })
+        || path
+            .components()
+            .any(|component| matches!(component, Component::CurDir | Component::ParentDir))
         || receipt.session_id != identity.session_id
         || receipt.run_id != identity.run_id
         || receipt.workspace_ref != identity.workspace_ref
         || receipt.initial_owner_epoch != 1
     {
-        return Err(db_error("remote executor start receipt identity is invalid"));
+        return Err(db_error(
+            "remote executor start receipt identity is invalid",
+        ));
     }
     Ok(())
 }
 
-fn validate_receipt_times(
-    receipt: &TaskBoardRemoteExecutorStartReceipt,
-) -> Result<(), CliError> {
+fn validate_receipt_times(receipt: &TaskBoardRemoteExecutorStartReceipt) -> Result<(), CliError> {
     let authority = canonical_time(
         &receipt.start_authority_at,
         "remote executor start receipt authority time",
@@ -333,7 +336,9 @@ fn validate_receipt_times(
         || started > owner
         || owner >= owner_expiry
     {
-        return Err(db_error("remote executor start receipt chronology is invalid"));
+        return Err(db_error(
+            "remote executor start receipt chronology is invalid",
+        ));
     }
     Ok(())
 }

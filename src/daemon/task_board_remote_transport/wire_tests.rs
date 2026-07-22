@@ -47,9 +47,8 @@ fn sealed_offer_digest_binds_complete_attempt_and_repository_evidence() {
     variants.push(with_binding(&request, |binding| {
         binding.execution_record_sha256 = "b".repeat(64);
     }));
-    let mut repository_changed = with_binding(&request, |binding| {
-        binding.repository = "org/other".into()
-    });
+    let mut repository_changed =
+        with_binding(&request, |binding| binding.repository = "org/other".into());
     repository_changed.source = RemoteSourceMaterial::repository_revision(
         "org/other",
         "1111111111111111111111111111111111111111",
@@ -198,12 +197,11 @@ fn typed_result_digest_and_exact_head_are_bound_to_attempt() {
         ..binding()
     };
     let offer_sha = "c".repeat(64);
-    let result =
-        RemoteTypedResult::seal(
-            local_result("2222222222222222222222222222222222222222"),
-            offer_sha.clone(),
-        )
-        .expect("seal result");
+    let result = RemoteTypedResult::seal(
+        local_result("2222222222222222222222222222222222222222"),
+        offer_sha.clone(),
+    )
+    .expect("seal result");
     result
         .validate(&binding, &offer_sha)
         .expect("matching typed result");

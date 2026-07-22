@@ -41,11 +41,11 @@ impl<'a> SourceReassignmentEvidence<'a> {
 
     pub(super) fn validate(self) -> Result<(), CliError> {
         match self {
-            Self::Abandonment { request, response } => response
-                .validate(request)
-                .map_err(|error| {
+            Self::Abandonment { request, response } => {
+                response.validate(request).map_err(|error| {
                     db_error(format!("validate source abandonment evidence: {error}"))
-                }),
+                })
+            }
             Self::OfferRejection {
                 request, response, ..
             } => {
@@ -53,8 +53,7 @@ impl<'a> SourceReassignmentEvidence<'a> {
                     db_error(format!("validate predecessor offer rejection: {error}"))
                 })?;
                 if response.disposition == RemoteOfferDisposition::Rejected
-                    && response.rejection_code.as_deref()
-                        == Some(PREDECESSOR_OFFER_NOT_RECEIVED)
+                    && response.rejection_code.as_deref() == Some(PREDECESSOR_OFFER_NOT_RECEIVED)
                 {
                     Ok(())
                 } else {
@@ -83,8 +82,7 @@ pub(super) async fn require_reassignment_evidence_in_tx(
             )
             .await?
             .ok_or_else(|| concurrent("source reassignment abandonment evidence disappeared"))?;
-            if !abandonment.is_exact_replay(request, principal)
-                || abandonment.response != *response
+            if !abandonment.is_exact_replay(request, principal) || abandonment.response != *response
             {
                 return Err(concurrent(
                     "source reassignment abandonment evidence changed",

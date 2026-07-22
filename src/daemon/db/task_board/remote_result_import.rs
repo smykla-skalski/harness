@@ -6,9 +6,7 @@ use super::remote_assignment_io_authority::{active_target_matches, has_remote_io
 use super::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, canonical_time, concurrent, load_assignment_in_tx, to_i64,
 };
-use super::workflow_executions::{
-    cas_mismatch, load_execution_in_tx, update_execution_in_tx,
-};
+use super::workflow_executions::{cas_mismatch, load_execution_in_tx, update_execution_in_tx};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::task_board_remote_transport::wire::{RemoteArtifactEntry, RemoteTypedResult};
 use crate::git::bundle::GitBundleImportEvidence;
@@ -53,7 +51,8 @@ impl AsyncDaemonDb {
                 "remote result import lost its exact parent record",
             ));
         }
-        let materials = load_import_materials(&mut transaction, &assignment, &parent, request).await?;
+        let materials =
+            load_import_materials(&mut transaction, &assignment, &parent, request).await?;
         if let Some(existing) = load_import_in_tx(
             &mut transaction,
             &assignment.assignment_id,
@@ -122,8 +121,7 @@ impl AsyncDaemonDb {
             import_sha256,
         )
         .await?;
-        if applied_time
-            < canonical_time(&record.prepared_at, "remote result import prepared time")?
+        if applied_time < canonical_time(&record.prepared_at, "remote result import prepared time")?
         {
             return Err(db_error(
                 "remote result import applied time precedes its preparation",
@@ -240,8 +238,7 @@ pub(super) async fn load_and_finalize_remote_implementation_import_in_tx(
         ));
     }
     if record.state != TaskBoardRemoteResultImportState::Applied
-        || TaskBoardWorkflowExecutionCas::from(parent).record_sha256
-            != record.parent_record_sha256
+        || TaskBoardWorkflowExecutionCas::from(parent).record_sha256 != record.parent_record_sha256
         || parent
             .ownership
             .resources
@@ -277,7 +274,10 @@ pub(super) async fn load_and_finalize_remote_implementation_import_in_tx(
     )
     .bind(adopted_at)
     .bind(&record.assignment_id)
-    .bind(to_i64(record.fencing_epoch, "result import adoption epoch")?)
+    .bind(to_i64(
+        record.fencing_epoch,
+        "result import adoption epoch",
+    )?)
     .bind(&record.import_sha256)
     .execute(transaction.as_mut())
     .await
@@ -395,8 +395,7 @@ fn require_exact_replay(
         && record.advertised_ref == request.advertised_ref
         && record.import_ref == request.import_ref
         && record.object_format == request.object_format
-        && TaskBoardWorkflowExecutionCas::from(parent).record_sha256
-            == record.parent_record_sha256
+        && TaskBoardWorkflowExecutionCas::from(parent).record_sha256 == record.parent_record_sha256
         && parent
             .ownership
             .resources
@@ -473,8 +472,8 @@ async fn require_import_authority(
     let parent = load_execution_in_tx(transaction, &record.execution_id)
         .await?
         .ok_or_else(|| concurrent("remote result import execution disappeared"))?;
-    let materials = load_import_materials(transaction, &assignment, &parent, &record.request())
-        .await?;
+    let materials =
+        load_import_materials(transaction, &assignment, &parent, &record.request()).await?;
     require_record_materials(record, &assignment, &materials)?;
     if TaskBoardWorkflowExecutionCas::from(&parent).record_sha256 == record.parent_record_sha256
         && parent
@@ -485,8 +484,6 @@ async fn require_import_authority(
     {
         Ok(())
     } else {
-        Err(concurrent(
-            "remote result import parent authority changed",
-        ))
+        Err(concurrent("remote result import parent authority changed"))
     }
 }

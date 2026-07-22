@@ -20,8 +20,7 @@ async fn crash_before_stop_io_restarts_in_stop_only_mode() {
         .await
         .expect("load start-authorized assignment")
         .expect("start-authorized assignment");
-    let (_, permit) =
-        persist_executor_run(&fixture, &assignment, &authority, STARTED_AT).await;
+    let (_, permit) = persist_executor_run(&fixture, &assignment, &authority, STARTED_AT).await;
     let snapshot = fixture
         .db
         .codex_run(&authority.identity.run_id)
@@ -95,8 +94,7 @@ async fn wrong_run_identity_cannot_persist_a_stop_marker() {
         .await
         .expect("load start-authorized assignment")
         .expect("start-authorized assignment");
-    let (_, permit) =
-        persist_executor_run(&fixture, &assignment, &authority, STARTED_AT).await;
+    let (_, permit) = persist_executor_run(&fixture, &assignment, &authority, STARTED_AT).await;
     let mut wrong_run = fixture
         .db
         .codex_run(&authority.identity.run_id)
@@ -153,8 +151,7 @@ async fn exact_run_with_invalid_launch_fields_can_stop_and_settle() {
         .await
         .expect("load start-authorized assignment")
         .expect("start-authorized assignment");
-    let (_, permit) =
-        persist_executor_run(&fixture, &assignment, &authority, STARTED_AT).await;
+    let (_, permit) = persist_executor_run(&fixture, &assignment, &authority, STARTED_AT).await;
     let mut invalid_run = fixture
         .db
         .codex_run(&authority.identity.run_id)

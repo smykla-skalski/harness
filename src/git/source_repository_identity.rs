@@ -16,11 +16,7 @@ impl GitSourceRepositoryProof {
         Ok(Self::ConfiguredCheckout { checkout })
     }
 
-    pub(super) fn require(
-        &self,
-        worktree: &Path,
-        repository: &str,
-    ) -> GitResult<()> {
+    pub(super) fn require(&self, worktree: &Path, repository: &str) -> GitResult<()> {
         require_canonical_slug(worktree, repository)?;
         match self {
             Self::ConfiguredCheckout { checkout } => {
@@ -55,14 +51,12 @@ pub(super) fn require_no_git_operation(repository: &Path) -> GitResult<()> {
         "rebase-merge",
         "sequencer",
     ] {
-        let path = PathBuf::from(stdout(
-            &GitCommandRunner::new(repository).read([
-                "rev-parse",
-                "--path-format=absolute",
-                "--git-path",
-                marker,
-            ])?,
-        ));
+        let path = PathBuf::from(stdout(&GitCommandRunner::new(repository).read([
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-path",
+            marker,
+        ])?));
         if path.exists() {
             return Err(GitError::unsafe_state(
                 repository,
@@ -100,8 +94,11 @@ fn require_same_common_git_dir(worktree: &Path, configured: &Path) -> GitResult<
 }
 
 fn common_git_dir(repository: &Path) -> GitResult<PathBuf> {
-    let output = GitCommandRunner::new(repository)
-        .read(["rev-parse", "--path-format=absolute", "--git-common-dir"])?;
+    let output = GitCommandRunner::new(repository).read([
+        "rev-parse",
+        "--path-format=absolute",
+        "--git-common-dir",
+    ])?;
     PathBuf::from(stdout(&output))
         .canonicalize()
         .map_err(|error| GitError::read(repository, error))
@@ -141,7 +138,10 @@ fn canonical_remote_slug(origin: &str) -> Option<String> {
         }
         path
     };
-    let path = path.trim_end_matches('/').strip_suffix(".git").unwrap_or(path);
+    let path = path
+        .trim_end_matches('/')
+        .strip_suffix(".git")
+        .unwrap_or(path);
     normalize_repository_slug(Some(path))
 }
 
@@ -156,7 +156,10 @@ mod tests {
             "ssh://git@github.com/example/widgets.git",
             "git@github.com:example/widgets.git",
         ] {
-            assert_eq!(canonical_remote_slug(origin).as_deref(), Some("example/widgets"));
+            assert_eq!(
+                canonical_remote_slug(origin).as_deref(),
+                Some("example/widgets")
+            );
         }
         for origin in [
             "/tmp/example/widgets",

@@ -1,9 +1,8 @@
 use tokio::task::spawn_blocking;
 
 use super::super::super::db::{
-    REMOTE_IMPLEMENTATION_BUNDLE_PATH, TaskBoardRemoteAssignmentRecord,
+    AsyncDaemonDb, REMOTE_IMPLEMENTATION_BUNDLE_PATH, TaskBoardRemoteAssignmentRecord,
     TaskBoardRemoteResultAdoptionOutcome, TaskBoardRemoteResultImportRequest,
-    AsyncDaemonDb,
 };
 use super::super::super::task_board_remote_transport::wire::RemoteAssignmentWireState;
 use crate::errors::{CliError, CliErrorKind};
@@ -135,10 +134,7 @@ fn import_plan_input(
         branch_ref: format!("refs/heads/harness/{}", context.session_id),
         base_revision: result.base_head_revision.clone(),
         result_revision: result.head_revision.clone(),
-        advertised_ref: format!(
-            "refs/harness/task-board/results/{}",
-            result.head_revision
-        ),
+        advertised_ref: format!("refs/harness/task-board/results/{}", result.head_revision),
         import_ref: format!(
             "refs/harness/task-board/imports/{}/{}",
             offer.request_sha256, bundle.sha256
@@ -146,9 +142,7 @@ fn import_plan_input(
     })
 }
 
-async fn import_plan_evidence(
-    input: ImportPlanInput,
-) -> Result<GitBundleImportEvidence, CliError> {
+async fn import_plan_evidence(input: ImportPlanInput) -> Result<GitBundleImportEvidence, CliError> {
     spawn_blocking(move || {
         GitBundleImportPlan::new(
             std::path::Path::new(&input.worktree_path),

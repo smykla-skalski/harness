@@ -171,7 +171,10 @@ fn bundle_source_matches(
 
 fn prior_implementation(
     parent: &TaskBoardWorkflowExecutionRecord,
-) -> Option<(&TaskBoardExecutionAttemptRecord, &TaskBoardImplementationResult)> {
+) -> Option<(
+    &TaskBoardExecutionAttemptRecord,
+    &TaskBoardImplementationResult,
+)> {
     let cycle = match parent.transition.phase {
         Some(TaskBoardExecutionPhase::Implementation) => {
             parent.artifacts.current_revision_cycle.checked_sub(1)

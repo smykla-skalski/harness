@@ -27,16 +27,11 @@ pub(crate) fn prepare_source_reassignment(
         .checked_add(1)
         .ok_or_else(|| super::invalid("remote source reassignment epoch overflow"))?;
     let mut binding = predecessor.binding.clone();
-    binding.assignment_id = super::deterministic_assignment_id(
-        execution,
-        attempt,
-        &binding.host_id,
-        fencing_epoch,
-    );
+    binding.assignment_id =
+        super::deterministic_assignment_id(execution, attempt, &binding.host_id, fencing_epoch);
     binding.host_instance_id = trust.observed_host_instance_id.clone();
     binding.fencing_epoch = fencing_epoch;
-    binding.execution_record_sha256 =
-        TaskBoardWorkflowExecutionCas::from(execution).record_sha256;
+    binding.execution_record_sha256 = TaskBoardWorkflowExecutionCas::from(execution).record_sha256;
     let mut request = predecessor.clone();
     request.binding = binding;
     request.request_sha256.clear();
@@ -44,8 +39,7 @@ pub(crate) fn prepare_source_reassignment(
         .seal()
         .map_err(|error| super::invalid(format!("seal replacement remote offer: {error}")))?;
     let offered_at = super::canonical_time(now, "source reassignment offer time")?;
-    let lease_expires_at =
-        offered_at + Duration::seconds(i64::from(request.lease_seconds));
+    let lease_expires_at = offered_at + Duration::seconds(i64::from(request.lease_seconds));
     Ok(PreparedRemoteReassignment {
         request,
         offered_at: super::canonical(offered_at),

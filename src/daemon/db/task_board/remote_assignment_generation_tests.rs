@@ -83,11 +83,7 @@ async fn status_rejects_a_late_request_after_the_exact_lease_generation_changes(
     };
     fixture
         .db
-        .claim_task_board_remote_renew_io_authority(
-            &renewal,
-            HOST,
-            "2026-07-19T10:00:20Z",
-        )
+        .claim_task_board_remote_renew_io_authority(&renewal, HOST, "2026-07-19T10:00:20Z")
         .await
         .expect("claim renewal authority")
         .expect("renewal remains active");

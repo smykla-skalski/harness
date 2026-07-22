@@ -170,12 +170,7 @@ async fn seed_assignments(pool: &SqlitePool, count: usize) {
     }
 }
 
-async fn insert_assignment(
-    pool: &SqlitePool,
-    assignment_id: &str,
-    state: &str,
-    order_at: &str,
-) {
+async fn insert_assignment(pool: &SqlitePool, assignment_id: &str, state: &str, order_at: &str) {
     query(
         "INSERT INTO task_board_remote_assignments (
              assignment_id, host_id, legacy_migrated, state, lease_id,

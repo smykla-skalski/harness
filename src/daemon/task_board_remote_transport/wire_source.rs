@@ -170,7 +170,8 @@ impl RemoteSourceMaterial {
             } => {
                 validate_common(*schema_version, repository, revision)?;
                 require_binding_repository(binding, repository)?;
-                let initial_default_task = binding.workflow_kind == TaskBoardWorkflowKind::DefaultTask
+                let initial_default_task = binding.workflow_kind
+                    == TaskBoardWorkflowKind::DefaultTask
                     && binding.phase == TaskBoardExecutionPhase::Implementation
                     && implementation_cycle(binding) == 1;
                 if !initial_default_task
@@ -225,8 +226,7 @@ fn validate_common(
     repository: &str,
     revision: &str,
 ) -> Result<(), RemoteWireError> {
-    if schema_version != REMOTE_SOURCE_MATERIAL_SCHEMA_VERSION
-        || !valid_repository_slug(repository)
+    if schema_version != REMOTE_SOURCE_MATERIAL_SCHEMA_VERSION || !valid_repository_slug(repository)
     {
         return Err(RemoteWireError::InvalidSourceMaterial);
     }
@@ -250,9 +250,7 @@ fn validate_selector(selector: &RemoteRepositorySelector) -> Result<(), RemoteWi
     let RemoteRepositorySelector::Branch { branch, reference } = selector else {
         return Ok(());
     };
-    if branch.len() > 1_024
-        || !valid_branch(branch)
-        || reference != &format!("refs/heads/{branch}")
+    if branch.len() > 1_024 || !valid_branch(branch) || reference != &format!("refs/heads/{branch}")
     {
         return Err(RemoteWireError::InvalidSourceMaterial);
     }
@@ -269,7 +267,7 @@ fn valid_branch(branch: &str) -> bool {
         && !branch.contains("..")
         && !branch.contains("//")
         && !branch.contains("@{")
-        && branch
-            .split('/')
-            .all(|component| !component.is_empty() && !component.starts_with('.') && !component.ends_with(".lock"))
+        && branch.split('/').all(|component| {
+            !component.is_empty() && !component.starts_with('.') && !component.ends_with(".lock")
+        })
 }

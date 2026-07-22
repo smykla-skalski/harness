@@ -14,11 +14,7 @@ pub(crate) async fn authorize_and_start_executor(
 ) -> TaskBoardRemoteMutationOutcome {
     let authority = fixture
         .db
-        .claim_task_board_remote_executor_start_authority(
-            assignment_id,
-            INSTANCE,
-            started_at,
-        )
+        .claim_task_board_remote_executor_start_authority(assignment_id, INSTANCE, started_at)
         .await
         .expect("claim executor start authority")
         .expect("executor start remains authorized");

@@ -1,3 +1,4 @@
+use super::TaskBoardRemoteMutationOutcome;
 use super::remote_assignment_generation_tests::{
     accept_controller, claim_controller, running_status, status_request,
 };
@@ -8,7 +9,6 @@ use super::remote_operation_trust::{
 };
 use super::workflow_execution_attempts::update_attempt_in_tx;
 use super::workflow_executions::update_execution_in_tx;
-use super::TaskBoardRemoteMutationOutcome;
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteClaimResponse, RemoteLease, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
@@ -304,10 +304,10 @@ async fn bind_parent_locally(
     let current = load_execution(fixture).await;
     let mut local = current.clone();
     local.ownership.host_id = None;
-    local.ownership.resources.insert(
-        TASK_BOARD_EXECUTION_TARGET_RESOURCE.into(),
-        "local".into(),
-    );
+    local
+        .ownership
+        .resources
+        .insert(TASK_BOARD_EXECUTION_TARGET_RESOURCE.into(), "local".into());
     local.updated_at = DIVERGED_AT.into();
     persist_parent(fixture, &current, &local, None).await;
     local
@@ -328,7 +328,10 @@ async fn terminalize_parent_out_of_band(
     let mut terminal = current.clone();
     terminal.transition.execution_state = TaskBoardExecutionState::Cancelled;
     terminal.ownership.host_id = None;
-    terminal.ownership.resources.remove(TASK_BOARD_EXECUTION_TARGET_RESOURCE);
+    terminal
+        .ownership
+        .resources
+        .remove(TASK_BOARD_EXECUTION_TARGET_RESOURCE);
     terminal
         .ownership
         .resources
@@ -398,9 +401,9 @@ async fn install_supersede_failure(fixture: &ControllerFixture) {
          ON task_board_remote_assignments WHEN NEW.state = 'superseded'
          BEGIN SELECT RAISE(ABORT, 'fixture failure'); END",
     )
-        .execute(fixture.db.pool())
-        .await
-        .expect("install detached supersede failure");
+    .execute(fixture.db.pool())
+    .await
+    .expect("install detached supersede failure");
 }
 
 async fn load_execution(

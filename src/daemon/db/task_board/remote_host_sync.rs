@@ -146,7 +146,11 @@ async fn clear_host_observation(
     .bind(host_role)
     .execute(transaction.as_mut())
     .await
-    .map_err(|error| db_error(format!("clear disabled execution host observation: {error}")))?;
+    .map_err(|error| {
+        db_error(format!(
+            "clear disabled execution host observation: {error}"
+        ))
+    })?;
     Ok(())
 }
 
@@ -185,13 +189,7 @@ async fn upsert_configured_host(
     host: &TaskBoardExecutionHostConfig,
     revision: i64,
 ) -> Result<(), CliError> {
-    let existing = query_as::<_, (
-        String,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        bool,
-    )>(
+    let existing = query_as::<_, (String, Option<String>, Option<String>, Option<String>, bool)>(
         "SELECT host_role, configured_endpoint, configured_leaf_sha256,
                 configured_credential_reference, enabled
          FROM task_board_execution_hosts WHERE host_id = ?1",
@@ -200,16 +198,17 @@ async fn upsert_configured_host(
     .fetch_optional(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("load configured remote host: {error}")))?;
-    let preserve_observation = existing.as_ref().is_some_and(
-        |(role, endpoint, leaf, credential, enabled)| {
-            role == "controller_remote"
-                && *enabled
-                && host.enabled
-                && endpoint.as_deref() == Some(host.endpoint.as_str())
-                && leaf.as_deref() == Some(host.certificate_fingerprint.as_str())
-                && credential.as_deref() == Some(host.credential_reference.as_str())
-        },
-    );
+    let preserve_observation =
+        existing
+            .as_ref()
+            .is_some_and(|(role, endpoint, leaf, credential, enabled)| {
+                role == "controller_remote"
+                    && *enabled
+                    && host.enabled
+                    && endpoint.as_deref() == Some(host.endpoint.as_str())
+                    && leaf.as_deref() == Some(host.certificate_fingerprint.as_str())
+                    && credential.as_deref() == Some(host.credential_reference.as_str())
+            });
     let now = crate::daemon::db::utc_now();
     let changed = query(
         "INSERT INTO task_board_execution_hosts (

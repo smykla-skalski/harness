@@ -8,15 +8,14 @@ pub(crate) async fn prepare_remote_implementation_offer(
     worktree: &str,
     base_head_revision: &str,
 ) -> PreparedRemoteOffer {
-    let (db, intent, preparation, launch) =
-        super::super::write_workflow_tests::reserved_write_at(
-            label,
-            Some("example/harness"),
-            worktree,
-            base_head_revision,
-            true,
-        )
-        .await;
+    let (db, intent, preparation, launch) = super::super::write_workflow_tests::reserved_write_at(
+        label,
+        Some("example/harness"),
+        worktree,
+        base_head_revision,
+        true,
+    )
+    .await;
     let applied =
         super::super::write_workflow_tests::publish_write(&db, &preparation, launch).await;
     let execution_id = applied
@@ -45,8 +44,7 @@ pub(crate) async fn prepare_remote_implementation_offer(
     offer.binding.workflow_kind = TaskBoardWorkflowKind::DefaultTask;
     offer.binding.base_revision = base_head_revision.into();
     offer.binding.expected_head_revision = None;
-    offer.source =
-        RemoteSourceMaterial::repository_revision("example/harness", base_head_revision);
+    offer.source = RemoteSourceMaterial::repository_revision("example/harness", base_head_revision);
     offer = offer.seal().expect("seal implementation offer");
     PreparedRemoteOffer {
         db,
@@ -58,10 +56,7 @@ pub(crate) async fn prepare_remote_implementation_offer(
     }
 }
 
-async fn normalize_prepared_times(
-    db: &crate::daemon::db::AsyncDaemonDb,
-    execution_id: &str,
-) {
+async fn normalize_prepared_times(db: &crate::daemon::db::AsyncDaemonDb, execution_id: &str) {
     sqlx::query(
         "UPDATE task_board_workflow_executions
          SET created_at = '2026-07-19T10:00:00Z', updated_at = '2026-07-19T10:00:00Z'

@@ -66,7 +66,10 @@ impl AsyncDaemonDb {
         request
             .validate()
             .map_err(|error| db_error(format!("validate remote artifact authority: {error}")))?;
-        nonblank(authenticated_principal, "remote artifact authority principal")?;
+        nonblank(
+            authenticated_principal,
+            "remote artifact authority principal",
+        )?;
         let mut transaction = self
             .begin_immediate_transaction("task board remote artifact I/O authority")
             .await?;
@@ -89,9 +92,10 @@ impl AsyncDaemonDb {
             Some(trust),
         )
         .await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit remote artifact I/O authority: {error}"))
-        })?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit remote artifact I/O authority: {error}")))?;
         Ok(true)
     }
 

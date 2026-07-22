@@ -1,7 +1,7 @@
 use super::disabled_tests::{
     EXECUTOR_INSTANCE, EXECUTOR_START_AT, claim_start_authority, codex_run_count,
-    configure_checkout, executor_session_count, executor_state, git_repository,
-    load_assignment, persist_exact_run, request_for_revision,
+    configure_checkout, executor_session_count, executor_state, git_repository, load_assignment,
+    persist_exact_run, request_for_revision,
 };
 use super::source::install_remote_session_creation_barrier;
 use super::{prepare_remote_workspace, reconcile_remote_executor_assignment};
@@ -87,11 +87,7 @@ async fn final_start_io_permit_fences_settings_until_adoption() {
     .expect("prepare exact executor workspace");
     let permit = fixture
         .db
-        .claim_task_board_remote_executor_start_io_permit(
-            &authority,
-            &workspace,
-            EXECUTOR_START_AT,
-        )
+        .claim_task_board_remote_executor_start_io_permit(&authority, &workspace, EXECUTOR_START_AT)
         .await
         .expect("claim final Start I/O permit")
         .expect_acquired("Start remains permitted");

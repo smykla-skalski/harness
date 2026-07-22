@@ -87,8 +87,14 @@ pub(in crate::daemon::db::task_board) async fn consume_cleanup_observation_trust
             "remote cleanup response lost its configured host trust fence",
         ));
     }
-    clear_operation_trust_in_tx(transaction, assignment, request_sha256, &trust_sha256, &fence)
-        .await
+    clear_operation_trust_in_tx(
+        transaction,
+        assignment,
+        request_sha256,
+        &trust_sha256,
+        &fence,
+    )
+    .await
 }
 
 async fn cleanup_fence_in_tx(
@@ -175,9 +181,8 @@ async fn replace_operation_trust_in_tx(
     next_trust_sha256: &str,
     next_fence: &TaskBoardRemoteLifecycleTrustSnapshot,
 ) -> Result<(), CliError> {
-    let prior_fence = prior_fence.ok_or_else(|| {
-        concurrent("remote cleanup rollover lost its immutable lifecycle fence")
-    })?;
+    let prior_fence = prior_fence
+        .ok_or_else(|| concurrent("remote cleanup rollover lost its immutable lifecycle fence"))?;
     let prior_fence_json = prior_fence.encoded()?;
     let next_fence_json = next_fence.encoded()?;
     let rows = query(

@@ -2,8 +2,7 @@ use super::remote_assignment_inbox::PREDECESSOR_OFFER_NOT_RECEIVED;
 use super::remote_assignment_test_support::{DEADLINE, HOST, LEASE_EXPIRES, NOW};
 use super::remote_outbound_source_tests::snapshot_offer;
 use super::{
-    TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome,
-    TaskBoardRemoteOperationTrustFence,
+    TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome, TaskBoardRemoteOperationTrustFence,
 };
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::tests::task_board::{
@@ -17,8 +16,7 @@ use crate::daemon::task_board_remote_transport::wire::{
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TASK_BOARD_REMOTE_PROTOCOL_VERSION,
     TaskBoardExecutionAttemptCas, TaskBoardExecutionHostAdvertisement,
-    TaskBoardPhaseCapabilityProfile, TaskBoardRemoteAssignmentState,
-    TaskBoardWorkflowExecutionCas,
+    TaskBoardPhaseCapabilityProfile, TaskBoardRemoteAssignmentState, TaskBoardWorkflowExecutionCas,
 };
 
 const SUCCESSOR_INSTANCE: &str = "instance-b";
@@ -118,19 +116,17 @@ async fn uploaded_source_and_accepted_predecessor_offer_continue_after_restart()
     let accepted = accepted_offer_response(&setup.offer);
 
     let TaskBoardRemoteMutationOutcome::Updated(updated) = restarted
-        .record_task_board_remote_predecessor_offer_acceptance(
-            &accepted,
-            HOST,
-            &trust,
-            OFFERED_AT,
-        )
+        .record_task_board_remote_predecessor_offer_acceptance(&accepted, HOST, &trust, OFFERED_AT)
         .await
         .expect("adopt immutable predecessor offer acceptance")
     else {
         panic!("predecessor acceptance did not update the original generation");
     };
     assert_eq!(updated.assignment_id, setup.offer.binding.assignment_id);
-    assert_eq!(updated.target_host_instance_id.as_deref(), Some("instance-a"));
+    assert_eq!(
+        updated.target_host_instance_id.as_deref(),
+        Some("instance-a")
+    );
     assert_eq!(updated.lease_id.as_deref(), Some("lease-predecessor"));
     assert!(updated.controller_operation.is_none());
     assert_eq!(assignment_count(&restarted).await, 1);
@@ -304,7 +300,10 @@ async fn assert_reassigned_generation(
         .await
         .expect("load predecessor after reassignment")
         .expect("predecessor retained");
-    assert_eq!(predecessor.state, TaskBoardRemoteAssignmentState::Superseded);
+    assert_eq!(
+        predecessor.state,
+        TaskBoardRemoteAssignmentState::Superseded
+    );
     assert!(predecessor.controller_operation.is_none());
     let handoff: (String, String, i64) = sqlx::query_as(
         "SELECT controller_handoff_kind, controller_handoff_successor_assignment_id,
@@ -330,7 +329,9 @@ async fn assert_reassigned_generation(
         .expect("load successor outbound source")
         .expect("successor outbound source retained");
     assert_eq!(
-        upload.validate().expect("validate successor outbound bytes"),
+        upload
+            .validate()
+            .expect("validate successor outbound bytes"),
         setup.content
     );
     let receipt = db

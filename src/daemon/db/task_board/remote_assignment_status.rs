@@ -96,7 +96,11 @@ impl AsyncDaemonDb {
             .await?
             .is_some()
         {
-            commit_noop(transaction, "verified pending remote cancel status authority").await?;
+            commit_noop(
+                transaction,
+                "verified pending remote cancel status authority",
+            )
+            .await?;
             return Ok(true);
         }
         claim_controller_operation_trust_in_tx(
@@ -126,7 +130,10 @@ impl AsyncDaemonDb {
                 "validate remote assignment status request: {error}"
             ))
         })?;
-        nonblank(authenticated_principal, "remote assignment authenticated principal")?;
+        nonblank(
+            authenticated_principal,
+            "remote assignment authenticated principal",
+        )?;
         let mut transaction = self
             .begin_immediate_transaction("task board remote assignment status")
             .await?;
@@ -138,13 +145,9 @@ impl AsyncDaemonDb {
             commit_noop(transaction, "stale status request generation").await?;
             return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
         }
-        if let Some(updated) = reconcile_pending_cancel_status_in_tx(
-            &mut transaction,
-            &record,
-            request,
-            response,
-        )
-        .await?
+        if let Some(updated) =
+            reconcile_pending_cancel_status_in_tx(&mut transaction, &record, request, response)
+                .await?
         {
             if !updated {
                 commit_noop(transaction, "stale pending remote cancel status").await?;

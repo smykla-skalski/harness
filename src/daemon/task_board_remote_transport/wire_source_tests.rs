@@ -68,8 +68,7 @@ fn pr_fix_initial_source_binds_fork_branch_and_canonical_ref() {
         );
         // Swapping the source repository breaks its binding pairing, and a malformed
         // ref is rejected once resealed; both fail semantically before the digest.
-        let repository_swapped =
-            changed.source.repository() != changed.binding.repository.as_str();
+        let repository_swapped = changed.source.repository() != changed.binding.repository.as_str();
         if malformed_ref || repository_swapped {
             changed.request_sha256.clear();
             changed = changed.seal().expect("reseal rejected fork source");

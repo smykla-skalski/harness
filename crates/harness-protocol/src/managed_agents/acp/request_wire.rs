@@ -204,8 +204,7 @@ mod tests {
             "a stdio env value must cross the wire verbatim"
         );
 
-        let decoded: AcpAgentStartRequest =
-            serde_json::from_str(&encoded).expect("decode request");
+        let decoded: AcpAgentStartRequest = serde_json::from_str(&encoded).expect("decode request");
         assert_eq!(decoded, request, "the request must round-trip unchanged");
     }
 
@@ -239,13 +238,11 @@ mod tests {
         let value = serde_json::to_value(&request).expect("serialize request");
         assert_eq!(value["endpoint"]["url"], "https://acp.example.test");
         assert_eq!(
-            value["endpoint"]["headers_env"]["Authorization"],
-            "REMOTE_ACP_TOKEN",
+            value["endpoint"]["headers_env"]["Authorization"], "REMOTE_ACP_TOKEN",
             "only the env var name crosses the wire, never the token"
         );
 
-        let decoded: AcpAgentStartRequest =
-            serde_json::from_value(value).expect("decode request");
+        let decoded: AcpAgentStartRequest = serde_json::from_value(value).expect("decode request");
         assert_eq!(decoded, request, "the endpoint must round-trip unchanged");
     }
 
