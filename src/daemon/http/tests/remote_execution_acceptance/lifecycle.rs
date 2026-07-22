@@ -10,7 +10,9 @@ use crate::daemon::service::task_board_remote_controller::drive_task_board_remot
 use crate::daemon::service::{
     install_deterministic_runtime_seam, reconcile_task_board_remote_executor_tick,
 };
-use crate::daemon::task_board_remote_transport::controller_authority_test_support::test_tls_material;
+use crate::daemon::task_board_remote_transport::controller_authority_test_support::{
+    TestTlsMaterial, test_tls_material,
+};
 use crate::task_board::{
     TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardAttemptResultArtifact,
     TaskBoardExecutionState, TaskBoardImplementationResult, TaskBoardLocalAttemptResult,
@@ -19,31 +21,36 @@ use crate::task_board::{
 
 #[test]
 fn default_task_implementation_cross_daemon_lifecycle_imports_and_cleans_up() {
-    run_deep_acceptance_async(
-        default_task_implementation_cross_daemon_lifecycle_imports_and_cleans_up_body,
-    );
+    run_deep_acceptance_async(|| async {
+        let tls = test_tls_material();
+        with_acceptance_environment(
+            &tls,
+            "remote-acceptance-lifecycle",
+            run_default_task_implementation_lifecycle(&tls),
+        )
+        .await;
+    });
 }
 
-async fn default_task_implementation_cross_daemon_lifecycle_imports_and_cleans_up_body() {
-    let tls = test_tls_material();
+pub(super) async fn with_acceptance_environment<F>(tls: &TestTlsMaterial, session_id: &str, run: F)
+where
+    F: Future<Output = ()>,
+{
     with_test_remote_tls_root(tls.ca_der(), &[(TOKEN_ENV, TOKEN)], async {
         let data = tempfile::tempdir().expect("isolated acceptance data root");
         let data_path = data.path().to_string_lossy().into_owned();
         temp_env::async_with_vars(
             [
                 ("XDG_DATA_HOME", Some(data_path.as_str())),
-                ("CLAUDE_SESSION_ID", Some("remote-acceptance-lifecycle")),
+                ("CLAUDE_SESSION_ID", Some(session_id)),
             ],
-            async {
-                run_default_task_implementation_lifecycle(&tls).await;
-            },
+            run,
         )
         .await;
     })
     .await;
 }
-
-fn run_deep_acceptance_async<F>(build: impl FnOnce() -> F + Send + 'static)
+pub(super) fn run_deep_acceptance_async<F>(build: impl FnOnce() -> F + Send + 'static)
 where
     F: Future<Output = ()> + 'static,
 {
@@ -62,10 +69,7 @@ where
         .join()
         .expect("join deep acceptance test thread");
 }
-
-async fn run_default_task_implementation_lifecycle(
-    tls: &crate::daemon::task_board_remote_transport::controller_authority_test_support::TestTlsMaterial,
-) {
+async fn run_default_task_implementation_lifecycle(tls: &TestTlsMaterial) {
     let fixture = AcceptanceFixture::new();
     let executor = fixture.executor_state(HOST_INSTANCE, true).await;
     let executor_db = executor.async_db.get().expect("executor async database");
@@ -93,13 +97,12 @@ async fn run_default_task_implementation_lifecycle(
     .await;
     server.stop().await;
 }
-
 struct ExecutorResult {
     session_id: String,
     result_head: String,
 }
 
-async fn offer_and_claim(
+pub(super) async fn offer_and_claim(
     controller_db: &crate::daemon::db::AsyncDaemonDb,
     execution_id: &str,
 ) -> crate::daemon::db::TaskBoardRemoteAssignmentRecord {
@@ -193,13 +196,7 @@ async fn assert_initial_start_boundary(
     assert!(record.start_receipt.is_none());
     assert!(record.workspace_ref.is_none());
     assert!(record.started_at.is_none());
-    assert!(
-        db.codex_run(&identity.run_id)
-            .await
-            .expect("load executor runtime")
-            .is_none(),
-        "pre-Start authority must not have launched Codex"
-    );
+    assert_executor_runtime_presence(db, identity, false).await;
 }
 
 async fn assert_active_start_boundary(
@@ -227,13 +224,19 @@ async fn assert_active_start_boundary(
     assert!(record.started_at.is_some());
     assert!(record.executor_start_authority_sha256.is_none());
     assert!(record.executor_start_io_permit_sha256.is_none());
-    assert!(
-        db.codex_run(&identity.run_id)
-            .await
-            .expect("load executor runtime")
-            .is_some(),
-        "executor Start must persist its deterministic Codex run"
-    );
+    assert_executor_runtime_presence(db, identity, true).await;
+}
+
+pub(super) async fn assert_executor_runtime_presence(
+    db: &crate::daemon::db::AsyncDaemonDb,
+    identity: &crate::daemon::db::TaskBoardRemoteExecutorIdentity,
+    expected: bool,
+) {
+    let run = db
+        .codex_run(&identity.run_id)
+        .await
+        .expect("load executor run");
+    assert_eq!(run.is_some(), expected);
 }
 
 async fn settle_and_clean_up(
@@ -342,7 +345,7 @@ async fn assert_completion(
     );
 }
 
-async fn drive(db: &crate::daemon::db::AsyncDaemonDb, phase: &str) {
+pub(super) async fn drive(db: &crate::daemon::db::AsyncDaemonDb, phase: &str) {
     let report = Box::pin(drive_task_board_remote_controller(db))
         .await
         .unwrap_or_else(|error| panic!("controller {phase}: {error}"));
@@ -353,13 +356,16 @@ async fn drive(db: &crate::daemon::db::AsyncDaemonDb, phase: &str) {
     );
 }
 
-async fn reconcile_executor_tick(executor: &crate::daemon::http::DaemonHttpState, phase: &str) {
+pub(super) async fn reconcile_executor_tick(
+    executor: &crate::daemon::http::DaemonHttpState,
+    phase: &str,
+) {
     reconcile_task_board_remote_executor_tick(executor)
         .await
         .unwrap_or_else(|error| panic!("executor {phase}: {error}"));
 }
 
-async fn executor_assignment(
+pub(super) async fn executor_assignment(
     db: &crate::daemon::db::AsyncDaemonDb,
     assignment_id: &str,
 ) -> crate::daemon::db::TaskBoardRemoteAssignmentRecord {

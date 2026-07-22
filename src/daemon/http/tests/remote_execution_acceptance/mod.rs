@@ -2,3 +2,4 @@
 
 mod fixture;
 mod lifecycle;
+mod restart;

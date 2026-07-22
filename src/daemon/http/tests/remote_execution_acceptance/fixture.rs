@@ -229,6 +229,7 @@ pub(super) fn git(path: &Path, args: &[&str]) -> String {
 
 pub(super) struct TlsRouterServer {
     endpoint: String,
+    bound_address: SocketAddr,
     shutdown: oneshot::Sender<()>,
     task: JoinHandle<()>,
 }
@@ -245,6 +246,10 @@ impl TlsRouterServer {
 
     pub(super) fn endpoint(&self) -> &str {
         &self.endpoint
+    }
+
+    pub(super) fn bound_address(&self) -> SocketAddr {
+        self.bound_address
     }
 
     pub(super) async fn stop(self) {
@@ -277,6 +282,7 @@ impl TlsRouterServer {
         });
         Self {
             endpoint: format!("https://localhost:{}", address.port()),
+            bound_address: address,
             shutdown,
             task,
         }

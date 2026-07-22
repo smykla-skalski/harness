@@ -1,5 +1,27 @@
 use super::*;
 
+pub(super) async fn abandon_predecessor_claim(
+    db: &AsyncDaemonDb,
+    record: &TaskBoardRemoteAssignmentRecord,
+    identity: &RemoteWorkerIdentity,
+    daemon_epoch: &str,
+) -> Result<bool, CliError> {
+    if record.claimed_host_instance_id.as_deref() == Some(daemon_epoch)
+        || executor_start_authority(record)?.is_some()
+    {
+        return Ok(false);
+    }
+    let _ = db
+        .abandon_task_board_remote_executor_claim_after_restart(
+            &record.assignment_id,
+            identity,
+            daemon_epoch,
+            &utc_now(),
+        )
+        .await?;
+    Ok(true)
+}
+
 pub(super) async fn prepare_recovery(
     db: &AsyncDaemonDb,
     record: &TaskBoardRemoteAssignmentRecord,

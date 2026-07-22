@@ -39,7 +39,7 @@ use adoption::execute_and_reconcile_remote_worker;
 use adoption::reconcile_persisted_start_without_run;
 use cleanup::{cleanup_unstarted_executor_provisioning, reconcile_settled_executor_cleanup};
 use fences::{concurrent, invalid_transition, require_executor_identity, shutdown_observed};
-use recovery::prepare_recovery;
+use recovery::{abandon_predecessor_claim, prepare_recovery};
 #[cfg(test)]
 use runtime::remote_codex_request;
 use runtime::{
@@ -270,6 +270,9 @@ async fn prepare_active_remote_worker(
         return Ok(None);
     }
     let persisted_authority = executor_start_authority(record)?;
+    if abandon_predecessor_claim(db, record, identity, daemon_epoch).await? {
+        return Ok(None);
+    }
     // Wall-clock gates fresh claims; authorized generations still reconcile after expiry.
     if persisted_authority.is_none()
         && !start_window_is_open(

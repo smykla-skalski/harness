@@ -7,6 +7,7 @@ use super::remote_assignment_active_fence::{
 use super::remote_assignment_cancel_status::{
     claim_pending_cancel_status_in_tx, reconcile_pending_cancel_status_in_tx,
 };
+use super::remote_assignment_controller_recovery::recover_ambiguous_remote_start_in_tx;
 use super::remote_assignment_io_authority::active_target_matches;
 use super::remote_assignment_lease::{
     claim_request_for_record, commit_noop, finish_mutation, require_assignment,
@@ -14,6 +15,7 @@ use super::remote_assignment_lease::{
 use super::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome, concurrent, nonblank, to_i64,
 };
+use super::remote_assignment_start_authority::EXECUTOR_RESTARTED_BEFORE_START;
 use super::remote_assignment_status_persistence::{
     persist_status, status_non_state_evidence_allowed, status_update_allowed,
 };
@@ -125,22 +127,11 @@ impl AsyncDaemonDb {
         response: &RemoteStatusResponse,
         authenticated_principal: &str,
     ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        request.validate().map_err(|error| {
-            db_error(format!(
-                "validate remote assignment status request: {error}"
-            ))
-        })?;
-        nonblank(
-            authenticated_principal,
-            "remote assignment authenticated principal",
-        )?;
+        validate_status_exchange(request, response, authenticated_principal)?;
         let mut transaction = self
             .begin_immediate_transaction("task board remote assignment status")
             .await?;
         let record = status_record_in_tx(&mut transaction, request).await?;
-        response
-            .validate(request)
-            .map_err(|error| db_error(format!("validate remote assignment status: {error}")))?;
         if !status_generation_matches(&record, request, response, authenticated_principal)? {
             commit_noop(transaction, "stale status request generation").await?;
             return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
@@ -167,6 +158,11 @@ impl AsyncDaemonDb {
             .await?;
             commit_noop(transaction, "replayed assignment status").await?;
             return Ok(TaskBoardRemoteMutationOutcome::Replayed(record));
+        }
+        if reconcile_prestart_restart_unknown_in_tx(&mut transaction, &record, request, response)
+            .await?
+        {
+            return finish_mutation(transaction, &record.assignment_id, "restart status").await;
         }
         if !status_update_allowed(&record, response)? {
             return rejected_status_outcome(transaction, record, request, response).await;
@@ -215,6 +211,66 @@ impl AsyncDaemonDb {
         settle_running_status_in_tx(&mut transaction, &resolution.parent, response).await?;
         finish_mutation(transaction, &record.assignment_id, "status").await
     }
+}
+
+fn validate_status_exchange(
+    request: &RemoteStatusRequest,
+    response: &RemoteStatusResponse,
+    authenticated_principal: &str,
+) -> Result<(), CliError> {
+    request.validate().map_err(|error| {
+        db_error(format!(
+            "validate remote assignment status request: {error}"
+        ))
+    })?;
+    nonblank(
+        authenticated_principal,
+        "remote assignment authenticated principal",
+    )?;
+    response
+        .validate(request)
+        .map_err(|error| db_error(format!("validate remote assignment status: {error}")))
+}
+
+async fn reconcile_prestart_restart_unknown_in_tx(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    record: &TaskBoardRemoteAssignmentRecord,
+    request: &RemoteStatusRequest,
+    response: &RemoteStatusResponse,
+) -> Result<bool, CliError> {
+    let exact = record.state == TaskBoardRemoteAssignmentState::Claimed
+        && response.state == RemoteAssignmentWireState::Unknown
+        && response.error_code.as_deref() == Some(EXECUTOR_RESTARTED_BEFORE_START)
+        && response.failure_class.is_none()
+        && response.started_at.is_none()
+        && response.workspace_ref.is_none()
+        && response.result.is_none()
+        && response.output_artifacts.entries.is_empty()
+        && record.start_receipt.is_none()
+        && record.started_at.is_none()
+        && record.workspace_ref.is_none()
+        && status_non_state_evidence_allowed(record, response)?;
+    if !exact {
+        return Ok(false);
+    }
+    let parent = load_execution_in_tx(transaction, &record.execution_id)
+        .await?
+        .ok_or_else(|| concurrent("pre-Start restart execution disappeared"))?;
+    consume_controller_operation_trust_in_tx(
+        transaction,
+        record,
+        TaskBoardRemoteOperationKind::Status,
+        &request.request_sha256,
+    )
+    .await?;
+    if !recover_ambiguous_remote_start_in_tx(transaction, record, &parent, &response.observed_at)
+        .await?
+    {
+        return Err(concurrent(
+            "pre-Start restart status did not advance its exact generation",
+        ));
+    }
+    Ok(true)
 }
 
 async fn rejected_status_outcome(

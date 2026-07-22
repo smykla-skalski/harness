@@ -58,19 +58,31 @@ async fn settings_winner_revokes_start_before_any_workspace_or_codex_io() {
 }
 
 #[tokio::test]
-async fn predecessor_claim_without_run_cannot_prepare_or_start() {
+async fn predecessor_claim_without_run_converges_unknown_without_executor_io() {
     let (fixture, accepted) = live_claimed_fixture().await;
     let state = executor_state(&fixture.db, "successor-instance");
 
     reconcile_remote_executor_assignment(&state, &fixture.db, &accepted.assignment_id)
         .await
-        .expect("predecessor claim defers without executor I/O");
+        .expect("successor settles the empty predecessor claim without executor I/O");
 
-    let unchanged = load_assignment(&fixture.db, &accepted.assignment_id).await;
-    assert_eq!(unchanged.state, TaskBoardRemoteAssignmentState::Claimed);
-    assert!(unchanged.executor_start_authority_sha256.is_none());
+    let unknown = load_assignment(&fixture.db, &accepted.assignment_id).await;
+    assert_eq!(unknown.state, TaskBoardRemoteAssignmentState::Unknown);
+    assert!(unknown.executor_start_authority_sha256.is_none());
+    assert_eq!(
+        unknown.error.as_deref(),
+        Some("remote executor restarted before worker start")
+    );
     assert_eq!(codex_run_count(&fixture.db).await, 0);
     assert_eq!(executor_session_count(&fixture.db).await, 0);
+
+    reconcile_remote_executor_assignment(&state, &fixture.db, &accepted.assignment_id)
+        .await
+        .expect("empty predecessor claim recovery replays without executor I/O");
+    assert_eq!(
+        load_assignment(&fixture.db, &accepted.assignment_id).await,
+        unknown
+    );
 }
 
 #[tokio::test]
