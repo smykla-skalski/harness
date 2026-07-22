@@ -82,17 +82,14 @@ impl RemoteExecutionControllerClient {
         }
         let verification = self.client.verify_source_bundle_receipt(request).await?;
         if verification.receipt.is_some() {
-            let stored = db
-                .adopt_verified_task_board_remote_source_bundle_receipt(
-                    request,
-                    &verification,
-                    &self.host_id,
-                    &trust,
-                )
-                .await?
-                .ok_or_else(|| {
-                    binding_error("verified source receipt disappeared during adoption")
-                })?;
+            let stored = Box::pin(db.adopt_verified_task_board_remote_source_bundle_receipt(
+                request,
+                &verification,
+                &self.host_id,
+                &trust,
+            ))
+            .await?
+            .ok_or_else(|| binding_error("verified source receipt disappeared during adoption"))?;
             return Ok(RemoteSourceBundleRecoveryOutcome::Receipt {
                 response: stored.response,
                 trust,
@@ -101,14 +98,13 @@ impl RemoteExecutionControllerClient {
         let abandon = super::wire::RemoteSourceBundleAbandonRequest::seal(request, verification)
             .map_err(super::client::RemoteExecutionHttpError::from)?;
         let response = self.client.abandon_source_bundle(&abandon).await?;
-        let stored = db
-            .record_task_board_remote_source_bundle_abandonment(
-                &abandon,
-                &response,
-                &self.host_id,
-                &trust,
-            )
-            .await?;
+        let stored = Box::pin(db.record_task_board_remote_source_bundle_abandonment(
+            &abandon,
+            &response,
+            &self.host_id,
+            &trust,
+        ))
+        .await?;
         Ok(RemoteSourceBundleRecoveryOutcome::Abandoned {
             request: stored.request,
             response: stored.response,

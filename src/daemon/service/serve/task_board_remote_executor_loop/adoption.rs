@@ -61,7 +61,8 @@ pub(super) async fn execute_and_reconcile_remote_worker(
     if record.state == TaskBoardRemoteAssignmentState::Claimed {
         let permit = permit
             .ok_or_else(|| concurrent("claimed remote worker has no durable Start I/O permit"))?;
-        let Some(started) = adopt_remote_start(state, db, permit, &snapshot, workspace).await?
+        let Some(started) =
+            Box::pin(adopt_remote_start(state, db, permit, &snapshot, workspace)).await?
         else {
             return Ok(());
         };
@@ -74,8 +75,14 @@ pub(super) async fn execute_and_reconcile_remote_worker(
         }
     }
     if !snapshot.status.is_active() {
-        return persist_terminal_snapshot(db, &state.daemon_epoch, &record, &snapshot, workspace)
-            .await;
+        return Box::pin(persist_terminal_snapshot(
+            db,
+            &state.daemon_epoch,
+            &record,
+            &snapshot,
+            workspace,
+        ))
+        .await;
     }
     mark_running_if_active(db, &record, &snapshot).await
 }

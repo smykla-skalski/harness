@@ -281,7 +281,9 @@ fn validate_executor_session_identity(
             .executor_checkout_path
             .as_deref()
             .ok_or_else(|| concurrent("remote executor cleanup has no frozen checkout path"))?,
-    );
+    )
+    .canonicalize()
+    .map_err(|error| workflow_io(format!("canonicalize remote cleanup origin: {error}")))?;
     let exact = state.session_id == identity.session_id
         && state.project_name == layout.project_name
         && state.worktree_path == layout.workspace()

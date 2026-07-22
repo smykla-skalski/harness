@@ -134,7 +134,9 @@ async fn prepare_dispatch_side_effects(
                 ))),
             )
         })?;
-    let worktree = resolved.state.worktree_path.to_string_lossy().into_owned();
+    let worktree = canonical_dispatch_worktree(resolved.state.worktree_path.clone())
+        .await
+        .map_err(|error| (DispatchFailureKind::CreateSession, error))?;
     let read_only_workflow = super::read_only_workflow_launch::prepare_read_only_workflow_launch(
         db,
         &claim.preparation.board_item_id,
@@ -163,6 +165,18 @@ async fn prepare_dispatch_side_effects(
         read_only_workflow,
         write_workflow,
     })
+}
+
+async fn canonical_dispatch_worktree(worktree: PathBuf) -> Result<String, CliError> {
+    spawn_blocking(move || worktree.canonicalize())
+        .await
+        .map_err(|error| {
+            CliErrorKind::workflow_io(format!("join dispatch worktree resolver: {error}"))
+        })?
+        .map(|path| path.to_string_lossy().into_owned())
+        .map_err(|error| {
+            CliErrorKind::workflow_io(format!("resolve dispatch worktree: {error}")).into()
+        })
 }
 
 async fn maintain_preparation_claim(

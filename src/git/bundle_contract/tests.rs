@@ -53,6 +53,28 @@ fn delta_output_limit_matches_one_maximum_raw_entry() {
 }
 
 #[test]
+fn result_delta_rejects_dot_and_git_administration_paths_before_object_checks() {
+    let repository = Path::new("/frozen/repository");
+    let oid = "a".repeat(40);
+    let header = format!(":100644 100644 {oid} {oid} M");
+
+    for path in [
+        b"..".as_slice(),
+        b".git".as_slice(),
+        b"nested/.GIT/hooks".as_slice(),
+    ] {
+        let mut raw = header.as_bytes().to_vec();
+        raw.push(0);
+        raw.extend_from_slice(path);
+        raw.push(0);
+
+        let error = parse_delta(repository, &raw, 40, GitBundleContentLimits::REMOTE_RESULT)
+            .expect_err("noncanonical result delta path must fail before object checks");
+        assert!(matches!(error, GitError::Unsafe { .. }));
+    }
+}
+
+#[test]
 fn source_tree_output_accepts_exact_path_limit_and_rejects_one_more() {
     let repository = Path::new("/frozen/repository");
     let limits = GitBundleContentLimits {

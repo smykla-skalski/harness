@@ -76,8 +76,7 @@ mod tests {
 
     #[test]
     fn maps_rate_limit_status() {
-        let error =
-            classify_status(429, Some(Duration::from_secs(7)), "rate limited".to_owned());
+        let error = classify_status(429, Some(Duration::from_secs(7)), "rate limited".to_owned());
         assert!(matches!(
             error,
             OpenRouterError::RateLimited { retry_after: Some(d) } if d == Duration::from_secs(7)
@@ -87,7 +86,10 @@ mod tests {
     #[test]
     fn maps_auth_status() {
         let error = classify_status(401, None, "bad key".to_owned());
-        assert!(matches!(error, OpenRouterError::AuthenticationFailed { .. }));
+        assert!(matches!(
+            error,
+            OpenRouterError::AuthenticationFailed { .. }
+        ));
     }
 
     #[test]

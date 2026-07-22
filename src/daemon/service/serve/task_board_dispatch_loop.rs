@@ -49,7 +49,11 @@ async fn run_task_board_dispatch_loop(
     reason = "recovery drains preparation and worker intent queues while preserving per-claim errors"
 )]
 async fn recover_pending_dispatches(state: &DaemonHttpState, db: &AsyncDaemonDb) {
-    if let Err(error) = super::recover_remote_assignments_before_local_work(state, db).await {
+    if let Err(error) = Box::pin(super::recover_remote_assignments_before_local_work(
+        state, db,
+    ))
+    .await
+    {
         warn!(%error, "remote assignment recovery blocked dispatch reconciliation");
         return;
     }
@@ -70,7 +74,11 @@ async fn recover_pending_dispatches(state: &DaemonHttpState, db: &AsyncDaemonDb)
             warn!(%release_error, "task board dispatch preparation release failed");
         }
     }
-    if let Err(error) = super::recover_remote_assignments_before_local_work(state, db).await {
+    if let Err(error) = Box::pin(super::recover_remote_assignments_before_local_work(
+        state, db,
+    ))
+    .await
+    {
         warn!(%error, "remote target selection blocked dispatch reconciliation");
         return;
     }

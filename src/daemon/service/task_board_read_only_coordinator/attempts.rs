@@ -73,7 +73,10 @@ where
             attempt.state,
             TaskBoardAttemptState::Starting | TaskBoardAttemptState::Running
         )
-    }) && reports::reconcile_report_attempt(db, runtime, &execution, attempt, false, now).await?
+    }) && Box::pin(reports::reconcile_report_attempt(
+        db, runtime, &execution, attempt, false, now,
+    ))
+    .await?
     {
         return Ok(());
     }
@@ -81,14 +84,20 @@ where
         execution.transition.phase == Some(TaskBoardExecutionPhase::Publish)
             && attempt.state == TaskBoardAttemptState::Running
     }) {
-        lifecycle::reconcile_lifecycle_attempt(db, runtime, &execution, attempt, now).await?;
+        Box::pin(lifecycle::reconcile_lifecycle_attempt(
+            db, runtime, &execution, attempt, now,
+        ))
+        .await?;
         return Ok(());
     }
     let Some(revisions) = current_revisions_or_invalidate(db, &execution, now).await? else {
         return Ok(());
     };
     if let Some(attempt) = active_attempt.as_ref() {
-        return reconcile_active_attempt(db, runtime, &execution, attempt, now).await;
+        return Box::pin(reconcile_active_attempt(
+            db, runtime, &execution, attempt, now,
+        ))
+        .await;
     }
     if attempt_recovery::recover_terminal_attempt_state(db, &execution, now).await? {
         return Ok(());
@@ -150,11 +159,16 @@ where
             TaskBoardExecutionPhase::Implementation
             | TaskBoardExecutionPhase::Review
             | TaskBoardExecutionPhase::Evaluate,
-        ) => reports::reconcile_report_attempt(db, runtime, execution, attempt, true, now)
-            .await
-            .map(|_| ()),
+        ) => Box::pin(reports::reconcile_report_attempt(
+            db, runtime, execution, attempt, true, now,
+        ))
+        .await
+        .map(|_| ()),
         Some(TaskBoardExecutionPhase::Publish | TaskBoardExecutionPhase::Cleanup) => {
-            lifecycle::reconcile_lifecycle_attempt(db, runtime, execution, attempt, now).await
+            Box::pin(lifecycle::reconcile_lifecycle_attempt(
+                db, runtime, execution, attempt, now,
+            ))
+            .await
         }
         phase => Err(invalid_transition(format!(
             "active read-only attempt cannot run in phase {phase:?}"

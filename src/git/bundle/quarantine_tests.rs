@@ -45,6 +45,14 @@ fn changed_result_symlink_rejects_a_parent_escape_target() {
 
 #[cfg(unix)]
 #[test]
+fn changed_result_symlink_rejects_a_repository_administration_target() {
+    let fixture = fixture_with_symlink_at("foo", ".git/hooks/post-checkout");
+
+    assert_unsafe_symlink_rejection(&fixture);
+}
+
+#[cfg(unix)]
+#[test]
 fn changed_result_symlink_accepts_a_contained_relative_target() {
     let fixture = fixture_with_symlink("../result.txt");
 
@@ -78,6 +86,12 @@ fn extra_object_limits(max_object_bytes: usize) -> GitBundleContentLimits {
 #[cfg(unix)]
 fn assert_changed_result_symlink_rejected(target: &str) {
     let fixture = fixture_with_symlink(target);
+
+    assert_unsafe_symlink_rejection(&fixture);
+}
+
+#[cfg(unix)]
+fn assert_unsafe_symlink_rejection(fixture: &Fixture) {
     let error = fixture
         .plan()
         .verify_and_import_objects(&fixture.bundle)
@@ -91,12 +105,18 @@ fn assert_changed_result_symlink_rejected(target: &str) {
 
 #[cfg(unix)]
 fn fixture_with_symlink(target: &str) -> Fixture {
+    fixture_with_symlink_at("changed/path", target)
+}
+
+#[cfg(unix)]
+fn fixture_with_symlink_at(link_path: &str, target: &str) -> Fixture {
     use std::os::unix::fs::symlink;
 
     let mut fixture = Fixture::new(false);
-    fs::create_dir_all(fixture.source.join("changed")).expect("symlink parent");
-    symlink(target, fixture.source.join("changed/path")).expect("result symlink");
-    run_git(&fixture.source, &["add", "changed/path"]);
+    let link = fixture.source.join(link_path);
+    fs::create_dir_all(link.parent().expect("symlink parent")).expect("symlink parent");
+    symlink(target, &link).expect("result symlink");
+    run_git(&fixture.source, &["add", link_path]);
     run_git(&fixture.source, &["commit", "-m", "result symlink"]);
     fixture.result = git(&fixture.source, &["rev-parse", "HEAD"]);
     run_git(
@@ -117,6 +137,59 @@ fn fixture_with_symlink(target: &str) -> Fixture {
         ],
     );
     fixture
+}
+
+#[test]
+fn raw_tree_dot_or_git_paths_reject_before_promotion_or_import_ref_mutation() {
+    for entry in ["..", ".git"] {
+        let mut fixture = Fixture::new(false);
+        fixture.replace_result_with_raw_tree_entry(entry);
+
+        let error = fixture
+            .plan()
+            .verify_and_import_objects(&fixture.bundle)
+            .expect_err("noncanonical raw tree entry must fail before result import");
+
+        assert!(matches!(error, GitError::Unsafe { .. }));
+        fixture.assert_untouched();
+        assert!(!object_exists(&fixture.controller, &fixture.result));
+        assert!(!quarantine_path(&fixture.controller).exists());
+    }
+}
+
+impl Fixture {
+    fn replace_result_with_raw_tree_entry(&mut self, entry: &str) {
+        let blob = git_with_input(
+            &self.source,
+            &["hash-object", "-w", "--stdin"],
+            "noncanonical tree payload\n",
+        );
+        let tree = git_with_input(
+            &self.source,
+            &["mktree"],
+            &format!("100644 blob {blob}\t{entry}\n"),
+        );
+        self.result = git_with_input(
+            &self.source,
+            &["commit-tree", &tree, "-p", &self.base],
+            "noncanonical tree result\n",
+        );
+        let result_ref = result_ref();
+        run_git(&self.source, &["update-ref", &result_ref, &self.result]);
+        fs::remove_file(&self.bundle).expect("replace result bundle");
+        let excluded = format!("^{}", self.base);
+        run_git(
+            &self.source,
+            &[
+                "bundle",
+                "create",
+                "--version=2",
+                path(&self.bundle),
+                &result_ref,
+                &excluded,
+            ],
+        );
+    }
 }
 
 fn object_exists(repository: &Path, object: &str) -> bool {

@@ -20,7 +20,7 @@ use crate::task_board::{DispatchAppliedTask, TaskBoardStatus, TaskBoardWorkflowS
 
 const CLAIM_LEASE_SECONDS: i64 = 30;
 
-struct PendingTaskBoardDispatchClaim {
+struct PendingTaskBoardDispatch {
     intent_id: String,
     payload_json: String,
     consumed_approval_grant_id: Option<String>,
@@ -32,7 +32,7 @@ struct PendingTaskBoardDispatchClaim {
 async fn load_pending_dispatch_claim(
     transaction: &mut Transaction<'_, Sqlite>,
     board_item_id: &str,
-) -> Result<Option<PendingTaskBoardDispatchClaim>, CliError> {
+) -> Result<Option<PendingTaskBoardDispatch>, CliError> {
     query_as::<_, (String, String, Option<String>, String, bool, Option<String>)>(
         "SELECT intent_id, payload_json, consumed_approval_grant_id,
                     status, compensation_pending, last_error
@@ -58,7 +58,7 @@ async fn load_pending_dispatch_claim(
                 prior_status,
                 compensation_pending,
                 last_error,
-            )| PendingTaskBoardDispatchClaim {
+            )| PendingTaskBoardDispatch {
                 intent_id,
                 payload_json,
                 consumed_approval_grant_id,
@@ -184,7 +184,9 @@ impl AsyncDaemonDb {
             TaskBoardDispatchClaimAction::Compensate {
                 reason: pending
                     .last_error
+                    .as_ref()
                     .filter(|reason| !reason.is_empty())
+                    .cloned()
                     .ok_or_else(|| db_error("compensating task board dispatch has no reason"))?,
             }
         } else if pending.prior_status == "starting" {
@@ -212,26 +214,9 @@ impl AsyncDaemonDb {
             TaskBoardDispatchClaimAction::Start
         };
         let claim_token = format!("dispatch-claim-{}", Uuid::new_v4().simple());
-        let changed = query(
-            "UPDATE task_board_dispatch_intents SET status = 'starting', attempts = attempts + 1,
-             claim_token = ?2, claimed_at = ?3, updated_at = ?3
-             WHERE intent_id = ?1 AND compensation_pending = ?4
-               AND (
-                   (?5 = 'pending' AND status = 'pending')
-                   OR (?5 = 'starting' AND status = 'starting'
-                       AND datetime(claimed_at) <= datetime('now', ?6))
-               )",
-        )
-        .bind(&pending.intent_id)
-        .bind(&claim_token)
-        .bind(utc_now())
-        .bind(pending.compensation_pending)
-        .bind(&pending.prior_status)
-        .bind(format!("-{CLAIM_LEASE_SECONDS} seconds"))
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("claim task board dispatch: {error}")))?
-        .rows_affected();
+        let changed =
+            claim_task_board_dispatch_intent_in_tx(&mut transaction, &pending, &claim_token)
+                .await?;
         transaction
             .commit()
             .await
@@ -412,6 +397,33 @@ async fn active_intent_payload(
     .await
     .map(|row| row.map(|row| row.0))
     .map_err(|error| db_error(format!("load active task board dispatch intent: {error}")))
+}
+
+async fn claim_task_board_dispatch_intent_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    pending: &PendingTaskBoardDispatch,
+    claim_token: &str,
+) -> Result<u64, CliError> {
+    query(
+        "UPDATE task_board_dispatch_intents SET status = 'starting', attempts = attempts + 1,
+         claim_token = ?2, claimed_at = ?3, updated_at = ?3
+         WHERE intent_id = ?1 AND compensation_pending = ?4
+           AND (
+               (?5 = 'pending' AND status = 'pending')
+               OR (?5 = 'starting' AND status = 'starting'
+                   AND datetime(claimed_at) <= datetime('now', ?6))
+           )",
+    )
+    .bind(&pending.intent_id)
+    .bind(claim_token)
+    .bind(utc_now())
+    .bind(pending.compensation_pending)
+    .bind(&pending.prior_status)
+    .bind(format!("-{CLAIM_LEASE_SECONDS} seconds"))
+    .execute(transaction.as_mut())
+    .await
+    .map(|result| result.rows_affected())
+    .map_err(|error| db_error(format!("claim task board dispatch: {error}")))
 }
 
 async fn insert_intent(

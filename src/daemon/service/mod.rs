@@ -245,6 +245,10 @@ mod reviews_github_policy;
 mod reviews_thread_resolve;
 mod reviews_timeline;
 mod serve;
+#[cfg(test)]
+pub(crate) use serve::test_support::{
+    install_deterministic_runtime_seam, reconcile_task_board_remote_executor_tick,
+};
 mod session_setup;
 mod session_teardown;
 mod sessions;

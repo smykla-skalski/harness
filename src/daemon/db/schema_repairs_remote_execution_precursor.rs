@@ -5,7 +5,7 @@
 use rusqlite::{Transaction, TransactionBehavior};
 
 use super::{
-    ASSIGNMENT_TABLE, CliError, Connection, INDEX_DDL, db_error, expected_table_sql,
+    ASSIGNMENT_TABLE, CliError, Connection, INDEX_DDL, MIGRATION_SQL, db_error, objects,
     require_complete_shape,
 };
 
@@ -74,7 +74,7 @@ fn rebuild_within_suspended_foreign_keys(conn: &Connection) -> Result<(), CliErr
             ))
         })?;
     let column_list = assignment_column_names(&transaction)?.join(", ");
-    let create_sql = expected_table_sql(ASSIGNMENT_TABLE)?;
+    let create_sql = objects::expected_table_sql(MIGRATION_SQL, ASSIGNMENT_TABLE)?;
     transaction
         .execute_batch(&format!(
             "ALTER TABLE task_board_remote_assignments

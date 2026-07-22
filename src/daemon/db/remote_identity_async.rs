@@ -1,6 +1,9 @@
-use sqlx::query;
+use sqlx::{Sqlite, Transaction, query};
 
-use super::remote_identity::{INSERT_REMOTE_AUDIT_EVENT_SQL, MARK_REMOTE_AUDIT_EVENT_FAILED_SQL};
+use super::remote_identity::{
+    INSERT_REMOTE_AUDIT_EVENT_SQL, MARK_REMOTE_AUDIT_EVENT_FAILED_SQL,
+    PRUNE_REMOTE_AUDIT_EVENTS_SQL, REMOTE_AUDIT_EVENT_RETENTION_LIMIT,
+};
 use super::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::remote_identity::{RemoteAuditEvent, redact_remote_error_detail};
 
@@ -57,6 +60,7 @@ impl AsyncDaemonDb {
                     audit.event_id
                 ))
             })?;
+        prune_remote_audit_events_in_transaction(&mut transaction).await?;
         transaction
             .commit()
             .await
@@ -72,6 +76,11 @@ impl AsyncDaemonDb {
         &self,
         event: &RemoteAuditEvent,
     ) -> Result<(), CliError> {
+        let mut transaction = self
+            .pool()
+            .begin()
+            .await
+            .map_err(|error| db_error(format!("begin remote audit retention: {error}")))?;
         query(INSERT_REMOTE_AUDIT_EVENT_SQL)
             .bind(&event.event_id)
             .bind(&event.recorded_at)
@@ -83,7 +92,7 @@ impl AsyncDaemonDb {
             .bind(event.outcome.as_str())
             .bind(event.remote_addr.as_deref())
             .bind(event.error_detail())
-            .execute(self.pool())
+            .execute(transaction.as_mut())
             .await
             .map_err(|error| {
                 db_error(format!(
@@ -91,7 +100,31 @@ impl AsyncDaemonDb {
                     event.event_id
                 ))
             })?;
+        prune_remote_audit_events_in_transaction(&mut transaction).await?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit remote audit retention: {error}")))?;
         Ok(())
+    }
+
+    /// Enforce the durable remote audit retention bound after reconnecting to
+    /// an existing database.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the retention transaction cannot complete.
+    pub(crate) async fn prune_remote_audit_events(&self) -> Result<u64, CliError> {
+        let mut transaction = self
+            .pool()
+            .begin()
+            .await
+            .map_err(|error| db_error(format!("begin remote audit prune: {error}")))?;
+        let pruned = prune_remote_audit_events_in_transaction(&mut transaction).await?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit remote audit prune: {error}")))?;
+        Ok(pruned)
     }
 
     /// Mark a persisted allowed request as failed without blocking a Tokio worker.
@@ -118,4 +151,15 @@ impl AsyncDaemonDb {
             "mark remote audit {event_id} failed: allowed event not found"
         )))
     }
+}
+
+pub(super) async fn prune_remote_audit_events_in_transaction(
+    transaction: &mut Transaction<'_, Sqlite>,
+) -> Result<u64, CliError> {
+    query(PRUNE_REMOTE_AUDIT_EVENTS_SQL)
+        .bind(REMOTE_AUDIT_EVENT_RETENTION_LIMIT)
+        .execute(transaction.as_mut())
+        .await
+        .map(|result| result.rows_affected())
+        .map_err(|error| db_error(format!("prune retained remote audit events: {error}")))
 }

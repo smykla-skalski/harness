@@ -190,7 +190,7 @@ impl AsyncDaemonDb {
         offered_at: &str,
         lease_expires_at: &str,
     ) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
-        self.reassign_task_board_remote_source_bundle_offer(
+        Box::pin(self.reassign_task_board_remote_source_bundle_offer(
             expected_execution,
             expected_attempt,
             super::remote_source_bundle_reassignment_evidence::SourceReassignmentEvidence::OfferRejection {
@@ -203,7 +203,7 @@ impl AsyncDaemonDb {
             trust,
             offered_at,
             lease_expires_at,
-        )
+        ))
         .await
     }
 }

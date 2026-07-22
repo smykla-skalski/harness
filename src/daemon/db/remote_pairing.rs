@@ -12,7 +12,9 @@ use std::fmt;
 use chrono::{DateTime, Utc};
 use rusqlite::{params, types::Type};
 
-use super::remote_identity::upsert_remote_client_for_pairing;
+use super::remote_identity::{
+    record_remote_audit_event_in_transaction, upsert_remote_client_for_pairing,
+};
 use super::{CliError, Connection, DaemonDb, OptionalExtension, db_error};
 use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_identity::{
@@ -40,12 +42,6 @@ SELECT pairing_id, code_hash, role, scopes_json, created_at, expires_at,
        claimed_at, claimed_client_id, claim_remote_addr, metadata_json
 FROM remote_pairing_codes
 WHERE code_hash = ?1";
-
-const INSERT_PAIRING_REMOTE_AUDIT_EVENT_SQL: &str = "
-INSERT INTO remote_audit_events (
-    event_id, recorded_at, request_id, client_id, route_or_method, scope,
-    scope_decision, outcome, remote_addr, error_detail, metadata_json
-) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, '{}')";
 
 const ROUTE_REMOTE_PAIR_CREATE: &str = "remote.pair.create";
 const ROUTE_REMOTE_PAIR_CLAIM: &str = "remote.pair.claim";
@@ -363,28 +359,7 @@ fn record_remote_audit_event_for_pairing(
     conn: &Connection,
     event: &RemoteAuditEvent,
 ) -> Result<(), CliError> {
-    conn.execute(
-        INSERT_PAIRING_REMOTE_AUDIT_EVENT_SQL,
-        params![
-            event.event_id,
-            event.recorded_at,
-            event.request_id,
-            event.client_id,
-            event.route_or_method,
-            event.scope.as_str(),
-            event.scope_decision.as_str(),
-            event.outcome.as_str(),
-            event.remote_addr,
-            event.error_detail,
-        ],
-    )
-    .map_err(|error| {
-        db_error(format!(
-            "insert remote audit event {}: {error}",
-            event.event_id.as_str()
-        ))
-    })?;
-    Ok(())
+    record_remote_audit_event_in_transaction(conn, event)
 }
 
 fn load_remote_pairing_by_hash(

@@ -2,14 +2,13 @@ use axum::http::{HeaderMap, HeaderValue, StatusCode, header::AUTHORIZATION};
 
 use super::{
     REMOTE_CLIENT_ID_HEADER, RemoteAuthError, RemoteAuthTarget, RemoteBearerCredentials,
-    authorize_remote_execution_operation, authorize_remote_http_route,
-    authorize_remote_ws_handshake, authorize_remote_ws_method, remote_ws_handshake_scope,
+    authorize_remote_execution_operation, authorize_remote_http_route, authorize_remote_ws_method,
 };
 use crate::daemon::protocol::{
     HTTP_API_CONTRACT, HttpApiRouteContract, HttpRouteMethod, HttpRouteParity, http_paths,
     ws_methods,
 };
-use crate::daemon::remote::{RemoteAccessScope, RemoteRole, remote_http_scopes};
+use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 use crate::daemon::remote_identity::{RemoteStoredClient, RemoteTokenHash};
 
 #[test]
@@ -166,7 +165,7 @@ fn remote_http_authz_denies_insufficient_scope_with_403() {
 }
 
 #[test]
-fn remote_ws_authz_covers_handshake_and_per_message_scope() {
+fn remote_ws_authz_covers_http_handshake_and_per_message_scope() {
     let viewer = remote_client("viewer", RemoteRole::Viewer, &[RemoteAccessScope::Read]);
     let operator = remote_client(
         "operator",
@@ -175,10 +174,13 @@ fn remote_ws_authz_covers_handshake_and_per_message_scope() {
     );
 
     assert_eq!(
-        authorize_remote_ws_handshake(&viewer)
+        authorize_remote_http_route(&viewer, http_route(http_paths::WS))
             .expect("viewer handshake")
             .target,
-        RemoteAuthTarget::WsHandshake
+        RemoteAuthTarget::Http {
+            method: "GET",
+            path: http_paths::WS,
+        }
     );
     assert_eq!(
         authorize_remote_ws_method(&viewer, ws_methods::SESSIONS)
@@ -254,19 +256,6 @@ fn automation_observability_scope_matrix_protects_run_detail() {
             .expect("operator websocket detail")
             .required_scope,
         RemoteAccessScope::Write
-    );
-}
-
-#[test]
-fn remote_ws_handshake_scope_uses_http_route_contract() {
-    let ws_route = http_route(http_paths::WS);
-    let expected_scope = remote_http_scopes(ws_route)
-        .and_then(|scopes| scopes.first().copied())
-        .expect("websocket HTTP route scope");
-
-    assert_eq!(
-        remote_ws_handshake_scope().expect("websocket handshake scope"),
-        expected_scope
     );
 }
 

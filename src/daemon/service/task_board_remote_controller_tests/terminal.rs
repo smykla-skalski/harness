@@ -37,7 +37,7 @@ async fn detached_completed_or_failed_return_before_any_terminal_client_operatio
             &fixture.db,
             &assignment,
             move || counted_terminal_operation(fetch_calls),
-            move |_| counted_terminal_operation(cleanup_calls),
+            move |_| counted_cleanup_operation(cleanup_calls),
             move |_| counted_terminal_operation(settle_calls),
         )
         .await
@@ -85,7 +85,7 @@ async fn same_target_with_any_mismatched_active_adoption_proof_has_zero_terminal
             &fixture.db,
             &assignment,
             move || counted_terminal_operation(fetch_calls),
-            move |_| counted_terminal_operation(cleanup_calls),
+            move |_| counted_cleanup_operation(cleanup_calls),
             move |_| counted_terminal_operation(settle_calls),
         )
         .await;
@@ -144,7 +144,7 @@ async fn result_adopted_handoff_settles_after_parent_deletion_without_fetch_or_a
             &fixture.db,
             &assignment,
             move || counted_terminal_operation(fetch_count),
-            move |_| counted_terminal_operation(cleanup_count),
+            move |_| counted_cleanup_operation(cleanup_count),
             move |_| counted_terminal_operation(settlement_count),
         )
         .await
@@ -256,6 +256,13 @@ fn counted_terminal_operation(
 ) -> impl std::future::Future<Output = Result<(), CliError>> {
     calls.fetch_add(1, Ordering::SeqCst);
     ready(Ok(()))
+}
+
+fn counted_cleanup_operation(
+    calls: Arc<AtomicUsize>,
+) -> impl std::future::Future<Output = Result<bool, CliError>> {
+    calls.fetch_add(1, Ordering::SeqCst);
+    ready(Ok(true))
 }
 
 async fn load_assignment(

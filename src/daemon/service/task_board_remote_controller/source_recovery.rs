@@ -23,37 +23,41 @@ pub(super) async fn progress_unclaimed_offer(
 ) -> Result<bool, CliError> {
     let offer = assignment.require_offer()?;
     if !offer.source.requires_upload() {
-        return client
-            .offer(db, offer)
+        return Box::pin(client.offer(db, offer))
             .await
             .map(|_| true)
             .map_err(controller_database_error);
     }
     let upload = exact_outbound_upload(db, assignment, offer).await?;
-    match client
-        .verify_or_abandon_predecessor_source_bundle(db, &upload)
+    match Box::pin(client.verify_or_abandon_predecessor_source_bundle(db, &upload))
         .await
         .map_err(controller_database_error)?
     {
         RemoteSourceBundleRecoveryOutcome::CurrentGeneration => {
-            client
-                .upload_source_bundle(db, &upload)
+            Box::pin(client.upload_source_bundle(db, &upload))
                 .await
                 .map_err(controller_database_error)?;
-            client
-                .offer(db, offer)
+            Box::pin(client.offer(db, offer))
                 .await
                 .map(|_| true)
                 .map_err(controller_database_error)
         }
         RemoteSourceBundleRecoveryOutcome::Receipt { trust, .. } => {
-            recover_offer_after_source_receipt(db, client, assignment, offer, &trust).await
+            Box::pin(recover_offer_after_source_receipt(
+                db, client, assignment, offer, &trust,
+            ))
+            .await
         }
         RemoteSourceBundleRecoveryOutcome::Abandoned {
             request,
             response,
             trust,
-        } => reassign_abandoned_source(db, assignment, &request, &response, &trust).await,
+        } => {
+            Box::pin(reassign_abandoned_source(
+                db, assignment, &request, &response, &trust,
+            ))
+            .await
+        }
     }
 }
 
@@ -64,8 +68,7 @@ async fn recover_offer_after_source_receipt(
     offer: &RemoteOfferRequest,
     trust: &TaskBoardRemoteOperationTrustFence,
 ) -> Result<bool, CliError> {
-    match client
-        .recover_predecessor_offer(db, offer, trust)
+    match Box::pin(client.recover_predecessor_offer(db, offer, trust))
         .await
         .map_err(controller_database_error)?
     {
@@ -75,7 +78,10 @@ async fn recover_offer_after_source_receipt(
                 | TaskBoardRemoteMutationOutcome::Replayed(_)
         )),
         RemotePredecessorOfferRecoveryOutcome::Rejected(response) => {
-            reassign_rejected_offer(db, assignment, offer, &response, trust).await
+            Box::pin(reassign_rejected_offer(
+                db, assignment, offer, &response, trust,
+            ))
+            .await
         }
     }
 }
@@ -88,7 +94,7 @@ async fn reassign_abandoned_source(
     trust: &TaskBoardRemoteOperationTrustFence,
 ) -> Result<bool, CliError> {
     let context = reassignment_context(db, assignment, &request.offer, trust).await?;
-    db.reassign_abandoned_task_board_remote_source_bundle_offer(
+    Box::pin(db.reassign_abandoned_task_board_remote_source_bundle_offer(
         &TaskBoardWorkflowExecutionCas::from(&context.execution),
         &TaskBoardExecutionAttemptCas::from(&context.attempt),
         request,
@@ -98,7 +104,7 @@ async fn reassign_abandoned_source(
         trust,
         &context.replacement.offered_at,
         &context.replacement.lease_expires_at,
-    )
+    ))
     .await
     .map(reassignment_progressed)
 }
@@ -111,7 +117,7 @@ async fn reassign_rejected_offer(
     trust: &TaskBoardRemoteOperationTrustFence,
 ) -> Result<bool, CliError> {
     let context = reassignment_context(db, assignment, offer, trust).await?;
-    db.reassign_rejected_task_board_remote_source_bundle_offer(
+    Box::pin(db.reassign_rejected_task_board_remote_source_bundle_offer(
         &TaskBoardWorkflowExecutionCas::from(&context.execution),
         &TaskBoardExecutionAttemptCas::from(&context.attempt),
         offer,
@@ -121,7 +127,7 @@ async fn reassign_rejected_offer(
         trust,
         &context.replacement.offered_at,
         &context.replacement.lease_expires_at,
-    )
+    ))
     .await
     .map(reassignment_progressed)
 }

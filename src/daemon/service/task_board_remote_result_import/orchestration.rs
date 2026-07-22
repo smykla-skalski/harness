@@ -19,7 +19,10 @@ pub(crate) async fn import_and_adopt_task_board_remote_implementation_result(
 ) -> Result<TaskBoardRemoteResultAdoptionOutcome, CliError> {
     let (expected, request, execution_id) =
         import_request(db, assignment_id, fencing_epoch).await?;
-    super::import_task_board_remote_implementation_result(db, &expected, &request).await?;
+    Box::pin(super::import_task_board_remote_implementation_result(
+        db, &expected, &request,
+    ))
+    .await?;
     let parent = db
         .task_board_workflow_execution(&execution_id)
         .await?

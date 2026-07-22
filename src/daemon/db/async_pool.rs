@@ -146,6 +146,7 @@ impl AsyncDaemonDb {
                     "async daemon database schema mismatch: expected {SCHEMA_VERSION}, found {version}"
                 )));
             }
+            db.prune_remote_audit_events().await?;
             record_daemon_db_pool_state(
                 "async",
                 u64::from(db.pool.size()),

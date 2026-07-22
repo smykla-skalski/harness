@@ -94,7 +94,11 @@ pub(crate) enum RemoteExecutionHttpError {
     RequestTooLarge,
     ResponseTooLarge,
     Transport,
-    HttpStatus(u16),
+    HttpStatus {
+        status: u16,
+        code: Option<String>,
+        message: Option<String>,
+    },
     Encode,
     Decode,
     Wire(RemoteWireError),
@@ -109,7 +113,22 @@ impl fmt::Display for RemoteExecutionHttpError {
             Self::RequestTooLarge => write!(formatter, "remote execution request is too large"),
             Self::ResponseTooLarge => write!(formatter, "remote execution response is too large"),
             Self::Transport => write!(formatter, "remote execution transport failed"),
-            Self::HttpStatus(status) => write!(formatter, "remote execution HTTP status {status}"),
+            Self::HttpStatus {
+                status,
+                code: Some(code),
+                message: Some(message),
+            } => write!(
+                formatter,
+                "remote execution HTTP status {status}: {code}: {message}"
+            ),
+            Self::HttpStatus {
+                status,
+                code: None,
+                message: None,
+            } => write!(formatter, "remote execution HTTP status {status}"),
+            Self::HttpStatus { status, .. } => {
+                write!(formatter, "remote execution HTTP status {status}")
+            }
             Self::Encode => write!(formatter, "remote execution request encoding failed"),
             Self::Decode => write!(formatter, "remote execution response decoding failed"),
             Self::Wire(error) => write!(formatter, "{error}"),
@@ -382,12 +401,31 @@ impl RemoteExecutionHttpClient {
             .await
             .map_err(|_| RemoteExecutionHttpError::Transport)?;
         if !response.status().is_success() {
-            return Err(RemoteExecutionHttpError::HttpStatus(
-                response.status().as_u16(),
-            ));
+            return Err(http_status_error(response).await);
         }
         let bytes = bounded_response(response, max_response_bytes).await?;
         serde_json::from_slice(&bytes).map_err(|_| RemoteExecutionHttpError::Decode)
+    }
+}
+
+async fn http_status_error(response: reqwest::Response) -> RemoteExecutionHttpError {
+    let status = response.status().as_u16();
+    let error = bounded_response(response, 4 * 1024)
+        .await
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+        .and_then(|body| {
+            let error = body.get("error")?;
+            Some((
+                error.get("code")?.as_str()?.to_owned(),
+                error.get("message")?.as_str()?.to_owned(),
+            ))
+        });
+    let (code, message) = error.map_or((None, None), |(code, message)| (Some(code), Some(message)));
+    RemoteExecutionHttpError::HttpStatus {
+        status,
+        code,
+        message,
     }
 }
 

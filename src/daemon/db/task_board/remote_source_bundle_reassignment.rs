@@ -57,7 +57,7 @@ impl AsyncDaemonDb {
         offered_at: &str,
         lease_expires_at: &str,
     ) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
-        self.reassign_task_board_remote_source_bundle_offer(
+        Box::pin(self.reassign_task_board_remote_source_bundle_offer(
             expected_execution,
             expected_attempt,
             SourceReassignmentEvidence::Abandonment {
@@ -69,7 +69,7 @@ impl AsyncDaemonDb {
             trust,
             offered_at,
             lease_expires_at,
-        )
+        ))
         .await
     }
 
@@ -108,13 +108,13 @@ impl AsyncDaemonDb {
             replacement.binding.fencing_epoch,
         )
         .await?;
-        if let Some(replayed) = replayed_replacement_in_tx(
+        if let Some(replayed) = Box::pin(replayed_replacement_in_tx(
             &mut transaction,
             evidence,
             replacement,
             authenticated_principal,
             trust,
-        )
+        ))
         .await?
         {
             transaction.commit().await.map_err(|error| {

@@ -246,7 +246,10 @@ mod tests {
         };
         let serialized = serde_json::to_value(&request).expect("serialize");
         assert!(serialized.get("tools").is_none(), "empty tools elided");
-        assert!(serialized.get("tool_choice").is_none(), "tool_choice elided");
+        assert!(
+            serialized.get("tool_choice").is_none(),
+            "tool_choice elided"
+        );
         assert_eq!(serialized["stream"], json!(true));
     }
 

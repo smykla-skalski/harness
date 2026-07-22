@@ -8,13 +8,21 @@ impl RemoteExecutionHttpClient {
     pub(crate) async fn observe_cleanup(
         &self,
         request: &RemoteCleanupObservationRequest,
-    ) -> Result<RemoteCleanupObservationResponse, RemoteExecutionHttpError> {
+    ) -> Result<Option<RemoteCleanupObservationResponse>, RemoteExecutionHttpError> {
         request.validate()?;
         let path = CLEANUP_OBSERVATION_PATH
             .strip_prefix('/')
             .unwrap_or(CLEANUP_OBSERVATION_PATH);
-        let response: RemoteCleanupObservationResponse = self.post(path, request).await?;
+        let response: RemoteCleanupObservationResponse = match self.post(path, request).await {
+            Ok(response) => response,
+            Err(RemoteExecutionHttpError::HttpStatus {
+                status: 503,
+                code: Some(code),
+                ..
+            }) if code == "REMOTE_CLEANUP_PENDING" => return Ok(None),
+            Err(error) => return Err(error),
+        };
         response.validate(request)?;
-        Ok(response)
+        Ok(Some(response))
     }
 }

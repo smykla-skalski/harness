@@ -55,14 +55,13 @@ impl RemoteExecutionControllerClient {
         match response.disposition {
             RemoteOfferDisposition::Accepted => {
                 let observed_at = self.clock.now();
-                let outcome = db
-                    .record_task_board_remote_predecessor_offer_acceptance(
-                        &response,
-                        &self.host_id,
-                        trust,
-                        &observed_at,
-                    )
-                    .await?;
+                let outcome = Box::pin(db.record_task_board_remote_predecessor_offer_acceptance(
+                    &response,
+                    &self.host_id,
+                    trust,
+                    &observed_at,
+                ))
+                .await?;
                 Ok(RemotePredecessorOfferRecoveryOutcome::Accepted { outcome })
             }
             RemoteOfferDisposition::Rejected => {

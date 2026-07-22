@@ -53,7 +53,7 @@ impl AsyncDaemonDb {
         lease_expires_at: &str,
         deadline_at: &str,
     ) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
-        self.offer_task_board_remote_assignment_with_source(
+        Box::pin(self.offer_task_board_remote_assignment_with_source(
             expected_execution,
             expected_attempt,
             request,
@@ -62,7 +62,7 @@ impl AsyncDaemonDb {
             offered_at,
             lease_expires_at,
             deadline_at,
-        )
+        ))
         .await
     }
 

@@ -78,16 +78,21 @@ fn safe_target(link_path: &[u8], target: &[u8]) -> bool {
     {
         return false;
     }
-    let mut depth = link_path
-        .split(|byte| *byte == b'/')
-        .count()
-        .saturating_sub(1);
+    let mut resolved = link_path.split(|byte| *byte == b'/').collect::<Vec<_>>();
+    resolved.pop();
+    if resolved
+        .iter()
+        .any(|component| super::is_git_administration_component(component))
+    {
+        return false;
+    }
     for component in target.split(|byte| *byte == b'/') {
         match component {
             b"" | b"." => {}
-            b".." if depth == 0 => return false,
-            b".." => depth -= 1,
-            _ => depth += 1,
+            b".." if resolved.pop().is_none() => return false,
+            b".." => {}
+            _ if super::is_git_administration_component(component) => return false,
+            _ => resolved.push(component),
         }
     }
     true

@@ -325,6 +325,7 @@ async fn exact_provisioned_session(
     identity: &TaskBoardRemoteExecutorIdentity,
     project_dir: &str,
 ) -> Result<bool, CliError> {
+    let origin_path = canonical_executor_checkout_path(record)?;
     query_scalar::<_, bool>(
         "SELECT EXISTS(
            SELECT 1 FROM sessions
@@ -343,7 +344,7 @@ async fn exact_provisioned_session(
         record.assignment_id, record.fencing_epoch
     ))
     .bind(project_dir)
-    .bind(record.executor_checkout_path.as_deref())
+    .bind(origin_path)
     .bind(format!("harness/{}", identity.session_id))
     .fetch_one(transaction.as_mut())
     .await
@@ -352,6 +353,21 @@ async fn exact_provisioned_session(
             "verify provisioned remote executor session: {error}"
         ))
     })
+}
+
+fn canonical_executor_checkout_path(
+    record: &TaskBoardRemoteAssignmentRecord,
+) -> Result<String, CliError> {
+    let checkout = record
+        .executor_checkout_path
+        .as_deref()
+        .ok_or_else(|| db_error("remote executor Start I/O permit has no frozen checkout path"))?;
+    let canonical = Path::new(checkout).canonicalize().map_err(|error| {
+        db_error(format!(
+            "canonicalize remote executor Start I/O checkout: {error}"
+        ))
+    })?;
+    canonical_project_dir(&canonical)
 }
 
 async fn deterministic_run_exists(

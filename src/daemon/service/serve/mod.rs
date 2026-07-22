@@ -123,7 +123,10 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         recovery_snapshot: Arc::default(),
     };
     if let Some(async_db) = app_state.async_db.get() {
-        recover_remote_assignments_at_startup_with_controller(&app_state, async_db).await?;
+        Box::pin(recover_remote_assignments_at_startup_with_controller(
+            &app_state, async_db,
+        ))
+        .await?;
     }
     app_state
         .codex_controller

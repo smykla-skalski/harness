@@ -31,6 +31,7 @@ impl DaemonDb {
             activity_fold: RefCell::new(super::activity_fold::ActivityFoldCache::new()),
         };
         db.ensure_schema()?;
+        db.prune_remote_audit_events()?;
         Ok(db)
     }
 
@@ -49,6 +50,7 @@ impl DaemonDb {
             activity_fold: RefCell::new(super::activity_fold::ActivityFoldCache::new()),
         };
         db.ensure_schema()?;
+        db.prune_remote_audit_events()?;
         Ok(db)
     }
 
@@ -115,7 +117,7 @@ impl DaemonDb {
 
     fn apply_pending_migrations(&self, version_number: u8) -> Result<(), CliError> {
         self.apply_pending_migrations_v8_to_v24(version_number)?;
-        self.apply_pending_migrations_v25_to_v44(version_number)
+        self.apply_pending_migrations_v25_to_v45(version_number)
     }
 
     #[expect(
@@ -181,7 +183,7 @@ impl DaemonDb {
         clippy::cognitive_complexity,
         reason = "sequential migration chain has one if-guard per schema version step"
     )]
-    fn apply_pending_migrations_v25_to_v44(&self, version_number: u8) -> Result<(), CliError> {
+    fn apply_pending_migrations_v25_to_v45(&self, version_number: u8) -> Result<(), CliError> {
         if version_number <= 24 {
             self.migrate_v24_to_v25()?;
         }
@@ -240,7 +242,10 @@ impl DaemonDb {
             self.migrate_v42_to_v43()?;
         }
         if version_number <= 43 {
-            self.migrate_v43_to_v44()?;
+            super::schema_v44::run(&self.conn)?;
+        }
+        if version_number <= 44 {
+            super::schema_v45::run(&self.conn)?;
         }
         Ok(())
     }
@@ -405,10 +410,6 @@ impl DaemonDb {
 
     fn migrate_v42_to_v43(&self) -> Result<(), CliError> {
         super::schema_v43::run(&self.conn)
-    }
-
-    fn migrate_v43_to_v44(&self) -> Result<(), CliError> {
-        super::schema_v44::run(&self.conn)
     }
 }
 

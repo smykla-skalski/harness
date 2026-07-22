@@ -1,4 +1,3 @@
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::bundle_contract::{
@@ -6,6 +5,7 @@ use super::bundle_contract::{
     require_bounded_result_delta_with_runner,
 };
 use super::bundle_quarantine::GitBundleQuarantine;
+use super::bundle_staging::GitBundleStaging;
 use super::command::stdout;
 use super::repository_coordinates::GitRepositoryCoordinates;
 use crate::git::{GitError, GitRepository, GitResult};
@@ -125,34 +125,28 @@ impl GitBundleImportPlan {
         require_bounded_bundle(bundle, bytes, limits)?;
         let output_limit = u64::try_from(bytes.len())
             .map_err(|_| GitError::unsafe_state(bundle, "git bundle length overflowed"))?;
-        // git bundle verify cannot check prerequisite reachability when the bundle
-        // is read from stdin (recent git closes rev-list's pipe early), so stage the
-        // bytes in the private git dir and verify the file; the quarantine that
-        // follows writes the same bytes anyway.
-        let staged = tempfile::NamedTempFile::new_in(self.coordinates.common_git_dir())
-            .map_err(|error| GitError::unsafe_state(bundle, format!("stage bundle: {error}")))?;
-        fs::write(staged.path(), bytes)
-            .map_err(|error| GitError::unsafe_state(bundle, format!("stage bundle: {error}")))?;
-        let staged_path = staged
-            .path()
-            .to_str()
-            .ok_or_else(|| GitError::unsafe_state(bundle, "staged bundle path is not UTF-8"))?;
+        let staged = GitBundleStaging::prepare(&self.coordinates, bytes, limits.max_bundle_bytes)?;
+        let staged_path = staged.path()?;
         self.git_contract_bounded_with_input(["bundle", "verify", staged_path], &[], output_limit)?;
-        drop(staged);
         self.require_exact_advertised_head(bundle, bytes)?;
         let quarantine = GitBundleQuarantine::prepare(&self.coordinates, bytes, limits)?;
-        let runner = quarantine.runner()?;
-        self.require_commit_with_runner(&runner, &self.base_revision, "bundle base")?;
-        self.require_commit_with_runner(&runner, &self.result_revision, "bundle result")?;
-        self.require_ancestry_with_runner(&runner)?;
-        require_bounded_result_delta_with_runner(
-            &self.worktree,
-            &runner,
-            &self.base_revision,
-            &self.result_revision,
-            limits,
-        )?;
-        quarantine.promote(bytes)?;
+        let verified = (|| {
+            let runner = quarantine.runner()?;
+            self.require_commit_with_runner(&runner, &self.base_revision, "bundle base")?;
+            self.require_commit_with_runner(&runner, &self.result_revision, "bundle result")?;
+            self.require_ancestry_with_runner(&runner)?;
+            require_bounded_result_delta_with_runner(
+                &self.worktree,
+                &runner,
+                &self.base_revision,
+                &self.result_revision,
+                limits,
+            )?;
+            quarantine.promote(bytes)
+        })();
+        let cleaned = quarantine.cleanup();
+        verified?;
+        cleaned?;
         self.create_or_verify_import_ref()
     }
 

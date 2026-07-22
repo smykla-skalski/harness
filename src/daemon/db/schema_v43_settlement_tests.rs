@@ -201,31 +201,7 @@ fn child_evidence_rejects_a_mismatched_assignment_generation() {
 #[test]
 fn settlement_response_requires_exact_request_digest_echo() {
     let db = strict_assignment_fixture();
-    let (request_json, response_json) = settlement_json(1, CHILD_DIGEST);
-    db.connection()
-        .execute(
-            "INSERT INTO task_board_remote_settlement_receipts (
-               assignment_id, execution_id, phase, action_key, attempt, idempotency_key,
-               host_id, target_host_instance_id, fencing_epoch, configuration_revision,
-               execution_record_sha256, lease_id, offer_request_sha256, terminal_state,
-               result_sha256, request_sha256, request_json, authenticated_principal,
-               response_json, settled_at, cleanup_ready_at
-             ) VALUES (
-               'assignment-a', 'execution-a', 'implementation', 'implementation:1', 1,
-               'idempotency-assignment-a', 'executor-a', 'instance-a', 1, 7,
-               ?1, 'lease-a', ?2, 'cancelled', NULL, ?3, ?4,
-               'executor:executor-a', ?5, '2026-07-19T09:10:00Z',
-               '2026-07-19T09:10:00Z'
-             )",
-            params![
-                "a".repeat(64),
-                OFFER_DIGEST,
-                CHILD_DIGEST,
-                request_json,
-                response_json
-            ],
-        )
-        .expect("insert exact settlement response digest echo");
+    insert_valid_settlement_receipt(&db);
 
     let error = db
         .connection()
@@ -239,6 +215,26 @@ fn settlement_response_requires_exact_request_digest_echo() {
         )
         .expect_err("settlement response must echo the exact request digest");
     assert!(error.to_string().contains("CHECK constraint failed"));
+}
+
+#[test]
+fn settlement_receipt_prevents_parent_assignment_delete() {
+    let db = strict_assignment_fixture();
+    super::super::schema_v45::run(db.connection()).expect("migrate remote execution integrity");
+    insert_valid_settlement_receipt(&db);
+
+    let error = db
+        .connection()
+        .execute(
+            "DELETE FROM task_board_remote_assignments WHERE assignment_id = 'assignment-a'",
+            [],
+        )
+        .expect_err("immutable settlement evidence must prevent parent delete");
+    assert!(
+        error
+            .to_string()
+            .contains("cannot delete remote assignment with immutable settlement receipt")
+    );
 }
 
 #[test]
@@ -387,6 +383,34 @@ fn strict_assignment_fixture() -> DaemonDb {
         )
         .expect("make strict assignment terminal");
     db
+}
+
+fn insert_valid_settlement_receipt(db: &DaemonDb) {
+    let (request_json, response_json) = settlement_json(1, CHILD_DIGEST);
+    db.connection()
+        .execute(
+            "INSERT INTO task_board_remote_settlement_receipts (
+               assignment_id, execution_id, phase, action_key, attempt, idempotency_key,
+               host_id, target_host_instance_id, fencing_epoch, configuration_revision,
+               execution_record_sha256, lease_id, offer_request_sha256, terminal_state,
+               result_sha256, request_sha256, request_json, authenticated_principal,
+               response_json, settled_at, cleanup_ready_at
+             ) VALUES (
+               'assignment-a', 'execution-a', 'implementation', 'implementation:1', 1,
+               'idempotency-assignment-a', 'executor-a', 'instance-a', 1, 7,
+               ?1, 'lease-a', ?2, 'cancelled', NULL, ?3, ?4,
+               'executor:executor-a', ?5, '2026-07-19T09:10:00Z',
+               '2026-07-19T09:10:00Z'
+             )",
+            params![
+                "a".repeat(64),
+                OFFER_DIGEST,
+                CHILD_DIGEST,
+                request_json,
+                response_json
+            ],
+        )
+        .expect("insert exact settlement response digest echo");
 }
 
 fn mismatched_settlement_json() -> (String, String) {

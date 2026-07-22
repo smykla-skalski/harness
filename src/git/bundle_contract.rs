@@ -214,7 +214,8 @@ fn parse_delta_entry(
         && canonical_mode(old_mode)
         && canonical_mode(fields[1])
         && canonical_or_zero_oid(fields[2], oid_len)
-        && matches!(fields[4], "A" | "D" | "M" | "T");
+        && matches!(fields[4], "A" | "D" | "M" | "T")
+        && canonical_tree_path(path);
     if !valid {
         return Err(delta_error(repository));
     }
@@ -467,9 +468,16 @@ fn canonical_tree_path(path: &[u8]) -> bool {
             .is_some_and(|size| size <= MAX_CHANGED_PATH_BYTES)
         && !path.starts_with(b"/")
         && !path.ends_with(b"/")
-        && path
-            .split(|byte| *byte == b'/')
-            .all(|part| !part.is_empty() && part != b"." && part != b"..")
+        && path.split(|byte| *byte == b'/').all(|part| {
+            !part.is_empty()
+                && part != b"."
+                && part != b".."
+                && !is_git_administration_component(part)
+        })
+}
+
+fn is_git_administration_component(component: &[u8]) -> bool {
+    component.eq_ignore_ascii_case(b".git")
 }
 
 fn canonical_or_zero_oid(value: &str, expected_len: usize) -> bool {

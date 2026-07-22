@@ -44,6 +44,21 @@ pub(crate) const OFFER_HTTP_BODY_LIMIT_BYTES: usize = MAX_REMOTE_OFFER_JSON_BYTE
 pub(crate) const SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES: usize = MAX_REMOTE_SOURCE_BUNDLE_JSON_BYTES;
 pub(crate) const SOURCE_BUNDLE_ABANDON_HTTP_BODY_LIMIT_BYTES: usize =
     MAX_REMOTE_SOURCE_ABANDON_JSON_BYTES;
+pub(crate) const DEFAULT_EXECUTION_HTTP_BODY_LIMIT_BYTES: usize = MAX_REMOTE_LIFECYCLE_JSON_BYTES;
+pub(crate) const MAX_EXECUTION_HTTP_BODY_LIMIT_BYTES: usize = max_body_limit(
+    max_body_limit(
+        SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES,
+        SOURCE_BUNDLE_ABANDON_HTTP_BODY_LIMIT_BYTES,
+    ),
+    max_body_limit(
+        OFFER_HTTP_BODY_LIMIT_BYTES,
+        DEFAULT_EXECUTION_HTTP_BODY_LIMIT_BYTES,
+    ),
+);
+
+const fn max_body_limit(left: usize, right: usize) -> usize {
+    if left > right { left } else { right }
+}
 
 pub(crate) fn execution_routes() -> Router<DaemonHttpState> {
     Router::new()
@@ -101,6 +116,30 @@ pub(crate) fn execution_routes() -> Router<DaemonHttpState> {
             post(super::routes_cleanup::observe_cleanup)
                 .layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)),
         )
+}
+
+pub(crate) fn execution_http_body_limit(method: &Method, path: &str) -> Option<usize> {
+    match (method, path) {
+        (&Method::POST, SOURCE_BUNDLE_PATH | SOURCE_BUNDLE_RECEIPT_PATH) => {
+            Some(SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES)
+        }
+        (&Method::POST, SOURCE_BUNDLE_ABANDON_PATH) => {
+            Some(SOURCE_BUNDLE_ABANDON_HTTP_BODY_LIMIT_BYTES)
+        }
+        (&Method::POST, OFFER_PATH) => Some(OFFER_HTTP_BODY_LIMIT_BYTES),
+        (
+            &Method::POST,
+            HEARTBEAT_PATH
+            | CLAIM_PATH
+            | LEASE_RENEW_PATH
+            | STATUS_PATH
+            | CANCEL_PATH
+            | SETTLED_PATH
+            | ARTIFACT_PATH
+            | super::routes_cleanup::CLEANUP_OBSERVATION_PATH,
+        ) => Some(DEFAULT_EXECUTION_HTTP_BODY_LIMIT_BYTES),
+        _ => None,
+    }
 }
 
 pub(crate) fn execution_operation(method: &Method, path: &str) -> Option<&'static str> {

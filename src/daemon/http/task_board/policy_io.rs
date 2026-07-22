@@ -1,7 +1,7 @@
 use axum::Json;
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, State};
-use axum::http::HeaderMap;
+use axum::http::{HeaderMap, Method};
 use axum::response::Response;
 use axum::routing::post;
 
@@ -14,7 +14,7 @@ use super::super::response::timed_json;
 use super::super::{DaemonHttpState, require_async_db, task_board_route_executor};
 use super::authenticated_request;
 
-const POLICY_TRANSFER_HTTP_BODY_LIMIT_BYTES: usize = 64 * 1024 * 1024;
+pub(in crate::daemon::http) const POLICY_TRANSFER_HTTP_BODY_LIMIT_BYTES: usize = 64 * 1024 * 1024;
 
 pub(super) fn merge_policy_io_routes(router: Router<DaemonHttpState>) -> Router<DaemonHttpState> {
     // Keep a finite last-resort ceiling for every buffered transfer request.
@@ -32,6 +32,18 @@ pub(super) fn merge_policy_io_routes(router: Router<DaemonHttpState>) -> Router<
             post(post_policy_import_batch)
                 .layer(DefaultBodyLimit::max(POLICY_TRANSFER_HTTP_BODY_LIMIT_BYTES)),
         )
+}
+
+pub(in crate::daemon::http) fn policy_transfer_http_body_limit(
+    method: &Method,
+    path: &str,
+) -> Option<usize> {
+    match (method, path) {
+        (&Method::POST, http_paths::POLICIES_DUMP | http_paths::POLICIES_IMPORT) => {
+            Some(POLICY_TRANSFER_HTTP_BODY_LIMIT_BYTES)
+        }
+        _ => None,
+    }
 }
 
 pub(super) async fn post_policy_dump(

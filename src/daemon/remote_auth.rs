@@ -2,7 +2,7 @@ use std::{error::Error, fmt};
 
 use axum::http::{HeaderMap, StatusCode, header::AUTHORIZATION};
 
-use super::protocol::{HTTP_API_CONTRACT, HttpApiRouteContract, http_paths};
+use super::protocol::HttpApiRouteContract;
 use super::remote::{RemoteAccessScope, remote_http_scopes, remote_ws_scopes};
 use super::remote_identity::RemoteStoredClient;
 
@@ -121,7 +121,6 @@ pub enum RemoteAuthTarget {
         method: &'static str,
         path: &'static str,
     },
-    WsHandshake,
     WsMethod {
         method: String,
     },
@@ -171,36 +170,6 @@ pub fn authorize_remote_http_route(
         },
         required_scope,
     })
-}
-
-/// Authorize the remote WebSocket handshake itself.
-///
-/// # Errors
-/// Returns [`RemoteAuthError::InsufficientScope`] when the client lacks read
-/// access to the `/v1/ws` route.
-pub fn authorize_remote_ws_handshake(
-    client: &RemoteStoredClient,
-) -> Result<RemoteAuthDecision, RemoteAuthError> {
-    let required_scope = remote_ws_handshake_scope()?;
-    authorize_client_scope(client, required_scope)?;
-    Ok(RemoteAuthDecision {
-        client_id: client.client_id.clone(),
-        target: RemoteAuthTarget::WsHandshake,
-        required_scope,
-    })
-}
-
-/// Return the remote scope required to establish the WebSocket connection.
-///
-/// # Errors
-/// Returns [`RemoteAuthError::MissingScopeContract`] when the `/v1/ws` HTTP
-/// route is missing or lacks a remote scope contract.
-pub fn remote_ws_handshake_scope() -> Result<RemoteAccessScope, RemoteAuthError> {
-    let route = HTTP_API_CONTRACT
-        .iter()
-        .find(|route| route.path == http_paths::WS)
-        .ok_or(RemoteAuthError::MissingScopeContract)?;
-    first_required_scope(remote_http_scopes(route))
 }
 
 /// Authorize one JSON-RPC method received on an authenticated remote WebSocket.

@@ -18,7 +18,7 @@ const QUARANTINE_LOCK: &str = "harness-task-board-quarantine.lock";
 
 pub(crate) struct GitBundleQuarantine<'a> {
     coordinates: &'a GitRepositoryCoordinates,
-    root: PathBuf,
+    root: GitBundleQuarantineRoot,
     pack_hash: String,
     limits: GitBundleContentLimits,
     _lock: File,
@@ -38,9 +38,8 @@ impl<'a> GitBundleQuarantine<'a> {
             )
         })?;
         let lock = acquire_lock(coordinates)?;
-        let root = coordinates.object_directory().join(QUARANTINE_DIRECTORY);
-        reset_quarantine(coordinates.worktree(), &root)?;
-        let runner = coordinates.quarantine_runner(&root)?;
+        let root = GitBundleQuarantineRoot::prepare(coordinates)?;
+        let runner = coordinates.quarantine_runner(root.path())?;
         let process_limits = process_limits(coordinates.worktree(), limits)?;
         let output = runner.contract_resource_limited_with_input(
             [
@@ -68,7 +67,7 @@ impl<'a> GitBundleQuarantine<'a> {
     }
 
     pub(crate) fn runner(&self) -> GitResult<GitCommandRunner<'_>> {
-        self.coordinates.quarantine_runner(&self.root)
+        self.coordinates.quarantine_runner(self.root.path())
     }
 
     pub(crate) fn promote(&self, bundle: &[u8]) -> GitResult<()> {
@@ -105,9 +104,15 @@ impl<'a> GitBundleQuarantine<'a> {
         }
     }
 
+    pub(crate) fn cleanup(&self) -> GitResult<()> {
+        remove_quarantine(self.root.path())
+            .map_err(|error| GitError::read(self.coordinates.worktree(), error))
+    }
+
     fn require_full_pack_contract(&self, limits: GitBundleContentLimits) -> GitResult<()> {
         let pack = self
             .root
+            .path()
             .join("pack")
             .join(format!("pack-{}.pack", self.pack_hash));
         let expected = pack_object_count(self.coordinates.worktree(), &pack)?;
@@ -128,9 +133,25 @@ impl<'a> GitBundleQuarantine<'a> {
     }
 }
 
-impl Drop for GitBundleQuarantine<'_> {
+struct GitBundleQuarantineRoot {
+    path: PathBuf,
+}
+
+impl GitBundleQuarantineRoot {
+    fn prepare(coordinates: &GitRepositoryCoordinates) -> GitResult<Self> {
+        let path = coordinates.object_directory().join(QUARANTINE_DIRECTORY);
+        reset_quarantine(coordinates.worktree(), &path)?;
+        Ok(Self { path })
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for GitBundleQuarantineRoot {
     fn drop(&mut self) {
-        let _ = remove_quarantine(&self.root);
+        let _ = remove_quarantine(&self.path);
     }
 }
 

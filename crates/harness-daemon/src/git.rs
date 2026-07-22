@@ -14,6 +14,8 @@ pub(crate) mod bundle_contract;
 pub(crate) mod bundle_export;
 #[path = "../../../src/git/bundle_quarantine.rs"]
 mod bundle_quarantine;
+#[path = "../../../src/git/bundle_staging.rs"]
+mod bundle_staging;
 #[path = "../../../src/git/command.rs"]
 mod command;
 #[path = "../../../src/git/identity.rs"]

@@ -54,7 +54,7 @@ impl AsyncDaemonDb {
         authenticated_principal: &str,
         trust: &TaskBoardRemoteOperationTrustFence,
     ) -> Result<bool, CliError> {
-        self.claim_status_io_authority(request, authenticated_principal, Some(trust))
+        Box::pin(self.claim_status_io_authority(request, authenticated_principal, Some(trust)))
             .await
     }
 

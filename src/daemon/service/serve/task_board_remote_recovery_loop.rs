@@ -36,7 +36,12 @@ async fn run_remote_recovery_loop(
         return;
     };
     let mut schedule = RecoverySchedule::new(fallback_interval);
-    maintain_remote_recovery_after_controller(&state, db.as_ref(), &mut schedule).await;
+    Box::pin(maintain_remote_recovery_after_controller(
+        &state,
+        db.as_ref(),
+        &mut schedule,
+    ))
+    .await;
     loop {
         tokio::select! {
             changed = shutdown_rx.changed() => {
@@ -45,7 +50,12 @@ async fn run_remote_recovery_loop(
                 }
             }
             () = sleep_until(TokioInstant::from_std(schedule.next_wake)) => {
-                maintain_remote_recovery_after_controller(&state, db.as_ref(), &mut schedule).await;
+                Box::pin(maintain_remote_recovery_after_controller(
+                    &state,
+                    db.as_ref(),
+                    &mut schedule,
+                ))
+                .await;
             }
         }
     }
@@ -56,12 +66,12 @@ pub(crate) async fn recover_remote_assignments_before_local_work(
     db: &AsyncDaemonDb,
 ) -> Result<(), CliError> {
     for _ in 0..MAXIMUM_FOREGROUND_PAGES {
-        let report = crate::daemon::service::task_board_remote_controller::drive_task_board_remote_controller_before_local_work(
-            db,
+        let report = Box::pin(
+            crate::daemon::service::task_board_remote_controller::drive_task_board_remote_controller_before_local_work(db),
         )
         .await?;
         if !report.scan_incomplete {
-            return recover_remote_assignments_before_work(db).await;
+            return Box::pin(recover_remote_assignments_before_work(db)).await;
         }
     }
     Err(CliErrorKind::concurrent_modification(
@@ -74,7 +84,7 @@ pub(crate) async fn recover_remote_assignments_before_work(
     db: &AsyncDaemonDb,
 ) -> Result<(), CliError> {
     for _ in 0..MAXIMUM_FOREGROUND_PAGES {
-        let batch = db.recover_task_board_remote_assignments(&utc_now()).await?;
+        let batch = Box::pin(db.recover_task_board_remote_assignments(&utc_now())).await?;
         log_recovery_failures(&batch);
         if !batch.incomplete {
             return Ok(());
@@ -91,7 +101,7 @@ pub(crate) async fn recover_remote_assignments_at_startup(
 ) -> Result<(), CliError> {
     for _ in 0..MAXIMUM_STARTUP_PAGES {
         let now = utc_now();
-        let batch = db.recover_task_board_remote_assignments(&now).await?;
+        let batch = Box::pin(db.recover_task_board_remote_assignments(&now)).await?;
         log_recovery_failures(&batch);
         if !batch.incomplete {
             prune_startup_evidence(db, &now).await;
@@ -111,15 +121,15 @@ pub(crate) async fn recover_remote_assignments_at_startup_with_controller(
     db: &AsyncDaemonDb,
 ) -> Result<(), CliError> {
     for _ in 0..MAXIMUM_STARTUP_PAGES {
-        let report = crate::daemon::service::task_board_remote_controller::drive_task_board_remote_controller_before_local_work(
-            db,
+        let report = Box::pin(
+            crate::daemon::service::task_board_remote_controller::drive_task_board_remote_controller_before_local_work(db),
         )
         .await?;
         if report.scan_incomplete {
             continue;
         }
         let now = utc_now();
-        let batch = db.recover_task_board_remote_assignments(&now).await?;
+        let batch = Box::pin(db.recover_task_board_remote_assignments(&now)).await?;
         log_recovery_failures(&batch);
         if !batch.incomplete {
             prune_startup_evidence(db, &now).await;
@@ -139,52 +149,75 @@ async fn maintain_remote_recovery_after_controller(
     db: &AsyncDaemonDb,
     schedule: &mut RecoverySchedule,
 ) {
-    let (controller_incomplete, controller_retry) = match crate::daemon::service::task_board_remote_controller::drive_task_board_remote_controller(
+    let (
+        controller_incomplete,
+        controller_failed,
+        controller_progressed,
+        controller_pagination_incomplete,
+    ) = match Box::pin(
+        crate::daemon::service::task_board_remote_controller::drive_task_board_remote_controller(
             db,
-        )
-        .await
-        {
+        ),
+    )
+    .await
+    {
         Ok(report) => {
             for failure in &report.failures {
                 tracing::warn!(error = %failure, "task-board remote controller operation failed");
             }
             (
                 report.scan_incomplete,
-                report.scan_incomplete || report.scan_blocked,
+                report.scan_blocked,
+                report.verified_assignments > 0 || report.offered_attempts > 0,
+                report.scan_incomplete,
             )
         }
         Err(error) => {
             tracing::warn!(%error, "task-board remote controller reconciliation failed");
-            (true, true)
+            // We cannot trust a failed controller pass to have advanced its
+            // durable cursor. Keep the DB-expiry fallback fenced, but do not
+            // turn the unknown failure into a one-second polling loop.
+            (true, true, false, false)
         }
     };
-    maintain_remote_recovery_after_coverage(db, schedule, controller_incomplete, controller_retry)
-        .await;
+    Box::pin(maintain_remote_recovery_after_coverage(
+        db,
+        schedule,
+        controller_incomplete,
+        controller_failed,
+        controller_progressed,
+        controller_pagination_incomplete,
+    ))
+    .await;
 }
 
 async fn maintain_remote_recovery_after_coverage(
     db: &AsyncDaemonDb,
     schedule: &mut RecoverySchedule,
     controller_incomplete: bool,
-    controller_retry: bool,
+    controller_failed: bool,
+    controller_progressed: bool,
+    controller_pagination_incomplete: bool,
 ) {
     if !controller_incomplete {
-        maintain_remote_recovery(db, schedule).await;
+        Box::pin(maintain_remote_recovery(db, schedule)).await;
     }
-    if controller_retry {
-        schedule.next_wake = schedule.next_wake.min(Instant::now() + MINIMUM_RETRY);
-    }
+    schedule.record_controller_coverage(
+        controller_failed,
+        controller_progressed,
+        controller_pagination_incomplete,
+    );
 }
 
 async fn maintain_remote_recovery(db: &AsyncDaemonDb, schedule: &mut RecoverySchedule) {
-    let result = async {
+    let result = Box::pin(async {
         let now = utc_now();
-        let batch = db.recover_task_board_remote_assignments(&now).await?;
+        let batch = Box::pin(db.recover_task_board_remote_assignments(&now)).await?;
         log_recovery_failures(&batch);
         let deadline = db.task_board_remote_assignment_recovery_deadline().await?;
         db.prune_task_board_remote_execution_evidence(&now).await?;
         Ok::<_, CliError>((batch, deadline))
-    }
+    })
     .await;
     match result {
         Ok((batch, deadline)) => schedule.record_batch(&batch, deadline.as_deref()),
@@ -228,23 +261,91 @@ impl RecoverySchedule {
     }
 
     fn record_batch(&mut self, batch: &TaskBoardRemoteRecoveryBatch, deadline: Option<&str>) {
-        self.consecutive_failures = 0;
+        self.record_batch_at(batch, deadline, Instant::now());
+    }
+
+    fn record_batch_at(
+        &mut self,
+        batch: &TaskBoardRemoteRecoveryBatch,
+        deadline: Option<&str>,
+        now: Instant,
+    ) {
         if batch.incomplete {
-            self.next_wake = Instant::now() + MINIMUM_RETRY;
+            self.next_wake = now + MINIMUM_RETRY;
+        } else if deadline.is_none() {
+            self.next_wake = now + self.fallback_interval;
         } else {
             self.next_wake =
                 next_deadline(deadline, self.fallback_interval).unwrap_or_else(|error| {
                     tracing::warn!(%error, "task-board remote recovery deadline is invalid");
-                    Instant::now() + MINIMUM_RETRY
+                    now + MINIMUM_RETRY
                 });
+        }
+        if !batch.failures.is_empty() {
+            self.record_failure_preserving_earlier_wake_at(now);
+        } else if !batch.recovered.is_empty() {
+            self.record_progress();
         }
     }
 
     fn record_failure(&mut self) {
+        self.record_failure_at(Instant::now());
+    }
+
+    fn record_failure_preserving_earlier_wake_at(&mut self, now: Instant) {
+        let existing_wake = self.next_wake;
+        self.record_failure_at(now);
+        if existing_wake > now {
+            self.next_wake = self.next_wake.min(existing_wake);
+        }
+    }
+
+    fn record_controller_coverage(
+        &mut self,
+        controller_failed: bool,
+        controller_progressed: bool,
+        controller_pagination_incomplete: bool,
+    ) {
+        self.record_controller_coverage_at(
+            controller_failed,
+            controller_progressed,
+            controller_pagination_incomplete,
+            Instant::now(),
+        );
+    }
+
+    fn record_controller_coverage_at(
+        &mut self,
+        controller_failed: bool,
+        controller_progressed: bool,
+        controller_pagination_incomplete: bool,
+        now: Instant,
+    ) {
+        if controller_progressed {
+            self.record_progress();
+        }
+        if controller_failed {
+            // A controller-operation failure has a durable, exact-generation
+            // quarantine deadline. Preserve an earlier healthy/lease deadline.
+            self.record_failure_preserving_earlier_wake_at(now);
+        }
+        if controller_pagination_incomplete {
+            // This is a successfully cursor-advanced page with more visible
+            // work. It is safe to continue immediately without overriding the
+            // exact generation's durable retry authority.
+            self.next_wake = self.next_wake.min(now + MINIMUM_RETRY);
+        }
+    }
+
+    fn record_failure_at(&mut self, now: Instant) {
         self.consecutive_failures = self.consecutive_failures.saturating_add(1);
         let shift = self.consecutive_failures.saturating_sub(1).min(6);
         let seconds = 1_u64.checked_shl(shift).unwrap_or(64).min(60);
-        self.next_wake = Instant::now() + Duration::from_secs(seconds).min(MAXIMUM_RETRY);
+        self.next_wake = now + Duration::from_secs(seconds).min(MAXIMUM_RETRY);
+    }
+
+    fn record_progress(&mut self) {
+        self.consecutive_failures = 0;
     }
 }
 

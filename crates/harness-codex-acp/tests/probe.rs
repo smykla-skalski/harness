@@ -7,7 +7,11 @@ fn probe_prints_exact_adapter_identity() {
         .output()
         .expect("run adapter probe");
 
-    assert!(output.status.success(), "probe exited with {}", output.status);
+    assert!(
+        output.status.success(),
+        "probe exited with {}",
+        output.status
+    );
     assert_eq!(output.stdout, b"harness-codex-acp\n");
     assert!(output.stderr.is_empty());
 }

@@ -10,6 +10,7 @@ pub(crate) mod bundle;
 pub(crate) mod bundle_contract;
 pub(crate) mod bundle_export;
 mod bundle_quarantine;
+mod bundle_staging;
 mod command;
 pub(crate) mod identity;
 pub(crate) mod mutation;
