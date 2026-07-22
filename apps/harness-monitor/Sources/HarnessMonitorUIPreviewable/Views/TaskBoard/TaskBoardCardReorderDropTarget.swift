@@ -18,33 +18,36 @@ struct TaskBoardCardReorderDropTarget: ViewModifier {
   let actions: TaskBoardOverviewActions
   @Binding var insertionHint: TaskBoardCardReorderInsertionHint?
 
-  @ViewBuilder
   func body(content: Content) -> some View {
-    if isEnabled {
-      content
-        .dropDestination(for: TaskBoardCardDragPayload.self) { _, session in
-          defer { clearInsertionHint() }
-          guard let draggedItemID else { return }
-          guard
-            let plan = TaskBoardCardReorderPlan.resolve(
-              draggedItemID: draggedItemID,
-              lane: lane,
-              apiItems: apiItems,
-              hoveredItemID: hoveredItemID,
-              insertAfterHovered: insertsAfter(session)
-            )
-          else {
-            return
-          }
-          actions.reorderTaskBoardItem(plan)
+    content
+      .dropDestination(
+        for: TaskBoardCardDragPayload.self,
+        isEnabled: isEnabled
+      ) { _, session in
+        defer { clearInsertionHint() }
+        guard isEnabled, let draggedItemID else { return }
+        guard
+          let plan = TaskBoardCardReorderPlan.resolve(
+            draggedItemID: draggedItemID,
+            lane: lane,
+            apiItems: apiItems,
+            hoveredItemID: hoveredItemID,
+            insertAfterHovered: insertsAfter(session)
+          )
+        else {
+          return
         }
-        .dropConfiguration { _ in
-          DropConfiguration(operation: .move)
+        actions.reorderTaskBoardItem(plan)
+      }
+      .dropConfiguration { _ in
+        DropConfiguration(operation: .move)
+      }
+      .onDropSessionUpdated(updateDropSession)
+      .onChange(of: isEnabled) { _, enabled in
+        if !enabled {
+          clearInsertionHint()
         }
-        .onDropSessionUpdated(updateDropSession)
-    } else {
-      content.onAppear(perform: clearInsertionHint)
-    }
+      }
   }
 
   private func updateDropSession(_ session: DropSession) {

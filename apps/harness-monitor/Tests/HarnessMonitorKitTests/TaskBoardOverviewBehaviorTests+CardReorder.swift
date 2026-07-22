@@ -132,7 +132,7 @@ extension TaskBoardOverviewBehaviorTests {
     )
   }
 
-  @Test("Reorder plan drops the last card to the end when dropped below the last card")
+  @Test("Reorder plan drops the first card to the end when dropped below the last card")
   func reorderPlanMovesFirstCardToEnd() throws {
     let items = reorderFixture()
 
