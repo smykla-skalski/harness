@@ -107,6 +107,7 @@ mod schema_v40;
 mod schema_v41;
 mod schema_v42;
 mod schema_v43;
+mod schema_v44;
 #[allow(dead_code)]
 mod task_board;
 #[cfg(test)]
@@ -139,7 +140,9 @@ pub(crate) use task_board::{
     TaskBoardAdmissionMissingRunRecovery, TaskBoardAdmissionWorkerRecovery,
     TaskBoardAutomationControlRecord, TaskBoardAutomationRunAdmission, TaskBoardAutomationRunFence,
     TaskBoardAutomationRunLease, TaskBoardAutomationRunStage, TaskBoardDispatchClaimAction,
-    TaskBoardImportMarker, TaskBoardItemSnapshot, TaskBoardRemoteArtifact,
+    TaskBoardImportMarker, TaskBoardItemSnapshot, TaskBoardItemsSnapshot,
+    TaskBoardLaneMutationResult, TaskBoardLanePositionInput, TaskBoardLaneResetInput,
+    TaskBoardLaneShift, TaskBoardRemoteArtifact,
     TaskBoardRemoteAssignmentRecord, TaskBoardRemoteControllerOperationToken,
     TaskBoardRemoteControllerScanItem, TaskBoardRemoteControllerScanStep,
     TaskBoardRemoteExecutorIdentity, TaskBoardRemoteExecutorScan,
@@ -359,7 +362,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-pub(crate) const SCHEMA_VERSION: &str = "43";
+pub(crate) const SCHEMA_VERSION: &str = "44";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]

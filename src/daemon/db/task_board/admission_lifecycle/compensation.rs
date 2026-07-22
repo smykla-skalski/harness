@@ -1,6 +1,5 @@
 use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
-use super::super::{ITEMS_CHANGE_SCOPE, items::bump_change_in_tx};
 use super::validation::{CurrentAllowedAdmission, current_allowed_admission, decode_requirements};
 use crate::daemon::db::{CliError, db_error, utc_now};
 use crate::task_board::TaskBoardAdmissionRequirementKind;
@@ -44,10 +43,10 @@ pub(in crate::daemon::db::task_board) async fn finalize_compensating_dispatch_ad
     transaction: &mut Transaction<'_, Sqlite>,
     intent_id: &str,
     managed_worker_id: &str,
-) -> Result<(), CliError> {
+) -> Result<bool, CliError> {
     let Some(recorded) = current_allowed_admission(transaction, intent_id).await? else {
         ensure_no_active_admission_rows(transaction, intent_id, "compensation finalize").await?;
-        return Ok(());
+        return Ok(false);
     };
     let requirements = decode_requirements(&recorded.requirements_json)?;
     let expected_concurrency = requirements
@@ -86,10 +85,7 @@ pub(in crate::daemon::db::task_board) async fn finalize_compensating_dispatch_ad
     })?
     .rows_affected();
     ensure_row_count(changed, remaining_concurrency, "finalize released")?;
-    if changed > 0 {
-        bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
-    }
-    Ok(())
+    Ok(changed > 0)
 }
 
 async fn ensure_compensating_admission_is_complete(

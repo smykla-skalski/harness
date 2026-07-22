@@ -3,6 +3,7 @@ use clap::builder::PossibleValue;
 use serde::{Deserialize, Serialize};
 
 use super::automation::TaskBoardWorkflowKind;
+use super::lane::TaskBoardLaneOrigin;
 
 pub const CURRENT_TASK_BOARD_ITEM_VERSION: u32 = 1;
 pub const MAX_TASK_BOARD_ESTIMATE: u64 = i64::MAX as u64;
@@ -54,6 +55,13 @@ pub struct TaskBoardItem {
     pub parent_item_id: Option<String>,
     #[serde(default, skip_serializing_if = "is_zero")]
     pub child_order: u32,
+    /// An explicit zero-based lane slot. `None` uses derived default ordering.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lane_position: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lane_origin: Option<TaskBoardLaneOrigin>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lane_set_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -88,6 +96,9 @@ impl TaskBoardItem {
             usage: TaskUsage::default(),
             parent_item_id: None,
             child_order: 0,
+            lane_position: None,
+            lane_origin: None,
+            lane_set_at: None,
             created_at: now.clone(),
             updated_at: now,
             deleted_at: None,

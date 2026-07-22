@@ -5,7 +5,11 @@ use super::super::admission_lifecycle::{
     commit_compensating_dispatch_admission_in_tx, finalize_compensating_dispatch_admission_in_tx,
     release_dispatch_admission_in_tx, renew_frozen_dispatch_admission_in_tx,
 };
-use super::super::items::{bump_change_in_tx, load_item_in_tx, replace_item_in_tx};
+use super::super::items::{bump_change_in_tx, load_item_in_tx};
+use super::super::lane_order::{
+    LaneTransitionKind, LaneTransitionWrite, record_lane_transition_audit_in_tx,
+    replace_with_lane_transition_in_tx,
+};
 use crate::daemon::db::policy::restore_consumed_approval_grant_in_tx_at;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::task_board::{
@@ -34,6 +38,7 @@ pub(in crate::daemon::db::task_board) async fn refuse_pending_admission_in_tx(
     let still_linked = item.session_id.as_deref() == Some(applied.session_id.as_str())
         && item.work_item_id.as_deref() == Some(applied.work_item_id.as_str());
     if still_linked && dispatch_item_can_be_rolled_back(&item) {
+        let before = item.clone();
         item.workflow.status = TaskBoardWorkflowStatus::Failed;
         item.workflow.current_step_id = Some("admission".to_string());
         item.workflow.last_error = Some(reason.to_string());
@@ -41,8 +46,16 @@ pub(in crate::daemon::db::task_board) async fn refuse_pending_admission_in_tx(
         item.session_id = None;
         item.work_item_id = None;
         item.updated_at = utc_now();
-        replace_item_in_tx(transaction, &item, revision + 1).await?;
-        bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
+        let write = replace_with_lane_transition_in_tx(
+            transaction,
+            before,
+            revision,
+            item,
+            LaneTransitionKind::Generic,
+        )
+        .await?;
+        let change_sequence = bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
+        record_lane_transition_audit_in_tx(transaction, &write, change_sequence).await?;
     }
     let now = utc_now();
     query(
@@ -335,7 +348,9 @@ impl AsyncDaemonDb {
         let still_linked = item.session_id.as_deref() == Some(session_id.as_str())
             && item.work_item_id.as_deref() == Some(work_item_id.as_str())
             && item.workflow.execution_id.as_deref() == Some(execution_id.as_str());
+        let mut lane_write: Option<LaneTransitionWrite> = None;
         if still_linked && dispatch_item_can_be_rolled_back(&item) {
+            let before = item.clone();
             item.workflow.status = TaskBoardWorkflowStatus::Failed;
             item.workflow.current_step_id = Some("worker_spawn".to_string());
             item.workflow.last_error = Some(reason.to_string());
@@ -343,8 +358,14 @@ impl AsyncDaemonDb {
             item.session_id = None;
             item.work_item_id = None;
             item.updated_at = utc_now();
-            replace_item_in_tx(&mut transaction, &item, revision + 1).await?;
-            bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
+            lane_write = Some(replace_with_lane_transition_in_tx(
+                &mut transaction,
+                before,
+                revision,
+                item,
+                LaneTransitionKind::Generic,
+            )
+            .await?);
         }
         let now = utc_now();
         let changed = query(
@@ -366,15 +387,23 @@ impl AsyncDaemonDb {
         if changed != 1 {
             return Err(lost_claim(intent_id));
         }
-        if let Some(managed_worker_id) = managed_worker_id {
+        let admission_changed = if let Some(managed_worker_id) = managed_worker_id {
             finalize_compensating_dispatch_admission_in_tx(
                 &mut transaction,
                 intent_id,
                 managed_worker_id,
             )
-            .await?;
+            .await?
         } else {
             release_dispatch_admission_in_tx(&mut transaction, intent_id).await?;
+            false
+        };
+        if lane_write.is_some() || admission_changed {
+            let change_sequence = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
+            if let Some(write) = lane_write.as_ref() {
+                record_lane_transition_audit_in_tx(&mut transaction, write, change_sequence)
+                    .await?;
+            }
         }
         transaction
             .commit()

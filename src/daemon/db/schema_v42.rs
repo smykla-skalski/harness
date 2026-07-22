@@ -44,13 +44,13 @@ fn column_exists(conn: &Connection, table: &str, column: &str) -> Result<bool, C
 #[cfg(test)]
 mod tests {
     use super::run;
-    use crate::daemon::db::DaemonDb;
+    use crate::daemon::db::{DaemonDb, SCHEMA_VERSION};
 
     #[test]
     fn current_schema_has_the_kind_column_defaulted_to_task() {
         let db = DaemonDb::open_in_memory().expect("open daemon db");
 
-        assert_eq!(db.schema_version().expect("schema version"), "43");
+        assert_eq!(db.schema_version().expect("schema version"), SCHEMA_VERSION);
         let exists: i64 = db
             .connection()
             .query_row(

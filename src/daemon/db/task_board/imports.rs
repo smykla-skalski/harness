@@ -5,14 +5,19 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 use uuid::Uuid;
 
 use super::aggregates::upsert_machine_in_tx;
-use super::items::{bump_change_in_tx, insert_item_in_tx};
+use super::items::bump_change_in_tx;
+use super::lane_order::{
+    LaneTransitionWrite, insert_with_lane_transition_in_tx, record_lane_transition_audit_in_tx,
+};
 use super::mapper::to_json;
 use super::{
     ITEMS_CHANGE_SCOPE, MACHINES_CHANGE_SCOPE, ORCHESTRATOR_CHANGE_SCOPE,
     POLICY_RUNTIME_CHANGE_SCOPE, RUNTIME_CONFIG_CHANGE_SCOPE,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
-use crate::task_board::TaskBoardGitRuntimeConfig;
+use crate::task_board::{
+    TaskBoardGitRuntimeConfig, sort_task_board_items, validate_task_board_lane_order,
+};
 use crate::task_board::legacy_import::LegacyTaskBoardSnapshot;
 
 pub(crate) const LEGACY_GLOBAL_SOURCE: &str = "legacy_global_board";
@@ -101,7 +106,7 @@ impl AsyncDaemonDb {
             });
         }
         ensure_import_target_empty(&mut transaction).await?;
-        insert_snapshot(&mut transaction, snapshot, runtime_config).await?;
+        let lane_writes = insert_snapshot(&mut transaction, snapshot, runtime_config).await?;
         verify_snapshot(&mut transaction, snapshot, runtime_config).await?;
         let counts_json = to_json(&snapshot.counts(), "legacy task board counts")?;
         let imported_at = utc_now();
@@ -140,6 +145,16 @@ impl AsyncDaemonDb {
             POLICY_RUNTIME_CHANGE_SCOPE,
         ] {
             change_revision = bump_change_in_tx(&mut transaction, scope).await?;
+            if scope == ITEMS_CHANGE_SCOPE {
+                for write in lane_writes.iter().filter(|write| write.changed) {
+                    record_lane_transition_audit_in_tx(
+                        &mut transaction,
+                        write,
+                        change_revision,
+                    )
+                    .await?;
+                }
+            }
         }
         transaction
             .commit()
@@ -160,9 +175,13 @@ async fn insert_snapshot(
     transaction: &mut Transaction<'_, Sqlite>,
     snapshot: &LegacyTaskBoardSnapshot,
     runtime_config: &TaskBoardGitRuntimeConfig,
-) -> Result<(), CliError> {
-    for item in &snapshot.items {
-        insert_item_in_tx(transaction, item, 1).await?;
+) -> Result<Vec<LaneTransitionWrite>, CliError> {
+    let mut items = snapshot.items.clone();
+    validate_task_board_lane_order(&items).map_err(db_error)?;
+    sort_task_board_items(&mut items);
+    let mut lane_writes = Vec::new();
+    for item in items {
+        lane_writes.push(insert_with_lane_transition_in_tx(transaction, item).await?);
     }
     for machine in &snapshot.machines {
         upsert_machine_in_tx(transaction, machine).await?;
@@ -175,7 +194,8 @@ async fn insert_snapshot(
             .map_err(|error| db_error(format!("import local machine pointer: {error}")))?;
     }
     insert_singletons(transaction, snapshot, runtime_config).await?;
-    insert_policy_runtime(transaction, snapshot).await
+    insert_policy_runtime(transaction, snapshot).await?;
+    Ok(lane_writes)
 }
 
 async fn insert_singletons(

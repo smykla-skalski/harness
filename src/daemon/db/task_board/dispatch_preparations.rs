@@ -11,7 +11,10 @@ use super::admission_reservations::persist_admission_snapshot_in_tx;
 use super::dispatch_workflow_launch::{
     prepare_workflow_launches_for_publication, rebind_write_launch,
 };
-use super::items::{bump_change_in_tx, load_item_in_tx, replace_item_in_tx};
+use super::items::{bump_change_in_tx, load_item_in_tx};
+use super::lane_order::{
+    LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
+};
 use crate::daemon::db::policy::consume_approval_grant_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::infra::io;
@@ -85,6 +88,43 @@ fn preparation_revision_error(
     } else {
         None
     }
+}
+
+fn rebind_prepared_workflow_launches(
+    item: &TaskBoardItem,
+    prepared_item_revision: i64,
+    workflow_execution_id: &str,
+    read_only_workflow: &mut Option<TaskBoardReadOnlyWorkflowLaunch>,
+    write_workflow: &mut Option<Box<TaskBoardWriteWorkflowLaunch>>,
+) -> Result<(), CliError> {
+    if let Some(launch) = read_only_workflow.as_mut() {
+        launch.prepared_item_revision = prepared_item_revision;
+    }
+    if let Some(launch) = write_workflow.as_mut() {
+        launch.prepared_item_revision = prepared_item_revision;
+        let started_item_revision = prepared_item_revision
+            .checked_add(1)
+            .ok_or_else(|| db_error("workflow item revision is out of range"))?;
+        rebind_write_launch(item, launch, workflow_execution_id, started_item_revision)?;
+    }
+    Ok(())
+}
+
+async fn consume_prepared_approval_grant(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    preparation: &TaskBoardDispatchPreparation,
+) -> Result<(), CliError> {
+    if !preparation.hold_worker
+        && let Some(grant_id) = preparation.plan.consumed_approval_grant_id.as_deref()
+    {
+        let consumed = consume_approval_grant_in_tx(transaction.as_mut(), grant_id).await?;
+        if !consumed {
+            return Err(db_error(format!(
+                "approval grant already consumed; rebuild plan (grant '{grant_id}')"
+            )));
+        }
+    }
+    Ok(())
 }
 
 impl AsyncDaemonDb {
@@ -354,6 +394,7 @@ impl AsyncDaemonDb {
                     preparation.board_item_id
                 ))
             })?;
+        let before = item.clone();
         validate_reservable_item(&item, &preparation.plan)?;
         (read_only_workflow, write_workflow) = prepare_workflow_launches_for_publication(
             preparation,
@@ -364,38 +405,24 @@ impl AsyncDaemonDb {
             write_workflow,
         )?;
         apply_preparation_to_item(&mut item, preparation, branch, worktree);
-        let prepared_item_revision = revision
-            .checked_add(1)
-            .ok_or_else(|| db_error("task-board item revision is out of range"))?;
-        replace_item_in_tx(&mut transaction, &item, prepared_item_revision).await?;
-        if let Some(launch) = read_only_workflow.as_mut() {
-            launch.prepared_item_revision = prepared_item_revision;
-        }
-        if let Some(launch) = write_workflow.as_mut() {
-            launch.prepared_item_revision = prepared_item_revision;
-            let started_item_revision = prepared_item_revision
-                .checked_add(1)
-                .ok_or_else(|| db_error("workflow item revision is out of range"))?;
-            rebind_write_launch(
-                &item,
-                launch,
-                &preparation.workflow_execution_id,
-                started_item_revision,
-            )?;
-        }
-        // Immediate dispatch consumes its one-shot grant with publication.
-        // Step-mode dispatch deliberately keeps the grant live while held;
-        // delivery re-evaluates current policy and consumes atomically there.
-        if !preparation.hold_worker
-            && let Some(grant_id) = preparation.plan.consumed_approval_grant_id.as_deref()
-        {
-            let consumed = consume_approval_grant_in_tx(transaction.as_mut(), grant_id).await?;
-            if !consumed {
-                return Err(db_error(format!(
-                    "approval grant already consumed; rebuild plan (grant '{grant_id}')"
-                )));
-            }
-        }
+        let write = replace_with_lane_transition_in_tx(
+            &mut transaction,
+            before,
+            revision,
+            item,
+            LaneTransitionKind::Generic,
+        )
+        .await?;
+        let prepared_item_revision = write.item_revision;
+        let item = write.item.clone();
+        rebind_prepared_workflow_launches(
+            &item,
+            prepared_item_revision,
+            &preparation.workflow_execution_id,
+            &mut read_only_workflow,
+            &mut write_workflow,
+        )?;
+        consume_prepared_approval_grant(&mut transaction, preparation).await?;
         let applied = DispatchAppliedTask {
             board_item_id: preparation.board_item_id.clone(),
             session_id: preparation.session_id.clone(),
@@ -433,7 +460,8 @@ impl AsyncDaemonDb {
         .execute(transaction.as_mut())
         .await
         .map_err(|error| db_error(format!("complete task board preparation: {error}")))?;
-        bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
+        let change_sequence = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
+        record_lane_transition_audit_in_tx(&mut transaction, &write, change_sequence).await?;
         transaction.commit().await.map_err(|error| {
             db_error(format!("commit task board preparation completion: {error}"))
         })?;

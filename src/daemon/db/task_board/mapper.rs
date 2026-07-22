@@ -4,7 +4,9 @@ use serde_json::Value;
 
 use super::rows::{ExternalRefRow, ItemRow, MachineRow};
 use crate::daemon::db::{CliError, db_error};
-use crate::task_board::{ExternalRef, Machine, TaskBoardItem};
+use crate::task_board::{
+    ExternalRef, Machine, TaskBoardItem, TaskBoardLaneOrigin, validate_lane_placement,
+};
 
 pub(super) fn item_from_rows(
     row: ItemRow,
@@ -13,8 +15,10 @@ pub(super) fn item_from_rows(
     let revision = row.revision;
     let schema_version = u32::try_from(row.schema_version)
         .map_err(|error| db_error(format!("parse task board schema version: {error}")))?;
-    Ok((
-        TaskBoardItem {
+    let lane_position = optional_u32(row.lane_position, "task board lane position")?;
+    let lane_origin = lane_origin_from_row(&row)?;
+    let lane_set_at = row.lane_set_at.clone();
+    let item = TaskBoardItem {
             schema_version,
             id: row.item_id,
             title: row.title,
@@ -53,12 +57,34 @@ pub(super) fn item_from_rows(
             parent_item_id: row.parent_item_id,
             child_order: u32::try_from(row.child_order)
                 .map_err(|error| db_error(format!("parse task board child order: {error}")))?,
+            lane_position,
+            lane_origin,
+            lane_set_at,
             created_at: row.created_at,
             updated_at: row.updated_at,
             deleted_at: row.deleted_at,
-        },
-        revision,
-    ))
+    };
+    validate_lane_placement(&item).map_err(db_error)?;
+    Ok((item, revision))
+}
+
+fn lane_origin_from_row(row: &ItemRow) -> Result<Option<TaskBoardLaneOrigin>, CliError> {
+    match (
+        row.lane_origin.as_deref(),
+        row.lane_actor.as_deref(),
+        row.lane_producer.as_deref(),
+    ) {
+        (None, None, None) => Ok(None),
+        (Some("manual"), Some(actor), None) => Ok(Some(TaskBoardLaneOrigin::Manual {
+            actor: actor.to_owned(),
+        })),
+        (Some("automatic"), None, Some(producer)) => {
+            Ok(Some(TaskBoardLaneOrigin::Automatic {
+                producer: producer.to_owned(),
+            }))
+        }
+        _ => Err(db_error("parse task board lane provenance")),
+    }
 }
 
 pub(super) fn external_ref_from_row(row: ExternalRefRow) -> Result<ExternalRef, CliError> {
@@ -111,5 +137,11 @@ fn optional_u64(value: Option<i64>, context: &str) -> Result<Option<u64>, CliErr
         .map(|value| {
             u64::try_from(value).map_err(|error| db_error(format!("parse {context}: {error}")))
         })
+        .transpose()
+}
+
+fn optional_u32(value: Option<i64>, context: &str) -> Result<Option<u32>, CliError> {
+    value
+        .map(|value| u32::try_from(value).map_err(|error| db_error(format!("parse {context}: {error}"))))
         .transpose()
 }

@@ -4,6 +4,7 @@ pub mod evaluation;
 pub mod external;
 mod external_create_intents;
 pub mod git_identity_defaults;
+pub mod lane;
 pub mod github;
 #[allow(dead_code)]
 #[cfg(feature = "daemon-runtime")]
@@ -72,6 +73,10 @@ pub use git_identity_defaults::{
     TaskBoardEnvDefaults, TaskBoardGhCliDefaults, TaskBoardGitConfigDefaults,
     TaskBoardGitIdentityDefaults, TaskBoardSshKeyDiscovery,
     discover as discover_git_identity_defaults,
+};
+pub use lane::{
+    TaskBoardLaneOrigin, sort_task_board_items, validate_lane_placement,
+    validate_task_board_lane_order,
 };
 pub use machines::Machine;
 #[cfg(test)]

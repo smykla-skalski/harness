@@ -9,13 +9,67 @@ use super::dispatch_workflow_start::{
     insert_started_workflow_in_tx, load_claimed_applied, validate_pending_dispatch,
     workflow_start_fence,
 };
-use super::items::{bump_change_in_tx, load_item_in_tx, replace_item_in_tx};
+use super::items::{bump_change_in_tx, load_item_in_tx};
+use super::lane_order::{
+    LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
+};
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error, utc_now};
 use crate::infra::io;
 use crate::task_board::dispatch::DispatchLifecycle;
 use crate::task_board::{DispatchAppliedTask, TaskBoardStatus, TaskBoardWorkflowStatus};
 
 const CLAIM_LEASE_SECONDS: i64 = 30;
+
+struct PendingTaskBoardDispatchClaim {
+    intent_id: String,
+    payload_json: String,
+    consumed_approval_grant_id: Option<String>,
+    prior_status: String,
+    compensation_pending: bool,
+    last_error: Option<String>,
+}
+
+async fn load_pending_dispatch_claim(
+    transaction: &mut Transaction<'_, Sqlite>,
+    board_item_id: &str,
+) -> Result<Option<PendingTaskBoardDispatchClaim>, CliError> {
+    query_as::<_, (String, String, Option<String>, String, bool, Option<String>)>(
+        "SELECT intent_id, payload_json, consumed_approval_grant_id,
+                    status, compensation_pending, last_error
+             FROM task_board_dispatch_intents
+             WHERE item_id = ?1
+               AND (
+                   (status = 'pending' AND datetime(available_at) <= datetime('now'))
+                   OR (status = 'starting'
+                       AND datetime(claimed_at) <= datetime('now', ?2))
+               )
+             ORDER BY created_at, intent_id LIMIT 1",
+    )
+    .bind(board_item_id)
+    .bind(format!("-{CLAIM_LEASE_SECONDS} seconds"))
+    .fetch_optional(transaction.as_mut())
+    .await
+    .map(|row| {
+        row.map(
+            |(
+                intent_id,
+                payload_json,
+                consumed_approval_grant_id,
+                prior_status,
+                compensation_pending,
+                last_error,
+            )| PendingTaskBoardDispatchClaim {
+                intent_id,
+                payload_json,
+                consumed_approval_grant_id,
+                prior_status,
+                compensation_pending,
+                last_error,
+            },
+        )
+    })
+    .map_err(|error| db_error(format!("load pending task board dispatch: {error}")))
+}
 
 #[path = "dispatch_intents_helpers.rs"]
 pub(super) mod helpers;
@@ -70,6 +124,7 @@ impl AsyncDaemonDb {
         let (mut item, revision) = load_item_in_tx(&mut transaction, board_item_id)
             .await?
             .ok_or_else(|| db_error(format!("task-board item '{board_item_id}' not found")))?;
+        let before = item.clone();
         if item.workflow.execution_id.is_none() {
             item.workflow.execution_id = Some(new_workflow_execution_id());
         }
@@ -81,18 +136,26 @@ impl AsyncDaemonDb {
         item.session_id = Some(session_id.to_string());
         item.work_item_id = Some(work_item_id.to_string());
         item.updated_at = utc_now();
-        replace_item_in_tx(&mut transaction, &item, revision + 1).await?;
+        let write = replace_with_lane_transition_in_tx(
+            &mut transaction,
+            before,
+            revision,
+            item,
+            LaneTransitionKind::Generic,
+        )
+        .await?;
+        let change_sequence = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
+        record_lane_transition_audit_in_tx(&mut transaction, &write, change_sequence).await?;
         let applied = DispatchAppliedTask {
             board_item_id: board_item_id.to_string(),
             session_id: session_id.to_string(),
             work_item_id: work_item_id.to_string(),
             lifecycle: lifecycle.clone(),
-            item,
+            item: write.item,
             read_only_workflow: None,
             write_workflow: None,
         };
         insert_intent(&mut transaction, &applied).await?;
-        bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
         transaction
             .commit()
             .await
@@ -109,44 +172,22 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board dispatch claim")
             .await?;
-        let Some((
-            intent_id,
-            payload_json,
-            consumed_approval_grant_id,
-            prior_status,
-            compensation_pending,
-            last_error,
-        )) = query_as::<_, (String, String, Option<String>, String, bool, Option<String>)>(
-            "SELECT intent_id, payload_json, consumed_approval_grant_id,
-                        status, compensation_pending, last_error
-                 FROM task_board_dispatch_intents
-                 WHERE item_id = ?1
-                   AND (
-                       (status = 'pending' AND datetime(available_at) <= datetime('now'))
-                       OR (status = 'starting'
-                           AND datetime(claimed_at) <= datetime('now', ?2))
-                   )
-                 ORDER BY created_at, intent_id LIMIT 1",
-        )
-        .bind(board_item_id)
-        .bind(format!("-{CLAIM_LEASE_SECONDS} seconds"))
-        .fetch_optional(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("load pending task board dispatch: {error}")))?
+        let Some(pending) = load_pending_dispatch_claim(&mut transaction, board_item_id).await?
         else {
             transaction.commit().await.map_err(|error| {
                 db_error(format!("commit empty task board dispatch claim: {error}"))
             })?;
             return Ok(None);
         };
-        let applied = decode_applied(&payload_json)?;
-        let action = if compensation_pending {
+        let applied = decode_applied(&pending.payload_json)?;
+        let action = if pending.compensation_pending {
             TaskBoardDispatchClaimAction::Compensate {
-                reason: last_error
+                reason: pending
+                    .last_error
                     .filter(|reason| !reason.is_empty())
                     .ok_or_else(|| db_error("compensating task board dispatch has no reason"))?,
             }
-        } else if prior_status == "starting" {
+        } else if pending.prior_status == "starting" {
             // A reclaimed `starting` claim can already own the deterministic
             // worker. Its recovery path must probe that identity before current
             // item or policy state is allowed to reject the intent.
@@ -155,9 +196,9 @@ impl AsyncDaemonDb {
             if let Err(error) = validate_pending_dispatch(
                 &mut transaction,
                 board_item_id,
-                &intent_id,
+                &pending.intent_id,
                 &applied,
-                consumed_approval_grant_id.as_deref(),
+                pending.consumed_approval_grant_id.as_deref(),
             )
             .await
             {
@@ -181,11 +222,11 @@ impl AsyncDaemonDb {
                        AND datetime(claimed_at) <= datetime('now', ?6))
                )",
         )
-        .bind(&intent_id)
+        .bind(&pending.intent_id)
         .bind(&claim_token)
         .bind(utc_now())
-        .bind(compensation_pending)
-        .bind(&prior_status)
+        .bind(pending.compensation_pending)
+        .bind(&pending.prior_status)
         .bind(format!("-{CLAIM_LEASE_SECONDS} seconds"))
         .execute(transaction.as_mut())
         .await
@@ -199,10 +240,10 @@ impl AsyncDaemonDb {
             return Ok(None);
         }
         Ok(Some(ClaimedTaskBoardDispatch {
-            intent_id,
+            intent_id: pending.intent_id,
             claim_token,
             applied,
-            consumed_approval_grant_id,
+            consumed_approval_grant_id: pending.consumed_approval_grant_id,
             action,
         }))
     }
@@ -244,6 +285,7 @@ impl AsyncDaemonDb {
         let (mut item, revision) = load_item_in_tx(&mut transaction, &item_id)
             .await?
             .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
+        let before = item.clone();
         let still_linked = item.session_id.as_deref() == Some(session_id.as_str())
             && item.work_item_id.as_deref() == Some(work_item_id.as_str())
             && item.workflow.execution_id.as_deref() == Some(execution_id.as_str());
@@ -267,10 +309,19 @@ impl AsyncDaemonDb {
         item.workflow.current_step_id = Some("worker_running".to_string());
         item.workflow.last_error = None;
         item.updated_at = utc_now();
-        replace_item_in_tx(&mut transaction, &item, revision + 1).await?;
-        insert_started_workflow_in_tx(&mut transaction, &item, revision + 1, intent_id, &applied)
+        let write = replace_with_lane_transition_in_tx(
+            &mut transaction,
+            before,
+            revision,
+            item,
+            LaneTransitionKind::Generic,
+        )
+        .await?;
+        let item = write.item.clone();
+        insert_started_workflow_in_tx(&mut transaction, &item, write.item_revision, intent_id, &applied)
             .await?;
-        bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
+        let change_sequence = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
+        record_lane_transition_audit_in_tx(&mut transaction, &write, change_sequence).await?;
         let now = utc_now();
         let changed = query(
             "UPDATE task_board_dispatch_intents SET status = 'completed', last_error = NULL,

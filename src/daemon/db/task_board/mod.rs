@@ -226,6 +226,10 @@ pub(crate) use dispatch_preparations::{
 pub(crate) use imports::{TaskBoardImportMarker, TaskBoardImportResult};
 #[allow(unused_imports)]
 pub(crate) use items::{TaskBoardItemSnapshot, TaskBoardMutation};
+pub(crate) use lane_order::{TaskBoardItemsSnapshot, TaskBoardLaneShift};
+pub(crate) use lane_order_api::{
+    TaskBoardLaneMutationResult, TaskBoardLanePositionInput, TaskBoardLaneResetInput,
+};
 #[allow(unused_imports)]
 pub(crate) use remote_artifacts::TaskBoardRemoteArtifact;
 pub(crate) use remote_assignment_controller_scan::{

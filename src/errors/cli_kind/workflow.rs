@@ -67,4 +67,9 @@ impl CliErrorKind {
     pub fn item_not_dispatchable(detail: impl Into<Cow<'static, str>>) -> Self {
         Self::Workflow(WorkflowError::item_not_dispatchable(detail))
     }
+
+    #[must_use]
+    pub fn task_board_lane_capacity(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::Workflow(WorkflowError::task_board_lane_capacity(detail))
+    }
 }

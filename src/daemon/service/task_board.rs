@@ -133,10 +133,11 @@ pub fn list_task_board_items(
     };
     Ok(TaskBoardListItemsResponse {
         items,
+        items_change_seq: 0,
+        item_revisions: std::collections::HashMap::new(),
         progress_rollups,
     })
 }
-
 /// Load one task-board item.
 ///
 /// # Errors
@@ -254,7 +255,6 @@ pub async fn sync_task_board_async(
     let config = active_external_sync_config_async().await?;
     sync_task_board_async_with_config(request, config).await
 }
-
 #[cfg(test)]
 pub(crate) async fn sync_task_board_async_with_config(
     request: &TaskBoardSyncRequest,

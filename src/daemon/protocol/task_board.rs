@@ -61,6 +61,12 @@ pub struct TaskBoardPlanRevokeRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskBoardListItemsResponse {
     pub items: Vec<TaskBoardItem>,
+    /// Sequence observed with `items`; clients use this to reject stale picks.
+    #[serde(default)]
+    pub items_change_seq: i64,
+    /// Per-item revisions observed with `items`, keyed by item id.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub item_revisions: HashMap<String, i64>,
     /// Keyed by umbrella item id, computed fresh from the full live item set
     /// at read time regardless of any `status` filter applied to `items`.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]

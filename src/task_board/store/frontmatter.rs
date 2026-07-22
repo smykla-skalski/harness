@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::super::TaskBoardWorkflowKind;
+use super::super::lane::TaskBoardLaneOrigin;
 use super::super::types::{
     AgentMode, ExternalRef, ExternalRefProvider, PlanningState, TaskBoardItem, TaskBoardItemKind,
     TaskBoardPriority, TaskBoardStatus, TaskBoardWorkflowState, TaskUsage,
@@ -48,6 +49,12 @@ pub(super) struct TaskBoardFrontmatter {
     parent_item_id: Option<String>,
     #[serde(default)]
     child_order: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    lane_position: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    lane_origin: Option<TaskBoardLaneOrigin>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    lane_set_at: Option<String>,
     created_at: String,
     updated_at: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -80,6 +87,9 @@ impl From<&TaskBoardItem> for TaskBoardFrontmatter {
             usage: item.usage.clone(),
             parent_item_id: item.parent_item_id.clone(),
             child_order: item.child_order,
+            lane_position: item.lane_position,
+            lane_origin: item.lane_origin.clone(),
+            lane_set_at: item.lane_set_at.clone(),
             created_at: item.created_at.clone(),
             updated_at: item.updated_at.clone(),
             deleted_at: item.deleted_at.clone(),
@@ -114,6 +124,9 @@ impl TaskBoardFrontmatter {
             usage: self.usage,
             parent_item_id: self.parent_item_id,
             child_order: self.child_order,
+            lane_position: self.lane_position,
+            lane_origin: self.lane_origin,
+            lane_set_at: self.lane_set_at,
             created_at: self.created_at,
             updated_at: self.updated_at,
             deleted_at: self.deleted_at,
