@@ -92,7 +92,7 @@ struct PreviewHarnessClientTaskBoardTests {
   @Test("Preview client applies a CAS position set and reset")
   func previewClientAppliesPositionMutations() async throws {
     let client = PreviewHarnessClient(fixtures: .taskBoardBoardOnly, isLaunchAgentInstalled: true)
-    let item = try #require(try await client.taskBoardItems(status: .todo).first)
+    let item = try #require(try await client.taskBoardItems(status: .backlog).first)
     let before = try await client.taskBoardItemPositionSnapshot(id: item.id)
     let set = try await client.setTaskBoardItemPosition(
       id: item.id,
