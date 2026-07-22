@@ -118,7 +118,7 @@ struct TaskBoardManagementPickerField<
         .font(captionSemibold)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       Picker(label, selection: $selection) {
-        ForEach(values) { value in
+        ForEach(taskBoardManagementPickerValues(Array(values), selection: selection)) { value in
           Text(value.title).tag(value)
         }
       }
@@ -127,6 +127,17 @@ struct TaskBoardManagementPickerField<
       .harnessNativeFormControl()
     }
   }
+}
+
+/// A persisted item can hold a value outside the offered set - a closed item is
+/// `.done`, which maps to no lane and is absent from `currentLaneCases`. Keep the
+/// current selection among the rendered options so the Picker always has a
+/// matching tag instead of logging "the selection is invalid and has no tag".
+func taskBoardManagementPickerValues<Value: Hashable>(
+  _ values: [Value],
+  selection: Value
+) -> [Value] {
+  values.contains(selection) ? values : values + [selection]
 }
 
 struct TaskBoardManagementMultilineField: View {

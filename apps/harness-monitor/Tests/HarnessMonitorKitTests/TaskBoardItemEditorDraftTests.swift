@@ -84,6 +84,25 @@ struct TaskBoardItemEditorDraftTests {
     #expect(DispatchStatusFilterChoice.allCases.map(\.title) == expectedFilterTitles)
   }
 
+  @Test("Status picker renders a tag for a closed item whose status has no lane")
+  func statusPickerRendersSelectionOutsideLaneCases() {
+    // A done item seeds `.done`, which `currentLaneCases` omits because it maps
+    // to no lane and `canonicalPersistedStatus` leaves it unchanged. The picker
+    // must still render it, or SwiftUI logs "the selection \"done\" is invalid
+    // and does not have an associated tag" and the control shows no value.
+    let withDone = taskBoardManagementPickerValues(
+      TaskBoardStatus.currentLaneCases,
+      selection: .done
+    )
+    #expect(withDone == TaskBoardStatus.currentLaneCases + [.done])
+
+    let withOfferedValue = taskBoardManagementPickerValues(
+      TaskBoardStatus.currentLaneCases,
+      selection: .todo
+    )
+    #expect(withOfferedValue == TaskBoardStatus.currentLaneCases)
+  }
+
   @Test("Legacy statuses seed current picker-compatible draft values")
   func legacyStatusesSeedCurrentPickerCompatibleDraftValues() {
     #expect(TaskBoardItemEditorDraft(item: sampleTaskBoardItem(status: .new)).status == .todo)
