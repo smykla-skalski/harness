@@ -1,7 +1,8 @@
-use std::io::{Read, Write as _};
+use std::io::{self, Read, Write as _};
 use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, ExitStatus};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread::{self, ScopedJoinHandle};
 use std::time::{Duration, Instant};
 
 use super::GitProcessLimits;
@@ -15,11 +16,11 @@ pub(super) struct CollectedGitOutput {
 }
 
 struct ClassifiedChildOutcome {
-    result: std::io::Result<(ExitStatus, bool)>,
+    result: io::Result<(ExitStatus, bool)>,
 }
 
 pub(super) struct WriterFailure {
-    pub(super) error: std::io::Error,
+    pub(super) error: io::Error,
 }
 
 pub(super) fn collect_child_output(
@@ -30,8 +31,8 @@ pub(super) fn collect_child_output(
     input: Option<&[u8]>,
     max_bytes: u64,
     limits: Option<GitProcessLimits>,
-) -> std::io::Result<CollectedGitOutput> {
-    std::thread::scope(|scope| {
+) -> io::Result<CollectedGitOutput> {
+    thread::scope(|scope| {
         let input_failed = Arc::new(AtomicBool::new(false));
         let writer_failure = Arc::clone(&input_failed);
         let writer = scope.spawn(move || write_stdin(stdin, input, &writer_failure));
@@ -69,12 +70,12 @@ fn write_stdin(
     input: Option<&[u8]>,
     input_failed: &AtomicBool,
 ) -> Option<WriterFailure> {
-    if let (Some(stdin), Some(input)) = (&mut stdin, input) {
-        if let Err(error) = stdin.write_all(input) {
-            let failure = WriterFailure { error };
-            input_failed.store(true, Ordering::Release);
-            return Some(failure);
-        }
+    if let (Some(stdin), Some(input)) = (&mut stdin, input)
+        && let Err(error) = stdin.write_all(input)
+    {
+        let failure = WriterFailure { error };
+        input_failed.store(true, Ordering::Release);
+        return Some(failure);
     }
     None
 }
@@ -83,11 +84,9 @@ fn read_and_flag_overflow(
     reader: impl Read,
     max_bytes: u64,
     overflow: &AtomicBool,
-) -> std::io::Result<Vec<u8>> {
+) -> io::Result<Vec<u8>> {
     let bytes = read_capped(reader, max_bytes);
-    if bytes.as_ref().is_ok_and(|bytes| exceeds(bytes, max_bytes)) {
-        overflow.store(true, Ordering::Release);
-    } else if bytes.is_err() {
+    if bytes.is_err() || bytes.as_ref().is_ok_and(|bytes| exceeds(bytes, max_bytes)) {
         overflow.store(true, Ordering::Release);
     }
     bytes
@@ -122,7 +121,7 @@ fn wait_for_child(
                     result: child.wait().map(|status| (status, true)),
                 };
             }
-            Ok(None) => std::thread::sleep(Duration::from_millis(10)),
+            Ok(None) => thread::sleep(Duration::from_millis(10)),
             Err(error) => {
                 let outcome = classified(Err(error));
                 let _ = child.kill();
@@ -133,7 +132,7 @@ fn wait_for_child(
     }
 }
 
-fn classified(result: std::io::Result<(ExitStatus, bool)>) -> ClassifiedChildOutcome {
+fn classified(result: io::Result<(ExitStatus, bool)>) -> ClassifiedChildOutcome {
     ClassifiedChildOutcome { result }
 }
 
@@ -141,27 +140,25 @@ pub(super) fn writer_failure_is_primary(
     failure: &WriterFailure,
     child_status_obtained: bool,
 ) -> bool {
-    failure.error.kind() != std::io::ErrorKind::BrokenPipe || !child_status_obtained
+    failure.error.kind() != io::ErrorKind::BrokenPipe || !child_status_obtained
 }
 
 fn join_writer(
-    handle: std::thread::ScopedJoinHandle<'_, Option<WriterFailure>>,
-) -> std::io::Result<Option<WriterFailure>> {
+    handle: ScopedJoinHandle<'_, Option<WriterFailure>>,
+) -> io::Result<Option<WriterFailure>> {
     handle
         .join()
-        .map_err(|_| std::io::Error::other("git stdin writer panicked"))
+        .map_err(|_| io::Error::other("git stdin writer panicked"))
 }
 
 fn join_io<T>(
-    handle: std::thread::ScopedJoinHandle<'_, std::io::Result<T>>,
+    handle: ScopedJoinHandle<'_, io::Result<T>>,
     panic_message: &'static str,
-) -> std::io::Result<T> {
-    handle
-        .join()
-        .map_err(|_| std::io::Error::other(panic_message))?
+) -> io::Result<T> {
+    handle.join().map_err(|_| io::Error::other(panic_message))?
 }
 
-pub(super) fn read_capped(reader: impl Read, max_bytes: u64) -> std::io::Result<Vec<u8>> {
+pub(super) fn read_capped(reader: impl Read, max_bytes: u64) -> io::Result<Vec<u8>> {
     let capacity = usize::try_from(max_bytes.min(1024 * 1024)).unwrap_or(1024 * 1024);
     let mut bytes = Vec::with_capacity(capacity);
     reader

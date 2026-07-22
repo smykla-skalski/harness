@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::str;
 
 use super::command::GitCommandRunner;
 use crate::git::{GitError, GitResult};
@@ -17,6 +18,7 @@ mod symlink;
 pub(crate) use io::read_bounded_bundle_file;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(clippy::struct_field_names)]
 pub(crate) struct GitBundleContentLimits {
     pub(crate) max_bundle_bytes: u64,
     pub(crate) max_pack_objects: u32,
@@ -202,7 +204,7 @@ fn parse_delta_entry(
     path: &[u8],
     oid_len: usize,
 ) -> GitResult<ChangedPath> {
-    let header = std::str::from_utf8(header).map_err(|_| delta_error(repository))?;
+    let header = str::from_utf8(header).map_err(|_| delta_error(repository))?;
     let fields = header.split(' ').collect::<Vec<_>>();
     let old_mode = fields
         .first()
@@ -255,7 +257,7 @@ fn parse_tree_entry(repository: &Path, row: &[u8], oid_len: usize) -> GitResult<
         .ok_or_else(|| tree_error(repository))?;
     let (header, path) = row.split_at(separator);
     let path = path.get(1..).ok_or_else(|| tree_error(repository))?;
-    let fields = std::str::from_utf8(header)
+    let fields = str::from_utf8(header)
         .map_err(|_| tree_error(repository))?
         .split(' ')
         .collect::<Vec<_>>();
@@ -301,7 +303,7 @@ fn require_bounded_objects<'a>(
         &input,
         object_output_limit(repository, &expected)?,
     )?;
-    let rows = std::str::from_utf8(&output.stdout)
+    let rows = str::from_utf8(&output.stdout)
         .map_err(|_| delta_error(repository))?
         .lines()
         .collect::<Vec<_>>();
@@ -367,7 +369,13 @@ fn require_checkout_without_external_filters(
         attribute_output_limit(repository, entries)?,
     )?;
     let values = nul_chunks(&output.stdout);
-    if values.len() != input.iter().filter(|byte| **byte == 0).count() * 6
+    let mut path_count = 0_usize;
+    for byte in &input {
+        if *byte == 0 {
+            path_count += 1;
+        }
+    }
+    if values.len() != path_count * 6
         || values.chunks(3).any(|triple| {
             triple.len() != 3
                 || (triple[1] != b"filter" && triple[1] != b"working-tree-encoding")

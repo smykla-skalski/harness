@@ -57,7 +57,7 @@ fn plan_for_bytes(fixture: &Fixture, bytes: &[u8]) -> (GitSourceBundleImportPlan
         REPOSITORY.into(),
         fixture.revision.clone(),
         fixture.advertised_ref.clone(),
-        fixture.offer_sha256.clone(),
+        &fixture.offer_sha256,
         digest,
         u64::try_from(bytes.len()).expect("bundle size"),
     )

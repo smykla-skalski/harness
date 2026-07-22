@@ -1,7 +1,10 @@
 use std::collections::HashSet;
-use std::fs::{File, OpenOptions};
-use std::io::Read as _;
+use std::fs::{self, File, OpenOptions};
+use std::io::{self, Read as _};
 use std::path::{Path, PathBuf};
+use std::process::Output;
+use std::str;
+use std::time::Duration;
 
 use fs2::FileExt as _;
 
@@ -135,6 +138,7 @@ fn acquire_lock(coordinates: &GitRepositoryCoordinates) -> GitResult<File> {
     let path = coordinates.object_directory().join(QUARANTINE_LOCK);
     let lock = OpenOptions::new()
         .create(true)
+        .truncate(false)
         .read(true)
         .write(true)
         .open(&path)
@@ -146,24 +150,21 @@ fn acquire_lock(coordinates: &GitRepositoryCoordinates) -> GitResult<File> {
 
 fn reset_quarantine(worktree: &Path, root: &Path) -> GitResult<()> {
     remove_quarantine(root).map_err(|error| GitError::read(worktree, error))?;
-    std::fs::create_dir_all(root.join("pack")).map_err(|error| GitError::read(worktree, error))
+    fs::create_dir_all(root.join("pack")).map_err(|error| GitError::read(worktree, error))
 }
 
-fn remove_quarantine(root: &Path) -> std::io::Result<()> {
-    let Ok(metadata) = std::fs::symlink_metadata(root) else {
+fn remove_quarantine(root: &Path) -> io::Result<()> {
+    let Ok(metadata) = fs::symlink_metadata(root) else {
         return Ok(());
     };
     if metadata.file_type().is_symlink() || metadata.is_file() {
-        std::fs::remove_file(root)
+        fs::remove_file(root)
     } else {
-        std::fs::remove_dir_all(root)
+        fs::remove_dir_all(root)
     }
 }
 
-fn parse_pack_hash(
-    coordinates: &GitRepositoryCoordinates,
-    output: &std::process::Output,
-) -> GitResult<String> {
+fn parse_pack_hash(coordinates: &GitRepositoryCoordinates, output: &Output) -> GitResult<String> {
     let rendered = stdout(output);
     let hash = rendered
         .split_ascii_whitespace()
@@ -216,7 +217,7 @@ fn process_limits(worktree: &Path, limits: GitBundleContentLimits) -> GitResult<
         .and_then(|value| value.checked_add(64 * 1024 * 1024))
         .ok_or_else(|| resource_error(worktree))?;
     Ok(GitProcessLimits {
-        wall_time: std::time::Duration::from_secs(30),
+        wall_time: Duration::from_secs(30),
         cpu_seconds: 20,
         address_space_bytes,
         // No single Git allocation may exceed the whole inflated-pack budget; this leaves
@@ -233,7 +234,7 @@ fn require_inflated_sizes(
     object_format: &str,
     limits: GitBundleContentLimits,
 ) -> GitResult<()> {
-    let text = std::str::from_utf8(output)
+    let text = str::from_utf8(output)
         .map_err(|_| GitError::unsafe_state(worktree, "Git pack index output is not UTF-8"))?;
     let mut objects = HashSet::new();
     let mut total = 0_u64;

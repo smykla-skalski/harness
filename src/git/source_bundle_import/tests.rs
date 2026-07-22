@@ -73,7 +73,7 @@ fn advertised_ref_and_symbolic_import_ref_fail_closed() {
         REPOSITORY.into(),
         fixture.revision.clone(),
         format!("refs/harness/task-board/results/{}", fixture.revision),
-        fixture.offer_sha256.clone(),
+        &fixture.offer_sha256,
         fixture.bundle_sha256.clone(),
         fixture.bundle_size,
     )
@@ -83,7 +83,7 @@ fn advertised_ref_and_symbolic_import_ref_fail_closed() {
         REPOSITORY.into(),
         fixture.revision.clone(),
         fixture.advertised_ref.clone(),
-        "not-deterministic".into(),
+        "not-deterministic",
         fixture.bundle_sha256.clone(),
         fixture.bundle_size,
     )
@@ -182,7 +182,7 @@ impl Fixture {
             REPOSITORY.into(),
             self.revision.clone(),
             self.advertised_ref.clone(),
-            self.offer_sha256.clone(),
+            &self.offer_sha256,
             self.bundle_sha256.clone(),
             self.bundle_size,
         )

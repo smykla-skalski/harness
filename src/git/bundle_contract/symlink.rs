@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::str;
 
 use super::ChangedPath;
 use crate::git::command::GitCommandRunner;
@@ -41,7 +42,7 @@ fn parse_batch(
             .iter()
             .position(|byte| *byte == b'\n')
             .ok_or_else(|| error(repository))?;
-        let header = std::str::from_utf8(&remaining[..newline]).map_err(|_| error(repository))?;
+        let header = str::from_utf8(&remaining[..newline]).map_err(|_| error(repository))?;
         let fields = header.split(' ').collect::<Vec<_>>();
         let exact = fields.len() == 3
             && fields.first().copied() == entry.object_id.as_deref()

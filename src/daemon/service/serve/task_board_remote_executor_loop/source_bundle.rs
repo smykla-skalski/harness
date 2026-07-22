@@ -32,7 +32,7 @@ pub(super) async fn materialize_repository_snapshot(
         repository_slug.clone(),
         revision.clone(),
         advertised_ref.clone(),
-        offer.request_sha256.clone(),
+        &offer.request_sha256,
         bundle.sha256.clone(),
         bundle.size_bytes,
     )
@@ -122,7 +122,7 @@ pub(super) async fn cleanup_prior_phase_import_ref(
             repository.clone(),
             revision.clone(),
             advertised_ref.clone(),
-            offer.request_sha256.clone(),
+            &offer.request_sha256,
             bundle.sha256.clone(),
             bundle.size_bytes,
         )

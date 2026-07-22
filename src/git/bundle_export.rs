@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Output;
 
@@ -117,7 +118,7 @@ impl GitBundleExportPlan {
         let staged = tempfile::NamedTempFile::new_in(&self.worktree).map_err(|error| {
             GitError::unsafe_state(&self.worktree, format!("stage result bundle: {error}"))
         })?;
-        std::fs::write(staged.path(), &bytes).map_err(|error| {
+        fs::write(staged.path(), &bytes).map_err(|error| {
             GitError::unsafe_state(&self.worktree, format!("stage result bundle: {error}"))
         })?;
         let staged_path = staged.path().to_str().ok_or_else(|| {

@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::bundle_contract::{
@@ -130,7 +131,7 @@ impl GitBundleImportPlan {
         // follows writes the same bytes anyway.
         let staged = tempfile::NamedTempFile::new_in(self.coordinates.common_git_dir())
             .map_err(|error| GitError::unsafe_state(bundle, format!("stage bundle: {error}")))?;
-        std::fs::write(staged.path(), bytes)
+        fs::write(staged.path(), bytes)
             .map_err(|error| GitError::unsafe_state(bundle, format!("stage bundle: {error}")))?;
         let staged_path = staged
             .path()
@@ -408,13 +409,13 @@ impl GitBundleImportPlan {
 
     fn require_import_ref(&self) -> GitResult<()> {
         let current = self.optional_revision(&self.import_ref)?;
-        if current.as_deref() != Some(self.result_revision.as_str()) {
+        if current.as_deref() == Some(self.result_revision.as_str()) {
+            self.require_direct_ref(&self.import_ref)
+        } else {
             Err(GitError::unsafe_state(
                 &self.worktree,
                 "bundle import ref does not preserve the exact result object",
             ))
-        } else {
-            self.require_direct_ref(&self.import_ref)
         }
     }
 }

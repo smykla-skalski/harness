@@ -1,4 +1,7 @@
+use std::env;
 use std::ffi::OsString;
+use std::fmt;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::time::Duration;
@@ -81,8 +84,8 @@ impl<'a> GitCommandRunner<'a> {
         object_directory: &Path,
         alternate_object_directory: &Path,
     ) -> GitResult<Self> {
-        let alternate_object_directories = std::env::join_paths([alternate_object_directory])
-            .map_err(|error| {
+        let alternate_object_directories =
+            env::join_paths([alternate_object_directory]).map_err(|error| {
                 GitError::unsafe_state(
                     self.worktree,
                     format!("Git alternate object path is not representable: {error}"),
@@ -373,42 +376,43 @@ fn apply_process_limits(command: &mut Command, limits: GitProcessLimits) {
 // an oversized single allocation before inflation, while the post-hoc verify-pack sizes and
 // the CPU/wall-clock budget remain the backstops.
 #[cfg(target_os = "linux")]
-fn set_address_space_limit(bytes: u64) -> std::io::Result<()> {
+fn set_address_space_limit(bytes: u64) -> io::Result<()> {
     set_resource_limit(libc::RLIMIT_AS, bytes)
 }
 
 #[cfg(not(target_os = "linux"))]
-fn set_address_space_limit(_bytes: u64) -> std::io::Result<()> {
+#[allow(clippy::unnecessary_wraps)]
+fn set_address_space_limit(_bytes: u64) -> io::Result<()> {
     Ok(())
 }
 
 #[cfg(target_os = "linux")]
 #[allow(unsafe_code)]
-fn set_resource_limit(resource: libc::__rlimit_resource_t, value: u64) -> std::io::Result<()> {
+fn set_resource_limit(resource: libc::__rlimit_resource_t, value: u64) -> io::Result<()> {
     let limit = resource_limit(value)?;
     // SAFETY: limit points to a fully initialized rlimit for this child process.
-    if unsafe { libc::setrlimit(resource, &limit) } == 0 {
+    if unsafe { libc::setrlimit(resource, &raw const limit) } == 0 {
         Ok(())
     } else {
-        Err(std::io::Error::last_os_error())
+        Err(io::Error::last_os_error())
     }
 }
 
 #[cfg(not(target_os = "linux"))]
 #[allow(unsafe_code)]
-fn set_resource_limit(resource: libc::c_int, value: u64) -> std::io::Result<()> {
+fn set_resource_limit(resource: libc::c_int, value: u64) -> io::Result<()> {
     let limit = resource_limit(value)?;
     // SAFETY: limit points to a fully initialized rlimit for this child process.
-    if unsafe { libc::setrlimit(resource, &limit) } == 0 {
+    if unsafe { libc::setrlimit(resource, &raw const limit) } == 0 {
         Ok(())
     } else {
-        Err(std::io::Error::last_os_error())
+        Err(io::Error::last_os_error())
     }
 }
 
-fn resource_limit(value: u64) -> std::io::Result<libc::rlimit> {
+fn resource_limit(value: u64) -> io::Result<libc::rlimit> {
     let value = libc::rlim_t::try_from(value)
-        .map_err(|_| std::io::Error::other("Git resource limit overflowed"))?;
+        .map_err(|_| io::Error::other("Git resource limit overflowed"))?;
     Ok(libc::rlimit {
         rlim_cur: value,
         rlim_max: value,
@@ -436,7 +440,7 @@ fn require_status(
     }
 }
 
-fn operation_error(path: &Path, mutation: bool, error: impl std::fmt::Display) -> GitError {
+fn operation_error(path: &Path, mutation: bool, error: impl fmt::Display) -> GitError {
     if mutation {
         GitError::mutation(path, error)
     } else {

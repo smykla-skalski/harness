@@ -34,7 +34,7 @@ impl GitSourceBundleImportPlan {
         repository_slug: String,
         revision: String,
         advertised_ref: String,
-        offer_request_sha256: String,
+        offer_request_sha256: &str,
         bundle_sha256: String,
         bundle_size: u64,
     ) -> GitResult<Self> {
