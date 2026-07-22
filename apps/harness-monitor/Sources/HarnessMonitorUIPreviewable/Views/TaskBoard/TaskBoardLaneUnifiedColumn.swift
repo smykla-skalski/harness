@@ -81,7 +81,10 @@ struct TaskBoardLaneUnifiedColumn: View {
   }
 
   private func isReorderDropEnabled(for itemID: String) -> Bool {
-    isDropEnabled && reorderDraggedItemID != nil && reorderDraggedItemID != itemID
+    lane != .umbrella
+      && isDropEnabled
+      && reorderDraggedItemID != nil
+      && reorderDraggedItemID != itemID
   }
 
   var body: some View {
@@ -222,7 +225,6 @@ struct TaskBoardLaneUnifiedColumn: View {
           hint: reorderInsertionHint,
           itemID: item.id
         )
-        .accessibilityIdentifier("harness.task-board.reorder-target.\(item.id)")
         .contextMenu {
           TaskBoardCardContextMenu(cardID: cardID)
         }

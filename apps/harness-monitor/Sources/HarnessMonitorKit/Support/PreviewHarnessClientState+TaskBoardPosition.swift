@@ -40,7 +40,11 @@ extension PreviewHarnessClientState {
       $0.id != id && $0.status.canonicalPersistedStatus == destination && $0.deletedAt == nil
     }
     guard request.lanePosition <= UInt32(candidates.count) else {
-      throw HarnessMonitorAPIError.server(code: 409, message: "Task board lane capacity changed")
+      throw HarnessMonitorAPIError.semanticServer(
+        code: 409,
+        semanticCode: "TASK_BOARD_LANE_CAPACITY",
+        message: "Task board lane capacity changed"
+      )
     }
     let shifted = shiftForSet(
       itemID: id,
@@ -100,7 +104,11 @@ extension PreviewHarnessClientState {
     throws
   {
     guard taskBoardItemRevisions[id] == revision, taskBoardItemsChangeSeq == sequence else {
-      throw HarnessMonitorAPIError.server(code: 409, message: "Task board position is stale")
+      throw HarnessMonitorAPIError.semanticServer(
+        code: 409,
+        semanticCode: "WORKFLOW_CONCURRENT",
+        message: "Task board position is stale"
+      )
     }
   }
 

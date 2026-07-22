@@ -95,21 +95,29 @@ public enum HarnessMonitorAPIError: Error, LocalizedError, Equatable {
     return Self.normalizedServerMessage(from: message)
   }
 
-  /// True for an HTTP 409 from any transport (HTTP, WebSocket, or the
-  /// preview fixture all funnel a CAS mismatch into this same case), the
-  /// shape a task-board lane-position conflict always takes.
-  public var isServerConflict: Bool {
-    guard case .server(let code, _) = self else {
-      return false
-    }
-    return code == 409
-  }
-
   public var serverSemanticCode: String? {
     guard case .server(_, let message) = self else {
       return nil
     }
     return Self.parsedServerEnvelope(from: message)?.error.code
+  }
+
+  static func semanticServer(
+    code: Int,
+    semanticCode: String,
+    message: String,
+    details: [String] = []
+  ) -> Self {
+    let envelope = ErrorEnvelope(
+      error: .init(code: semanticCode, message: message, details: details)
+    )
+    guard
+      let data = try? JSONEncoder().encode(envelope),
+      let rawMessage = String(data: data, encoding: .utf8)
+    else {
+      return .server(code: code, message: message)
+    }
+    return .server(code: code, message: rawMessage)
   }
 
   public var acpServiceError: AcpServiceError? {

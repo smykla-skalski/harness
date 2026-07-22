@@ -301,6 +301,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var taskBoardItemsChangeSeqStorage: Int64 = 0
   var taskBoardPositionError: (any Error)?
   var taskBoardPositionErrorRemainingUses = 0
+  var taskBoardPositionItemsAfterError: [TaskBoardItem]?
   var taskUpdateError: (any Error)?
   var taskBoardRuntimeConfigError: (any Error)?
   var taskBoardOrchestratorSettingsError: (any Error)?

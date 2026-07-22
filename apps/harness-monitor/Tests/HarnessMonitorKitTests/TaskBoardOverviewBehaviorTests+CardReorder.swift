@@ -29,7 +29,9 @@ extension TaskBoardOverviewBehaviorTests {
 
     #expect(plan.itemID == "d")
     #expect(plan.status == .todo)
-    #expect(plan.lanePosition == 0)
+    #expect(plan.placement.anchorItemID == "a")
+    #expect(plan.placement.edge == .before)
+    #expect(plan.placement.resolvePosition(itemID: "d", orderedItemIDs: items.map(\.id)) == 0)
   }
 
   @Test("Reorder plan moves a card later when dropped below a card past it")
@@ -46,7 +48,7 @@ extension TaskBoardOverviewBehaviorTests {
       )
     )
 
-    #expect(plan.lanePosition == 2)
+    #expect(plan.placement.resolvePosition(itemID: "a", orderedItemIDs: items.map(\.id)) == 2)
   }
 
   @Test("Reorder plan is a no-op when dropped above the card immediately after it")
@@ -144,6 +146,24 @@ extension TaskBoardOverviewBehaviorTests {
       )
     )
 
-    #expect(plan.lanePosition == 3)
+    #expect(plan.placement.resolvePosition(itemID: "a", orderedItemIDs: items.map(\.id)) == 3)
+  }
+
+  @Test("Reorder plan rejects the visual umbrella lane because it spans persisted statuses")
+  func reorderPlanRejectsUmbrellaLane() {
+    let items = [
+      taskBoardItem(id: "open", status: .todo, kind: .umbrella),
+      taskBoardItem(id: "closed", status: .done, kind: .umbrella),
+    ]
+
+    #expect(
+      TaskBoardCardReorderPlan.resolve(
+        draggedItemID: "closed",
+        lane: .umbrella,
+        apiItems: items,
+        hoveredItemID: "open",
+        insertAfterHovered: false
+      ) == nil
+    )
   }
 }

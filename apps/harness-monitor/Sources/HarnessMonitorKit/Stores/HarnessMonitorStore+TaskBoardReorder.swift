@@ -1,8 +1,25 @@
 import Foundation
 
 extension Error {
-  var isTaskBoardPositionConflict: Bool {
-    (self as? HarnessMonitorAPIError)?.isServerConflict == true
+  fileprivate var isTaskBoardPositionConcurrentModification: Bool {
+    (self as? HarnessMonitorAPIError)?.serverSemanticCode == "WORKFLOW_CONCURRENT"
+  }
+}
+
+private enum TaskBoardPositionActionError: LocalizedError {
+  case boardChanged
+
+  var errorDescription: String? {
+    "Cannot update task position: the board changed before the action completed"
+  }
+}
+
+extension TaskBoardLaneOrigin {
+  fileprivate var isManual: Bool {
+    if case .manual = self {
+      return true
+    }
+    return false
   }
 }
 
@@ -16,7 +33,7 @@ extension HarnessMonitorStore {
   public func reorderTaskBoardItem(
     id: String,
     status: TaskBoardStatus,
-    lanePosition: UInt32,
+    placement: TaskBoardRelativeLanePlacement,
     actor: String = "Harness Monitor"
   ) async -> Bool {
     guard let client else { return false }
@@ -32,7 +49,7 @@ extension HarnessMonitorStore {
           using: client,
           id: id,
           status: status,
-          lanePosition: lanePosition,
+          placement: placement,
           actor: actor,
           remainingRetries: Self.taskBoardPositionConflictRetryLimit
         )
@@ -84,47 +101,88 @@ extension HarnessMonitorStore {
     }
   }
 
-  /// One bounded retry against a fresh snapshot when the daemon reports a
-  /// concurrent-modification conflict on the item revision or the shared
-  /// items-change sequence; any other failure surfaces immediately.
+  /// Recomputes the relative drop against one canonical server snapshot per
+  /// attempt, so a bounded retry cannot replay an obsolete absolute slot.
   nonisolated static func setTaskBoardItemPositionWithRetry(
     using client: any HarnessMonitorClientProtocol,
     id: String,
     status: TaskBoardStatus,
-    lanePosition: UInt32,
+    placement: TaskBoardRelativeLanePlacement,
     actor: String,
     remainingRetries: Int
   ) async throws -> TaskBoardItemPositionMutationResponse {
-    let snapshot = try await client.taskBoardItemPositionSnapshot(id: id)
-    let request = TaskBoardSetItemPositionRequest(
+    let snapshot = try await client.taskBoardItemsSnapshot(status: status)
+    let request = try taskBoardReorderRequest(
+      snapshot: snapshot,
+      id: id,
       status: status,
-      lanePosition: lanePosition,
-      expectedItemRevision: snapshot.itemRevision,
-      expectedItemsChangeSeq: snapshot.itemsChangeSeq,
+      placement: placement,
       actor: actor
     )
     do {
       return try await client.setTaskBoardItemPosition(id: id, request: request)
     } catch {
-      guard remainingRetries > 0, error.isTaskBoardPositionConflict else { throw error }
+      guard remainingRetries > 0, error.isTaskBoardPositionConcurrentModification else {
+        throw error
+      }
       return try await setTaskBoardItemPositionWithRetry(
         using: client,
         id: id,
         status: status,
-        lanePosition: lanePosition,
+        placement: placement,
         actor: actor,
         remainingRetries: remainingRetries - 1
       )
     }
   }
 
+  private nonisolated static func taskBoardReorderRequest(
+    snapshot: TaskBoardListItemsSnapshot,
+    id: String,
+    status: TaskBoardStatus,
+    placement: TaskBoardRelativeLanePlacement,
+    actor: String
+  ) throws -> TaskBoardSetItemPositionRequest {
+    let statusItems = snapshot.items.filter { item in
+      item.status == status && item.deletedAt == nil
+    }
+    guard
+      let item = statusItems.first(where: { $0.id == id }),
+      item.kind != .umbrella,
+      let anchor = statusItems.first(where: { $0.id == placement.anchorItemID }),
+      anchor.kind != .umbrella,
+      let itemRevision = snapshot.itemRevisions[id],
+      let lanePosition = placement.resolvePosition(
+        itemID: id,
+        orderedItemIDs: statusItems.map(\.id)
+      )
+    else {
+      throw TaskBoardPositionActionError.boardChanged
+    }
+    return TaskBoardSetItemPositionRequest(
+      status: status,
+      lanePosition: lanePosition,
+      expectedItemRevision: itemRevision,
+      expectedItemsChangeSeq: snapshot.itemsChangeSeq,
+      actor: actor
+    )
+  }
+
   nonisolated static func resetTaskBoardItemPositionWithRetry(
     using client: any HarnessMonitorClientProtocol,
     id: String,
     actor: String,
-    remainingRetries: Int
+    remainingRetries: Int,
+    initialItemRevision: Int64? = nil
   ) async throws -> TaskBoardItemPositionMutationResponse {
     let snapshot = try await client.taskBoardItemPositionSnapshot(id: id)
+    guard
+      snapshot.item.deletedAt == nil,
+      snapshot.item.laneOrigin?.isManual == true,
+      initialItemRevision == nil || initialItemRevision == snapshot.itemRevision
+    else {
+      throw TaskBoardPositionActionError.boardChanged
+    }
     let request = TaskBoardResetItemPositionRequest(
       expectedItemRevision: snapshot.itemRevision,
       expectedItemsChangeSeq: snapshot.itemsChangeSeq,
@@ -133,12 +191,15 @@ extension HarnessMonitorStore {
     do {
       return try await client.resetTaskBoardItemPosition(id: id, request: request)
     } catch {
-      guard remainingRetries > 0, error.isTaskBoardPositionConflict else { throw error }
+      guard remainingRetries > 0, error.isTaskBoardPositionConcurrentModification else {
+        throw error
+      }
       return try await resetTaskBoardItemPositionWithRetry(
         using: client,
         id: id,
         actor: actor,
-        remainingRetries: remainingRetries - 1
+        remainingRetries: remainingRetries - 1,
+        initialItemRevision: initialItemRevision ?? snapshot.itemRevision
       )
     }
   }

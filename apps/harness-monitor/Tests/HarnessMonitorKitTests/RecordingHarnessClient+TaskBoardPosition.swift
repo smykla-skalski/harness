@@ -3,6 +3,23 @@ import Foundation
 @testable import HarnessMonitorKit
 
 extension RecordingHarnessClient {
+  func taskBoardItemsSnapshot(status: TaskBoardStatus?) async throws
+    -> TaskBoardListItemsSnapshot
+  {
+    lock.withLock {
+      let items = taskBoardItemsStorage.filter { status == nil || $0.status == status }
+      return TaskBoardListItemsSnapshot(
+        items: items,
+        itemsChangeSeq: taskBoardItemsChangeSeqStorage,
+        itemRevisions: Dictionary(
+          uniqueKeysWithValues: items.map { item in
+            (item.id, taskBoardItemRevisionsStorage[item.id, default: 1])
+          }
+        )
+      )
+    }
+  }
+
   func taskBoardItemPositionSnapshot(id: String) async throws -> TaskBoardItemPositionSnapshot {
     try lock.withLock {
       guard let item = taskBoardItemsStorage.first(where: { $0.id == id }) else {
@@ -39,13 +56,23 @@ extension RecordingHarnessClient {
         expectedItemRevision: request.expectedItemRevision,
         expectedItemsChangeSeq: request.expectedItemsChangeSeq
       )
+      let laneCount = taskBoardItemsStorage.count { item in
+        item.status == request.status && item.deletedAt == nil
+      }
+      guard Int(request.lanePosition) < laneCount else {
+        throw HarnessMonitorAPIError.semanticServer(
+          code: 409,
+          semanticCode: "TASK_BOARD_LANE_CAPACITY",
+          message: "Task board lane capacity changed"
+        )
+      }
       let item = taskBoardItemsStorage[index].withPosition(
         status: request.status,
         lanePosition: request.lanePosition,
         laneOrigin: .manual(actor: request.actor),
         laneSetAt: "2026-07-22T15:00:00Z"
       )
-      taskBoardItemsStorage[index] = item
+      replaceInMaterializedLane(item, at: Int(request.lanePosition))
       let revision = bumpPositionState(id: id)
       return TaskBoardItemPositionMutationResponse(
         snapshot: TaskBoardItemPositionSnapshot(
@@ -99,7 +126,32 @@ extension RecordingHarnessClient {
       return nil
     }
     taskBoardPositionErrorRemainingUses -= 1
+    applyPositionItemsAfterErrorIfNeeded()
     return error
+  }
+
+  private func applyPositionItemsAfterErrorIfNeeded() {
+    guard let replacement = taskBoardPositionItemsAfterError else { return }
+    let previousByID = Dictionary(uniqueKeysWithValues: taskBoardItemsStorage.map { ($0.id, $0) })
+    for item in replacement where previousByID[item.id] != item {
+      taskBoardItemRevisionsStorage[item.id, default: 1] += 1
+    }
+    taskBoardItemsStorage = replacement
+    taskBoardItemsChangeSeqStorage += 1
+    taskBoardPositionItemsAfterError = nil
+  }
+
+  private func replaceInMaterializedLane(_ item: TaskBoardItem, at target: Int) {
+    var laneItems = taskBoardItemsStorage.filter { entry in
+      entry.status == item.status && entry.id != item.id
+    }
+    laneItems.insert(item, at: target)
+    var laneIndex = 0
+    taskBoardItemsStorage = taskBoardItemsStorage.map { entry in
+      guard entry.status == item.status else { return entry }
+      defer { laneIndex += 1 }
+      return laneItems[laneIndex]
+    }
   }
 
   private func ensureExpectedPositionState(
@@ -111,7 +163,11 @@ extension RecordingHarnessClient {
       taskBoardItemRevisionsStorage[id, default: 1] == expectedItemRevision,
       taskBoardItemsChangeSeqStorage == expectedItemsChangeSeq
     else {
-      throw HarnessMonitorAPIError.server(code: 409, message: "Task board position is stale")
+      throw HarnessMonitorAPIError.semanticServer(
+        code: 409,
+        semanticCode: "WORKFLOW_CONCURRENT",
+        message: "Task board position is stale"
+      )
     }
   }
 
@@ -122,6 +178,7 @@ extension RecordingHarnessClient {
     taskBoardItemsChangeSeqStorage += 1
     return revision
   }
+
 }
 
 extension TaskBoardItem {

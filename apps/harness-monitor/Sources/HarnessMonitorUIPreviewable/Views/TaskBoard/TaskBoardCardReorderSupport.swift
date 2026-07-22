@@ -9,7 +9,7 @@ import HarnessMonitorKit
 struct TaskBoardCardReorderPlan: Equatable {
   let itemID: String
   let status: TaskBoardStatus
-  let lanePosition: UInt32
+  let placement: TaskBoardRelativeLanePlacement
 
   static func resolve(
     draggedItemID: String,
@@ -19,33 +19,37 @@ struct TaskBoardCardReorderPlan: Equatable {
     insertAfterHovered: Bool
   ) -> Self? {
     guard
+      lane != .umbrella,
       let draggedIndex = apiItems.firstIndex(where: { $0.id == draggedItemID }),
       let hoveredIndex = apiItems.firstIndex(where: { $0.id == hoveredItemID }),
-      TaskBoardInboxLane(taskBoardItem: apiItems[draggedIndex]) == lane
+      TaskBoardInboxLane(taskBoardItem: apiItems[draggedIndex]) == lane,
+      TaskBoardInboxLane(taskBoardItem: apiItems[hoveredIndex]) == lane
     else {
       return nil
     }
-    let rawTarget = insertAfterHovered ? hoveredIndex + 1 : hoveredIndex
-    // The dragged item vacates its own slot before the insert, so every raw
-    // target past it shifts left by one to land among the remaining siblings.
-    let adjustedTarget = draggedIndex < rawTarget ? rawTarget - 1 : rawTarget
-    let clampedTarget = max(0, min(adjustedTarget, apiItems.count - 1))
-    guard clampedTarget != draggedIndex, let lanePosition = UInt32(exactly: clampedTarget) else {
-      // Either a no-op drop (same slot it already occupies) or an
-      // out-of-range index a stale array shouldn't produce; both skip.
+    let placement = TaskBoardRelativeLanePlacement(
+      anchorItemID: hoveredItemID,
+      edge: insertAfterHovered ? .after : .before
+    )
+    guard
+      placement.resolvePosition(
+        itemID: draggedItemID,
+        orderedItemIDs: apiItems.map(\.id)
+      ) != nil
+    else {
       return nil
     }
     return Self(
       itemID: draggedItemID,
       status: apiItems[draggedIndex].status,
-      lanePosition: lanePosition
+      placement: placement
     )
   }
 }
 
 /// Which side of a hovered card the pointer is over, used only to render the
-/// insertion line; the drop math above is computed independently from the
-/// live `DropSession` at delivery time.
+/// insertion line; the relative placement above is resolved against a fresh
+/// daemon snapshot at delivery time.
 struct TaskBoardCardReorderInsertionHint: Equatable {
   let itemID: String
   let insertAfter: Bool

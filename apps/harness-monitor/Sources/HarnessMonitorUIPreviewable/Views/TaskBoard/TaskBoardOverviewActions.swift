@@ -236,7 +236,7 @@ public struct TaskBoardOverviewActions: Equatable {
         await store.reorderTaskBoardItem(
           id: plan.itemID,
           status: plan.status,
-          lanePosition: plan.lanePosition
+          placement: plan.placement
         )
       }
     )
@@ -279,7 +279,10 @@ public struct TaskBoardOverviewActions: Equatable {
     guard canCreateItem, let store else { return }
     HarnessMonitorAsyncWorkQueue.shared.submit(
       .init(title: "Creating task board item") {
-        let success = await store.createTaskBoardItem(request: request, initialStatus: initialStatus)
+        let success = await store.createTaskBoardItem(
+          request: request,
+          initialStatus: initialStatus
+        )
         guard success else { return }
         await MainActor.run {
           outcome.succeeded = true

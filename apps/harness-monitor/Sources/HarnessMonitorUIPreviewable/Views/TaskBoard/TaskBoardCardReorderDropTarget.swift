@@ -18,40 +18,54 @@ struct TaskBoardCardReorderDropTarget: ViewModifier {
   let actions: TaskBoardOverviewActions
   @Binding var insertionHint: TaskBoardCardReorderInsertionHint?
 
+  @ViewBuilder
   func body(content: Content) -> some View {
-    content
-      .dropDestination(for: TaskBoardCardDragPayload.self, isEnabled: isEnabled) { _, session in
-        defer { clearInsertionHint() }
-        guard let draggedItemID else { return }
-        guard
-          let plan = TaskBoardCardReorderPlan.resolve(
-            draggedItemID: draggedItemID,
-            lane: lane,
-            apiItems: apiItems,
-            hoveredItemID: hoveredItemID,
-            insertAfterHovered: insertsAfter(session)
-          )
-        else {
-          return
+    if isEnabled {
+      content
+        .dropDestination(for: TaskBoardCardDragPayload.self) { _, session in
+          defer { clearInsertionHint() }
+          guard let draggedItemID else { return }
+          guard
+            let plan = TaskBoardCardReorderPlan.resolve(
+              draggedItemID: draggedItemID,
+              lane: lane,
+              apiItems: apiItems,
+              hoveredItemID: hoveredItemID,
+              insertAfterHovered: insertsAfter(session)
+            )
+          else {
+            return
+          }
+          actions.reorderTaskBoardItem(plan)
         }
-        actions.reorderTaskBoardItem(plan)
-      }
-      .dropConfiguration { _ in
-        DropConfiguration(operation: isEnabled ? .move : .forbidden)
-      }
-      .onDropSessionUpdated { session in
-        switch session.phase {
-        case .entering, .active:
-          insertionHint = TaskBoardCardReorderInsertionHint(
-            itemID: hoveredItemID,
-            insertAfter: insertsAfter(session)
-          )
-        case .exiting, .ended, .dataTransferCompleted:
-          clearInsertionHint()
-        @unknown default:
-          clearInsertionHint()
+        .dropConfiguration { _ in
+          DropConfiguration(operation: .move)
         }
+        .onDropSessionUpdated(updateDropSession)
+    } else {
+      content.onAppear(perform: clearInsertionHint)
+    }
+  }
+
+  private func updateDropSession(_ session: DropSession) {
+    guard isEnabled else {
+      clearInsertionHint()
+      return
+    }
+    switch session.phase {
+    case .entering, .active:
+      let hint = TaskBoardCardReorderInsertionHint(
+        itemID: hoveredItemID,
+        insertAfter: insertsAfter(session)
+      )
+      if insertionHint != hint {
+        insertionHint = hint
       }
+    case .exiting, .ended, .dataTransferCompleted:
+      clearInsertionHint()
+    @unknown default:
+      clearInsertionHint()
+    }
   }
 
   private func insertsAfter(_ session: DropSession) -> Bool {

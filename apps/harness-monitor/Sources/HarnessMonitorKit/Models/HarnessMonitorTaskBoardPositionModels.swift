@@ -38,6 +38,36 @@ public enum TaskBoardLaneOrigin: Codable, Equatable, Sendable {
   }
 }
 
+public enum TaskBoardRelativeLaneEdge: Equatable, Sendable {
+  case before
+  case after
+}
+
+public struct TaskBoardRelativeLanePlacement: Equatable, Sendable {
+  public let anchorItemID: String
+  public let edge: TaskBoardRelativeLaneEdge
+
+  public init(anchorItemID: String, edge: TaskBoardRelativeLaneEdge) {
+    self.anchorItemID = anchorItemID
+    self.edge = edge
+  }
+
+  public func resolvePosition(itemID: String, orderedItemIDs: [String]) -> UInt32? {
+    guard
+      let itemIndex = orderedItemIDs.firstIndex(of: itemID),
+      let anchorIndex = orderedItemIDs.firstIndex(of: anchorItemID)
+    else {
+      return nil
+    }
+    let rawTarget = edge == .after ? anchorIndex + 1 : anchorIndex
+    let target = itemIndex < rawTarget ? rawTarget - 1 : rawTarget
+    guard target != itemIndex else {
+      return nil
+    }
+    return UInt32(exactly: target)
+  }
+}
+
 public struct TaskBoardListItemsSnapshot: Equatable, Sendable {
   public let items: [TaskBoardItem]
   public let itemsChangeSeq: Int64
