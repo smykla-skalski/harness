@@ -1,4 +1,3 @@
-use std::io;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -82,7 +81,7 @@ pub(super) struct SpawnProtocolInput<'a> {
 pub(super) fn spawn_protocol_task(
     transport: AcpTransport,
     input: SpawnProtocolInput<'_>,
-) -> io::Result<SpawnedAcpProtocol> {
+) -> SpawnedAcpProtocol {
     let SpawnProtocolInput {
         request,
         session_config,
@@ -145,7 +144,7 @@ pub(super) fn spawn_protocol_task(
         manager,
         credential,
     }));
-    Ok(SpawnedAcpProtocol {
+    SpawnedAcpProtocol {
         events: batcher.events,
         disconnects,
         protocol: protocol_task,
@@ -160,7 +159,7 @@ pub(super) fn spawn_protocol_task(
             commands::response_timeout_for(supervisor.config().lifecycle_timeout),
         ),
         start: start_tx,
-    })
+    }
 }
 
 struct RunProtocolArgs {

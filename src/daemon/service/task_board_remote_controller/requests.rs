@@ -357,10 +357,10 @@ fn initial_snapshot_required(
         && execution.artifacts.current_revision_cycle == 1
 }
 
-fn initial_revision<'a>(
-    execution: &'a TaskBoardWorkflowExecutionRecord,
+fn initial_revision(
+    execution: &TaskBoardWorkflowExecutionRecord,
     phase: TaskBoardExecutionPhase,
-) -> Result<&'a str, CliError> {
+) -> Result<&str, CliError> {
     match phase {
         TaskBoardExecutionPhase::Implementation => implementation_base(execution),
         TaskBoardExecutionPhase::Review | TaskBoardExecutionPhase::Evaluate => execution

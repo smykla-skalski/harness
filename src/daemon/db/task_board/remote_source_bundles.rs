@@ -83,13 +83,13 @@ impl AsyncDaemonDb {
         }
         let collisions =
             load_source_bundle_collisions_in_tx(&mut transaction, &request.offer).await?;
-        if let [existing] = collisions.as_slice() {
-            if existing.is_exact_replay(request, authenticated_principal) {
-                transaction.commit().await.map_err(|error| {
-                    db_error(format!("commit replayed remote source bundle: {error}"))
-                })?;
-                return Ok(existing.clone());
-            }
+        if let [existing] = collisions.as_slice()
+            && existing.is_exact_replay(request, authenticated_principal)
+        {
+            transaction.commit().await.map_err(|error| {
+                db_error(format!("commit replayed remote source bundle: {error}"))
+            })?;
+            return Ok(existing.clone());
         }
         if !collisions.is_empty() {
             return Err(concurrent(

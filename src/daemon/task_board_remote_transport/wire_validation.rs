@@ -328,10 +328,12 @@ fn validate_run_evidence(response: &RemoteStatusResponse) -> Result<(), RemoteWi
     let stage = run_evidence_stage(response)?;
     match (response.state, stage) {
         (RemoteAssignmentWireState::Offered, RunEvidenceStage::Offered)
-        | (RemoteAssignmentWireState::Claimed, RunEvidenceStage::Claimed)
+        | (
+            RemoteAssignmentWireState::Claimed | RemoteAssignmentWireState::Failed,
+            RunEvidenceStage::Claimed,
+        )
         // A Start that failed before attaching a run reports Failed with claim evidence
         // but no start evidence.
-        | (RemoteAssignmentWireState::Failed, RunEvidenceStage::Claimed)
         | (
             RemoteAssignmentWireState::Running
             | RemoteAssignmentWireState::Completed

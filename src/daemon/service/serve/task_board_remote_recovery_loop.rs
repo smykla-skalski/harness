@@ -10,7 +10,7 @@ use crate::daemon::http::DaemonHttpState;
 use crate::errors::{CliError, CliErrorKind};
 
 const MINIMUM_RETRY: Duration = Duration::from_secs(1);
-const MAXIMUM_RETRY: Duration = Duration::from_secs(60);
+const MAXIMUM_RETRY: Duration = Duration::from_mins(1);
 const MAXIMUM_FALLBACK: Duration = Duration::from_secs(30);
 const MAXIMUM_STARTUP_PAGES: usize = 64;
 const MAXIMUM_FOREGROUND_PAGES: usize = 64;

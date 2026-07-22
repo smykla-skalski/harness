@@ -368,21 +368,24 @@ fn classify_shape(conn: &Connection) -> Result<RemoteSchemaShape, CliError> {
     // Every ledger table other than the remote-assignment table shares one
     // current-shape gate; the assignment table then decides current vs precursor.
     let others_current = is_expected_table(&host_sql, HOST_TABLE)?
-        && table_current(&offer_receipt_sql, OFFER_RECEIPT_TABLE)?
-        && table_current(&settlement_receipt_sql, SETTLEMENT_RECEIPT_TABLE)?
-        && table_current(&source_bundle_sql, SOURCE_BUNDLE_TABLE)?
-        && table_current(&outbound_source_sql, OUTBOUND_SOURCE_TABLE)?
+        && table_current(offer_receipt_sql.as_deref(), OFFER_RECEIPT_TABLE)?
+        && table_current(settlement_receipt_sql.as_deref(), SETTLEMENT_RECEIPT_TABLE)?
+        && table_current(source_bundle_sql.as_deref(), SOURCE_BUNDLE_TABLE)?
+        && table_current(outbound_source_sql.as_deref(), OUTBOUND_SOURCE_TABLE)?
         && table_current(
-            &source_bundle_abandonment_sql,
+            source_bundle_abandonment_sql.as_deref(),
             SOURCE_BUNDLE_ABANDONMENT_TABLE,
         )?
-        && table_current(&artifact_sql, ARTIFACT_TABLE)?
-        && table_current(&result_import_sql, RESULT_IMPORT_TABLE)?
-        && table_current(&recovery_quarantine_sql, RECOVERY_QUARANTINE_TABLE)?
+        && table_current(artifact_sql.as_deref(), ARTIFACT_TABLE)?
+        && table_current(result_import_sql.as_deref(), RESULT_IMPORT_TABLE)?
+        && table_current(
+            recovery_quarantine_sql.as_deref(),
+            RECOVERY_QUARANTINE_TABLE,
+        )?
         && quarantine::current_shape_matches(conn)?
         && is_expected_table(&dispatch_sql, DISPATCH_TABLE)?
-        && table_current(&admission_decision_sql, ADMISSION_DECISION_TABLE)?
-        && table_current(&admission_ledger_sql, ADMISSION_LEDGER_TABLE)?;
+        && table_current(admission_decision_sql.as_deref(), ADMISSION_DECISION_TABLE)?
+        && table_current(admission_ledger_sql.as_deref(), ADMISSION_LEDGER_TABLE)?;
     if others_current && is_expected_table(&assignment_sql, ASSIGNMENT_TABLE)? {
         return Ok(RemoteSchemaShape::CurrentV43);
     }
@@ -441,9 +444,8 @@ fn is_expected_table(stored_sql: &str, table: &str) -> Result<bool, CliError> {
 }
 
 /// A present optional table matches the current shape; an absent one is not.
-fn table_current(stored_sql: &Option<String>, table: &str) -> Result<bool, CliError> {
+fn table_current(stored_sql: Option<&str>, table: &str) -> Result<bool, CliError> {
     stored_sql
-        .as_deref()
         .map(|sql| is_expected_table(sql, table))
         .transpose()
         .map(|current| current.unwrap_or(false))

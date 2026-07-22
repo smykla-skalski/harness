@@ -381,9 +381,9 @@ async fn persist_lost_claim_receipt_in_tx(
             "lost remote claim evidence changed its exact lease",
         ));
     }
-    let claim_response = claim_response_for_record(record, &request, claimed_at)?;
+    let claim_response = claim_response_for_record(record, request, claimed_at)?;
     let (response_json, receipt_sha256) =
-        claim_receipt_values(record, &request, &claim_response, principal)?;
+        claim_receipt_values(record, request, &claim_response, principal)?;
     let rows = query(
         "UPDATE task_board_remote_assignments
          SET claimed_host_instance_id = ?2, claimed_at = ?3,

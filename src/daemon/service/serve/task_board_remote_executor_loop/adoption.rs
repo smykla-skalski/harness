@@ -298,8 +298,10 @@ async fn adopt_remote_start(
         )
         .await;
     match outcome {
-        Ok(TaskBoardRemoteMutationOutcome::Updated(record))
-        | Ok(TaskBoardRemoteMutationOutcome::Replayed(record)) => Ok(Some(record)),
+        Ok(
+            TaskBoardRemoteMutationOutcome::Updated(record)
+            | TaskBoardRemoteMutationOutcome::Replayed(record),
+        ) => Ok(Some(record)),
         Ok(TaskBoardRemoteMutationOutcome::Stale(_)) => {
             settle_failed_adoption(
                 state,

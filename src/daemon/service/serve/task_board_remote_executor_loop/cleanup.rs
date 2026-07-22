@@ -191,11 +191,10 @@ async fn cleanup_executor_session(
     let Some(resolved) = db.resolve_session(&identity.session_id).await? else {
         return cleanup_orphan_executor_session(db, record, identity).await;
     };
-    let project_dir = record
-        .start_receipt
-        .as_ref()
-        .map(|start| start.project_dir.as_str())
-        .unwrap_or_else(|| resolved.state.worktree_path.to_str().unwrap_or_default());
+    let project_dir = record.start_receipt.as_ref().map_or_else(
+        || resolved.state.worktree_path.to_str().unwrap_or_default(),
+        |start| start.project_dir.as_str(),
+    );
     let layout = cleanup_layout(project_dir, &identity.session_id)?;
     validate_cleanup_session(record, identity, &resolved.state, &layout)?;
     let origin = PathBuf::from(
@@ -236,7 +235,7 @@ async fn validate_cleanup_run(
         .resolve_session(&identity.session_id)
         .await?
         .ok_or_else(|| concurrent("unadopted remote cleanup run has no durable session"))?;
-    if session.state.worktree_path != PathBuf::from(&run.project_dir) {
+    if session.state.worktree_path.as_path() != Path::new(&run.project_dir) {
         return Err(concurrent(
             "unadopted remote cleanup run uses another session worktree",
         ));
@@ -394,7 +393,7 @@ fn deterministic_session_layout(
 
 fn cleanup_layout(project_dir: &str, session_id: &str) -> Result<SessionLayout, CliError> {
     let workspace = Path::new(project_dir);
-    let session_root = workspace
+    let session_dir = workspace
         .parent()
         .filter(|_| {
             workspace
@@ -402,12 +401,12 @@ fn cleanup_layout(project_dir: &str, session_id: &str) -> Result<SessionLayout, 
                 .is_some_and(|name| name == "workspace")
         })
         .ok_or_else(|| concurrent("remote executor cleanup worktree path is not canonical"))?;
-    if session_root.file_name().and_then(|name| name.to_str()) != Some(session_id) {
+    if session_dir.file_name().and_then(|name| name.to_str()) != Some(session_id) {
         return Err(concurrent(
             "remote executor cleanup worktree does not match its session",
         ));
     }
-    let project = session_root
+    let project = session_dir
         .parent()
         .ok_or_else(|| concurrent("remote executor cleanup session has no project directory"))?;
     let sessions_root = project

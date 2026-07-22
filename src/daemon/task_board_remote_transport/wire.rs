@@ -173,10 +173,10 @@ impl RemoteAttemptBinding {
         if !valid_repository_slug(&self.repository) || !valid_revision(&self.base_revision) {
             return Err(RemoteWireError::InvalidSourceMaterial);
         }
-        if let Some(head) = &self.expected_head_revision {
-            if !valid_revision(head) {
-                return Err(RemoteWireError::InvalidSourceMaterial);
-            }
+        if let Some(head) = &self.expected_head_revision
+            && !valid_revision(head)
+        {
+            return Err(RemoteWireError::InvalidSourceMaterial);
         }
         Ok(())
     }

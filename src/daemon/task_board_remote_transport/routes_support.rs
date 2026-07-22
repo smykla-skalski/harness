@@ -30,9 +30,9 @@ pub(super) async fn assignment_route<'a>(
         CliErrorKind::session_permission_denied("remote executor authorization denied")
     })?;
     let stale_claim = if operation == "claim" && binding.host_instance_id != state.daemon_epoch {
-        !db.task_board_remote_assignment(&binding.assignment_id)
+        db.task_board_remote_assignment(&binding.assignment_id)
             .await?
-            .is_some_and(|record| record.claim_receipt.is_some())
+            .is_none_or(|record| record.claim_receipt.is_none())
     } else {
         false
     };

@@ -299,10 +299,8 @@ async fn recover_one(
     now: &str,
 ) -> Result<bool, CliError> {
     let state = TaskBoardRemoteAssignmentState::decode(&row.state)?;
-    if state == TaskBoardRemoteAssignmentState::Unknown {
-        if row.host_role != "controller_remote" {
-            return Ok(false);
-        }
+    if state == TaskBoardRemoteAssignmentState::Unknown && row.host_role != "controller_remote" {
+        return Ok(false);
     }
     if state == TaskBoardRemoteAssignmentState::Offered && row.host_role == "executor_self" {
         return supersede_unclaimed_host_offer(transaction, row, now).await;
