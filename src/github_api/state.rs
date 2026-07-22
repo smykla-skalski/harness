@@ -139,6 +139,19 @@ impl GitHubApiState {
         });
     }
 
+    /// Advance the read generation without broadcasting a data change, so a
+    /// user-requested sync's GitHub reads miss the cache and surface edits made
+    /// directly on GitHub (a new assignee, a review request). Stays silent on
+    /// purpose: no client-facing mutation happened, only a forced refresh.
+    pub(super) fn refresh_read_generation(&self) {
+        let _guard = self
+            .data_revision_write
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let revision = self.data_revision.fetch_add(1, Ordering::AcqRel) + 1;
+        self.persist_data_revision(revision);
+    }
+
     fn republish_current_data_change(&self, operation: &str) {
         let _guard = self
             .data_revision_write
@@ -174,6 +187,10 @@ pub(crate) async fn begin_external_mutation(operation: &str) -> GitHubMutationGu
 
 pub(crate) fn republish_current_data_change(operation: &str) {
     global_state().republish_current_data_change(operation);
+}
+
+pub(crate) fn refresh_read_generation() {
+    global_state().refresh_read_generation();
 }
 
 pub(crate) async fn stable_data_revision_guard(

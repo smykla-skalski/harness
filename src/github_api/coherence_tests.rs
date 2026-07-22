@@ -121,6 +121,20 @@ async fn mutation_epoch_invalidates_exact_read_cache_and_publishes_change() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn refresh_read_generation_advances_the_read_generation() {
+    let _budget_guard = super::acquire_global_budget_test_lock().await;
+    let initial_revision = GitHubProtectedClient::data_revision();
+
+    super::refresh_read_generation();
+
+    assert_eq!(
+        GitHubProtectedClient::data_revision(),
+        initial_revision + 1,
+        "a user-requested sync must advance the read generation so cached GitHub searches miss"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn read_started_before_mutation_cannot_repopulate_current_epoch() {
     let _budget_guard = super::acquire_global_budget_test_lock().await;
     let state = DelayedReadState::default();

@@ -257,6 +257,14 @@ async fn sync_task_board_db_with_context(
     request: &TaskBoardSyncRequest,
     context: &TaskBoardSyncRunContext,
 ) -> Result<TaskBoardSyncResponse, CliError> {
+    // A user-pressed Sync must reflect edits made directly on GitHub (a new
+    // assignee, a review request), which never bump the daemon's GitHub read
+    // generation - so a cached search up to an hour old would hide them. Advancing
+    // it forces this sync's reads to miss the cache and hit GitHub; the
+    // orchestrator keeps its cache so background reconciles stay cheap.
+    if context.trigger() == sync_audit::TaskBoardSyncAuditTrigger::Requested {
+        crate::github_api::refresh_read_generation();
+    }
     let mut metrics = SyncExecutionMetrics::default();
     let result = provider_sync_execution::execute(db, request, context, &mut metrics).await;
     context.observe_sync_metrics(&metrics);
