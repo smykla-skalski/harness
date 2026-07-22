@@ -30,6 +30,21 @@ extension TaskBoardOverviewView {
     selectionModelValue.orderedSelectedIDs
   }
 
+  /// The single `.api` card currently being dragged, or `nil` when nothing is
+  /// dragging, more than one card is selected for the drag, or the dragged
+  /// card is an inbox item. Same-lane reorder only applies to one task-board
+  /// item at a time; every other case keeps the existing cross-lane behavior.
+  var reorderDraggedItemValue: TaskBoardCardDragItem? {
+    guard
+      draggedCardIDsValue.count == 1,
+      case .api(let itemID) = draggedCardIDsValue[0],
+      let item = currentPresentation.taskBoardItem(id: itemID)
+    else {
+      return nil
+    }
+    return .api(itemID: item.id, status: item.status, kind: item.kind)
+  }
+
   func cardDragPayloads(
     _ cardIDs: [TaskBoardCardID]
   ) -> [TaskBoardCardDragPayload] {

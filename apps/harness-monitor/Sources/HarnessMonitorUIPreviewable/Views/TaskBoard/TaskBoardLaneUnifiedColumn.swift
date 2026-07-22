@@ -39,6 +39,10 @@ struct TaskBoardLaneUnifiedColumn: View {
   let isCollapsed: Bool
   let isDropEnabled: Bool
   let isDropCandidate: Bool
+  /// The single `.api` card being dragged when its source lane is this one;
+  /// `nil` disables every per-card reorder drop target in this column so
+  /// cross-lane drops keep landing on the column-wide `.dropDestination`.
+  let reorderDraggedItem: TaskBoardCardDragItem?
   let selectionModel: TaskBoardCardSelectionModel
   let actions: TaskBoardOverviewActions
   let liveInboxItems: TaskBoardLiveInboxItems
@@ -50,6 +54,7 @@ struct TaskBoardLaneUnifiedColumn: View {
   @State private var perfScrollPosition = ScrollPosition()
   @State private var hoverTracking = TaskBoardLaneHoverTracking()
   @State private var hoveredCardID: TaskBoardLaneCardHoverID?
+  @State private var reorderInsertionHint: TaskBoardCardReorderInsertionHint?
   private let perfScrollHookEnabled = HarnessMonitorPerfTaskBoardLaneScrollBus.isActiveAtLaunch
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
@@ -63,6 +68,20 @@ struct TaskBoardLaneUnifiedColumn: View {
 
   private var isEmpty: Bool {
     apiItems.isEmpty && inboxItems.isEmpty && decisions.isEmpty
+  }
+
+  private var reorderDraggedItemID: String? {
+    guard
+      case .api(let itemID, _, _) = reorderDraggedItem,
+      reorderDraggedItem?.sourceLane == lane
+    else {
+      return nil
+    }
+    return itemID
+  }
+
+  private func isReorderDropEnabled(for itemID: String) -> Bool {
+    isDropEnabled && reorderDraggedItemID != nil && reorderDraggedItemID != itemID
   }
 
   var body: some View {
@@ -190,6 +209,20 @@ struct TaskBoardLaneUnifiedColumn: View {
           isHovered: hoveredCardID == hoverID,
           onChange: resolveHoveredCard
         )
+        .taskBoardCardReorderDropTarget(
+          hoveredItemID: item.id,
+          lane: lane,
+          apiItems: apiItems,
+          draggedItemID: reorderDraggedItemID,
+          isEnabled: isReorderDropEnabled(for: item.id),
+          actions: actions,
+          insertionHint: $reorderInsertionHint
+        )
+        .taskBoardCardReorderInsertionOverlay(
+          hint: reorderInsertionHint,
+          itemID: item.id
+        )
+        .accessibilityIdentifier("harness.task-board.reorder-target.\(item.id)")
         .contextMenu {
           TaskBoardCardContextMenu(cardID: cardID)
         }
