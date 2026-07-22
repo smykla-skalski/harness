@@ -54,7 +54,7 @@ actor TaskBoardOperationsDispatchPresentationWorker {
     }
 
     cachedInput = input
-    let visibleItems = TaskBoardVisibleItems.sorted(input.taskBoardItems)
+    let visibleItems = TaskBoardVisibleItems.visibleItemsPreservingOrder(input.taskBoardItems)
     let dispatchableItems = TaskBoardHostMachine.dispatchableItems(
       visibleItems,
       machineProjectTypes: input.localHostProjectTypes

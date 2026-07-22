@@ -146,7 +146,7 @@ actor TaskBoardOverviewPresentationWorker {
       } else {
         input.taskBoardItems
       }
-    let taskBoardItems = TaskBoardVisibleItems.sorted(scopedTaskBoardItems)
+    let taskBoardItems = TaskBoardVisibleItems.visibleItemsPreservingOrder(scopedTaskBoardItems)
     let apiItemsByLane = Dictionary(grouping: taskBoardItems) { item in
       TaskBoardInboxLane(taskBoardItem: item) ?? .backlog
     }
