@@ -60,15 +60,15 @@ enum TaskBoardLaneColorToken: String, CaseIterable, Codable, Identifiable, Senda
     case .danger:
       HarnessMonitorTheme.danger
     case .blue:
-      .blue
+      HarnessMonitorTheme.blue
     case .teal:
-      .teal
+      HarnessMonitorTheme.teal
     case .purple:
-      .purple
+      HarnessMonitorTheme.purple
     case .pink:
-      .pink
+      HarnessMonitorTheme.pink
     case .mint:
-      .mint
+      HarnessMonitorTheme.mint
     }
   }
 }
