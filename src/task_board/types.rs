@@ -66,6 +66,18 @@ pub struct TaskBoardItem {
     pub updated_at: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub deleted_at: Option<String>,
+    /// Why a tombstoned item was deleted. `ProviderExclusion` is reversible by
+    /// the sync layer when the triggering provider label is later removed;
+    /// `Manual` never is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tombstone_cause: Option<TaskBoardTombstoneCause>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskBoardTombstoneCause {
+    Manual,
+    ProviderExclusion,
 }
 
 impl TaskBoardItem {
@@ -102,6 +114,7 @@ impl TaskBoardItem {
             created_at: now.clone(),
             updated_at: now,
             deleted_at: None,
+            tombstone_cause: None,
         }
     }
 
@@ -346,6 +359,10 @@ pub struct ExternalRefSyncState {
     pub updated_at: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub synced_at: Option<String>,
+    /// The provider's label set as of the last successful sync, so a later
+    /// sync can tell a provider-side removal apart from a locally added tag.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub labels: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]

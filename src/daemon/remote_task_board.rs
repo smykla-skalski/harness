@@ -1,7 +1,12 @@
 use serde::Serialize;
 
-use crate::daemon::protocol::{TaskBoardItemPositionSnapshot, TaskBoardListItemsResponse};
-use crate::task_board::{AgentMode, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
+use crate::daemon::protocol::{
+    TaskBoardItemPositionSnapshot, TaskBoardListItemsResponse, TaskBoardTriageCurrentResponse,
+    TaskBoardTriageHistoryResponse,
+};
+use crate::task_board::{
+    AgentMode, TaskBoardItem, TaskBoardPriority, TaskBoardStatus, TaskBoardTriageDecisionRecord,
+};
 
 use super::remote_redaction::redact_known_secrets;
 
@@ -119,6 +124,52 @@ pub(crate) fn project_task_board_position_snapshot(
     }
 }
 
+/// Triage redaction nulls `reason_detail`/`evidence_fingerprint` on the same
+/// record type rather than projecting to a distinct viewer struct: unlike the
+/// item/position projections above, every other field is already safe to show
+/// a remote viewer as-is, so a second mirrored type would only double the
+/// generated Swift surface for no redaction benefit.
+#[must_use]
+pub(crate) fn project_task_board_triage_current(
+    response: TaskBoardTriageCurrentResponse,
+    viewer: bool,
+) -> TaskBoardTriageCurrentResponse {
+    if viewer {
+        TaskBoardTriageCurrentResponse {
+            current: response.current.map(redact_triage_record),
+        }
+    } else {
+        response
+    }
+}
+
+#[must_use]
+pub(crate) fn project_task_board_triage_history(
+    response: TaskBoardTriageHistoryResponse,
+    viewer: bool,
+) -> TaskBoardTriageHistoryResponse {
+    if viewer {
+        TaskBoardTriageHistoryResponse {
+            decisions: response
+                .decisions
+                .into_iter()
+                .map(redact_triage_record)
+                .collect(),
+            next_before_generation: response.next_before_generation,
+        }
+    } else {
+        response
+    }
+}
+
+fn redact_triage_record(record: TaskBoardTriageDecisionRecord) -> TaskBoardTriageDecisionRecord {
+    TaskBoardTriageDecisionRecord {
+        reason_detail: None,
+        evidence_fingerprint: None,
+        ..record
+    }
+}
+
 impl From<TaskBoardItem> for RemoteViewerTaskBoardItem {
     fn from(item: TaskBoardItem) -> Self {
         Self {
@@ -166,7 +217,83 @@ fn body_preview(body: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::body_preview;
+    use super::{
+        TaskBoardTriageCurrentResponse, TaskBoardTriageHistoryResponse, body_preview,
+        project_task_board_triage_current, project_task_board_triage_history,
+    };
+    use crate::task_board::{
+        TaskBoardTriageDecisionRecord, TriageCause, TriageReasonCode, TriageVerdict,
+    };
+
+    fn sample_record() -> TaskBoardTriageDecisionRecord {
+        TaskBoardTriageDecisionRecord {
+            decision_id: "triage-00000000000000000000000000000000".to_string(),
+            item_id: "task-1".to_string(),
+            generation: 1,
+            verdict: TriageVerdict::Todo,
+            reason_code: TriageReasonCode::MeaningfulLabel,
+            reason_detail: Some("secret detail".to_string()),
+            evaluator_identity: "task_board.triage.builtin_v1".to_string(),
+            evaluator_version: 1,
+            evidence_fingerprint: Some(
+                "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+                    .to_string(),
+            ),
+            cause: TriageCause::Initial,
+            decided_at: "2026-07-23T00:00:00Z".to_string(),
+            superseded_at: None,
+        }
+    }
+
+    #[test]
+    fn viewer_current_nulls_reason_detail_and_evidence_fingerprint() {
+        let response = TaskBoardTriageCurrentResponse {
+            current: Some(sample_record()),
+        };
+        let projected = project_task_board_triage_current(response, true);
+        let wire = serde_json::to_value(&projected).expect("serialize viewer projection");
+        assert!(wire["current"]["reason_detail"].is_null());
+        assert!(wire["current"]["evidence_fingerprint"].is_null());
+        let current = projected.current.expect("current decision");
+        assert!(current.reason_detail.is_none());
+        assert!(current.evidence_fingerprint.is_none());
+        assert_eq!(
+            current.decision_id,
+            "triage-00000000000000000000000000000000"
+        );
+    }
+
+    #[test]
+    fn full_current_keeps_reason_detail_and_evidence_fingerprint() {
+        let response = TaskBoardTriageCurrentResponse {
+            current: Some(sample_record()),
+        };
+        let projected = project_task_board_triage_current(response, false);
+        let current = projected.current.expect("current decision");
+        assert_eq!(current.reason_detail.as_deref(), Some("secret detail"));
+        assert_eq!(
+            current.evidence_fingerprint.as_deref(),
+            Some("sha256:0000000000000000000000000000000000000000000000000000000000000000")
+        );
+    }
+
+    #[test]
+    fn viewer_history_nulls_every_decision() {
+        let response = TaskBoardTriageHistoryResponse {
+            decisions: vec![sample_record(), sample_record()],
+            next_before_generation: Some(1),
+        };
+        let projected = project_task_board_triage_history(response, true);
+        assert_eq!(projected.decisions.len(), 2);
+        assert!(
+            projected
+                .decisions
+                .iter()
+                .all(|decision| decision.reason_detail.is_none()
+                    && decision.evidence_fingerprint.is_none())
+        );
+        assert_eq!(projected.next_before_generation, Some(1));
+    }
 
     #[test]
     fn viewer_body_preview_redacts_then_truncates_by_character() {

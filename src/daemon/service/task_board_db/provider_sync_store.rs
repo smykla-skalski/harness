@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::daemon::db::{AsyncDaemonDb, db_error};
+use crate::daemon::db::AsyncDaemonDb;
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{
     ExternalCreateOutcome, ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
@@ -8,7 +8,8 @@ use crate::task_board::external::{
 };
 use crate::task_board::store::{TaskBoardItemPatch, apply_patch};
 use crate::task_board::{
-    ExternalProvider, ExternalRef, ExternalSyncField, TaskBoardExternalCreateBegin,
+    ExternalProvider, ExternalRef, ExternalSyncField, ProviderExclusionAuditContext,
+    ProviderExclusionRestoreOutcome, TaskBoardExternalCreateBegin,
     TaskBoardExternalCreateFinalizeResult, TaskBoardExternalCreateIntent,
     TaskBoardExternalCreateStore, TaskBoardItem, TaskBoardStatus, TaskBoardSyncConflict,
     TaskBoardSyncStore,
@@ -90,8 +91,19 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
         self.list_task_board_items_including_deleted().await
     }
 
+    async fn list_item_snapshots_including_deleted(
+        &self,
+    ) -> Result<Vec<TaskBoardSyncItemSnapshot>, CliError> {
+        Ok(self
+            .list_task_board_item_snapshots_including_deleted()
+            .await?
+            .into_iter()
+            .map(|snapshot| TaskBoardSyncItemSnapshot::new(snapshot.item, snapshot.item_revision))
+            .collect())
+    }
+
     async fn create_item(&self, item: TaskBoardItem) -> Result<TaskBoardItem, CliError> {
-        self.create_task_board_item(item)
+        self.create_task_board_item_with_provider_triage(item)
             .await
             .map(|mutation| mutation.item)
     }
@@ -102,25 +114,57 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
         patch: TaskBoardItemPatch,
     ) -> Result<TaskBoardItem, CliError> {
         let item_id = expected_item.id.clone();
-        self.update_task_board_item(&item_id, |item| {
-            if item != expected_item {
-                return Err(CliErrorKind::concurrent_modification(format!(
-                    "task-board item '{item_id}' changed during external sync"
-                ))
-                .into());
-            }
-            apply_patch(item, patch);
-            Ok(true)
-        })
-        .await?
-        .map(|mutation| mutation.item)
-        .ok_or_else(|| db_error("Task Board sync update produced no mutation"))
+        let mutation = self
+            .update_task_board_item_with_provider_triage(&item_id, |item| {
+                if item != expected_item {
+                    return Err(CliErrorKind::concurrent_modification(format!(
+                        "task-board item '{item_id}' changed during external sync"
+                    ))
+                    .into());
+                }
+                apply_patch(item, patch);
+                Ok(true)
+            })
+            .await?;
+        Ok(mutation.map_or_else(|| expected_item.clone(), |mutation| mutation.item))
     }
 
     async fn item_snapshot(&self, item_id: &str) -> Result<TaskBoardSyncItemSnapshot, CliError> {
         self.task_board_item_snapshot(item_id)
             .await
             .map(|snapshot| TaskBoardSyncItemSnapshot::new(snapshot.item, snapshot.item_revision))
+    }
+
+    async fn hide_for_provider_exclusion(
+        &self,
+        item_id: &str,
+        expected_revision: i64,
+        patch: TaskBoardItemPatch,
+        context: ProviderExclusionAuditContext,
+        conflicts: Option<Vec<TaskBoardSyncConflict>>,
+    ) -> Result<Option<TaskBoardItem>, CliError> {
+        super::provider_sync_exclusion::hide_for_provider_exclusion(
+            self,
+            item_id,
+            expected_revision,
+            patch,
+            &context,
+            conflicts,
+        )
+        .await
+    }
+
+    async fn restore_from_provider_exclusion(
+        &self,
+        expected: TaskBoardSyncItemSnapshot,
+        patch: TaskBoardItemPatch,
+        context: ProviderExclusionAuditContext,
+        conflicts: Option<Vec<TaskBoardSyncConflict>>,
+    ) -> Result<ProviderExclusionRestoreOutcome, CliError> {
+        super::provider_sync_exclusion::restore_from_provider_exclusion(
+            self, expected, patch, &context, conflicts,
+        )
+        .await
     }
 
     async fn provider_scope_state(
@@ -215,6 +259,10 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
         .await
     }
 }
+
+#[cfg(test)]
+#[path = "provider_sync_parent_tests.rs"]
+mod parent_tests;
 
 #[cfg(test)]
 mod tests {
@@ -424,6 +472,7 @@ mod tests {
             project_id: Some("todoist-project".into()),
             updated_at: Some("provider-revision".into()),
             synced_at: Some("2026-07-16T15:01:00Z".into()),
+            labels: Vec::new(),
         });
         (outcome, baseline)
     }

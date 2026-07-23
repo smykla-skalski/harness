@@ -1,71 +1,63 @@
 use crate::errors::CliError;
-use crate::task_board::external::targeting::{
-    execution_repository_for_task, provider_project_maps_to_board,
-};
 use crate::task_board::external::{
-    ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncField, ExternalTask, ExternalTaskRef,
+    ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncField, ExternalTask,
 };
-use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
-use crate::task_board::types::{
-    ExternalRef, ExternalRefSyncState, TaskBoardItem, TaskBoardItemKind, TaskBoardStatus,
-};
+use crate::task_board::matched_exclusion_label;
+use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch, apply_patch};
+use crate::task_board::types::TaskBoardItem;
 
-use super::super::github::reconciled_external_status;
 use super::conflicts::build_sync_conflicts;
-use super::merge::{
-    changed_fields, external_ref_matches, matching_ref, merge_external_labels,
-    pull_conflict_fields, pull_resolution_fields, sync_state_from_task, task_signals_umbrella,
-};
+use super::merge::{changed_fields, matching_ref, pull_conflict_fields, pull_resolution_fields};
+use super::provider_exclusion::hide_existing_item_for_exclusion;
 use super::{
     ExternalSyncAction, ExternalSyncDirection, ExternalSyncOperation, ExternalSyncOptions,
     OperationDraft, TaskBoardSyncStore, canonical_external_status, operation,
 };
 
+mod patch;
+pub(super) use patch::reconciliation_patch;
+
 #[expect(
     clippy::cognitive_complexity,
-    reason = "reconciliation keeps conflict policy, dry-run, and local CAS branches explicit"
+    clippy::too_many_arguments,
+    reason = "reconciliation keeps conflict policy, CAS state, hierarchy, and operation output explicit"
 )]
 pub(super) async fn reconcile_existing_item(
     board: &dyn TaskBoardSyncStore,
     options: ExternalSyncOptions,
     provider: ExternalProvider,
     item: &TaskBoardItem,
+    expected_revision: i64,
     task: ExternalTask,
     resolved_parent_item_id: Option<&str>,
     operations: &mut Vec<ExternalSyncOperation>,
 ) -> Result<(), CliError> {
-    let reports_conflicts = matches!(options.direction, ExternalSyncDirection::Both)
-        && matches!(options.conflict_policy, ExternalSyncConflictPolicy::Report);
-    let snapshot = if reports_conflicts && !options.dry_run {
-        Some(board.item_snapshot(&item.id).await?)
-    } else {
-        None
-    };
-    let item = snapshot.as_ref().map_or(item, |snapshot| &snapshot.item);
-    let conflict_fields = pull_conflict_fields(item, &task);
-    if let Some(snapshot) = &snapshot {
-        let conflicts = build_sync_conflicts(item, &task, &conflict_fields, snapshot.item_revision);
-        board
-            .replace_open_sync_conflicts(
-                &item.id,
-                provider,
-                &task.reference.external_id,
-                snapshot.item_revision,
-                &conflicts,
-            )
-            .await?;
-    }
-    if reports_conflicts && !conflict_fields.is_empty() {
-        operations.push(operation(OperationDraft {
+    if let Some(matched_label) = matched_exclusion_label(&task.labels) {
+        return hide_existing_item_for_exclusion(
+            board,
+            options,
             provider,
-            action: ExternalSyncAction::Conflict,
-            board_item_id: Some(item.id.clone()),
-            reference: task.reference,
-            dry_run: options.dry_run,
-            applied: false,
-            changed_fields: conflict_fields,
-            unsupported_fields: Vec::new(),
-        }));
+            item,
+            expected_revision,
+            task,
+            matched_label,
+            operations,
+        )
+        .await;
+    }
+    let conflict_fields = pull_conflict_fields(item, &task);
+    if report_reconcile_conflicts_if_any(
+        board,
+        options,
+        provider,
+        item,
+        &task,
+        expected_revision,
+        &conflict_fields,
+        operations,
+    )
+    .await?
+    {
         return Ok(());
     }
     let prefer_remote = matches!(
@@ -75,8 +67,16 @@ pub(super) async fn reconcile_existing_item(
         && matches!(options.conflict_policy, ExternalSyncConflictPolicy::Report);
     let patch = reconciliation_patch(item, &task, prefer_remote, resolved_parent_item_id);
     if !has_reconciliation_change(&patch) {
-        supersede_resolved_conflicts(board, options, provider, item, &task, &conflict_fields)
-            .await?;
+        supersede_resolved_conflicts(
+            board,
+            options,
+            provider,
+            item,
+            &task,
+            &conflict_fields,
+            expected_revision,
+        )
+        .await?;
         return Ok(());
     }
     let changed_fields = changed_fields(&patch);
@@ -94,23 +94,95 @@ pub(super) async fn reconcile_existing_item(
         }));
         return Ok(());
     }
-    let applied = apply_reconciliation(
+    let patch_for_convergence = patch.clone();
+    let applied_revision = apply_reconciliation(board, item, expected_revision, patch).await?;
+    record_reconciliation_write(
         board,
+        options,
+        provider,
         item,
         &task,
-        prefer_remote,
-        resolved_parent_item_id,
-        patch,
+        &conflict_fields,
+        changed_fields,
+        hierarchy_changed,
+        patch_for_convergence,
+        applied_revision,
+        operations,
     )
-    .await?;
-    let records_applied_operation = applied
-        && (hierarchy_changed
-            || !changed_fields.is_empty()
-            || conflict_fields.is_empty()
-            || !matches!(
-                options.conflict_policy,
-                ExternalSyncConflictPolicy::PreferLocal
-            ));
+    .await
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "gate needs board/policy/item/task/operations together"
+)]
+async fn report_reconcile_conflicts_if_any(
+    board: &dyn TaskBoardSyncStore,
+    options: ExternalSyncOptions,
+    provider: ExternalProvider,
+    item: &TaskBoardItem,
+    task: &ExternalTask,
+    expected_revision: i64,
+    conflict_fields: &[ExternalSyncField],
+    operations: &mut Vec<ExternalSyncOperation>,
+) -> Result<bool, CliError> {
+    let reports_conflicts = matches!(options.direction, ExternalSyncDirection::Both)
+        && matches!(options.conflict_policy, ExternalSyncConflictPolicy::Report);
+    if reports_conflicts && !options.dry_run {
+        let conflicts = build_sync_conflicts(item, task, conflict_fields, expected_revision);
+        board
+            .replace_open_sync_conflicts(
+                &item.id,
+                provider,
+                &task.reference.external_id,
+                expected_revision,
+                &conflicts,
+            )
+            .await?;
+    }
+    if !reports_conflicts || conflict_fields.is_empty() {
+        return Ok(false);
+    }
+    operations.push(operation(OperationDraft {
+        provider,
+        action: ExternalSyncAction::Conflict,
+        board_item_id: Some(item.id.clone()),
+        reference: task.reference.clone(),
+        dry_run: options.dry_run,
+        applied: false,
+        changed_fields: conflict_fields.to_vec(),
+        unsupported_fields: Vec::new(),
+    }));
+    Ok(true)
+}
+
+/// The just-applied patch is simulated onto a clone rather than re-read from
+/// storage, so convergence still reflects this write without a second point
+/// read.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "finishes one already-decomposed reconcile call"
+)]
+async fn record_reconciliation_write(
+    board: &dyn TaskBoardSyncStore,
+    options: ExternalSyncOptions,
+    provider: ExternalProvider,
+    item: &TaskBoardItem,
+    task: &ExternalTask,
+    conflict_fields: &[ExternalSyncField],
+    changed_fields: Vec<ExternalSyncField>,
+    hierarchy_changed: bool,
+    patch_for_convergence: TaskBoardItemPatch,
+    applied_revision: i64,
+    operations: &mut Vec<ExternalSyncOperation>,
+) -> Result<(), CliError> {
+    let records_applied_operation = hierarchy_changed
+        || !changed_fields.is_empty()
+        || conflict_fields.is_empty()
+        || !matches!(
+            options.conflict_policy,
+            ExternalSyncConflictPolicy::PreferLocal
+        );
     if records_applied_operation {
         operations.push(operation(OperationDraft {
             provider,
@@ -123,70 +195,34 @@ pub(super) async fn reconcile_existing_item(
             unsupported_fields: Vec::new(),
         }));
     }
-    supersede_resolved_conflicts(board, options, provider, item, &task, &conflict_fields).await?;
-    Ok(())
+    let mut post_patch_item = item.clone();
+    apply_patch(&mut post_patch_item, patch_for_convergence);
+    supersede_resolved_conflicts(
+        board,
+        options,
+        provider,
+        &post_patch_item,
+        task,
+        conflict_fields,
+        applied_revision,
+    )
+    .await
 }
 
+/// Returns the resulting revision without a point read. A concurrent writer
+/// makes this sync pass fail closed; the next batch snapshot retries it.
 async fn apply_reconciliation(
     board: &dyn TaskBoardSyncStore,
     item: &TaskBoardItem,
-    task: &ExternalTask,
-    prefer_remote: bool,
-    resolved_parent_item_id: Option<&str>,
+    expected_revision: i64,
     patch: TaskBoardItemPatch,
-) -> Result<bool, CliError> {
-    let sets_parent = matches!(patch.parent_item_id, OptionalFieldPatch::Set(_));
-    let patch_without_parent = TaskBoardItemPatch {
-        parent_item_id: OptionalFieldPatch::Unchanged,
-        ..patch.clone()
-    };
-    let Err(error) = board.update_item(item, patch).await else {
-        return Ok(true);
-    };
-    if sets_parent && error.code() == "WORKFLOW_IO" {
-        return apply_reconciliation_without_parent(board, item, &error, patch_without_parent)
-            .await;
-    }
-    if error.code() != "WORKFLOW_CONCURRENT" {
-        return Err(error);
-    }
-    if latest_item_still_needs_reconciliation(
-        board,
-        item,
-        task,
-        prefer_remote,
-        resolved_parent_item_id,
-    )
-    .await?
-    {
-        return Err(error);
-    }
-    Ok(false)
-}
-
-/// A rejected parent assignment (self-parent, cycle, or otherwise invalid)
-/// must not undo the rest of this item's reconciliation: a bad GitHub
-/// cross-reference is isolated to just the parent field, and the item's
-/// other fields still apply.
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing::warn! macro expands into a chain clippy reads as branchy"
-)]
-async fn apply_reconciliation_without_parent(
-    board: &dyn TaskBoardSyncStore,
-    item: &TaskBoardItem,
-    original_error: &CliError,
-    patch: TaskBoardItemPatch,
-) -> Result<bool, CliError> {
-    tracing::warn!(
-        item_id = %item.id,
-        error = %original_error.message(),
-        "task-board github import: rejected parent link, applying the rest of this sync without it"
-    );
-    if !has_reconciliation_change(&patch) {
-        return Ok(false);
-    }
-    board.update_item(item, patch).await.map(|_| true)
+) -> Result<i64, CliError> {
+    let updated = board.update_item(item, patch).await?;
+    Ok(if updated == *item {
+        expected_revision
+    } else {
+        expected_revision + 1
+    })
 }
 
 async fn supersede_resolved_conflicts(
@@ -196,18 +232,18 @@ async fn supersede_resolved_conflicts(
     item: &TaskBoardItem,
     task: &ExternalTask,
     conflict_fields: &[ExternalSyncField],
+    item_revision: i64,
 ) -> Result<(), CliError> {
     if options.dry_run || !conflicts_are_resolved(options, conflict_fields) {
         return Ok(());
     }
-    let snapshot = board.item_snapshot(&item.id).await?;
-    let resolved_fields = converged_pull_fields(&snapshot.item, task);
+    let resolved_fields = converged_pull_fields(item, task);
     board
         .supersede_open_sync_conflicts(
             &item.id,
             provider,
             &task.reference.external_id,
-            snapshot.item_revision,
+            item_revision,
             &resolved_fields,
         )
         .await
@@ -244,155 +280,6 @@ fn converged_pull_fields(item: &TaskBoardItem, task: &ExternalTask) -> Vec<Exter
         .collect()
 }
 
-async fn latest_item_still_needs_reconciliation(
-    board: &dyn TaskBoardSyncStore,
-    expected_item: &TaskBoardItem,
-    task: &ExternalTask,
-    prefer_remote: bool,
-    resolved_parent_item_id: Option<&str>,
-) -> Result<bool, CliError> {
-    let latest = board
-        .list_items(None)
-        .await?
-        .into_iter()
-        .find(|item| item.id == expected_item.id);
-    Ok(latest.as_ref().is_none_or(|item| {
-        has_reconciliation_change(&reconciliation_patch(
-            item,
-            task,
-            prefer_remote,
-            resolved_parent_item_id,
-        ))
-    }))
-}
-
-fn reconciliation_patch(
-    item: &TaskBoardItem,
-    task: &ExternalTask,
-    prefer_remote: bool,
-    resolved_parent_item_id: Option<&str>,
-) -> TaskBoardItemPatch {
-    let mut patch = TaskBoardItemPatch::default();
-    let sync_state = matching_ref(item, &task.reference, task.project_id.as_deref())
-        .and_then(|reference| reference.sync_state.as_ref());
-    if item.title != task.title
-        && should_apply_remote(
-            sync_state.and_then(|state| state.title.as_ref()),
-            &item.title,
-            &task.title,
-            prefer_remote,
-            true,
-        )
-    {
-        patch.title = Some(task.title.clone());
-    }
-    let shared_review_without_body = task.body.is_empty()
-        && task
-            .reference
-            .url
-            .as_deref()
-            .is_some_and(|url| url.contains("/pull/"));
-    if item.body != task.body
-        && !shared_review_without_body
-        && should_apply_remote(
-            sync_state.and_then(|state| state.body.as_ref()),
-            &item.body,
-            &task.body,
-            prefer_remote,
-            true,
-        )
-    {
-        patch.body = Some(task.body.clone());
-    }
-    let status = reconciled_status(item, task);
-    if item.status != status {
-        patch.status = Some(status);
-    }
-    if provider_project_maps_to_board(task.reference.provider)
-        && item.project_id != task.project_id
-        && should_apply_remote(
-            sync_state.map(|state| &state.project_id),
-            &item.project_id,
-            &task.project_id,
-            prefer_remote,
-            true,
-        )
-    {
-        patch.project_id = task
-            .project_id
-            .clone()
-            .map_or(OptionalFieldPatch::Clear, OptionalFieldPatch::Set);
-    }
-    if item.execution_repository.is_none()
-        && let Some(repository) = execution_repository_for_task(task)
-    {
-        patch.execution_repository = OptionalFieldPatch::Set(repository);
-    }
-    if let Some(refs) = reconciled_external_refs(item, task) {
-        patch.external_refs = Some(refs);
-    }
-    apply_hierarchy_patch(&mut patch, item, task, resolved_parent_item_id);
-    patch
-}
-
-/// Reconciles tags, kind, and parent linkage. Split out from
-/// `reconciliation_patch` to keep that function's branch count under the
-/// cognitive-complexity gate.
-fn apply_hierarchy_patch(
-    patch: &mut TaskBoardItemPatch,
-    item: &TaskBoardItem,
-    task: &ExternalTask,
-    resolved_parent_item_id: Option<&str>,
-) {
-    if task_signals_umbrella(task) && item.kind != TaskBoardItemKind::Umbrella {
-        // One-directional: we promote to Umbrella whenever the provider
-        // signals it, but we never demote an existing Umbrella back to
-        // something else.
-        patch.kind = Some(TaskBoardItemKind::Umbrella);
-    }
-    let merged_tags = merge_external_labels(&item.tags, &task.labels);
-    if merged_tags != item.tags {
-        patch.tags = Some(merged_tags);
-    }
-    // A self-reference (the remote body naming this same issue as its own
-    // parent) is as unusable as a parent that hasn't imported yet, so it
-    // takes the same "unresolvable" path below rather than being kept as a
-    // valid target.
-    let resolved_parent_item_id =
-        resolved_parent_item_id.filter(|&parent_item_id| parent_item_id != item.id);
-    match resolved_parent_item_id {
-        Some(parent_item_id) if item.parent_item_id.as_deref() != Some(parent_item_id) => {
-            patch.parent_item_id = OptionalFieldPatch::Set(parent_item_id.to_owned());
-        }
-        // The task still names a parent, just not one resolvable locally yet
-        // (a re-parent to an issue not imported yet, or a self-reference,
-        // rather than the absence of any parent at all): drop the stale
-        // link instead of keeping whichever issue used to track it, and
-        // defer to a later sync.
-        None if task.parent_reference.is_some() && item.parent_item_id.is_some() => {
-            patch.parent_item_id = OptionalFieldPatch::Clear;
-        }
-        _ => {}
-    }
-}
-
-fn reconciled_status(item: &TaskBoardItem, task: &ExternalTask) -> TaskBoardStatus {
-    let last_synced_status = matching_ref(item, &task.reference, task.project_id.as_deref())
-        .and_then(|reference| reference.sync_state.as_ref())
-        .and_then(|state| state.status);
-    reconciled_external_status(item.status, last_synced_status, task.status)
-}
-
-fn should_apply_remote<T: PartialEq>(
-    base: Option<&T>,
-    local: &T,
-    remote: &T,
-    prefer_remote: bool,
-    apply_without_base: bool,
-) -> bool {
-    prefer_remote || local == remote || base.map_or(apply_without_base, |base| local == base)
-}
-
 fn has_reconciliation_change(patch: &TaskBoardItemPatch) -> bool {
     patch.title.is_some()
         || patch.body.is_some()
@@ -411,45 +298,6 @@ fn hierarchy_fields_changed(patch: &TaskBoardItemPatch) -> bool {
     patch.kind.is_some()
         || patch.tags.is_some()
         || !matches!(patch.parent_item_id, OptionalFieldPatch::Unchanged)
-}
-
-fn reconciled_external_refs(item: &TaskBoardItem, task: &ExternalTask) -> Option<Vec<ExternalRef>> {
-    let reference = &task.reference;
-    let mut changed = false;
-    let next_sync_state = sync_state_from_task(task);
-    let refs = item
-        .external_refs
-        .iter()
-        .map(|candidate| {
-            if external_ref_matches(item, candidate, reference, task.project_id.as_deref())
-                && reference_changed(candidate, reference, &next_sync_state)
-            {
-                changed = true;
-                let mut next = reference.clone().into_core_ref();
-                next.sync_state = Some(next_sync_state.clone());
-                return next;
-            }
-            candidate.clone()
-        })
-        .collect();
-    changed.then_some(refs)
-}
-
-fn reference_changed(
-    current: &ExternalRef,
-    next: &ExternalTaskRef,
-    next_state: &ExternalRefSyncState,
-) -> bool {
-    current.provider != next.provider.into()
-        || current.external_id != next.external_id
-        || current.url != next.url
-        || current.sync_state.as_ref().is_none_or(|current_state| {
-            current_state.title != next_state.title
-                || current_state.body != next_state.body
-                || current_state.status != next_state.status
-                || current_state.project_id != next_state.project_id
-                || current_state.updated_at != next_state.updated_at
-        })
 }
 
 #[cfg(test)]

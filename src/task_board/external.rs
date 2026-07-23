@@ -149,6 +149,40 @@ pub struct ExternalCreateOutcome {
     pub provider_project_id: Option<String>,
 }
 
+/// Provider identity and matched-label context for a provider-exclusion
+/// hide or restore audit, kept as a plain domain type so both the sync
+/// layer (which knows the provider and matched label) and the DB layer
+/// (which records the audit) can share it without either depending on the
+/// other's internals.
+#[derive(Debug, Clone)]
+pub struct ProviderExclusionAuditContext {
+    pub provider: ExternalRefProvider,
+    /// The provider's current external id for this task, as reported by
+    /// this pull (may be a qualified cross-repo form).
+    pub incoming_external_ref: String,
+    /// The exact external id the matched item's own stored ref carries
+    /// (may be a legacy bare form); hide/restore re-verify this is still
+    /// attached to the row inside the transaction, in addition to the
+    /// revision CAS.
+    pub stored_external_ref: String,
+    /// The canonical exclusion label that triggered this hide/restore.
+    /// Required: the DB boundary revalidates it's actually one of the
+    /// closed exclusion labels rather than trusting the caller.
+    pub matched_label: String,
+}
+
+/// What happened when a provider-exclusion restore was attempted. Kept
+/// distinct from a plain `Option` so a caller can never mistake
+/// `ConflictPublished` (conflicts atomically recorded, tombstone
+/// deliberately left in place) for `NotApplied` (the batch snapshot became
+/// stale and must be retried before create can be considered).
+#[derive(Debug, Clone)]
+pub enum ProviderExclusionRestoreOutcome {
+    NotApplied,
+    ConflictPublished,
+    Restored(Box<TaskBoardItem>),
+}
+
 impl From<ExternalRef> for ExternalTaskRef {
     fn from(reference: ExternalRef) -> Self {
         Self {

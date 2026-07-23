@@ -9,11 +9,29 @@ use crate::task_board::{
 
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 
+#[derive(Debug, Default)]
+pub(super) struct SyncConflictReplacement {
+    changed_fields: Vec<String>,
+}
+
+impl SyncConflictReplacement {
+    pub(super) fn changed(&self) -> bool {
+        !self.changed_fields.is_empty()
+    }
+
+    pub(super) fn changed_fields(&self) -> &[String] {
+        &self.changed_fields
+    }
+
+    fn record_changed_field(&mut self, field: &str) {
+        if !self.changed_fields.iter().any(|changed| changed == field) {
+            self.changed_fields.push(field.to_owned());
+            self.changed_fields.sort_unstable();
+        }
+    }
+}
+
 impl AsyncDaemonDb {
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "conflict replacement keeps revision validation and one atomic publication"
-    )]
     pub(crate) async fn replace_open_task_board_sync_conflicts(
         &self,
         item_id: &str,
@@ -22,23 +40,19 @@ impl AsyncDaemonDb {
         item_revision: i64,
         conflicts: &[TaskBoardSyncConflict],
     ) -> Result<(), CliError> {
-        require_conflict_revisions(item_id, item_revision, conflicts)?;
         let mut transaction = self
             .begin_immediate_transaction("task board sync conflict replace")
             .await?;
-        require_item_revision(transaction.as_mut(), item_id, item_revision).await?;
-        let mut changed = supersede_removed_conflicts(
+        let replacement = replace_open_sync_conflicts_in_connection(
             transaction.as_mut(),
             item_id,
             provider,
             external_ref,
+            item_revision,
             conflicts,
         )
         .await?;
-        for conflict in conflicts {
-            changed |= upsert_open_conflict(transaction.as_mut(), conflict).await?;
-        }
-        if changed {
+        if replacement.changed() {
             bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
         }
         transaction
@@ -96,6 +110,26 @@ impl AsyncDaemonDb {
     }
 }
 
+pub(super) async fn replace_open_sync_conflicts_in_connection(
+    connection: &mut SqliteConnection,
+    item_id: &str,
+    provider: ExternalProvider,
+    external_ref: &str,
+    item_revision: i64,
+    conflicts: &[TaskBoardSyncConflict],
+) -> Result<SyncConflictReplacement, CliError> {
+    require_conflict_scope(item_id, provider, external_ref, item_revision, conflicts)?;
+    require_item_revision(connection, item_id, item_revision).await?;
+    let mut replacement =
+        supersede_removed_conflicts(connection, item_id, provider, external_ref, conflicts).await?;
+    for conflict in conflicts {
+        if upsert_open_conflict(connection, conflict).await? {
+            replacement.record_changed_field(&conflict.field);
+        }
+    }
+    Ok(replacement)
+}
+
 pub(super) async fn supersede_open_sync_conflicts_in_connection(
     connection: &mut SqliteConnection,
     item_id: &str,
@@ -128,19 +162,24 @@ pub(super) async fn supersede_open_sync_conflicts_in_connection(
     Ok(changed)
 }
 
-fn require_conflict_revisions(
+fn require_conflict_scope(
     item_id: &str,
+    provider: ExternalProvider,
+    external_ref: &str,
     expected_revision: i64,
     conflicts: &[TaskBoardSyncConflict],
 ) -> Result<(), CliError> {
-    if conflicts
-        .iter()
-        .all(|conflict| conflict.item_id == item_id && conflict.item_revision == expected_revision)
-    {
+    let matches_scope = conflicts.iter().all(|conflict| {
+        conflict.item_id == item_id
+            && ExternalProvider::from(conflict.provider) == provider
+            && conflict.external_ref == external_ref
+            && conflict.item_revision == expected_revision
+    });
+    if matches_scope {
         return Ok(());
     }
     Err(CliErrorKind::concurrent_modification(format!(
-        "task-board sync conflicts for '{item_id}' do not match item revision {expected_revision}"
+        "task-board sync conflicts for '{item_id}' do not match the provider scope or item revision {expected_revision}"
     ))
     .into())
 }
@@ -171,7 +210,7 @@ async fn supersede_removed_conflicts(
     provider: ExternalProvider,
     external_ref: &str,
     conflicts: &[TaskBoardSyncConflict],
-) -> Result<bool, CliError> {
+) -> Result<SyncConflictReplacement, CliError> {
     let fields = conflicts
         .iter()
         .map(|conflict| conflict.field.as_str())
@@ -186,10 +225,10 @@ async fn supersede_removed_conflicts(
     .fetch_all(&mut *connection)
     .await
     .map_err(|error| db_error(format!("read open task-board sync conflicts: {error}")))?;
-    let mut changed = false;
+    let mut replacement = SyncConflictReplacement::default();
     for (conflict_id, field) in rows {
         if !fields.contains(&field.as_str()) {
-            changed |= query(
+            let changed = query(
                 "UPDATE task_board_sync_conflicts
                  SET state = 'superseded', resolved_at = ?2
                  WHERE conflict_id = ?1",
@@ -201,9 +240,12 @@ async fn supersede_removed_conflicts(
             .map_err(|error| db_error(format!("supersede task-board sync conflict: {error}")))?
             .rows_affected()
                 > 0;
+            if changed {
+                replacement.record_changed_field(&field);
+            }
         }
     }
-    Ok(changed)
+    Ok(replacement)
 }
 
 async fn upsert_open_conflict(

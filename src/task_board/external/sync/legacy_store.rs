@@ -62,6 +62,22 @@ impl TaskBoardSyncStore for TaskBoardStore {
             .map_err(|error| sync_join_error("list tombstones", error))?
     }
 
+    async fn list_item_snapshots_including_deleted(
+        &self,
+    ) -> Result<Vec<TaskBoardSyncItemSnapshot>, CliError> {
+        let board = self.clone();
+        tokio::task::spawn_blocking(move || {
+            board.list_including_deleted().map(|items| {
+                items
+                    .into_iter()
+                    .map(|item| TaskBoardSyncItemSnapshot::new(item, 0))
+                    .collect()
+            })
+        })
+        .await
+        .map_err(|error| sync_join_error("list snapshot tombstones", error))?
+    }
+
     async fn create_item(&self, item: TaskBoardItem) -> Result<TaskBoardItem, CliError> {
         let board = self.clone();
         tokio::task::spawn_blocking(move || {

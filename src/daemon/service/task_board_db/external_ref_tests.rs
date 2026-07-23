@@ -171,5 +171,6 @@ fn complete_sync_state(title: &str) -> ExternalRefSyncState {
         project_id: Some("example/project".into()),
         updated_at: Some("2026-07-13T09:59:00Z".into()),
         synced_at: Some("2026-07-13T10:00:00Z".into()),
+        labels: Vec::new(),
     }
 }

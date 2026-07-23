@@ -411,6 +411,12 @@ impl TaskBoardSyncStore for FailingPersistenceStore {
         Ok(vec![self.item.clone()])
     }
 
+    async fn list_item_snapshots_including_deleted(
+        &self,
+    ) -> Result<Vec<TaskBoardSyncItemSnapshot>, CliError> {
+        Ok(vec![TaskBoardSyncItemSnapshot::new(self.item.clone(), 2)])
+    }
+
     async fn create_item(&self, _item: TaskBoardItem) -> Result<TaskBoardItem, CliError> {
         unreachable!("push-only linked task")
     }

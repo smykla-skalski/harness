@@ -79,6 +79,26 @@ pub(super) fn dispatch_item_can_be_rolled_back(item: &TaskBoardItem) -> bool {
         && item.workflow.status == TaskBoardWorkflowStatus::Running
 }
 
+pub(in crate::daemon::db::task_board) async fn has_active_dispatch_reservation_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    item_id: &str,
+) -> Result<bool, CliError> {
+    query_scalar::<_, bool>(
+        "SELECT EXISTS(
+             SELECT 1 FROM task_board_dispatch_intents
+             WHERE item_id = ?1
+               AND status IN (
+                   'preparing', 'preparing_claimed', 'held', 'pending',
+                   'workflow_prepared', 'starting'
+               )
+         )",
+    )
+    .bind(item_id)
+    .fetch_one(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("check task board dispatch reservation: {error}")))
+}
+
 impl AsyncDaemonDb {
     pub(crate) async fn begin_task_board_dispatch_compensation(
         &self,

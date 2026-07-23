@@ -75,6 +75,19 @@ impl TaskBoardSyncStore for EvidenceStore {
         Ok(self.items.lock().expect("items").clone())
     }
 
+    async fn list_item_snapshots_including_deleted(
+        &self,
+    ) -> Result<Vec<TaskBoardSyncItemSnapshot>, CliError> {
+        Ok(self
+            .items
+            .lock()
+            .expect("items")
+            .iter()
+            .cloned()
+            .map(|item| TaskBoardSyncItemSnapshot::new(item, 0))
+            .collect())
+    }
+
     async fn create_item(&self, item: TaskBoardItem) -> Result<TaskBoardItem, CliError> {
         let call = self.create_calls.fetch_add(1, Ordering::SeqCst);
         if call >= self.successful_creates {

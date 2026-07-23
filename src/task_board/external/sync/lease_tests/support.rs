@@ -346,6 +346,15 @@ impl TaskBoardSyncStore for DurableCreateStore {
         Ok(vec![self.item.lock().expect("item").clone()])
     }
 
+    async fn list_item_snapshots_including_deleted(
+        &self,
+    ) -> Result<Vec<TaskBoardSyncItemSnapshot>, CliError> {
+        Ok(vec![TaskBoardSyncItemSnapshot::new(
+            self.item.lock().expect("item").clone(),
+            0,
+        )])
+    }
+
     async fn create_item(&self, _item: TaskBoardItem) -> Result<TaskBoardItem, CliError> {
         unreachable!("push-only create test")
     }

@@ -34,6 +34,7 @@ pub(super) struct ItemRow {
     pub(super) lane_actor: Option<String>,
     pub(super) lane_producer: Option<String>,
     pub(super) lane_set_at: Option<String>,
+    pub(super) tombstone_cause: Option<String>,
 }
 
 #[derive(Debug, FromRow)]

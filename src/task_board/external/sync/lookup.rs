@@ -1,49 +1,254 @@
 use std::collections::HashMap;
 
-use crate::task_board::types::{ExternalRefProvider, TaskBoardItem};
+use crate::errors::{CliError, CliErrorKind};
+use crate::task_board::external::TaskBoardSyncItemSnapshot;
+use crate::task_board::types::{ExternalRefProvider, TaskBoardItem, TaskBoardTombstoneCause};
 
 use super::{
     ExternalProvider, ExternalSyncAction, ExternalSyncField, ExternalSyncOperation, ExternalTask,
-    ExternalTaskRef, matching_ref,
+    ExternalTaskRef,
 };
 
-pub(super) fn item_for_ref<'a>(
-    board_items: &'a [TaskBoardItem],
-    item_index: &HashMap<(ExternalRefProvider, String), usize>,
-    reference: &ExternalTaskRef,
-    project_id: Option<&str>,
-) -> Option<&'a TaskBoardItem> {
-    let key = (reference.provider.into(), reference.external_id.clone());
-    if let Some(index) = item_index.get(&key)
-        && let Some(item) = board_items.get(*index)
-        && matching_ref(item, reference, project_id).is_some()
-    {
-        return Some(item);
-    }
-    board_items
-        .iter()
-        .find(|item| matching_ref(item, reference, project_id).is_some())
+type ProviderRefKey = (ExternalRefProvider, String);
+
+/// `Ambiguous` means two distinct items claimed this key; resolving it must
+/// fail closed rather than pick one.
+enum KeyClaim {
+    Unique {
+        snapshot_index: usize,
+        class: SnapshotClass,
+    },
+    Ambiguous,
 }
 
-pub(super) fn build_external_ref_index(
-    items: &[TaskBoardItem],
-) -> HashMap<(ExternalRefProvider, String), usize> {
-    let mut index = HashMap::with_capacity(items.len() * 2);
-    for (offset, item) in items.iter().enumerate() {
-        for reference in &item.external_refs {
-            let key = (reference.provider, reference.external_id.clone());
-            index.entry(key).or_insert(offset);
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SnapshotClass {
+    Active,
+    Excluded,
+}
+
+/// Built once per pull from the batch-loaded snapshot list. Keys map into
+/// `snapshots` by index rather than storing a clone per key, so an item with
+/// many ref aliases costs one clone. A key two items collide on is not
+/// rejected at build time -- that would fail the whole batch over one
+/// unrelated alias -- it's marked `Ambiguous` and only fails the query that
+/// resolves through it.
+pub(super) struct ProviderItemIndex {
+    snapshots: Vec<TaskBoardSyncItemSnapshot>,
+    claims: HashMap<ProviderRefKey, KeyClaim>,
+}
+
+impl ProviderItemIndex {
+    pub(super) fn build(snapshots: Vec<TaskBoardSyncItemSnapshot>) -> Self {
+        let mut stored = Vec::with_capacity(snapshots.len());
+        let mut claims = HashMap::new();
+        for snapshot in snapshots {
+            let is_excluded = snapshot.item.is_deleted()
+                && snapshot.item.tombstone_cause
+                    == Some(TaskBoardTombstoneCause::ProviderExclusion);
+            if snapshot.item.is_deleted() && !is_excluded {
+                continue;
+            }
+            let index = stored.len();
+            let class = if is_excluded {
+                SnapshotClass::Excluded
+            } else {
+                SnapshotClass::Active
+            };
+            for key in reference_keys(&snapshot.item) {
+                claim(&mut claims, key, index, class);
+            }
+            stored.push(snapshot);
+        }
+        Self {
+            snapshots: stored,
+            claims,
         }
     }
-    index
+
+    pub(super) fn active_snapshot(
+        &self,
+        reference: &ExternalTaskRef,
+        project_id: Option<&str>,
+    ) -> Result<Option<&TaskBoardSyncItemSnapshot>, CliError> {
+        self.lookup(SnapshotClass::Active, reference, project_id)
+    }
+
+    pub(super) fn excluded_snapshot(
+        &self,
+        reference: &ExternalTaskRef,
+        project_id: Option<&str>,
+    ) -> Result<Option<&TaskBoardSyncItemSnapshot>, CliError> {
+        self.lookup(SnapshotClass::Excluded, reference, project_id)
+    }
+
+    fn lookup(
+        &self,
+        class: SnapshotClass,
+        reference: &ExternalTaskRef,
+        project_id: Option<&str>,
+    ) -> Result<Option<&TaskBoardSyncItemSnapshot>, CliError> {
+        let provider = reference.provider.into();
+        let canonical_key = canonical_reference_key(provider, &reference.external_id);
+        let canonical_claim = self.claims.get(&(provider, canonical_key.clone()));
+        if provider == ExternalRefProvider::GitHub
+            && let Some(project) = project_id
+        {
+            let alias = qualified_alias_key(project, legacy_suffix(&reference.external_id));
+            if alias != canonical_key
+                && let Some(alias_claim) = self.claims.get(&(provider, alias.clone()))
+            {
+                return self.resolve_preferred_claim(alias_claim, canonical_claim, class, &alias);
+            }
+        }
+        match canonical_claim {
+            Some(claim) => self.resolve_claim(claim, class, &reference.external_id),
+            None => Ok(None),
+        }
+    }
+
+    fn resolve_preferred_claim(
+        &self,
+        preferred: &KeyClaim,
+        fallback: Option<&KeyClaim>,
+        class: SnapshotClass,
+        key_label: &str,
+    ) -> Result<Option<&TaskBoardSyncItemSnapshot>, CliError> {
+        let KeyClaim::Unique {
+            snapshot_index: preferred_index,
+            ..
+        } = preferred
+        else {
+            return self.resolve_claim(preferred, class, key_label);
+        };
+        if let Some(KeyClaim::Unique {
+            snapshot_index: fallback_index,
+            ..
+        }) = fallback
+            && fallback_index != preferred_index
+        {
+            return Err(CliErrorKind::workflow_io(format!(
+                "ambiguous provider reference '{key_label}': exact and project-qualified claims disagree"
+            ))
+            .into());
+        }
+        self.resolve_claim(preferred, class, key_label)
+    }
+
+    fn resolve_claim(
+        &self,
+        claim: &KeyClaim,
+        class: SnapshotClass,
+        key_label: &str,
+    ) -> Result<Option<&TaskBoardSyncItemSnapshot>, CliError> {
+        match claim {
+            KeyClaim::Unique {
+                snapshot_index,
+                class: claim_class,
+            } if *claim_class == class => Ok(self.snapshots.get(*snapshot_index)),
+            KeyClaim::Unique { .. } => Ok(None),
+            KeyClaim::Ambiguous => Err(CliErrorKind::workflow_io(format!(
+                "ambiguous provider reference '{key_label}': more than one item claims it"
+            ))
+            .into()),
+        }
+    }
+}
+
+fn claim(
+    claims: &mut HashMap<ProviderRefKey, KeyClaim>,
+    key: ProviderRefKey,
+    snapshot_index: usize,
+    class: SnapshotClass,
+) {
+    use std::collections::hash_map::Entry;
+    match claims.entry(key) {
+        Entry::Vacant(entry) => {
+            entry.insert(KeyClaim::Unique {
+                snapshot_index,
+                class,
+            });
+        }
+        Entry::Occupied(entry)
+            if matches!(
+                entry.get(),
+                KeyClaim::Unique {
+                    snapshot_index: existing,
+                    ..
+                } if *existing == snapshot_index
+            ) => {}
+        Entry::Occupied(mut entry) => {
+            entry.insert(KeyClaim::Ambiguous);
+        }
+    }
+}
+
+/// The bare id portion of a GitHub reference regardless of whether it
+/// already carries a cross-repo qualifier.
+fn legacy_suffix(external_id: &str) -> &str {
+    external_id
+        .rsplit_once('#')
+        .map_or(external_id, |(_, suffix)| suffix)
+}
+
+/// Case-insensitive on the project segment, matching `project_matches`;
+/// the id segment stays as-is.
+fn qualified_alias_key(project: &str, legacy_id: &str) -> String {
+    format!("{}#{legacy_id}", project.to_ascii_lowercase())
+}
+
+fn canonical_reference_key(provider: ExternalRefProvider, external_id: &str) -> String {
+    if provider == ExternalRefProvider::GitHub
+        && let Some((project, legacy_id)) = external_id.rsplit_once('#')
+        && !project.is_empty()
+    {
+        return qualified_alias_key(project, legacy_id);
+    }
+    external_id.to_string()
+}
+
+fn reference_keys(item: &TaskBoardItem) -> Vec<ProviderRefKey> {
+    let mut keys = Vec::new();
+    for reference in &item.external_refs {
+        keys.push((
+            reference.provider,
+            canonical_reference_key(reference.provider, &reference.external_id),
+        ));
+        if reference.provider == ExternalRefProvider::GitHub && !reference.external_id.contains('#')
+        {
+            // A bare legacy id only disambiguates once qualified with the
+            // first project candidate the matcher would consult, so a new-
+            // format incoming reference ("owner/repo#123") finds this
+            // candidate through the plain (provider, external_id) lookup
+            // without widening alias ownership to every fallback project.
+            if let Some(project) = item
+                .execution_repository
+                .as_deref()
+                .or_else(|| {
+                    reference
+                        .sync_state
+                        .as_ref()
+                        .and_then(|state| state.project_id.as_deref())
+                })
+                .or(item.project_id.as_deref())
+            {
+                keys.push((
+                    reference.provider,
+                    qualified_alias_key(project, &reference.external_id),
+                ));
+            }
+        }
+    }
+    keys
 }
 
 /// Resolves the tracking issue a task names as its parent to an already
 /// imported local item. Absence is not an error: the parent may not have
-/// been imported yet, and the same lookup on a later sync links it up.
+/// been imported yet, and the same lookup on a later sync links it up. An
+/// ambiguous parent reference is treated the same way rather than failing
+/// the child task over it.
 pub(super) fn resolve_parent_item_id(
-    board_items: &[TaskBoardItem],
-    item_index: &HashMap<(ExternalRefProvider, String), usize>,
+    index: &ProviderItemIndex,
     task: &ExternalTask,
 ) -> Option<String> {
     let reference = task.parent_reference.as_ref()?;
@@ -55,7 +260,11 @@ pub(super) fn resolve_parent_item_id(
         .map(|(project_id, _)| project_id)
         .filter(|project_id| !project_id.is_empty())
         .or(task.project_id.as_deref());
-    item_for_ref(board_items, item_index, reference, parent_project_id).map(|item| item.id.clone())
+    index
+        .active_snapshot(reference, parent_project_id)
+        .ok()
+        .flatten()
+        .map(|snapshot| snapshot.item.id.clone())
 }
 
 pub(super) fn provider_ref(
@@ -68,7 +277,7 @@ pub(super) fn provider_ref(
         .filter(|candidate| candidate.provider == core_provider)
         .find_map(|candidate| {
             let probe = ExternalTaskRef::new(provider, candidate.external_id.clone());
-            matching_ref(item, &probe, item.project_id.as_deref())
+            super::matching_ref(item, &probe, item.project_id.as_deref())
                 .map(|matched| ExternalTaskRef::from(matched.clone()))
         })
 }
@@ -107,41 +316,5 @@ pub(super) fn provider_is_allowed(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::task_board::types::{ExternalRef, TaskBoardStatus};
-
-    #[test]
-    fn resolve_parent_item_id_matches_a_legacy_cross_repo_parent_by_its_own_repo() {
-        let mut parent = TaskBoardItem::new(
-            "legacy-parent".into(),
-            "Parent issue".into(),
-            String::new(),
-            "2026-07-15T10:00:00Z".into(),
-        );
-        parent.execution_repository = Some("other-owner/other-repo".into());
-        parent.external_refs = vec![ExternalRef {
-            provider: ExternalRefProvider::GitHub,
-            external_id: "42".into(),
-            url: None,
-            sync_state: None,
-        }];
-        let board_items = vec![parent];
-        let item_index = build_external_ref_index(&board_items);
-        let task = ExternalTask {
-            reference: ExternalTaskRef::new(ExternalProvider::GitHub, "child-owner/child-repo#7"),
-            title: "Child issue".into(),
-            status: TaskBoardStatus::Backlog,
-            project_id: Some("child-owner/child-repo".into()),
-            parent_reference: Some(ExternalTaskRef::new(
-                ExternalProvider::GitHub,
-                "other-owner/other-repo#42",
-            )),
-            ..ExternalTask::default()
-        };
-
-        let resolved = resolve_parent_item_id(&board_items, &item_index, &task);
-
-        assert_eq!(resolved, Some("legacy-parent".to_string()));
-    }
-}
+#[path = "lookup/tests.rs"]
+mod tests;

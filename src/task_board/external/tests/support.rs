@@ -254,6 +254,7 @@ fn github_review_request_ref(external_id: &str) -> ExternalRef {
         project_id: Some("owner/repo".to_owned()),
         updated_at: Some("2026-05-14T03:00:00Z".to_owned()),
         synced_at: Some("2026-05-14T03:00:00Z".to_owned()),
+        labels: Vec::new(),
     });
     reference
 }

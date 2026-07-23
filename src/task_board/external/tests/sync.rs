@@ -477,6 +477,7 @@ async fn sync_external_tasks_skips_stale_review_check_when_item_was_not_imported
         project_id: Some("owner/repo".to_owned()),
         updated_at: Some("2026-05-14T00:00:00Z".to_owned()),
         synced_at: Some("2026-05-14T00:00:00Z".to_owned()),
+        labels: Vec::new(),
     });
     item.external_refs = vec![reference];
     board

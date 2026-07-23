@@ -22,6 +22,7 @@ pub mod runtime_config;
 pub mod store;
 pub mod summary;
 pub mod transport;
+pub mod triage;
 pub mod types;
 mod worker_prompt;
 
@@ -54,8 +55,8 @@ pub use external::{
     ExternalSyncDirection, ExternalSyncField, ExternalSyncOperation, ExternalSyncOptions,
     ExternalTask, ExternalTaskRef, ExternalTaskUpdate, ExternalUpdateOutcome, GH_TOKEN_ENV,
     GITHUB_REPOSITORY_ENV, GitHubInboxSyncClient, GitHubSyncClient, HARNESS_GITHUB_REPOSITORY_ENV,
-    HARNESS_GITHUB_TOKEN_ENV, HARNESS_TODOIST_TOKEN_ENV, TodoistSyncClient,
-    configured_sync_clients,
+    HARNESS_GITHUB_TOKEN_ENV, HARNESS_TODOIST_TOKEN_ENV, ProviderExclusionAuditContext,
+    ProviderExclusionRestoreOutcome, TodoistSyncClient, configured_sync_clients,
 };
 #[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use external::{
@@ -140,10 +141,17 @@ pub use summary::{
 pub use summary::{
     build_audit_summary, build_dispatch_summary, build_dispatch_summary_with_policy_root,
 };
+pub use triage::{
+    BUILTIN_V1_EVALUATOR_IDENTITY, BUILTIN_V1_EVALUATOR_VERSION, TaskBoardTriageDecision,
+    TaskBoardTriageDecisionRecord, TriageCause, TriageOutcome, TriageReasonCode, TriageVerdict,
+    canonicalize_labels, evaluate_builtin_v1, evidence_fingerprint, is_canonical_bounded_text,
+    is_canonical_decided_at, is_canonical_evaluator_identity, is_canonical_evidence_fingerprint,
+    is_canonical_reason_detail, is_exclusion_label, matched_exclusion_label,
+};
 pub use types::{
     AgentMode, ExternalRef, ExternalRefProvider, ExternalRefSyncState, PlanningState,
-    TaskBoardItem, TaskBoardPriority, TaskBoardStatus, TaskBoardWorkflowState,
-    TaskBoardWorkflowStatus, TaskUsage,
+    TaskBoardItem, TaskBoardPriority, TaskBoardStatus, TaskBoardTombstoneCause,
+    TaskBoardWorkflowState, TaskBoardWorkflowStatus, TaskUsage,
 };
 pub(crate) use worker_prompt::plan_worker_prompt;
 #[cfg(any(test, feature = "daemon-runtime"))]

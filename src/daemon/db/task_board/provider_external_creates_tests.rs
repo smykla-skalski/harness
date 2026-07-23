@@ -422,6 +422,7 @@ pub(super) fn create_evidence(
         project_id: Some(intent.snapshot.provider_target.clone()),
         updated_at: Some(revision.into()),
         synced_at: Some("2026-07-16T10:00:00Z".into()),
+        labels: Vec::new(),
     });
     (outcome, baseline)
 }

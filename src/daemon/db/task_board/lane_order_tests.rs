@@ -511,3 +511,6 @@ mod position_contracts;
 
 #[path = "lane_order_revision_overflow_tests.rs"]
 mod revision_overflow;
+
+#[path = "lane_order_automatic_tests.rs"]
+mod automatic;

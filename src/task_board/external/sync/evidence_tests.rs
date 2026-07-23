@@ -110,6 +110,7 @@ async fn applied_pull_evidence_survives_conflict_cleanup_failure() {
         },
         ExternalProvider::Todoist,
         &item,
+        0,
         task,
         None,
         &mut operations,
@@ -144,6 +145,7 @@ async fn converged_concurrent_pull_emits_no_applied_evidence() {
         },
         ExternalProvider::Todoist,
         &expected,
+        0,
         task,
         None,
         &mut operations,
@@ -283,6 +285,7 @@ fn linked_item(id: &str, title: &str) -> TaskBoardItem {
         project_id: None,
         updated_at: Some("2026-07-16T10:00:00Z".into()),
         synced_at: Some("2026-07-16T10:00:00Z".into()),
+        labels: Vec::new(),
     });
     item.external_refs = vec![reference];
     item
@@ -308,6 +311,7 @@ fn sync_state(task: &ExternalTask) -> ExternalRefSyncState {
         project_id: task.project_id.clone(),
         updated_at: task.updated_at.clone(),
         synced_at: Some("2026-07-16T10:05:00Z".into()),
+        labels: Vec::new(),
     }
 }
 

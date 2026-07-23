@@ -24,6 +24,7 @@ mod lane_order_tests;
 mod mapper;
 mod policy_queues;
 mod policy_runs;
+mod provider_exclusion;
 mod provider_external_create_evidence;
 mod provider_external_create_finalize;
 mod provider_external_create_follow_up;
@@ -93,6 +94,10 @@ mod remote_assignment_status_settlement_tests;
 mod remote_assignment_stop_fence;
 mod remote_assignment_terminal;
 mod remote_assignment_terminal_handoff;
+mod triage_apply;
+mod triage_audit;
+mod triage_decisions;
+mod triage_queries;
 pub(crate) use remote_assignment_terminal_handoff::{
     exact_active_remote_target, parent_points_to_assignment,
 };

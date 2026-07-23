@@ -33,11 +33,13 @@ mod external_ref_tests;
 mod list_items;
 mod positions;
 mod provider_sync_context_store;
+mod provider_sync_exclusion;
 mod provider_sync_execution;
 mod provider_sync_store;
 mod reviews_sync;
 mod sync_audit;
 mod sync_run_context;
+mod triage_reads;
 
 use estimate_validation::{validate_estimate, validate_update_estimates};
 pub(crate) use list_items::list_task_board_items_db;
@@ -53,6 +55,9 @@ pub(crate) use sync_audit::{
     record_targeted_reviews_projection_result,
 };
 pub(crate) use sync_run_context::TaskBoardSyncRunContext;
+pub(crate) use triage_reads::{
+    get_task_board_item_triage_current_db, get_task_board_item_triage_history_db,
+};
 
 pub(crate) async fn create_task_board_item_db(
     db: &AsyncDaemonDb,
@@ -88,7 +93,7 @@ pub(crate) async fn create_task_board_item_db(
     }
     item.session_id.clone_from(&request.session_id);
     item.work_item_id.clone_from(&request.work_item_id);
-    Ok(db.create_task_board_item(item).await?.item)
+    Ok(db.create_task_board_item_with_triage(item).await?.item)
 }
 
 pub(crate) async fn get_task_board_item_db(
@@ -106,7 +111,7 @@ pub(crate) async fn update_task_board_item_db(
     validate_update_estimates(request)?;
     super::task_board_completion::validate_linked_task_completion(db, id, request.status).await?;
     let mutation = db
-        .update_task_board_item(id, |item| {
+        .update_task_board_item_with_triage(id, |item| {
             apply_update_request(item, request)?;
             Ok(true)
         })

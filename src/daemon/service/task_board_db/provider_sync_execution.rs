@@ -391,6 +391,7 @@ mod tests {
             project_id: Some("provider-project".into()),
             updated_at: None,
             synced_at: Some("2026-07-16T10:00:00Z".into()),
+            labels: Vec::new(),
         });
         db.record_task_board_external_create_outcome(&intent, &outcome, &baseline)
             .await

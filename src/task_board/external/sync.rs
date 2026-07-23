@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::errors::CliError;
 use crate::task_board::TaskBoardExternalCreateIntent;
+use crate::task_board::matched_exclusion_label;
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::types::{TaskBoardItem, TaskBoardItemKind, TaskBoardStatus};
 use crate::workspace::utc_now;
@@ -30,6 +31,7 @@ mod lease_tests;
 mod legacy_store;
 mod lookup;
 mod merge;
+mod provider_exclusion;
 mod push;
 mod reconcile;
 mod scope;
@@ -45,11 +47,9 @@ pub(crate) use create_recovery::{
     prepare_external_create_recovery,
 };
 use import::{external_item_id, imported_external_planning};
-use lookup::{
-    OperationDraft, build_external_ref_index, item_for_ref, operation, provider_ref,
-    resolve_parent_item_id,
-};
+use lookup::{OperationDraft, ProviderItemIndex, operation, provider_ref, resolve_parent_item_id};
 use merge::{matching_ref, pull_create_fields, sync_state_from_task, task_signals_umbrella};
+use provider_exclusion::try_restore_provider_exclusion_tombstone;
 use push::push_board_tasks;
 use reconcile::reconcile_existing_item;
 use scope::SyncClientError;
@@ -235,16 +235,19 @@ async fn pull_provider_tasks(
         options.dry_run,
     )
     .await?;
-    let board_items = board.list_items(None).await?;
-    let item_index = build_external_ref_index(&board_items);
+    let snapshots = board.list_item_snapshots_including_deleted().await?;
+    let board_items: Vec<TaskBoardItem> = snapshots
+        .iter()
+        .filter(|snapshot| !snapshot.item.is_deleted())
+        .map(|snapshot| snapshot.item.clone())
+        .collect();
+    let provider_item_index = ProviderItemIndex::build(snapshots);
     for task in tasks.iter().cloned() {
-        let resolved_parent_item_id = resolve_parent_item_id(&board_items, &item_index, &task);
-        if let Some(item) = item_for_ref(
-            &board_items,
-            &item_index,
-            &task.reference,
-            task.project_id.as_deref(),
-        ) {
+        let resolved_parent_item_id = resolve_parent_item_id(&provider_item_index, &task);
+        if let Some(snapshot) =
+            provider_item_index.active_snapshot(&task.reference, task.project_id.as_deref())?
+        {
+            let item = &snapshot.item;
             if !existing_pull_matches_status_filter(options.status, item, &task) {
                 continue;
             }
@@ -253,11 +256,31 @@ async fn pull_provider_tasks(
                 options,
                 client.provider(),
                 item,
+                snapshot.item_revision,
                 task,
                 resolved_parent_item_id.as_deref(),
                 operations,
             )
             .await?;
+            continue;
+        }
+        if matched_exclusion_label(&task.labels).is_some() {
+            continue;
+        }
+        if task.title.trim().is_empty() {
+            continue;
+        }
+        if handle_matching_provider_exclusion(
+            board,
+            &provider_item_index,
+            options,
+            client.provider(),
+            &task,
+            resolved_parent_item_id.clone(),
+            operations,
+        )
+        .await?
+        {
             continue;
         }
         if !new_pull_matches_status_filter(options.status, &task) {
@@ -277,25 +300,10 @@ async fn pull_provider_tasks(
             continue;
         }
         let item = create_item_from_external(&task);
-        let item = match board.create_item(item).await {
-            Ok(item) => item,
-            Err(error) => {
-                let Some(item) = find_item_for_task(board, &task).await? else {
-                    return Err(error);
-                };
-                reconcile_existing_item(
-                    board,
-                    options,
-                    client.provider(),
-                    &item,
-                    task,
-                    resolved_parent_item_id.as_deref(),
-                    operations,
-                )
-                .await?;
-                continue;
-            }
-        };
+        // A create collision fails outright rather than reconciling against
+        // a fresh point read, which the batch-snapshot contract rules out;
+        // the next pass picks it up through the normal matched-item path.
+        let item = board.create_item(item).await?;
         let item = link_resolved_parent(board, item, resolved_parent_item_id.as_deref()).await?;
         operations.push(operation(OperationDraft {
             provider: client.provider(),
@@ -320,6 +328,36 @@ async fn pull_provider_tasks(
     Ok(recovered_create)
 }
 
+async fn handle_matching_provider_exclusion(
+    board: &dyn TaskBoardSyncStore,
+    index: &ProviderItemIndex,
+    options: ExternalSyncOptions,
+    provider: ExternalProvider,
+    task: &ExternalTask,
+    resolved_parent_item_id: Option<String>,
+    operations: &mut Vec<ExternalSyncOperation>,
+) -> Result<bool, CliError> {
+    let Some(excluded) = index.excluded_snapshot(&task.reference, task.project_id.as_deref())?
+    else {
+        return Ok(false);
+    };
+    if !existing_pull_matches_status_filter(options.status, &excluded.item, task) {
+        return Ok(true);
+    }
+    let restored = try_restore_provider_exclusion_tombstone(
+        board,
+        index,
+        options,
+        provider,
+        task,
+        resolved_parent_item_id,
+        operations,
+    )
+    .await?;
+    debug_assert!(restored, "the same index resolved the excluded snapshot");
+    Ok(true)
+}
+
 fn existing_pull_matches_status_filter(
     filter: Option<TaskBoardStatus>,
     item: &TaskBoardItem,
@@ -341,15 +379,6 @@ fn new_pull_matches_status_filter(filter: Option<TaskBoardStatus>, task: &Extern
 
 fn client_owns_item(client: &dyn ExternalSyncClient, item: &TaskBoardItem, scope_id: &str) -> bool {
     client.scope_for_item(item).eq_ignore_ascii_case(scope_id)
-}
-
-async fn find_item_for_task(
-    board: &dyn TaskBoardSyncStore,
-    task: &ExternalTask,
-) -> Result<Option<TaskBoardItem>, CliError> {
-    let items = board.list_items(None).await?;
-    let index = build_external_ref_index(&items);
-    Ok(item_for_ref(&items, &index, &task.reference, task.project_id.as_deref()).cloned())
 }
 
 fn create_item_from_external(task: &ExternalTask) -> TaskBoardItem {
@@ -381,14 +410,8 @@ fn create_item_from_external(task: &ExternalTask) -> TaskBoardItem {
 /// time, so the same code path that computes sibling `child_order` and
 /// rejects cycles for a manual re-parent also governs an imported one.
 ///
-/// A rejected assignment (self-parent, cycle, or otherwise invalid) is
-/// isolated to this one item: a bad GitHub cross-reference must not abort
-/// the whole sync batch, and the item simply stays unparented, exactly as
-/// it would if the parent were not yet resolvable at all.
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing::warn! macro expands into a chain clippy reads as branchy"
-)]
+/// The provider store isolates a semantically invalid assignment inside its
+/// transaction and returns the item with its prior parent state intact.
 async fn link_resolved_parent(
     board: &dyn TaskBoardSyncStore,
     item: TaskBoardItem,
@@ -400,8 +423,7 @@ async fn link_resolved_parent(
     if parent_item_id == item.id || item.parent_item_id.as_deref() == Some(parent_item_id) {
         return Ok(item);
     }
-    let item_id = item.id.clone();
-    match board
+    board
         .update_item(
             &item,
             TaskBoardItemPatch {
@@ -410,17 +432,4 @@ async fn link_resolved_parent(
             },
         )
         .await
-    {
-        Ok(updated) => Ok(updated),
-        Err(error) if error.code() == "WORKFLOW_IO" => {
-            tracing::warn!(
-                item_id,
-                parent_item_id,
-                error = %error.message(),
-                "task-board github import: rejected parent link, leaving item unparented"
-            );
-            Ok(item)
-        }
-        Err(error) => Err(error),
-    }
 }

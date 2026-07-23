@@ -10,6 +10,12 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
     -> TaskBoardItemPositionMutationResponse
   func resetTaskBoardItemPosition(id: String, request: TaskBoardResetItemPositionRequest)
     async throws -> TaskBoardItemPositionMutationResponse
+  func taskBoardItemTriageCurrent(id: String) async throws -> TaskBoardTriageCurrentResponse
+  func taskBoardItemTriageHistory(
+    id: String,
+    beforeGeneration: UInt64?,
+    limit: UInt32?
+  ) async throws -> TaskBoardTriageHistoryResponse
   func createTaskBoardItem(request: TaskBoardCreateItemRequest) async throws -> TaskBoardItem
   func updateTaskBoardItem(
     id: String,

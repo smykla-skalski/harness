@@ -72,6 +72,7 @@ mod task_board_position_parity;
 mod task_board_route_parity;
 mod task_board_route_parity_support;
 mod task_board_support;
+mod task_board_triage_parity;
 mod task_review;
 mod telemetry;
 

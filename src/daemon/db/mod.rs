@@ -73,6 +73,7 @@ mod schema_repairs_reconciliation_cursors;
 mod schema_repairs_remote_execution;
 mod schema_repairs_remote_execution_objects;
 mod schema_repairs_remote_execution_v45;
+mod schema_repairs_triage;
 mod schema_repairs_wake_events;
 mod schema_sql;
 mod schema_v10;
@@ -111,6 +112,7 @@ mod schema_v42;
 mod schema_v43;
 mod schema_v44;
 mod schema_v45;
+mod schema_v46;
 #[allow(dead_code)]
 mod task_board;
 #[cfg(test)]
@@ -367,7 +369,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-pub(crate) const SCHEMA_VERSION: &str = "45";
+pub(crate) const SCHEMA_VERSION: &str = "46";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]

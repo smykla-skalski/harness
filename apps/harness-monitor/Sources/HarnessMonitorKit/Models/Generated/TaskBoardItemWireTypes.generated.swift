@@ -35,8 +35,9 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
   public var createdAt: String
   public var updatedAt: String
   public var deletedAt: String?
+  public var tombstoneCause: TaskBoardTombstoneCause?
 
-  public init(schemaVersion: UInt32, id: String, title: String, body: String = "", status: TaskBoardStatus = .todo, priority: TaskBoardPriority = .medium, tags: [String] = [], projectId: String? = nil, targetProjectTypes: [String] = [], agentMode: TaskBoardAgentMode = .headless, workflowKind: TaskBoardWorkflowKind = .defaultTask, kind: TaskBoardItemKind = .task, executionRepository: String? = nil, estimatedTokens: UInt64? = nil, estimatedCostMicrousd: UInt64? = nil, externalRefs: [ExternalRefWire] = [], importedFromProvider: ExternalRefProviderWire? = nil, planning: PlanningStateWire = PlanningStateWire(), workflow: TaskBoardWorkflowStateWire? = nil, sessionId: String? = nil, workItemId: String? = nil, usage: TaskUsageWire = TaskUsageWire(), parentItemId: String? = nil, childOrder: UInt32 = 0, lanePosition: UInt32? = nil, laneOrigin: TaskBoardLaneOriginWire? = nil, laneSetAt: String? = nil, createdAt: String, updatedAt: String, deletedAt: String? = nil) {
+  public init(schemaVersion: UInt32, id: String, title: String, body: String = "", status: TaskBoardStatus = .todo, priority: TaskBoardPriority = .medium, tags: [String] = [], projectId: String? = nil, targetProjectTypes: [String] = [], agentMode: TaskBoardAgentMode = .headless, workflowKind: TaskBoardWorkflowKind = .defaultTask, kind: TaskBoardItemKind = .task, executionRepository: String? = nil, estimatedTokens: UInt64? = nil, estimatedCostMicrousd: UInt64? = nil, externalRefs: [ExternalRefWire] = [], importedFromProvider: ExternalRefProviderWire? = nil, planning: PlanningStateWire = PlanningStateWire(), workflow: TaskBoardWorkflowStateWire? = nil, sessionId: String? = nil, workItemId: String? = nil, usage: TaskUsageWire = TaskUsageWire(), parentItemId: String? = nil, childOrder: UInt32 = 0, lanePosition: UInt32? = nil, laneOrigin: TaskBoardLaneOriginWire? = nil, laneSetAt: String? = nil, createdAt: String, updatedAt: String, deletedAt: String? = nil, tombstoneCause: TaskBoardTombstoneCause? = nil) {
     self.schemaVersion = schemaVersion
     self.id = id
     self.title = title
@@ -67,6 +68,7 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
     self.createdAt = createdAt
     self.updatedAt = updatedAt
     self.deletedAt = deletedAt
+    self.tombstoneCause = tombstoneCause
   }
 
   public init(from decoder: Decoder) throws {
@@ -101,6 +103,7 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
     createdAt = try container.decode(String.self, forKey: .createdAt)
     updatedAt = try container.decode(String.self, forKey: .updatedAt)
     deletedAt = try container.decodeIfPresent(String.self, forKey: .deletedAt)
+    tombstoneCause = try container.decodeIfPresent(TaskBoardTombstoneCause.self, forKey: .tombstoneCause)
   }
 
   enum CodingKeys: String, CodingKey {
@@ -134,7 +137,15 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
     case createdAt = "created_at"
     case updatedAt = "updated_at"
     case deletedAt = "deleted_at"
+    case tombstoneCause = "tombstone_cause"
   }
+}
+
+public enum TaskBoardTombstoneCause: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case manual = "manual"
+  case providerExclusion = "provider_exclusion"
+
+  public var id: String { rawValue }
 }
 
 public struct TaskBoardWorkflowStateWire: Codable, Equatable, Sendable {
@@ -251,14 +262,27 @@ public struct ExternalRefSyncStateWire: Codable, Equatable, Sendable {
   public var projectId: String?
   public var updatedAt: String?
   public var syncedAt: String?
+  public var labels: [String]
 
-  public init(title: String? = nil, body: String? = nil, status: TaskBoardStatus? = nil, projectId: String? = nil, updatedAt: String? = nil, syncedAt: String? = nil) {
+  public init(title: String? = nil, body: String? = nil, status: TaskBoardStatus? = nil, projectId: String? = nil, updatedAt: String? = nil, syncedAt: String? = nil, labels: [String] = []) {
     self.title = title
     self.body = body
     self.status = status
     self.projectId = projectId
     self.updatedAt = updatedAt
     self.syncedAt = syncedAt
+    self.labels = labels
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    title = try container.decodeIfPresent(String.self, forKey: .title)
+    body = try container.decodeIfPresent(String.self, forKey: .body)
+    status = try container.decodeIfPresent(TaskBoardStatus.self, forKey: .status)
+    projectId = try container.decodeIfPresent(String.self, forKey: .projectId)
+    updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
+    syncedAt = try container.decodeIfPresent(String.self, forKey: .syncedAt)
+    labels = try container.decodeIfPresent([String].self, forKey: .labels) ?? []
   }
 
   enum CodingKeys: String, CodingKey {
@@ -268,6 +292,7 @@ public struct ExternalRefSyncStateWire: Codable, Equatable, Sendable {
     case projectId = "project_id"
     case updatedAt = "updated_at"
     case syncedAt = "synced_at"
+    case labels
   }
 }
 

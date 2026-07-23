@@ -36,7 +36,9 @@ pub(crate) async fn dispatch_task_board_method(
         return Some(response);
     }
     match request.method.as_str() {
-        ws_methods::TASK_BOARD_CREATE => Some(dispatch_task_board_create(request, state).await),
+        ws_methods::TASK_BOARD_CREATE => {
+            Some(Box::pin(dispatch_task_board_create(request, state)).await)
+        }
         ws_methods::TASK_BOARD_CAPABILITIES => {
             Some(read::dispatch_task_board_capabilities(request, state).await)
         }
@@ -54,6 +56,12 @@ pub(crate) async fn dispatch_task_board_method(
         }
         ws_methods::TASK_BOARD_POSITION_RESET => {
             Some(dispatch_task_board_position_reset(request, state).await)
+        }
+        ws_methods::TASK_BOARD_TRIAGE_GET => {
+            Some(read::dispatch_task_board_triage_get(request, state, connection).await)
+        }
+        ws_methods::TASK_BOARD_TRIAGE_HISTORY => {
+            Some(read::dispatch_task_board_triage_history(request, state, connection).await)
         }
         ws_methods::TASK_BOARD_UPDATE => Some(dispatch_task_board_update(request, state).await),
         ws_methods::TASK_BOARD_DELETE => Some(dispatch_task_board_delete(request, state).await),
@@ -111,24 +119,18 @@ pub(crate) async fn dispatch_task_board_method(
     }
 }
 
+/// Create and update do not record a WS-layer audit event: the DB layer
+/// already records exactly one (either the typed `BuiltInV1` triage
+/// decision, or the plain lane-transition audit for non-eligible items) in
+/// the very same transaction as the mutation, and REST calls the same
+/// executor with no audit call of its own. Recording a second, generic
+/// event here would double-audit every eligible create/update and break
+/// REST/WS transport parity.
 async fn dispatch_task_board_create(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     let Ok(body) = parse_params::<TaskBoardCreateItemRequest>(request) else {
         return invalid_params(request);
     };
     let result = task_board_route_executor::create_item(state, &body).await;
-    record_task_board_audit_result(
-        state,
-        "task_board.create",
-        "Create task-board item",
-        body.id.as_deref().or(Some(body.title.as_str())),
-        serde_json::json!({
-            "title": body.title,
-            "priority": body.priority,
-            "project_id": body.project_id,
-        }),
-        &result,
-    )
-    .await;
     dispatch_query_result(&request.id, result)
 }
 
@@ -140,25 +142,6 @@ async fn dispatch_task_board_update(request: &WsRequest, state: &DaemonHttpState
         return invalid_params(request);
     };
     let result = task_board_route_executor::update_item(state, id, &body).await;
-    record_task_board_audit_result(
-        state,
-        "task_board.update",
-        "Update task-board item",
-        Some(id),
-        serde_json::json!({
-            "id": id,
-            "status": body.status,
-            "priority": body.priority,
-            "project_id": body.project_id,
-            "clear_project_id": body.clear_identity.clear_project_id,
-            "clear_session_id": body.clear_identity.clear_session_id,
-            "clear_work_item_id": body.clear_identity.clear_work_item_id,
-            "clear_planning": body.clear_state.clear_planning,
-            "clear_workflow": body.clear_state.clear_workflow,
-        }),
-        &result,
-    )
-    .await;
     dispatch_query_result(&request.id, result)
 }
 

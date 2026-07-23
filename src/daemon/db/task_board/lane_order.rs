@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use serde_json::json;
 use sqlx::{Sqlite, Transaction, query, query_as};
@@ -14,6 +14,8 @@ use crate::errors::CliErrorKind;
 use crate::task_board::{
     TaskBoardItem, TaskBoardLaneOrigin, TaskBoardStatus, sort_task_board_items,
 };
+
+mod automatic;
 
 #[derive(Debug, Clone)]
 pub(crate) struct TaskBoardItemsSnapshot {
@@ -40,6 +42,8 @@ pub(super) enum LaneTransitionKind {
     Generic,
     Manual,
     Automatic,
+    ProviderExclusionHide,
+    ProviderExclusionRestore,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -130,7 +134,12 @@ async fn write_lane_transition_in_tx(
     transition: LaneTransitionKind,
 ) -> Result<LaneTransitionWrite, CliError> {
     item.status = item.status.canonical_persisted_status();
-    if item.deleted_at.is_some() {
+    let preserves_manual_tombstone = transition == LaneTransitionKind::ProviderExclusionHide
+        && item
+            .lane_origin
+            .as_ref()
+            .is_some_and(TaskBoardLaneOrigin::is_manual);
+    if item.deleted_at.is_some() && !preserves_manual_tombstone {
         clear_placement(&mut item);
     }
     let changed = lane_membership_changed(before.as_ref().map(|(item, _)| item), &item);
@@ -164,8 +173,7 @@ async fn write_lane_transition_in_tx(
         });
     }
 
-    let allow_generic_cross_lane_clamp =
-        is_generic_cross_lane_placement(previous, &item, transition);
+    let allow_destination_clamp = allows_destination_clamp(previous, &item, transition);
     let source_status = previous
         .filter(|prior| prior.deleted_at.is_none())
         .map(|prior| prior.status.canonical_persisted_status());
@@ -182,7 +190,7 @@ async fn write_lane_transition_in_tx(
         source_status,
         destination_status,
         transition,
-        allow_generic_cross_lane_clamp,
+        allow_destination_clamp,
     )?;
 
     let mut shifted = Vec::new();
@@ -219,9 +227,18 @@ fn normalize_lane_entries(
     source_status: Option<TaskBoardStatus>,
     destination_status: Option<TaskBoardStatus>,
     transition: LaneTransitionKind,
-    allow_generic_cross_lane_clamp: bool,
+    allow_destination_clamp: bool,
 ) -> Result<(), CliError> {
     entries.retain(|entry| entry.before.id != item.id);
+    if transition == LaneTransitionKind::Automatic {
+        return automatic::normalize_transition(
+            entries,
+            previous,
+            item,
+            source_status,
+            destination_status,
+        );
+    }
     if let Some(prior) = previous.filter(|prior| prior.deleted_at.is_none()) {
         let position =
             source_removal_position(source_status, destination_status, prior, item, entries);
@@ -232,13 +249,7 @@ fn normalize_lane_entries(
     let unchanged_same_lane_position = source_status == destination_status
         && previous.is_some_and(|prior| prior.lane_position == item.lane_position);
     if let Some(status) = destination_status.filter(|_| !unchanged_same_lane_position) {
-        place_in_destination(
-            entries,
-            item,
-            status,
-            transition,
-            allow_generic_cross_lane_clamp,
-        )?;
+        place_in_destination(entries, item, status, transition, allow_destination_clamp)?;
     }
     Ok(())
 }
@@ -325,6 +336,15 @@ fn is_generic_cross_lane_placement(
         && item.lane_set_at == previous.lane_set_at
 }
 
+fn allows_destination_clamp(
+    previous: Option<&TaskBoardItem>,
+    item: &TaskBoardItem,
+    transition: LaneTransitionKind,
+) -> bool {
+    transition == LaneTransitionKind::ProviderExclusionRestore
+        || is_generic_cross_lane_placement(previous, item, transition)
+}
+
 fn shift_left_after_removal(entries: &mut [LaneEntry], status: TaskBoardStatus, position: u32) {
     for entry in entries {
         if entry.item.status == status
@@ -343,7 +363,7 @@ fn place_in_destination(
     item: &mut TaskBoardItem,
     status: TaskBoardStatus,
     transition: LaneTransitionKind,
-    allow_generic_cross_lane_clamp: bool,
+    allow_destination_clamp: bool,
 ) -> Result<(), CliError> {
     let destination_count = entries
         .iter()
@@ -356,7 +376,7 @@ fn place_in_destination(
         return Ok(());
     };
     if requested > max_position {
-        if allow_generic_cross_lane_clamp {
+        if allow_destination_clamp {
             requested = max_position;
             item.lane_position = Some(requested);
         } else {
@@ -366,20 +386,7 @@ fn place_in_destination(
             .into());
         }
     }
-    if transition == LaneTransitionKind::Automatic {
-        let occupied = entries
-            .iter()
-            .filter(|entry| entry.item.status == status)
-            .filter_map(|entry| entry.item.lane_position)
-            .collect::<BTreeSet<_>>();
-        let target = (requested..=max_position)
-            .find(|position| !occupied.contains(position))
-            .ok_or_else(|| {
-                CliErrorKind::task_board_lane_capacity("automatic lane has no free slot")
-            })?;
-        item.lane_position = Some(target);
-        return Ok(());
-    }
+    debug_assert_ne!(transition, LaneTransitionKind::Automatic);
     for entry in entries {
         if entry.item.status == status
             && entry
@@ -428,13 +435,13 @@ async fn clear_changed_anchors_in_tx(
 }
 
 #[derive(Debug)]
-struct LaneEntry {
+pub(super) struct LaneEntry {
     before: TaskBoardItem,
-    item: TaskBoardItem,
+    pub(super) item: TaskBoardItem,
     revision: i64,
 }
 
-async fn load_lane_entries_in_tx(
+pub(super) async fn load_lane_entries_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     source: Option<TaskBoardStatus>,
     destination: Option<TaskBoardStatus>,

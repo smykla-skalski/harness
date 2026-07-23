@@ -143,6 +143,9 @@ pub(super) fn current_schema_shape_needs_repair(
     if super::schema_repairs_remote_execution_v45::shape_needs_repair(conn)? {
         return Ok(true);
     }
+    if super::schema_repairs_triage::shape_needs_repair(conn)? {
+        return Ok(true);
+    }
     Ok(false)
 }
 
@@ -266,12 +269,14 @@ pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError>
     super::schema_v43::run(&db.conn)?;
     super::schema_v44::run(&db.conn)?;
     super::schema_v45::run(&db.conn)?;
+    super::schema_v46::run(&db.conn)?;
     super::schema_repairs_external_creates::require_complete_shape(&db.conn)?;
     super::schema_repairs_wake_events::require_complete_shape(&db.conn)?;
     super::schema_repairs_admission::require_complete_shape(&db.conn)?;
     super::schema_repairs_reconciliation_cursors::require_complete_shape(&db.conn)?;
     super::schema_repairs_remote_execution::require_complete_shape(&db.conn)?;
     super::schema_repairs_remote_execution_v45::require_complete_shape(&db.conn)?;
+    super::schema_repairs_triage::require_complete_shape(&db.conn)?;
     db.conn
         .execute(
             "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",

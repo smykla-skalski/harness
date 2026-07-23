@@ -50,6 +50,45 @@ let sampleTaskBoardPositionMutationText =
   }
   """
 
+let sampleTaskBoardTriageCurrentText =
+  """
+  {
+    "current": {
+      "decision_id": "triage-00000000000000000000000000000001",
+      "item_id": "board-1",
+      "generation": 2,
+      "verdict": "todo",
+      "reason_code": "meaningful_label",
+      "evaluator_identity": "task_board.triage.builtin_v1",
+      "evaluator_version": 1,
+      "evidence_fingerprint": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "cause": "fingerprint_changed",
+      "decided_at": "2026-07-23T00:02:00Z"
+    }
+  }
+  """
+
+let sampleTaskBoardTriageHistoryText =
+  """
+  {
+    "decisions": [
+      {
+        "decision_id": "triage-00000000000000000000000000000001",
+        "item_id": "board-1",
+        "generation": 2,
+        "verdict": "todo",
+        "reason_code": "meaningful_label",
+        "evaluator_identity": "task_board.triage.builtin_v1",
+        "evaluator_version": 1,
+        "evidence_fingerprint": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "cause": "fingerprint_changed",
+        "decided_at": "2026-07-23T00:02:00Z"
+      }
+    ],
+    "next_before_generation": 2
+  }
+  """
+
 let sampleTaskBoardEvaluationSummaryText =
   """
   {

@@ -23,6 +23,10 @@ actor PreviewHarnessClientState {
   var taskBoardItems: [TaskBoardItem]
   var taskBoardItemsChangeSeq: Int64
   var taskBoardItemRevisions: [String: Int64]
+  /// Ordered newest-first per item id; the first entry is the current decision.
+  /// Empty by default -- preview fixtures carry no triage history until a
+  /// preview or test explicitly seeds one via `seedTaskBoardTriageDecisions`.
+  var taskBoardTriageDecisionsByItemID: [String: [TaskBoardTriageDecisionRecord]]
   var reviewItems: [ReviewItem]
   var taskBoardHostRegistry: [TaskBoardHostMachine]
   var nextAgentTuiSequence: Int
@@ -69,6 +73,7 @@ actor PreviewHarnessClientState {
     self.taskBoardItemRevisions = Dictionary(
       uniqueKeysWithValues: fixtures.taskBoardItems.map { ($0.id, 1) }
     )
+    self.taskBoardTriageDecisionsByItemID = [:]
     self.reviewItems = fixtures.reviewsResponse.items
     self.taskBoardHostRegistry = [
       TaskBoardHostMachine(

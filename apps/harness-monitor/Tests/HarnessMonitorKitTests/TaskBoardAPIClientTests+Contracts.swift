@@ -133,6 +133,71 @@ extension TaskBoardAPIClientTests {
     #expect(reset.snapshot.itemsChangeSeq == 43)
   }
 
+  @Test("HTTP client uses task-board triage read routes")
+  func httpClientUsesTaskBoardTriageReadRoutes() async throws {
+    TaskBoardURLProtocol.reset()
+    let client = try makeClient()
+
+    let current = try await client.taskBoardItemTriageCurrent(id: "board-1")
+    let history = try await client.taskBoardItemTriageHistory(
+      id: "board-1",
+      beforeGeneration: 3,
+      limit: 25
+    )
+    await #expect(throws: (any Error).self) {
+      _ = try await client.taskBoardItemTriageCurrent(id: "../unsafe")
+    }
+    let records = TaskBoardURLProtocol.records
+
+    #expect(records.map(\.method) == ["GET", "GET"])
+    #expect(
+      records.map(\.path) == [
+        "/v1/task-board/items/board-1/triage",
+        "/v1/task-board/items/board-1/triage/history",
+      ])
+    #expect(records[0].query == nil)
+    #expect(records[1].query == "before_generation=3&limit=25")
+    #expect(current.current?.generation == 2)
+    #expect(history.decisions.map(\.generation) == [2])
+    #expect(history.nextBeforeGeneration == 2)
+  }
+
+  @Test("WebSocket transport uses task-board triage read methods")
+  func webSocketTransportUsesTaskBoardTriageReadMethods() async throws {
+    let probe = RPCProbe()
+    let transport = WebSocketTransport(
+      connection: HarnessMonitorConnection(
+        endpoint: try #require(URL(string: "http://127.0.0.1:1")), token: "token"
+      ),
+      session: URLSession(configuration: .ephemeral),
+      rpcSender: { method, params, _ in
+        await probe.record(method: method, params: params)
+        return try taskBoardRPCResponse(for: method)
+      }
+    )
+
+    let beforeGeneration = UInt64(Int64.max)
+    let current = try await transport.taskBoardItemTriageCurrent(id: "board-1")
+    let history = try await transport.taskBoardItemTriageHistory(
+      id: "board-1",
+      beforeGeneration: beforeGeneration,
+      limit: 25
+    )
+    let calls = await probe.calls
+
+    #expect(calls.map(\.method) == [.taskBoardTriageGet, .taskBoardTriageHistory])
+    #expect(positionObjectValue(calls[0].params, key: "id") == .string("board-1"))
+    #expect(positionObjectValue(calls[1].params, key: "id") == .string("board-1"))
+    #expect(
+      positionObjectValue(calls[1].params, key: "before_generation")
+        == .string(String(beforeGeneration))
+    )
+    #expect(positionObjectValue(calls[1].params, key: "limit") == .number(25))
+    #expect(current.current?.generation == 2)
+    #expect(history.decisions.map(\.generation) == [2])
+    #expect(history.nextBeforeGeneration == 2)
+  }
+
   @Test("WebSocket transport uses reviews RPC contract")
   func webSocketTransportUsesReviewsRPCContract() async throws {
     let result = try await performReviewsWebSocketContractCalls()

@@ -86,6 +86,8 @@ private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
   .taskBoardPositionGet: .object(sampleTaskBoardPositionSnapshotJSON),
   .taskBoardPositionSet: .object(sampleTaskBoardPositionMutationJSON),
   .taskBoardPositionReset: .object(sampleTaskBoardPositionMutationJSON),
+  .taskBoardTriageGet: fixtureJSONValue(sampleTaskBoardTriageCurrentText),
+  .taskBoardTriageHistory: fixtureJSONValue(sampleTaskBoardTriageHistoryText),
   .taskBoardCreate: .object(sampleTaskBoardItemJSON),
   .taskBoardGet: .object(sampleTaskBoardItemJSON),
   .taskBoardUpdate: .object(sampleTaskBoardItemJSON),
@@ -232,6 +234,10 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
       sampleTaskBoardPositionMutationText,
     Route("/v1/task-board/items/board-1/position/reset", method: "POST"):
       sampleTaskBoardPositionMutationText,
+    Route("/v1/task-board/items/board-1/triage", method: "GET"):
+      sampleTaskBoardTriageCurrentText,
+    Route("/v1/task-board/items/board-1/triage/history", method: "GET"):
+      sampleTaskBoardTriageHistoryText,
     Route("/v1/task-board/items/board-1/planning/begin"): sampleTaskBoardPlanningResponseText,
     Route("/v1/task-board/items/board-1/planning/submit"): sampleTaskBoardPlanningResponseText,
     Route("/v1/task-board/items/board-1/planning/approve"): sampleTaskBoardPlanningResponseText,

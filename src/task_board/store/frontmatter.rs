@@ -130,6 +130,7 @@ impl TaskBoardFrontmatter {
             created_at: self.created_at,
             updated_at: self.updated_at,
             deleted_at: self.deleted_at,
+            tombstone_cause: None,
         }
     }
 }
