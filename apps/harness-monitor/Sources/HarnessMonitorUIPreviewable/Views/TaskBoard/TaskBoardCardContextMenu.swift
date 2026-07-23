@@ -14,6 +14,8 @@ struct TaskBoardCardContextMenuActions {
   let openGitHubURL: (URL) -> Void
   let canMove: ([TaskBoardCardID], TaskBoardInboxLane) -> Bool
   let move: ([TaskBoardCardID], TaskBoardInboxLane) -> Void
+  let canResetPosition: (TaskBoardCardID) -> Bool
+  let resetPosition: (TaskBoardCardID) -> Void
   let deletionTargets: ([TaskBoardCardID]) -> [TaskBoardDeletionTarget]
   let canDelete: ([TaskBoardCardID]) -> Bool
   let deleteTargets: (([TaskBoardDeletionTarget]) -> Void)?
@@ -39,6 +41,8 @@ extension TaskBoardCardContextMenuActions {
       openGitHubURL: { _ in },
       canMove: { _, _ in false },
       move: { _, _ in },
+      canResetPosition: { _ in false },
+      resetPosition: { _ in },
       deletionTargets: { _ in [] },
       canDelete: { _ in false },
       deleteTargets: nil,
@@ -89,6 +93,14 @@ struct TaskBoardCardContextMenu: View {
         } label: {
           Label("Open on GitHub", systemImage: "arrow.up.right.square")
         }
+      }
+      if actions.canResetPosition(scope.primaryID) {
+        Button {
+          actions.resetPosition(scope.primaryID)
+        } label: {
+          Label("Reset Position", systemImage: "arrow.uturn.backward")
+        }
+        .disabled(actions.isActionInFlight)
       }
     }
     Button(scope.copyIDsLabel) {

@@ -229,6 +229,28 @@ public struct TaskBoardOverviewActions: Equatable {
     )
   }
 
+  func reorderTaskBoardItem(_ plan: TaskBoardCardReorderPlan) {
+    guard let store else { return }
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Reordering task board item") {
+        await store.reorderTaskBoardItem(
+          id: plan.itemID,
+          status: plan.status,
+          placement: plan.placement
+        )
+      }
+    )
+  }
+
+  func resetTaskBoardItemPosition(_ item: TaskBoardItem) {
+    guard let store else { return }
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Resetting task board position") {
+        await store.resetTaskBoardItemManualPosition(id: item.id)
+      }
+    )
+  }
+
   func moveTaskBoardItems(_ updates: [TaskBoardItemStatusUpdate]) {
     guard let store else { return }
     HarnessMonitorAsyncWorkQueue.shared.submit(
@@ -257,7 +279,10 @@ public struct TaskBoardOverviewActions: Equatable {
     guard canCreateItem, let store else { return }
     HarnessMonitorAsyncWorkQueue.shared.submit(
       .init(title: "Creating task board item") {
-        let success = await store.createTaskBoardItem(request: request, initialStatus: initialStatus)
+        let success = await store.createTaskBoardItem(
+          request: request,
+          initialStatus: initialStatus
+        )
         guard success else { return }
         await MainActor.run {
           outcome.succeeded = true

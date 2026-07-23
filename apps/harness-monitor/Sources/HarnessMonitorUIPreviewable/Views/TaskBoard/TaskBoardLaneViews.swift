@@ -145,6 +145,14 @@ struct TaskBoardItemRow: View {
     if let policyTraceCount = item.workflow?.policyTraceIds.count, policyTraceCount > 0 {
       TaskBoardCardPill(label: "\(policyTraceCount) policy", tint: HarnessMonitorTheme.secondaryInk)
     }
+    if case .manual = item.laneOrigin {
+      TaskBoardCardPill(
+        label: "Manual",
+        tint: HarnessMonitorTheme.accent,
+        systemImage: "hand.point.up.left.fill"
+      )
+      .accessibilityLabel("Manually placed in this lane")
+    }
   }
 
   private static var currentEventModifiers: EventModifiers {

@@ -64,6 +64,7 @@ extension TaskBoardOverviewView {
         isCollapsed: isCollapsed,
         isDropEnabled: !isActionInFlight,
         isDropCandidate: !isActionInFlight && dropCandidateLanesValue.contains(lane),
+        reorderDraggedItem: isActionInFlight ? nil : reorderDraggedItemValue,
         selectionModel: selectionModelValue,
         actions: actions,
         liveInboxItems: liveInboxItemsValue,

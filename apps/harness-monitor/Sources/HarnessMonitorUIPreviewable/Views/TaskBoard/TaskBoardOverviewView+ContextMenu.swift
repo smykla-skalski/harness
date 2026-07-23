@@ -21,6 +21,8 @@ extension TaskBoardOverviewView {
       },
       canMove: canMoveCardContextMenuSelection,
       move: moveCardContextMenuSelection,
+      canResetPosition: canResetCardPosition,
+      resetPosition: resetCardPosition,
       deletionTargets: deletionTargets,
       canDelete: canDeleteTaskBoardCards,
       deleteTargets: deleteTargetsAction,
@@ -61,6 +63,25 @@ extension TaskBoardOverviewView {
       to: lane,
       liveInboxItems: liveInboxItemsValue
     )
+  }
+
+  private func canResetCardPosition(_ cardID: TaskBoardCardID) -> Bool {
+    guard case .api(let itemID) = cardID, let item = currentPresentation.taskBoardItem(id: itemID)
+    else {
+      return false
+    }
+    if case .manual = item.laneOrigin {
+      return actions.canMoveTaskBoardItems
+    }
+    return false
+  }
+
+  private func resetCardPosition(_ cardID: TaskBoardCardID) {
+    guard case .api(let itemID) = cardID, let item = currentPresentation.taskBoardItem(id: itemID)
+    else {
+      return
+    }
+    actions.resetTaskBoardItemPosition(item)
   }
 
   private func cardContextMenuMovePlan(

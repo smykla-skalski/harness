@@ -102,6 +102,24 @@ public enum HarnessMonitorAPIError: Error, LocalizedError, Equatable {
     return Self.parsedServerEnvelope(from: message)?.error.code
   }
 
+  static func semanticServer(
+    code: Int,
+    semanticCode: String,
+    message: String,
+    details: [String] = []
+  ) -> Self {
+    let envelope = ErrorEnvelope(
+      error: .init(code: semanticCode, message: message, details: details)
+    )
+    guard
+      let data = try? JSONEncoder().encode(envelope),
+      let rawMessage = String(data: data, encoding: .utf8)
+    else {
+      return .server(code: code, message: message)
+    }
+    return .server(code: code, message: rawMessage)
+  }
+
   public var acpServiceError: AcpServiceError? {
     guard let code = serverSemanticCode else {
       return nil
