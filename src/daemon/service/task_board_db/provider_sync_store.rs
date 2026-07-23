@@ -91,7 +91,7 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
     }
 
     async fn create_item(&self, item: TaskBoardItem) -> Result<TaskBoardItem, CliError> {
-        self.create_task_board_item(item)
+        self.create_task_board_item_with_provider_triage(item)
             .await
             .map(|mutation| mutation.item)
     }
@@ -102,7 +102,7 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
         patch: TaskBoardItemPatch,
     ) -> Result<TaskBoardItem, CliError> {
         let item_id = expected_item.id.clone();
-        self.update_task_board_item(&item_id, |item| {
+        self.update_task_board_item_with_provider_triage(&item_id, |item| {
             if item != expected_item {
                 return Err(CliErrorKind::concurrent_modification(format!(
                     "task-board item '{item_id}' changed during external sync"
@@ -121,6 +121,20 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
         self.task_board_item_snapshot(item_id)
             .await
             .map(|snapshot| TaskBoardSyncItemSnapshot::new(snapshot.item, snapshot.item_revision))
+    }
+
+    async fn hide_for_provider_exclusion(
+        &self,
+        item_id: &str,
+    ) -> Result<Option<TaskBoardItem>, CliError> {
+        super::provider_sync_exclusion::hide_for_provider_exclusion(self, item_id).await
+    }
+
+    async fn restore_from_provider_exclusion(
+        &self,
+        revived: TaskBoardItem,
+    ) -> Result<Option<TaskBoardItem>, CliError> {
+        super::provider_sync_exclusion::restore_from_provider_exclusion(self, revived).await
     }
 
     async fn provider_scope_state(

@@ -151,6 +151,21 @@ impl TaskBoardSyncStore for ProviderSyncRunStore<'_> {
         <AsyncDaemonDb as TaskBoardSyncStore>::item_snapshot(self.db, item_id).await
     }
 
+    async fn hide_for_provider_exclusion(
+        &self,
+        item_id: &str,
+    ) -> Result<Option<TaskBoardItem>, CliError> {
+        <AsyncDaemonDb as TaskBoardSyncStore>::hide_for_provider_exclusion(self.db, item_id).await
+    }
+
+    async fn restore_from_provider_exclusion(
+        &self,
+        revived: TaskBoardItem,
+    ) -> Result<Option<TaskBoardItem>, CliError> {
+        <AsyncDaemonDb as TaskBoardSyncStore>::restore_from_provider_exclusion(self.db, revived)
+            .await
+    }
+
     async fn provider_scope_state(
         &self,
         provider: ExternalProvider,

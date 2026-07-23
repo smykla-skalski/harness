@@ -79,7 +79,7 @@ pub(super) async fn next_child_order_in_tx(
 /// Unparent every reference to `parent_id`, live or tombstoned, so deleting a
 /// parent leaves its children intact rather than orphaned or hidden, and no
 /// item is ever left pointing at a deleted parent.
-pub(super) async fn clear_children_parent_in_tx(
+pub(crate) async fn clear_children_parent_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     parent_id: &str,
 ) -> Result<(), CliError> {
