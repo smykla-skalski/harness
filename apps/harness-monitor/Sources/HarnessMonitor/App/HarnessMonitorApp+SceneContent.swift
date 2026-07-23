@@ -72,6 +72,7 @@ extension HarnessMonitorApp {
             set: {
               if !$0 {
                 pendingPairingURLValue = nil
+                pendingPairingInvitationValue = nil
                 pendingPairingErrorValue = nil
               }
             }
@@ -87,6 +88,7 @@ extension HarnessMonitorApp {
               if !$0 {
                 pendingPairingErrorValue = nil
                 pendingPairingURLValue = nil
+                pendingPairingInvitationValue = nil
               }
             }
           )
@@ -94,6 +96,7 @@ extension HarnessMonitorApp {
           Button("OK") {
             pendingPairingErrorValue = nil
             pendingPairingURLValue = nil
+            pendingPairingInvitationValue = nil
           }
         } message: {
           if let error = pendingPairingErrorValue {
@@ -113,13 +116,16 @@ extension HarnessMonitorApp {
       url.host?.lowercased() == "remote-pair"
     {
       do {
-        _ = try RemoteDaemonPairingInvitation.decode(url)
+        let invitation = try RemoteDaemonPairingInvitation.decode(url)
+        pendingPairingInvitationValue = invitation
         pendingPairingURLValue = url
         pendingPairingErrorValue = nil
       } catch let error as RemoteDaemonPairingInvitationError {
+        pendingPairingInvitationValue = nil
         pendingPairingURLValue = nil
         pendingPairingErrorValue = error
       } catch {
+        pendingPairingInvitationValue = nil
         pendingPairingURLValue = nil
         pendingPairingErrorValue = .invalidPayload
       }
@@ -145,7 +151,7 @@ extension HarnessMonitorApp {
   @ViewBuilder
   private var pairingConfirmationSheetContent: some View {
     if let url = pendingPairingURLValue,
-      let invitation = try? RemoteDaemonPairingInvitation.decode(url)
+      let invitation = pendingPairingInvitationValue
     {
       RemoteDaemonPairingConfirmationView(
         invitation: invitation,
@@ -157,9 +163,11 @@ extension HarnessMonitorApp {
           settingsSelectedSectionBinding.wrappedValue = .connection
           openWindow(id: HarnessMonitorWindowID.settings)
           pendingPairingURLValue = nil
+          pendingPairingInvitationValue = nil
         },
         onCancel: {
           pendingPairingURLValue = nil
+          pendingPairingInvitationValue = nil
         }
       )
     }

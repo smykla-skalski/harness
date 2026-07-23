@@ -50,6 +50,7 @@ struct HarnessMonitorApp: App {
   @State private var perfScenarioStatus: HarnessMonitorPerfScenarioStatus = .idle
   @State private var perfScenarioFailureReason: String?
   @State private var pendingPairingURL: URL?
+  @State private var pendingPairingInvitation: RemoteDaemonPairingInvitation?
   @State private var pendingPairingError: RemoteDaemonPairingInvitationError?
   @AppStorage(HarnessMonitorThemeDefaults.modeKey)
   var themeMode: HarnessMonitorThemeMode = .auto
@@ -347,6 +348,11 @@ struct HarnessMonitorApp: App {
   var pendingPairingErrorValue: RemoteDaemonPairingInvitationError? {
     get { pendingPairingError }
     nonmutating set { pendingPairingError = newValue }
+  }
+
+  var pendingPairingInvitationValue: RemoteDaemonPairingInvitation? {
+    get { pendingPairingInvitation }
+    nonmutating set { pendingPairingInvitation = newValue }
   }
 
   var pendingPairingURLBinding: Binding<URL?> {
