@@ -8,13 +8,6 @@ public struct RemoteDaemonPairingConfirmationView: View {
 
   @State private var displayName = ""
 
-  private static let expirationFormatter: DateFormatter = {
-    let f = DateFormatter()
-    f.dateStyle = .medium
-    f.timeStyle = .short
-    return f
-  }()
-
   public init(
     invitation: RemoteDaemonPairingInvitation,
     onPair: @escaping @MainActor @Sendable (String) -> Void,
@@ -111,7 +104,7 @@ public struct RemoteDaemonPairingConfirmationView: View {
   }
 
   private var expirationText: String {
-    Self.expirationFormatter.string(from: invitation.expiresAt)
+    invitation.expiresAt.formatted(date: .abbreviated, time: .shortened)
   }
 
   private var expirationColor: Color {
