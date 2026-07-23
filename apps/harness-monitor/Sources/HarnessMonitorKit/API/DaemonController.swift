@@ -197,7 +197,7 @@ public struct DaemonController: DaemonControlling {
           WebSocket upgrade exceeded \(gracePeriod, privacy: .public)
           """
         )
-      case .unavailable:
+      case .unavailable, .cancelled:
         break
       }
       try await requireNotCancelled(releasing: httpClient)

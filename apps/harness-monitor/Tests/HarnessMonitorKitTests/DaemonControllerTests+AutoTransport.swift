@@ -180,21 +180,26 @@ struct DaemonControllerAutoTransportTests {
     }
   }
 
-  @Test("cancelled auto transport bootstrap releases the HTTP client")
-  func cancelledAutoTransportBootstrapReleasesHTTPClient() async throws {
+  @Test("cancelled auto transport bootstrap stops without waiting out the grace period")
+  func cancelledAutoTransportBootstrapStopsWithoutGraceWait() async throws {
     let httpClient = RecordingHarnessClient()
     let attemptStarted = LockedFlag()
+    let attemptCancelled = LockedFlag()
+    // Long enough that waiting the grace period out is unmistakable in the
+    // measured wait rather than a matter of scheduling noise.
+    let gracePeriod: Duration = .seconds(5)
     let controller = DaemonController(
       transportPreference: .auto,
       launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
       ownership: .managed,
-      autoTransportWebSocketGracePeriod: .milliseconds(100),
+      autoTransportWebSocketGracePeriod: gracePeriod,
       sessionFactory: { _ in httpClient },
       webSocketBootstrapper: { _ in
         attemptStarted.set()
         while !Task.isCancelled {
           try? await Task.sleep(for: .milliseconds(10))
         }
+        attemptCancelled.set()
         return nil
       }
     )
@@ -210,14 +215,25 @@ struct DaemonControllerAutoTransportTests {
       try await Task.sleep(for: .milliseconds(10))
     }
     #expect(attemptStarted.get())
-    bootstrap.cancel()
 
+    let cancelledAt = clock.now
+    bootstrap.cancel()
     await #expect(throws: CancellationError.self) {
       _ = try await bootstrap.value
     }
-    // Throwing without closing the healthy HTTP client would leak the socket
-    // this PR closes on the WebSocket side.
+    let elapsed = cancelledAt.duration(to: clock.now)
+
+    #expect(elapsed < .milliseconds(500))
+    #expect(elapsed < gracePeriod)
+    // Throwing without closing the healthy HTTP client would leak the socket.
     #expect(httpClient.shutdownCallCount() == 1)
+
+    let attemptDeadline = clock.now + .seconds(1)
+    while !attemptCancelled.get(), clock.now < attemptDeadline {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    // The attempt stops at the cancel, not when the grace period expires.
+    #expect(attemptCancelled.get())
   }
 
   @Test("default WebSocket bootstrap stops a hung health probe on cancel")
