@@ -275,10 +275,15 @@ struct TaskBoardPlanLifecycleActionButtons: View {
 
   var body: some View {
     let labelFont = labelFont
-    beginPlanButton(labelFont: labelFont)
-    submitPlanButton(labelFont: labelFont)
-    approvePlanButton(labelFont: labelFont)
-    revokePlanButton(labelFont: labelFont)
+    HarnessMonitorWrapLayout(
+      spacing: HarnessMonitorTheme.spacingSM,
+      lineSpacing: HarnessMonitorTheme.spacingSM
+    ) {
+      beginPlanButton(labelFont: labelFont)
+      submitPlanButton(labelFont: labelFont)
+      approvePlanButton(labelFont: labelFont)
+      revokePlanButton(labelFont: labelFont)
+    }
   }
 
   private func revokePlanButton(labelFont: Font) -> some View {

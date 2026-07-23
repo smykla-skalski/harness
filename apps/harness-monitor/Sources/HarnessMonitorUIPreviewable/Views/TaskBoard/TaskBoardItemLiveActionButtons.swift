@@ -17,7 +17,10 @@ struct TaskBoardItemLiveActionButtons: View {
   private var canEvaluate: Bool { actions.canEvaluateItem || actions.canEvaluateBoard }
 
   var body: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+    HarnessMonitorWrapLayout(
+      spacing: HarnessMonitorTheme.spacingSM,
+      lineSpacing: HarnessMonitorTheme.spacingSM
+    ) {
       runOnceButton
       evaluateButton
     }
