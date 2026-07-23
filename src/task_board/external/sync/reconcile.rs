@@ -5,6 +5,7 @@ use crate::task_board::external::targeting::{
 use crate::task_board::external::{
     ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncField, ExternalTask, ExternalTaskRef,
 };
+use crate::task_board::matched_exclusion_label;
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::types::{
     ExternalRef, ExternalRefSyncState, TaskBoardItem, TaskBoardItemKind, TaskBoardStatus,
@@ -16,6 +17,7 @@ use super::merge::{
     changed_fields, external_ref_matches, matching_ref, pull_conflict_fields,
     pull_resolution_fields, reconcile_provider_labels, sync_state_from_task, task_signals_umbrella,
 };
+use super::provider_exclusion::hide_existing_item_for_exclusion;
 use super::{
     ExternalSyncAction, ExternalSyncDirection, ExternalSyncOperation, ExternalSyncOptions,
     OperationDraft, TaskBoardSyncStore, canonical_external_status, operation,
@@ -34,6 +36,10 @@ pub(super) async fn reconcile_existing_item(
     resolved_parent_item_id: Option<&str>,
     operations: &mut Vec<ExternalSyncOperation>,
 ) -> Result<(), CliError> {
+    if matched_exclusion_label(&task.labels).is_some() {
+        return hide_existing_item_for_exclusion(board, options, provider, item, task, operations)
+            .await;
+    }
     let reports_conflicts = matches!(options.direction, ExternalSyncDirection::Both)
         && matches!(options.conflict_policy, ExternalSyncConflictPolicy::Report);
     let snapshot = if reports_conflicts && !options.dry_run {

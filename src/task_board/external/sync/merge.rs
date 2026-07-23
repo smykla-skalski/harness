@@ -2,6 +2,7 @@ use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::types::{
     ExternalRef, ExternalRefProvider, ExternalRefSyncState, TaskBoardItem, TaskBoardStatus,
 };
+use crate::task_board::canonicalize_labels;
 use crate::workspace::utc_now;
 
 use crate::task_board::external::targeting::provider_project_maps_to_board;
@@ -97,7 +98,7 @@ pub(super) fn sync_state_from_task(task: &ExternalTask) -> ExternalRefSyncState 
         project_id: task.project_id.clone(),
         updated_at: task.updated_at.clone(),
         synced_at: Some(utc_now()),
-        labels: task.labels.clone(),
+        labels: canonicalize_labels(&task.labels),
     }
 }
 

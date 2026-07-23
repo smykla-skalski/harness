@@ -2,7 +2,7 @@ use crate::task_board::external::{
     ExternalProvider, ExternalProviderScopeAttempt, ExternalSyncClient, ExternalSyncField,
     ExternalTaskRef,
 };
-use crate::task_board::types::TaskBoardItem;
+use crate::task_board::types::{TaskBoardItem, TaskBoardTombstoneCause};
 
 use super::{
     ExternalSyncAction, ExternalSyncOperation, ExternalSyncOptions, OperationDraft,
@@ -28,6 +28,7 @@ pub(super) async fn delete_remote_tombstones(
         .into_iter()
         .filter(|item| {
             item.is_deleted()
+                && item.tombstone_cause != Some(TaskBoardTombstoneCause::ProviderExclusion)
                 && !item.external_refs.is_empty()
                 && client_owns_item(client, item, &scope_id)
         })

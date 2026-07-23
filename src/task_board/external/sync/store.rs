@@ -110,6 +110,32 @@ pub(crate) trait TaskBoardSyncStore: TaskBoardExternalCreateStore {
 
     async fn item_snapshot(&self, item_id: &str) -> Result<TaskBoardSyncItemSnapshot, CliError>;
 
+    /// Tombstones an already-visible, pre-dispatch item because the provider
+    /// now reports an exclusion label (duplicate/invalid/wontfix, bare or
+    /// `triage/`-prefixed). Returns `None`, doing nothing, when the item is
+    /// not eligible to be hidden this way (already deleted, past
+    /// pre-dispatch, or otherwise dispatched/claimed work).
+    async fn hide_for_provider_exclusion(
+        &self,
+        _item_id: &str,
+    ) -> Result<Option<TaskBoardItem>, CliError> {
+        Err(durable_external_create_store_required())
+    }
+
+    /// Restores a previously provider-exclusion-tombstoned item because the
+    /// provider no longer reports an exclusion label, refreshing its title,
+    /// body, status, tags, project, execution repository, and external refs
+    /// from `revived` (built fresh from the current provider task, same
+    /// deterministic id) in the same step. Returns `None` when `revived.id`
+    /// is not currently tombstoned for provider exclusion (including when it
+    /// does not exist at all, or was tombstoned some other way).
+    async fn restore_from_provider_exclusion(
+        &self,
+        _revived: TaskBoardItem,
+    ) -> Result<Option<TaskBoardItem>, CliError> {
+        Err(durable_external_create_store_required())
+    }
+
     async fn provider_scope_state(
         &self,
         provider: ExternalProvider,

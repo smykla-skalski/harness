@@ -31,6 +31,7 @@ mod lease_tests;
 mod legacy_store;
 mod lookup;
 mod merge;
+mod provider_exclusion;
 mod push;
 mod reconcile;
 mod scope;
@@ -51,6 +52,7 @@ use lookup::{
     resolve_parent_item_id,
 };
 use merge::{matching_ref, pull_create_fields, sync_state_from_task, task_signals_umbrella};
+use provider_exclusion::try_restore_provider_exclusion_tombstone;
 use push::push_board_tasks;
 use reconcile::reconcile_existing_item;
 use scope::SyncClientError;
@@ -264,8 +266,29 @@ async fn pull_provider_tasks(
         if !new_pull_matches_status_filter(options.status, &task) {
             continue;
         }
-        if matched_exclusion_label(&task.labels).is_some() || task.title.trim().is_empty() {
+        if matched_exclusion_label(&task.labels).is_some() {
             continue;
+        }
+        if task.title.trim().is_empty() {
+            continue;
+        }
+        if !options.dry_run {
+            if let Some(restored) = try_restore_provider_exclusion_tombstone(board, &task).await? {
+                let restored =
+                    link_resolved_parent(board, restored, resolved_parent_item_id.as_deref())
+                        .await?;
+                operations.push(operation(OperationDraft {
+                    provider: client.provider(),
+                    action: ExternalSyncAction::Pull,
+                    board_item_id: Some(restored.id),
+                    reference: task.reference.clone(),
+                    dry_run: false,
+                    applied: true,
+                    changed_fields: pull_create_fields(&task),
+                    unsupported_fields: Vec::new(),
+                }));
+                continue;
+            }
         }
         if options.dry_run {
             operations.push(operation(OperationDraft {
