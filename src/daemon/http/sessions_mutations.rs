@@ -20,7 +20,7 @@ use super::response::{extract_request_id, timed_json};
 use super::{DaemonHttpState, run_acp_agent_blocking};
 
 #[cfg(feature = "openapi")]
-use super::openapi::DaemonErrorBody;
+use super::openapi::{DaemonErrorBody, SessionAdHocError};
 
 #[cfg_attr(feature = "openapi", utoipa::path(
     post,
@@ -440,7 +440,7 @@ fn session_mutation_response(session_state: SessionState) -> SessionMutationResp
     params(("session_id" = String, Path, description = "Session identifier")),
     responses(
         (status = 204, description = "Session deleted"),
-        (status = 404, description = "Session not found"),
+        (status = 404, description = "Session not found; body is `{\"error\": \"session not found\"}`", body = SessionAdHocError),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 ))]

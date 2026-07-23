@@ -623,10 +623,24 @@
             }
           },
           "409": {
-            "description": "A session already exists for the adopted directory"
+            "description": "A session already exists for the adopted directory; body is `{\"error\": \"already-attached\", \"session_id\": ...}`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionAdHocError"
+                }
+              }
+            }
           },
           "422": {
-            "description": "Adoption request could not be validated"
+            "description": "Adoption request could not be validated; body `error` is one of `layout-violation`, `unsupported-schema-version`, or `origin-mismatch`, each with its own context fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionAdHocError"
+                }
+              }
+            }
           },
           "401": {
             "$ref": "#/components/responses/RemoteAuthRequired"
@@ -672,56 +686,7 @@
           {
             "name": "scope",
             "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 0
-            }
-          },
-          {
-            "name": "known_revision",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "before_recorded_at",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "before_entry_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "after_recorded_at",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "after_entry_id",
-            "in": "query",
+            "description": "Set to `core` for the reduced core view; any other value or omission returns the full detail",
             "required": false,
             "schema": {
               "type": "string"
@@ -801,7 +766,14 @@
             }
           },
           "404": {
-            "description": "Session not found"
+            "description": "Session not found; body is `{\"error\": \"session not found\"}`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionAdHocError"
+                }
+              }
+            }
           },
           "401": {
             "$ref": "#/components/responses/RemoteAuthRequired"
@@ -1143,7 +1115,7 @@
               }
             }
           },
-          "required": true
+          "required": false
         },
         "responses": {
           "200": {
@@ -2938,6 +2910,19 @@
                 "$ref": "#/components/schemas/ResolvedRuntimeSessionAgent"
               }
             ]
+          }
+        }
+      },
+      "SessionAdHocError": {
+        "type": "object",
+        "description": "Ad-hoc error body emitted by a few session endpoints that predate the\nstandard [`DaemonErrorBody`] envelope. It always carries a short string\n`error` tag or message; some responses add variant-specific fields, which\nthe owning operation documents. The schema leaves additional properties\nopen so those variant fields validate.",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error tag or message, for example `already-attached` or\n`session not found`."
           }
         }
       },

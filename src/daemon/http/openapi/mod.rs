@@ -38,6 +38,18 @@ pub struct DaemonErrorDetail {
     pub details: Vec<String>,
 }
 
+/// Ad-hoc error body emitted by a few session endpoints that predate the
+/// standard [`DaemonErrorBody`] envelope. It always carries a short string
+/// `error` tag or message; some responses add variant-specific fields, which
+/// the owning operation documents. The schema leaves additional properties
+/// open so those variant fields validate.
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct SessionAdHocError {
+    /// Error tag or message, for example `already-attached` or
+    /// `session not found`.
+    pub error: String,
+}
+
 #[derive(utoipa::OpenApi)]
 #[openapi(
     info(
@@ -107,6 +119,7 @@ pub fn openapi_json_value() -> serde_json::Value {
         serde_json::to_value(openapi_document()).expect("openapi document serializes to json");
     inject_websocket_methods(&mut doc);
     inject_cross_cutting_responses(&mut doc);
+    inject_optional_request_bodies(&mut doc);
     inject_provenance(&mut doc);
     doc
 }
@@ -169,6 +182,36 @@ fn inject_provenance(doc: &mut serde_json::Value) {
                 "note": "Generated file. Do not edit by hand - rerun: mise run openapi:generate",
             }),
         );
+    }
+}
+
+/// Operations whose handler accepts an optional request body
+/// (`Option<Json<..>>`). `utoipa` marks every declared `request_body` as
+/// required, so the optional ones are relaxed here at the JSON layer.
+const OPTIONAL_REQUEST_BODIES: &[(&str, &str)] = &[("post", "/v1/sessions/{session_id}/observe")];
+
+/// Mark the request body optional for operations whose handler tolerates a
+/// missing body, since `utoipa` cannot express `required = false` on
+/// `request_body`.
+fn inject_optional_request_bodies(doc: &mut serde_json::Value) {
+    let Some(paths) = doc
+        .get_mut("paths")
+        .and_then(serde_json::Value::as_object_mut)
+    else {
+        return;
+    };
+    for (method, path) in OPTIONAL_REQUEST_BODIES {
+        let Some(request_body) = paths
+            .get_mut(*path)
+            .and_then(serde_json::Value::as_object_mut)
+            .and_then(|item| item.get_mut(*method))
+            .and_then(serde_json::Value::as_object_mut)
+            .and_then(|operation| operation.get_mut("requestBody"))
+            .and_then(serde_json::Value::as_object_mut)
+        else {
+            continue;
+        };
+        request_body.insert("required".to_owned(), serde_json::Value::Bool(false));
     }
 }
 

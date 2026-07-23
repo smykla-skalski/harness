@@ -147,7 +147,7 @@ pub(super) async fn get_sessions(
     tag = "sessions",
     params(
         ("session_id" = String, Path, description = "Session identifier"),
-        SessionScopeQuery,
+        ("scope" = Option<String>, Query, description = "Set to `core` for the reduced core view; any other value or omission returns the full detail"),
     ),
     responses(
         (status = 200, description = "Session detail", body = SessionDetail),
