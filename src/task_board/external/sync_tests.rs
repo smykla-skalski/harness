@@ -8,6 +8,7 @@ use crate::task_board::store::TaskBoardStore;
 use crate::task_board::types::{ExternalRefSyncState, TaskBoardItem, TaskBoardStatus};
 
 mod conflict_correctness_tests;
+mod provider_exclusion_status_filter_tests;
 mod pull_policy_tests;
 mod status_roundtrip_tests;
 

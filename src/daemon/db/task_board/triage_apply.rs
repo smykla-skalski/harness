@@ -1,5 +1,6 @@
 use sqlx::{Sqlite, Transaction};
 
+use super::dispatch_intents::helpers::has_active_dispatch_reservation_in_tx;
 use super::lane_order::load_lane_entries_in_tx;
 use super::triage_decisions::{current_triage_decision_in_tx, record_triage_decision_in_tx};
 use crate::daemon::db::{CliError, db_error};
@@ -56,7 +57,9 @@ pub(super) async fn apply_builtin_v1_triage_in_tx(
     decided_at: &str,
     suppress_placement: bool,
 ) -> Result<Option<TriageOutcome>, CliError> {
-    if !triage_eligible(item) {
+    if !triage_eligible(item)
+        || has_active_dispatch_reservation_in_tx(transaction, &item.id).await?
+    {
         return Ok(None);
     }
     let fingerprint = evidence_fingerprint(item);

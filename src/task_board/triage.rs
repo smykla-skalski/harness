@@ -10,7 +10,7 @@ pub const BUILTIN_V1_EVALUATOR_IDENTITY: &str = "task_board.triage.builtin_v1";
 /// Bumped only when this check table itself changes, never by configuration.
 pub const BUILTIN_V1_EVALUATOR_VERSION: u32 = 1;
 
-const NEEDS_INFO_LABEL: &str = "triage/needs-info";
+const NEEDS_INFO_LABELS: [&str; 2] = ["needs-info", "triage/needs-info"];
 const EXCLUSION_LABELS: [&str; 6] = [
     "duplicate",
     "invalid",
@@ -63,6 +63,51 @@ pub struct TaskBoardTriageDecision {
     pub decided_at: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskBoardTriageDecisionRecord {
+    pub decision_id: String,
+    pub item_id: String,
+    pub generation: u64,
+    pub verdict: TriageVerdict,
+    pub reason_code: TriageReasonCode,
+    #[serde(default)]
+    pub reason_detail: Option<String>,
+    pub evaluator_identity: String,
+    pub evaluator_version: u32,
+    #[serde(default)]
+    pub evidence_fingerprint: Option<String>,
+    pub cause: TriageCause,
+    pub decided_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub superseded_at: Option<String>,
+}
+
+impl TaskBoardTriageDecisionRecord {
+    #[must_use]
+    pub(crate) fn from_decision(
+        decision_id: String,
+        item_id: String,
+        generation: u64,
+        decision: TaskBoardTriageDecision,
+        superseded_at: Option<String>,
+    ) -> Self {
+        Self {
+            decision_id,
+            item_id,
+            generation,
+            verdict: decision.verdict,
+            reason_code: decision.reason_code,
+            reason_detail: decision.reason_detail,
+            evaluator_identity: decision.evaluator_identity,
+            evaluator_version: decision.evaluator_version,
+            evidence_fingerprint: Some(decision.evidence_fingerprint),
+            cause: decision.cause,
+            decided_at: decision.decided_at,
+            superseded_at,
+        }
+    }
+}
+
 /// Lower-case, trim, dedupe, and sort tags into the canonical label set `BuiltInV1`
 /// evaluates and fingerprints. Order and case in the source tags never matter.
 #[must_use]
@@ -100,11 +145,14 @@ pub fn matched_exclusion_label(tags: &[String]) -> Option<String> {
 #[must_use]
 pub fn evaluate_builtin_v1(item: &TaskBoardItem) -> TriageOutcome {
     let labels = canonicalize_labels(&item.tags);
-    if labels.iter().any(|label| label == NEEDS_INFO_LABEL) {
+    if let Some(label) = labels
+        .iter()
+        .find(|label| NEEDS_INFO_LABELS.contains(&label.as_str()))
+    {
         return TriageOutcome {
             verdict: TriageVerdict::Undecided,
             reason_code: TriageReasonCode::NeedsInfoLabel,
-            reason_detail: Some(NEEDS_INFO_LABEL.to_string()),
+            reason_detail: Some(label.clone()),
         };
     }
     if labels.is_empty() {
@@ -221,7 +269,11 @@ pub fn is_canonical_decided_at(value: &str) -> bool {
     let Ok(parsed) = DateTime::parse_from_rfc3339(value) else {
         return false;
     };
-    parsed.with_timezone(&Utc).format("%Y-%m-%dT%H:%M:%SZ").to_string() == value
+    parsed
+        .with_timezone(&Utc)
+        .format("%Y-%m-%dT%H:%M:%SZ")
+        .to_string()
+        == value
 }
 
 const fn priority_tag(priority: TaskBoardPriority) -> &'static [u8] {

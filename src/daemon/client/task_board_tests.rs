@@ -184,6 +184,53 @@ fn automation_runs_encode_history_query() {
 }
 
 #[test]
+fn triage_current_uses_item_triage_route() {
+    let (endpoint, request_line, handle) = spawn_mock("200 OK", r#"{"current":null}"#.into());
+
+    let response = client_with(endpoint)
+        .get_task_board_item_triage("task-1")
+        .expect("triage current");
+    handle.join().expect("server");
+
+    assert!(response.current.is_none());
+    assert_eq!(
+        *request_line.lock().expect("request line"),
+        "GET /v1/task-board/items/task-1/triage HTTP/1.1"
+    );
+}
+
+#[test]
+fn triage_history_encodes_cursor_and_limit_query() {
+    let (endpoint, request_line, handle) = spawn_mock("200 OK", r#"{"decisions":[]}"#.into());
+
+    let response = client_with(endpoint)
+        .get_task_board_item_triage_history("task-1", Some(7), Some(25))
+        .expect("triage history");
+    handle.join().expect("server");
+
+    assert!(response.decisions.is_empty());
+    assert_eq!(
+        *request_line.lock().expect("request line"),
+        "GET /v1/task-board/items/task-1/triage/history?before_generation=7&limit=25 HTTP/1.1"
+    );
+}
+
+#[test]
+fn triage_reads_reject_unsafe_item_ids_before_transport() {
+    let client = client_with("http://127.0.0.1:1".to_string());
+
+    let current = client
+        .get_task_board_item_triage("../unsafe")
+        .expect_err("unsafe current id");
+    let history = client
+        .get_task_board_item_triage_history("../unsafe", None, None)
+        .expect_err("unsafe history id");
+
+    assert_eq!(current.code(), "KSRCLI059");
+    assert_eq!(history.code(), "KSRCLI059");
+}
+
+#[test]
 fn automation_run_detail_expands_path_and_preserves_missing_detail_error() {
     let (endpoint, request_line, handle) =
         spawn_mock("400 Bad Request", r#"{"error":"not found"}"#.into());

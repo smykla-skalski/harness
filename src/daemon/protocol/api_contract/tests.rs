@@ -264,6 +264,37 @@ fn task_board_position_remote_scopes_keep_viewers_read_only() {
 }
 
 #[test]
+fn task_board_triage_remote_scopes_are_read_only() {
+    let route_scope = |method, path| {
+        let route = HTTP_API_CONTRACT
+            .iter()
+            .find(|route| route.method == method && route.path == path)
+            .unwrap_or_else(|| panic!("missing task-board triage route {method:?} {path}"));
+        remote_http_scopes(route)
+    };
+
+    assert_eq!(
+        route_scope(HttpRouteMethod::Get, http_paths::TASK_BOARD_ITEM_TRIAGE),
+        Some(&[RemoteAccessScope::Read][..])
+    );
+    assert_eq!(
+        route_scope(
+            HttpRouteMethod::Get,
+            http_paths::TASK_BOARD_ITEM_TRIAGE_HISTORY
+        ),
+        Some(&[RemoteAccessScope::Read][..])
+    );
+    assert_eq!(
+        remote_ws_scopes(ws_methods::TASK_BOARD_TRIAGE_GET),
+        Some(&[RemoteAccessScope::Read][..])
+    );
+    assert_eq!(
+        remote_ws_scopes(ws_methods::TASK_BOARD_TRIAGE_HISTORY),
+        Some(&[RemoteAccessScope::Read][..])
+    );
+}
+
+#[test]
 fn reviews_pull_request_resolve_remote_scope_is_read_only() {
     let route = HTTP_API_CONTRACT
         .iter()

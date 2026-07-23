@@ -1,3 +1,4 @@
+use sqlx::{query, query_scalar};
 use tempfile::tempdir;
 
 use super::super::items::{load_item_in_tx, replace_item_in_tx};
@@ -77,12 +78,7 @@ async fn eligible_backlog_item_with_a_label_promotes_to_todo_with_automatic_plac
         .expect("item exists");
     item.work_item_id = None;
     let outcome =
-        apply_builtin_v1_triage_in_tx(
-            &mut transaction,
-            &mut item,
-            "2026-07-22T01:00:00Z",
-            false,
-        )
+        apply_builtin_v1_triage_in_tx(&mut transaction, &mut item, "2026-07-22T01:00:00Z", false)
             .await
             .expect("apply triage")
             .expect("decision recorded");
@@ -120,12 +116,7 @@ async fn eligible_backlog_item_with_no_labels_stays_in_backlog_as_undecided() {
         .expect("item exists");
     item.work_item_id = None;
     let outcome =
-        apply_builtin_v1_triage_in_tx(
-            &mut transaction,
-            &mut item,
-            "2026-07-22T01:00:00Z",
-            false,
-        )
+        apply_builtin_v1_triage_in_tx(&mut transaction, &mut item, "2026-07-22T01:00:00Z", false)
             .await
             .expect("apply triage")
             .expect("decision recorded");
@@ -136,6 +127,73 @@ async fn eligible_backlog_item_with_no_labels_stays_in_backlog_as_undecided() {
     assert_eq!(decision.reason_code, TriageReasonCode::NoMeaningfulLabels);
     assert_eq!(item.status, TaskBoardStatus::Backlog);
     assert_eq!(item.lane_position, None);
+}
+
+#[tokio::test]
+async fn active_dispatch_reservations_suppress_triage_decisions_and_placement() {
+    for status in [
+        "preparing",
+        "preparing_claimed",
+        "held",
+        "pending",
+        "workflow_prepared",
+        "starting",
+    ] {
+        let (_directory, db) = connect().await;
+        db.create_task_board_item(backlog_item("item-1", vec!["kind/bug".into()]))
+            .await
+            .expect("seed item");
+        let claim_token = matches!(status, "preparing_claimed" | "starting").then_some("claim");
+        let claimed_at =
+            matches!(status, "preparing_claimed" | "starting").then_some("2026-07-22T00:00:00Z");
+        query(
+            "INSERT INTO task_board_dispatch_intents (
+                 intent_id, item_id, session_id, work_item_id, workflow_execution_id,
+                 payload_json, status, attempts, available_at, claim_token, claimed_at,
+                 created_at, updated_at
+             ) VALUES (?1, 'item-1', 'session-1', 'work-1', 'workflow-1', '{}',
+                       ?2, 0, '2026-07-22T00:00:00Z', ?3, ?4,
+                       '2026-07-22T00:00:00Z', '2026-07-22T00:00:00Z')",
+        )
+        .bind(format!("intent-{status}"))
+        .bind(status)
+        .bind(claim_token)
+        .bind(claimed_at)
+        .execute(db.pool())
+        .await
+        .expect("seed dispatch reservation");
+
+        let mut transaction = db
+            .begin_immediate_transaction("test reserved item triage")
+            .await
+            .expect("begin transaction");
+        let (mut item, _) = load_item_in_tx(&mut transaction, "item-1")
+            .await
+            .expect("load item")
+            .expect("item exists");
+        item.work_item_id = None;
+        let outcome = apply_builtin_v1_triage_in_tx(
+            &mut transaction,
+            &mut item,
+            "2026-07-22T01:00:00Z",
+            false,
+        )
+        .await
+        .expect("check triage eligibility");
+        transaction.commit().await.expect("commit");
+
+        assert!(outcome.is_none(), "{status} must suppress triage");
+        assert_eq!(item.status, TaskBoardStatus::Backlog);
+        assert_eq!(item.lane_position, None);
+        assert_eq!(item.lane_origin, None);
+        let decisions: i64 = query_scalar(
+            "SELECT COUNT(*) FROM task_board_triage_decisions WHERE item_id = 'item-1'",
+        )
+        .fetch_one(db.pool())
+        .await
+        .expect("count decisions");
+        assert_eq!(decisions, 0);
+    }
 }
 
 #[tokio::test]
@@ -158,12 +216,7 @@ async fn needs_info_label_stays_undecided_even_with_other_labels() {
         .expect("item exists");
     item.work_item_id = None;
     let outcome =
-        apply_builtin_v1_triage_in_tx(
-            &mut transaction,
-            &mut item,
-            "2026-07-22T01:00:00Z",
-            false,
-        )
+        apply_builtin_v1_triage_in_tx(&mut transaction, &mut item, "2026-07-22T01:00:00Z", false)
             .await
             .expect("apply triage")
             .expect("decision recorded");
@@ -205,14 +258,16 @@ async fn unchanged_fingerprint_is_idempotent_and_records_no_new_decision() {
         repeat.is_none(),
         "unchanged fingerprint with congruent persisted placement must not re-decide"
     );
-    let generations: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM task_board_triage_decisions WHERE item_id = ?1",
-    )
-    .bind(item_id)
-    .fetch_one(db.pool())
-    .await
-    .expect("count decision history");
-    assert_eq!(generations, 1, "idempotent re-evaluation must not append history");
+    let generations: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM task_board_triage_decisions WHERE item_id = ?1")
+            .bind(item_id)
+            .fetch_one(db.pool())
+            .await
+            .expect("count decision history");
+    assert_eq!(
+        generations, 1,
+        "idempotent re-evaluation must not append history"
+    );
 }
 
 #[tokio::test]
@@ -241,12 +296,7 @@ async fn manual_placement_suppresses_status_and_placement_but_not_decision_histo
     // No labels at all -> BuiltInV1 would normally demote to Backlog/Undecided,
     // but a manual anchor must suppress the status/placement effect.
     let outcome =
-        apply_builtin_v1_triage_in_tx(
-            &mut transaction,
-            &mut item,
-            "2026-07-22T01:00:00Z",
-            false,
-        )
+        apply_builtin_v1_triage_in_tx(&mut transaction, &mut item, "2026-07-22T01:00:00Z", false)
             .await
             .expect("apply triage")
             .expect("decision recorded even though placement is suppressed");
@@ -317,12 +367,7 @@ async fn ineligible_umbrella_item_is_never_evaluated() {
         .expect("item exists");
     item.work_item_id = None;
     let decision =
-        apply_builtin_v1_triage_in_tx(
-            &mut transaction,
-            &mut item,
-            "2026-07-22T01:00:00Z",
-            false,
-        )
+        apply_builtin_v1_triage_in_tx(&mut transaction, &mut item, "2026-07-22T01:00:00Z", false)
             .await
             .expect("apply triage");
     transaction.commit().await.expect("commit");

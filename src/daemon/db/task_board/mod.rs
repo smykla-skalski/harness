@@ -14,7 +14,6 @@ mod dispatch_workflow_start;
 mod held_dispatch;
 mod import_lifecycle;
 mod imports;
-mod triage_audit;
 mod items;
 mod items_reads;
 mod lane_order;
@@ -96,7 +95,9 @@ mod remote_assignment_stop_fence;
 mod remote_assignment_terminal;
 mod remote_assignment_terminal_handoff;
 mod triage_apply;
+mod triage_audit;
 mod triage_decisions;
+mod triage_queries;
 pub(crate) use remote_assignment_terminal_handoff::{
     exact_active_remote_target, parent_points_to_assignment,
 };

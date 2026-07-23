@@ -8,15 +8,15 @@ use crate::task_board::{
 };
 
 #[derive(sqlx::FromRow)]
-struct TriageDecisionRow {
-    verdict: String,
-    reason_code: String,
-    reason_detail: Option<String>,
-    evaluator_identity: String,
-    evaluator_version: i64,
-    evidence_fingerprint: String,
-    cause: String,
-    decided_at: String,
+pub(super) struct TriageDecisionRow {
+    pub(super) verdict: String,
+    pub(super) reason_code: String,
+    pub(super) reason_detail: Option<String>,
+    pub(super) evaluator_identity: String,
+    pub(super) evaluator_version: i64,
+    pub(super) evidence_fingerprint: String,
+    pub(super) cause: String,
+    pub(super) decided_at: String,
 }
 
 /// Load the current (`is_current = 1`) `BuiltInV1` decision for one item, if any.
@@ -61,6 +61,9 @@ pub(super) async fn record_triage_decision_in_tx(
 ) -> Result<TaskBoardTriageDecision, CliError> {
     if !is_canonical_evaluator_identity(evaluator_identity) {
         return Err(db_error("triage evaluator identity is not canonical"));
+    }
+    if evaluator_version == 0 {
+        return Err(db_error("triage evaluator version must be positive"));
     }
     if !is_canonical_evidence_fingerprint(evidence_fingerprint) {
         return Err(db_error("triage evidence fingerprint is not canonical"));
@@ -136,9 +139,13 @@ pub(super) async fn record_triage_decision_in_tx(
 /// written by anything other than [`record_triage_decision_in_tx`] could
 /// otherwise carry a fingerprint, identity, or timestamp the rest of this
 /// module never actually produces.
-fn decision_from_row(row: TriageDecisionRow) -> Result<TaskBoardTriageDecision, CliError> {
+pub(super) fn decision_from_row(
+    row: TriageDecisionRow,
+) -> Result<TaskBoardTriageDecision, CliError> {
     if !is_canonical_evaluator_identity(&row.evaluator_identity) {
-        return Err(db_error("stored triage evaluator identity is not canonical"));
+        return Err(db_error(
+            "stored triage evaluator identity is not canonical",
+        ));
     }
     if !is_canonical_evidence_fingerprint(&row.evidence_fingerprint) {
         return Err(db_error(
@@ -161,7 +168,9 @@ fn decision_from_row(row: TriageDecisionRow) -> Result<TaskBoardTriageDecision, 
         reason_detail: row.reason_detail,
         evaluator_identity: row.evaluator_identity,
         evaluator_version: u32::try_from(row.evaluator_version)
-            .map_err(|_| db_error("stored triage evaluator version out of range"))?,
+            .ok()
+            .filter(|version| *version > 0)
+            .ok_or_else(|| db_error("stored triage evaluator version out of range"))?,
         evidence_fingerprint: row.evidence_fingerprint,
         cause: parse_cause(&row.cause)?,
         decided_at: row.decided_at,

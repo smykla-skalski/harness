@@ -11,6 +11,7 @@ mod policy;
 mod policy_io;
 mod policy_spawn_gate;
 mod positions;
+mod triage;
 
 pub(super) use self::items::{authenticated_request, authorized_control_request_parts};
 pub(super) use self::policy_io::{
@@ -33,6 +34,7 @@ use self::positions::{
     get_task_board_item_position_snapshot, post_task_board_item_position_reset,
     put_task_board_item_position,
 };
+use self::triage::{get_task_board_item_triage, get_task_board_item_triage_history};
 
 fn task_board_host_routes() -> Router<DaemonHttpState> {
     Router::new()
@@ -73,6 +75,14 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::TASK_BOARD_ITEM_POSITION_RESET,
             post(post_task_board_item_position_reset),
+        )
+        .route(
+            http_paths::TASK_BOARD_ITEM_TRIAGE,
+            get(get_task_board_item_triage),
+        )
+        .route(
+            http_paths::TASK_BOARD_ITEM_TRIAGE_HISTORY,
+            get(get_task_board_item_triage_history),
         )
         .route(
             http_paths::TASK_BOARD_PLAN_BEGIN,

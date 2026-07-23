@@ -58,6 +58,7 @@ private func daemonTaskBoardHTTPRoutes() throws -> [TaskBoardHTTPRoute] {
   let relativePaths = [
     "src/daemon/protocol/api_contract/routes_task_board.rs",
     "src/daemon/protocol/api_contract/routes_task_board_positions.rs",
+    "src/daemon/protocol/api_contract/routes_task_board_triage.rs",
   ]
   let pathConstants = try daemonHTTPPathConstants()
   var routes: [TaskBoardHTTPRoute] = []
@@ -98,6 +99,7 @@ private func swiftTaskBoardHTTPRoutes() throws -> [TaskBoardHTTPRoute] {
   let relativePaths = [
     "apps/harness-monitor/Sources/HarnessMonitorKit/API/HarnessMonitorAPIClient+TaskBoard.swift",
     "apps/harness-monitor/Sources/HarnessMonitorKit/API/HarnessMonitorAPIClient+TaskBoardPosition.swift",
+    "apps/harness-monitor/Sources/HarnessMonitorKit/API/HarnessMonitorAPIClient+TaskBoardTriage.swift",
   ]
   let routes = try relativePaths.flatMap { relativePath in
     let source = try repoFileContents(relativePath: relativePath)

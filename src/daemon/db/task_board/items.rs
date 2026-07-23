@@ -1,16 +1,10 @@
 use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 use super::ITEMS_CHANGE_SCOPE;
-use super::lane_order::{
-    LaneTransitionKind, LaneTransitionWrite, record_lane_transition_audit_in_tx,
-    replace_with_lane_transition_in_tx,
-};
+use super::lane_order::{LaneTransitionWrite, record_lane_transition_audit_in_tx};
 use super::mapper::item_from_rows;
 use super::rows::{ExternalRefRow, ItemRow};
-use super::triage_apply::{
-    TriageOutcome, apply_builtin_v1_triage_in_tx,
-    clear_stale_automatic_placement_on_human_status_move,
-};
+use super::triage_apply::TriageOutcome;
 use super::triage_audit::{
     record_item_created_audit_in_tx, record_item_updated_audit_in_tx,
     record_triage_decided_audit_in_tx, record_triage_effect_reapplied_audit_in_tx,
@@ -23,15 +17,16 @@ use crate::task_board::{TaskBoardItem, TaskBoardStatus, validate_lane_placement}
 
 #[path = "items_lifecycle.rs"]
 mod lifecycle;
-use lifecycle::ensure_estimates_are_editable_in_tx;
 pub(super) use lifecycle::{
     apply_task_board_item_status_transition_in_tx, ensure_workflow_item_mutation_allowed_in_tx,
 };
 
 #[path = "items_parent.rs"]
 mod parent;
-use parent::{ensure_parent_assignment_is_valid_in_tx, next_child_order_in_tx};
-pub(super) use parent::clear_children_parent_in_tx;
+pub(super) use parent::{
+    ParentAssignmentValidation, check_parent_assignment_in_tx, clear_children_parent_in_tx,
+    next_child_order_in_tx,
+};
 
 #[path = "items_write.rs"]
 mod write;
@@ -39,6 +34,9 @@ pub(super) use write::{insert_item_in_tx, replace_item_in_tx};
 
 #[path = "items_create.rs"]
 mod create;
+
+#[path = "items_update.rs"]
+mod update;
 
 const SELECT_ITEM: &str = "SELECT * FROM task_board_items WHERE item_id = ?1";
 const SELECT_REFS: &str = "SELECT item_id, position, provider, external_id, url, sync_state_json
@@ -145,175 +143,6 @@ impl AsyncDaemonDb {
         Ok(items)
     }
 
-    /// Atomically load and conditionally mutate one Task Board item. Never
-    /// evaluates `BuiltInV1`: every internal workflow/lifecycle mutation
-    /// (dispatch, planning, estimates, reviews, GitHub projection, ...) must
-    /// keep using this method so unrelated writes can never become
-    /// accidental triage ingress. The public update API and provider
-    /// create/reconcile/restore use the `_with_triage` methods below
-    /// instead.
-    pub(crate) async fn update_task_board_item<F>(
-        &self,
-        item_id: &str,
-        mutate: F,
-    ) -> Result<Option<TaskBoardMutation>, CliError>
-    where
-        F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
-    {
-        self.update_task_board_item_impl(item_id, mutate, TaskBoardTriageIngress::None)
-            .await
-    }
-
-    /// Like [`update_task_board_item`], but also evaluates `BuiltInV1` in the
-    /// same transaction, for the public update API: a same-call status or
-    /// placement change is a direct human effect and suppresses `BuiltInV1`
-    /// placement (decision history still refreshes).
-    pub(crate) async fn update_task_board_item_with_triage<F>(
-        &self,
-        item_id: &str,
-        mutate: F,
-    ) -> Result<Option<TaskBoardMutation>, CliError>
-    where
-        F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
-    {
-        self.update_task_board_item_impl(item_id, mutate, TaskBoardTriageIngress::HumanUpdate)
-            .await
-    }
-
-    /// Like [`update_task_board_item_with_triage`], but for provider
-    /// create/reconcile/restore: a same-call status or placement change
-    /// reflects provider evidence, not a human override, so it never
-    /// suppresses `BuiltInV1` placement on its own. Only a pre-existing
-    /// manual lane anchor still suppresses.
-    pub(crate) async fn update_task_board_item_with_provider_triage<F>(
-        &self,
-        item_id: &str,
-        mutate: F,
-    ) -> Result<Option<TaskBoardMutation>, CliError>
-    where
-        F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
-    {
-        self.update_task_board_item_impl(item_id, mutate, TaskBoardTriageIngress::ProviderReconcile)
-            .await
-    }
-
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "pre-existing sequential mutation/guard chain; triage is one more straight-line step"
-    )]
-    async fn update_task_board_item_impl<F>(
-        &self,
-        item_id: &str,
-        mutate: F,
-        ingress: TaskBoardTriageIngress,
-    ) -> Result<Option<TaskBoardMutation>, CliError>
-    where
-        F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
-    {
-        io::validate_safe_segment(item_id)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board item update")
-            .await?;
-        let (mut item, revision) = load_item_in_tx(&mut transaction, item_id)
-            .await?
-            .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
-        let before = item.clone();
-        let prior_estimates = (item.estimated_tokens, item.estimated_cost_microusd);
-        let prior_parent_item_id = item.parent_item_id.clone();
-        if !mutate(&mut item)? {
-            transaction
-                .commit()
-                .await
-                .map_err(|error| db_error(format!("commit task board item no-op: {error}")))?;
-            return Ok(None);
-        }
-        if item.id != item_id {
-            return Err(db_error(format!(
-                "task-board mutation cannot change item id '{item_id}' to '{}'",
-                item.id
-            )));
-        }
-        if prior_estimates != (item.estimated_tokens, item.estimated_cost_microusd) {
-            ensure_estimates_are_editable_in_tx(&mut transaction, item_id).await?;
-        }
-        validate_item(&item)?;
-        item.status = item.status.canonical_persisted_status();
-        item.updated_at = utc_now();
-        if item.parent_item_id != prior_parent_item_id {
-            item.child_order = match item.parent_item_id.clone() {
-                Some(parent_id) => {
-                    ensure_parent_assignment_is_valid_in_tx(&mut transaction, item_id, &parent_id)
-                        .await?;
-                    next_child_order_in_tx(&mut transaction, &parent_id).await?
-                }
-                None => 0,
-            };
-        }
-        apply_task_board_item_status_transition_in_tx(&mut transaction, &item).await?;
-        if item.deleted_at.is_some() {
-            clear_children_parent_in_tx(&mut transaction, item_id).await?;
-        }
-        if ingress == TaskBoardTriageIngress::HumanUpdate {
-            clear_stale_automatic_placement_on_human_status_move(
-                before.status.canonical_persisted_status(),
-                &mut item,
-            );
-        }
-        let pre_triage_item = item.clone();
-        let outcome = match ingress {
-            TaskBoardTriageIngress::None => None,
-            TaskBoardTriageIngress::HumanUpdate | TaskBoardTriageIngress::ProviderReconcile => {
-                let decided_at = item.updated_at.clone();
-                let direct_effect_this_call = before.status != item.status
-                    || before.lane_position != item.lane_position
-                    || before.lane_origin != item.lane_origin;
-                let suppress_placement = ingress == TaskBoardTriageIngress::HumanUpdate
-                    && direct_effect_this_call;
-                apply_builtin_v1_triage_in_tx(
-                    &mut transaction,
-                    &mut item,
-                    &decided_at,
-                    suppress_placement,
-                )
-                .await?
-            }
-        };
-        let triage_changed_placement = item.status != pre_triage_item.status
-            || item.lane_position != pre_triage_item.lane_position
-            || item.lane_origin != pre_triage_item.lane_origin
-            || item.lane_set_at != pre_triage_item.lane_set_at;
-        let transition_kind = if triage_changed_placement {
-            LaneTransitionKind::Automatic
-        } else {
-            LaneTransitionKind::Generic
-        };
-        let before_triage = before.clone();
-        let write =
-            replace_with_lane_transition_in_tx(&mut transaction, before, revision, item, transition_kind)
-                .await?;
-        let change_revision = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
-        let mutation_kind =
-            (ingress != TaskBoardTriageIngress::None).then_some(TaskBoardMutationKind::Update);
-        record_triage_or_lane_audit_in_tx(
-            &mut transaction,
-            &before_triage,
-            outcome.as_ref(),
-            mutation_kind,
-            &write,
-            change_revision,
-        )
-        .await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board item update: {error}")))?;
-        Ok(Some(TaskBoardMutation {
-            item: write.item,
-            item_revision: write.item_revision,
-            change_revision,
-        }))
-    }
-
     /// Tombstone one Task Board item.
     pub(crate) async fn delete_task_board_item(
         &self,
@@ -347,8 +176,14 @@ async fn record_triage_or_lane_audit_in_tx(
 ) -> Result<(), CliError> {
     match outcome {
         Some(TriageOutcome::Decided(decision)) => {
-            record_triage_decided_audit_in_tx(transaction, before, decision, write, items_change_seq)
-                .await
+            record_triage_decided_audit_in_tx(
+                transaction,
+                before,
+                decision,
+                write,
+                items_change_seq,
+            )
+            .await
         }
         Some(TriageOutcome::RetainedEffect(decision)) => {
             record_triage_effect_reapplied_audit_in_tx(
@@ -369,6 +204,41 @@ async fn record_triage_or_lane_audit_in_tx(
             }
             None => record_lane_transition_audit_in_tx(transaction, write, items_change_seq).await,
         },
+    }
+}
+
+async fn resolve_parent_update_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    item: &mut TaskBoardItem,
+    before: &TaskBoardItem,
+    ingress: TaskBoardTriageIngress,
+) -> Result<(), CliError> {
+    if item.parent_item_id == before.parent_item_id {
+        return Ok(());
+    }
+    let Some(parent_id) = item.parent_item_id.clone() else {
+        item.child_order = 0;
+        return Ok(());
+    };
+    match check_parent_assignment_in_tx(transaction, &item.id, &parent_id).await? {
+        ParentAssignmentValidation::Valid => {
+            item.child_order = next_child_order_in_tx(transaction, &parent_id).await?;
+            Ok(())
+        }
+        ParentAssignmentValidation::Invalid(reason)
+            if ingress == TaskBoardTriageIngress::ProviderReconcile =>
+        {
+            tracing::warn!(
+                item_id = %item.id,
+                parent_id,
+                reason,
+                "task-board provider reconcile rejected parent link"
+            );
+            item.parent_item_id.clone_from(&before.parent_item_id);
+            item.child_order = before.child_order;
+            Ok(())
+        }
+        ParentAssignmentValidation::Invalid(reason) => Err(db_error(reason)),
     }
 }
 

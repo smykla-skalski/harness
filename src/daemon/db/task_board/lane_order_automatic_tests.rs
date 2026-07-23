@@ -81,25 +81,14 @@ async fn automatic_rerank_preserves_manual_anchor_and_updates_each_shift_once() 
 #[tokio::test]
 async fn triage_priority_change_reranks_automatic_cards_around_manual_anchor() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(automatic_test_item(
-        "manual",
-        TaskBoardPriority::Medium,
-    ))
-    .await
-    .expect("create manual item");
+    db.create_task_board_item(automatic_test_item("manual", TaskBoardPriority::Medium))
+        .await
+        .expect("create manual item");
     anchor(&db, "manual", 0).await;
     for (id, priority, created_at) in [
-        (
-            "medium",
-            TaskBoardPriority::Medium,
-            "2026-07-23T10:00:00Z",
-        ),
+        ("medium", TaskBoardPriority::Medium, "2026-07-23T10:00:00Z"),
         ("low", TaskBoardPriority::Low, "2026-07-23T10:01:00Z"),
-        (
-            "candidate",
-            TaskBoardPriority::Low,
-            "2026-07-23T10:02:00Z",
-        ),
+        ("candidate", TaskBoardPriority::Low, "2026-07-23T10:02:00Z"),
     ] {
         db.create_task_board_item_with_triage(triage_test_item(id, priority, created_at))
             .await
@@ -164,11 +153,7 @@ fn automatic_test_item(id: &str, priority: TaskBoardPriority) -> TaskBoardItem {
     item
 }
 
-fn triage_test_item(
-    id: &str,
-    priority: TaskBoardPriority,
-    created_at: &str,
-) -> TaskBoardItem {
+fn triage_test_item(id: &str, priority: TaskBoardPriority, created_at: &str) -> TaskBoardItem {
     let mut item = item(id, created_at);
     item.status = TaskBoardStatus::Backlog;
     item.priority = priority;

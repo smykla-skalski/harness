@@ -36,7 +36,9 @@ pub(crate) async fn dispatch_task_board_method(
         return Some(response);
     }
     match request.method.as_str() {
-        ws_methods::TASK_BOARD_CREATE => Some(dispatch_task_board_create(request, state).await),
+        ws_methods::TASK_BOARD_CREATE => {
+            Some(Box::pin(dispatch_task_board_create(request, state)).await)
+        }
         ws_methods::TASK_BOARD_CAPABILITIES => {
             Some(read::dispatch_task_board_capabilities(request, state).await)
         }
@@ -54,6 +56,12 @@ pub(crate) async fn dispatch_task_board_method(
         }
         ws_methods::TASK_BOARD_POSITION_RESET => {
             Some(dispatch_task_board_position_reset(request, state).await)
+        }
+        ws_methods::TASK_BOARD_TRIAGE_GET => {
+            Some(read::dispatch_task_board_triage_get(request, state, connection).await)
+        }
+        ws_methods::TASK_BOARD_TRIAGE_HISTORY => {
+            Some(read::dispatch_task_board_triage_history(request, state, connection).await)
         }
         ws_methods::TASK_BOARD_UPDATE => Some(dispatch_task_board_update(request, state).await),
         ws_methods::TASK_BOARD_DELETE => Some(dispatch_task_board_delete(request, state).await),

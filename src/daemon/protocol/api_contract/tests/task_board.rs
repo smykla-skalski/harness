@@ -5,6 +5,7 @@ fn task_board_routes_have_complete_ws_parity() {
     let actual: Vec<_> = super::routes_task_board::ROUTES
         .iter()
         .chain(super::routes_task_board_positions::ROUTES)
+        .chain(super::routes_task_board_triage::ROUTES)
         .chain(super::routes_task_board_orchestrator::ROUTES)
         .map(|route| {
             let ws_method = route
@@ -420,6 +421,18 @@ fn task_board_routes_have_complete_ws_parity() {
             ),
             (
                 HttpRouteMethod::Get,
+                http_paths::TASK_BOARD_ITEM_TRIAGE,
+                ws_methods::TASK_BOARD_TRIAGE_GET,
+                true,
+            ),
+            (
+                HttpRouteMethod::Get,
+                http_paths::TASK_BOARD_ITEM_TRIAGE_HISTORY,
+                ws_methods::TASK_BOARD_TRIAGE_HISTORY,
+                true,
+            ),
+            (
+                HttpRouteMethod::Get,
                 http_paths::TASK_BOARD_ORCHESTRATOR_RUNS,
                 ws_methods::TASK_BOARD_ORCHESTRATOR_RUNS,
                 false,
@@ -447,6 +460,7 @@ fn task_board_routes_have_complete_ws_parity() {
     let expected_mcp_methods: Vec<_> = super::routes_task_board::ROUTES
         .iter()
         .chain(super::routes_task_board_positions::ROUTES)
+        .chain(super::routes_task_board_triage::ROUTES)
         .map(|route| {
             route
                 .parity

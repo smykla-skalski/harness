@@ -97,7 +97,7 @@ fn apply_destination(
         .filter(|candidate| !is_manual(candidate))
         .collect::<Vec<_>>();
     non_manual.insert(insertion, item.clone());
-    apply_layout(entries, item, status, manuals, &non_manual)
+    apply_layout(entries, item, status, &manuals, &non_manual)
 }
 
 fn apply_order(
@@ -112,7 +112,7 @@ fn apply_order(
         .filter(|candidate| !is_manual(candidate))
         .cloned()
         .collect::<Vec<_>>();
-    apply_layout(entries, item, status, manuals, &non_manual)
+    apply_layout(entries, item, status, &manuals, &non_manual)
 }
 
 fn adjusted_manual_slots(
@@ -156,7 +156,7 @@ fn apply_layout(
     entries: &mut [LaneEntry],
     item: &mut TaskBoardItem,
     status: TaskBoardStatus,
-    manuals: BTreeMap<usize, String>,
+    manuals: &BTreeMap<usize, String>,
     non_manual: &[TaskBoardItem],
 ) -> Result<(), CliError> {
     let count = manuals.len() + non_manual.len();

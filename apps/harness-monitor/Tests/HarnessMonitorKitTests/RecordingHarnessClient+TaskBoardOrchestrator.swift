@@ -76,7 +76,9 @@ extension RecordingHarnessClient {
       guard let index = taskBoardItemsStorage.firstIndex(where: { $0.id == id }) else {
         throw HarnessMonitorAPIError.server(code: 404, message: "Task board item unavailable.")
       }
-      return taskBoardItemsStorage.remove(at: index)
+      let deleted = taskBoardItemsStorage.remove(at: index)
+      taskBoardTriageDecisionsStorage.removeValue(forKey: id)
+      return deleted
     }
   }
 

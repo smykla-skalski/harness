@@ -12,9 +12,8 @@ async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {
     (directory, db)
 }
 
-/// Umbrella kind keeps the seed ineligible for BuiltInV1, so
-/// `db.create_task_board_item` (which itself now runs BuiltInV1) leaves no
-/// decision behind for these persistence-layer tests to collide with.
+/// Umbrella kind keeps the seed ineligible if a triaging create path is used,
+/// so these persistence-layer tests never collide with an automatic decision.
 async fn seed_item(db: &AsyncDaemonDb, id: &str) {
     let mut item = TaskBoardItem::new(
         id.into(),
@@ -141,7 +140,7 @@ async fn recording_again_supersedes_the_prior_generation_and_stays_current() {
 }
 
 #[tokio::test]
-async fn rejects_non_canonical_evaluator_identity_and_fingerprint() {
+async fn rejects_non_canonical_evaluator_identity_version_and_fingerprint() {
     let (_directory, db) = connect().await;
     seed_item(&db, "item-1").await;
 
@@ -163,6 +162,21 @@ async fn rejects_non_canonical_evaluator_identity_and_fingerprint() {
     )
     .await;
     assert!(blank_identity.is_err());
+
+    let zero_version = record_triage_decision_in_tx(
+        &mut transaction,
+        "item-1",
+        TriageVerdict::Todo,
+        TriageReasonCode::MeaningfulLabel,
+        None,
+        "task_board.triage.builtin_v1",
+        0,
+        "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+        TriageCause::Initial,
+        "2026-07-22T00:00:00Z",
+    )
+    .await;
+    assert!(zero_version.is_err());
 
     let malformed_fingerprint = record_triage_decision_in_tx(
         &mut transaction,

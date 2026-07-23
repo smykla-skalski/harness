@@ -25,9 +25,11 @@ use crate::daemon::protocol::{
     TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse,
     TaskBoardProjectsResponse, TaskBoardResetItemPositionRequest, TaskBoardSetItemPositionRequest,
     TaskBoardSyncRequest, TaskBoardSyncResponse, TaskBoardTodoistTokenSyncRequest,
-    TaskBoardTodoistTokenSyncResponse, TaskBoardUpdateItemRequest, http_paths,
+    TaskBoardTodoistTokenSyncResponse, TaskBoardTriageCurrentResponse,
+    TaskBoardTriageHistoryResponse, TaskBoardUpdateItemRequest, http_paths,
 };
 use crate::errors::{CliError, CliErrorKind};
+use crate::infra::io;
 use crate::task_board::{TaskBoardItem, TaskBoardStatus};
 
 use super::DaemonClient;
@@ -91,6 +93,33 @@ impl DaemonClient {
         request: &TaskBoardResetItemPositionRequest,
     ) -> Result<TaskBoardItemPositionMutationResponse, CliError> {
         self.post(&item_action_path(item_id, "position/reset"), request)
+    }
+
+    pub fn get_task_board_item_triage(
+        &self,
+        item_id: &str,
+    ) -> Result<TaskBoardTriageCurrentResponse, CliError> {
+        io::validate_safe_segment(item_id)?;
+        self.get(&item_action_path(item_id, "triage"))
+    }
+
+    pub fn get_task_board_item_triage_history(
+        &self,
+        item_id: &str,
+        before_generation: Option<u64>,
+        limit: Option<u32>,
+    ) -> Result<TaskBoardTriageHistoryResponse, CliError> {
+        io::validate_safe_segment(item_id)?;
+        let before_generation = before_generation.map(|value| value.to_string());
+        let limit = limit.map(|value| value.to_string());
+        let mut query = Vec::with_capacity(2);
+        if let Some(value) = before_generation.as_deref() {
+            query.push(("before_generation", value));
+        }
+        if let Some(value) = limit.as_deref() {
+            query.push(("limit", value));
+        }
+        self.get_with_query(&item_action_path(item_id, "triage/history"), &query)
     }
 
     pub fn update_task_board_item(

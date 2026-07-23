@@ -300,6 +300,8 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var taskBoardUpdateError: (any Error)?
   var taskBoardItemRevisionsStorage: [String: Int64] = [:]
   var taskBoardItemsChangeSeqStorage: Int64 = 0
+  /// Ordered newest-first per item id; the first entry is the current decision.
+  var taskBoardTriageDecisionsStorage: [String: [TaskBoardTriageDecisionRecord]] = [:]
   var taskBoardPositionError: (any Error)?
   var taskBoardPositionErrorRemainingUses = 0
   var taskBoardPositionItemsAfterError: [TaskBoardItem]?

@@ -7,7 +7,8 @@ use crate::task_board::external::{
 };
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::{
-    ExternalProvider, ExternalRef, ExternalSyncField, TaskBoardExternalCreateBegin,
+    ExternalProvider, ExternalRef, ExternalSyncField, ProviderExclusionAuditContext,
+    ProviderExclusionRestoreOutcome, TaskBoardExternalCreateBegin,
     TaskBoardExternalCreateFinalizeResult, TaskBoardExternalCreateIntent, TaskBoardItem,
     TaskBoardStatus, TaskBoardSyncConflict,
 };
@@ -101,6 +102,17 @@ pub(crate) trait TaskBoardSyncStore: TaskBoardExternalCreateStore {
         status: Option<TaskBoardStatus>,
     ) -> Result<Vec<TaskBoardItem>, CliError>;
     async fn list_items_including_deleted(&self) -> Result<Vec<TaskBoardItem>, CliError>;
+
+    /// Like [`list_items_including_deleted`](Self::list_items_including_deleted),
+    /// but returns the row revision alongside each item so a batch-loaded
+    /// provider-exclusion index can CAS the exact matched revision without a
+    /// second point read.
+    async fn list_item_snapshots_including_deleted(
+        &self,
+    ) -> Result<Vec<TaskBoardSyncItemSnapshot>, CliError> {
+        Err(durable_external_create_store_required())
+    }
+
     async fn create_item(&self, item: TaskBoardItem) -> Result<TaskBoardItem, CliError>;
     async fn update_item(
         &self,
@@ -112,27 +124,56 @@ pub(crate) trait TaskBoardSyncStore: TaskBoardExternalCreateStore {
 
     /// Tombstones an already-visible, pre-dispatch item because the provider
     /// now reports an exclusion label (duplicate/invalid/wontfix, bare or
-    /// `triage/`-prefixed). Returns `None`, doing nothing, when the item is
-    /// not eligible to be hidden this way (already deleted, past
-    /// pre-dispatch, or otherwise dispatched/claimed work).
+    /// `triage/`-prefixed). `expected_revision` CASes against the exact row
+    /// revision the caller last observed; `context` additionally re-verifies
+    /// the exact stored provider link inside the transaction. `patch` (the
+    /// normal reconciliation patch, minus parent) is applied before
+    /// tombstoning so the row records the triggering label and a fresh
+    /// `sync_state`. Returns `None`, doing nothing, when the item is not
+    /// eligible to be hidden this way: already deleted, past pre-dispatch,
+    /// otherwise dispatched/claimed work, or the row (or its provider link)
+    /// moved since the caller last looked at it. `conflicts` follows the
+    /// same publish-or-supersede contract as
+    /// [`restore_from_provider_exclusion`](Self::restore_from_provider_exclusion),
+    /// except a hide always tombstones regardless of it.
     async fn hide_for_provider_exclusion(
         &self,
         _item_id: &str,
+        _expected_revision: i64,
+        _patch: TaskBoardItemPatch,
+        _context: ProviderExclusionAuditContext,
+        _conflicts: Option<Vec<TaskBoardSyncConflict>>,
     ) -> Result<Option<TaskBoardItem>, CliError> {
         Err(durable_external_create_store_required())
     }
 
     /// Restores a previously provider-exclusion-tombstoned item because the
-    /// provider no longer reports an exclusion label, refreshing its title,
-    /// body, status, tags, project, execution repository, and external refs
-    /// from `revived` (built fresh from the current provider task, same
-    /// deterministic id) in the same step. Returns `None` when `revived.id`
-    /// is not currently tombstoned for provider exclusion (including when it
-    /// does not exist at all, or was tombstoned some other way).
+    /// provider no longer reports an exclusion label. `expected` CASes
+    /// against the exact snapshot (stored item id, row revision) the caller
+    /// matched by provider reference; `context` additionally re-verifies the
+    /// exact stored provider link inside the transaction. `patch` is the
+    /// normal reconciliation patch (the same `reconciliation_patch` an
+    /// ordinary pull reconcile computes, including the parent tri-state) so
+    /// a restore preserves or conflicts exactly like any other reconcile
+    /// instead of unconditionally overwriting local state. Local-only state
+    /// this patch never touches -- planning approval, workflow, session,
+    /// work item linkage, estimates, agent mode, a `Manual` lane anchor --
+    /// stays exactly as stored. Returns `NotApplied` when `expected`'s row
+    /// or provider link moved, or it is no longer tombstoned for provider
+    /// exclusion, since the caller matched it. `conflicts` is `None` when
+    /// this restore isn't under `Both`+`Report` at all (conflict state
+    /// untouched); `Some(empty)` supersedes stale open conflict rows in the
+    /// same transaction as the restore, which then proceeds normally;
+    /// `Some(non-empty)` publishes them, CAS-gated on the exact tombstone
+    /// revision/provider/stored ref, and returns `ConflictPublished` with
+    /// the item left tombstoned.
     async fn restore_from_provider_exclusion(
         &self,
-        _revived: TaskBoardItem,
-    ) -> Result<Option<TaskBoardItem>, CliError> {
+        _expected: TaskBoardSyncItemSnapshot,
+        _patch: TaskBoardItemPatch,
+        _context: ProviderExclusionAuditContext,
+        _conflicts: Option<Vec<TaskBoardSyncConflict>>,
+    ) -> Result<ProviderExclusionRestoreOutcome, CliError> {
         Err(durable_external_create_store_required())
     }
 

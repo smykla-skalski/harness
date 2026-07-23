@@ -24,15 +24,11 @@ async fn same_evidence_with_missing_builtin_placement_reapplies_and_reports_reta
     item.lane_position = None;
     item.lane_origin = None;
     item.lane_set_at = None;
-    let outcome = apply_builtin_v1_triage_in_tx(
-        &mut transaction,
-        &mut item,
-        "2026-07-22T02:00:00Z",
-        false,
-    )
-    .await
-    .expect("apply triage")
-    .expect("desync must be reported");
+    let outcome =
+        apply_builtin_v1_triage_in_tx(&mut transaction, &mut item, "2026-07-22T02:00:00Z", false)
+            .await
+            .expect("apply triage")
+            .expect("desync must be reported");
     transaction.commit().await.expect("commit");
 
     assert!(matches!(outcome, TriageOutcome::RetainedEffect(_)));
@@ -55,15 +51,11 @@ async fn same_evidence_with_wrong_automatic_producer_reapplies_and_reports_retai
     item.lane_origin = Some(TaskBoardLaneOrigin::Automatic {
         producer: "some-other-evaluator".into(),
     });
-    let outcome = apply_builtin_v1_triage_in_tx(
-        &mut transaction,
-        &mut item,
-        "2026-07-22T02:00:00Z",
-        false,
-    )
-    .await
-    .expect("apply triage")
-    .expect("desync must be reported");
+    let outcome =
+        apply_builtin_v1_triage_in_tx(&mut transaction, &mut item, "2026-07-22T02:00:00Z", false)
+            .await
+            .expect("apply triage")
+            .expect("desync must be reported");
     transaction.commit().await.expect("commit");
 
     assert!(matches!(outcome, TriageOutcome::RetainedEffect(_)));
@@ -123,15 +115,11 @@ async fn same_evidence_with_stale_backlog_placement_reports_retained_effect() {
         producer: BUILTIN_V1_EVALUATOR_IDENTITY.to_string(),
     });
     item.lane_set_at = Some("2026-07-22T01:30:00Z".into());
-    let outcome = apply_builtin_v1_triage_in_tx(
-        &mut transaction,
-        &mut item,
-        "2026-07-22T02:00:00Z",
-        false,
-    )
-    .await
-    .expect("apply triage")
-    .expect("desync must be reported");
+    let outcome =
+        apply_builtin_v1_triage_in_tx(&mut transaction, &mut item, "2026-07-22T02:00:00Z", false)
+            .await
+            .expect("apply triage")
+            .expect("desync must be reported");
     transaction.commit().await.expect("commit");
 
     assert!(matches!(outcome, TriageOutcome::RetainedEffect(_)));
@@ -158,14 +146,10 @@ async fn human_suppressed_status_move_produces_no_retained_effect_audit() {
     item.lane_position = None;
     item.lane_origin = None;
     item.lane_set_at = None;
-    let outcome = apply_builtin_v1_triage_in_tx(
-        &mut transaction,
-        &mut item,
-        "2026-07-22T02:00:00Z",
-        true,
-    )
-    .await
-    .expect("apply triage");
+    let outcome =
+        apply_builtin_v1_triage_in_tx(&mut transaction, &mut item, "2026-07-22T02:00:00Z", true)
+            .await
+            .expect("apply triage");
     transaction.commit().await.expect("commit");
 
     assert!(

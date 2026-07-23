@@ -1,8 +1,8 @@
+use crate::task_board::canonicalize_labels;
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::types::{
     ExternalRef, ExternalRefProvider, ExternalRefSyncState, TaskBoardItem, TaskBoardStatus,
 };
-use crate::task_board::canonicalize_labels;
 use crate::workspace::utc_now;
 
 use crate::task_board::external::targeting::provider_project_maps_to_board;
@@ -367,10 +367,25 @@ pub(super) fn external_ref_matches(
     if candidate.external_id == reference.external_id {
         return true;
     }
+    if provider == ExternalRefProvider::GitHub
+        && qualified_github_ref_matches(&candidate.external_id, &reference.external_id)
+    {
+        return true;
+    }
     provider == ExternalRefProvider::GitHub
         && project_id.is_some_and(|project_id| project_matches(item, candidate, project_id))
         && github_legacy_external_id(reference.external_id.as_str())
             .is_some_and(|legacy_id| candidate.external_id == legacy_id)
+}
+
+fn qualified_github_ref_matches(candidate: &str, reference: &str) -> bool {
+    let Some((candidate_project, candidate_id)) = candidate.rsplit_once('#') else {
+        return false;
+    };
+    let Some((reference_project, reference_id)) = reference.rsplit_once('#') else {
+        return false;
+    };
+    candidate_project.eq_ignore_ascii_case(reference_project) && candidate_id == reference_id
 }
 
 fn project_matches(item: &TaskBoardItem, candidate: &ExternalRef, project_id: &str) -> bool {
@@ -461,5 +476,33 @@ mod tests {
                 .and_then(|state| state.updated_at.as_deref()),
             None
         );
+    }
+
+    #[test]
+    fn clean_labels_drop_the_provider_exclusion_baseline_label() {
+        // A hide refreshes last_synced to include the label that triggered
+        // the exclusion; a later sync reporting clean labels must drop it
+        // rather than keep it as if it were still provider-reported.
+        let reconciled = reconcile_provider_labels(&["wontfix".into()], &[], &["wontfix".into()]);
+        assert!(reconciled.is_empty());
+    }
+
+    #[test]
+    fn qualified_github_refs_match_repository_names_case_insensitively() {
+        let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "owner/repo#42");
+        let item = TaskBoardItem::new(
+            "task-1".into(),
+            "Title".into(),
+            String::new(),
+            "2026-07-23T00:00:00Z".into(),
+        );
+        let candidate = ExternalRef {
+            provider: ExternalRefProvider::GitHub,
+            external_id: "Owner/Repo#42".into(),
+            url: None,
+            sync_state: None,
+        };
+
+        assert!(external_ref_matches(&item, &candidate, &reference, None));
     }
 }

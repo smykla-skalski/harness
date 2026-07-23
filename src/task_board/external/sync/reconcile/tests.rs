@@ -1,11 +1,14 @@
 use async_trait::async_trait;
 
+use super::super::merge::sync_state_from_task;
 use super::*;
 use crate::errors::CliErrorKind;
-use crate::task_board::TaskBoardSyncConflict;
 use crate::task_board::external::{
     ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision, ExternalProviderScopeState,
     ExternalSyncDirection, TaskBoardSyncItemSnapshot,
+};
+use crate::task_board::{
+    ExternalRefSyncState, ExternalTaskRef, TaskBoardStatus, TaskBoardSyncConflict,
 };
 
 #[tokio::test]
@@ -29,6 +32,7 @@ async fn prefer_remote_concurrent_edit_never_claims_unapplied_remote_intent() {
         },
         ExternalProvider::Todoist,
         &expected,
+        0,
         task,
         None,
         &mut operations,

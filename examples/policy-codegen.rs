@@ -2597,11 +2597,13 @@ const TASK_BOARD_ITEM_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonito
 // items-list and explicit-position response wrappers from the protocol facade.
 // References the adopted TaskBoardStatus/TaskBoardPriority/TaskBoardAgentMode/
 // TaskBoardWorkflowKind enums bare; the two closed enums here
-// (ExternalRefProvider, TaskBoardWorkflowStatus) take the suffix. The *Wire types
-// own the faithful daemon decode, while the workflow source resolves the
-// workflow-kind serde default without emitting the rest of its graph.
+// (ExternalRefProvider, TaskBoardWorkflowStatus, TaskBoardTombstoneCause) take
+// the suffix. The *Wire types own the faithful daemon decode, while the
+// workflow source resolves the workflow-kind serde default without emitting
+// the rest of its graph.
 const TASK_BOARD_ITEM_EMIT_ONLY: &[&str] = &[
     "TaskBoardItem",
+    "TaskBoardTombstoneCause",
     "TaskBoardLaneOrigin",
     "ExternalRef",
     "ExternalRefSyncState",
@@ -2615,6 +2617,22 @@ const TASK_BOARD_ITEM_EMIT_ONLY: &[&str] = &[
     "TaskBoardItemPositionSnapshot",
     "TaskBoardShiftedItemRevision",
     "TaskBoardItemPositionMutationResponse",
+];
+const TASK_BOARD_TRIAGE_SOURCE: &str = include_str!("../src/task_board/triage.rs");
+const TASK_BOARD_TRIAGE_PROTOCOL_SOURCE: &str =
+    include_str!("../src/daemon/protocol/task_board_triage.rs");
+const TASK_BOARD_TRIAGE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardTriageWireTypes.generated.swift";
+// The BuiltInV1 triage decision record and its verdict/reason/cause enums,
+// plus the current/history read responses from the protocol facade. None of
+// these reference TaskBoardItem, so unlike the item/position cluster they
+// ride bare (no Wire suffix, no hand mirror needed).
+const TASK_BOARD_TRIAGE_EMIT_ONLY: &[&str] = &[
+    "TriageVerdict",
+    "TriageReasonCode",
+    "TriageCause",
+    "TaskBoardTriageDecisionRecord",
+    "TaskBoardTriageCurrentResponse",
+    "TaskBoardTriageHistoryResponse",
 ];
 const TASK_BOARD_MACHINES_SOURCE: &str = include_str!("../src/task_board/machines.rs");
 const TASK_BOARD_MACHINES_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardMachineWireTypes.generated.swift";
@@ -3170,6 +3188,12 @@ fn modules() -> Vec<GeneratedModule> {
             ],
         },
         GeneratedModule {
+            output: TASK_BOARD_TRIAGE_OUTPUT,
+            description: "the Rust task-board triage decision record and its read responses",
+            defaults: &[TASK_BOARD_TRIAGE_SOURCE],
+            sources: &[TASK_BOARD_TRIAGE_SOURCE, TASK_BOARD_TRIAGE_PROTOCOL_SOURCE],
+        },
+        GeneratedModule {
             output: TASK_BOARD_MACHINES_OUTPUT,
             description: "the Rust task-board host machine type",
             defaults: &[],
@@ -3381,6 +3405,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         TASK_BOARD_ENUMS_OUTPUT => TASK_BOARD_ENUMS_EMIT_ONLY,
         TASK_BOARD_SUMMARY_OUTPUT => TASK_BOARD_SUMMARY_EMIT_ONLY,
         TASK_BOARD_ITEM_OUTPUT => TASK_BOARD_ITEM_EMIT_ONLY,
+        TASK_BOARD_TRIAGE_OUTPUT => TASK_BOARD_TRIAGE_EMIT_ONLY,
         TASK_BOARD_MACHINES_OUTPUT => TASK_BOARD_MACHINES_EMIT_ONLY,
         TASK_BOARD_PLANNING_OUTPUT => TASK_BOARD_PLANNING_EMIT_ONLY,
         TASK_BOARD_EVALUATION_OUTPUT => TASK_BOARD_EVALUATION_EMIT_ONLY,

@@ -87,6 +87,20 @@ impl AsyncDaemonDb {
     pub(crate) async fn list_task_board_items_including_deleted(
         &self,
     ) -> Result<Vec<TaskBoardItem>, CliError> {
+        Ok(self
+            .list_task_board_item_snapshots_including_deleted()
+            .await?
+            .into_iter()
+            .map(|snapshot| snapshot.item)
+            .collect())
+    }
+
+    /// Like [`list_task_board_items_including_deleted`], but keeps each
+    /// item's row revision, for a batch caller that needs to CAS an exact
+    /// matched revision without a second point read.
+    pub(crate) async fn list_task_board_item_snapshots_including_deleted(
+        &self,
+    ) -> Result<Vec<TaskBoardItemSnapshot>, CliError> {
         let mut transaction = self
             .pool()
             .begin()
@@ -98,10 +112,7 @@ impl AsyncDaemonDb {
             .await
             .map_err(|error| db_error(format!("commit task board item list: {error}")))?;
         sort_item_snapshots(&mut snapshots);
-        Ok(snapshots
-            .into_iter()
-            .map(|snapshot| snapshot.item)
-            .collect())
+        Ok(snapshots)
     }
 }
 

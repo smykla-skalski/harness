@@ -8,7 +8,8 @@ use crate::daemon::protocol::{
     TaskBoardMachinesResponse, TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest,
     TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse,
     TaskBoardProjectsResponse, TaskBoardResetItemPositionRequest, TaskBoardSetItemPositionRequest,
-    TaskBoardSyncRequest, TaskBoardSyncResponse, TaskBoardUpdateItemRequest,
+    TaskBoardSyncRequest, TaskBoardSyncResponse, TaskBoardTriageCurrentResponse,
+    TaskBoardTriageHistoryResponse, TaskBoardUpdateItemRequest,
 };
 use crate::daemon::service;
 use crate::errors::CliError;
@@ -83,6 +84,32 @@ pub(crate) async fn reset_item_position(
         require_async_db(state, "task board position reset")?,
         item_id,
         request,
+    )
+    .await
+}
+
+pub(crate) async fn get_item_triage_current(
+    state: &DaemonHttpState,
+    item_id: &str,
+) -> Result<TaskBoardTriageCurrentResponse, CliError> {
+    service::get_task_board_item_triage_current_db(
+        require_async_db(state, "task board triage current")?,
+        item_id,
+    )
+    .await
+}
+
+pub(crate) async fn get_item_triage_history(
+    state: &DaemonHttpState,
+    item_id: &str,
+    before_generation: Option<u64>,
+    limit: u32,
+) -> Result<TaskBoardTriageHistoryResponse, CliError> {
+    service::get_task_board_item_triage_history_db(
+        require_async_db(state, "task board triage history")?,
+        item_id,
+        before_generation,
+        limit,
     )
     .await
 }

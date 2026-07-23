@@ -12,7 +12,8 @@ use crate::task_board::external::{
 };
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::{
-    ExternalProvider, ExternalRef, ExternalSyncField, TaskBoardExternalCreateBegin,
+    ExternalProvider, ExternalRef, ExternalSyncField, ProviderExclusionAuditContext,
+    ProviderExclusionRestoreOutcome, TaskBoardExternalCreateBegin,
     TaskBoardExternalCreateFinalizeResult, TaskBoardExternalCreateIntent,
     TaskBoardExternalCreateStore, TaskBoardItem, TaskBoardStatus, TaskBoardSyncConflict,
     TaskBoardSyncStore,
@@ -135,6 +136,12 @@ impl TaskBoardSyncStore for ProviderSyncRunStore<'_> {
         <AsyncDaemonDb as TaskBoardSyncStore>::list_items_including_deleted(self.db).await
     }
 
+    async fn list_item_snapshots_including_deleted(
+        &self,
+    ) -> Result<Vec<TaskBoardSyncItemSnapshot>, CliError> {
+        <AsyncDaemonDb as TaskBoardSyncStore>::list_item_snapshots_including_deleted(self.db).await
+    }
+
     async fn create_item(&self, item: TaskBoardItem) -> Result<TaskBoardItem, CliError> {
         <AsyncDaemonDb as TaskBoardSyncStore>::create_item(self.db, item).await
     }
@@ -154,16 +161,33 @@ impl TaskBoardSyncStore for ProviderSyncRunStore<'_> {
     async fn hide_for_provider_exclusion(
         &self,
         item_id: &str,
+        expected_revision: i64,
+        patch: TaskBoardItemPatch,
+        context: ProviderExclusionAuditContext,
+        conflicts: Option<Vec<TaskBoardSyncConflict>>,
     ) -> Result<Option<TaskBoardItem>, CliError> {
-        <AsyncDaemonDb as TaskBoardSyncStore>::hide_for_provider_exclusion(self.db, item_id).await
+        <AsyncDaemonDb as TaskBoardSyncStore>::hide_for_provider_exclusion(
+            self.db,
+            item_id,
+            expected_revision,
+            patch,
+            context,
+            conflicts,
+        )
+        .await
     }
 
     async fn restore_from_provider_exclusion(
         &self,
-        revived: TaskBoardItem,
-    ) -> Result<Option<TaskBoardItem>, CliError> {
-        <AsyncDaemonDb as TaskBoardSyncStore>::restore_from_provider_exclusion(self.db, revived)
-            .await
+        expected: TaskBoardSyncItemSnapshot,
+        patch: TaskBoardItemPatch,
+        context: ProviderExclusionAuditContext,
+        conflicts: Option<Vec<TaskBoardSyncConflict>>,
+    ) -> Result<ProviderExclusionRestoreOutcome, CliError> {
+        <AsyncDaemonDb as TaskBoardSyncStore>::restore_from_provider_exclusion(
+            self.db, expected, patch, context, conflicts,
+        )
+        .await
     }
 
     async fn provider_scope_state(

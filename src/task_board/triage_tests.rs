@@ -45,13 +45,15 @@ fn exclusion_labels_cover_bare_and_triage_prefixed_forms_case_insensitively() {
 }
 
 #[test]
-fn needs_info_label_yields_undecided_even_with_other_labels_present() {
-    let mut with_needs_info = item();
-    with_needs_info.tags = vec!["kind/bug".to_string(), "triage/needs-info".to_string()];
-    let outcome = evaluate_builtin_v1(&with_needs_info);
-    assert_eq!(outcome.verdict, TriageVerdict::Undecided);
-    assert_eq!(outcome.reason_code, TriageReasonCode::NeedsInfoLabel);
-    assert_eq!(outcome.reason_detail.as_deref(), Some("triage/needs-info"));
+fn needs_info_labels_yield_undecided_even_with_other_labels_present() {
+    for label in ["needs-info", "triage/needs-info"] {
+        let mut with_needs_info = item();
+        with_needs_info.tags = vec!["kind/bug".to_string(), label.to_string()];
+        let outcome = evaluate_builtin_v1(&with_needs_info);
+        assert_eq!(outcome.verdict, TriageVerdict::Undecided);
+        assert_eq!(outcome.reason_code, TriageReasonCode::NeedsInfoLabel);
+        assert_eq!(outcome.reason_detail.as_deref(), Some(label));
+    }
 }
 
 #[test]
