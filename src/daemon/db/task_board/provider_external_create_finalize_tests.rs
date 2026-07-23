@@ -141,6 +141,7 @@ async fn finalize_same_identity_preserves_newer_local_reference() {
         project_id: Some("example/repository".into()),
         updated_at: Some("revision-newer".into()),
         synced_at: Some("2026-07-16T11:00:00Z".into()),
+        labels: Vec::new(),
     });
     db.update_task_board_item("task-finalize-existing", |current| {
         current.external_refs.push(newer.clone());

@@ -144,6 +144,7 @@ fn locally_edited_item() -> TaskBoardItem {
         project_id: None,
         updated_at: Some("2026-07-15T10:00:00Z".into()),
         synced_at: Some("2026-07-15T10:00:00Z".into()),
+        labels: Vec::new(),
     });
     item.external_refs = vec![reference];
     item

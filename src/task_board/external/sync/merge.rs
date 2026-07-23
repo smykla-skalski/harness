@@ -97,6 +97,7 @@ pub(super) fn sync_state_from_task(task: &ExternalTask) -> ExternalRefSyncState 
         project_id: task.project_id.clone(),
         updated_at: task.updated_at.clone(),
         synced_at: Some(utc_now()),
+        labels: task.labels.clone(),
     }
 }
 
@@ -321,6 +322,27 @@ pub(super) fn merge_external_labels(existing: &[String], labels: &[String]) -> V
     merged
 }
 
+/// Drops tags that the provider previously sent (per `last_synced`) but no
+/// longer reports, while preserving locally owned tags the snapshot never
+/// covered, then additively merges in the current provider labels.
+pub(super) fn reconcile_provider_labels(
+    existing: &[String],
+    labels: &[String],
+    last_synced: &[String],
+) -> Vec<String> {
+    let retained = existing
+        .iter()
+        .filter(|tag| {
+            !last_synced.iter().any(|old| old.eq_ignore_ascii_case(tag))
+                || labels
+                    .iter()
+                    .any(|current| current.eq_ignore_ascii_case(tag))
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    merge_external_labels(&retained, labels)
+}
+
 pub(super) fn matching_ref<'a>(
     item: &'a TaskBoardItem,
     reference: &ExternalTaskRef,
@@ -390,6 +412,7 @@ mod tests {
             project_id: None,
             updated_at: Some("provider-revision-1".into()),
             synced_at: Some("2026-07-16T10:00:00Z".into()),
+            labels: Vec::new(),
         });
         item.external_refs = vec![core_reference];
 

@@ -460,6 +460,7 @@ fn linked_item(id: &str, title: &str, body: &str, status: TaskBoardStatus) -> Ta
         project_id: None,
         updated_at: Some("2026-05-14T00:00:00Z".to_string()),
         synced_at: Some("2026-05-14T00:00:00Z".to_string()),
+        labels: Vec::new(),
     });
     item.external_refs.push(reference);
     item

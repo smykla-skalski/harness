@@ -424,6 +424,7 @@ mod tests {
             project_id: Some("todoist-project".into()),
             updated_at: Some("provider-revision".into()),
             synced_at: Some("2026-07-16T15:01:00Z".into()),
+            labels: Vec::new(),
         });
         (outcome, baseline)
     }

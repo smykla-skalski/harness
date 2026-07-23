@@ -300,6 +300,7 @@ async fn created_preflight_suppresses_pull_base_revision_persistence() {
         project_id: Some("provider-project".into()),
         updated_at: Some("provider-revision-1".into()),
         synced_at: Some("2026-07-16T10:00:00Z".into()),
+        labels: Vec::new(),
     });
     store
         .record_external_create_outcome(&intent, &outcome, &baseline)

@@ -175,6 +175,7 @@ fn linked_item(id: &str, deleted: bool) -> TaskBoardItem {
         project_id: Some("provider-project".into()),
         updated_at: Some("provider-revision-1".into()),
         synced_at: Some("2026-07-16T10:00:00Z".into()),
+        labels: Vec::new(),
     });
     item.external_refs.push(core_reference);
     item

@@ -245,6 +245,7 @@ async fn pull_title_conflict_persists_three_way_values_without_overwriting_local
         project_id: Some("acme/widgets".into()),
         updated_at: Some("2026-07-15T10:00:00Z".into()),
         synced_at: Some("2026-07-15T10:00:00Z".into()),
+        labels: Vec::new(),
     });
     item.external_refs = vec![reference];
     db.create_task_board_item(item).await.expect("create item");
@@ -494,6 +495,7 @@ fn linked_item(id: &str, status: TaskBoardStatus) -> TaskBoardItem {
         project_id: Some("acme/widgets".into()),
         updated_at: Some("2026-07-15T10:00:00Z".into()),
         synced_at: Some("2026-07-15T10:00:00Z".into()),
+        labels: Vec::new(),
     });
     item.external_refs = vec![reference];
     item

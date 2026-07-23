@@ -294,6 +294,7 @@ async fn recovery_accepts_a_github_issue_moved_from_the_original_repository() {
         project_id: Some("moved/repository".into()),
         updated_at: Some("revision-moved".into()),
         synced_at: Some("2026-07-16T14:56:00Z".into()),
+        labels: Vec::new(),
     });
 
     let created = db
@@ -341,6 +342,7 @@ async fn moved_github_recovery_accepts_an_already_converged_local_identity() {
         project_id: Some("moved/repository".into()),
         updated_at: Some("revision-moved".into()),
         synced_at: Some("2026-07-16T15:02:00Z".into()),
+        labels: Vec::new(),
     });
     let created = db
         .record_task_board_external_create_outcome(&intent, &outcome, &baseline)
@@ -485,6 +487,7 @@ fn current_todoist_evidence() -> (ExternalCreateOutcome, ExternalRef) {
         project_id: Some("todoist-project-moved".into()),
         updated_at: Some("revision-recovered".into()),
         synced_at: Some("2026-07-16T14:55:00Z".into()),
+        labels: Vec::new(),
     });
     (outcome, baseline)
 }

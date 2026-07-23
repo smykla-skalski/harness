@@ -13,8 +13,8 @@ use crate::task_board::types::{
 use super::super::github::reconciled_external_status;
 use super::conflicts::build_sync_conflicts;
 use super::merge::{
-    changed_fields, external_ref_matches, matching_ref, merge_external_labels,
-    pull_conflict_fields, pull_resolution_fields, sync_state_from_task, task_signals_umbrella,
+    changed_fields, external_ref_matches, matching_ref, pull_conflict_fields,
+    pull_resolution_fields, reconcile_provider_labels, sync_state_from_task, task_signals_umbrella,
 };
 use super::{
     ExternalSyncAction, ExternalSyncDirection, ExternalSyncOperation, ExternalSyncOptions,
@@ -335,6 +335,15 @@ fn reconciliation_patch(
     patch
 }
 
+/// Labels the provider reported as of the last sync, from the matching
+/// external ref's persisted snapshot, or empty if there is no prior sync.
+fn last_synced_provider_labels(item: &TaskBoardItem, task: &ExternalTask) -> Vec<String> {
+    matching_ref(item, &task.reference, task.project_id.as_deref())
+        .and_then(|reference| reference.sync_state.as_ref())
+        .map(|state| state.labels.clone())
+        .unwrap_or_default()
+}
+
 /// Reconciles tags, kind, and parent linkage. Split out from
 /// `reconciliation_patch` to keep that function's branch count under the
 /// cognitive-complexity gate.
@@ -350,7 +359,8 @@ fn apply_hierarchy_patch(
         // something else.
         patch.kind = Some(TaskBoardItemKind::Umbrella);
     }
-    let merged_tags = merge_external_labels(&item.tags, &task.labels);
+    let last_synced_labels = last_synced_provider_labels(item, task);
+    let merged_tags = reconcile_provider_labels(&item.tags, &task.labels, &last_synced_labels);
     if merged_tags != item.tags {
         patch.tags = Some(merged_tags);
     }
@@ -449,6 +459,7 @@ fn reference_changed(
                 || current_state.status != next_state.status
                 || current_state.project_id != next_state.project_id
                 || current_state.updated_at != next_state.updated_at
+                || current_state.labels != next_state.labels
         })
 }
 

@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::errors::CliError;
 use crate::task_board::TaskBoardExternalCreateIntent;
+use crate::task_board::matched_exclusion_label;
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::types::{TaskBoardItem, TaskBoardItemKind, TaskBoardStatus};
 use crate::workspace::utc_now;
@@ -261,6 +262,9 @@ async fn pull_provider_tasks(
             continue;
         }
         if !new_pull_matches_status_filter(options.status, &task) {
+            continue;
+        }
+        if matched_exclusion_label(&task.labels).is_some() || task.title.trim().is_empty() {
             continue;
         }
         if options.dry_run {
