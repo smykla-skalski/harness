@@ -114,28 +114,29 @@ fn websocket_extension_matches_contract_parity() {
 
 #[test]
 fn every_operation_documents_cross_cutting_responses() {
+    // (status, shared component, present only when the operation has a body).
+    const CROSS_CUTTING: &[(&str, &str, bool)] = &[
+        ("401", "RemoteAuthRequired", false),
+        ("414", "RemoteRequestUriTooLong", false),
+        ("429", "RemoteRequestThrottled", false),
+        ("431", "RemoteRequestHeadersTooLarge", false),
+        ("503", "RemoteServiceUnavailable", false),
+        ("504", "RemoteRequestTimedOut", false),
+        ("413", "RemoteRequestBodyTooLarge", true),
+    ];
+
     let doc = openapi_json_value();
     let shared = doc
         .pointer("/components/responses")
         .and_then(serde_json::Value::as_object)
         .expect("components/responses is defined once");
-    for name in [
-        "RemoteAuthRequired",
-        "RemoteRequestUriTooLong",
-        "RemoteRequestBodyTooLarge",
-        "RemoteRequestHeadersTooLarge",
-        "RemoteRequestThrottled",
-        "RemoteServiceUnavailable",
-        "RemoteRequestTimedOut",
-    ] {
+    for (_status, component, _body_only) in CROSS_CUTTING {
         assert!(
-            shared.contains_key(name),
-            "shared response {name} must be defined"
+            shared.contains_key(*component),
+            "shared response {component} must be defined"
         );
     }
 
-    // Statuses the middleware can return for any route regardless of body.
-    let always = ["401", "414", "429", "431", "503", "504"];
     let paths = doc
         .get("paths")
         .and_then(serde_json::Value::as_object)
@@ -146,14 +147,28 @@ fn every_operation_documents_cross_cutting_responses() {
             let Some(operation) = item.get(method).and_then(serde_json::Value::as_object) else {
                 continue;
             };
+            let has_body = operation.contains_key("requestBody");
             let responses = operation
                 .get("responses")
                 .and_then(serde_json::Value::as_object)
                 .unwrap_or_else(|| panic!("{method} {path} has no responses"));
-            for status in always {
-                assert!(
-                    responses.contains_key(status),
-                    "{method} {path} must reference the cross-cutting {status} response"
+            for (status, component, body_only) in CROSS_CUTTING {
+                let reference = responses
+                    .get(*status)
+                    .and_then(|response| response.get("$ref"))
+                    .and_then(serde_json::Value::as_str);
+                if *body_only && !has_body {
+                    assert!(
+                        reference.is_none(),
+                        "{method} {path} should not document {status} without a request body"
+                    );
+                    continue;
+                }
+                let expected = format!("#/components/responses/{component}");
+                assert_eq!(
+                    reference,
+                    Some(expected.as_str()),
+                    "{method} {path} status {status} must reference the {component} response"
                 );
             }
         }

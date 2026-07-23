@@ -244,7 +244,12 @@ fn define_shared_responses(doc: &mut serde_json::Value) {
     else {
         return;
     };
-    let mut responses = serde_json::Map::new();
+    let responses = components
+        .entry("responses")
+        .or_insert_with(|| serde_json::Value::Object(serde_json::Map::new()));
+    let Some(responses) = responses.as_object_mut() else {
+        return;
+    };
     for shared in SHARED_RESPONSES {
         responses.insert(
             shared.component.to_owned(),
@@ -258,7 +263,6 @@ fn define_shared_responses(doc: &mut serde_json::Value) {
             }),
         );
     }
-    components.insert("responses".to_owned(), serde_json::Value::Object(responses));
 }
 
 fn reference_shared_responses(doc: &mut serde_json::Value) {
