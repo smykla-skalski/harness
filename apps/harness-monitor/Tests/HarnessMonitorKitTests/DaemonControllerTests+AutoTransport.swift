@@ -101,8 +101,8 @@ struct DaemonControllerAutoTransportTests {
     #expect(webSocketClient.shutdownCallCount() == 1)
   }
 
-  @Test("auto transport bootstrap cancel stops an in-flight WebSocket attempt")
-  func autoTransportBootstrapCancelStopsInFlightWebSocketAttempt() async throws {
+  @Test("auto transport grace timeout cancels the in-flight WebSocket attempt")
+  func autoTransportGraceTimeoutCancelsInFlightWebSocketAttempt() async throws {
     let httpClient = RecordingHarnessClient()
     let cancelObserved = LockedFlag()
     let gracePeriod: Duration = .milliseconds(100)
