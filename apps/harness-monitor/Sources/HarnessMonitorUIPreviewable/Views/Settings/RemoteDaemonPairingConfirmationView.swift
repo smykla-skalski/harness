@@ -46,6 +46,7 @@ public struct RemoteDaemonPairingConfirmationView: View {
     }
     .frame(width: 420)
     .onAppear {
+      guard displayName.isEmpty else { return }
       displayName = Host.current().localizedName ?? "Harness Monitor on macOS"
     }
   }
