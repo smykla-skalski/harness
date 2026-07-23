@@ -180,6 +180,46 @@ struct DaemonControllerAutoTransportTests {
     }
   }
 
+  @Test("cancelled auto transport bootstrap releases the HTTP client")
+  func cancelledAutoTransportBootstrapReleasesHTTPClient() async throws {
+    let httpClient = RecordingHarnessClient()
+    let attemptStarted = LockedFlag()
+    let controller = DaemonController(
+      transportPreference: .auto,
+      launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
+      ownership: .managed,
+      autoTransportWebSocketGracePeriod: .milliseconds(100),
+      sessionFactory: { _ in httpClient },
+      webSocketBootstrapper: { _ in
+        attemptStarted.set()
+        while !Task.isCancelled {
+          try? await Task.sleep(for: .milliseconds(10))
+        }
+        return nil
+      }
+    )
+    let connection = HarnessMonitorConnection(
+      endpoint: try #require(URL(string: "http://127.0.0.1:65535")),
+      token: "test-token"
+    )
+
+    let bootstrap = Task { try await controller.bootstrap(connection: connection) }
+    let clock = ContinuousClock()
+    let startDeadline = clock.now + .seconds(2)
+    while !attemptStarted.get(), clock.now < startDeadline {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(attemptStarted.get())
+    bootstrap.cancel()
+
+    await #expect(throws: CancellationError.self) {
+      _ = try await bootstrap.value
+    }
+    // Throwing without closing the healthy HTTP client would leak the socket
+    // this PR closes on the WebSocket side.
+    #expect(httpClient.shutdownCallCount() == 1)
+  }
+
   @Test("default WebSocket bootstrap stops a hung health probe on cancel")
   func defaultWebSocketBootstrapStopsHungHealthProbeOnCancel() async throws {
     // Binds and listens but never accepts, so the upgrade request is sent and

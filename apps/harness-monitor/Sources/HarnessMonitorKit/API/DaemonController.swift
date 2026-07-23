@@ -187,6 +187,7 @@ public struct DaemonController: DaemonControlling {
         HarnessMonitorLogger.lifecycle.trace(
           "Upgraded daemon transport to WebSocket for \(connection.endpoint.absoluteString, privacy: .public)"
         )
+        try await requireNotCancelled(releasing: wsClient)
         return wsClient
       case .timedOut:
         let gracePeriod = String(describing: autoTransportWebSocketGracePeriod)
@@ -199,6 +200,7 @@ public struct DaemonController: DaemonControlling {
       case .unavailable:
         break
       }
+      try await requireNotCancelled(releasing: httpClient)
       return httpClient
     }
 

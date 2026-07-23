@@ -35,6 +35,17 @@ extension DaemonController {
     }
   }
 
+  /// Releases `client` and reports cancellation, so a caller that gave up
+  /// during the race never receives a live client it does not know to close.
+  /// A bare `checkCancellation` here would leak the socket it hands back.
+  func requireNotCancelled(releasing client: any HarnessMonitorClientProtocol) async throws {
+    guard Task.isCancelled else {
+      return
+    }
+    await client.shutdown()
+    throw CancellationError()
+  }
+
   func bootstrapAutoTransport(
     connection: HarnessMonitorConnection
   ) async -> AutoTransportBootstrapOutcome {
