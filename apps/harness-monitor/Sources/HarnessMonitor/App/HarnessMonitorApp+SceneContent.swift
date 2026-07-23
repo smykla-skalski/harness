@@ -66,17 +66,69 @@ extension HarnessMonitorApp {
         .onOpenURL { url in
           handleHarnessDeepLink(url)
         }
+        .sheet(
+          isPresented: Binding(
+            get: { pendingPairingURLValue != nil },
+            set: {
+              if !$0 {
+                pendingPairingURLValue = nil
+                pendingPairingInvitationValue = nil
+                pendingPairingErrorValue = nil
+              }
+            }
+          )
+        ) {
+          pairingConfirmationSheetContent
+        }
+        .alert(
+          "Invalid Pairing Link",
+          isPresented: Binding(
+            get: { pendingPairingErrorValue != nil },
+            set: {
+              if !$0 {
+                pendingPairingErrorValue = nil
+                pendingPairingURLValue = nil
+                pendingPairingInvitationValue = nil
+              }
+            }
+          )
+        ) {
+          // Dismissal runs the isPresented setter above, which clears the
+          // pending pairing state; the button only needs to close the alert.
+          Button("OK") {}
+        } message: {
+          if let error = pendingPairingErrorValue {
+            Text(error.localizedDescription)
+          }
+        }
     } else {
       Color.clear.accessibilityHidden(true)
     }
   }
 
-  /// Bridges incoming `harness://` URLs into the running app's selection
-  /// surfaces. Pull-request links route through the existing Open Anything
-  /// review registry so the dashboard's selection plumbing is reused; review
-  /// and task-board routes are reserved for follow-up units that wire route
-  /// switching and per-route scene storage.
+  /// Handles incoming `harness://` URLs. Remote-pairing links show a
+  /// confirmation sheet before pairing. Other routes go through the deep-link
+  /// router for review / task-board navigation.
   func handleHarnessDeepLink(_ url: URL) {
+    if url.scheme?.lowercased() == "harness",
+      url.host?.lowercased() == "remote-pair"
+    {
+      do {
+        let invitation = try RemoteDaemonPairingInvitation.decode(url)
+        pendingPairingInvitationValue = invitation
+        pendingPairingURLValue = url
+        pendingPairingErrorValue = nil
+      } catch let error as RemoteDaemonPairingInvitationError {
+        pendingPairingInvitationValue = nil
+        pendingPairingURLValue = nil
+        pendingPairingErrorValue = error
+      } catch {
+        pendingPairingInvitationValue = nil
+        pendingPairingURLValue = nil
+        pendingPairingErrorValue = .invalidPayload
+      }
+      return
+    }
     guard let route = HarnessMonitorDeepLinkRouter.parse(url: url) else { return }
     switch route {
     case .pullRequest(let id, let file):
@@ -91,6 +143,31 @@ extension HarnessMonitorApp {
       // Route switching into reviews/taskBoard is deferred (intents-foundation Unit 2):
       // once the deep-link router can drive `selectedRoute` + `needsMeOn` SceneStorage.
       break
+    }
+  }
+
+  @ViewBuilder
+  private var pairingConfirmationSheetContent: some View {
+    if let url = pendingPairingURLValue,
+      let invitation = pendingPairingInvitationValue
+    {
+      RemoteDaemonPairingConfirmationView(
+        invitation: invitation,
+        onPair: { displayName in
+          appStore.pairRemoteDaemon(
+            using: .deepLink(url.absoluteString),
+            displayName: displayName
+          )
+          settingsSelectedSectionBinding.wrappedValue = .connection
+          openWindow(id: HarnessMonitorWindowID.settings)
+          pendingPairingURLValue = nil
+          pendingPairingInvitationValue = nil
+        },
+        onCancel: {
+          pendingPairingURLValue = nil
+          pendingPairingInvitationValue = nil
+        }
+      )
     }
   }
 

@@ -312,6 +312,10 @@ public enum HarnessMonitorAccessibility {
   public static let sendSignalSheetActionHintField = "harness.sheet.send-signal.action-hint"
   public static let sendSignalSheetCancelButton = "harness.sheet.send-signal.cancel"
   public static let sendSignalSheetSubmitButton = "harness.sheet.send-signal.submit"
+  public static let remotePairSheet = "harness.sheet.remote-pair"
+  public static let remotePairSheetClientNameField = "harness.sheet.remote-pair.client-name"
+  public static let remotePairSheetCancelButton = "harness.sheet.remote-pair.cancel"
+  public static let remotePairSheetPairButton = "harness.sheet.remote-pair.pair"
   public static let settingsCodexSection = "harness.settings.codex"
   public static let settingsAgentsSection = settingsCodexSection
   public static let settingsPoliciesCanvasThemePicker =
