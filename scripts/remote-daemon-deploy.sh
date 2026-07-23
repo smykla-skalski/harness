@@ -46,7 +46,7 @@ fi
 # it is never elevated.
 run_controller() {
   if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
-    sudo "$@"
+    sudo -- "$@"
   else
     "$@"
   fi
