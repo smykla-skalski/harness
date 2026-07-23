@@ -243,8 +243,6 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
     Route("/v1/task-board/orchestrator/settings"): sampleOrchestratorSettingsText,
     Route("/v1/task-board/orchestrator/runs", method: "GET"):
       sampleTaskBoardAutomationHistoryText,
-    Route("/v1/task-board/orchestrator/runs/run/42 ?#%", method: "GET"):
-      sampleTaskBoardAutomationDetailText,
     Route("/v1/task-board/orchestrator/metrics", method: "GET"):
       sampleTaskBoardAutomationMetricsText,
     Route("/v1/task-board/orchestrator/runtime-config"): sampleTaskBoardGitRuntimeConfigText,
