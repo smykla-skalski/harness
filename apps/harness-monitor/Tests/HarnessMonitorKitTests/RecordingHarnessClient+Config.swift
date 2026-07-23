@@ -77,6 +77,20 @@ extension RecordingHarnessClient {
     }
   }
 
+  func configureDeliverTaskBoardDispatchErrors(_ errors: [any Error]) {
+    lock.withLock {
+      queuedDeliverTaskBoardDispatchErrors = errors
+    }
+  }
+
+  /// Items the daemon reports as holding a step-mode delivery that is waiting
+  /// to be claimed.
+  func configureHeldTaskBoardDispatches(_ itemIDs: [String]) {
+    lock.withLock {
+      heldTaskBoardDispatchItemIDs = itemIDs
+    }
+  }
+
   func configureMutationDelay(_ delay: Duration?) {
     lock.withLock {
       mutationDelay = delay

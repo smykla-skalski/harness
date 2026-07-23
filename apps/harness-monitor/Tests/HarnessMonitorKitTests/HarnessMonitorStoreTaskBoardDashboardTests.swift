@@ -111,6 +111,104 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
     #expect(store.currentSuccessFeedbackMessage == "Dispatched task board")
   }
 
+  @Test("Step-mode prepare+deliver completes with a single success when delivery starts the worker")
+  func stepModePrepareAndDeliverCompletesWithOneSuccess() async {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardItems([sampleTaskBoardItem()])
+    client.configureHeldTaskBoardDispatches(["board-1"])
+    let store = await makeBootstrappedStore(client: client)
+
+    let delivery = await store.prepareAndDeliverTaskBoardDispatch(
+      request: TaskBoardDispatchRequest(itemId: "board-1", dryRun: false)
+    )
+
+    #expect(delivery != nil)
+    #expect(store.currentSuccessFeedbackMessage == "Prepared and delivered task-board item")
+    #expect(store.currentFailureFeedbackMessage == nil)
+    // The reserve must not stand as a finished dispatch of its own.
+    #expect(store.globalTaskBoardDispatchSummary == nil)
+    #expect(
+      client.recordedCalls().contains(.deliverTaskBoardDispatch(itemID: "board-1", dryRun: false))
+    )
+  }
+
+  @Test("Step-mode prepare+deliver reports one outcome when the held claim fails")
+  func stepModePrepareAndDeliverReportsSingleOutcomeWhenClaimFails() async {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardItems([sampleTaskBoardItem()])
+    client.configureHeldTaskBoardDispatches(["board-1"])
+    // The hold is claimed out from under the delivery between the check and
+    // the claim, which is the one race the daemon still has to answer for.
+    client.configureDeliverTaskBoardDispatchErrors([
+      HarnessMonitorAPIError.server(
+        code: 409,
+        message: "task-board dispatch for item 'board-1' has no held delivery to claim"
+      )
+    ])
+    let store = await makeBootstrappedStore(client: client)
+
+    let delivery = await store.prepareAndDeliverTaskBoardDispatch(
+      request: TaskBoardDispatchRequest(itemId: "board-1", dryRun: false)
+    )
+
+    #expect(delivery == nil)
+    // No success toast or finished-dispatch record may stand next to the failure.
+    #expect(store.globalTaskBoardDispatchSummary == nil)
+    #expect(store.currentSuccessFeedbackMessage == nil)
+    #expect(store.currentFailureFeedbackMessage?.contains("no held delivery to claim") == true)
+    #expect(
+      client.recordedCalls().contains(
+        .dispatchTaskBoard(
+          dryRun: false,
+          status: nil,
+          itemID: "board-1",
+          projectDir: nil,
+          actor: nil
+        )
+      )
+    )
+  }
+
+  @Test("Step-mode prepare+deliver never claims a delivery the daemon is not holding")
+  func stepModePrepareAndDeliverSkipsClaimWhenNothingIsHeld() async {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardItems([sampleTaskBoardItem()])
+    // The daemon holds nothing: its own step mode was off, so the reserve
+    // started the worker outright instead of parking a held delivery.
+    let store = await makeBootstrappedStore(client: client)
+
+    let delivery = await store.prepareAndDeliverTaskBoardDispatch(
+      request: TaskBoardDispatchRequest(itemId: "board-1", dryRun: false)
+    )
+
+    #expect(delivery == nil)
+    #expect(store.currentSuccessFeedbackMessage == "Dispatched task-board item")
+    #expect(store.currentFailureFeedbackMessage == nil)
+    // Claiming anyway is exactly what produced the "is not held" conflict.
+    #expect(
+      !client.recordedCalls().contains(.deliverTaskBoardDispatch(itemID: "board-1", dryRun: false))
+    )
+  }
+
+  @Test("Step-mode prepare+deliver reports a clean failure when the reserve took no item")
+  func stepModePrepareAndDeliverFailsCleanlyWhenReserveTookNoItem() async {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardItems([sampleTaskBoardItem()])
+    let store = await makeBootstrappedStore(client: client)
+
+    // Nothing reserves "board-2", so there is no hold and no started worker.
+    let delivery = await store.prepareAndDeliverTaskBoardDispatch(
+      request: TaskBoardDispatchRequest(itemId: "board-2", dryRun: false)
+    )
+
+    #expect(delivery == nil)
+    #expect(store.currentSuccessFeedbackMessage == nil)
+    #expect(store.currentFailureFeedbackMessage?.contains("No held delivery to claim") == true)
+    #expect(
+      !client.recordedCalls().contains(.deliverTaskBoardDispatch(itemID: "board-2", dryRun: false))
+    )
+  }
+
   @Test("Audit, projects, and machines summaries update dashboard state")
   func auditProjectsAndMachinesUpdateDashboardState() async {
     let client = RecordingHarnessClient()

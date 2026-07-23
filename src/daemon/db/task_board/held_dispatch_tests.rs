@@ -230,6 +230,44 @@ async fn failed_worker_start_restores_unexpired_one_shot_grant() {
 }
 
 #[tokio::test]
+async fn missing_held_delivery_states_the_real_reason_not_a_session_conflict() {
+    let dir = tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+        .await
+        .expect("connect");
+    let item_id = "never-held-item".to_string();
+    let item = TaskBoardItem::new(
+        item_id.clone(),
+        "Never held".into(),
+        "Body".into(),
+        "2026-07-14T10:00:00Z".into(),
+    );
+    db.create_task_board_item(item).await.expect("create item");
+
+    // Dry-run preview path.
+    let preview_error = db
+        .held_task_board_dispatch(&item_id)
+        .await
+        .expect_err("dry-run needs a held delivery");
+    assert_eq!(preview_error.code(), "TASK_BOARD_DELIVERY_NOT_HELD");
+    assert!(
+        !preview_error.message().contains("session agent conflict"),
+        "missing hold must not read as a session conflict: {}",
+        preview_error.message()
+    );
+    assert!(preview_error.message().contains(&item_id));
+    assert!(preview_error.message().contains("no held delivery to claim"));
+
+    // Real claim path.
+    let claim_error = db
+        .claim_held_task_board_dispatch(&item_id)
+        .await
+        .expect_err("claim needs a held delivery");
+    assert_eq!(claim_error.code(), "TASK_BOARD_DELIVERY_NOT_HELD");
+    assert!(claim_error.message().contains("no held delivery to claim"));
+}
+
+#[tokio::test]
 async fn expired_or_revision_stale_grant_cannot_claim_held_delivery() {
     let fixture = held_fixture().await;
     sqlx::query(

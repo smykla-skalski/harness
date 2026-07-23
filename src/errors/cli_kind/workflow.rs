@@ -72,4 +72,9 @@ impl CliErrorKind {
     pub fn task_board_lane_capacity(detail: impl Into<Cow<'static, str>>) -> Self {
         Self::Workflow(WorkflowError::task_board_lane_capacity(detail))
     }
+
+    #[must_use]
+    pub fn task_board_delivery_not_held(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::Workflow(WorkflowError::task_board_delivery_not_held(detail))
+    }
 }

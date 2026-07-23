@@ -166,12 +166,14 @@ extension RecordingHarnessClient {
   func sampleTaskBoardOrchestratorStatus(
     enabled: Bool = true,
     running: Bool = false,
-    stepMode: Bool = false
+    stepMode: Bool = false,
+    heldDispatches: TaskBoardHeldDispatchSummary = TaskBoardHeldDispatchSummary()
   ) -> TaskBoardOrchestratorStatus {
     TaskBoardOrchestratorStatus(
       enabled: enabled,
       running: running,
       stepMode: stepMode,
+      heldDispatches: heldDispatches,
       currentTick: TaskBoardOrchestratorTickInfo(
         runId: "run-active",
         phase: .evaluation,

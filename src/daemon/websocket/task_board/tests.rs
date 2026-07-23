@@ -104,6 +104,54 @@ async fn ws_task_board_dispatch_pick_accepts_omitted_params() {
     assert_eq!(response.result, Some(json!({})));
 }
 
+/// A step-mode delivery is the phase that actually starts the worker, so its
+/// outcome has to reach the audit trail. Without this the reserve's success
+/// event is the only record of the action and a failed delivery reads as a
+/// dispatch that simply worked.
+#[test]
+fn ws_task_board_dispatch_deliver_records_failed_delivery_in_the_audit_trail() {
+    let sandbox = tempdir().expect("tempdir");
+    with_isolated_harness_env(sandbox.path(), || {
+        tokio::runtime::Runtime::new()
+            .expect("runtime")
+            .block_on(async {
+                let state = test_http_state_with_db();
+                let connection = Arc::new(Mutex::new(ConnectionState::new()));
+                let response = dispatch_task_board_method(
+                    &WsRequest {
+                        id: "ws-deliver-audit".into(),
+                        method: ws_methods::TASK_BOARD_DISPATCH_DELIVER.into(),
+                        params: json!({ "item_id": "never-held-item", "dry_run": false }),
+                        trace_context: None,
+                    },
+                    &state,
+                    &connection,
+                )
+                .await
+                .expect("deliver response");
+                assert!(
+                    response.error.is_some(),
+                    "delivering an unheld item should fail"
+                );
+
+                let events = state
+                    .async_db
+                    .get()
+                    .expect("async db")
+                    .load_audit_events(&crate::daemon::protocol::HarnessMonitorAuditEventsRequest {
+                        action_keys: vec!["task_board.dispatch_deliver".into()],
+                        ..Default::default()
+                    })
+                    .await
+                    .expect("load audit events")
+                    .events;
+                assert_eq!(events.len(), 1);
+                assert_eq!(events[0].outcome, "failure");
+                assert_eq!(events[0].subject.as_deref(), Some("never-held-item"));
+            });
+    });
+}
+
 #[test]
 fn ws_task_board_sync_persists_exactly_one_audit_event() {
     let sandbox = tempdir().expect("tempdir");
