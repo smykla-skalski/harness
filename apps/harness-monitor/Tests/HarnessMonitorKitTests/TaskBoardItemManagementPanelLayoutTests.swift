@@ -18,8 +18,8 @@ struct TaskBoardItemManagementPanelLayoutTests {
   private static let sheetIdealWidth: CGFloat = 1_240
 
   @Test(
-    "Panel minimum width stays within the sheet at every text size",
-    arguments: [HarnessMonitorTextSize.defaultIndex, 6]
+    "Panel minimum width stays within the sheet at the default and largest text sizes",
+    arguments: [HarnessMonitorTextSize.defaultIndex, HarnessMonitorTextSize.scales.count - 1]
   )
   func panelMinimumWidthStaysWithinSheet(textSizeIndex: Int) {
     let minimumWidth = panelWidth(
@@ -37,7 +37,7 @@ struct TaskBoardItemManagementPanelLayoutTests {
   func panelLaidOutAtSheetWidthDoesNotOverflow(sheetWidth: CGFloat) {
     let laidOutWidth = panelWidth(
       whenProposed: sheetWidth,
-      textSizeIndex: 6
+      textSizeIndex: HarnessMonitorTextSize.scales.count - 1
     )
 
     #expect(laidOutWidth <= sheetWidth)
