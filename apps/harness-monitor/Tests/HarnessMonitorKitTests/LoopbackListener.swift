@@ -16,13 +16,18 @@ final class LoopbackListener {
     }
 
     var reuse: Int32 = 1
-    _ = setsockopt(
+    let optionResult = setsockopt(
       fileDescriptor,
       SOL_SOCKET,
       SO_REUSEADDR,
       &reuse,
       socklen_t(MemoryLayout<Int32>.size)
     )
+    guard optionResult == 0 else {
+      let optionErrno = errno
+      Darwin.close(fileDescriptor)
+      throw LoopbackListenerError.setOptionFailed(errno: optionErrno)
+    }
 
     var address = sockaddr_in()
     address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
@@ -77,6 +82,7 @@ final class LoopbackListener {
 
 enum LoopbackListenerError: Error {
   case socketFailed(errno: Int32)
+  case setOptionFailed(errno: Int32)
   case addressParseFailed
   case bindFailed(errno: Int32)
   case listenFailed(errno: Int32)
