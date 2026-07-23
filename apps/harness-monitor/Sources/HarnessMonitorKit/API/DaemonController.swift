@@ -47,15 +47,22 @@ public struct DaemonController: DaemonControlling {
       },
     webSocketBootstrapper:
       @escaping @Sendable (HarnessMonitorConnection) async
-      -> (any HarnessMonitorClientProtocol)? = {
-        let transport = WebSocketTransport(connection: $0)
-        do {
-          try await transport.connect()
-          _ = try await transport.health()
-          return transport
-        } catch {
-          await transport.shutdown()
-          return nil
+      -> (any HarnessMonitorClientProtocol)? = { connection in
+        let transport = WebSocketTransport(connection: connection)
+        return await withTaskCancellationHandler {
+          do {
+            try Task.checkCancellation()
+            try await transport.connect()
+            try Task.checkCancellation()
+            _ = try await transport.health()
+            try Task.checkCancellation()
+            return transport
+          } catch {
+            await transport.shutdown()
+            return nil
+          }
+        } onCancel: {
+          Task { await transport.shutdown() }
         }
       },
     endpointProbe: @escaping @Sendable (URL) async -> Bool = {
@@ -225,35 +232,45 @@ public struct DaemonController: DaemonControlling {
   func bootstrapAutoTransport(
     connection: HarnessMonitorConnection
   ) async -> AutoTransportBootstrapOutcome {
-    await withTaskGroup(
-      of: AutoTransportBootstrapOutcome.self,
-      returning: AutoTransportBootstrapOutcome.self
-    ) { group in
-      group.addTask {
-        if let wsClient = await webSocketBootstrapper(connection) {
-          return .upgraded(wsClient)
-        }
-        return .unavailable
-      }
-      let gracePeriod = autoTransportWebSocketGracePeriod
-      group.addTask {
-        try? await Task.sleep(for: gracePeriod)
-        return .timedOut
-      }
-
-      let outcome = await group.next() ?? .unavailable
-      group.cancelAll()
-      // Cancellation cannot unwind a WebSocket connect that already resumed, so
-      // the losing branch can still land a connected client. Drop it on the
-      // floor and it keeps a socket and heartbeat alive for the whole session.
-      if case .timedOut = outcome {
-        for await pending in group {
-          if case .upgraded(let webSocketClient) = pending {
-            await webSocketClient.shutdown()
-          }
-        }
-      }
+    let gracePeriod = autoTransportWebSocketGracePeriod
+    // Keep the WebSocket attempt unstructured so a timed-out race can return
+    // within the grace period. `withTaskGroup` always join-waits remaining
+    // children, which pinned startup to a hung connect/health probe.
+    let attempt = Task { await webSocketBootstrapper(connection) }
+    let outcome = await raceAutoTransportAttempt(attempt, gracePeriod: gracePeriod)
+    switch outcome {
+    case .upgraded, .unavailable:
       return outcome
+    case .timedOut:
+      attempt.cancel()
+      // A connect that already resumed can still finish after cancel. Shut the
+      // late client down without blocking startup on that finish.
+      Task {
+        if let webSocketClient = await attempt.value {
+          await webSocketClient.shutdown()
+        }
+      }
+      return .timedOut
+    }
+  }
+
+  private func raceAutoTransportAttempt(
+    _ attempt: Task<(any HarnessMonitorClientProtocol)?, Never>,
+    gracePeriod: Duration
+  ) async -> AutoTransportBootstrapOutcome {
+    await withCheckedContinuation { continuation in
+      let finish = OnceResume(continuation)
+      Task {
+        if let webSocketClient = await attempt.value {
+          finish.resume(returning: .upgraded(webSocketClient))
+        } else {
+          finish.resume(returning: .unavailable)
+        }
+      }
+      Task {
+        try? await Task.sleep(for: gracePeriod)
+        finish.resume(returning: .timedOut)
+      }
     }
   }
 
@@ -416,5 +433,23 @@ public struct DaemonController: DaemonControlling {
     }
 
     return .managedDaemonVersionMismatch(expected: expectedVersion, actual: manifest.version)
+  }
+}
+
+/// Resumes a checked continuation at most once across concurrent race branches.
+private final class OnceResume<T: Sendable>: @unchecked Sendable {
+  private let lock = NSLock()
+  private var continuation: CheckedContinuation<T, Never>?
+
+  init(_ continuation: CheckedContinuation<T, Never>) {
+    self.continuation = continuation
+  }
+
+  func resume(returning value: T) {
+    let toResume: CheckedContinuation<T, Never>? = lock.withLock {
+      defer { continuation = nil }
+      return continuation
+    }
+    toResume?.resume(returning: value)
   }
 }

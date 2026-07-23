@@ -19,6 +19,19 @@ private final class LockedEndpointBox: @unchecked Sendable {
   }
 }
 
+private final class LockedFlag: @unchecked Sendable {
+  private let lock = NSLock()
+  private var value = false
+
+  func set() {
+    lock.withLock { value = true }
+  }
+
+  func get() -> Bool {
+    lock.withLock { value }
+  }
+}
+
 @Suite("Daemon controller service management")
 struct DaemonControllerTests {
   @Test(
@@ -152,15 +165,73 @@ struct DaemonControllerTests {
   func autoTransportBootstrapFallsBackAfterConfiguredGracePeriod() async throws {
     let httpClient = RecordingHarnessClient()
     let webSocketClient = RecordingHarnessClient()
+    // Model a daemon that accepts the socket and never answers: the connect
+    // stays in flight past the grace period and ignores cooperative cancel.
+    let hangDuration: Duration = .milliseconds(600)
+    let gracePeriod: Duration = .milliseconds(150)
     let controller = DaemonController(
       transportPreference: .auto,
       launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
       ownership: .managed,
-      autoTransportWebSocketGracePeriod: .milliseconds(150),
+      autoTransportWebSocketGracePeriod: gracePeriod,
       sessionFactory: { _ in httpClient },
       webSocketBootstrapper: { _ in
-        try? await Task.sleep(for: .milliseconds(400))
-        return webSocketClient
+        await withCheckedContinuation {
+          (continuation: CheckedContinuation<(any HarnessMonitorClientProtocol)?, Never>) in
+          Task.detached {
+            try? await Task.sleep(for: hangDuration)
+            continuation.resume(returning: webSocketClient)
+          }
+        }
+      }
+    )
+    let connection = HarnessMonitorConnection(
+      endpoint: try #require(URL(string: "http://127.0.0.1:65535")),
+      token: "test-token"
+    )
+    let clock = ContinuousClock()
+    let start = clock.now
+
+    let client = try await controller.bootstrap(connection: connection)
+
+    let elapsed = start.duration(to: clock.now)
+    #expect(client as AnyObject === httpClient as AnyObject)
+    // Wait must honor the grace period even while the WebSocket attempt is still
+    // in flight; do not block startup on the hang finishing.
+    #expect(elapsed < .milliseconds(300))
+    #expect(elapsed < hangDuration)
+    #expect(httpClient.readCallCount(.health) == 1)
+    #expect(httpClient.shutdownCallCount() == 0)
+
+    // Late winner still has to be shut down once it lands (#360).
+    let shutdownDeadline = clock.now + hangDuration + .milliseconds(500)
+    while webSocketClient.shutdownCallCount() == 0, clock.now < shutdownDeadline {
+      try await Task.sleep(for: .milliseconds(20))
+    }
+    #expect(webSocketClient.shutdownCallCount() == 1)
+  }
+
+  @Test("auto transport bootstrap cancel stops an in-flight WebSocket attempt")
+  func autoTransportBootstrapCancelStopsInFlightWebSocketAttempt() async throws {
+    let httpClient = RecordingHarnessClient()
+    let webSocketClient = RecordingHarnessClient()
+    let attemptEnded = LockedFlag()
+    let cancelledDuringAttempt = LockedFlag()
+    let gracePeriod: Duration = .milliseconds(100)
+    let controller = DaemonController(
+      transportPreference: .auto,
+      launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
+      ownership: .managed,
+      autoTransportWebSocketGracePeriod: gracePeriod,
+      sessionFactory: { _ in httpClient },
+      webSocketBootstrapper: { _ in
+        defer { attemptEnded.set() }
+        while !Task.isCancelled {
+          try? await Task.sleep(for: .milliseconds(20))
+        }
+        cancelledDuringAttempt.set()
+        // A cancelled attempt must not hand back a live client.
+        return nil
       }
     )
     let connection = HarnessMonitorConnection(
@@ -175,11 +246,14 @@ struct DaemonControllerTests {
     let elapsed = start.duration(to: clock.now)
     #expect(client as AnyObject === httpClient as AnyObject)
     #expect(elapsed < .milliseconds(300))
-    #expect(httpClient.readCallCount(.health) == 1)
-    #expect(httpClient.shutdownCallCount() == 0)
-    // The losing WebSocket client still connects; dropping it would leave a live
-    // socket with a running heartbeat behind the adopted HTTP client.
-    #expect(webSocketClient.shutdownCallCount() == 1)
+
+    let endDeadline = clock.now + .milliseconds(500)
+    while !attemptEnded.get(), clock.now < endDeadline {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(attemptEnded.get())
+    #expect(cancelledDuringAttempt.get())
+    #expect(webSocketClient.shutdownCallCount() == 0)
   }
 
   @Test("bootstrapClient recovers a newer daemon endpoint from events when manifest is stale")
