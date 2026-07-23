@@ -1,6 +1,7 @@
 use super::task_board_automation_force_cancel::force_cancel_task_board_automation_db;
 use crate::daemon::db::{
     accept_remote_controller, claim_remote_controller, remote_controller_fixture,
+    seed_cancelable_controller_targets,
 };
 use crate::daemon::protocol::{
     HarnessMonitorAuditEventsRequest, TaskBoardAutomationForceCancelDisposition,
@@ -343,6 +344,21 @@ async fn ineligible_first_scan_page_does_not_hide_exact_target() {
         fixture.execution.execution_id
     );
     assert!(!snapshot.cancelable_targets_truncated);
+}
+
+#[tokio::test]
+async fn eligible_remote_cancel_targets_truncate_at_one_hundred() {
+    let fixture = remote_controller_fixture(101).await;
+    initialize_automation_control(&fixture.db).await;
+    seed_cancelable_controller_targets(&fixture, 101).await;
+
+    let snapshot = fixture
+        .db
+        .task_board_automation_snapshot()
+        .await
+        .expect("snapshot 101 eligible remote targets");
+    assert_eq!(snapshot.cancelable_targets.len(), 100);
+    assert!(snapshot.cancelable_targets_truncated);
 }
 
 fn spawn_cancel(

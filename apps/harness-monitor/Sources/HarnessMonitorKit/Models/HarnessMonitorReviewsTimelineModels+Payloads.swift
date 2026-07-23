@@ -312,6 +312,7 @@ public enum AnyCodableJSONValue: Codable, Equatable, Sendable {
   case null
   case bool(Bool)
   case number(Double)
+  case unsignedInteger(UInt64)
   case string(String)
   case array([Self])
   case object([String: Self])
@@ -322,6 +323,10 @@ public enum AnyCodableJSONValue: Codable, Equatable, Sendable {
       self = .null
     } else if let value = try? single.decode(Bool.self) {
       self = .bool(value)
+    } else if let value = try? single.decode(UInt64.self),
+      value > 9_007_199_254_740_992
+    {
+      self = .unsignedInteger(value)
     } else if let value = try? single.decode(Double.self) {
       self = .number(value)
     } else if let value = try? single.decode(String.self) {
@@ -344,6 +349,7 @@ public enum AnyCodableJSONValue: Codable, Equatable, Sendable {
     case .null: try single.encodeNil()
     case .bool(let value): try single.encode(value)
     case .number(let value): try single.encode(value)
+    case .unsignedInteger(let value): try single.encode(value)
     case .string(let value): try single.encode(value)
     case .array(let value): try single.encode(value)
     case .object(let value): try single.encode(value)
