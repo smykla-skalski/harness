@@ -65,7 +65,7 @@ extension DaemonController {
     gracePeriod: Duration
   ) async -> AutoTransportBootstrapOutcome {
     var graceTimer: Task<Void, Never>?
-    let outcome = await withCheckedContinuation { continuation in
+    let outcome: AutoTransportBootstrapOutcome = await withCheckedContinuation { continuation in
       let finish = OnceResume(continuation)
       Task {
         if let webSocketClient = await attempt.value {
