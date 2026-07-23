@@ -1,6 +1,11 @@
 use serde::{Deserialize, Deserializer, Serialize, de};
 
-use crate::task_board::TaskBoardTriageDecisionRecord;
+use crate::task_board::{
+    TaskBoardTriageDecisionRecord, TaskBoardTriageEffectiveOutcome, TaskBoardTriageOverride,
+    TriageVerdict,
+};
+
+use super::{TaskBoardItemPositionSnapshot, TaskBoardShiftedItemRevision};
 
 /// Applied when a history request omits `limit`.
 pub const TASK_BOARD_TRIAGE_HISTORY_DEFAULT_LIMIT: u32 = 50;
@@ -11,11 +16,55 @@ pub const TASK_BOARD_TRIAGE_HISTORY_MAX_LIMIT: u32 = 100;
 pub const TASK_BOARD_TRIAGE_HISTORY_INVALID_PARAMS: &str =
     "invalid task-board triage history params";
 
-/// Response for `GET /v1/task-board/items/{item_id}/triage`.
+/// Response for `GET /v1/task-board/items/{item_id}/triage`. Extended with
+/// the active override (if any) and the single effective outcome those two
+/// resolve to; existing readers that only look at `current` are unaffected.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskBoardTriageCurrentResponse {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current: Option<TaskBoardTriageDecisionRecord>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub triage_override: Option<TaskBoardTriageOverride>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effective: Option<TaskBoardTriageEffectiveOutcome>,
+}
+
+/// Request for `PUT /v1/task-board/items/{item_id}/triage/override`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardSetTriageOverrideRequest {
+    pub verdict: TriageVerdict,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    pub expected_item_revision: i64,
+    pub expected_items_change_seq: i64,
+    /// Bound to the authenticated control-plane principal at the transport edge.
+    #[serde(default)]
+    pub actor: String,
+}
+
+/// Request for `POST /v1/task-board/items/{item_id}/triage/override/clear`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardClearTriageOverrideRequest {
+    pub expected_item_revision: i64,
+    pub expected_items_change_seq: i64,
+    /// Bound to the authenticated control-plane principal at the transport edge.
+    #[serde(default)]
+    pub actor: String,
+}
+
+/// Result of a triage override set or clear under one item-revision and
+/// item-list sequence CAS. Mirrors [`TaskBoardItemPositionMutationResponse`]'s
+/// snapshot/shifted shape so a client can update lane placement from the
+/// mutation response alone.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardTriageOverrideMutationResponse {
+    pub snapshot: TaskBoardItemPositionSnapshot,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub shifted: Vec<TaskBoardShiftedItemRevision>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub triage_override: Option<TaskBoardTriageOverride>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effective: Option<TaskBoardTriageEffectiveOutcome>,
 }
 
 /// Combined WS params for `task_board.triage_history`: the item id plus the

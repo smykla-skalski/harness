@@ -1197,6 +1197,11 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "TaskBoardItemPositionSnapshot",
     "TaskBoardShiftedItemRevision",
     "TaskBoardItemPositionMutationResponse",
+    // task_board_triage.rs override mutation response wrapper: embeds the
+    // rerouted TaskBoardItemPositionSnapshotWire, same shape as
+    // TaskBoardItemPositionMutationResponse above; Swift hand is
+    // TaskBoardTriageOverrideMutationResponse.
+    "TaskBoardTriageOverrideMutationResponse",
     // task_board planning.rs transition + its protocol response wrapper (the response
     // carries the rerouted TaskBoardItemWire); Swift hands are TaskBoardPlanningTransition
     // /TaskBoardPlanningResponse.
@@ -2619,20 +2624,31 @@ const TASK_BOARD_ITEM_EMIT_ONLY: &[&str] = &[
     "TaskBoardItemPositionMutationResponse",
 ];
 const TASK_BOARD_TRIAGE_SOURCE: &str = include_str!("../src/task_board/triage.rs");
+const TASK_BOARD_TRIAGE_OVERRIDE_SOURCE: &str =
+    include_str!("../src/task_board/triage_override.rs");
 const TASK_BOARD_TRIAGE_PROTOCOL_SOURCE: &str =
     include_str!("../src/daemon/protocol/task_board_triage.rs");
 const TASK_BOARD_TRIAGE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardTriageWireTypes.generated.swift";
 // The BuiltInV1 triage decision record and its verdict/reason/cause enums,
-// plus the current/history read responses from the protocol facade. None of
-// these reference TaskBoardItem, so unlike the item/position cluster they
-// ride bare (no Wire suffix, no hand mirror needed).
+// the durable override and effective-outcome choke point, plus the
+// current/history read responses and the override set/clear request and
+// mutation-response types from the protocol facade. The mutation response
+// references TaskBoardItemPositionSnapshot/TaskBoardShiftedItemRevision from
+// the item cluster bare, same as TaskBoardItemPositionMutationResponse does
+// there -- both ride in the same Swift target so no re-emit is needed.
 const TASK_BOARD_TRIAGE_EMIT_ONLY: &[&str] = &[
     "TriageVerdict",
     "TriageReasonCode",
     "TriageCause",
     "TaskBoardTriageDecisionRecord",
+    "TaskBoardTriageOverride",
+    "TaskBoardTriageEffectiveSource",
+    "TaskBoardTriageEffectiveOutcome",
     "TaskBoardTriageCurrentResponse",
     "TaskBoardTriageHistoryResponse",
+    "TaskBoardSetTriageOverrideRequest",
+    "TaskBoardClearTriageOverrideRequest",
+    "TaskBoardTriageOverrideMutationResponse",
 ];
 const TASK_BOARD_MACHINES_SOURCE: &str = include_str!("../src/task_board/machines.rs");
 const TASK_BOARD_MACHINES_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardMachineWireTypes.generated.swift";
@@ -3189,9 +3205,13 @@ fn modules() -> Vec<GeneratedModule> {
         },
         GeneratedModule {
             output: TASK_BOARD_TRIAGE_OUTPUT,
-            description: "the Rust task-board triage decision record and its read responses",
-            defaults: &[TASK_BOARD_TRIAGE_SOURCE],
-            sources: &[TASK_BOARD_TRIAGE_SOURCE, TASK_BOARD_TRIAGE_PROTOCOL_SOURCE],
+            description: "the Rust task-board triage decision record, its override, and its read/mutation responses",
+            defaults: &[TASK_BOARD_TRIAGE_SOURCE, TASK_BOARD_TRIAGE_OVERRIDE_SOURCE],
+            sources: &[
+                TASK_BOARD_TRIAGE_SOURCE,
+                TASK_BOARD_TRIAGE_OVERRIDE_SOURCE,
+                TASK_BOARD_TRIAGE_PROTOCOL_SOURCE,
+            ],
         },
         GeneratedModule {
             output: TASK_BOARD_MACHINES_OUTPUT,

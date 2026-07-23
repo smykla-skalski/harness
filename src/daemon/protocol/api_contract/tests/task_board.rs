@@ -432,6 +432,18 @@ fn task_board_routes_have_complete_ws_parity() {
                 true,
             ),
             (
+                HttpRouteMethod::Put,
+                http_paths::TASK_BOARD_ITEM_TRIAGE_OVERRIDE,
+                ws_methods::TASK_BOARD_TRIAGE_OVERRIDE_SET,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_ITEM_TRIAGE_OVERRIDE_CLEAR,
+                ws_methods::TASK_BOARD_TRIAGE_OVERRIDE_CLEAR,
+                true,
+            ),
+            (
                 HttpRouteMethod::Get,
                 http_paths::TASK_BOARD_ORCHESTRATOR_RUNS,
                 ws_methods::TASK_BOARD_ORCHESTRATOR_RUNS,

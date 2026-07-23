@@ -23,4 +23,24 @@ extension WebSocketTransport {
     let value = try await rpc(method: .taskBoardTriageHistory, params: .object(params))
     return try decodePolicyWire(value)
   }
+
+  public func setTaskBoardItemTriageOverride(
+    id: String,
+    request: TaskBoardSetTriageOverrideRequest
+  ) async throws -> TaskBoardTriageOverrideMutationResponse {
+    let params = try encodeParams(request, extra: ["id": .string(id)])
+    let value = try await rpc(method: .taskBoardTriageOverrideSet, params: params)
+    let wire: TaskBoardTriageOverrideMutationResponseWire = try decodePolicyWire(value)
+    return TaskBoardTriageOverrideMutationResponse(wire: wire)
+  }
+
+  public func clearTaskBoardItemTriageOverride(
+    id: String,
+    request: TaskBoardClearTriageOverrideRequest
+  ) async throws -> TaskBoardTriageOverrideMutationResponse {
+    let params = try encodeParams(request, extra: ["id": .string(id)])
+    let value = try await rpc(method: .taskBoardTriageOverrideClear, params: params)
+    let wire: TaskBoardTriageOverrideMutationResponseWire = try decodePolicyWire(value)
+    return TaskBoardTriageOverrideMutationResponse(wire: wire)
+  }
 }

@@ -78,6 +78,7 @@ extension RecordingHarnessClient {
       }
       let deleted = taskBoardItemsStorage.remove(at: index)
       taskBoardTriageDecisionsStorage.removeValue(forKey: id)
+      taskBoardTriageOverridesStorage.removeValue(forKey: id)
       return deleted
     }
   }

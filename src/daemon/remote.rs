@@ -337,6 +337,8 @@ const WRITE_WS_METHODS: &[&str] = &[
     ws_methods::TASK_BOARD_UPDATE,
     ws_methods::TASK_BOARD_POSITION_SET,
     ws_methods::TASK_BOARD_POSITION_RESET,
+    ws_methods::TASK_BOARD_TRIAGE_OVERRIDE_SET,
+    ws_methods::TASK_BOARD_TRIAGE_OVERRIDE_CLEAR,
     ws_methods::TASK_BOARD_DELETE,
     ws_methods::TASK_BOARD_PLAN_BEGIN,
     ws_methods::TASK_BOARD_PLAN_SUBMIT,

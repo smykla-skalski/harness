@@ -8,6 +8,11 @@ final class TaskBoardItemCreationOutcome {
   var succeeded = false
 }
 
+private struct TaskBoardTriageInspectorLoadKey: Hashable {
+  let itemID: String
+  let updatedAt: String
+}
+
 struct TaskBoardItemManagementPanel: View {
   let item: TaskBoardItem?
   let metrics: TaskBoardOverviewMetrics
@@ -23,10 +28,17 @@ struct TaskBoardItemManagementPanel: View {
   @State private var draft: TaskBoardItemEditorDraft
   @State private var projectTypeSuggestions: [String] = []
   @State private var creationOutcome = TaskBoardItemCreationOutcome()
+  @State private var triageInspector = TaskBoardTriageInspectorState()
   @Environment(\.fontScale)
   var fontScale
   @Environment(\.dismiss)
   private var dismiss
+
+  private var triageInspectorLoadKey: TaskBoardTriageInspectorLoadKey? {
+    item.map {
+      TaskBoardTriageInspectorLoadKey(itemID: $0.id, updatedAt: $0.updatedAt)
+    }
+  }
 
   var headerTitleFont: Font {
     HarnessMonitorTextSize.scaledFont(.title2.weight(.semibold), by: fontScale)
@@ -83,6 +95,15 @@ struct TaskBoardItemManagementPanel: View {
       editorFields
       routesToEditor
       approvalReadout
+      if let item {
+        TaskBoardManagementTriageSection(
+          item: item,
+          metrics: metrics,
+          isActionInFlight: isActionInFlight,
+          actions: actions,
+          inspector: triageInspector
+        )
+      }
       externalRefsEditor
       if !externalDestinations.isEmpty {
         TaskBoardExternalLinks(destinations: externalDestinations, metrics: metrics)
@@ -92,6 +113,10 @@ struct TaskBoardItemManagementPanel: View {
     .padding(HarnessMonitorTheme.spacingMD)
     .frame(maxWidth: .infinity, minHeight: metrics.managementPanelMinHeight, alignment: .leading)
     .task { await loadProjectTypeSuggestions() }
+    .task(id: triageInspectorLoadKey) {
+      guard let item else { return }
+      await triageInspector.load(item: item, actions: actions)
+    }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.manage-item.\(item?.id ?? "new")")
     .onChange(of: item) { _, newValue in

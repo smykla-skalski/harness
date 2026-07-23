@@ -14,6 +14,9 @@ mod parent_tests;
 #[path = "provider_exclusion_restore_conflict_tests.rs"]
 mod conflict_tests;
 
+#[path = "provider_exclusion_restore_override_tests.rs"]
+mod override_tests;
+
 #[tokio::test]
 async fn restores_a_tombstoned_item_reconciling_fields_and_records_one_audit_event() {
     let (_directory, db) = connect().await;

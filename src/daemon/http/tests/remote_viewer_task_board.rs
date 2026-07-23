@@ -6,17 +6,21 @@ use tempfile::tempdir;
 use crate::daemon::http::DaemonHttpAuthMode;
 use crate::daemon::protocol::{http_paths, ws_methods};
 use crate::daemon::remote::RemoteRole;
-use crate::task_board::{TaskBoardItem, TaskBoardStatus};
+use crate::task_board::TaskBoardItem;
 
 use super::remote_viewer_support::{
     connect_remote_ws, get_http_json, register_remote_client, serve_http, ws_rpc,
 };
+use super::remote_viewer_task_board_triage::{
+    TRIAGE_ITEM_ID, assert_full_triage_current, assert_viewer_triage_current,
+    assert_viewer_triage_history, assert_viewer_triage_override_mutations_are_denied,
+    assert_ws_viewer_triage_override_mutations_are_denied, seed_triage_item,
+};
 use super::test_http_state_with_db;
 
-const VIEWER_ID: &str = "viewer-task-board";
+pub(super) const VIEWER_ID: &str = "viewer-task-board";
 const OPERATOR_ID: &str = "operator-task-board";
 const ITEM_ID: &str = "remote-sensitive-item";
-const TRIAGE_ITEM_ID: &str = "remote-triage-item";
 
 #[test]
 fn remote_task_board_reads_minimize_viewer_payloads_for_http_and_websocket() {
@@ -40,22 +44,32 @@ async fn run_remote_viewer_projection_flow() {
     let (base_url, server) = serve_http(state).await;
     let client = reqwest::Client::new();
 
+    assert_http_viewer_reads_and_write_denials(&client, &base_url).await;
+    assert_http_operator_reads(&client, &base_url).await;
+    assert_ws_viewer_reads_and_write_denials(&base_url).await;
+    assert_ws_operator_reads(&base_url).await;
+
+    server.abort();
+    let _ = server.await;
+}
+
+async fn assert_http_viewer_reads_and_write_denials(client: &reqwest::Client, base_url: &str) {
     let viewer_list =
-        get_http_json(&client, &base_url, http_paths::TASK_BOARD_ITEMS, VIEWER_ID).await;
+        get_http_json(client, base_url, http_paths::TASK_BOARD_ITEMS, VIEWER_ID).await;
     assert_viewer_projection(list_item_by_id(&viewer_list, ITEM_ID));
     assert!(viewer_list["items_change_seq"].is_i64());
     assert!(viewer_list["item_revisions"][ITEM_ID].is_i64());
     let viewer_item = get_http_json(
-        &client,
-        &base_url,
+        client,
+        base_url,
         &format!("{}/{}", http_paths::TASK_BOARD_ITEMS, ITEM_ID),
         VIEWER_ID,
     )
     .await;
     assert_viewer_projection(&viewer_item);
     let viewer_position = get_http_json(
-        &client,
-        &base_url,
+        client,
+        base_url,
         &http_paths::TASK_BOARD_ITEM_POSITION.replace("{item_id}", ITEM_ID),
         VIEWER_ID,
     )
@@ -63,43 +77,43 @@ async fn run_remote_viewer_projection_flow() {
     assert_viewer_position_snapshot(&viewer_position);
 
     let viewer_triage_current = get_http_json(
-        &client,
-        &base_url,
+        client,
+        base_url,
         &http_paths::TASK_BOARD_ITEM_TRIAGE.replace("{item_id}", TRIAGE_ITEM_ID),
         VIEWER_ID,
     )
     .await;
     assert_viewer_triage_current(&viewer_triage_current);
     let viewer_triage_history = get_http_json(
-        &client,
-        &base_url,
+        client,
+        base_url,
         &http_paths::TASK_BOARD_ITEM_TRIAGE_HISTORY.replace("{item_id}", TRIAGE_ITEM_ID),
         VIEWER_ID,
     )
     .await;
     assert_viewer_triage_history(&viewer_triage_history);
 
-    assert_viewer_position_mutations_are_denied(&client, &base_url).await;
+    assert_viewer_position_mutations_are_denied(client, base_url).await;
+    assert_viewer_triage_override_mutations_are_denied(client, base_url).await;
+}
 
-    let operator_list = get_http_json(
-        &client,
-        &base_url,
-        http_paths::TASK_BOARD_ITEMS,
-        OPERATOR_ID,
-    )
-    .await;
+async fn assert_http_operator_reads(client: &reqwest::Client, base_url: &str) {
+    let operator_list =
+        get_http_json(client, base_url, http_paths::TASK_BOARD_ITEMS, OPERATOR_ID).await;
     assert_full_item(list_item_by_id(&operator_list, ITEM_ID));
 
     let operator_triage_current = get_http_json(
-        &client,
-        &base_url,
+        client,
+        base_url,
         &http_paths::TASK_BOARD_ITEM_TRIAGE.replace("{item_id}", TRIAGE_ITEM_ID),
         OPERATOR_ID,
     )
     .await;
     assert_full_triage_current(&operator_triage_current);
+}
 
-    let mut viewer_socket = connect_remote_ws(&base_url, VIEWER_ID).await;
+async fn assert_ws_viewer_reads_and_write_denials(base_url: &str) {
+    let mut viewer_socket = connect_remote_ws(base_url, VIEWER_ID).await;
     let viewer_ws_list = ws_rpc(
         &mut viewer_socket,
         "viewer-list",
@@ -156,8 +170,11 @@ async fn run_remote_viewer_projection_flow() {
     )
     .await;
     assert_remote_write_denied(&viewer_ws_reset);
+    assert_ws_viewer_triage_override_mutations_are_denied(&mut viewer_socket).await;
+}
 
-    let mut operator_socket = connect_remote_ws(&base_url, OPERATOR_ID).await;
+async fn assert_ws_operator_reads(base_url: &str) {
+    let mut operator_socket = connect_remote_ws(base_url, OPERATOR_ID).await;
     let operator_ws_list = ws_rpc(
         &mut operator_socket,
         "operator-list",
@@ -174,9 +191,6 @@ async fn run_remote_viewer_projection_flow() {
     )
     .await;
     assert_full_triage_current(&operator_ws_triage_current["result"]);
-
-    server.abort();
-    let _ = server.await;
 }
 
 fn list_item_by_id<'a>(response: &'a Value, item_id: &str) -> &'a Value {
@@ -233,59 +247,6 @@ async fn seed_sensitive_item(state: &crate::daemon::http::DaemonHttpState) {
         .create_task_board_item(item)
         .await
         .expect("seed task item");
-}
-
-async fn seed_triage_item(state: &crate::daemon::http::DaemonHttpState) {
-    let mut item = TaskBoardItem::new(
-        TRIAGE_ITEM_ID.into(),
-        "Triage item".into(),
-        "Verify triage redaction.".into(),
-        "2026-07-23T00:00:00Z".into(),
-    );
-    item.status = TaskBoardStatus::Backlog;
-    item.tags = vec!["triage/needs-info".to_string()];
-    state
-        .async_db
-        .get()
-        .expect("async db")
-        .create_task_board_item_with_triage(item)
-        .await
-        .expect("seed triage item");
-}
-
-fn assert_viewer_triage_current(response: &Value) {
-    let Some(current) = response["current"].as_object() else {
-        panic!("expected a current triage decision, got {response}");
-    };
-    assert_eq!(current["item_id"], TRIAGE_ITEM_ID);
-    assert!(current.get("reason_detail").is_some_and(Value::is_null));
-    assert!(
-        current
-            .get("evidence_fingerprint")
-            .is_some_and(Value::is_null)
-    );
-}
-
-fn assert_viewer_triage_history(response: &Value) {
-    let decisions = response["decisions"].as_array().expect("decisions array");
-    assert!(!decisions.is_empty());
-    for decision in decisions {
-        assert!(decision.get("reason_detail").is_some_and(Value::is_null));
-        assert!(
-            decision
-                .get("evidence_fingerprint")
-                .is_some_and(Value::is_null)
-        );
-    }
-}
-
-fn assert_full_triage_current(response: &Value) {
-    let current = response["current"]
-        .as_object()
-        .expect("expected a current triage decision");
-    assert_eq!(current["reason_code"], "needs_info_label");
-    assert_eq!(current["reason_detail"], "triage/needs-info");
-    assert!(current["evidence_fingerprint"].as_str().is_some());
 }
 
 fn assert_viewer_projection(item: &Value) {
@@ -379,7 +340,7 @@ async fn assert_viewer_position_mutations_are_denied(client: &reqwest::Client, b
     }
 }
 
-fn assert_remote_write_denied(response: &Value) {
+pub(super) fn assert_remote_write_denied(response: &Value) {
     assert_eq!(response["result"], Value::Null);
     assert_eq!(response["error"]["code"], "REMOTE_AUTH");
     assert_eq!(response["error"]["status_code"], 403);

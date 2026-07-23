@@ -56,7 +56,8 @@ pub(crate) use sync_audit::{
 };
 pub(crate) use sync_run_context::TaskBoardSyncRunContext;
 pub(crate) use triage_reads::{
-    get_task_board_item_triage_current_db, get_task_board_item_triage_history_db,
+    clear_task_board_triage_override_db, get_task_board_item_triage_current_db,
+    get_task_board_item_triage_history_db, set_task_board_triage_override_db,
 };
 
 pub(crate) async fn create_task_board_item_db(

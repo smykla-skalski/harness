@@ -29,6 +29,29 @@ extension HarnessMonitorAPIClient {
     )
   }
 
+  public func setTaskBoardItemTriageOverride(
+    id: String,
+    request: TaskBoardSetTriageOverrideRequest
+  ) async throws -> TaskBoardTriageOverrideMutationResponse {
+    let id = try taskBoardTriagePathSegment(id)
+    let wire: TaskBoardTriageOverrideMutationResponseWire = try await put(
+      "/v1/task-board/items/\(id)/triage/override", body: request, decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardTriageOverrideMutationResponse(wire: wire)
+  }
+
+  public func clearTaskBoardItemTriageOverride(
+    id: String,
+    request: TaskBoardClearTriageOverrideRequest
+  ) async throws -> TaskBoardTriageOverrideMutationResponse {
+    let id = try taskBoardTriagePathSegment(id)
+    let wire: TaskBoardTriageOverrideMutationResponseWire = try await post(
+      "/v1/task-board/items/\(id)/triage/override/clear", body: request,
+      decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardTriageOverrideMutationResponse(wire: wire)
+  }
+
   private func taskBoardTriagePathSegment(_ value: String) throws -> String {
     guard
       !value.isEmpty,

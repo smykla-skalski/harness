@@ -97,6 +97,7 @@ const fn migration_effect_column(migration_version: i64) -> Option<(&'static str
         30 => Some(("task_board_items", "workflow_kind")),
         35 => Some(("task_board_execution_hosts", "observed_host_instance_id")),
         40 => Some(("task_board_items", "tombstone_cause")),
+        41 => Some(("task_board_items", "triage_override_verdict")),
         _ => None,
     }
 }
@@ -145,6 +146,7 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         38 => 44,
         39 => 45,
         40 => 46,
+        41 => 47,
         _ => u64::MAX,
     }
 }

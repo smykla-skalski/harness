@@ -20,4 +20,20 @@ extension PreviewHarnessClient {
       limit: limit
     )
   }
+
+  public func setTaskBoardItemTriageOverride(
+    id: String,
+    request: TaskBoardSetTriageOverrideRequest
+  ) async throws -> TaskBoardTriageOverrideMutationResponse {
+    try await performActionDelay()
+    return try await state.setTaskBoardItemTriageOverride(id: id, request: request)
+  }
+
+  public func clearTaskBoardItemTriageOverride(
+    id: String,
+    request: TaskBoardClearTriageOverrideRequest
+  ) async throws -> TaskBoardTriageOverrideMutationResponse {
+    try await performActionDelay()
+    return try await state.clearTaskBoardItemTriageOverride(id: id, request: request)
+  }
 }

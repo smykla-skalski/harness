@@ -1,11 +1,25 @@
 use sqlx::{Sqlite, Transaction, query_as, query_scalar};
 
 use super::triage_decisions::{TriageDecisionRow, decision_from_row};
+use super::triage_override::current_triage_override_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::infra::io;
-use crate::task_board::{TaskBoardTriageDecisionRecord, is_canonical_decided_at};
+use crate::task_board::{
+    TaskBoardTriageDecision, TaskBoardTriageDecisionRecord, TaskBoardTriageEffectiveOutcome,
+    TaskBoardTriageOverride, effective_triage_outcome, is_canonical_decided_at,
+};
 
 pub(crate) const TASK_BOARD_TRIAGE_HISTORY_MAX_LIMIT: u32 = 100;
+
+/// Everything `GET /v1/task-board/items/{item_id}/triage` needs: the latest
+/// automatic decision, the active triage override (if any), and the single
+/// effective outcome those two resolve to.
+#[derive(Debug)]
+pub(crate) struct TaskBoardTriageCurrentRead {
+    pub(crate) current: Option<TaskBoardTriageDecisionRecord>,
+    pub(crate) triage_override: Option<TaskBoardTriageOverride>,
+    pub(crate) effective: Option<TaskBoardTriageEffectiveOutcome>,
+}
 
 #[derive(Debug)]
 pub(crate) struct TaskBoardTriageHistoryPage {
@@ -34,7 +48,7 @@ impl AsyncDaemonDb {
     pub(crate) async fn task_board_triage_current(
         &self,
         item_id: &str,
-    ) -> Result<Option<TaskBoardTriageDecisionRecord>, CliError> {
+    ) -> Result<TaskBoardTriageCurrentRead, CliError> {
         io::validate_safe_segment(item_id)?;
         let mut transaction = self
             .pool()
@@ -58,11 +72,19 @@ impl AsyncDaemonDb {
                 "load current task board triage decision '{item_id}': {error}"
             ))
         })?;
+        let triage_override = current_triage_override_in_tx(&mut transaction, item_id).await?;
         transaction
             .commit()
             .await
             .map_err(|error| db_error(format!("commit task board triage read: {error}")))?;
-        row.map(record_from_row).transpose()
+        let current = row.map(record_from_row).transpose()?;
+        let decision = current.as_ref().and_then(decision_from_record);
+        let effective = effective_triage_outcome(triage_override.as_ref(), decision.as_ref());
+        Ok(TaskBoardTriageCurrentRead {
+            current,
+            triage_override,
+            effective,
+        })
     }
 
     pub(crate) async fn task_board_triage_history(
@@ -159,6 +181,23 @@ fn history_page(
     Ok(TaskBoardTriageHistoryPage {
         decisions,
         next_before_generation,
+    })
+}
+
+/// Reconstruct the unwrapped decision from a freshly loaded (never redacted)
+/// record, for feeding [`effective_triage_outcome`]. Returns `None` only if
+/// the record's `evidence_fingerprint` was already redacted, which never
+/// happens for a record built directly from this module's own reads.
+fn decision_from_record(record: &TaskBoardTriageDecisionRecord) -> Option<TaskBoardTriageDecision> {
+    Some(TaskBoardTriageDecision {
+        verdict: record.verdict,
+        reason_code: record.reason_code,
+        reason_detail: record.reason_detail.clone(),
+        evaluator_identity: record.evaluator_identity.clone(),
+        evaluator_version: record.evaluator_version,
+        evidence_fingerprint: record.evidence_fingerprint.clone()?,
+        cause: record.cause,
+        decided_at: record.decided_at.clone(),
     })
 }
 

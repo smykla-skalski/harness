@@ -4,11 +4,13 @@ use super::dispatch_intents::helpers::has_active_dispatch_reservation_in_tx;
 use super::items::{
     ParentAssignmentValidation, TaskBoardMutation, bump_change_in_tx,
     check_parent_assignment_in_tx, clear_children_parent_in_tx, load_item_in_tx,
-    next_child_order_in_tx, validate_item,
+    load_item_with_triage_override_in_tx, next_child_order_in_tx, validate_item,
 };
 use super::lane_order::{LaneTransitionKind, replace_with_lane_transition_in_tx};
 use super::provider_sync_conflicts::replace_open_sync_conflicts_in_connection;
-use super::triage_apply::apply_builtin_v1_triage_in_tx;
+use super::triage_apply::{
+    TriageOutcome, apply_builtin_v1_triage_in_tx, reapply_active_override_outcome_in_tx,
+};
 use super::triage_audit::{
     ProviderExclusionConflictAudit, record_provider_exclusion_hidden_audit_in_tx,
     record_provider_exclusion_restored_audit_in_tx,
@@ -21,7 +23,7 @@ use crate::task_board::types::TaskBoardItemKind;
 use crate::task_board::{
     ExternalProvider, ProviderExclusionAuditContext, ProviderExclusionRestoreOutcome,
     TaskBoardItem, TaskBoardStatus, TaskBoardSyncConflict, TaskBoardTombstoneCause,
-    canonicalize_labels, is_exclusion_label,
+    TaskBoardTriageOverride, canonicalize_labels, is_exclusion_label,
 };
 
 impl AsyncDaemonDb {
@@ -165,21 +167,7 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board provider exclusion restore")
             .await?;
-        let Some((mut item, revision)) = load_provider_exclusion_restore_candidate_in_tx(
-            &mut transaction,
-            expected_item_id,
-            expected_revision,
-            context,
-        )
-        .await?
-        else {
-            transaction
-                .commit()
-                .await
-                .map_err(|error| db_error(format!("commit task board restore no-op: {error}")))?;
-            return Ok(ProviderExclusionRestoreOutcome::NotApplied);
-        };
-        let conflict_audit = match apply_restore_conflicts_in_tx(
+        let (mut item, revision, existing_override, conflict_audit) = match prepare_restore_in_tx(
             &mut transaction,
             expected_item_id,
             expected_revision,
@@ -188,14 +176,14 @@ impl AsyncDaemonDb {
         )
         .await?
         {
-            RestoreConflictAction::Continue(audit) => audit,
-            RestoreConflictAction::Block => {
-                transaction.commit().await.map_err(|error| {
-                    db_error(format!(
-                        "commit task board restore conflict publish: {error}"
-                    ))
-                })?;
-                return Ok(ProviderExclusionRestoreOutcome::ConflictPublished);
+            RestorePreparation::Ready {
+                item,
+                revision,
+                existing_override,
+                conflict_audit,
+            } => (*item, revision, existing_override, conflict_audit),
+            RestorePreparation::Done(outcome) => {
+                return commit_restore_no_op(transaction, outcome, "no-op").await;
             }
         };
         let before = item.clone();
@@ -222,21 +210,14 @@ impl AsyncDaemonDb {
         )
         .await?;
         validate_item(&item)?;
-        // Snapshot after the restore patch and parent resolution, but
-        // before triage, so a manual anchor or an ordinary provider field
-        // refresh is never mistaken for a triage-driven placement change --
-        // comparing against the still-tombstoned `before` row would make
-        // every restore look like it moved lanes, forcing `Automatic` on a
-        // manual anchor and discarding the whole write.
-        let pre_triage_item = item.clone();
         let decided_at = item.updated_at.clone();
-        let outcome =
-            apply_builtin_v1_triage_in_tx(&mut transaction, &mut item, &decided_at, false).await?;
-        let transition_kind = if triage_changed_placement(&pre_triage_item, &item) {
-            LaneTransitionKind::Automatic
-        } else {
-            LaneTransitionKind::ProviderExclusionRestore
-        };
+        let (outcome, transition_kind) = reconcile_restore_triage_in_tx(
+            &mut transaction,
+            &mut item,
+            existing_override.as_ref(),
+            &decided_at,
+        )
+        .await?;
         let write = replace_with_lane_transition_in_tx(
             &mut transaction,
             before.clone(),
@@ -277,8 +258,10 @@ async fn load_provider_exclusion_restore_candidate_in_tx(
     item_id: &str,
     expected_revision: i64,
     context: &ProviderExclusionAuditContext,
-) -> Result<Option<(TaskBoardItem, i64)>, CliError> {
-    let Some((item, revision)) = load_item_in_tx(transaction, item_id).await? else {
+) -> Result<Option<(TaskBoardItem, i64, Option<TaskBoardTriageOverride>)>, CliError> {
+    let Some((item, revision, override_)) =
+        load_item_with_triage_override_in_tx(transaction, item_id).await?
+    else {
         return Ok(None);
     };
     if revision != expected_revision
@@ -294,7 +277,7 @@ async fn load_provider_exclusion_restore_candidate_in_tx(
         ))
         .into());
     }
-    Ok(Some((item, revision)))
+    Ok(Some((item, revision, override_)))
 }
 
 async fn apply_restore_conflicts_in_tx(
@@ -380,11 +363,111 @@ fn item_has_stored_provider_ref(
     })
 }
 
+enum RestorePreparation {
+    Ready {
+        item: Box<TaskBoardItem>,
+        revision: i64,
+        existing_override: Option<TaskBoardTriageOverride>,
+        conflict_audit: ProviderExclusionConflictAudit,
+    },
+    Done(ProviderExclusionRestoreOutcome),
+}
+
+/// Loads the restore candidate and applies conflict resolution -- the two
+/// steps that can each end the restore early. `Done` means the caller
+/// commits the no-op and returns; `Ready` carries what the rest needs.
+async fn prepare_restore_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    expected_item_id: &str,
+    expected_revision: i64,
+    context: &ProviderExclusionAuditContext,
+    conflicts: Option<&[TaskBoardSyncConflict]>,
+) -> Result<RestorePreparation, CliError> {
+    let Some((item, revision, existing_override)) =
+        load_provider_exclusion_restore_candidate_in_tx(
+            transaction,
+            expected_item_id,
+            expected_revision,
+            context,
+        )
+        .await?
+    else {
+        return Ok(RestorePreparation::Done(
+            ProviderExclusionRestoreOutcome::NotApplied,
+        ));
+    };
+    let conflict_audit = match apply_restore_conflicts_in_tx(
+        transaction,
+        expected_item_id,
+        expected_revision,
+        context,
+        conflicts,
+    )
+    .await?
+    {
+        RestoreConflictAction::Continue(audit) => audit,
+        RestoreConflictAction::Block => {
+            return Ok(RestorePreparation::Done(
+                ProviderExclusionRestoreOutcome::ConflictPublished,
+            ));
+        }
+    };
+    Ok(RestorePreparation::Ready {
+        item: Box::new(item),
+        revision,
+        existing_override,
+        conflict_audit,
+    })
+}
+
+/// Commits a restore transaction that has nothing left to write (no
+/// candidate found, or a conflict publish superseded the restore) and
+/// returns the outcome the caller already decided on.
+async fn commit_restore_no_op(
+    transaction: Transaction<'_, Sqlite>,
+    outcome: ProviderExclusionRestoreOutcome,
+    reason: &str,
+) -> Result<ProviderExclusionRestoreOutcome, CliError> {
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task board restore {reason}: {error}")))?;
+    Ok(outcome)
+}
+
 fn triage_changed_placement(before: &TaskBoardItem, after: &TaskBoardItem) -> bool {
     before.status != after.status
         || before.lane_position != after.lane_position
         || before.lane_origin != after.lane_origin
         || before.lane_set_at != after.lane_set_at
+}
+
+/// Evaluates `BuiltInV1` for a restored item and decides the lane-transition
+/// kind to write with. `item` is the post-patch snapshot, before triage --
+/// comparing against the still-tombstoned `before` row would make every
+/// restore look like a lane move. An active override still wins over the
+/// refreshed decision alone.
+async fn reconcile_restore_triage_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    item: &mut TaskBoardItem,
+    existing_override: Option<&TaskBoardTriageOverride>,
+    decided_at: &str,
+) -> Result<(Option<TriageOutcome>, LaneTransitionKind), CliError> {
+    let pre_triage_item = item.clone();
+    let outcome =
+        apply_builtin_v1_triage_in_tx(transaction, item, decided_at, false, existing_override)
+            .await?;
+    let override_reapply_transition =
+        reapply_active_override_outcome_in_tx(transaction, item, existing_override, decided_at)
+            .await?;
+    let transition_kind = override_reapply_transition.unwrap_or_else(|| {
+        if triage_changed_placement(&pre_triage_item, item) {
+            LaneTransitionKind::Automatic
+        } else {
+            LaneTransitionKind::ProviderExclusionRestore
+        }
+    });
+    Ok((outcome, transition_kind))
 }
 
 async fn is_hideable_for_provider_exclusion_in_tx(

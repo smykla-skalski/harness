@@ -147,3 +147,16 @@ extension TaskBoardItemPositionMutationResponse {
     )
   }
 }
+
+extension TaskBoardTriageOverrideMutationResponse {
+  public init(wire: TaskBoardTriageOverrideMutationResponseWire) {
+    self.init(
+      snapshot: TaskBoardItemPositionSnapshot(wire: wire.snapshot),
+      shifted: wire.shifted.map {
+        TaskBoardShiftedItemRevision(itemId: $0.itemId, itemRevision: $0.itemRevision)
+      },
+      triageOverride: wire.triageOverride,
+      effective: wire.effective
+    )
+  }
+}

@@ -112,7 +112,9 @@ async fn reject_if_item_exists_in_tx(
 /// transition. Returns the original insert write unchanged otherwise, so a
 /// non-promoting create costs no extra revision bump. A fresh create never
 /// has a manual placement or an explicit status signal (the create request
-/// exposes neither), so placement is never suppressed here.
+/// exposes neither), so placement is never suppressed here. The item did not
+/// exist a moment ago, so it cannot carry a triage override yet -- no query
+/// needed to know that.
 async fn apply_triage_after_insert_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     inserted: LaneTransitionWrite,
@@ -120,7 +122,8 @@ async fn apply_triage_after_insert_in_tx(
     let before_triage = inserted.item.clone();
     let mut item = inserted.item.clone();
     let decided_at = utc_now();
-    let outcome = apply_builtin_v1_triage_in_tx(transaction, &mut item, &decided_at, false).await?;
+    let outcome =
+        apply_builtin_v1_triage_in_tx(transaction, &mut item, &decided_at, false, None).await?;
     if item == before_triage {
         return Ok((inserted, outcome));
     }

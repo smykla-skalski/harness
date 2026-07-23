@@ -9,11 +9,14 @@ use super::triage_audit::{
     record_item_created_audit_in_tx, record_item_updated_audit_in_tx,
     record_triage_decided_audit_in_tx, record_triage_effect_reapplied_audit_in_tx,
 };
+use super::triage_override::triage_override_from_item_row;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::errors::CliErrorKind;
 use crate::infra::io;
 use crate::task_board::types::{CURRENT_TASK_BOARD_ITEM_VERSION, MAX_TASK_BOARD_ESTIMATE};
-use crate::task_board::{TaskBoardItem, TaskBoardStatus, validate_lane_placement};
+use crate::task_board::{
+    TaskBoardItem, TaskBoardStatus, TaskBoardTriageOverride, validate_lane_placement,
+};
 
 #[path = "items_lifecycle.rs"]
 mod lifecycle;
@@ -260,6 +263,33 @@ pub(super) async fn load_item_in_tx(
         .await
         .map_err(|error| db_error(format!("load task board refs '{item_id}': {error}")))?;
     item_from_rows(row, refs).map(Some)
+}
+
+/// Like [`load_item_in_tx`], but also returns the item's active triage
+/// override, decoded from the same already-fetched row instead of a second
+/// round trip -- `SELECT_ITEM` already reads every column on this row, so a
+/// caller that needs both the item and its override (triage evaluation, an
+/// override set/clear) gets them from one query.
+pub(super) async fn load_item_with_triage_override_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    item_id: &str,
+) -> Result<Option<(TaskBoardItem, i64, Option<TaskBoardTriageOverride>)>, CliError> {
+    let Some(row) = query_as::<_, ItemRow>(SELECT_ITEM)
+        .bind(item_id)
+        .fetch_optional(transaction.as_mut())
+        .await
+        .map_err(|error| db_error(format!("load task board item '{item_id}': {error}")))?
+    else {
+        return Ok(None);
+    };
+    let override_ = triage_override_from_item_row(&row)?;
+    let refs = query_as::<_, ExternalRefRow>(SELECT_REFS)
+        .bind(item_id)
+        .fetch_all(transaction.as_mut())
+        .await
+        .map_err(|error| db_error(format!("load task board refs '{item_id}': {error}")))?;
+    let (item, revision) = item_from_rows(row, refs)?;
+    Ok(Some((item, revision, override_)))
 }
 
 pub(super) async fn bump_change_in_tx(

@@ -100,7 +100,7 @@ extension PreviewHarnessClientState {
     )
   }
 
-  private func requireCurrentPositionSnapshot(_ id: String, _ revision: Int64, _ sequence: Int64)
+  func requireCurrentPositionSnapshot(_ id: String, _ revision: Int64, _ sequence: Int64)
     throws
   {
     guard taskBoardItemRevisions[id] == revision, taskBoardItemsChangeSeq == sequence else {
@@ -112,7 +112,7 @@ extension PreviewHarnessClientState {
     }
   }
 
-  private func replacePosition(
+  func replacePosition(
     _ item: TaskBoardItem,
     status: TaskBoardStatus,
     lanePosition: UInt32?,
@@ -138,7 +138,7 @@ extension PreviewHarnessClientState {
     }
   }
 
-  private func shiftForSet(
+  func shiftForSet(
     itemID: String,
     source: TaskBoardStatus,
     sourceIndex: UInt32?,
@@ -189,7 +189,7 @@ extension PreviewHarnessClientState {
     return shifted
   }
 
-  private func shiftLaterAnchors(
+  func shiftLaterAnchors(
     in status: TaskBoardStatus,
     after index: UInt32,
     excluding itemID: String

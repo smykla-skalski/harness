@@ -1,3 +1,4 @@
+use axum::Json;
 use axum::extract::rejection::QueryRejection;
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
@@ -5,7 +6,8 @@ use axum::response::Response;
 use serde::Deserialize;
 
 use crate::daemon::protocol::{
-    TASK_BOARD_TRIAGE_HISTORY_INVALID_PARAMS, TaskBoardTriageHistoryRequest, http_paths,
+    TASK_BOARD_TRIAGE_HISTORY_INVALID_PARAMS, TaskBoardClearTriageOverrideRequest,
+    TaskBoardSetTriageOverrideRequest, TaskBoardTriageHistoryRequest, http_paths,
 };
 use crate::daemon::remote_task_board::{
     project_task_board_triage_current, project_task_board_triage_history,
@@ -15,7 +17,7 @@ use crate::errors::{CliError, CliErrorKind};
 use super::super::DaemonHttpState;
 use super::super::response::timed_json;
 use super::super::task_board_route_executor;
-use super::items::authenticated_task_board_read;
+use super::items::{authenticated_task_board_read, authorized_control_request_parts};
 
 #[derive(Debug, Clone, Default, Deserialize)]
 pub(super) struct TaskBoardTriageHistoryQuery {
@@ -83,6 +85,46 @@ pub(super) async fn get_task_board_item_triage_history(
         &request_id,
         start,
         result,
+    )
+}
+
+pub(super) async fn put_task_board_item_triage_override(
+    Path(item_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(mut request): Json<TaskBoardSetTriageOverrideRequest>,
+) -> Response {
+    let (start, request_id) = match authorized_control_request_parts(&headers, &state, &mut request)
+    {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    timed_json(
+        "PUT",
+        http_paths::TASK_BOARD_ITEM_TRIAGE_OVERRIDE,
+        &request_id,
+        start,
+        task_board_route_executor::set_item_triage_override(&state, &item_id, &request).await,
+    )
+}
+
+pub(super) async fn post_task_board_item_triage_override_clear(
+    Path(item_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(mut request): Json<TaskBoardClearTriageOverrideRequest>,
+) -> Response {
+    let (start, request_id) = match authorized_control_request_parts(&headers, &state, &mut request)
+    {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_ITEM_TRIAGE_OVERRIDE_CLEAR,
+        &request_id,
+        start,
+        task_board_route_executor::clear_item_triage_override(&state, &item_id, &request).await,
     )
 }
 

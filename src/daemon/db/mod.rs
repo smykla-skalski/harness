@@ -74,6 +74,7 @@ mod schema_repairs_remote_execution;
 mod schema_repairs_remote_execution_objects;
 mod schema_repairs_remote_execution_v45;
 mod schema_repairs_triage;
+mod schema_repairs_triage_override;
 mod schema_repairs_wake_events;
 mod schema_sql;
 mod schema_v10;
@@ -113,6 +114,7 @@ mod schema_v43;
 mod schema_v44;
 mod schema_v45;
 mod schema_v46;
+mod schema_v47;
 #[allow(dead_code)]
 mod task_board;
 #[cfg(test)]
@@ -165,8 +167,10 @@ pub(crate) use task_board::{
     TaskBoardRemoteResultImportRequest, TaskBoardRemoteResultImportState,
     TaskBoardRemoteSettlementReceipt, TaskBoardRemoteSourceBundle,
     TaskBoardRemoteSourceOfferReassignment, TaskBoardRemoteTerminalArtifact,
-    TaskBoardRunAcquireRequest, executor_start_authority, executor_start_io_permit,
-    remote_executor_identity, remote_executor_identity_from_parts, stop_pending_snapshot_matches,
+    TaskBoardRunAcquireRequest, TaskBoardTriageCurrentRead, TaskBoardTriageOverrideClearInput,
+    TaskBoardTriageOverrideMutationResult, TaskBoardTriageOverrideSetInput,
+    executor_start_authority, executor_start_io_permit, remote_executor_identity,
+    remote_executor_identity_from_parts, stop_pending_snapshot_matches,
 };
 #[cfg(test)]
 pub(crate) use task_board::{
@@ -369,7 +373,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-pub(crate) const SCHEMA_VERSION: &str = "46";
+pub(crate) const SCHEMA_VERSION: &str = "47";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]
