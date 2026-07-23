@@ -28,6 +28,7 @@ extension DaemonController {
       return webSocketClient
     }
     await httpClient.shutdown()
+    try Task.checkCancellation()
     throw DaemonControlError.commandFailed("WebSocket connection failed")
   }
 
