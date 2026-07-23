@@ -85,7 +85,10 @@ struct HarnessMonitorStoreTaskBoardReorderTests {
       return false
     }
     #expect(setCalls.count == 1)
-    #expect(store.currentFailureFeedbackMessage != nil)
+    #expect(
+      store.currentFailureFeedbackMessage
+        == "Cannot update task board position: the board changed before the action completed"
+    )
   }
 
   @Test("A non-concurrency 409 is not retried")
@@ -141,6 +144,47 @@ struct HarnessMonitorStoreTaskBoardReorderTests {
     )
   }
 
+  @Test("Reordering canonicalizes legacy lane aliases across conflict retries")
+  func reorderCanonicalizesLegacyLaneAliases() async throws {
+    let client = RecordingHarnessClient()
+    let legacyItem = taskBoardItem(id: "legacy", status: .new)
+    let canonicalItem = taskBoardItem(id: "canonical", status: .todo)
+    let thirdItem = taskBoardItem(id: "third", status: .todo)
+    let deletedItem = taskBoardItem(
+      id: "deleted",
+      status: .new,
+      deletedAt: "2026-07-22T15:00:00Z"
+    )
+    client.configureTaskBoardItems([legacyItem, canonicalItem, thirdItem, deletedItem])
+    client.taskBoardPositionError = concurrentModificationError
+    client.taskBoardPositionErrorRemainingUses = 1
+    client.taskBoardPositionItemsAfterError = [
+      thirdItem,
+      deletedItem,
+      legacyItem,
+      canonicalItem,
+    ]
+    let store = await makeBootstrappedStore(client: client)
+
+    let success = await store.reorderTaskBoardItem(
+      id: "legacy",
+      status: .new,
+      placement: placement(after: "canonical")
+    )
+    let todoSnapshot = try await client.taskBoardItemsSnapshot(status: .todo)
+    let legacySnapshot = try await client.taskBoardItemsSnapshot(status: .new)
+
+    #expect(success)
+    #expect(todoSnapshot.items.map(\.id) == ["third", "canonical", "legacy"])
+    #expect(legacySnapshot.items.map(\.id) == todoSnapshot.items.map(\.id))
+    #expect(
+      client.recordedCalls() == [
+        .setTaskBoardItemPosition(id: "legacy", status: .todo, lanePosition: 1),
+        .setTaskBoardItemPosition(id: "legacy", status: .todo, lanePosition: 2),
+      ]
+    )
+  }
+
   @Test("Recording reorder leaves deleted same-status rows in place")
   func reorderFixturePreservesDeletedRows() async throws {
     let client = RecordingHarnessClient()
@@ -163,8 +207,8 @@ struct HarnessMonitorStoreTaskBoardReorderTests {
     let snapshot = try await client.taskBoardItemsSnapshot(status: .todo)
 
     #expect(success)
-    #expect(snapshot.items.map(\.id) == ["b", "deleted", "a"])
-    #expect(snapshot.items.first(where: { $0.id == "deleted" })?.deletedAt != nil)
+    #expect(snapshot.items.map(\.id) == ["b", "a"])
+    #expect(client.taskBoardItemsStorage.map(\.id) == ["b", "deleted", "a"])
   }
 
   @Test("Resetting a manually placed item clears its lane placement")

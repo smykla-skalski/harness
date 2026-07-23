@@ -7,7 +7,11 @@ extension RecordingHarnessClient {
     -> TaskBoardListItemsSnapshot
   {
     lock.withLock {
-      let items = taskBoardItemsStorage.filter { status == nil || $0.status == status }
+      let canonicalStatus = status?.canonicalPersistedStatus
+      let items = taskBoardItemsStorage.filter { item in
+        item.deletedAt == nil
+          && (canonicalStatus == nil || item.status.canonicalPersistedStatus == canonicalStatus)
+      }
       return TaskBoardListItemsSnapshot(
         items: items,
         itemsChangeSeq: taskBoardItemsChangeSeqStorage,
@@ -22,7 +26,10 @@ extension RecordingHarnessClient {
 
   func taskBoardItemPositionSnapshot(id: String) async throws -> TaskBoardItemPositionSnapshot {
     try lock.withLock {
-      guard let item = taskBoardItemsStorage.first(where: { $0.id == id }) else {
+      guard
+        let item = taskBoardItemsStorage.first(where: { $0.id == id }),
+        item.deletedAt == nil
+      else {
         throw HarnessMonitorAPIError.server(code: 404, message: "Task board item unavailable.")
       }
       return TaskBoardItemPositionSnapshot(
@@ -57,7 +64,7 @@ extension RecordingHarnessClient {
         expectedItemsChangeSeq: request.expectedItemsChangeSeq
       )
       let laneCount = taskBoardItemsStorage.count { item in
-        item.status == request.status && item.deletedAt == nil
+        item.status.canonicalPersistedStatus == request.status && item.deletedAt == nil
       }
       guard Int(request.lanePosition) < laneCount else {
         throw HarnessMonitorAPIError.semanticServer(
@@ -144,7 +151,7 @@ extension RecordingHarnessClient {
   private func replaceInMaterializedLane(_ item: TaskBoardItem, at target: Int) {
     let liveLaneIndices = taskBoardItemsStorage.indices.filter { index in
       let entry = taskBoardItemsStorage[index]
-      return entry.status == item.status && entry.deletedAt == nil
+      return entry.status.canonicalPersistedStatus == item.status && entry.deletedAt == nil
     }
     var laneItems = liveLaneIndices.map { taskBoardItemsStorage[$0] }
     laneItems.removeAll { $0.id == item.id }

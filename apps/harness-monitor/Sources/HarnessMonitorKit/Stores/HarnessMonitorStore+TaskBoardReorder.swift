@@ -10,7 +10,7 @@ private enum TaskBoardPositionActionError: LocalizedError {
   case boardChanged
 
   var errorDescription: String? {
-    "Cannot update task position: the board changed before the action completed"
+    "Cannot update task board position: the board changed before the action completed"
   }
 }
 
@@ -111,11 +111,12 @@ extension HarnessMonitorStore {
     actor: String,
     remainingRetries: Int
   ) async throws -> TaskBoardItemPositionMutationResponse {
-    let snapshot = try await client.taskBoardItemsSnapshot(status: status)
+    let canonicalStatus = status.canonicalPersistedStatus
+    let snapshot = try await client.taskBoardItemsSnapshot(status: canonicalStatus)
     let request = try taskBoardReorderRequest(
       snapshot: snapshot,
       id: id,
-      status: status,
+      status: canonicalStatus,
       placement: placement,
       actor: actor
     )
@@ -128,7 +129,7 @@ extension HarnessMonitorStore {
       return try await setTaskBoardItemPositionWithRetry(
         using: client,
         id: id,
-        status: status,
+        status: canonicalStatus,
         placement: placement,
         actor: actor,
         remainingRetries: remainingRetries - 1
@@ -144,7 +145,7 @@ extension HarnessMonitorStore {
     actor: String
   ) throws -> TaskBoardSetItemPositionRequest {
     let statusItems = snapshot.items.filter { item in
-      item.status == status && item.deletedAt == nil
+      item.status.canonicalPersistedStatus == status && item.deletedAt == nil
     }
     guard
       let item = statusItems.first(where: { $0.id == id }),
