@@ -31,6 +31,12 @@ pub enum WorkflowError {
     ItemNotDispatchable { detail: Cow<'static, str> },
     #[error("task-board lane capacity exceeded: {detail}")]
     TaskBoardLaneCapacity { detail: Cow<'static, str> },
+    /// A held step-mode dispatch is missing or no longer claimable when the
+    /// worker delivery tried to claim it. Distinct from a session conflict so
+    /// callers see the real reason (already delivered, cancelled, or never
+    /// reserved) instead of a generic agent contention message.
+    #[error("{detail}")]
+    TaskBoardDeliveryNotHeld { detail: Cow<'static, str> },
 }
 
 impl WorkflowError {
@@ -51,6 +57,7 @@ impl WorkflowError {
             Self::SessionScopeDenied { .. } => "SESSION_SCOPE_DENIED",
             Self::ItemNotDispatchable { .. } => "KSRCLI094",
             Self::TaskBoardLaneCapacity { .. } => "TASK_BOARD_LANE_CAPACITY",
+            Self::TaskBoardDeliveryNotHeld { .. } => "TASK_BOARD_DELIVERY_NOT_HELD",
         }
     }
 
@@ -149,6 +156,13 @@ impl WorkflowError {
     #[must_use]
     pub fn task_board_lane_capacity(detail: impl Into<Cow<'static, str>>) -> Self {
         Self::TaskBoardLaneCapacity {
+            detail: detail.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn task_board_delivery_not_held(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::TaskBoardDeliveryNotHeld {
             detail: detail.into(),
         }
     }

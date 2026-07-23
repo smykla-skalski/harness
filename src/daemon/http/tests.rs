@@ -119,6 +119,10 @@ fn task_board_position_conflicts_map_to_409() {
             CliErrorKind::task_board_lane_capacity("lane is full").into(),
             "TASK_BOARD_LANE_CAPACITY",
         ),
+        (
+            CliErrorKind::task_board_delivery_not_held("no held delivery to claim").into(),
+            "TASK_BOARD_DELIVERY_NOT_HELD",
+        ),
     ] {
         let (status, body) = super::response::error_status_and_body(&error);
         assert_eq!(status, StatusCode::CONFLICT);

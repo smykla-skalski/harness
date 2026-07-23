@@ -40,7 +40,10 @@ pub(crate) fn error_status_and_body(error: &CliError) -> (StatusCode, serde_json
     }
     if matches!(
         error.code(),
-        "KSRCLI092" | "TASK_BOARD_LANE_CAPACITY" | "WORKFLOW_CONCURRENT"
+        "KSRCLI092"
+            | "TASK_BOARD_LANE_CAPACITY"
+            | "TASK_BOARD_DELIVERY_NOT_HELD"
+            | "WORKFLOW_CONCURRENT"
     ) {
         return (
             StatusCode::CONFLICT,

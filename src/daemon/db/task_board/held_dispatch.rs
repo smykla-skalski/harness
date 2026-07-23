@@ -310,8 +310,9 @@ fn spawn_gate_switches(workspace: Option<&PolicyCanvasWorkspace>) -> SpawnGateSw
 }
 
 fn held_conflict(board_item_id: &str) -> CliError {
-    CliErrorKind::session_agent_conflict(format!(
-        "task-board dispatch for item '{board_item_id}' is not held"
+    CliErrorKind::task_board_delivery_not_held(format!(
+        "task-board dispatch for item '{board_item_id}' has no held delivery to claim; \
+         it may have already been delivered, been cancelled, or was never reserved in step mode"
     ))
     .into()
 }
