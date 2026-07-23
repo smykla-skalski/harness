@@ -182,6 +182,41 @@ fn v47_override_columns_reject_incoherent_writes() {
         "a non-canonical override set_at must be rejected by the CHECK constraint"
     );
 
+    for (name, actor, reason) in [
+        ("empty actor", String::new(), None),
+        ("whitespace actor", " \t\n".to_string(), None),
+        ("multibyte actor over byte limit", "🦀".repeat(100), None),
+        (
+            "empty reason",
+            "operator-1".to_string(),
+            Some(String::new()),
+        ),
+        (
+            "whitespace reason",
+            "operator-1".to_string(),
+            Some(" \t\n".to_string()),
+        ),
+        (
+            "multibyte reason over byte limit",
+            "operator-1".to_string(),
+            Some("🦀".repeat(100)),
+        ),
+    ] {
+        let result = db.connection().execute(
+            "UPDATE task_board_items SET
+                 triage_override_verdict = 'todo',
+                 triage_override_actor = ?1,
+                 triage_override_reason = ?2,
+                 triage_override_set_at = '2026-07-22T00:00:00Z'
+             WHERE item_id = 'item-1'",
+            (&actor, reason.as_deref()),
+        );
+        assert!(
+            result.is_err(),
+            "{name} must be rejected by the CHECK constraint"
+        );
+    }
+
     let coherent = db.connection().execute(
         "UPDATE task_board_items SET
              triage_override_verdict = 'todo',
@@ -201,39 +236,15 @@ fn v47_override_columns_reject_incoherent_writes() {
 fn v47_restart_rejects_noncanonical_override_values_that_sql_accepts() {
     for (name, actor, reason, set_at) in [
         (
-            "blank actor",
-            "   ".to_string(),
-            None,
-            "2026-07-22T00:00:00Z".to_string(),
-        ),
-        (
             "control actor",
             "operator\n1".to_string(),
             None,
             "2026-07-22T00:00:00Z".to_string(),
         ),
         (
-            "multibyte actor over byte limit",
-            "🦀".repeat(100),
-            None,
-            "2026-07-22T00:00:00Z".to_string(),
-        ),
-        (
-            "blank reason",
-            "operator-1".to_string(),
-            Some("   ".to_string()),
-            "2026-07-22T00:00:00Z".to_string(),
-        ),
-        (
             "control reason",
             "operator-1".to_string(),
             Some("bad\nreason".to_string()),
-            "2026-07-22T00:00:00Z".to_string(),
-        ),
-        (
-            "multibyte reason over byte limit",
-            "operator-1".to_string(),
-            Some("🦀".repeat(100)),
             "2026-07-22T00:00:00Z".to_string(),
         ),
         (

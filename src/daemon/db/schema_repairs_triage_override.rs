@@ -17,8 +17,11 @@ triage_override_actor TEXT
         OR (
             triage_override_verdict IS NOT NULL
             AND triage_override_actor IS NOT NULL
-            AND length(triage_override_actor) > 0
-            AND length(triage_override_actor) <= 256
+            AND length(trim(
+                triage_override_actor,
+                ' ' || char(9) || char(10) || char(11) || char(12) || char(13)
+            )) > 0
+            AND length(CAST(triage_override_actor AS BLOB)) <= 256
         )
     )";
 const REASON_DEFINITION: &str = "
@@ -26,7 +29,14 @@ triage_override_reason TEXT
     CONSTRAINT task_board_items_triage_override_reason_coherence
     CHECK (
         triage_override_reason IS NULL
-        OR (triage_override_verdict IS NOT NULL AND length(triage_override_reason) <= 256)
+        OR (
+            triage_override_verdict IS NOT NULL
+            AND length(trim(
+                triage_override_reason,
+                ' ' || char(9) || char(10) || char(11) || char(12) || char(13)
+            )) > 0
+            AND length(CAST(triage_override_reason AS BLOB)) <= 256
+        )
     )";
 const SET_AT_DEFINITION: &str = "
 triage_override_set_at TEXT
