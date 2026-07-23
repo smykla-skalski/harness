@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use serde_json::json;
 use sqlx::{Sqlite, Transaction, query, query_as};
@@ -14,6 +14,8 @@ use crate::errors::CliErrorKind;
 use crate::task_board::{
     TaskBoardItem, TaskBoardLaneOrigin, TaskBoardStatus, sort_task_board_items,
 };
+
+mod automatic;
 
 #[derive(Debug, Clone)]
 pub(crate) struct TaskBoardItemsSnapshot {
@@ -222,6 +224,15 @@ fn normalize_lane_entries(
     allow_generic_cross_lane_clamp: bool,
 ) -> Result<(), CliError> {
     entries.retain(|entry| entry.before.id != item.id);
+    if transition == LaneTransitionKind::Automatic {
+        return automatic::normalize_transition(
+            entries,
+            previous,
+            item,
+            source_status,
+            destination_status,
+        );
+    }
     if let Some(prior) = previous.filter(|prior| prior.deleted_at.is_none()) {
         let position =
             source_removal_position(source_status, destination_status, prior, item, entries);
@@ -366,20 +377,7 @@ fn place_in_destination(
             .into());
         }
     }
-    if transition == LaneTransitionKind::Automatic {
-        let occupied = entries
-            .iter()
-            .filter(|entry| entry.item.status == status)
-            .filter_map(|entry| entry.item.lane_position)
-            .collect::<BTreeSet<_>>();
-        let target = (requested..=max_position)
-            .find(|position| !occupied.contains(position))
-            .ok_or_else(|| {
-                CliErrorKind::task_board_lane_capacity("automatic lane has no free slot")
-            })?;
-        item.lane_position = Some(target);
-        return Ok(());
-    }
+    debug_assert_ne!(transition, LaneTransitionKind::Automatic);
     for entry in entries {
         if entry.item.status == status
             && entry
