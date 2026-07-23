@@ -333,6 +333,48 @@ fn audit_events_route_is_swift_exposed_rpc() {
     }
 }
 
+#[test]
+fn github_status_route_is_swift_exposed_rpc() {
+    let route = HTTP_API_CONTRACT
+        .iter()
+        .find(|route| route.path == http_paths::GITHUB_STATUS)
+        .expect("github status route should be registered");
+    assert_eq!(route.method, HttpRouteMethod::Get);
+    assert!(route.swift_client_exposed);
+    match route.parity {
+        HttpRouteParity::Rpc { ws_method } => assert_eq!(ws_method, ws_methods::GITHUB_STATUS),
+        HttpRouteParity::Exempt { .. } => panic!("github status route must use websocket parity"),
+    }
+}
+
+/// WebSocket methods in [`ws_methods::ALL`] that intentionally have no HTTP
+/// route - socket-only subscription and keepalive primitives. Every other
+/// declared method must map to a route; an unmapped method is almost always a
+/// missing route contract, as `github.status` and `task.delete` both were.
+const WS_ONLY_METHODS: &[&str] = &[
+    ws_methods::PING,
+    ws_methods::SESSION_SUBSCRIBE,
+    ws_methods::SESSION_UNSUBSCRIBE,
+    ws_methods::STREAM_SUBSCRIBE,
+    ws_methods::STREAM_UNSUBSCRIBE,
+];
+
+#[test]
+fn every_declared_ws_method_maps_to_a_route_or_is_ws_only() {
+    let mapped: BTreeSet<&str> = mapped_ws_methods().into_iter().collect();
+    let unmapped: BTreeSet<&str> = ws_methods::ALL
+        .iter()
+        .copied()
+        .filter(|method| !mapped.contains(method))
+        .collect();
+    let ws_only: BTreeSet<&str> = WS_ONLY_METHODS.iter().copied().collect();
+    assert_eq!(
+        unmapped, ws_only,
+        "every websocket method in ws_methods::ALL must map to an HTTP route or be listed in \
+         WS_ONLY_METHODS; an unexpected unmapped method is almost always a missing route contract"
+    );
+}
+
 mod task_board;
 
 #[test]
