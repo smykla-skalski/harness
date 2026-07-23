@@ -110,12 +110,34 @@ public enum TaskBoardAgentMode: TaskBoardOpenEnum, CaseIterable, Identifiable {
   public var id: String { rawValue }
 }
 
-public enum TaskBoardWorkflowKind: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
-  case unknown = "unknown"
-  case defaultTask = "default_task"
-  case prFix = "pr_fix"
-  case prReview = "pr_review"
-  case review = "review"
+public enum TaskBoardWorkflowKind: TaskBoardOpenEnum, CaseIterable, Identifiable {
+  case defaultTask
+  case prFix
+  case prReview
+  case review
+  case unknown(String)
+
+  public static let allCases: [Self] = [.defaultTask, .prFix, .prReview, .review]
+
+  public var rawValue: String {
+    switch self {
+    case .defaultTask: "default_task"
+    case .prFix: "pr_fix"
+    case .prReview: "pr_review"
+    case .review: "review"
+    case .unknown(let raw): raw
+    }
+  }
+
+  public init(rawValue: String) {
+    switch rawValue {
+    case "default_task": self = .defaultTask
+    case "pr_fix": self = .prFix
+    case "pr_review": self = .prReview
+    case "review": self = .review
+    default: self = .unknown(rawValue)
+    }
+  }
 
   public var id: String { rawValue }
 }

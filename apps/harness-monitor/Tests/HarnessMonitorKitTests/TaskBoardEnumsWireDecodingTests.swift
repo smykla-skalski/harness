@@ -6,10 +6,10 @@ import Testing
 /// Wire-contract for the task-board foundation enums, generated from
 /// src/task_board/types.rs and adopted in place (the hand enums were deleted, the
 /// generated open/closed enums replace them, and the app-only `title` moved to an
-/// extension). TaskBoardStatus/TaskBoardAgentMode are open (unknown-tolerant) and
-/// TaskBoardPriority is closed. These prove the snake_case wire values decode to the
-/// exact cases the app already used, unknown values survive, and the title extension
-/// still resolves.
+/// extension). TaskBoardStatus, TaskBoardAgentMode, and TaskBoardWorkflowKind are
+/// open (unknown-tolerant); TaskBoardPriority is closed. These prove the snake_case
+/// wire values decode to the exact cases the app already used, unknown values survive,
+/// and the title extension still resolves.
 @Suite("Task board foundation enums")
 struct TaskBoardEnumsWireDecodingTests {
   private let decoder = PolicyWireCoding.decoder
@@ -87,6 +87,17 @@ struct TaskBoardEnumsWireDecodingTests {
     #expect(try decode(TaskBoardAgentMode.self, "evaluate") == .evaluate)
     #expect(try decode(TaskBoardAgentMode.self, "swarm") == .unknown("swarm"))
     #expect(TaskBoardAgentMode.interactive.title == "Interactive")
+  }
+
+  @Test("decodes workflow kind including the unknown fallback")
+  func decodesWorkflowKind() throws {
+    #expect(try decode(TaskBoardWorkflowKind.self, "default_task") == .defaultTask)
+    #expect(try decode(TaskBoardWorkflowKind.self, "pr_review") == .prReview)
+    let future = try decode(TaskBoardWorkflowKind.self, "future_workflow")
+    #expect(future == .unknown("future_workflow"))
+    #expect(try decode(TaskBoardWorkflowKind.self, "unknown") == .unknown("unknown"))
+    let encodedFuture = try wireString(TaskBoardWorkflowKind.unknown("future_workflow"))
+    #expect(encodedFuture == "future_workflow")
   }
 
   @Test("decodes the closed priority enum")

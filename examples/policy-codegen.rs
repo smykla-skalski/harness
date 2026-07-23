@@ -172,10 +172,12 @@ const OPEN_STRING_ENUMS: &[&str] = &[
     "FixSafety",
     // task_board types.rs foundation enums adopted as the app's open TaskBoardOpenEnum
     // conformers (listed by Swift name: AgentMode is renamed to TaskBoardAgentMode).
-    // Both already model an unknown(String) catch-all app-side; TaskBoardPriority stays
-    // closed (default emit). Their .title moves to a hand extension.
+    // Status and agent mode already modeled an unknown(String) catch-all app-side;
+    // workflow kind is open so a newer daemon cannot break item decoding.
+    // TaskBoardPriority stays closed (default emit). Their .title moves to a hand extension.
     "TaskBoardStatus",
     "TaskBoardAgentMode",
+    "TaskBoardWorkflowKind",
 ];
 
 /// Emit an open Swift enum conforming to `TaskBoardOpenEnum` (which supplies the
@@ -2571,7 +2573,7 @@ const TASK_BOARD_ENUMS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonit
 // The task-board foundation enums that every item/summary/request references.
 // TaskBoardItemKind stays hand-written because its Unknown(String) variant
 // carries a raw value the string-enum emitter cannot model. TaskBoardStatus and
-// AgentMode emit open; TaskBoardPriority and TaskBoardWorkflowKind are closed.
+// Status, AgentMode, and WorkflowKind emit open; TaskBoardPriority is closed.
 const TASK_BOARD_ENUMS_EMIT_ONLY: &[&str] = &[
     "TaskBoardStatus",
     "TaskBoardPriority",

@@ -67,6 +67,26 @@ struct TaskBoardItemWireDecodingTests {
     #expect(item.deletedAt == nil)
   }
 
+  @Test("preserves an unknown workflow kind without rejecting the item")
+  func decodesUnknownWorkflowKind() throws {
+    let payload = """
+      {
+        "schema_version": 1,
+        "id": "task-future",
+        "title": "Future",
+        "workflow_kind": "future_workflow",
+        "created_at": "a",
+        "updated_at": "b"
+      }
+      """
+    let item = try decoder.decode(
+      TaskBoardItemWire.self,
+      from: Data(payload.utf8)
+    )
+
+    #expect(item.workflowKind == .unknown("future_workflow"))
+  }
+
   @Test("maps a decoded wire item to the rich hand model")
   func mapsFullItemToHandModel() throws {
     let wire = try decoder.decode(
