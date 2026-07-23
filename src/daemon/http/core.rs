@@ -25,8 +25,8 @@ use crate::errors::{CliError, CliErrorKind};
 use super::openapi::DaemonErrorBody;
 #[cfg(feature = "openapi")]
 use crate::daemon::protocol::{
-    DaemonControlResponse, DaemonTelemetryResponse, HealthResponse, LogLevelResponse,
-    ProjectSummary,
+    DaemonControlResponse, DaemonTelemetryResponse, GitHubApiDiagnostics, HealthResponse,
+    LogLevelResponse, ProjectSummary,
 };
 
 use super::audit::get_audit_events;
@@ -184,6 +184,15 @@ pub(super) async fn get_diagnostics(
     timed_json("GET", http_paths::DIAGNOSTICS, &request_id, start, result)
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/v1/github/status",
+    tag = "daemon",
+    responses(
+        (status = 200, description = "GitHub API usage diagnostics", body = GitHubApiDiagnostics),
+        (status = 401, description = "Missing or invalid daemon token", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn get_github_status(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,

@@ -57,6 +57,7 @@ struct HarnessDaemonApi;
     super::core::get_log_level,
     super::core::put_log_level,
     super::core::post_daemon_telemetry,
+    super::core::get_github_status,
     super::core::get_projects,
     super::core::get_runtime_session_resolution,
 ))]

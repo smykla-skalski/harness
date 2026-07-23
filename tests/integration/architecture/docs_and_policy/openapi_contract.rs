@@ -27,6 +27,7 @@ const DOCUMENTED_ROUTES: &[(&str, &str)] = &[
     ("GET", "/v1/daemon/log-level"),
     ("PUT", "/v1/daemon/log-level"),
     ("POST", "/v1/daemon/telemetry"),
+    ("GET", "/v1/github/status"),
     ("GET", "/v1/projects"),
     ("GET", "/v1/runtime-sessions/resolve"),
 ];

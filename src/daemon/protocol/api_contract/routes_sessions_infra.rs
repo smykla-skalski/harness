@@ -27,6 +27,14 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Get,
+        path: http_paths::GITHUB_STATUS,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::GITHUB_STATUS,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
         path: http_paths::AUDIT_EVENTS,
         parity: HttpRouteParity::Rpc {
             ws_method: ws_methods::AUDIT_EVENTS,

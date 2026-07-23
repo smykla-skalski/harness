@@ -11,6 +11,14 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
+        path: http_paths::SESSION_TASK_DELETE,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_DELETE,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
         path: http_paths::SESSION_TASK_ASSIGN,
         parity: HttpRouteParity::Rpc {
             ws_method: ws_methods::TASK_ASSIGN,

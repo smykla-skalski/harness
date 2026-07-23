@@ -190,6 +190,37 @@
         }
       }
     },
+    "/v1/github/status": {
+      "get": {
+        "tags": [
+          "daemon"
+        ],
+        "operationId": "get_github_status",
+        "responses": {
+          "200": {
+            "description": "GitHub API usage diagnostics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubApiDiagnostics"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid daemon token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-websocket-method": "github.status"
+      }
+    },
     "/v1/health": {
       "get": {
         "tags": [
@@ -464,6 +495,155 @@
         "properties": {
           "recorded_at": {
             "type": "string"
+          }
+        }
+      },
+      "GitHubApiDiagnostics": {
+        "type": "object",
+        "required": [
+          "buckets",
+          "cooling",
+          "last_hour_network_requests",
+          "last_hour_graphql_points",
+          "cache_hits",
+          "cache_stale_hits",
+          "cache_deferred_hits",
+          "deferred_budget",
+          "top_operations"
+        ],
+        "properties": {
+          "buckets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GitHubRateBucketDiagnostics"
+            }
+          },
+          "cache_deferred_hits": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "cache_hits": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "cache_stale_hits": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "cooling": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GitHubCooldownDiagnostics"
+            }
+          },
+          "data_revision": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "deferred_budget": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "last_hour_graphql_points": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "last_hour_network_requests": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "top_operations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GitHubOperationSpendDiagnostics"
+            }
+          }
+        }
+      },
+      "GitHubCooldownDiagnostics": {
+        "type": "object",
+        "required": [
+          "resource",
+          "reason",
+          "until_seconds_from_now"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "resource": {
+            "type": "string"
+          },
+          "until_seconds_from_now": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "GitHubOperationSpendDiagnostics": {
+        "type": "object",
+        "required": [
+          "operation",
+          "network_requests",
+          "graphql_points"
+        ],
+        "properties": {
+          "graphql_points": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "network_requests": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "operation": {
+            "type": "string"
+          }
+        }
+      },
+      "GitHubRateBucketDiagnostics": {
+        "type": "object",
+        "required": [
+          "resource",
+          "remaining",
+          "limit",
+          "used",
+          "reset_at"
+        ],
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "remaining": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "reset_at": {
+            "type": "string"
+          },
+          "resource": {
+            "type": "string"
+          },
+          "used": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
           }
         }
       },

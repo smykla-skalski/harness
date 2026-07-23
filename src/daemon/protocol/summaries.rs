@@ -139,6 +139,7 @@ pub struct DaemonDiagnosticsReport {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct GitHubApiDiagnostics {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub data_revision: Option<u64>,
@@ -154,6 +155,7 @@ pub struct GitHubApiDiagnostics {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct GitHubRateBucketDiagnostics {
     pub resource: String,
     pub remaining: u32,
@@ -163,6 +165,7 @@ pub struct GitHubRateBucketDiagnostics {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct GitHubCooldownDiagnostics {
     pub resource: String,
     pub reason: String,
@@ -170,6 +173,7 @@ pub struct GitHubCooldownDiagnostics {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct GitHubOperationSpendDiagnostics {
     pub operation: String,
     pub network_requests: u64,
