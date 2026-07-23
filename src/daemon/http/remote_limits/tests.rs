@@ -2,8 +2,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use axum::Router;
+use axum::body::Body;
 use axum::extract::Extension;
-use axum::http::StatusCode;
+use axum::http::{Method, Request, StatusCode};
 use axum::middleware;
 use axum::routing::get;
 use serde_json::Value;
@@ -12,6 +13,11 @@ use tokio::sync::Notify;
 
 use super::*;
 use crate::daemon::protocol::http_paths;
+use crate::daemon::task_board_remote_transport::routes::{
+    DEFAULT_EXECUTION_HTTP_BODY_LIMIT_BYTES, HEARTBEAT_PATH, OFFER_HTTP_BODY_LIMIT_BYTES,
+    OFFER_PATH, SOURCE_BUNDLE_ABANDON_HTTP_BODY_LIMIT_BYTES, SOURCE_BUNDLE_ABANDON_PATH,
+    SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES, SOURCE_BUNDLE_PATH, SOURCE_BUNDLE_RECEIPT_PATH,
+};
 
 #[test]
 fn remote_request_limit_defaults_are_valid_and_non_zero() {
@@ -23,6 +29,121 @@ fn remote_request_limit_defaults_are_valid_and_non_zero() {
     assert!(config.max_concurrent_tls_handshakes > 0);
     assert!(config.max_websocket_connections > 0);
     assert!(config.max_websocket_in_flight_requests > 0);
+    assert_eq!(config.max_http_body_bytes, MAX_REMOTE_HTTP_BODY_LIMIT_BYTES);
+}
+
+#[test]
+fn unauthenticated_audit_retry_after_rounds_up_to_the_full_window() {
+    let limits = RemoteRequestLimits::new(RemoteRequestLimitConfig {
+        unauthenticated_audit_window: Duration::from_millis(1_500),
+        ..RemoteRequestLimitConfig::default()
+    })
+    .expect("fractional audit window");
+
+    assert_eq!(limits.unauthenticated_audit_retry_after_seconds(), 2);
+}
+
+#[test]
+fn unauthenticated_audit_limiter_recovers_from_mutex_poisoning() {
+    let limits = RemoteRequestLimits::default();
+    let limiter = Arc::clone(&limits.unauthenticated_audit_limiter);
+    let poisoned = std::panic::catch_unwind(move || {
+        let _guard = limiter.lock().expect("lock limiter before poisoning");
+        panic!("poison the test limiter");
+    });
+
+    assert!(poisoned.is_err());
+    assert_eq!(
+        limits.admit_unauthenticated_audit("127.0.0.1"),
+        RemoteUnauthenticatedAuditAdmission::Audit,
+    );
+}
+
+#[test]
+fn concurrency_rejection_preserves_a_longer_audit_retry_interval() {
+    let response = Response::builder()
+        .status(StatusCode::TOO_MANY_REQUESTS)
+        .header(axum::http::header::RETRY_AFTER, "60")
+        .body(Body::empty())
+        .expect("rate-limited response");
+
+    let response = RemoteHttpLimitRejection::with_retry_after(
+        StatusCode::TOO_MANY_REQUESTS,
+        "remote request concurrency limit reached",
+    )
+    .with_response_headers(response);
+
+    assert_eq!(
+        response.headers().get(axum::http::header::RETRY_AFTER),
+        Some(&HeaderValue::from_static("60")),
+    );
+}
+
+#[test]
+fn remote_http_body_limit_uses_exact_route_contracts_and_operator_ceiling() {
+    assert_eq!(
+        effective_remote_http_body_limit(
+            &body_limit_request(Method::POST, SOURCE_BUNDLE_PATH),
+            MAX_REMOTE_HTTP_BODY_LIMIT_BYTES,
+        ),
+        SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES,
+    );
+    assert_eq!(
+        effective_remote_http_body_limit(
+            &body_limit_request(Method::POST, SOURCE_BUNDLE_RECEIPT_PATH),
+            MAX_REMOTE_HTTP_BODY_LIMIT_BYTES,
+        ),
+        SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES,
+    );
+    assert_eq!(
+        effective_remote_http_body_limit(
+            &body_limit_request(Method::POST, OFFER_PATH),
+            MAX_REMOTE_HTTP_BODY_LIMIT_BYTES,
+        ),
+        OFFER_HTTP_BODY_LIMIT_BYTES,
+    );
+    assert_eq!(
+        effective_remote_http_body_limit(
+            &body_limit_request(Method::POST, SOURCE_BUNDLE_ABANDON_PATH),
+            MAX_REMOTE_HTTP_BODY_LIMIT_BYTES,
+        ),
+        SOURCE_BUNDLE_ABANDON_HTTP_BODY_LIMIT_BYTES,
+    );
+    assert_eq!(
+        effective_remote_http_body_limit(
+            &body_limit_request(Method::POST, HEARTBEAT_PATH),
+            MAX_REMOTE_HTTP_BODY_LIMIT_BYTES,
+        ),
+        DEFAULT_EXECUTION_HTTP_BODY_LIMIT_BYTES,
+    );
+    assert_eq!(
+        effective_remote_http_body_limit(
+            &body_limit_request(Method::POST, http_paths::POLICIES_IMPORT),
+            MAX_REMOTE_HTTP_BODY_LIMIT_BYTES,
+        ),
+        POLICY_TRANSFER_HTTP_BODY_LIMIT_BYTES,
+    );
+    assert_eq!(
+        effective_remote_http_body_limit(
+            &body_limit_request(Method::POST, http_paths::POLICIES_DUMP),
+            MAX_REMOTE_HTTP_BODY_LIMIT_BYTES,
+        ),
+        POLICY_TRANSFER_HTTP_BODY_LIMIT_BYTES,
+    );
+    assert_eq!(
+        effective_remote_http_body_limit(
+            &body_limit_request(Method::GET, SOURCE_BUNDLE_PATH),
+            MAX_REMOTE_HTTP_BODY_LIMIT_BYTES,
+        ),
+        DEFAULT_REMOTE_NON_BULK_HTTP_BODY_LIMIT_BYTES,
+    );
+    assert_eq!(
+        effective_remote_http_body_limit(
+            &body_limit_request(Method::POST, SOURCE_BUNDLE_PATH),
+            512,
+        ),
+        512,
+    );
 }
 
 #[test]
@@ -60,7 +181,7 @@ async fn remote_http_admission_fails_closed_without_runtime_limits() {
 
     stop_server(server).await;
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
-    assert_eq!(body["error"]["code"], REMOTE_LIMIT_ERROR_CODE);
+    assert_eq!(body["error"]["code"], "REMOTE_AUDIT");
 }
 
 #[tokio::test]
@@ -169,8 +290,7 @@ async fn local_http_requests_ignore_remote_body_limits() {
         .get(base_url)
         .body(vec![
             b'x';
-            RemoteRequestLimitConfig::default().max_http_body_bytes
-                + 1
+            DEFAULT_REMOTE_NON_BULK_HTTP_BODY_LIMIT_BYTES + 1
         ])
         .send()
         .await
@@ -196,6 +316,14 @@ async fn blocking_handler(Extension(blocking): Extension<BlockingRequest>) -> St
 async fn slow_handler() -> StatusCode {
     tokio::time::sleep(Duration::from_secs(1)).await;
     StatusCode::OK
+}
+
+fn body_limit_request(method: Method, path: &str) -> Request<Body> {
+    Request::builder()
+        .method(method)
+        .uri(path)
+        .body(Body::empty())
+        .expect("body limit request")
 }
 
 fn remote_state(config: RemoteRequestLimitConfig) -> DaemonHttpState {

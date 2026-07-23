@@ -41,16 +41,26 @@ pub(crate) mod task_board;
 
 #[test]
 fn db_round_trip_smoke_covers_public_surface() {
-    use crate::session::types::SessionTransition;
-
     let db = DaemonDb::open_in_memory().expect("open db");
     let project = sample_project();
-    db.sync_project(&project).expect("sync project");
-
     let state = sample_session_state();
-    db.create_session_record(&project.project_id, &state)
-        .expect("create session");
+    seed_round_trip_smoke(&db, &project, &state);
+    assert_initial_session_surface(&db, &project, &state);
+    persist_round_trip_smoke_events(&db, &state);
+    assert_round_trip_smoke_reads(&db, &state);
+}
 
+fn seed_round_trip_smoke(db: &DaemonDb, project: &DiscoveredProject, state: &SessionState) {
+    db.sync_project(project).expect("sync project");
+    db.create_session_record(&project.project_id, state)
+        .expect("create session");
+}
+
+fn assert_initial_session_surface(
+    db: &DaemonDb,
+    project: &DiscoveredProject,
+    state: &SessionState,
+) {
     assert_eq!(
         db.project_id_for_session(&state.session_id)
             .expect("project for session"),
@@ -66,6 +76,10 @@ fn db_round_trip_smoke_covers_public_surface() {
             .expect("state version"),
         Some(1)
     );
+}
+
+fn persist_round_trip_smoke_events(db: &DaemonDb, state: &SessionState) {
+    use crate::session::types::SessionTransition;
 
     let mut mutable_state = db
         .load_session_state_for_mutation(&state.session_id)
@@ -75,8 +89,7 @@ fn db_round_trip_smoke_covers_public_surface() {
     mutable_state.state_version = 2;
     db.save_session_state("project-abc123", &mutable_state)
         .expect("save mutable state");
-
-    let log_entry = SessionLogEntry {
+    db.append_log_entry(&SessionLogEntry {
         sequence: 1,
         recorded_at: "2026-04-03T12:00:00Z".into(),
         session_id: state.session_id.clone(),
@@ -86,24 +99,23 @@ fn db_round_trip_smoke_covers_public_surface() {
         },
         actor_id: Some("claude-leader".into()),
         reason: None,
-    };
-    db.append_log_entry(&log_entry).expect("append log entry");
-
-    let checkpoint = TaskCheckpoint {
-        checkpoint_id: "checkpoint-1".into(),
-        task_id: "task-1".into(),
-        recorded_at: "2026-04-03T12:01:00Z".into(),
-        actor_id: Some("claude-leader".into()),
-        summary: "Investigating".into(),
-        progress: 25,
-    };
-    db.append_checkpoint(&state.session_id, &checkpoint)
-        .expect("append checkpoint");
-
+    })
+    .expect("append log entry");
+    db.append_checkpoint(
+        &state.session_id,
+        &TaskCheckpoint {
+            checkpoint_id: "checkpoint-1".into(),
+            task_id: "task-1".into(),
+            recorded_at: "2026-04-03T12:01:00Z".into(),
+            actor_id: Some("claude-leader".into()),
+            summary: "Investigating".into(),
+            progress: 25,
+        },
+    )
+    .expect("append checkpoint");
     let signal = sample_signal_record("2099-12-31T23:59:59Z");
     db.sync_signal_index(&state.session_id, std::slice::from_ref(&signal))
         .expect("sync signals");
-
     let events = vec![ConversationEvent {
         kind: ConversationEventKind::Error {
             code: None,
@@ -114,7 +126,6 @@ fn db_round_trip_smoke_covers_public_surface() {
     }];
     db.sync_conversation_events(&state.session_id, "claude-leader", "claude", &events)
         .expect("sync conversation events");
-
     let activity = daemon_protocol::AgentToolActivitySummary {
         agent_id: "claude-leader".into(),
         runtime: "claude".into(),
@@ -128,7 +139,10 @@ fn db_round_trip_smoke_covers_public_surface() {
     };
     db.sync_agent_activity(&state.session_id, std::slice::from_ref(&activity))
         .expect("sync agent activity");
+    persist_round_trip_smoke_runtime_state(db, state);
+}
 
+fn persist_round_trip_smoke_runtime_state(db: &DaemonDb, state: &SessionState) {
     db.set_diagnostics_cache("smoke", "cached")
         .expect("set diagnostics cache");
     assert_eq!(
@@ -137,13 +151,11 @@ fn db_round_trip_smoke_covers_public_surface() {
             .as_deref(),
         Some("cached")
     );
-
     db.append_daemon_event("2026-05-04T15:00:00Z", "info", "smoke event")
         .expect("append daemon event");
     let daemon_events = db.load_recent_daemon_events(5).expect("load daemon events");
     assert_eq!(daemon_events.len(), 1);
     assert_eq!(daemon_events[0].message, "smoke event");
-
     let codex_run = sample_codex_run("codex-smoke", "2026-04-09T11:00:00Z");
     db.save_codex_run(&codex_run).expect("save codex run");
     assert_eq!(
@@ -158,7 +170,6 @@ fn db_round_trip_smoke_covers_public_surface() {
             .len(),
         1
     );
-
     let agent_tui = sample_agent_tui("agent-tui-smoke", "2026-04-09T11:00:00Z");
     db.save_agent_tui(&agent_tui).expect("save agent tui");
     assert_eq!(
@@ -178,11 +189,12 @@ fn db_round_trip_smoke_covers_public_surface() {
             .len(),
         1
     );
+}
 
+fn assert_round_trip_smoke_reads(db: &DaemonDb, state: &SessionState) {
     let loaded_signals = db.load_signals(&state.session_id).expect("load signals");
     assert_eq!(loaded_signals.len(), 1);
     assert_eq!(loaded_signals[0].signal.signal_id, "sig-test-1");
-
     let loaded_events = db
         .load_conversation_events(&state.session_id, "claude-leader")
         .expect("load conversation events");
@@ -191,45 +203,39 @@ fn db_round_trip_smoke_covers_public_surface() {
         ConversationEventKind::Error { message, .. } => assert_eq!(message, "boom"),
         other => panic!("unexpected conversation event: {other:?}"),
     }
-
     let loaded_activity = db
         .load_agent_activity(&state.session_id)
         .expect("load agent activity");
     assert_eq!(loaded_activity.len(), 1);
     assert_eq!(loaded_activity[0].latest_tool_name.as_deref(), Some("Read"));
-
     let checkpoints = db
         .load_task_checkpoints(&state.session_id, "task-1")
         .expect("load checkpoints");
     assert_eq!(checkpoints.len(), 1);
     assert_eq!(checkpoints[0].checkpoint_id, "checkpoint-1");
-
-    let log_entries = db
-        .load_session_log(&state.session_id)
-        .expect("load session log");
-    assert_eq!(log_entries.len(), 1);
-
+    assert_eq!(
+        db.load_session_log(&state.session_id)
+            .expect("load session log")
+            .len(),
+        1
+    );
     let resolved = db
         .resolve_session(&state.session_id)
         .expect("resolve session")
         .expect("resolved session");
     assert_eq!(resolved.state.context, "updated context");
-
     let timeline = db
         .load_session_timeline_window(&state.session_id, &TimelineWindowRequest::default())
         .expect("load timeline window")
         .expect("timeline window present");
     assert_eq!(timeline.total_count, 3);
     assert_eq!(timeline.entries.as_ref().map(Vec::len), Some(3));
-
     let project_summaries = db.list_project_summaries().expect("project summaries");
     assert_eq!(project_summaries.len(), 1);
     assert_eq!(project_summaries[0].total_session_count, 1);
-
     let session_summaries = db.list_session_summaries_full().expect("session summaries");
     assert_eq!(session_summaries.len(), 1);
     assert_eq!(session_summaries[0].context, "updated context");
-
     let session_states = db.list_session_summaries().expect("session states");
     assert_eq!(session_states.len(), 1);
     assert_eq!(session_states[0].context, "updated context");

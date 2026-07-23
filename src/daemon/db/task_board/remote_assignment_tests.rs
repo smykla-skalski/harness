@@ -16,7 +16,6 @@ use crate::task_board::{
 };
 
 const FORK_REPOSITORY: &str = "contributor/harness";
-const FORK_CHECKOUT: &str = "/tmp/harness-remote-fork";
 
 #[tokio::test]
 async fn fork_offer_requires_and_freezes_the_exact_source_repository_checkout() {
@@ -40,6 +39,14 @@ async fn fork_offer_requires_and_freezes_the_exact_source_repository_checkout() 
     );
 
     let configured = executor_fixture(1).await;
+    let fork_checkout = configured._temp.path().join("fork-checkout");
+    std::fs::create_dir(&fork_checkout).expect("create fork checkout");
+    let fork_checkout = fork_checkout
+        .canonicalize()
+        .expect("canonicalize fork checkout")
+        .to_str()
+        .expect("fork checkout is UTF-8")
+        .to_owned();
     let mut settings = configured
         .db
         .task_board_orchestrator_settings()
@@ -50,7 +57,7 @@ async fn fork_offer_requires_and_freezes_the_exact_source_repository_checkout() 
         .repositories
         .push(TaskBoardLocalExecutionRepositoryConfig {
             repository: FORK_REPOSITORY.into(),
-            checkout_path: FORK_CHECKOUT.into(),
+            checkout_path: fork_checkout.clone(),
         });
     settings
         .local_execution_host
@@ -73,7 +80,7 @@ async fn fork_offer_requires_and_freezes_the_exact_source_repository_checkout() 
     );
     assert_eq!(
         accepted.executor_checkout_path.as_deref(),
-        Some(FORK_CHECKOUT)
+        Some(fork_checkout.as_str())
     );
     configured
         .db
@@ -105,10 +112,16 @@ fn fork_offer(assignment_id: &str, idempotency_key: &str) -> RemoteOfferRequest 
 async fn lost_acceptance_replays_after_settings_change_but_start_fails_before_io() {
     let fixture = executor_fixture(1).await;
     let accepted = accept_executor(&fixture, &fixture.request).await;
+    let checkout = fixture
+        ._temp
+        .path()
+        .join("checkout")
+        .canonicalize()
+        .expect("canonicalize executor checkout");
     assert!(accepted.executor_configuration_revision.is_some());
     assert_eq!(
         accepted.executor_checkout_path.as_deref(),
-        Some("/tmp/harness-remote-checkouts")
+        checkout.to_str()
     );
     change_executor_capacity(&fixture, 2).await;
 

@@ -57,8 +57,12 @@ impl AsyncDaemonDb {
             || recorded >= renewed_expiry
             || recorded >= window.deadline
         {
-            recover_controller_remote_assignment_in_tx(&mut transaction, &record, recorded_at)
-                .await?;
+            Box::pin(recover_controller_remote_assignment_in_tx(
+                &mut transaction,
+                &record,
+                recorded_at,
+            ))
+            .await?;
         } else {
             clear_renew_io_authority_in_tx(
                 &mut transaction,

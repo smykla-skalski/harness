@@ -53,9 +53,11 @@ async fn claimed_remote_without_start(label: &str) -> PreparedRemoteOffer {
             &crate::task_board::TaskBoardExecutionAttemptCas::from(&prepared.attempt),
             &prepared.offer,
             "executor-a",
-            "2026-07-19T10:00:00Z",
-            "2026-07-19T10:01:00Z",
-            "2026-07-19T10:10:00Z",
+            crate::daemon::db::TaskBoardRemoteOfferWindow::new(
+                "2026-07-19T10:00:00Z",
+                "2026-07-19T10:01:00Z",
+                "2026-07-19T10:10:00Z",
+            ),
         )
         .await
         .expect("offer remote assignment");

@@ -31,7 +31,7 @@ pub(crate) struct TaskBoardRemoteControllerScanFailure {
 
 #[derive(Debug)]
 pub(crate) enum TaskBoardRemoteControllerScanStep {
-    Assignment(TaskBoardRemoteControllerScanItem),
+    Assignment(Box<TaskBoardRemoteControllerScanItem>),
     Quarantined(TaskBoardRemoteControllerScanFailure),
 }
 
@@ -73,7 +73,7 @@ impl AsyncDaemonDb {
         {
             Ok(Some(assignment)) if assignment.offered_at == cursor.order_at => {
                 Ok(Some(TaskBoardRemoteControllerScanStep::Assignment(
-                    TaskBoardRemoteControllerScanItem { assignment, cursor },
+                    Box::new(TaskBoardRemoteControllerScanItem { assignment, cursor }),
                 )))
             }
             Ok(Some(_)) => self
@@ -298,7 +298,7 @@ async fn load_scan_row(
     .bind(order_at)
     .fetch_optional(transaction.as_mut())
     .await
-    .map_err(scan_error)
+    .map_err(|error| scan_error(&error))
 }
 
 async fn complete_scan_item_in_tx(
@@ -358,20 +358,27 @@ async fn load_or_start_cycle(
     transaction: &mut Transaction<'_, Sqlite>,
     now: &str,
 ) -> Result<Option<ScanRow>, CliError> {
-    if let Some((updated_at, assignment_id)) =
+    let Some((updated_at, assignment_id)) =
         load_named_cursor(transaction, CONTROLLER_CYCLE_END_QUEUE).await?
-    {
-        return Ok(Some(ScanRow {
-            assignment_id,
-            order_at: updated_at,
-            ..ScanRow::cursor_only(String::new(), String::new())
-        }));
-    }
+    else {
+        return load_or_start_new_cycle(transaction, now).await;
+    };
+    Ok(Some(ScanRow {
+        assignment_id,
+        order_at: updated_at,
+        ..ScanRow::cursor_only(String::new(), String::new())
+    }))
+}
+
+async fn load_or_start_new_cycle(
+    transaction: &mut Transaction<'_, Sqlite>,
+    now: &str,
+) -> Result<Option<ScanRow>, CliError> {
     let boundary = query_as::<_, ScanRow>(SCAN_CYCLE_MAX)
         .bind(now)
         .fetch_optional(transaction.as_mut())
         .await
-        .map_err(scan_error)?;
+        .map_err(|error| scan_error(&error))?;
     clear_named_cursor(transaction, CONTROLLER_QUEUE).await?;
     clear_named_cursor(transaction, CONTROLLER_PENDING_QUEUE).await?;
     if let Some(boundary) = boundary.as_ref() {
@@ -473,7 +480,7 @@ async fn select_cycle_page(
             .bind(limit)
             .fetch_all(transaction.as_mut())
             .await
-            .map_err(scan_error),
+            .map_err(|error| scan_error(&error)),
         None => query_as::<_, ScanRow>(SCAN_CYCLE_FROM_START)
             .bind(now)
             .bind(&boundary.order_at)
@@ -481,11 +488,11 @@ async fn select_cycle_page(
             .bind(limit)
             .fetch_all(transaction.as_mut())
             .await
-            .map_err(scan_error),
+            .map_err(|error| scan_error(&error)),
     }
 }
 
-fn scan_error(error: sqlx::Error) -> CliError {
+fn scan_error(error: &sqlx::Error) -> CliError {
     db_error(format!("scan remote controller assignments: {error}"))
 }
 

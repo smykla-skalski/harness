@@ -97,7 +97,14 @@ async fn redirects_are_not_followed_and_errors_redact_credentials() {
     )
     .await;
 
-    assert_eq!(error, RemoteExecutionHttpError::HttpStatus(302));
+    assert_eq!(
+        error,
+        RemoteExecutionHttpError::HttpStatus {
+            status: 302,
+            code: None,
+            message: None,
+        }
+    );
     assert!(!format!("{error:?}").contains("redirect-secret"));
     assert!(request.await.expect("server task").is_some());
 }

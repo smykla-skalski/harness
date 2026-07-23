@@ -17,52 +17,8 @@ use crate::task_board::{
     TaskBoardRemoteAssignmentState, TaskBoardWorkflowExecutionCas,
 };
 
-#[test]
-fn recovery_schedule_uses_earlier_remote_deadline_and_backs_off_failures() {
-    let fallback = Duration::from_secs(30);
-    let deadline =
-        (Utc::now() + ChronoDuration::seconds(5)).to_rfc3339_opts(SecondsFormat::Secs, true);
-    let scheduled = next_deadline(Some(&deadline), fallback).expect("remote deadline");
-    assert!(scheduled <= Instant::now() + Duration::from_secs(6));
-
-    let expired =
-        (Utc::now() - ChronoDuration::seconds(5)).to_rfc3339_opts(SecondsFormat::Secs, true);
-    let expired_wake = next_deadline(Some(&expired), fallback).expect("expired remote deadline");
-    assert!(expired_wake >= Instant::now() + Duration::from_millis(900));
-    assert!(expired_wake <= Instant::now() + Duration::from_secs(2));
-
-    let mut schedule = RecoverySchedule::new(fallback);
-    schedule.record_failure();
-    assert!(schedule.next_wake >= Instant::now() + Duration::from_millis(900));
-    assert!(schedule.next_wake <= Instant::now() + Duration::from_secs(2));
-
-    let mut incomplete = RecoverySchedule::new(fallback);
-    incomplete.record_batch(
-        &TaskBoardRemoteRecoveryBatch {
-            incomplete: true,
-            ..TaskBoardRemoteRecoveryBatch::default()
-        },
-        None,
-    );
-    assert!(incomplete.next_wake >= Instant::now() + Duration::from_millis(900));
-    assert!(incomplete.next_wake <= Instant::now() + Duration::from_secs(2));
-
-    let mut quarantined = RecoverySchedule::new(fallback);
-    quarantined.consecutive_failures = 4;
-    quarantined.record_batch(
-        &TaskBoardRemoteRecoveryBatch {
-            failures: vec![crate::daemon::db::TaskBoardRemoteRecoveryFailure {
-                assignment_id: "poisoned-assignment".into(),
-                code: "malformed_evidence".into(),
-                message: "quarantined".into(),
-            }],
-            ..TaskBoardRemoteRecoveryBatch::default()
-        },
-        None,
-    );
-    assert_eq!(quarantined.consecutive_failures, 0);
-    assert!(quarantined.next_wake <= Instant::now() + fallback);
-}
+#[path = "task_board_remote_recovery_loop_tests/schedule.rs"]
+mod schedule;
 
 #[tokio::test]
 async fn foreground_recovery_drains_poisoned_incomplete_pages_before_unrelated_callback() {
@@ -165,7 +121,17 @@ async fn background_expiry_waits_for_the_last_controller_page() {
     let fixture = poisoned_recovery_fixture(65).await;
     let mut schedule = RecoverySchedule::new(Duration::from_secs(30));
 
-    maintain_remote_recovery_after_coverage(&fixture.db, &mut schedule, true, true).await;
+    maintain_remote_recovery_after_coverage(
+        &fixture.db,
+        &mut schedule,
+        ControllerCoverage {
+            incomplete: true,
+            failed: false,
+            progress: ControllerProgress::Idle,
+            pagination_incomplete: true,
+        },
+    )
+    .await;
     assert_eq!(
         fixture
             .db
@@ -184,7 +150,17 @@ async fn background_expiry_waits_for_the_last_controller_page() {
             .expect("load exact active fence before the last controller page")
     );
 
-    maintain_remote_recovery_after_coverage(&fixture.db, &mut schedule, false, false).await;
+    maintain_remote_recovery_after_coverage(
+        &fixture.db,
+        &mut schedule,
+        ControllerCoverage {
+            incomplete: false,
+            failed: false,
+            progress: ControllerProgress::Idle,
+            pagination_incomplete: false,
+        },
+    )
+    .await;
     assert_eq!(
         fixture
             .db
@@ -377,9 +353,11 @@ async fn poisoned_recovery_fixture(poison_count: u32) -> RecoveryFixture {
             &TaskBoardExecutionAttemptCas::from(&prepared.attempt),
             &prepared.offer,
             "executor-a",
-            &offered_at,
-            &lease_expires_at,
-            &prepared.offer.deadline_at,
+            crate::daemon::db::TaskBoardRemoteOfferWindow::new(
+                &offered_at,
+                &lease_expires_at,
+                &prepared.offer.deadline_at,
+            ),
         )
         .await
         .expect("persist healthy due assignment");

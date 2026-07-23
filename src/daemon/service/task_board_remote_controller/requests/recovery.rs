@@ -29,7 +29,9 @@ pub(crate) fn prepare_source_reassignment(
     let mut binding = predecessor.binding.clone();
     binding.assignment_id =
         super::deterministic_assignment_id(execution, attempt, &binding.host_id, fencing_epoch);
-    binding.host_instance_id = trust.observed_host_instance_id.clone();
+    binding
+        .host_instance_id
+        .clone_from(&trust.observed_host_instance_id);
     binding.fencing_epoch = fencing_epoch;
     binding.execution_record_sha256 = TaskBoardWorkflowExecutionCas::from(execution).record_sha256;
     let mut request = predecessor.clone();

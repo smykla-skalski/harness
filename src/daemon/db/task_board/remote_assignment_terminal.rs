@@ -1,5 +1,3 @@
-use sqlx::{Sqlite, Transaction, query};
-
 use super::remote_assignment_authority_settlement::clear_offer_io_authority_in_tx;
 use super::remote_assignment_lease::{
     commit_noop, exact_mutation_replay, finish_mutation, mutation_binding_matches,
@@ -22,7 +20,7 @@ use crate::daemon::task_board_remote_transport::wire::{
     RemoteAttemptBinding, RemoteCancelRequest, RemoteOfferDisposition, RemoteOfferResponse,
 };
 use crate::task_board::TaskBoardRemoteAssignmentState;
-
+use sqlx::{Sqlite, Transaction, query};
 impl AsyncDaemonDb {
     pub(crate) async fn record_task_board_remote_offer_response(
         &self,
@@ -78,14 +76,25 @@ impl AsyncDaemonDb {
         .await?;
         match response.disposition {
             RemoteOfferDisposition::Accepted => {
-                apply_accepted_offer(transaction, record, response, observed_at).await
+                Box::pin(apply_accepted_offer(
+                    transaction,
+                    record,
+                    response,
+                    observed_at,
+                ))
+                .await
             }
             RemoteOfferDisposition::Rejected => {
-                apply_rejected_offer(transaction, record, response, observed_at).await
+                Box::pin(apply_rejected_offer(
+                    transaction,
+                    record,
+                    response,
+                    observed_at,
+                ))
+                .await
             }
         }
     }
-
     pub(crate) async fn record_task_board_remote_predecessor_offer_acceptance(
         &self,
         response: &RemoteOfferResponse,
@@ -148,9 +157,14 @@ impl AsyncDaemonDb {
             trust,
         )
         .await?;
-        apply_accepted_offer(transaction, record, response, observed_at).await
+        Box::pin(apply_accepted_offer(
+            transaction,
+            record,
+            response,
+            observed_at,
+        ))
+        .await
     }
-
     pub(crate) async fn cancel_task_board_remote_assignment(
         &self,
         request: &RemoteCancelRequest,
@@ -220,7 +234,6 @@ impl AsyncDaemonDb {
         }
         finish_mutation(transaction, &record.assignment_id, "cancellation").await
     }
-
     pub(crate) async fn mark_task_board_remote_assignment_unknown(
         &self,
         binding: &RemoteAttemptBinding,
@@ -310,7 +323,6 @@ impl AsyncDaemonDb {
         finish_mutation(transaction, &record.assignment_id, "supersede").await
     }
 }
-
 async fn apply_accepted_offer(
     mut transaction: Transaction<'_, Sqlite>,
     record: TaskBoardRemoteAssignmentRecord,
@@ -341,7 +353,13 @@ async fn apply_accepted_offer(
         && record.claimed_at.is_none()
         && record.lease_id.is_none()
     {
-        return retain_late_accepted_offer(transaction, record, response, observed_at).await;
+        return Box::pin(retain_late_accepted_offer(
+            transaction,
+            record,
+            response,
+            observed_at,
+        ))
+        .await;
     }
     if record.state != TaskBoardRemoteAssignmentState::Offered
         || record.claimed_at.is_some()
@@ -389,17 +407,16 @@ async fn apply_accepted_offer(
             updated_at: observed_at.into(),
             ..record
         };
-        return apply_unclaimable_offer(
+        return Box::pin(apply_unclaimable_offer(
             transaction,
             accepted,
             "remote offer acceptance arrived after lease expiry",
             observed_at,
-        )
+        ))
         .await;
     }
     finish_mutation(transaction, &record.assignment_id, "accepted offer").await
 }
-
 async fn retain_late_accepted_offer(
     mut transaction: Transaction<'_, Sqlite>,
     record: TaskBoardRemoteAssignmentRecord,

@@ -13,6 +13,8 @@ mod attach_tests;
 mod contract_tests;
 #[path = "quarantine_tests.rs"]
 mod quarantine_tests;
+#[path = "staging_tests.rs"]
+mod staging_tests;
 #[path = "symbolic_ref_tests.rs"]
 mod symbolic_ref_tests;
 

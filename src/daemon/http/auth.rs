@@ -260,6 +260,18 @@ async fn audit_verification_failure(
     response: Response,
 ) -> Response {
     let error_detail = auth_audit::authentication_error_detail(response.status());
+    if response.status() == StatusCode::UNAUTHORIZED {
+        return match audit
+            .record_unauthenticated_denial(state, error_detail)
+            .await
+        {
+            Ok(auth_audit::RemoteUnauthenticatedAuditResult::Recorded) => response,
+            Ok(auth_audit::RemoteUnauthenticatedAuditResult::RateLimited {
+                retry_after_seconds,
+            }) => auth_audit::unauthenticated_rate_limited_response(retry_after_seconds),
+            Err(error) => auth_audit::unavailable_response(&error),
+        };
+    }
     match audit.record_denied(state, None, error_detail).await {
         Ok(()) => response,
         Err(error) => auth_audit::unavailable_response(&error),
@@ -371,7 +383,22 @@ async fn record_remote_http_limit_rejection(
                 .record_denied(state, Some(&client.client_id), error_detail)
                 .await
         }
-        Err(_) => audit.record_denied(state, None, error_detail).await,
+        Err(_) => {
+            match audit
+                .record_unauthenticated_denial(state, error_detail)
+                .await
+            {
+                Ok(auth_audit::RemoteUnauthenticatedAuditResult::Recorded) => Ok(()),
+                Ok(auth_audit::RemoteUnauthenticatedAuditResult::RateLimited {
+                    retry_after_seconds,
+                }) => {
+                    return Err(Box::new(auth_audit::unauthenticated_rate_limited_response(
+                        retry_after_seconds,
+                    )));
+                }
+                Err(error) => Err(error),
+            }
+        }
     };
     result.map_err(|error| Box::new(auth_audit::unavailable_response(&error)))
 }

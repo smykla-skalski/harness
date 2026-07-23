@@ -41,7 +41,7 @@ impl ExternalCreateRecoveryClient for TodoistSyncClient {
         lease.renew().await?;
         self.replay_create(request)
             .await
-            .map(ExternalCreateProbe::Found)
+            .map(|task| ExternalCreateProbe::Found(Box::new(task)))
     }
 }
 

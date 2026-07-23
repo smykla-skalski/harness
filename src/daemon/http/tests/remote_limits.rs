@@ -9,7 +9,7 @@ use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::{Error as WebSocketError, Message};
 
 use crate::daemon::http::RemoteRequestLimitConfig;
-use crate::daemon::http::remote_limits::DEFAULT_REMOTE_HTTP_BODY_LIMIT_BYTES;
+use crate::daemon::http::remote_limits::DEFAULT_REMOTE_NON_BULK_HTTP_BODY_LIMIT_BYTES;
 use crate::daemon::protocol::{http_paths, ws_methods};
 use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_auth::REMOTE_CLIENT_ID_HEADER;
@@ -33,7 +33,10 @@ async fn remote_http_rejects_bodies_over_the_configured_limit() {
         .header("x-request-id", "limit-body-viewer")
         .header(REMOTE_CLIENT_ID_HEADER, "viewer")
         .bearer_auth(remote_token("viewer"))
-        .body(vec![b'x'; DEFAULT_REMOTE_HTTP_BODY_LIMIT_BYTES + 1])
+        .body(vec![
+            b'x';
+            DEFAULT_REMOTE_NON_BULK_HTTP_BODY_LIMIT_BYTES + 1
+        ])
         .send()
         .await
         .expect("send oversized remote request");
@@ -71,7 +74,10 @@ async fn remote_http_bounds_unauthenticated_bodies_before_authentication() {
     let response = reqwest::Client::new()
         .get(format!("{base_url}{}", http_paths::HEALTH))
         .header("x-request-id", "limit-body-unauthenticated")
-        .body(vec![b'x'; DEFAULT_REMOTE_HTTP_BODY_LIMIT_BYTES + 1])
+        .body(vec![
+            b'x';
+            DEFAULT_REMOTE_NON_BULK_HTTP_BODY_LIMIT_BYTES + 1
+        ])
         .send()
         .await
         .expect("send unauthenticated oversized remote request");
@@ -158,7 +164,10 @@ async fn remote_http_limit_rejections_fail_closed_without_audit_storage() {
         .get(format!("{base_url}{}", http_paths::HEALTH))
         .header(REMOTE_CLIENT_ID_HEADER, "viewer")
         .bearer_auth(remote_token("viewer"))
-        .body(vec![b'x'; DEFAULT_REMOTE_HTTP_BODY_LIMIT_BYTES + 1])
+        .body(vec![
+            b'x';
+            DEFAULT_REMOTE_NON_BULK_HTTP_BODY_LIMIT_BYTES + 1
+        ])
         .send()
         .await
         .expect("send oversized request without audit store");
@@ -302,7 +311,7 @@ async fn remote_websocket_rejects_messages_over_the_configured_limit() {
     let oversized = serde_json::json!({
         "id": "oversized-ws-request",
         "method": ws_methods::PING,
-        "params": { "padding": "x".repeat(DEFAULT_REMOTE_HTTP_BODY_LIMIT_BYTES) },
+        "params": { "padding": "x".repeat(DEFAULT_REMOTE_NON_BULK_HTTP_BODY_LIMIT_BYTES) },
     });
     let send_result = socket
         .send(Message::Text(oversized.to_string().into()))

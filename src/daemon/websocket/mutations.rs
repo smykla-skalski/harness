@@ -458,7 +458,7 @@ pub(crate) struct MutationError {
     code: String,
     message: String,
     status_code: Option<u16>,
-    data: Option<Value>,
+    data: Option<Box<Value>>,
 }
 
 impl From<CliError> for MutationError {
@@ -468,7 +468,7 @@ impl From<CliError> for MutationError {
             code: payload.code,
             message: payload.message,
             status_code: payload.status_code,
-            data: payload.data,
+            data: payload.data.map(Box::new),
         }
     }
 }
@@ -491,7 +491,7 @@ impl MutationError {
             message: self.message,
             details: vec![],
             status_code: self.status_code,
-            data: self.data,
+            data: self.data.map(|data| *data),
         }
     }
 }

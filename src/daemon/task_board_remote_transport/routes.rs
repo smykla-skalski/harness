@@ -44,6 +44,21 @@ pub(crate) const OFFER_HTTP_BODY_LIMIT_BYTES: usize = MAX_REMOTE_OFFER_JSON_BYTE
 pub(crate) const SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES: usize = MAX_REMOTE_SOURCE_BUNDLE_JSON_BYTES;
 pub(crate) const SOURCE_BUNDLE_ABANDON_HTTP_BODY_LIMIT_BYTES: usize =
     MAX_REMOTE_SOURCE_ABANDON_JSON_BYTES;
+pub(crate) const DEFAULT_EXECUTION_HTTP_BODY_LIMIT_BYTES: usize = MAX_REMOTE_LIFECYCLE_JSON_BYTES;
+pub(crate) const MAX_EXECUTION_HTTP_BODY_LIMIT_BYTES: usize = max_body_limit(
+    max_body_limit(
+        SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES,
+        SOURCE_BUNDLE_ABANDON_HTTP_BODY_LIMIT_BYTES,
+    ),
+    max_body_limit(
+        OFFER_HTTP_BODY_LIMIT_BYTES,
+        DEFAULT_EXECUTION_HTTP_BODY_LIMIT_BYTES,
+    ),
+);
+
+const fn max_body_limit(left: usize, right: usize) -> usize {
+    if left > right { left } else { right }
+}
 
 pub(crate) fn execution_routes() -> Router<DaemonHttpState> {
     Router::new()
@@ -103,6 +118,30 @@ pub(crate) fn execution_routes() -> Router<DaemonHttpState> {
         )
 }
 
+pub(crate) fn execution_http_body_limit(method: &Method, path: &str) -> Option<usize> {
+    match (method, path) {
+        (&Method::POST, SOURCE_BUNDLE_PATH | SOURCE_BUNDLE_RECEIPT_PATH) => {
+            Some(SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES)
+        }
+        (&Method::POST, SOURCE_BUNDLE_ABANDON_PATH) => {
+            Some(SOURCE_BUNDLE_ABANDON_HTTP_BODY_LIMIT_BYTES)
+        }
+        (&Method::POST, OFFER_PATH) => Some(OFFER_HTTP_BODY_LIMIT_BYTES),
+        (
+            &Method::POST,
+            HEARTBEAT_PATH
+            | CLAIM_PATH
+            | LEASE_RENEW_PATH
+            | STATUS_PATH
+            | CANCEL_PATH
+            | SETTLED_PATH
+            | ARTIFACT_PATH
+            | super::routes_cleanup::CLEANUP_OBSERVATION_PATH,
+        ) => Some(DEFAULT_EXECUTION_HTTP_BODY_LIMIT_BYTES),
+        _ => None,
+    }
+}
+
 pub(crate) fn execution_operation(method: &Method, path: &str) -> Option<&'static str> {
     match (method, path) {
         (&Method::GET, ADVERTISE_PATH) => Some("advertise"),
@@ -129,7 +168,7 @@ async fn upload_source_bundle(
 ) -> Response {
     map_route_result(
         async {
-            request.validate().map_err(wire_error)?;
+            request.validate().map_err(|error| wire_error(&error))?;
             let (db, principal) = assignment_route(
                 &headers,
                 &state,
@@ -165,7 +204,7 @@ async fn advertise(headers: HeaderMap, State(state): State<DaemonHttpState>) -> 
             verify_route_identity(&host, &state.daemon_epoch, &client.client_id, None)?;
             let active = active_assignments(db, &host).await?;
             host_wire_advertisement(&host, &state.daemon_epoch, active, utc_now())
-                .map_err(wire_error)
+                .map_err(|error| wire_error(&error))
         }
         .await,
     )
@@ -178,7 +217,7 @@ async fn heartbeat(
 ) -> Response {
     map_route_result(
         async {
-            request.validate().map_err(wire_error)?;
+            request.validate().map_err(|error| wire_error(&error))?;
             let db = require_async_db(&state, "heartbeat remote execution host")?;
             let host = local_host(db).await?;
             let client =
@@ -219,7 +258,7 @@ async fn offer(
 ) -> Response {
     map_route_result(
         async {
-            request.validate().map_err(wire_error)?;
+            request.validate().map_err(|error| wire_error(&error))?;
             let (db, principal) =
                 assignment_route(&headers, &state, "offer", &request.binding).await?;
             let outcome = db
@@ -243,7 +282,7 @@ async fn claim(
 ) -> Response {
     map_route_result(
         async {
-            request.validate().map_err(wire_error)?;
+            request.validate().map_err(|error| wire_error(&error))?;
             let (db, principal) =
                 assignment_route(&headers, &state, "claim", &request.binding).await?;
             let _ = mutation_record(
@@ -266,7 +305,7 @@ async fn renew_lease(
 ) -> Response {
     map_route_result(
         async {
-            request.validate().map_err(wire_error)?;
+            request.validate().map_err(|error| wire_error(&error))?;
             let (db, principal) =
                 assignment_route(&headers, &state, "renew_lease", &request.binding).await?;
             let record = mutation_record(
@@ -291,7 +330,7 @@ async fn status(
 ) -> Response {
     map_route_result(
         async {
-            request.validate().map_err(wire_error)?;
+            request.validate().map_err(|error| wire_error(&error))?;
             let (db, principal) =
                 assignment_route(&headers, &state, "status", &request.binding).await?;
             let record = load_assignment(db, &request.binding.assignment_id).await?;
@@ -315,7 +354,7 @@ async fn cancel(
 ) -> Response {
     map_route_result(
         async {
-            request.validate().map_err(wire_error)?;
+            request.validate().map_err(|error| wire_error(&error))?;
             let (db, principal) =
                 assignment_route(&headers, &state, "cancel", &request.binding).await?;
             let record = mutation_record(
@@ -334,7 +373,7 @@ async fn cancel(
                 observed_at: record.updated_at,
             }
             .seal(&request)
-            .map_err(wire_error)
+            .map_err(|error| wire_error(&error))
         }
         .await,
     )
@@ -347,7 +386,7 @@ async fn settled(
 ) -> Response {
     map_route_result(
         async {
-            request.validate().map_err(wire_error)?;
+            request.validate().map_err(|error| wire_error(&error))?;
             let (db, principal) =
                 assignment_route(&headers, &state, "settled", &request.binding).await?;
             Ok(db
@@ -365,7 +404,7 @@ async fn fetch_artifact(
     Json(request): Json<RemoteArtifactFetchRequest>,
 ) -> Response {
     let result = async {
-        request.validate().map_err(wire_error)?;
+        request.validate().map_err(|error| wire_error(&error))?;
         let (db, principal) =
             assignment_route(&headers, &state, "fetch_artifact", &request.binding).await?;
         db.task_board_remote_artifact(&request, &principal)
@@ -381,6 +420,6 @@ async fn fetch_artifact(
             "REMOTE_ARTIFACT_UNAVAILABLE",
             "remote executor artifact storage is unavailable",
         ),
-        Err(error) => map_route_error(error),
+        Err(error) => map_route_error(&error),
     }
 }

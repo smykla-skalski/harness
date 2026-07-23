@@ -66,7 +66,7 @@ impl ExternalCreateRequest {
 /// Result of probing a provider for an earlier create attempt.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ExternalCreateProbe {
-    Found(ExternalTask),
+    Found(Box<ExternalTask>),
     Absent,
 }
 
@@ -189,7 +189,7 @@ mod tests {
         assert_eq!(created.reference.external_id, request.item_id());
         assert_eq!(created.title, request.title());
         assert_eq!(created.body, request.body());
-        assert_eq!(probe, ExternalCreateProbe::Found(created));
+        assert_eq!(probe, ExternalCreateProbe::Found(Box::new(created)));
         assert_eq!(
             recovery
                 .extract_create_key(&mut marked)
@@ -241,7 +241,9 @@ mod tests {
             lease: &dyn ExternalCreateLease,
         ) -> Result<ExternalCreateProbe, CliError> {
             lease.renew().await?;
-            Ok(ExternalCreateProbe::Found(task_from_request(request)))
+            Ok(ExternalCreateProbe::Found(Box::new(task_from_request(
+                request,
+            ))))
         }
 
         fn extract_create_key(&self, task: &mut ExternalTask) -> Result<Option<String>, CliError> {

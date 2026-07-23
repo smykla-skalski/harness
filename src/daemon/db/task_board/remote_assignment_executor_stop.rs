@@ -49,7 +49,7 @@ impl AsyncDaemonDb {
                 "remote executor stop authority conflicts with durable intent",
             ));
         }
-        if !source_matches(&record, authority, reason)?
+        if !source_matches(&record, authority, reason)
             || !durable_run_matches_snapshot(&mut transaction, &record, snapshot).await?
         {
             commit_noop(transaction, "stale remote executor stop authority").await?;

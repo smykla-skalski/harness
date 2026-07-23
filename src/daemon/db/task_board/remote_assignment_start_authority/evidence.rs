@@ -155,9 +155,12 @@ pub(crate) fn start_authority_digest(
         offer.binding.attempt.to_string(),
         offer.binding.idempotency_key.clone(),
         record.host_id.clone(),
-        required(&record.claimed_host_instance_id, "claimed host")?,
-        required(&record.authenticated_principal, "authenticated principal")?,
-        required(&record.claimed_at, "claim time")?,
+        required(record.claimed_host_instance_id.as_ref(), "claimed host")?,
+        required(
+            record.authenticated_principal.as_ref(),
+            "authenticated principal",
+        )?,
+        required(record.claimed_at.as_ref(), "claim time")?,
         record.fencing_epoch.to_string(),
         offer.request_sha256.clone(),
         record
@@ -166,15 +169,15 @@ pub(crate) fn start_authority_digest(
             .ok_or_else(|| db_error("remote executor start has no claim receipt"))?
             .sha256
             .clone(),
-        required(&record.lease_id, "lease")?,
-        required(&record.lease_expires_at, "lease expiry")?,
-        required(&record.deadline_at, "deadline")?,
+        required(record.lease_id.as_ref(), "lease")?,
+        required(record.lease_expires_at.as_ref(), "lease expiry")?,
+        required(record.deadline_at.as_ref(), "deadline")?,
         offer.binding.configuration_revision.to_string(),
         record
             .executor_configuration_revision
             .ok_or_else(|| db_error("remote executor start has no executor revision"))?
             .to_string(),
-        required(&record.executor_checkout_path, "checkout")?,
+        required(record.executor_checkout_path.as_ref(), "checkout")?,
         identity.session_id.clone(),
         identity.run_id.clone(),
         identity.workspace_ref.clone(),
@@ -188,8 +191,8 @@ pub(crate) fn start_authority_digest(
     Ok(hex::encode(hasher.finalize()))
 }
 
-fn required(value: &Option<String>, label: &str) -> Result<String, CliError> {
+fn required(value: Option<&String>, label: &str) -> Result<String, CliError> {
     value
-        .clone()
+        .cloned()
         .ok_or_else(|| db_error(format!("remote executor start has no {label}")))
 }

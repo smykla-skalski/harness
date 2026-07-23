@@ -2,12 +2,6 @@
 // library test target for `--all-targets` even when Cargo marks it disabled.
 #![cfg(not(test))]
 #![deny(unsafe_code)]
-// The standalone wrapper unifies the full remote-controller feature graph.
-// Boxing each propagated await solely for this lint would add allocations to
-// production lifecycle paths; size-focused async refactoring belongs in a
-// dedicated follow-up.
-#![allow(clippy::large_futures)]
-
 use tracing::Level;
 
 pub mod agents;

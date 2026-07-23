@@ -6,6 +6,7 @@ use super::wire::{RemoteWireError, require_digest};
 
 const MAX_MANIFEST_ENTRIES: usize = 64;
 pub(crate) const MAX_REMOTE_ARTIFACT_BYTES: u64 = 32 * 1024 * 1024;
+pub(super) const MAX_REMOTE_ARTIFACT_BYTES_USIZE: usize = 32 * 1024 * 1024;
 const MAX_MANIFEST_BYTES: u64 = 128 * 1024 * 1024;
 const MAX_ARTIFACT_PATH_BYTES: usize = 512;
 

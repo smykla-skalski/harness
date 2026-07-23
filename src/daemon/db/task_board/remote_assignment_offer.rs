@@ -1,4 +1,4 @@
-use chrono::{DateTime, Duration, Utc};
+use chrono::Duration;
 use sqlx::{Sqlite, Transaction, query_scalar};
 
 use super::ORCHESTRATOR_CHANGE_SCOPE;
@@ -40,7 +40,11 @@ use crate::task_board::{
 
 #[path = "remote_assignment_offer/capacity.rs"]
 mod capacity;
+#[path = "remote_assignment_offer/types.rs"]
+mod types;
 use capacity::host_has_capacity;
+pub(crate) use types::TaskBoardRemoteOfferWindow;
+use types::{OfferPreparation, OfferTimes};
 
 impl AsyncDaemonDb {
     pub(crate) async fn offer_task_board_remote_assignment(
@@ -49,20 +53,16 @@ impl AsyncDaemonDb {
         expected_attempt: &TaskBoardExecutionAttemptCas,
         request: &RemoteOfferRequest,
         authenticated_principal: &str,
-        offered_at: &str,
-        lease_expires_at: &str,
-        deadline_at: &str,
+        window: TaskBoardRemoteOfferWindow<'_>,
     ) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
-        self.offer_task_board_remote_assignment_with_source(
+        Box::pin(self.offer_task_board_remote_assignment_with_source(
             expected_execution,
             expected_attempt,
             request,
             None,
             authenticated_principal,
-            offered_at,
-            lease_expires_at,
-            deadline_at,
-        )
+            window,
+        ))
         .await
     }
 
@@ -73,16 +73,14 @@ impl AsyncDaemonDb {
         request: &RemoteOfferRequest,
         source_content: Option<&[u8]>,
         authenticated_principal: &str,
-        offered_at: &str,
-        lease_expires_at: &str,
-        deadline_at: &str,
+        window: TaskBoardRemoteOfferWindow<'_>,
     ) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
         let times = validate_offer_input(
             request,
             authenticated_principal,
-            offered_at,
-            lease_expires_at,
-            deadline_at,
+            window.offered,
+            window.lease_expires,
+            window.deadline,
         )?;
         let mut transaction = self
             .begin_immediate_transaction("task board remote assignment offer")
@@ -114,7 +112,7 @@ impl AsyncDaemonDb {
             expected_execution,
             expected_attempt,
             request,
-            offered_at,
+            window.offered,
             times,
         )
         .await?
@@ -133,28 +131,20 @@ impl AsyncDaemonDb {
             capture_lifecycle_trust_for_offer_in_tx(&mut transaction, request).await?;
         let assignment = persist_remote_offer_in_tx(
             &mut transaction,
-            expected_execution,
-            expected_attempt,
-            request,
-            source_content,
-            authenticated_principal,
-            &prepared.parent,
-            &prepared.attempt,
-            prepared.attempt_index,
-            offered_at,
-            lease_expires_at,
-            deadline_at,
-            &lifecycle_trust,
+            PersistRemoteOfferInput {
+                expected_execution,
+                expected_attempt,
+                request,
+                source_content,
+                authenticated_principal,
+                prepared: &prepared,
+                window,
+                lifecycle_trust: &lifecycle_trust,
+            },
         )
         .await?;
         commit_created_offer(transaction, assignment).await
     }
-}
-
-enum OfferPreparation {
-    Stale(&'static str),
-    Unavailable(&'static str),
-    Ready(PreparedRemoteOffer),
 }
 
 struct PreparedRemoteOffer {
@@ -202,51 +192,64 @@ async fn prepare_remote_offer_in_tx(
         return Ok(OfferPreparation::Unavailable("settled blocked admission"));
     }
     let attempt = current_attempt.clone();
-    Ok(OfferPreparation::Ready(PreparedRemoteOffer {
+    Ok(OfferPreparation::Ready(Box::new(PreparedRemoteOffer {
         parent,
         attempt,
         attempt_index,
-    }))
+    })))
+}
+
+struct PersistRemoteOfferInput<'a> {
+    expected_execution: &'a TaskBoardWorkflowExecutionCas,
+    expected_attempt: &'a TaskBoardExecutionAttemptCas,
+    request: &'a RemoteOfferRequest,
+    source_content: Option<&'a [u8]>,
+    authenticated_principal: &'a str,
+    prepared: &'a PreparedRemoteOffer,
+    window: TaskBoardRemoteOfferWindow<'a>,
+    lifecycle_trust: &'a TaskBoardRemoteLifecycleTrustSnapshot,
 }
 
 async fn persist_remote_offer_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
-    expected_execution: &TaskBoardWorkflowExecutionCas,
-    expected_attempt: &TaskBoardExecutionAttemptCas,
-    request: &RemoteOfferRequest,
-    source_content: Option<&[u8]>,
-    authenticated_principal: &str,
-    parent: &TaskBoardWorkflowExecutionRecord,
-    current_attempt: &TaskBoardExecutionAttemptRecord,
-    attempt_index: usize,
-    offered_at: &str,
-    lease_expires_at: &str,
-    deadline_at: &str,
-    lifecycle_trust: &TaskBoardRemoteLifecycleTrustSnapshot,
+    input: PersistRemoteOfferInput<'_>,
 ) -> Result<TaskBoardRemoteAssignmentRecord, CliError> {
-    let (updated_parent, updated_attempt, combined) =
-        build_remote_claim(parent, current_attempt, attempt_index, request, offered_at)?;
-    update_execution_in_tx(transaction, expected_execution, &updated_parent).await?;
-    update_attempt_in_tx(transaction, expected_attempt, &updated_attempt).await?;
+    let prepared = input.prepared;
+    let window = input.window;
+    let (updated_parent, updated_attempt, combined) = build_remote_claim(
+        &prepared.parent,
+        &prepared.attempt,
+        prepared.attempt_index,
+        input.request,
+        window.offered,
+    )?;
+    update_execution_in_tx(transaction, input.expected_execution, &updated_parent).await?;
+    update_attempt_in_tx(transaction, input.expected_attempt, &updated_attempt).await?;
     insert_assignment_in_tx(
         transaction,
-        request,
-        authenticated_principal,
-        offered_at,
+        input.request,
+        input.authenticated_principal,
+        window.offered,
         None,
-        lease_expires_at,
-        deadline_at,
+        window.lease_expires,
+        window.deadline,
         None,
         None,
-        Some(lifecycle_trust),
+        Some(input.lifecycle_trust),
     )
     .await?;
-    persist_outbound_source_in_tx(transaction, request, source_content, offered_at).await?;
+    persist_outbound_source_in_tx(
+        transaction,
+        input.request,
+        input.source_content,
+        window.offered,
+    )
+    .await?;
     bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-    let assignment = load_assignment_in_tx(transaction, &request.binding.assignment_id)
+    let assignment = load_assignment_in_tx(transaction, &input.request.binding.assignment_id)
         .await?
         .ok_or_else(|| db_error("inserted remote assignment disappeared"))?;
-    debug_assert_eq!(combined.attempts[attempt_index], updated_attempt);
+    debug_assert_eq!(combined.attempts[prepared.attempt_index], updated_attempt);
     Ok(assignment)
 }
 
@@ -260,10 +263,6 @@ async fn commit_created_offer(
         ))
     })?;
     Ok(TaskBoardRemoteOfferOutcome::Created(assignment))
-}
-
-struct OfferTimes {
-    offered_at: DateTime<Utc>,
 }
 
 fn validate_offer_input(
@@ -442,7 +441,7 @@ fn build_remote_claim(
     updated_attempt.available_at = None;
     updated_attempt.error = None;
     updated_attempt.artifact = None;
-    updated_attempt.updated_at = now.to_owned();
+    now.clone_into(&mut updated_attempt.updated_at);
     updated_attempt.completed_at = None;
     validate_task_board_attempt_update(current_attempt, &updated_attempt)
         .map_err(|error| db_error(format!("validate remote offer attempt: {error}")))?;
@@ -465,9 +464,9 @@ fn build_remote_claim(
     );
     updated_parent.available_at = None;
     updated_parent.blocked_reason = None;
-    updated_parent.updated_at = now.to_owned();
+    now.clone_into(&mut updated_parent.updated_at);
     let mut combined = updated_parent.clone();
-    combined.attempts[attempt_index] = updated_attempt.clone();
+    combined.attempts[attempt_index].clone_from(&updated_attempt);
     validate_task_board_execution_target_update(parent, &combined)
         .map_err(|error| db_error(format!("validate remote offer parent: {error}")))?;
     validate_task_board_workflow_execution(&combined)

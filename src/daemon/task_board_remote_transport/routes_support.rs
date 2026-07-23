@@ -232,7 +232,7 @@ pub(super) fn required(value: Option<String>, field: &'static str) -> Result<Str
     value.ok_or_else(|| concurrent(field))
 }
 
-pub(super) fn wire_error(error: RemoteWireError) -> CliError {
+pub(super) fn wire_error(error: &RemoteWireError) -> CliError {
     CliErrorKind::workflow_parse(error.to_string()).into()
 }
 
@@ -243,11 +243,11 @@ pub(super) fn concurrent(message: &'static str) -> CliError {
 pub(super) fn map_route_result<T: serde::Serialize>(result: Result<T, CliError>) -> Response {
     match result {
         Ok(value) => Json(value).into_response(),
-        Err(error) => map_route_error(error),
+        Err(error) => map_route_error(&error),
     }
 }
 
-pub(super) fn map_route_error(error: CliError) -> Response {
+pub(super) fn map_route_error(error: &CliError) -> Response {
     let status = match error.code() {
         "WORKFLOW_CONCURRENT" => StatusCode::CONFLICT,
         "WORKFLOW_IO" => StatusCode::SERVICE_UNAVAILABLE,

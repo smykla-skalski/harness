@@ -200,9 +200,7 @@ async fn persist_predecessor(
                 offer,
                 Some(content),
                 HOST,
-                NOW,
-                LEASE_EXPIRES,
-                DEADLINE,
+                crate::daemon::db::TaskBoardRemoteOfferWindow::new(NOW, LEASE_EXPIRES, DEADLINE,),
             )
             .await
             .expect("persist predecessor source offer"),

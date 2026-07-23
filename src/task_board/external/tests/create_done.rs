@@ -359,10 +359,10 @@ impl ExternalCreateRecoveryClient for CreateDoneClient {
         lease: &dyn ExternalCreateLease,
     ) -> Result<ExternalCreateProbe, CliError> {
         lease.renew().await?;
-        Ok(ExternalCreateProbe::Found(task_from_request(
+        Ok(ExternalCreateProbe::Found(Box::new(task_from_request(
             request,
             self.create_revision.clone(),
-        )))
+        ))))
     }
 }
 

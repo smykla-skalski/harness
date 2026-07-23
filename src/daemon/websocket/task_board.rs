@@ -32,7 +32,7 @@ pub(crate) async fn dispatch_task_board_method(
     state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
 ) -> Option<WsResponse> {
-    if let Some(response) = orchestrator::dispatch_method(request, state).await {
+    if let Some(response) = Box::pin(orchestrator::dispatch_method(request, state)).await {
         return Some(response);
     }
     match request.method.as_str() {
@@ -70,7 +70,9 @@ pub(crate) async fn dispatch_task_board_method(
             Some(dispatch_task_board_plan_revoke(request, state).await)
         }
         ws_methods::TASK_BOARD_SYNC => Some(dispatch_task_board_sync(request, state).await),
-        ws_methods::TASK_BOARD_DISPATCH => Some(dispatch_task_board_dispatch(request, state).await),
+        ws_methods::TASK_BOARD_DISPATCH => {
+            Some(Box::pin(dispatch_task_board_dispatch(request, state)).await)
+        }
         ws_methods::TASK_BOARD_DISPATCH_DELIVER => {
             Some(dispatch_task_board_dispatch_deliver(request, state).await)
         }
@@ -105,7 +107,7 @@ pub(crate) async fn dispatch_task_board_method(
         ws_methods::TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_ACK => {
             Some(secret_handoff::dispatch_ack(request, state).await)
         }
-        _ => policy::dispatch_policy_method(request, state).await,
+        _ => Box::pin(policy::dispatch_policy_method(request, state)).await,
     }
 }
 

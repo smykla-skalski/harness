@@ -31,7 +31,7 @@ impl AsyncDaemonDb {
         else {
             return Ok(None);
         };
-        match exact_claim_response(&record, request, principal)? {
+        match exact_claim_response(&record, request, principal) {
             Some(response) => Ok(Some((response, record))),
             None if record.claim_receipt.is_none() => Ok(None),
             None => Err(concurrent("remote claim receipt conflicts with replay")),
@@ -151,16 +151,14 @@ pub(super) fn exact_claim_response(
     record: &TaskBoardRemoteAssignmentRecord,
     request: &RemoteClaimRequest,
     principal: &str,
-) -> Result<Option<RemoteClaimResponse>, CliError> {
-    let Some(receipt) = record.claim_receipt.as_ref() else {
-        return Ok(None);
-    };
+) -> Option<RemoteClaimResponse> {
+    let receipt = record.claim_receipt.as_ref()?;
     let exact = record.authenticated_principal.as_deref() == Some(principal)
         && receipt.request_sha256 == request.request_sha256
         && receipt.response.binding == request.binding
         && receipt.response.offer_request_sha256 == request.offer_request_sha256
         && receipt.response.lease.lease_id == request.lease_id;
-    Ok(exact.then(|| receipt.response.clone()))
+    exact.then(|| receipt.response.clone())
 }
 
 fn receipt_digest(

@@ -19,18 +19,20 @@ pub(crate) async fn import_and_adopt_task_board_remote_implementation_result(
 ) -> Result<TaskBoardRemoteResultAdoptionOutcome, CliError> {
     let (expected, request, execution_id) =
         import_request(db, assignment_id, fencing_epoch).await?;
-    super::import_task_board_remote_implementation_result(db, &expected, &request).await?;
+    Box::pin(super::import_task_board_remote_implementation_result(
+        db, &expected, &request,
+    ))
+    .await?;
     let parent = db
         .task_board_workflow_execution(&execution_id)
         .await?
         .ok_or_else(|| concurrent("remote implementation execution disappeared before adoption"))?;
-    let outcome = db
-        .adopt_task_board_remote_terminal_result(
-            &TaskBoardWorkflowExecutionCas::from(&parent),
-            assignment_id,
-            fencing_epoch,
-        )
-        .await?;
+    let outcome = Box::pin(db.adopt_task_board_remote_terminal_result(
+        &TaskBoardWorkflowExecutionCas::from(&parent),
+        assignment_id,
+        fencing_epoch,
+    ))
+    .await?;
     if matches!(
         outcome,
         TaskBoardRemoteResultAdoptionOutcome::Updated(_)

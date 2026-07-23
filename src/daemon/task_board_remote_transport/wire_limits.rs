@@ -1,7 +1,7 @@
 use serde::Serialize;
 
 use super::wire::RemoteWireError;
-use super::wire_artifacts::MAX_REMOTE_ARTIFACT_BYTES;
+use super::wire_artifacts::MAX_REMOTE_ARTIFACT_BYTES_USIZE;
 
 pub(crate) const MAX_REMOTE_RECEIPT_JSON_BYTES: usize = 16 * 1024;
 pub(crate) const MAX_REMOTE_LIFECYCLE_JSON_BYTES: usize = 4 * 1024 * 1024;
@@ -9,7 +9,7 @@ pub(crate) const MAX_REMOTE_OFFER_JSON_BYTES: usize = 16 * 1024 * 1024;
 pub(crate) const MAX_REMOTE_SOURCE_RECOVERY_RESPONSE_JSON_BYTES: usize =
     2 * MAX_REMOTE_RECEIPT_JSON_BYTES;
 
-const SOURCE_BUNDLE_BASE64_BYTES: usize = (MAX_REMOTE_ARTIFACT_BYTES as usize).div_ceil(3) * 4;
+const SOURCE_BUNDLE_BASE64_BYTES: usize = MAX_REMOTE_ARTIFACT_BYTES_USIZE.div_ceil(3) * 4;
 const SOURCE_BUNDLE_PREFIX: &str = "{\"schema_version\":1,\"offer\":";
 const SOURCE_BUNDLE_CONTENT_PREFIX: &str = ",\"content_base64\":\"";
 const SOURCE_BUNDLE_DIGEST_PREFIX: &str = "\",\"request_sha256\":\"";

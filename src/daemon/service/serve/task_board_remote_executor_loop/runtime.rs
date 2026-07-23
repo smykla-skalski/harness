@@ -188,17 +188,16 @@ pub(super) const fn worker_action(
 ) -> RemoteWorkerAction {
     match (assignment, run) {
         (TaskBoardRemoteAssignmentState::Claimed, None) => RemoteWorkerAction::Start,
-        (TaskBoardRemoteAssignmentState::Claimed, Some(_)) => RemoteWorkerAction::Probe,
         (
-            TaskBoardRemoteAssignmentState::Started | TaskBoardRemoteAssignmentState::Running,
+            TaskBoardRemoteAssignmentState::Claimed
+            | TaskBoardRemoteAssignmentState::Started
+            | TaskBoardRemoteAssignmentState::Running,
             Some(_),
         ) => RemoteWorkerAction::Probe,
-        (TaskBoardRemoteAssignmentState::Cancelled, Some(status)) if status.is_active() => {
-            RemoteWorkerAction::Cancel
-        }
-        (TaskBoardRemoteAssignmentState::Unknown, Some(status)) if status.is_active() => {
-            RemoteWorkerAction::Cancel
-        }
+        (
+            TaskBoardRemoteAssignmentState::Cancelled | TaskBoardRemoteAssignmentState::Unknown,
+            Some(status),
+        ) if status.is_active() => RemoteWorkerAction::Cancel,
         _ => RemoteWorkerAction::Hold,
     }
 }

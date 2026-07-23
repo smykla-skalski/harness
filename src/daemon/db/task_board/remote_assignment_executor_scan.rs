@@ -145,7 +145,7 @@ async fn select_canonical(
         .bind(limit)
         .fetch_all(transaction.as_mut())
         .await
-        .map_err(|error| scan_error(class, error))
+        .map_err(|error| scan_error(class, &error))
 }
 
 async fn select_after_cursor(
@@ -162,7 +162,7 @@ async fn select_after_cursor(
         .bind(limit)
         .fetch_all(transaction.as_mut())
         .await
-        .map_err(|error| scan_error(class, error))
+        .map_err(|error| scan_error(class, &error))
 }
 
 async fn select_through_cursor(
@@ -179,7 +179,7 @@ async fn select_through_cursor(
         .bind(limit)
         .fetch_all(transaction.as_mut())
         .await
-        .map_err(|error| scan_error(class, error))
+        .map_err(|error| scan_error(class, &error))
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -200,7 +200,7 @@ fn class_query(class: ScanClass, range: CursorRange) -> &'static str {
     }
 }
 
-fn scan_error(class: ScanClass, error: sqlx::Error) -> CliError {
+fn scan_error(class: ScanClass, error: &sqlx::Error) -> CliError {
     db_error(format!(
         "scan {} remote executor assignments: {error}",
         class.label()

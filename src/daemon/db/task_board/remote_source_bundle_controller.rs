@@ -36,7 +36,7 @@ impl AsyncDaemonDb {
             })?;
         let collisions =
             load_source_bundle_collisions_in_tx(&mut transaction, &request.offer).await?;
-        let result = exact_receipt(collisions, request, authenticated_principal)?;
+        let result = exact_receipt(&collisions, request, authenticated_principal)?;
         transaction
             .commit()
             .await
@@ -59,7 +59,7 @@ impl AsyncDaemonDb {
             .await?;
         let collisions =
             load_source_bundle_collisions_in_tx(&mut transaction, &request.offer).await?;
-        if exact_receipt(collisions, request, authenticated_principal)?.is_some() {
+        if exact_receipt(&collisions, request, authenticated_principal)?.is_some() {
             transaction.commit().await.map_err(|error| {
                 db_error(format!("commit replayed source upload authority: {error}"))
             })?;
@@ -108,7 +108,7 @@ impl AsyncDaemonDb {
             .await?;
         let collisions =
             load_source_bundle_collisions_in_tx(&mut transaction, &request.offer).await?;
-        if let Some(existing) = exact_receipt(collisions, request, authenticated_principal)? {
+        if let Some(existing) = exact_receipt(&collisions, request, authenticated_principal)? {
             if existing.response != *response {
                 return Err(concurrent(
                     "source upload response changed after immutable receipt storage",
@@ -193,11 +193,11 @@ impl AsyncDaemonDb {
 }
 
 fn exact_receipt(
-    collisions: Vec<TaskBoardRemoteSourceBundle>,
+    collisions: &[TaskBoardRemoteSourceBundle],
     request: &RemoteSourceBundleUploadRequest,
     principal: &str,
 ) -> Result<Option<TaskBoardRemoteSourceBundle>, CliError> {
-    match collisions.as_slice() {
+    match collisions {
         [] => Ok(None),
         [stored] if stored.is_exact_replay(request, principal) => Ok(Some(stored.clone())),
         _ => Err(concurrent(

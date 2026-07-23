@@ -1,8 +1,10 @@
+use super::super::remote_identity::REMOTE_AUDIT_EVENT_RETENTION_LIMIT;
 use super::*;
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 use crate::daemon::remote_identity::{
     RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteClientRegistration,
 };
+use rusqlite::params;
 
 #[test]
 fn remote_identity_tables_exist_in_current_schema() {
@@ -276,4 +278,58 @@ fn remote_audit_allowed_event_is_marked_failed_in_place() {
         rows[0].error_detail.as_deref(),
         Some("request timeout authorization=<redacted>")
     );
+}
+
+#[test]
+fn remote_audit_retention_prunes_oldest_rows_deterministically_after_restart() {
+    let temp = tempfile::tempdir().expect("create audit retention tempdir");
+    let path = temp.path().join("harness.db");
+    let retention_limit =
+        usize::try_from(REMOTE_AUDIT_EVENT_RETENTION_LIMIT).expect("retention limit fits usize");
+    drop(DaemonDb::open(&path).expect("initialize daemon database"));
+
+    let conn = Connection::open(&path).expect("open audit retention database");
+    let transaction = conn
+        .unchecked_transaction()
+        .expect("begin oversized audit seed transaction");
+    for index in 0..=retention_limit + 1 {
+        transaction
+            .execute(
+                "INSERT INTO remote_audit_events (
+                    event_id, recorded_at, request_id, client_id, route_or_method,
+                    scope, scope_decision, outcome, remote_addr, error_detail, metadata_json
+                 ) VALUES (?1, '2026-07-22T12:00:00Z', NULL, NULL, 'GET /v1/health',
+                           'read', 'denied', 'failure', NULL, NULL, '{}')",
+                params![format!("retention-{index:05}")],
+            )
+            .expect("seed oversized remote audit row");
+    }
+    transaction.commit().expect("commit oversized audit seed");
+    drop(conn);
+
+    let db = DaemonDb::open(&path).expect("reopen and prune remote audits");
+    let rows = db
+        .load_remote_audit_events(u32::try_from(retention_limit).expect("limit fits u32"))
+        .expect("load retained remote audits");
+    let newest_retained = format!("retention-{:05}", retention_limit + 1);
+    let oldest_retained = format!("retention-{:05}", 2);
+    assert_eq!(rows.len(), retention_limit);
+    assert_eq!(
+        rows.first().map(|row| row.event_id.as_str()),
+        Some(newest_retained.as_str())
+    );
+    assert_eq!(
+        rows.last().map(|row| row.event_id.as_str()),
+        Some(oldest_retained.as_str())
+    );
+    drop(db);
+
+    let reopened = DaemonDb::open(&path).expect("restart after remote audit prune");
+    let count: i64 = reopened
+        .connection()
+        .query_row("SELECT COUNT(*) FROM remote_audit_events", [], |row| {
+            row.get(0)
+        })
+        .expect("count retained remote audits after restart");
+    assert_eq!(count, REMOTE_AUDIT_EVENT_RETENTION_LIMIT);
 }

@@ -2,7 +2,7 @@ use serde_json::{Value, json};
 use tempfile::tempdir;
 
 use crate::daemon::http::RemoteRequestLimitConfig;
-use crate::daemon::http::remote_limits::DEFAULT_REMOTE_HTTP_BODY_LIMIT_BYTES;
+use crate::daemon::http::remote_limits::DEFAULT_REMOTE_NON_BULK_HTTP_BODY_LIMIT_BYTES;
 use crate::daemon::protocol::{http_paths, ws_methods};
 use crate::daemon::remote_auth::REMOTE_CLIENT_ID_HEADER;
 
@@ -80,7 +80,7 @@ async fn run_policy_transfer_dump_above_remote_body_limit() {
 }
 
 async fn run_policy_transfer_larger_remote_body() {
-    let configured_limit = DEFAULT_REMOTE_HTTP_BODY_LIMIT_BYTES + 256 * 1024;
+    let configured_limit = DEFAULT_REMOTE_NON_BULK_HTTP_BODY_LIMIT_BYTES + 256 * 1024;
     let state = remote_state_with_viewer_config(RemoteRequestLimitConfig {
         max_http_body_bytes: configured_limit,
         ..RemoteRequestLimitConfig::default()
@@ -98,7 +98,7 @@ async fn run_policy_transfer_larger_remote_body() {
         .header(REMOTE_CLIENT_ID_HEADER, "viewer")
         .bearer_auth(remote_token("viewer"))
         .json(&json!({
-            "padding": "x".repeat(DEFAULT_REMOTE_HTTP_BODY_LIMIT_BYTES + 1),
+            "padding": "x".repeat(DEFAULT_REMOTE_NON_BULK_HTTP_BODY_LIMIT_BYTES + 1),
         }))
         .send()
         .await

@@ -36,7 +36,7 @@ async fn todoist_create_recovery_replays_exact_persisted_request() {
         .expect("recover existing");
 
     assert_exact_provider_task(&created);
-    assert_eq!(recovered, ExternalCreateProbe::Found(created));
+    assert_eq!(recovered, ExternalCreateProbe::Found(Box::new(created)));
     assert_eq!(lease.renewals.load(Ordering::SeqCst), 2);
     handle.join().expect("mock server");
     let captured = captured.lock().expect("captured requests");

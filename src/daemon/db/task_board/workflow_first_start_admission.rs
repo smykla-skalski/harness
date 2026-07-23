@@ -66,10 +66,7 @@ pub(super) async fn revalidate_first_start_admission_in_tx(
             freeze_unconfigured_start_admission_in_tx(transaction, &intent_id).await?;
             Ok(TaskBoardFirstStartAdmission::Ready)
         }
-        admission => {
-            admission.ensure_allowed()?;
-            Ok(TaskBoardFirstStartAdmission::Ready)
-        }
+        TaskBoardAdmissionCheck::Allowed(_) => Ok(TaskBoardFirstStartAdmission::Ready),
     }
 }
 
@@ -114,7 +111,7 @@ async fn settle_blocked_first_start_in_tx(
         })
         .ok_or_else(|| db_error("blocked first-start attempt disappeared"))?;
     let mut combined = stopped.clone();
-    combined.attempts[index] = cancelled.clone();
+    combined.attempts[index].clone_from(&cancelled);
     validate_task_board_workflow_execution(&combined)
         .map_err(|error| db_error(format!("validate blocked first-start record: {error}")))?;
 

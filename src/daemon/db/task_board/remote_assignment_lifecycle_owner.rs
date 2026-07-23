@@ -275,14 +275,14 @@ fn lifecycle_owner_digest(
             .ok_or_else(|| db_error("remote lifecycle owner has no start receipt"))?
             .sha256
             .clone(),
-        required(&record.claimed_host_instance_id, "claimed host")?,
+        required(record.claimed_host_instance_id.as_ref(), "claimed host")?,
         record
             .executor_configuration_revision
             .ok_or_else(|| db_error("remote lifecycle owner has no executor revision"))?
             .to_string(),
-        required(&record.executor_checkout_path, "checkout")?,
-        required(&record.started_at, "start time")?,
-        required(&record.workspace_ref, "workspace")?,
+        required(record.executor_checkout_path.as_ref(), "checkout")?,
+        required(record.started_at.as_ref(), "start time")?,
+        required(record.workspace_ref.as_ref(), "workspace")?,
         identity.session_id,
         identity.run_id,
         owner_instance_id.into(),
@@ -298,8 +298,8 @@ fn lifecycle_owner_digest(
     Ok(hex::encode(hasher.finalize()))
 }
 
-fn required(value: &Option<String>, label: &str) -> Result<String, CliError> {
+fn required(value: Option<&String>, label: &str) -> Result<String, CliError> {
     value
-        .clone()
+        .cloned()
         .ok_or_else(|| db_error(format!("remote lifecycle owner has no {label}")))
 }

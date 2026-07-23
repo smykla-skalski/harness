@@ -180,9 +180,11 @@ async fn accept_remote_assignment(
                 &TaskBoardExecutionAttemptCas::from(&fixture.attempt),
                 &fixture.request,
                 &fixture.request.binding.host_id,
-                OFFERED_AT,
-                LEASE_EXPIRES_AT,
-                &fixture.request.deadline_at,
+                crate::daemon::db::TaskBoardRemoteOfferWindow::new(
+                    OFFERED_AT,
+                    LEASE_EXPIRES_AT,
+                    &fixture.request.deadline_at,
+                ),
             )
             .await
             .expect("offer terminal cleanup assignment"),

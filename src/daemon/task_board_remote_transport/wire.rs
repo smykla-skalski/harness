@@ -10,10 +10,10 @@ use crate::task_board::{
     normalize_repository_slug,
 };
 
+#[cfg(test)]
+pub(crate) use super::wire_artifacts::MAX_REMOTE_ARTIFACT_BYTES;
 pub(super) use super::wire_artifacts::valid_artifact_path;
-pub(crate) use super::wire_artifacts::{
-    MAX_REMOTE_ARTIFACT_BYTES, RemoteArtifactEntry, RemoteArtifactManifest,
-};
+pub(crate) use super::wire_artifacts::{RemoteArtifactEntry, RemoteArtifactManifest};
 
 pub(crate) use super::wire_host::{
     RemoteHeartbeatRequest, RemoteHeartbeatResponse, RemoteHostAdvertisement,
@@ -25,7 +25,9 @@ pub(crate) use super::wire_lifecycle::{
     RemoteArtifactFetchRequest, RemoteArtifactFetchResponse, RemoteCancelRequest,
     RemoteCancelResponse, RemoteSettledRequest, RemoteSettledResponse,
 };
-pub(crate) use super::wire_result::{MAX_REMOTE_TYPED_RESULT_BYTES, RemoteTypedResult};
+#[cfg(test)]
+pub(crate) use super::wire_result::MAX_REMOTE_TYPED_RESULT_BYTES;
+pub(crate) use super::wire_result::RemoteTypedResult;
 pub(crate) use super::wire_source::{RemoteRepositorySelector, RemoteSourceMaterial};
 pub(crate) use super::wire_source_bundle::{
     RemoteSourceBundleUploadRequest, RemoteSourceBundleUploadResponse,

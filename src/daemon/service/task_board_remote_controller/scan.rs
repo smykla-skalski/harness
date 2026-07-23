@@ -33,7 +33,7 @@ pub(super) async fn progress_existing_assignments(
                 continue;
             }
         };
-        let result = progress_assignment(db, item.assignment.clone()).await;
+        let result = Box::pin(progress_assignment(db, item.assignment.clone())).await;
         finish_progress_attempt(db, &item, result, report).await?;
         if !report.scan_incomplete {
             return Ok(());
@@ -52,6 +52,7 @@ pub(super) async fn finish_progress_attempt(
         Ok(changed) => {
             db.clear_task_board_remote_controller_progression_quarantine(item)
                 .await?;
+            report.verified_assignments += 1;
             if changed {
                 report.progressed_assignments += 1;
             }

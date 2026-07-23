@@ -123,13 +123,18 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         recovery_snapshot: Arc::default(),
     };
     if let Some(async_db) = app_state.async_db.get() {
-        recover_remote_assignments_at_startup_with_controller(&app_state, async_db).await?;
-    }
-    app_state
-        .codex_controller
-        .reconcile_task_board_admission_workers_after_restart()
+        Box::pin(recover_remote_assignments_at_startup_with_controller(
+            &app_state, async_db,
+        ))
         .await?;
-    let _background = spawn_background_tasks(&app_state, config.poll_interval, shutdown_rx.clone());
+    }
+    Box::pin(
+        app_state
+            .codex_controller
+            .reconcile_task_board_admission_workers_after_restart(),
+    )
+    .await?;
+    let _background = spawn_background_tasks(&app_state, config.poll_interval, &shutdown_rx);
 
     let serve_result = http::serve(listener, app_state, shutdown_rx).await;
     audit::record_daemon_stopped(async_db_slot_for_audit.get(), &serve_result).await;

@@ -153,7 +153,10 @@ async fn moderation_status_maps_to_moderation() {
         Ok(_) => panic!("expected error"),
         Err(err) => err,
     };
-    assert!(matches!(err, OpenRouterError::Moderation { .. }), "got {err:?}");
+    assert!(
+        matches!(err, OpenRouterError::Moderation { .. }),
+        "got {err:?}"
+    );
 }
 
 #[tokio::test]

@@ -86,9 +86,11 @@ async fn central_offer_at(
             &TaskBoardExecutionAttemptCas::from(&fixture.attempt),
             &fixture.request,
             HOST_ID,
-            &offered_at,
-            &initial_expiry,
-            &fixture.request.deadline_at,
+            crate::daemon::db::TaskBoardRemoteOfferWindow::new(
+                &offered_at,
+                &initial_expiry,
+                &fixture.request.deadline_at,
+            ),
         )
         .await
         .expect("persist central authority offer");

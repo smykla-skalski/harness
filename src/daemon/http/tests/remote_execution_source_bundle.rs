@@ -1,6 +1,13 @@
+use serde::Serialize;
 use sha2::{Digest as _, Sha256};
 
 use super::*;
+use crate::daemon::http::RemoteRequestLimits;
+use crate::daemon::remote_auth::REMOTE_CLIENT_ID_HEADER;
+use crate::daemon::task_board_remote_transport::routes::{
+    DEFAULT_EXECUTION_HTTP_BODY_LIMIT_BYTES, HEARTBEAT_PATH, SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES,
+    SOURCE_BUNDLE_RECEIPT_PATH,
+};
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest,
 };
@@ -10,17 +17,7 @@ const BUNDLE_RESULT: &str = "2222222222222222222222222222222222222222";
 
 #[tokio::test]
 async fn source_bundle_route_is_authenticated_durable_and_required_before_offer() {
-    let mut state = remote_executor_state().await;
-    let mut limits = state
-        .remote_request_limits
-        .as_ref()
-        .expect("remote limits")
-        .config();
-    limits.max_http_body_bytes = 6 * 1024 * 1024;
-    state.remote_request_limits = Some(
-        crate::daemon::http::RemoteRequestLimits::new(limits)
-            .expect("expanded source upload limit"),
-    );
+    let state = remote_executor_state().await;
     let db = state.async_db.get().expect("async db").clone();
     let (base_url, server) = serve(state).await;
     let client = Client::new();
@@ -76,6 +73,87 @@ async fn source_bundle_route_is_authenticated_durable_and_required_before_offer(
     let _ = server.await;
 }
 
+#[tokio::test]
+async fn remote_source_bundle_limits_reach_source_routes_without_widening_other_routes() {
+    let state = remote_executor_state().await;
+    let (base_url, server) = serve(state).await;
+    let client = Client::new();
+    let content = b"source bundle route boundary";
+    let offer = bundle_offer(content);
+    let upload = RemoteSourceBundleUploadRequest::seal(offer, content).expect("seal source upload");
+
+    let uploaded = authenticated_json_bytes(
+        &client,
+        &base_url,
+        SOURCE_BUNDLE_PATH,
+        HOST_ID,
+        serialized_json_at_limit(&upload, SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES),
+    )
+    .await;
+    assert_eq!(uploaded.status(), StatusCode::OK);
+
+    let receipt = authenticated_json_bytes(
+        &client,
+        &base_url,
+        SOURCE_BUNDLE_RECEIPT_PATH,
+        HOST_ID,
+        serialized_json_at_limit(&upload, SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES),
+    )
+    .await;
+    assert_eq!(receipt.status(), StatusCode::OK);
+
+    let oversized_source = authenticated_json_bytes(
+        &client,
+        &base_url,
+        SOURCE_BUNDLE_PATH,
+        HOST_ID,
+        serialized_json_at_limit(&upload, SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES + 1),
+    )
+    .await;
+    assert_eq!(oversized_source.status(), StatusCode::PAYLOAD_TOO_LARGE);
+
+    let oversized_heartbeat = authenticated_json_bytes(
+        &client,
+        &base_url,
+        HEARTBEAT_PATH,
+        HOST_ID,
+        vec![b'x'; DEFAULT_EXECUTION_HTTP_BODY_LIMIT_BYTES + 1],
+    )
+    .await;
+    assert_eq!(oversized_heartbeat.status(), StatusCode::PAYLOAD_TOO_LARGE);
+
+    server.abort();
+    let _ = server.await;
+}
+
+#[tokio::test]
+async fn remote_source_bundle_route_honors_a_lower_operator_body_ceiling() {
+    let configured_limit = 512;
+    assert!(configured_limit < SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES);
+    let mut state = remote_executor_state().await;
+    let mut limits = state
+        .remote_request_limits
+        .as_ref()
+        .expect("remote limits")
+        .config();
+    limits.max_http_body_bytes = configured_limit;
+    state.remote_request_limits =
+        Some(RemoteRequestLimits::new(limits).expect("lower source upload operator limit"));
+    let (base_url, server) = serve(state).await;
+    let response = authenticated_json_bytes(
+        &Client::new(),
+        &base_url,
+        SOURCE_BUNDLE_PATH,
+        HOST_ID,
+        vec![b'x'; configured_limit + 1],
+    )
+    .await;
+
+    server.abort();
+    let _ = server.await;
+    assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+}
+
 fn bundle_offer(content: &[u8]) -> RemoteOfferRequest {
     let bundle = RemoteArtifactEntry {
         relative_path: "source/prior-phase.bundle".into(),
@@ -98,4 +176,29 @@ fn bundle_offer(content: &[u8]) -> RemoteOfferRequest {
     };
     offer.request_sha256.clear();
     offer.seal().expect("seal bundle route offer")
+}
+
+fn serialized_json_at_limit<T: Serialize>(value: &T, limit: usize) -> Vec<u8> {
+    let mut body = serde_json::to_vec(value).expect("serialize route body");
+    assert!(body.len() <= limit, "valid route body exceeds its limit");
+    body.resize(limit, b' ');
+    body
+}
+
+async fn authenticated_json_bytes(
+    client: &Client,
+    base_url: &str,
+    path: &str,
+    client_id: &str,
+    body: Vec<u8>,
+) -> reqwest::Response {
+    client
+        .post(format!("{base_url}{path}"))
+        .header(REMOTE_CLIENT_ID_HEADER, client_id)
+        .bearer_auth(token(client_id))
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .body(body)
+        .send()
+        .await
+        .expect("send authenticated remote executor body")
 }

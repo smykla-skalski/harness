@@ -8,10 +8,10 @@ fn environment_credentials_are_resolved_per_call_and_redacted() {
         "HARNESS_REMOTE_EXECUTOR_TEST_TOKEN",
         Some("first-secret"),
         || {
-            let resolver = RemoteExecutionCredentialResolver;
-            let first = resolver
-                .resolve("env://HARNESS_REMOTE_EXECUTOR_TEST_TOKEN")
-                .expect("first credential");
+            let first = RemoteExecutionCredentialResolver::resolve(
+                "env://HARNESS_REMOTE_EXECUTOR_TEST_TOKEN",
+            )
+            .expect("first credential");
             assert_eq!(first.expose(), "first-secret");
             assert!(!format!("{first:?}").contains("first-secret"));
 
@@ -19,9 +19,10 @@ fn environment_credentials_are_resolved_per_call_and_redacted() {
                 "HARNESS_REMOTE_EXECUTOR_TEST_TOKEN",
                 Some("rotated-secret"),
                 || {
-                    let rotated = resolver
-                        .resolve("env://HARNESS_REMOTE_EXECUTOR_TEST_TOKEN")
-                        .expect("rotated credential");
+                    let rotated = RemoteExecutionCredentialResolver::resolve(
+                        "env://HARNESS_REMOTE_EXECUTOR_TEST_TOKEN",
+                    )
+                    .expect("rotated credential");
                     assert_eq!(rotated.expose(), "rotated-secret");
                 },
             );
@@ -63,9 +64,10 @@ fn credential_errors_never_include_secret_values() {
         "HARNESS_REMOTE_EXECUTOR_BAD_TOKEN",
         Some("secret with whitespace"),
         || {
-            let error = RemoteExecutionCredentialResolver
-                .resolve("env://HARNESS_REMOTE_EXECUTOR_BAD_TOKEN")
-                .expect_err("whitespace credential denied");
+            let error = RemoteExecutionCredentialResolver::resolve(
+                "env://HARNESS_REMOTE_EXECUTOR_BAD_TOKEN",
+            )
+            .expect_err("whitespace credential denied");
             assert_eq!(error, RemoteExecutionCredentialError::InvalidCredential);
             assert!(!error.to_string().contains("secret with whitespace"));
             assert!(!format!("{error:?}").contains("secret with whitespace"));

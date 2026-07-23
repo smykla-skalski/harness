@@ -47,7 +47,7 @@ impl AsyncDaemonDb {
             ..TaskBoardRemoteRecoveryBatch::default()
         };
         for candidate in due {
-            match self.recover_one_remote_assignment(&candidate, now).await {
+            match Box::pin(self.recover_one_remote_assignment(&candidate, now)).await {
                 Ok(Some(assignment)) => batch.recovered.push(assignment),
                 Ok(None) => {}
                 Err(error) => {
@@ -167,7 +167,7 @@ impl AsyncDaemonDb {
             })?;
             return Ok(None);
         };
-        let changed = match recover_one(&mut transaction, &row, now).await {
+        let changed = match Box::pin(recover_one(&mut transaction, &row, now)).await {
             Ok(changed) => changed,
             Err(error) => {
                 transaction.rollback().await.map_err(|rollback| {
@@ -331,7 +331,12 @@ async fn recover_one(
         {
             abandon_controller_operation_trust_in_tx(transaction, &assignment).await?;
         }
-        return recover_controller_remote_assignment_in_tx(transaction, &assignment, now).await;
+        return Box::pin(recover_controller_remote_assignment_in_tx(
+            transaction,
+            &assignment,
+            now,
+        ))
+        .await;
     }
     mark_outcome_unknown(transaction, row, now).await
 }

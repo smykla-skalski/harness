@@ -27,6 +27,9 @@ pub(crate) use start_io_permit::{
     executor_start_io_permit,
 };
 
+pub(crate) const EXECUTOR_RESTARTED_BEFORE_START: &str =
+    "remote executor restarted before worker start";
+
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
 use super::remote_assignment_lease::{commit_noop, finish_mutation, require_assignment};
@@ -241,10 +244,12 @@ impl AsyncDaemonDb {
             &record,
             permit,
             &receipt,
-            started_at,
-            owner_instance_id,
-            owner_at,
-            &owner_expires_at,
+            start_adoption::TaskBoardRemoteStartAdoptionContext {
+                started_at,
+                owner_instance_id,
+                owner_at,
+                owner_expires_at: &owner_expires_at,
+            },
         )
         .await?;
         finish_mutation(

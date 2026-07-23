@@ -115,9 +115,7 @@ async fn persist_source_owned_offer(prepared: &PreparedRemoteOffer) -> RemoteOff
                 &offer,
                 Some(&content),
                 HOST,
-                NOW,
-                LEASE_EXPIRES,
-                DEADLINE,
+                crate::daemon::db::TaskBoardRemoteOfferWindow::new(NOW, LEASE_EXPIRES, DEADLINE,),
             )
             .await
             .expect("persist source-owned offer"),

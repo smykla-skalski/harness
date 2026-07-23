@@ -5,7 +5,7 @@ use sqlx::{Sqlite, Transaction, query, query_scalar};
 use super::{
     TaskBoardRemoteExecutorIdentity, TaskBoardRemoteExecutorStartAuthority,
     executor_settings_still_match, executor_start_authority, executor_start_io_permit,
-    start_authority_eligible,
+    remote_executor_identity, start_authority_eligible,
 };
 use crate::daemon::db::task_board::remote_assignment_lease::{
     commit_noop, finish_mutation, require_assignment,
@@ -14,9 +14,10 @@ use crate::daemon::db::task_board::remote_assignment_model::{
     TaskBoardRemoteMutationOutcome, canonical_time, concurrent, nonblank, to_i64,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
+use crate::task_board::TaskBoardRemoteAssignmentState;
 
 const SETTINGS_CHANGED_BEFORE_START: &str = "remote executor settings changed before worker start";
-const EXECUTOR_RESTARTED_BEFORE_START: &str = "remote executor restarted before worker start";
+use super::EXECUTOR_RESTARTED_BEFORE_START;
 
 pub(crate) async fn refuse_settings_replacement_during_executor_start_io(
     transaction: &mut Transaction<'_, Sqlite>,
@@ -268,21 +269,110 @@ impl AsyncDaemonDb {
         )
         .await
     }
+
+    pub(crate) async fn abandon_task_board_remote_executor_claim_after_restart(
+        &self,
+        assignment_id: &str,
+        identity: &TaskBoardRemoteExecutorIdentity,
+        successor_instance_id: &str,
+        observed_at: &str,
+    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
+        nonblank(successor_instance_id, "remote executor successor instance")?;
+        canonical_time(observed_at, "remote executor predecessor claim time")?;
+        let mut transaction = self
+            .begin_immediate_transaction("task board remote predecessor claim cleanup")
+            .await?;
+        let record = require_assignment(&mut transaction, assignment_id).await?;
+        let exact_empty_claim = record.state == TaskBoardRemoteAssignmentState::Claimed
+            && record.target_host_instance_id == record.claimed_host_instance_id
+            && record.claimed_host_instance_id.as_deref() != Some(successor_instance_id)
+            && record.claim_receipt.is_some()
+            && record.lease_id.is_some()
+            && record.claimed_at.is_some()
+            && remote_executor_identity(&record)? == *identity
+            && executor_start_authority(&record)?.is_none()
+            && executor_start_io_permit(&record)?.is_none()
+            && record.start_receipt.is_none()
+            && record.executor_lifecycle_owner.is_none()
+            && record.executor_stop_pending.is_none()
+            && record.workspace_ref.is_none()
+            && record.started_at.is_none();
+        if !exact_empty_claim {
+            commit_noop(transaction, "stale remote predecessor claim cleanup").await?;
+            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
+        }
+        require_empty_executor_identity(&mut transaction, identity).await?;
+        let claim_receipt = record
+            .claim_receipt
+            .as_ref()
+            .expect("validated claim receipt");
+        let rows = query(
+            "UPDATE task_board_remote_assignments
+             SET state = 'unknown', error = ?2, updated_at = ?3
+             WHERE assignment_id = ?1 AND fencing_epoch = ?4 AND state = 'claimed'
+               AND claimed_host_instance_id != ?5
+               AND target_host_instance_id = claimed_host_instance_id
+               AND claim_receipt_sha256 = ?6 AND lease_id = ?7 AND claimed_at = ?8
+               AND executor_start_authority_sha256 IS NULL
+               AND executor_start_authority_at IS NULL
+               AND executor_start_io_permit_sha256 IS NULL
+               AND executor_start_io_permit_at IS NULL
+               AND executor_start_receipt_json IS NULL
+               AND executor_start_receipt_sha256 IS NULL
+               AND executor_lifecycle_owner_sha256 IS NULL
+               AND executor_stop_pending_sha256 IS NULL
+               AND workspace_ref IS NULL AND started_at IS NULL
+               AND NOT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?9)
+               AND NOT EXISTS(SELECT 1 FROM sessions WHERE session_id = ?10)",
+        )
+        .bind(&record.assignment_id)
+        .bind(EXECUTOR_RESTARTED_BEFORE_START)
+        .bind(observed_at)
+        .bind(to_i64(record.fencing_epoch, "assignment fencing epoch")?)
+        .bind(successor_instance_id)
+        .bind(&claim_receipt.sha256)
+        .bind(record.lease_id.as_deref().expect("validated claim lease"))
+        .bind(record.claimed_at.as_deref().expect("validated claim time"))
+        .bind(&identity.run_id)
+        .bind(&identity.session_id)
+        .execute(transaction.as_mut())
+        .await
+        .map_err(|error| db_error(format!("abandon predecessor executor claim: {error}")))?
+        .rows_affected();
+        if rows != 1 {
+            return Err(concurrent(
+                "remote predecessor claim cleanup lost its fence",
+            ));
+        }
+        finish_mutation(
+            transaction,
+            &record.assignment_id,
+            "remote predecessor claim cleanup",
+        )
+        .await
+    }
 }
 
 async fn require_empty_provisioning(
     transaction: &mut Transaction<'_, Sqlite>,
     authority: &TaskBoardRemoteExecutorStartAuthority,
 ) -> Result<(), CliError> {
+    require_empty_executor_identity(transaction, &authority.identity).await
+}
+
+async fn require_empty_executor_identity(
+    transaction: &mut Transaction<'_, Sqlite>,
+    identity: &TaskBoardRemoteExecutorIdentity,
+) -> Result<(), CliError> {
     let run_exists =
         query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?1)")
-            .bind(&authority.identity.run_id)
+            .bind(&identity.run_id)
             .fetch_one(transaction.as_mut())
             .await
             .map_err(|error| db_error(format!("check pre-Start executor run: {error}")))?;
     let session_exists =
         query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM sessions WHERE session_id = ?1)")
-            .bind(&authority.identity.session_id)
+            .bind(&identity.session_id)
             .fetch_one(transaction.as_mut())
             .await
             .map_err(|error| db_error(format!("check pre-Start executor session: {error}")))?;

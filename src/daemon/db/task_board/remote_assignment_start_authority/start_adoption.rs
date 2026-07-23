@@ -9,28 +9,32 @@ use super::TaskBoardRemoteExecutorStartIoPermit;
 use crate::daemon::db::{CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 
+pub(super) struct TaskBoardRemoteStartAdoptionContext<'a> {
+    pub(super) started_at: &'a str,
+    pub(super) owner_instance_id: &'a str,
+    pub(super) owner_at: &'a str,
+    pub(super) owner_expires_at: &'a str,
+}
+
 pub(super) async fn persist_start_adoption_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     record: &TaskBoardRemoteAssignmentRecord,
     permit: &TaskBoardRemoteExecutorStartIoPermit,
     receipt: &TaskBoardRemoteExecutorStartReceipt,
-    started_at: &str,
-    owner_instance_id: &str,
-    owner_at: &str,
-    owner_expires_at: &str,
+    context: TaskBoardRemoteStartAdoptionContext<'_>,
 ) -> Result<(), CliError> {
     let mut adopted = record.clone();
     adopted.state = TaskBoardRemoteAssignmentState::Started;
-    adopted.started_at = Some(started_at.into());
-    adopted.heartbeat_at = Some(started_at.into());
+    adopted.started_at = Some(context.started_at.into());
+    adopted.heartbeat_at = Some(context.started_at.into());
     adopted.workspace_ref = Some(permit.identity.workspace_ref.clone());
     adopted.executor_start_authority_sha256 = None;
     adopted.executor_start_authority_at = None;
     adopted.executor_start_io_permit_sha256 = None;
     adopted.executor_start_io_permit_at = None;
     adopted.start_receipt = Some(receipt.clone());
-    let owner = lifecycle_owner(&adopted, owner_instance_id, 1, owner_at)?;
-    if owner.expires_at != owner_expires_at {
+    let owner = lifecycle_owner(&adopted, context.owner_instance_id, 1, context.owner_at)?;
+    if owner.expires_at != context.owner_expires_at {
         return Err(db_error("remote executor initial owner expiry diverged"));
     }
     let (receipt_json, receipt_sha256) = start_receipt_values(receipt)?;
@@ -57,7 +61,7 @@ pub(super) async fn persist_start_adoption_in_tx(
            AND executor_stop_pending_sha256 IS NULL",
     )
     .bind(&record.assignment_id)
-    .bind(started_at)
+    .bind(context.started_at)
     .bind(&permit.identity.workspace_ref)
     .bind(to_i64(record.fencing_epoch, "assignment fencing epoch")?)
     .bind(&permit.authority.sha256)

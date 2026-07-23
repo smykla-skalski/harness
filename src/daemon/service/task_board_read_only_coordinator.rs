@@ -116,7 +116,7 @@ async fn reconcile_candidate<R>(
         return;
     }
     report.processed += 1;
-    if let Err(error) = attempts::reconcile_execution(db, runtime, execution, now).await {
+    if let Err(error) = Box::pin(attempts::reconcile_execution(db, runtime, execution, now)).await {
         report
             .failures
             .push(format!("execution '{execution_id}' failed: {error}"));

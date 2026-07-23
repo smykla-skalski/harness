@@ -2,7 +2,7 @@ use sqlx::query_scalar;
 use tempfile::tempdir;
 
 use super::{run, shape_needs_repair};
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+use crate::daemon::db::{AsyncDaemonDb, DaemonDb, SCHEMA_VERSION};
 
 #[test]
 fn fresh_schema_includes_v44_lane_ordering() {
@@ -20,11 +20,11 @@ fn fresh_schema_includes_v44_lane_ordering() {
         .expect("inspect fresh lane columns");
 
     assert_eq!(columns, 5);
-    assert_eq!(db.schema_version().expect("schema version"), "44");
+    assert_eq!(db.schema_version().expect("schema version"), SCHEMA_VERSION);
 }
 
 #[test]
-fn v43_database_migrates_to_v44_and_restarts() {
+fn v43_database_migrates_through_lane_v44_to_current_and_restarts() {
     let directory = tempdir().expect("tempdir");
     let path = directory.path().join("harness.db");
     let db = DaemonDb::open(&path).expect("open current database");
@@ -45,15 +45,21 @@ fn v43_database_migrates_to_v44_and_restarts() {
     drop(db);
 
     let reopened = DaemonDb::open(&path).expect("migrate v43 database");
-    assert_eq!(reopened.schema_version().expect("schema version"), "44");
+    assert_eq!(
+        reopened.schema_version().expect("schema version"),
+        SCHEMA_VERSION
+    );
     drop(reopened);
 
     let restarted = DaemonDb::open(&path).expect("restart migrated database");
-    assert_eq!(restarted.schema_version().expect("schema version"), "44");
+    assert_eq!(
+        restarted.schema_version().expect("schema version"),
+        SCHEMA_VERSION
+    );
 }
 
 #[tokio::test]
-async fn async_upgrade_records_remote_v43_then_lane_v44_migrations() {
+async fn async_upgrade_records_remote_v43_lane_v44_and_integrity_v45_migrations() {
     let directory = tempdir().expect("tempdir");
     let path = directory.path().join("harness.db");
     let db = DaemonDb::open(&path).expect("open current remote v43 database");
@@ -79,15 +85,15 @@ async fn async_upgrade_records_remote_v43_then_lane_v44_migrations() {
 
     assert_eq!(
         async_db.schema_version().await.expect("schema version"),
-        "44"
+        SCHEMA_VERSION
     );
     let migrations: Vec<i64> = query_scalar(
-        "SELECT version FROM _sqlx_migrations WHERE version IN (37, 38) ORDER BY version",
+        "SELECT version FROM _sqlx_migrations WHERE version IN (37, 38, 39) ORDER BY version",
     )
     .fetch_all(async_db.pool())
     .await
     .expect("read migration ledger");
-    assert_eq!(migrations, vec![37, 38]);
+    assert_eq!(migrations, vec![37, 38, 39]);
 }
 
 #[test]

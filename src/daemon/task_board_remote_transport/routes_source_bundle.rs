@@ -15,7 +15,7 @@ pub(super) async fn verify_source_bundle_receipt(
 ) -> Response {
     map_route_result(
         async {
-            request.validate().map_err(wire_error)?;
+            request.validate().map_err(|error| wire_error(&error))?;
             let (db, principal) = assignment_route(
                 &headers,
                 &state,
@@ -42,7 +42,7 @@ pub(super) async fn abandon_source_bundle(
 ) -> Response {
     map_route_result(
         async {
-            request.validate().map_err(wire_error)?;
+            request.validate().map_err(|error| wire_error(&error))?;
             let (db, principal) = assignment_route(
                 &headers,
                 &state,

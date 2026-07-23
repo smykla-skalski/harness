@@ -57,7 +57,7 @@ impl AsyncDaemonDb {
         offered_at: &str,
         lease_expires_at: &str,
     ) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
-        self.reassign_task_board_remote_source_bundle_offer(
+        Box::pin(self.reassign_task_board_remote_source_bundle_offer(
             expected_execution,
             expected_attempt,
             SourceReassignmentEvidence::Abandonment {
@@ -69,7 +69,7 @@ impl AsyncDaemonDb {
             trust,
             offered_at,
             lease_expires_at,
-        )
+        ))
         .await
     }
 
@@ -108,13 +108,13 @@ impl AsyncDaemonDb {
             replacement.binding.fencing_epoch,
         )
         .await?;
-        if let Some(replayed) = replayed_replacement_in_tx(
+        if let Some(replayed) = Box::pin(replayed_replacement_in_tx(
             &mut transaction,
             evidence,
             replacement,
             authenticated_principal,
             trust,
-        )
+        ))
         .await?
         {
             transaction.commit().await.map_err(|error| {
@@ -151,14 +151,16 @@ impl AsyncDaemonDb {
             capture_lifecycle_trust_for_offer_in_tx(&mut transaction, replacement).await?;
         let created = persist_reassigned_offer_in_tx(
             &mut transaction,
-            &predecessor,
-            &parent,
-            replacement,
-            authenticated_principal,
-            &source_content,
-            offered_at,
-            lease_expires_at,
-            &lifecycle_trust,
+            PersistReassignedOfferInput {
+                predecessor: &predecessor,
+                parent: &parent,
+                replacement,
+                authenticated_principal,
+                source_content: &source_content,
+                offered_at,
+                lease_expires_at,
+                lifecycle_trust: &lifecycle_trust,
+            },
         )
         .await?;
         transaction.commit().await.map_err(|error| {
@@ -168,51 +170,60 @@ impl AsyncDaemonDb {
     }
 }
 
+struct PersistReassignedOfferInput<'a> {
+    predecessor: &'a TaskBoardRemoteAssignmentRecord,
+    parent: &'a TaskBoardWorkflowExecutionRecord,
+    replacement: &'a RemoteOfferRequest,
+    authenticated_principal: &'a str,
+    source_content: &'a [u8],
+    offered_at: &'a str,
+    lease_expires_at: &'a str,
+    lifecycle_trust: &'a TaskBoardRemoteLifecycleTrustSnapshot,
+}
+
 async fn persist_reassigned_offer_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
-    predecessor: &TaskBoardRemoteAssignmentRecord,
-    parent: &TaskBoardWorkflowExecutionRecord,
-    replacement: &RemoteOfferRequest,
-    authenticated_principal: &str,
-    source_content: &[u8],
-    offered_at: &str,
-    lease_expires_at: &str,
-    lifecycle_trust: &TaskBoardRemoteLifecycleTrustSnapshot,
+    input: PersistReassignedOfferInput<'_>,
 ) -> Result<TaskBoardRemoteAssignmentRecord, CliError> {
-    let updated = replacement_parent(parent, replacement, offered_at)?;
-    validate_task_board_remote_target_reassignment(parent, &updated)
+    let updated = replacement_parent(input.parent, input.replacement, input.offered_at)?;
+    validate_task_board_remote_target_reassignment(input.parent, &updated)
         .map_err(|error| db_error(format!("validate remote source reassignment: {error}")))?;
-    supersede_predecessor_in_tx(transaction, predecessor, offered_at).await?;
+    supersede_predecessor_in_tx(transaction, input.predecessor, input.offered_at).await?;
     update_execution_in_tx(
         transaction,
-        &TaskBoardWorkflowExecutionCas::from(parent),
+        &TaskBoardWorkflowExecutionCas::from(input.parent),
         &updated,
     )
     .await?;
     insert_assignment_in_tx(
         transaction,
-        replacement,
-        authenticated_principal,
-        offered_at,
+        input.replacement,
+        input.authenticated_principal,
+        input.offered_at,
         None,
-        lease_expires_at,
-        &replacement.deadline_at,
+        input.lease_expires_at,
+        &input.replacement.deadline_at,
         None,
         None,
-        Some(lifecycle_trust),
+        Some(input.lifecycle_trust),
     )
     .await?;
-    persist_outbound_source_in_tx(transaction, replacement, Some(source_content), offered_at)
-        .await?;
-    let created = load_assignment_in_tx(transaction, &replacement.binding.assignment_id)
+    persist_outbound_source_in_tx(
+        transaction,
+        input.replacement,
+        Some(input.source_content),
+        input.offered_at,
+    )
+    .await?;
+    let created = load_assignment_in_tx(transaction, &input.replacement.binding.assignment_id)
         .await?
         .ok_or_else(|| db_error("replacement remote source offer disappeared"))?;
     record_controller_reassignment_handoff_in_tx(
         transaction,
-        predecessor,
+        input.predecessor,
         &created,
         &updated,
-        offered_at,
+        input.offered_at,
     )
     .await?;
     bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
@@ -328,14 +339,20 @@ fn validate_replacement(
 ) -> Result<(), CliError> {
     let old = predecessor.require_offer()?;
     let mut expected_binding = old.binding.clone();
-    expected_binding.assignment_id = replacement.binding.assignment_id.clone();
-    expected_binding.host_instance_id = trust.observed_host_instance_id.clone();
+    expected_binding
+        .assignment_id
+        .clone_from(&replacement.binding.assignment_id);
+    expected_binding
+        .host_instance_id
+        .clone_from(&trust.observed_host_instance_id);
     expected_binding.fencing_epoch = old
         .binding
         .fencing_epoch
         .checked_add(1)
         .ok_or_else(|| db_error("remote source reassignment epoch overflow"))?;
-    expected_binding.execution_record_sha256 = expected_execution.record_sha256.clone();
+    expected_binding
+        .execution_record_sha256
+        .clone_from(&expected_execution.record_sha256);
     let exact = replacement.binding == expected_binding
         && replacement.binding.assignment_id != old.binding.assignment_id
         && replacement.lease_seconds == old.lease_seconds

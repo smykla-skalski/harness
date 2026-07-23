@@ -123,9 +123,7 @@ async fn tampered_launch_contract_is_rejected_before_remote_persistence() {
                 &crate::task_board::TaskBoardExecutionAttemptCas::from(&fixture.attempt),
                 &request,
                 HOST,
-                NOW,
-                LEASE_EXPIRES,
-                DEADLINE,
+                crate::daemon::db::TaskBoardRemoteOfferWindow::new(NOW, LEASE_EXPIRES, DEADLINE),
             )
             .await
             .expect_err("tampered launch must fail before offer persistence");
@@ -192,9 +190,7 @@ async fn wrong_base_or_head_is_rejected_before_assignment_or_target_mutation() {
                 &crate::task_board::TaskBoardExecutionAttemptCas::from(&fixture.attempt),
                 &request,
                 HOST,
-                NOW,
-                LEASE_EXPIRES,
-                DEADLINE,
+                crate::daemon::db::TaskBoardRemoteOfferWindow::new(NOW, LEASE_EXPIRES, DEADLINE),
             )
             .await
             .expect_err("wrong revision evidence must fail");

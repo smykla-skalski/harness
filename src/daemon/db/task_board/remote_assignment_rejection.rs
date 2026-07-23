@@ -79,7 +79,13 @@ pub(super) async fn apply_rejected_offer(
     )
     .await?;
     clear_offer_io_authority_in_tx(&mut transaction, &record, observed_at).await?;
-    apply_unclaimable_offer(transaction, record, reason, observed_at).await
+    Box::pin(apply_unclaimable_offer(
+        transaction,
+        record,
+        reason,
+        observed_at,
+    ))
+    .await
 }
 
 pub(super) async fn apply_unclaimable_offer(

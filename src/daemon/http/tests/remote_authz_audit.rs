@@ -24,6 +24,8 @@ use crate::daemon::remote_identity::{
 
 use super::test_http_state_with_db;
 
+mod rate_limit;
+
 #[tokio::test]
 async fn remote_authorization_audit_records_http_allow_and_deny() {
     let state = remote_state_with_viewer();

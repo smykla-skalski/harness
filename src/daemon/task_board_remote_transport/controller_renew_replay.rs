@@ -52,15 +52,16 @@ impl RemoteExecutionControllerClient {
         };
         let settled_at = self.clock.now();
         let trust = self.current_stable_host_trust_for_replay(db).await?;
-        let outcome = db
-            .record_pending_task_board_remote_assignment_lease_renewal_replay(
+        let outcome = Box::pin(
+            db.record_pending_task_board_remote_assignment_lease_renewal_replay(
                 request,
                 &response,
                 &self.host_id,
                 &settled_at,
                 &trust,
-            )
-            .await?;
+            ),
+        )
+        .await?;
         Ok((response, outcome))
     }
 }

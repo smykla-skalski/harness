@@ -114,9 +114,7 @@ pub(super) async fn offer_controller(fixture: &ControllerFixture) -> TaskBoardRe
             &crate::task_board::TaskBoardExecutionAttemptCas::from(&fixture.attempt),
             &fixture.request,
             HOST,
-            NOW,
-            LEASE_EXPIRES,
-            DEADLINE,
+            crate::daemon::db::TaskBoardRemoteOfferWindow::new(NOW, LEASE_EXPIRES, DEADLINE),
         )
         .await
         .expect("offer controller assignment")
@@ -130,6 +128,8 @@ pub(crate) struct ExecutorFixture {
 
 pub(crate) async fn executor_fixture(capacity: u32) -> ExecutorFixture {
     let temp = tempfile::tempdir().expect("tempdir");
+    let checkout = temp.path().join("checkout");
+    std::fs::create_dir(&checkout).expect("create executor fixture checkout");
     let db = AsyncDaemonDb::connect(&temp.path().join("executor.db"))
         .await
         .expect("open executor db");
@@ -143,7 +143,12 @@ pub(crate) async fn executor_fixture(capacity: u32) -> ExecutorFixture {
         capacity,
         repositories: vec![TaskBoardLocalExecutionRepositoryConfig {
             repository: REPOSITORY.into(),
-            checkout_path: "/tmp/harness-remote-checkouts".into(),
+            checkout_path: checkout
+                .canonicalize()
+                .expect("canonicalize executor fixture checkout")
+                .to_str()
+                .expect("executor fixture checkout is UTF-8")
+                .into(),
         }],
         runtimes: vec!["codex".into()],
         capabilities: vec![TaskBoardPhaseCapabilityProfile::ReviewReadOnly],

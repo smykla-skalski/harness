@@ -226,7 +226,7 @@ async fn drive_unknown_once(
                 || async { Ok(()) },
                 move |request| async move {
                     cleanup_calls.fetch_add(1, Ordering::SeqCst);
-                    record_cleanup(db, &request).await
+                    record_cleanup(db, &request).await.map(|()| true)
                 },
                 move |request| async move {
                     settle_calls.fetch_add(1, Ordering::SeqCst);

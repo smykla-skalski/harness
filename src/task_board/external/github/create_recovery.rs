@@ -58,7 +58,9 @@ impl ExternalCreateRecoveryClient for GitHubSyncClient {
                     .scan_create_marker(&repository, request.create_key(), lease)
                     .await
                 {
-                    Ok(RecoveryScanCompletion::Probe(ExternalCreateProbe::Found(task))) => Ok(task),
+                    Ok(RecoveryScanCompletion::Probe(ExternalCreateProbe::Found(task))) => {
+                        Ok(*task)
+                    }
                     Ok(RecoveryScanCompletion::Probe(ExternalCreateProbe::Absent)) => {
                         Err(create_error)
                     }
@@ -261,10 +263,9 @@ impl RecoveryScanState {
         if self.duplicate_match {
             return RecoveryScanCompletion::DuplicateMatches;
         }
-        RecoveryScanCompletion::Probe(
-            self.found
-                .map_or(ExternalCreateProbe::Absent, ExternalCreateProbe::Found),
-        )
+        RecoveryScanCompletion::Probe(self.found.map_or(ExternalCreateProbe::Absent, |task| {
+            ExternalCreateProbe::Found(Box::new(task))
+        }))
     }
 }
 

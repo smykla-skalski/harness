@@ -136,16 +136,13 @@ pub(super) fn pending_cancel_request_for_record(
         .error
         .as_deref()
         .ok_or_else(|| concurrent("pending remote cancel journal has no reason"))?;
-    let journal_sha256 = match (
+    let (Some("cancel"), Some(journal_sha256)) = (
         record.last_mutation_kind.as_deref(),
         record.last_mutation_sha256.as_deref(),
-    ) {
-        (Some("cancel"), Some(digest)) => digest,
-        _ => {
-            return Err(concurrent(
-                "pending remote cancel journal has incomplete request evidence",
-            ));
-        }
+    ) else {
+        return Err(concurrent(
+            "pending remote cancel journal has incomplete request evidence",
+        ));
     };
     let request = cancel_request(record, reason)?;
     if request.request_sha256 != operation.request_sha256

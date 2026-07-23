@@ -18,13 +18,12 @@ pub(super) async fn poll_active_assignment(
         .task_board_remote_cancel_intent(&assignment.assignment_id)
         .await?
     {
-        return poll_cancel_intent(db, client, assignment, &cancel).await;
+        return Box::pin(poll_cancel_intent(db, client, assignment, &cancel)).await;
     }
-    poll_active_assignment_with(
+    Box::pin(poll_active_assignment_with(
         assignment,
         |request| async move {
-            client
-                .status(db, &request)
+            Box::pin(client.status(db, &request))
                 .await
                 .map(|(_, outcome)| outcome)
                 .map_err(controller_database_error)
@@ -35,21 +34,19 @@ pub(super) async fn poll_active_assignment(
                 .map(|trust| trust.config.enabled)
         },
         |request| async move {
-            client
-                .renew_lease(db, &request)
+            Box::pin(client.renew_lease(db, &request))
                 .await
                 .map(|(_, outcome)| outcome)
                 .map_err(controller_database_error)
         },
         |request| async move {
-            client
-                .reconcile_pending_renewal(db, &request)
+            Box::pin(client.reconcile_pending_renewal(db, &request))
                 .await
                 .map(|(_, outcome)| outcome)
                 .map_err(controller_database_error)
         },
         canonical_now,
-    )
+    ))
     .await
 }
 
@@ -71,8 +68,7 @@ async fn poll_cancel_intent(
     }
     if pending == Some("cancel") {
         let status = requests::status_request(assignment)?;
-        let (response, outcome) = client
-            .status(db, &status)
+        let (response, outcome) = Box::pin(client.status(db, &status))
             .await
             .map_err(controller_database_error)?;
         if matches!(
@@ -81,19 +77,18 @@ async fn poll_cancel_intent(
                 | RemoteAssignmentWireState::Failed
                 | RemoteAssignmentWireState::Cancelled
         ) {
-            require_cancel_progress(outcome)?;
+            require_cancel_progress(&outcome)?;
             return Ok(true);
         }
     }
-    let (_, outcome) = client
-        .cancel(db, request)
+    let (_, outcome) = Box::pin(client.cancel(db, request))
         .await
         .map_err(controller_database_error)?;
-    require_cancel_progress(outcome)?;
+    require_cancel_progress(&outcome)?;
     Ok(true)
 }
 
-fn require_cancel_progress(outcome: TaskBoardRemoteMutationOutcome) -> Result<(), CliError> {
+fn require_cancel_progress(outcome: &TaskBoardRemoteMutationOutcome) -> Result<(), CliError> {
     match outcome {
         TaskBoardRemoteMutationOutcome::Updated(_)
         | TaskBoardRemoteMutationOutcome::Replayed(_) => Ok(()),

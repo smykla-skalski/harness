@@ -1,12 +1,15 @@
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Output;
 
 use super::bundle_contract::{
-    GitBundleContentLimits, require_bounded_bundle, require_bounded_result_delta,
+    GitBundleContentLimits, require_bounded_bundle, require_bounded_result_delta_with_runner,
 };
-use super::command::{GitCommandRunner, stdout};
-use crate::git::{GitError, GitRepository, GitResult};
+use super::bundle_staging::GitBundleStaging;
+use super::command::stdout;
+use super::repository_coordinates::GitRepositoryCoordinates;
+use crate::git::{GitError, GitResult};
+
+const MAX_STATUS_OUTPUT_BYTES: u64 = 64 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct GitBundleExport {
@@ -22,6 +25,7 @@ pub(crate) struct GitBundleExportPlan {
     base_revision: String,
     result_revision: String,
     advertised_ref: String,
+    coordinates: GitRepositoryCoordinates,
 }
 
 impl GitBundleExportPlan {
@@ -30,22 +34,15 @@ impl GitBundleExportPlan {
         base_revision: String,
         result_revision: String,
     ) -> GitResult<Self> {
-        let canonical = worktree
-            .canonicalize()
-            .map_err(|error| GitError::discover(worktree, error))?;
-        let repository = GitRepository::discover(&canonical)?;
-        if repository.path() != canonical {
-            return Err(GitError::read(
-                worktree,
-                "bundle export requires the exact executor worktree",
-            ));
-        }
+        let coordinates = GitRepositoryCoordinates::freeze(worktree)?;
+        let canonical = coordinates.worktree().to_path_buf();
         let advertised_ref = format!("refs/harness/task-board/results/{result_revision}");
         let plan = Self {
             worktree: canonical,
             base_revision,
             result_revision,
             advertised_ref,
+            coordinates,
         };
         plan.validate()?;
         Ok(plan)
@@ -69,9 +66,10 @@ impl GitBundleExportPlan {
     }
 
     fn validate(&self) -> GitResult<()> {
-        let repository = GitRepository::discover(&self.worktree)?;
-        if repository.path() != self.worktree
-            || repository.has_changes_including_untracked()?
+        self.coordinates.require_current()?;
+        self.coordinates.require_dense_checkout()?;
+        self.require_no_git_operation()?;
+        if self.has_changes_including_untracked()?
             || self.revision("HEAD")? != self.result_revision
             || self.base_revision == self.result_revision
         {
@@ -83,8 +81,10 @@ impl GitBundleExportPlan {
         self.require_commit(&self.base_revision, "bundle base")?;
         self.require_commit(&self.result_revision, "bundle result")?;
         self.require_ancestry()?;
-        require_bounded_result_delta(
+        let runner = self.coordinates.runner()?;
+        require_bounded_result_delta_with_runner(
             &self.worktree,
+            &runner,
             &self.base_revision,
             &self.result_revision,
             GitBundleContentLimits::REMOTE_RESULT,
@@ -112,24 +112,16 @@ impl GitBundleExportPlan {
         )?;
         let bytes = output.stdout;
         require_bounded_bundle(&self.worktree, &bytes, limits)?;
-        // The result bundle always carries a `^base` prerequisite, and recent git
-        // (>=2.53) cannot check prerequisite reachability from a stdin bundle, so stage
-        // the bytes and verify the file path (mirrors the import side in bundle.rs).
-        let staged = tempfile::NamedTempFile::new_in(&self.worktree).map_err(|error| {
-            GitError::unsafe_state(&self.worktree, format!("stage result bundle: {error}"))
-        })?;
-        fs::write(staged.path(), &bytes).map_err(|error| {
-            GitError::unsafe_state(&self.worktree, format!("stage result bundle: {error}"))
-        })?;
-        let staged_path = staged.path().to_str().ok_or_else(|| {
-            GitError::unsafe_state(&self.worktree, "staged result bundle path is not UTF-8")
-        })?;
-        self.git_contract_bounded_with_input(
-            ["bundle", "verify", staged_path],
-            &[],
-            limits.max_bundle_bytes,
-        )?;
-        drop(staged);
+        {
+            let staged =
+                GitBundleStaging::prepare(&self.coordinates, &bytes, limits.max_bundle_bytes)?;
+            let staged_path = staged.path()?;
+            self.git_contract_bounded_with_input(
+                ["bundle", "verify", staged_path],
+                &[],
+                limits.max_bundle_bytes,
+            )?;
+        }
         self.require_exact_head(&bytes)?;
         Ok(GitBundleExport {
             base_revision: self.base_revision.clone(),
@@ -261,12 +253,46 @@ impl GitBundleExportPlan {
         }
     }
 
+    fn has_changes_including_untracked(&self) -> GitResult<bool> {
+        let output = self.coordinates.runner()?.read_bounded_stdout(
+            ["status", "--porcelain=v1", "--untracked-files=all"],
+            MAX_STATUS_OUTPUT_BYTES,
+        )?;
+        Ok(!output.stdout.is_empty())
+    }
+
+    fn require_no_git_operation(&self) -> GitResult<()> {
+        for marker in [
+            "MERGE_HEAD",
+            "CHERRY_PICK_HEAD",
+            "REVERT_HEAD",
+            "BISECT_LOG",
+            "rebase-apply",
+            "rebase-merge",
+            "sequencer",
+        ] {
+            let marker_path = stdout(&self.git_read([
+                "rev-parse",
+                "--path-format=absolute",
+                "--git-path",
+                marker,
+            ])?);
+            if Path::new(&marker_path).exists() {
+                return Err(GitError::unsafe_state(
+                    &self.worktree,
+                    "bundle export refuses an in-progress git operation",
+                ));
+            }
+        }
+        Ok(())
+    }
+
     fn git_read<const N: usize>(&self, args: [&str; N]) -> GitResult<Output> {
-        GitCommandRunner::new(&self.worktree).read(args)
+        self.coordinates.runner()?.read(args)
     }
 
     fn git_mutation<const N: usize>(&self, args: [&str; N]) -> GitResult<Output> {
-        GitCommandRunner::new(&self.worktree).mutation(args)
+        self.coordinates.runner()?.mutation(args)
     }
 
     fn git_mutation_bounded_stdout<const N: usize>(
@@ -274,7 +300,9 @@ impl GitBundleExportPlan {
         args: [&str; N],
         max_bytes: u64,
     ) -> GitResult<Output> {
-        GitCommandRunner::new(&self.worktree).mutation_bounded_stdout(args, max_bytes)
+        self.coordinates
+            .runner()?
+            .mutation_bounded_stdout(args, max_bytes)
     }
 
     fn git_contract_bounded_with_input<const N: usize>(
@@ -283,11 +311,13 @@ impl GitBundleExportPlan {
         input: &[u8],
         max_bytes: u64,
     ) -> GitResult<Output> {
-        GitCommandRunner::new(&self.worktree).contract_bounded_with_input(args, input, max_bytes)
+        self.coordinates
+            .runner()?
+            .contract_bounded_with_input(args, input, max_bytes)
     }
 
     fn git_probe<const N: usize>(&self, args: [&str; N]) -> GitResult<Output> {
-        GitCommandRunner::new(&self.worktree).probe(args)
+        self.coordinates.runner()?.probe(args)
     }
 }
 

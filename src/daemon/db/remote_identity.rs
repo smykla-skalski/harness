@@ -62,6 +62,22 @@ UPDATE remote_audit_events
 SET outcome = 'failure', error_detail = ?2
 WHERE event_id = ?1 AND scope_decision = 'allowed'";
 
+/// Durable cap for remote authorization and lifecycle evidence.
+///
+/// The cap is intentionally independent of the in-memory unauthenticated
+/// admission limiter: it survives process restarts and bounds every remote
+/// audit writer, including pairing and lifecycle paths.
+pub(crate) const REMOTE_AUDIT_EVENT_RETENTION_LIMIT: i64 = 10_000;
+
+pub(super) const PRUNE_REMOTE_AUDIT_EVENTS_SQL: &str = "
+DELETE FROM remote_audit_events
+WHERE event_id IN (
+    SELECT event_id
+    FROM remote_audit_events
+    ORDER BY recorded_at DESC, event_id DESC
+    LIMIT -1 OFFSET ?1
+)";
+
 impl DaemonDb {
     /// Persist a paired remote client with a hashed bearer token.
     ///
@@ -210,29 +226,32 @@ impl DaemonDb {
         &self,
         event: &RemoteAuditEvent,
     ) -> Result<(), CliError> {
-        self.conn
-            .execute(
-                INSERT_REMOTE_AUDIT_EVENT_SQL,
-                params![
-                    event.event_id,
-                    event.recorded_at,
-                    event.request_id,
-                    event.client_id,
-                    event.route_or_method,
-                    event.scope.as_str(),
-                    event.scope_decision.as_str(),
-                    event.outcome.as_str(),
-                    event.remote_addr,
-                    event.error_detail,
-                ],
-            )
-            .map_err(|error| {
-                db_error(format!(
-                    "insert remote audit event {}: {error}",
-                    event.event_id.as_str()
-                ))
-            })?;
+        let transaction = self
+            .conn
+            .unchecked_transaction()
+            .map_err(|error| db_error(format!("begin remote audit retention: {error}")))?;
+        record_remote_audit_event_in_transaction(&transaction, event)?;
+        transaction
+            .commit()
+            .map_err(|error| db_error(format!("commit remote audit retention: {error}")))?;
         Ok(())
+    }
+
+    /// Enforce the durable remote audit retention bound after opening an
+    /// existing database or recovering from an interrupted process.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the retention transaction cannot complete.
+    pub(crate) fn prune_remote_audit_events(&self) -> Result<u64, CliError> {
+        let transaction = self
+            .conn
+            .unchecked_transaction()
+            .map_err(|error| db_error(format!("begin remote audit prune: {error}")))?;
+        let pruned = prune_remote_audit_events_in_transaction(&transaction)?;
+        transaction
+            .commit()
+            .map_err(|error| db_error(format!("commit remote audit prune: {error}")))?;
+        Ok(pruned)
     }
 
     /// Mark a persisted allowed request as failed without creating a duplicate audit row.
@@ -295,6 +314,49 @@ impl DaemonDb {
             .optional()
             .map_err(|error| db_error(format!("load remote client {client_id}: {error}")))
     }
+}
+
+pub(super) fn record_remote_audit_event_in_transaction(
+    conn: &Connection,
+    event: &RemoteAuditEvent,
+) -> Result<(), CliError> {
+    insert_remote_audit_event(conn, event)?;
+    prune_remote_audit_events_in_transaction(conn)?;
+    Ok(())
+}
+
+pub(super) fn prune_remote_audit_events_in_transaction(conn: &Connection) -> Result<u64, CliError> {
+    conn.execute(
+        PRUNE_REMOTE_AUDIT_EVENTS_SQL,
+        [REMOTE_AUDIT_EVENT_RETENTION_LIMIT],
+    )
+    .map(|pruned| u64::try_from(pruned).unwrap_or(u64::MAX))
+    .map_err(|error| db_error(format!("prune retained remote audit events: {error}")))
+}
+
+fn insert_remote_audit_event(conn: &Connection, event: &RemoteAuditEvent) -> Result<(), CliError> {
+    conn.execute(
+        INSERT_REMOTE_AUDIT_EVENT_SQL,
+        params![
+            event.event_id,
+            event.recorded_at,
+            event.request_id,
+            event.client_id,
+            event.route_or_method,
+            event.scope.as_str(),
+            event.scope_decision.as_str(),
+            event.outcome.as_str(),
+            event.remote_addr,
+            event.error_detail,
+        ],
+    )
+    .map_err(|error| {
+        db_error(format!(
+            "insert remote audit event {}: {error}",
+            event.event_id.as_str()
+        ))
+    })?;
+    Ok(())
 }
 
 pub(super) fn upsert_remote_client_for_pairing(

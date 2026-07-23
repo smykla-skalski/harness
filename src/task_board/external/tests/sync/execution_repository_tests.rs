@@ -180,7 +180,9 @@ impl ExternalCreateRecoveryClient for GitHubCreateClient {
         lease: &dyn ExternalCreateLease,
     ) -> Result<ExternalCreateProbe, CliError> {
         lease.renew().await?;
-        Ok(ExternalCreateProbe::Found(created_github_task(request)))
+        Ok(ExternalCreateProbe::Found(Box::new(created_github_task(
+            request,
+        ))))
     }
 }
 

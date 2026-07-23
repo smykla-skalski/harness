@@ -57,8 +57,10 @@ async fn execute_durable_run(
     request: &TaskBoardOrchestratorRunOnceRequest,
     session: &service::TaskBoardAutomationRunSession,
 ) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
-    let result =
-        service::run_task_board_orchestrator_once_with_session_db(db, request, session).await;
+    let result = Box::pin(service::run_task_board_orchestrator_once_with_session_db(
+        db, request, session,
+    ))
+    .await;
     let status = result?;
     session.begin_stage(6, "worker_start", None, None).await?;
     let status = handle_run_once_result(state, Ok(status), db).await;

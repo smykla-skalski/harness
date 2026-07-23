@@ -182,9 +182,9 @@ async fn persist_start_io_permit(
         permitted_at: permitted_at.into(),
         authority: authority.clone(),
         identity: authority.identity.clone(),
-        lease_id: required(&record.lease_id, "lease")?,
-        lease_expires_at: required(&record.lease_expires_at, "lease expiry")?,
-        deadline_at: required(&record.deadline_at, "deadline")?,
+        lease_id: required(record.lease_id.as_ref(), "lease")?,
+        lease_expires_at: required(record.lease_expires_at.as_ref(), "lease expiry")?,
+        deadline_at: required(record.deadline_at.as_ref(), "deadline")?,
     })
 }
 
@@ -254,9 +254,9 @@ pub(crate) fn executor_start_io_permit(
         sha256: sha256.into(),
         permitted_at: permitted_at.into(),
         identity: authority.identity.clone(),
-        lease_id: required(&record.lease_id, "lease")?,
-        lease_expires_at: required(&record.lease_expires_at, "lease expiry")?,
-        deadline_at: required(&record.deadline_at, "deadline")?,
+        lease_id: required(record.lease_id.as_ref(), "lease")?,
+        lease_expires_at: required(record.lease_expires_at.as_ref(), "lease expiry")?,
+        deadline_at: required(record.deadline_at.as_ref(), "deadline")?,
         authority,
     }))
 }
@@ -270,9 +270,9 @@ fn start_io_permit_digest(
         record,
         &authority.sha256,
         &authority.acquired_at,
-        &required(&record.lease_id, "lease")?,
-        &required(&record.lease_expires_at, "lease expiry")?,
-        &required(&record.deadline_at, "deadline")?,
+        &required(record.lease_id.as_ref(), "lease")?,
+        &required(record.lease_expires_at.as_ref(), "lease expiry")?,
+        &required(record.deadline_at.as_ref(), "deadline")?,
         permitted_at,
     )
 }
@@ -296,8 +296,8 @@ pub(crate) fn start_io_permit_digest_from_evidence(
         offer.request_sha256.clone(),
         start_authority_sha256.into(),
         start_authority_at.into(),
-        required(&record.claimed_host_instance_id, "claimed host")?,
-        required(&record.authenticated_principal, "principal")?,
+        required(record.claimed_host_instance_id.as_ref(), "claimed host")?,
+        required(record.authenticated_principal.as_ref(), "principal")?,
         lease_id.into(),
         lease_expires_at.into(),
         deadline_at.into(),
@@ -305,7 +305,7 @@ pub(crate) fn start_io_permit_digest_from_evidence(
             .executor_configuration_revision
             .ok_or_else(|| db_error("remote executor Start I/O permit has no revision"))?
             .to_string(),
-        required(&record.executor_checkout_path, "checkout")?,
+        required(record.executor_checkout_path.as_ref(), "checkout")?,
         identity.session_id,
         identity.run_id,
         identity.workspace_ref,
@@ -325,6 +325,7 @@ async fn exact_provisioned_session(
     identity: &TaskBoardRemoteExecutorIdentity,
     project_dir: &str,
 ) -> Result<bool, CliError> {
+    let origin_path = canonical_executor_checkout_path(record)?;
     query_scalar::<_, bool>(
         "SELECT EXISTS(
            SELECT 1 FROM sessions
@@ -343,7 +344,7 @@ async fn exact_provisioned_session(
         record.assignment_id, record.fencing_epoch
     ))
     .bind(project_dir)
-    .bind(record.executor_checkout_path.as_deref())
+    .bind(origin_path)
     .bind(format!("harness/{}", identity.session_id))
     .fetch_one(transaction.as_mut())
     .await
@@ -352,6 +353,21 @@ async fn exact_provisioned_session(
             "verify provisioned remote executor session: {error}"
         ))
     })
+}
+
+fn canonical_executor_checkout_path(
+    record: &TaskBoardRemoteAssignmentRecord,
+) -> Result<String, CliError> {
+    let checkout = record
+        .executor_checkout_path
+        .as_deref()
+        .ok_or_else(|| db_error("remote executor Start I/O permit has no frozen checkout path"))?;
+    let canonical = Path::new(checkout).canonicalize().map_err(|error| {
+        db_error(format!(
+            "canonicalize remote executor Start I/O checkout: {error}"
+        ))
+    })?;
+    canonical_project_dir(&canonical)
 }
 
 async fn deterministic_run_exists(
@@ -381,8 +397,8 @@ fn canonical_project_dir(project_dir: &Path) -> Result<String, CliError> {
         .ok_or_else(|| db_error("remote executor Start I/O project path is not UTF-8"))
 }
 
-fn required(value: &Option<String>, label: &str) -> Result<String, CliError> {
+fn required(value: Option<&String>, label: &str) -> Result<String, CliError> {
     value
-        .clone()
+        .cloned()
         .ok_or_else(|| db_error(format!("remote executor Start I/O permit has no {label}")))
 }

@@ -69,7 +69,7 @@ async fn connect_upgrades_applied_original_v34_migration() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        (1..=38).collect::<Vec<i64>>()
+        (1..=39).collect::<Vec<i64>>()
     );
     let requires_live = query_scalar::<_, bool>(
         "SELECT spawn_requires_live_policy FROM policy_workspace WHERE singleton = 1",
@@ -86,6 +86,71 @@ async fn connect_upgrades_applied_original_v34_migration() {
     .await
     .expect("inspect migrated dispatch schema");
     assert_eq!(has_grant_tracking, 1);
+}
+
+#[tokio::test]
+async fn connect_repairs_v44_remote_execution_integrity_across_restart() {
+    let tmp = tempdir().expect("tempdir");
+    let db_path = tmp.path().join("harness.db");
+    let initial = AsyncDaemonDb::connect(&db_path)
+        .await
+        .expect("open current async daemon db");
+    initial.pool().close().await;
+    drop(initial);
+
+    let conn = Connection::open(&db_path).expect("open sqlite");
+    conn.execute_batch(
+        "DROP TRIGGER task_board_remote_assignments_preserve_settlement_receipts;
+         DROP INDEX task_board_remote_assignments_controller_scan;
+         DELETE FROM _sqlx_migrations WHERE version = 39;
+         UPDATE schema_meta SET value = '44' WHERE key = 'version';",
+    )
+    .expect("restore v44 remote execution shape");
+    drop(conn);
+
+    let upgraded = AsyncDaemonDb::connect(&db_path)
+        .await
+        .expect("upgrade v44 remote execution integrity");
+    assert_eq!(
+        upgraded.schema_version().await.expect("schema version"),
+        SCHEMA_VERSION
+    );
+    assert_eq!(
+        applied_migration_versions(&upgraded).await,
+        (1..=39).collect::<Vec<i64>>()
+    );
+    assert_integrity_objects(&upgraded).await;
+    upgraded.pool().close().await;
+    drop(upgraded);
+
+    let restarted = AsyncDaemonDb::connect(&db_path)
+        .await
+        .expect("restart upgraded async daemon db");
+    assert_eq!(
+        restarted.schema_version().await.expect("schema version"),
+        SCHEMA_VERSION
+    );
+    assert_integrity_objects(&restarted).await;
+}
+
+async fn assert_integrity_objects(db: &AsyncDaemonDb) {
+    for (object_type, name) in [
+        ("index", "task_board_remote_assignments_controller_scan"),
+        (
+            "trigger",
+            "task_board_remote_assignments_preserve_settlement_receipts",
+        ),
+    ] {
+        let count = query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = ?1 AND name = ?2",
+        )
+        .bind(object_type)
+        .bind(name)
+        .fetch_one(db.pool())
+        .await
+        .expect("inspect v45 integrity object");
+        assert_eq!(count, 1, "missing {object_type} {name}");
+    }
 }
 
 fn restore_original_v34_upgrade_shape(db: &DaemonDb) {
@@ -210,6 +275,10 @@ const SHIPPED_MIGRATION_CHECKSUMS: &[(&str, &str)] = &[
     (
         "0038_daemon_v44_task_board_lane_order.sql",
         "4DEA33ABAE80ACA81B3644E575B82D940F04382703BD81FE3BFE8E413F95D4F637DBB827A02936E9FED7C87F4B7F3F6E",
+    ),
+    (
+        "0039_daemon_v45_task_board_remote_execution_integrity.sql",
+        "C17211A47907CB9706529CF213547DAF2EDD7192A94E61738E4749C8135CD78007E2932571135CFED10348B82F1FA949",
     ),
 ];
 

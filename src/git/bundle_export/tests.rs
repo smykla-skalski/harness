@@ -3,6 +3,7 @@ use std::process::Command;
 
 use tempfile::TempDir;
 
+use super::super::bundle_staging::staging_root_for_test;
 use super::GitBundleExportPlan;
 
 #[test]
@@ -51,6 +52,26 @@ fn rejects_dirty_wrong_head_non_descendant_and_too_small_limit() {
             &["rev-parse", "--verify", "--quiet", &fixture.result_ref()]
         )
         .is_none()
+    );
+}
+
+#[test]
+fn rejects_a_clean_result_checkout_with_an_in_progress_git_operation() {
+    let fixture = Fixture::new();
+    fs_err::write(fixture.worktree.join(".git/MERGE_HEAD"), &fixture.result)
+        .expect("seed in-progress merge marker");
+
+    fixture
+        .plan_result()
+        .expect_err("result export must reject an in-progress Git operation");
+
+    assert!(
+        optional_git(
+            &fixture.worktree,
+            &["rev-parse", "--verify", "--quiet", &fixture.result_ref()]
+        )
+        .is_none(),
+        "validation must reject before creating the private export ref"
     );
 }
 
@@ -148,6 +169,77 @@ fn symbolic_result_ref_never_deletes_its_direct_target_during_cleanup() {
     );
 }
 
+#[test]
+fn crashed_staging_replay_keeps_the_executor_worktree_clean() {
+    let fixture = Fixture::new();
+    let plan = fixture.plan();
+    let staging_root = staging_root_for_test(&plan.coordinates);
+    let crashed = staging_root.join("crashed-export");
+    fs_err::create_dir_all(&crashed).expect("seed stale staging directory");
+    fs_err::write(crashed.join("bundle"), vec![b'x'; 1024]).expect("seed stale bundle");
+
+    plan.export(4 * 1024 * 1024)
+        .expect("retry must clean stale staged bundle");
+
+    assert!(git(&fixture.worktree, &["status", "--porcelain"]).is_empty());
+    assert_staging_root_is_empty(&staging_root);
+}
+
+#[test]
+fn linked_worktree_route_swap_fails_before_result_ref_or_target_mutation() {
+    let fixture = Fixture::new();
+    let linked = fixture._temp.path().join("linked");
+    let linked_path = linked.to_str().expect("linked path utf8");
+    git(
+        &fixture.worktree,
+        &["worktree", "add", "--detach", linked_path, &fixture.result],
+    );
+    let plan =
+        GitBundleExportPlan::for_result(&linked, fixture.base.clone(), fixture.result.clone())
+            .expect("freeze linked worktree coordinates");
+
+    let target = fixture._temp.path().join("target");
+    fs_err::create_dir_all(&target).expect("create target repository");
+    git(&target, &["init", "-b", "main"]);
+    git(&target, &["config", "user.name", "Harness Test"]);
+    git(&target, &["config", "user.email", "test@example.com"]);
+    fs_err::write(target.join("target.txt"), "target\n").expect("write target file");
+    git(&target, &["add", "target.txt"]);
+    git(&target, &["commit", "-m", "target"]);
+    let target_head = git(&target, &["rev-parse", "HEAD"]);
+
+    let linked_git = linked.join(".git");
+    let original_route = fs_err::read_to_string(&linked_git).expect("read linked worktree route");
+    let target_git = target
+        .join(".git")
+        .canonicalize()
+        .expect("canonical target git dir");
+    fs_err::write(&linked_git, format!("gitdir: {}\n", target_git.display()))
+        .expect("swap linked worktree route");
+
+    plan.export(4 * 1024 * 1024)
+        .expect_err("coordinate route swap must fail closed");
+
+    fs_err::write(&linked_git, original_route).expect("restore linked worktree route");
+    assert!(
+        optional_git(
+            &fixture.worktree,
+            &["rev-parse", "--verify", "--quiet", &fixture.result_ref()]
+        )
+        .is_none()
+    );
+    assert!(
+        optional_git(
+            &target,
+            &["rev-parse", "--verify", "--quiet", &fixture.result_ref()]
+        )
+        .is_none()
+    );
+    assert_eq!(git(&target, &["rev-parse", "HEAD"]), target_head);
+    assert!(git(&fixture.worktree, &["status", "--porcelain"]).is_empty());
+    assert!(git(&target, &["status", "--porcelain"]).is_empty());
+}
+
 struct Fixture {
     _temp: TempDir,
     worktree: PathBuf,
@@ -208,4 +300,14 @@ fn optional_git(repository: &Path, args: &[&str]) -> Option<String> {
             .trim()
             .to_string()
     })
+}
+
+fn assert_staging_root_is_empty(root: &Path) {
+    assert!(
+        fs_err::read_dir(root)
+            .expect("read staging root")
+            .next()
+            .is_none(),
+        "staging root must not retain a crashed bundle"
+    );
 }

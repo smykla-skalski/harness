@@ -1,4 +1,5 @@
 use super::*;
+use crate::daemon::db::{CliError, TaskBoardItemSnapshot};
 use crate::task_board::{
     TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardLaunchCapability,
     TaskBoardReadOnlyRunContext,
@@ -8,6 +9,32 @@ use crate::task_board::{
 async fn read_only_completion_rechecks_configuration_before_mutation_and_can_compensate() {
     let db = test_db().await;
     configure_policy(&db, admission_policy(1)).await;
+    let fixture = prepare_read_only_completion_fence(&db).await;
+    let item_before_completion = db
+        .task_board_item_snapshot(&fixture.item_id)
+        .await
+        .expect("item before completion");
+    assert_configuration_revision_aba(&db).await;
+    let admission_owner = workflow_owner(&fixture.execution_id);
+    let side_effect_worker_id = format!("codex-{}", fixture.intent);
+
+    let error = db
+        .complete_task_board_dispatch(&fixture.intent, &fixture.claim_token, &admission_owner)
+        .await
+        .expect_err("configuration drift must refuse dispatch completion");
+
+    assert_refused_completion(&db, &fixture, &item_before_completion, &error).await;
+    finalize_refused_completion(&db, &fixture, &side_effect_worker_id).await;
+}
+
+struct ReadOnlyCompletionFenceFixture {
+    item_id: String,
+    intent: String,
+    claim_token: String,
+    execution_id: String,
+}
+
+async fn prepare_read_only_completion_fence(db: &AsyncDaemonDb) -> ReadOnlyCompletionFenceFixture {
     let item_id = "completion-configuration-fence";
     let mut item = TaskBoardItem::new(
         item_id.into(),
@@ -33,7 +60,7 @@ async fn read_only_completion_rechecks_configuration_before_mutation_and_can_com
         .await
         .expect("claim preparation")
         .expect("pending preparation");
-    let launch = read_only_launch(&db, item_id, &preparation.preparation.session_id).await;
+    let launch = read_only_launch(db, item_id, &preparation.preparation.session_id).await;
     let applied = db
         .complete_task_board_dispatch_preparation_with_workflow(
             &preparation,
@@ -67,26 +94,27 @@ async fn read_only_completion_rechecks_configuration_before_mutation_and_can_com
     )
     .await
     .expect("authorize stable read-only start");
-    let item_before_completion = db
-        .task_board_item_snapshot(item_id)
-        .await
-        .expect("item before completion");
-    assert_configuration_revision_aba(&db).await;
-    let admission_owner = workflow_owner(execution_id);
-    let side_effect_worker_id = format!("codex-{intent}");
+    ReadOnlyCompletionFenceFixture {
+        item_id: item_id.into(),
+        intent,
+        claim_token: claim.claim_token,
+        execution_id: execution_id.into(),
+    }
+}
 
-    let error = db
-        .complete_task_board_dispatch(&intent, &claim.claim_token, &admission_owner)
-        .await
-        .expect_err("configuration drift must refuse dispatch completion");
-
+async fn assert_refused_completion(
+    db: &AsyncDaemonDb,
+    fixture: &ReadOnlyCompletionFenceFixture,
+    item_before_completion: &TaskBoardItemSnapshot,
+    error: &CliError,
+) {
     assert!(
         error
             .to_string()
             .contains("configuration revision changed before worker start")
     );
     let item_after_completion = db
-        .task_board_item_snapshot(item_id)
+        .task_board_item_snapshot(&fixture.item_id)
         .await
         .expect("item after refused completion");
     assert_eq!(
@@ -94,33 +122,45 @@ async fn read_only_completion_rechecks_configuration_before_mutation_and_can_com
         item_before_completion.item_revision
     );
     assert_eq!(item_after_completion.item, item_before_completion.item);
-    assert_eq!(workflow_execution_count(&db).await, 0);
-    assert_eq!(ledger_state_count(&db, &intent, "reserved").await, 2);
-    assert_eq!(ledger_state_count(&db, &intent, "committed").await, 0);
-    assert_eq!(intent_status(&db, &intent).await, "starting");
+    assert_eq!(workflow_execution_count(db).await, 0);
+    assert_eq!(ledger_state_count(db, &fixture.intent, "reserved").await, 2);
+    assert_eq!(
+        ledger_state_count(db, &fixture.intent, "committed").await,
+        0
+    );
+    assert_eq!(intent_status(db, &fixture.intent).await, "starting");
+}
 
+async fn finalize_refused_completion(
+    db: &AsyncDaemonDb,
+    fixture: &ReadOnlyCompletionFenceFixture,
+    side_effect_worker_id: &str,
+) {
     db.begin_task_board_dispatch_compensation(
-        &intent,
-        &claim.claim_token,
-        &side_effect_worker_id,
+        &fixture.intent,
+        &fixture.claim_token,
+        side_effect_worker_id,
         "configuration drift after external start",
     )
     .await
     .expect("persist compensation after refused completion");
     db.finalize_task_board_dispatch_compensation(
-        &intent,
-        &claim.claim_token,
-        &side_effect_worker_id,
+        &fixture.intent,
+        &fixture.claim_token,
+        side_effect_worker_id,
         "configuration drift after external start",
     )
     .await
     .expect("finalize compensation after worker stop");
     assert_eq!(
-        ledger_kind_state(&db, &intent, "concurrency").await,
+        ledger_kind_state(db, &fixture.intent, "concurrency").await,
         "released"
     );
-    assert_eq!(ledger_kind_state(&db, &intent, "rate").await, "committed");
-    assert_eq!(intent_status(&db, &intent).await, "failed");
+    assert_eq!(
+        ledger_kind_state(db, &fixture.intent, "rate").await,
+        "committed"
+    );
+    assert_eq!(intent_status(db, &fixture.intent).await, "failed");
 }
 
 async fn read_only_launch(

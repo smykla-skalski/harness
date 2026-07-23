@@ -98,9 +98,12 @@ impl RemoteExecutionControllerClient {
         )?;
         let response = self.client.offer(request).await?;
         let settled_at = self.clock.now();
-        let outcome = db
-            .record_task_board_remote_offer_response(&response, &self.host_id, &settled_at)
-            .await?;
+        let outcome = Box::pin(db.record_task_board_remote_offer_response(
+            &response,
+            &self.host_id,
+            &settled_at,
+        ))
+        .await?;
         Ok((response, outcome))
     }
 
@@ -148,14 +151,13 @@ impl RemoteExecutionControllerClient {
         )?;
         let response = self.client.claim(request).await?;
         let settled_at = self.clock.now();
-        let outcome = db
-            .record_task_board_remote_assignment_claim(
-                request,
-                &response,
-                &self.host_id,
-                &settled_at,
-            )
-            .await?;
+        let outcome = Box::pin(db.record_task_board_remote_assignment_claim(
+            request,
+            &response,
+            &self.host_id,
+            &settled_at,
+        ))
+        .await?;
         Ok((response, outcome))
     }
 
@@ -210,14 +212,13 @@ impl RemoteExecutionControllerClient {
             Err(error) => return Err(error.into()),
         };
         let settled_at = self.clock.now();
-        let outcome = db
-            .record_task_board_remote_assignment_lease_renewal(
-                request,
-                &response,
-                &self.host_id,
-                &settled_at,
-            )
-            .await?;
+        let outcome = Box::pin(db.record_task_board_remote_assignment_lease_renewal(
+            request,
+            &response,
+            &self.host_id,
+            &settled_at,
+        ))
+        .await?;
         Ok((response, outcome))
     }
 
@@ -244,16 +245,22 @@ impl RemoteExecutionControllerClient {
                 &request.binding.assignment_id,
             )
             .await?;
-        if !db
-            .claim_task_board_remote_status_io_authority_fenced(request, &self.host_id, &trust)
-            .await?
+        if !Box::pin(db.claim_task_board_remote_status_io_authority_fenced(
+            request,
+            &self.host_id,
+            &trust,
+        ))
+        .await?
         {
             return Err(binding_error("remote status lost its assignment authority").into());
         }
         let response = self.client.status(request).await?;
-        let outcome = db
-            .record_task_board_remote_assignment_status(request, &response, &self.host_id)
-            .await?;
+        let outcome = Box::pin(db.record_task_board_remote_assignment_status(
+            request,
+            &response,
+            &self.host_id,
+        ))
+        .await?;
         Ok((response, outcome))
     }
 
@@ -303,14 +310,13 @@ impl RemoteExecutionControllerClient {
             Err(error) => return Err(error.into()),
         };
         let settled_at = self.clock.now();
-        let outcome = db
-            .record_task_board_remote_assignment_cancel(
-                request,
-                &response,
-                &self.host_id,
-                &settled_at,
-            )
-            .await?;
+        let outcome = Box::pin(db.record_task_board_remote_assignment_cancel(
+            request,
+            &response,
+            &self.host_id,
+            &settled_at,
+        ))
+        .await?;
         Ok((response, outcome))
     }
 
@@ -490,5 +496,9 @@ pub(super) fn lifecycle_response_may_be_lost(error: &RemoteExecutionHttpError) -
             | RemoteExecutionHttpError::ResponseTooLarge
             | RemoteExecutionHttpError::Decode
             | RemoteExecutionHttpError::Wire(_)
-    ) || matches!(error, RemoteExecutionHttpError::HttpStatus(status) if (500..=599).contains(status))
+    ) || matches!(
+        error,
+        // `status` is borrowed by the match, so `contains` receives `&u16` directly.
+        RemoteExecutionHttpError::HttpStatus { status, .. } if (500..=599).contains(status)
+    )
 }

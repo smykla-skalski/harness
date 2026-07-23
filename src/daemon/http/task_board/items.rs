@@ -283,7 +283,7 @@ pub(super) async fn post_task_board_dispatch(
         Ok(parts) => parts,
         Err(response) => return *response,
     };
-    let result = task_board_route_executor::dispatch(&state, request).await;
+    let result = Box::pin(task_board_route_executor::dispatch(&state, request)).await;
     timed_json(
         "POST",
         http_paths::TASK_BOARD_DISPATCH,

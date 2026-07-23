@@ -42,9 +42,8 @@ async fn admission_revalidates_then_commits_and_releases_concurrency() {
         .await
         .expect_err("worker claim must freeze estimate edits");
     assert!(
-        error
-            .to_string()
-            .contains("cannot change while its workflow side effect is claimed")
+        error.to_string().contains("frozen after worker start"),
+        "{error}"
     );
     assert_eq!(
         db.task_board_item("admission-start")

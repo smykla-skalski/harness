@@ -113,6 +113,7 @@ pub(super) async fn ensure_remote_session(
             db,
         )
         .await?;
+        #[cfg(test)]
         wait_after_remote_session_creation(record).await;
         validate_remote_session(
             &session,
@@ -175,9 +176,6 @@ async fn wait_after_remote_session_creation(record: &TaskBoardRemoteAssignmentRe
     }
 }
 
-#[cfg(not(test))]
-async fn wait_after_remote_session_creation(_record: &TaskBoardRemoteAssignmentRecord) {}
-
 #[cfg(test)]
 fn session_creation_barriers() -> &'static Mutex<HashMap<String, Arc<RemoteSessionCreationBarrier>>>
 {
@@ -239,18 +237,18 @@ pub(super) fn initial_source_revision(offer: &RemoteOfferRequest) -> Result<&str
         .validate()
         .map_err(|error| invalid_transition(format!("invalid sealed remote offer: {error}")))?;
     match &offer.source {
-        RemoteSourceMaterial::Repository { revision, .. } => Ok(revision),
+        RemoteSourceMaterial::Repository { revision, .. }
+        | RemoteSourceMaterial::RepositorySnapshotBundle { revision, .. } => Ok(revision),
         RemoteSourceMaterial::PriorPhaseBundle { base_revision, .. } => Ok(base_revision),
-        RemoteSourceMaterial::RepositorySnapshotBundle { revision, .. } => Ok(revision),
     }
 }
 
 async fn verify_repository_revision(origin: PathBuf, revision: String) -> Result<(), CliError> {
     spawn_blocking(move || {
-        let repository = GitRepository::discover(&origin).map_err(git_error)?;
+        let repository = GitRepository::discover(&origin).map_err(|error| git_error(&error))?;
         let resolved = repository
             .resolve_revision_to_commit(&revision)
-            .map_err(git_error)?;
+            .map_err(|error| git_error(&error))?;
         if resolved == revision {
             Ok(())
         } else {
@@ -277,8 +275,12 @@ async fn validate_remote_session(
     let expected_branch = format!("harness/{session_id}");
     let actual_branch = session.branch_ref.clone();
     spawn_blocking(move || {
-        let expected_origin = expected_origin.canonicalize().map_err(io_error)?;
-        let actual_origin = actual_origin.canonicalize().map_err(io_error)?;
+        let expected_origin = expected_origin
+            .canonicalize()
+            .map_err(|error| io_error(&error))?;
+        let actual_origin = actual_origin
+            .canonicalize()
+            .map_err(|error| io_error(&error))?;
         if expected_origin != actual_origin
             || worktree == expected_origin
             || actual_branch != expected_branch
@@ -296,10 +298,10 @@ pub(super) fn validate_remote_worktree_head(
     revision: &str,
     require_source_head: bool,
 ) -> Result<(), CliError> {
-    let repository = GitRepository::discover(worktree).map_err(git_error)?;
+    let repository = GitRepository::discover(worktree).map_err(|error| git_error(&error))?;
     let head = repository
         .resolve_revision_to_commit("HEAD")
-        .map_err(git_error)?;
+        .map_err(|error| git_error(&error))?;
     if !require_source_head || head == revision {
         Ok(())
     } else {
@@ -309,10 +311,10 @@ pub(super) fn validate_remote_worktree_head(
     }
 }
 
-fn git_error(error: crate::git::GitError) -> CliError {
+fn git_error(error: &crate::git::GitError) -> CliError {
     CliErrorKind::workflow_io(format!("verify remote executor Git source: {error}")).into()
 }
 
-fn io_error(error: std::io::Error) -> CliError {
+fn io_error(error: &std::io::Error) -> CliError {
     CliErrorKind::workflow_io(format!("verify remote executor path: {error}")).into()
 }

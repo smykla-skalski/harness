@@ -22,7 +22,7 @@ pub(super) async fn observe_cleanup(
     Json(request): Json<RemoteCleanupObservationRequest>,
 ) -> Response {
     let result = async {
-        request.validate().map_err(wire_error)?;
+        request.validate().map_err(|error| wire_error(&error))?;
         let (db, principal) =
             assignment_route(&headers, &state, "observe_cleanup", &request.binding).await?;
         let record = load_assignment(db, &request.binding.assignment_id).await?;
@@ -36,7 +36,7 @@ pub(super) async fn observe_cleanup(
             "REMOTE_CLEANUP_PENDING",
             "remote executor cleanup has not completed",
         ),
-        Err(error) => map_route_error(error),
+        Err(error) => map_route_error(&error),
     }
 }
 
@@ -81,5 +81,5 @@ fn cleanup_response(
     }
     RemoteCleanupObservationResponse::for_completed(request, cleanup_completed_at)
         .map(Some)
-        .map_err(wire_error)
+        .map_err(|error| wire_error(&error))
 }

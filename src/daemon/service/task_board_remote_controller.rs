@@ -42,6 +42,7 @@ static CONTROLLER_DRIVER: Mutex<()> = Mutex::const_new(());
 #[derive(Debug, Default)]
 pub(crate) struct TaskBoardRemoteControllerReport {
     pub(crate) refreshed_hosts: usize,
+    pub(crate) verified_assignments: usize,
     pub(crate) progressed_assignments: usize,
     pub(crate) offered_attempts: usize,
     pub(crate) scan_incomplete: bool,
@@ -73,7 +74,7 @@ pub(crate) async fn drive_task_board_remote_controller(
 pub(crate) async fn drive_task_board_remote_controller_before_local_work(
     db: &AsyncDaemonDb,
 ) -> Result<TaskBoardRemoteControllerReport, CliError> {
-    let report = drive_task_board_remote_controller(db).await?;
+    let report = Box::pin(drive_task_board_remote_controller(db)).await?;
     if report.refreshed_hosts > 0
         || report.progressed_assignments > 0
         || report.offered_attempts > 0
@@ -165,12 +166,16 @@ async fn progress_assignment(
     let client = controller_for_assignment(db, &assignment).await?;
     match assignment.state {
         TaskBoardRemoteAssignmentState::Offered if assignment.lease_id.is_none() => {
-            source_recovery::progress_unclaimed_offer(db, &client, &assignment).await
+            Box::pin(source_recovery::progress_unclaimed_offer(
+                db,
+                &client,
+                &assignment,
+            ))
+            .await
         }
         TaskBoardRemoteAssignmentState::Offered => {
             let request = requests::claim_request(&assignment)?;
-            client
-                .claim(db, &request)
+            Box::pin(client.claim(db, &request))
                 .await
                 .map(|_| true)
                 .map_err(controller_database_error)
@@ -178,16 +183,26 @@ async fn progress_assignment(
         TaskBoardRemoteAssignmentState::Claimed
         | TaskBoardRemoteAssignmentState::Started
         | TaskBoardRemoteAssignmentState::Running => {
-            active_poll::poll_active_assignment(db, &client, &assignment).await
+            Box::pin(active_poll::poll_active_assignment(
+                db,
+                &client,
+                &assignment,
+            ))
+            .await
         }
         TaskBoardRemoteAssignmentState::Unknown => {
-            poll_unknown_assignment(db, &client, &assignment).await
+            Box::pin(poll_unknown_assignment(db, &client, &assignment)).await
         }
         TaskBoardRemoteAssignmentState::Completed
         | TaskBoardRemoteAssignmentState::Failed
         | TaskBoardRemoteAssignmentState::Cancelled
         | TaskBoardRemoteAssignmentState::Superseded => {
-            terminal::finish_terminal_assignment(db, &client, &assignment).await
+            Box::pin(terminal::finish_terminal_assignment(
+                db,
+                &client,
+                &assignment,
+            ))
+            .await
         }
     }
 }
@@ -197,18 +212,19 @@ async fn poll_unknown_assignment(
     client: &RemoteExecutionControllerClient,
     assignment: &TaskBoardRemoteAssignmentRecord,
 ) -> Result<bool, CliError> {
-    poll_unknown_assignment_with(
+    Box::pin(poll_unknown_assignment_with(
         db,
         assignment,
         |request| async move {
-            client
-                .status(db, &request)
+            Box::pin(client.status(db, &request))
                 .await
                 .map(|_| ())
                 .map_err(controller_database_error)
         },
-        |current| async move { terminal::finish_terminal_assignment(db, client, &current).await },
-    )
+        |current| async move {
+            Box::pin(terminal::finish_terminal_assignment(db, client, &current)).await
+        },
+    ))
     .await
 }
 
@@ -304,18 +320,19 @@ async fn offer_remote_candidates(
             select_local_target(db, &execution, attempt, &now).await?;
             continue;
         };
-        match db
-            .offer_task_board_remote_assignment_with_source(
-                &TaskBoardWorkflowExecutionCas::from(&execution),
-                &crate::task_board::TaskBoardExecutionAttemptCas::from(attempt),
-                &prepared.request,
-                prepared.source_content.as_deref(),
-                &host.config.host_id,
+        match Box::pin(db.offer_task_board_remote_assignment_with_source(
+            &TaskBoardWorkflowExecutionCas::from(&execution),
+            &crate::task_board::TaskBoardExecutionAttemptCas::from(attempt),
+            &prepared.request,
+            prepared.source_content.as_deref(),
+            &host.config.host_id,
+            crate::daemon::db::TaskBoardRemoteOfferWindow::new(
                 &prepared.offered_at,
                 &prepared.lease_expires_at,
                 &prepared.deadline_at,
-            )
-            .await?
+            ),
+        ))
+        .await?
         {
             TaskBoardRemoteOfferOutcome::Created(_) | TaskBoardRemoteOfferOutcome::Replayed(_) => {
                 report.offered_attempts += 1;

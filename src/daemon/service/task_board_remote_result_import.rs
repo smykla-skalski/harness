@@ -41,24 +41,24 @@ pub(crate) async fn import_task_board_remote_implementation_result(
         Ok(plan) => plan,
         Err(error) => match existing.as_ref() {
             Some(record) if manual_git_failure(&error) => {
-                return mark_or_retry(db, request, record, error).await;
+                return Box::pin(mark_or_retry(db, request, record, error)).await;
             }
-            _ => return Err(git_error(error)),
+            _ => return Err(git_error(&error)),
         },
     };
     let plan_evidence = match plan.evidence() {
         Ok(evidence) => evidence,
         Err(error) => match existing.as_ref() {
             Some(record) if manual_git_failure(&error) => {
-                return mark_or_retry(db, request, record, error).await;
+                return Box::pin(mark_or_retry(db, request, record, error)).await;
             }
-            _ => return Err(git_error(error)),
+            _ => return Err(git_error(&error)),
         },
     };
     if let Err(error) = require_plan_matches_request(&plan_evidence, request) {
         match existing.as_ref() {
-            Some(record) => return mark_or_retry(db, request, record, error).await,
-            None => return Err(git_error(error)),
+            Some(record) => return Box::pin(mark_or_retry(db, request, record, error)).await,
+            None => return Err(git_error(&error)),
         }
     }
     let work = match db
@@ -68,7 +68,7 @@ pub(crate) async fn import_task_board_remote_implementation_result(
         Ok(work) => work,
         Err(error) if error.code() == "WORKFLOW_CONCURRENT" => {
             if let Some(record) = existing.as_ref() {
-                return mark_verification_failure(db, request, record, error).await;
+                return Box::pin(mark_verification_failure(db, request, record, error)).await;
             }
             return Err(error);
         }
@@ -78,7 +78,7 @@ pub(crate) async fn import_task_board_remote_implementation_result(
         return Ok(work.record);
     }
     if work.record.state == TaskBoardRemoteResultImportState::Applied {
-        return verify_applied_import(db, request, &work.record, plan).await;
+        return Box::pin(verify_applied_import(db, request, &work.record, plan)).await;
     }
     if work.record.state != TaskBoardRemoteResultImportState::Prepared {
         return Err(CliErrorKind::concurrent_modification(
@@ -89,7 +89,7 @@ pub(crate) async fn import_task_board_remote_implementation_result(
     let import_sha256 = work.record.import_sha256.clone();
     let bundle = work.bundle;
     let apply_plan = plan.clone();
-    let applied = spawn_blocking(move || apply_bundle(apply_plan, &bundle))
+    let applied = spawn_blocking(move || apply_bundle(&apply_plan, &bundle))
         .await
         .map_err(|error| {
             CliErrorKind::workflow_io(format!("remote result import worker failed: {error}"))
@@ -97,7 +97,7 @@ pub(crate) async fn import_task_board_remote_implementation_result(
     let git = match applied {
         Ok(git) => git,
         Err(error) => {
-            return settle_git_failure(db, request, &work.record, plan, error).await;
+            return Box::pin(settle_git_failure(db, request, &work.record, plan, error)).await;
         }
     };
     let applied_at = crate::workspace::utc_now();
@@ -130,17 +130,18 @@ pub(crate) async fn cleanup_task_board_remote_result_import(
         )
         .into());
     }
-    let plan = plan_from_request(&record.request()).map_err(git_error)?;
-    let evidence = plan.evidence().map_err(git_error)?;
-    require_plan_matches_request(&evidence, &record.request()).map_err(git_error)?;
-    spawn_blocking(move || plan.cleanup_import_ref().map_err(git_error))
+    let plan = plan_from_request(&record.request()).map_err(|error| git_error(&error))?;
+    let evidence = plan.evidence().map_err(|error| git_error(&error))?;
+    require_plan_matches_request(&evidence, &record.request())
+        .map_err(|error| git_error(&error))?;
+    spawn_blocking(move || plan.cleanup_import_ref().map_err(|error| git_error(&error)))
         .await
         .map_err(|error| {
             CliErrorKind::workflow_io(format!("remote import ref cleanup worker failed: {error}"))
         })?
 }
 
-fn apply_bundle(plan: GitBundleImportPlan, bundle: &[u8]) -> GitResult<GitBundleImportEvidence> {
+fn apply_bundle(plan: &GitBundleImportPlan, bundle: &[u8]) -> GitResult<GitBundleImportEvidence> {
     plan.verify_and_import_bytes(bundle)?;
     for _ in 0..3 {
         if plan.state()? == GitBundleWorktreeState::AttachedResult {
@@ -176,7 +177,7 @@ async fn verify_applied_import(
             )
             .await
         }
-        Err(error) => mark_or_retry(db, request, record, error).await,
+        Err(error) => Box::pin(mark_or_retry(db, request, record, error)).await,
     }
 }
 
@@ -208,11 +209,13 @@ async fn settle_git_failure(
                     )
                     .await;
             }
-            Ok(None) => return Err(git_error(error)),
-            Err(proof_error) => return mark_or_retry(db, request, record, proof_error).await,
+            Ok(None) => return Err(git_error(&error)),
+            Err(proof_error) => {
+                return Box::pin(mark_or_retry(db, request, record, proof_error)).await;
+            }
         }
     }
-    mark_or_retry(db, request, record, error).await
+    Box::pin(mark_or_retry(db, request, record, error)).await
 }
 
 async fn mark_or_retry(
@@ -222,16 +225,16 @@ async fn mark_or_retry(
     error: GitError,
 ) -> Result<TaskBoardRemoteResultImportRecord, CliError> {
     if !manual_git_failure(&error) {
-        return Err(git_error(error));
+        return Err(git_error(&error));
     }
     let detail = error.to_string();
-    db.mark_task_board_remote_result_import_manual_required(
+    Box::pin(db.mark_task_board_remote_result_import_manual_required(
         &request.assignment_id,
         request.fencing_epoch,
         &record.import_sha256,
         &detail,
         &crate::workspace::utc_now(),
-    )
+    ))
     .await?;
     Err(CliErrorKind::concurrent_modification(format!(
         "remote result import requires human review: {detail}"
@@ -246,13 +249,13 @@ async fn mark_verification_failure(
     error: CliError,
 ) -> Result<TaskBoardRemoteResultImportRecord, CliError> {
     let detail = error.to_string();
-    db.mark_task_board_remote_result_import_manual_required(
+    Box::pin(db.mark_task_board_remote_result_import_manual_required(
         &request.assignment_id,
         request.fencing_epoch,
         &record.import_sha256,
         &detail,
         &crate::workspace::utc_now(),
-    )
+    ))
     .await?;
     Err(CliErrorKind::concurrent_modification(format!(
         "remote result import requires human review: {detail}"
@@ -328,7 +331,7 @@ fn require_record_matches_request(
     }
 }
 
-fn git_error(error: crate::git::GitError) -> CliError {
+fn git_error(error: &GitError) -> CliError {
     CliErrorKind::workflow_io(error.to_string()).into()
 }
 

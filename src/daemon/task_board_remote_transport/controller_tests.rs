@@ -55,7 +55,11 @@ fn only_ambiguous_renewal_failures_replay_the_exact_request() {
         &RemoteExecutionHttpError::Decode
     ));
     assert!(renewal_response_may_be_lost(
-        &RemoteExecutionHttpError::HttpStatus(503)
+        &RemoteExecutionHttpError::HttpStatus {
+            status: 503,
+            code: None,
+            message: None,
+        }
     ));
     assert!(!renewal_response_may_be_lost(
         &RemoteExecutionHttpError::Credential(
@@ -63,7 +67,11 @@ fn only_ambiguous_renewal_failures_replay_the_exact_request() {
         )
     ));
     assert!(!renewal_response_may_be_lost(
-        &RemoteExecutionHttpError::HttpStatus(409)
+        &RemoteExecutionHttpError::HttpStatus {
+            status: 409,
+            code: None,
+            message: None,
+        }
     ));
     assert!(lifecycle_response_may_be_lost(
         &RemoteExecutionHttpError::Transport
@@ -182,9 +190,11 @@ pub(super) async fn prepared_controller_fixture() -> (RemoteControllerFixture, C
             &TaskBoardExecutionAttemptCas::from(&fixture.attempt),
             &fixture.request,
             HOST_ID,
-            &times.offered_at,
-            &times.initial_expiry,
-            &fixture.request.deadline_at,
+            crate::daemon::db::TaskBoardRemoteOfferWindow::new(
+                &times.offered_at,
+                &times.initial_expiry,
+                &fixture.request.deadline_at,
+            ),
         )
         .await
         .expect("persist offer before remote I/O");

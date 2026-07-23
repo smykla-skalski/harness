@@ -384,9 +384,11 @@ pub(super) async fn offer_remote(
             &crate::task_board::TaskBoardExecutionAttemptCas::from(&prepared.attempt),
             &prepared.offer,
             "executor-a",
-            offered_at,
-            lease_expires_at,
-            "2026-07-19T10:10:00Z",
+            crate::daemon::db::TaskBoardRemoteOfferWindow::new(
+                offered_at,
+                lease_expires_at,
+                "2026-07-19T10:10:00Z",
+            ),
         )
         .await
 }

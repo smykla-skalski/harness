@@ -25,7 +25,7 @@ const MAX_TERMINAL_ARTIFACT_BYTES: u64 = 32 * 1024 * 1024;
 
 enum TerminalEvidence {
     Completed {
-        result: RemoteTypedResult,
+        result: Box<RemoteTypedResult>,
         artifacts: Vec<TaskBoardRemoteTerminalArtifact>,
     },
     Failed {
@@ -144,7 +144,7 @@ async fn completed_evidence(
         artifacts.push(implementation_bundle(record, &typed, workspace).await?);
     }
     Ok(TerminalEvidence::Completed {
-        result: typed,
+        result: Box::new(typed),
         artifacts,
     })
 }
@@ -206,7 +206,7 @@ fn terminal_response(
     let (state, result, entries, error_code, failure_class) = match evidence {
         TerminalEvidence::Completed { result, artifacts } => (
             RemoteAssignmentWireState::Completed,
-            Some(result.clone()),
+            Some((**result).clone()),
             artifacts
                 .iter()
                 .map(|artifact| artifact.entry.clone())
@@ -232,8 +232,8 @@ fn terminal_response(
         offer_request_sha256: offer.request_sha256.clone(),
         status_sha256: String::new(),
         lease: Some(RemoteLease {
-            lease_id: required(&record.lease_id, "lease")?,
-            expires_at: required(&record.lease_expires_at, "lease expiry")?,
+            lease_id: required(record.lease_id.as_deref(), "lease")?,
+            expires_at: required(record.lease_expires_at.as_deref(), "lease expiry")?,
         }),
         result,
         output_artifacts: RemoteArtifactManifest { entries },
@@ -248,9 +248,9 @@ fn terminal_response(
     .map_err(|error| invalid_transition(format!("seal remote terminal status: {error}")))
 }
 
-fn required(value: &Option<String>, label: &str) -> Result<String, CliError> {
+fn required(value: Option<&str>, label: &str) -> Result<String, CliError> {
     value
-        .clone()
+        .map(str::to_owned)
         .ok_or_else(|| invalid_transition(format!("remote terminal has no {label}")))
 }
 

@@ -3,7 +3,7 @@ use std::sync::{Arc, OnceLock};
 use axum::Json;
 use axum::body::Body;
 use axum::extract::connect_info::ConnectInfo;
-use axum::http::{HeaderMap, Request, StatusCode};
+use axum::http::{HeaderMap, HeaderValue, Request, StatusCode, header::RETRY_AFTER};
 use axum::response::{IntoResponse as _, Response};
 
 use crate::daemon::protocol::HttpApiRouteContract;
@@ -12,7 +12,7 @@ use crate::daemon::remote_auth::{
     REMOTE_CLIENT_ID_HEADER, RemoteAuthError, remote_http_required_scope,
 };
 use crate::daemon::remote_request_audit::{
-    RemoteAuthorizationAudit, RemoteAuthorizationAuditReceipt,
+    RemoteAuthorizationAudit, RemoteAuthorizationAuditReceipt, RemoteUnauthenticatedAuditAdmission,
 };
 use crate::errors::{CliError, CliErrorKind};
 
@@ -20,6 +20,8 @@ use super::{DaemonConnectInfo, DaemonHttpState};
 
 const AUDIT_CLIENT_ID_MAX_CHARS: usize = 256;
 const REMOTE_AUDIT_UNAVAILABLE_MESSAGE: &str = "remote authorization audit is unavailable";
+pub(super) const REMOTE_UNAUTHENTICATED_RATE_LIMIT_MESSAGE: &str =
+    "remote unauthenticated requests are rate limited";
 
 #[derive(Clone, Default)]
 pub(super) struct RemoteHttpAuditMarker(Arc<OnceLock<RemoteAuthorizationAuditReceipt>>);
@@ -42,6 +44,11 @@ pub(super) struct RemoteHttpAuditContext {
     remote_addr: Option<String>,
     marker: Option<RemoteHttpAuditMarker>,
     receipt: OnceLock<RemoteAuthorizationAuditReceipt>,
+}
+
+pub(super) enum RemoteUnauthenticatedAuditResult {
+    Recorded,
+    RateLimited { retry_after_seconds: u64 },
 }
 
 impl RemoteHttpAuditContext {
@@ -134,6 +141,49 @@ impl RemoteHttpAuditContext {
         self.finish_record(result)
     }
 
+    pub(super) async fn record_unauthenticated_denial(
+        &self,
+        state: &DaemonHttpState,
+        error_detail: &str,
+    ) -> Result<RemoteUnauthenticatedAuditResult, CliError> {
+        let (admission, retry_after_seconds) = {
+            let limits = state.remote_request_limits.as_ref().ok_or_else(|| {
+                CliError::from(CliErrorKind::workflow_io(
+                    "remote unauthenticated audit limiter is unavailable",
+                ))
+            })?;
+            (
+                limits.admit_unauthenticated_audit(self.unauthenticated_admission_key()),
+                limits.unauthenticated_audit_retry_after_seconds(),
+            )
+        };
+        match admission {
+            RemoteUnauthenticatedAuditAdmission::Audit => {
+                self.record_denied(state, None, error_detail).await?;
+                Ok(RemoteUnauthenticatedAuditResult::Recorded)
+            }
+            RemoteUnauthenticatedAuditAdmission::RateLimited { audit: true } => {
+                self.record_denied(state, None, REMOTE_UNAUTHENTICATED_RATE_LIMIT_MESSAGE)
+                    .await?;
+                Ok(RemoteUnauthenticatedAuditResult::RateLimited {
+                    retry_after_seconds,
+                })
+            }
+            RemoteUnauthenticatedAuditAdmission::RateLimited { audit: false } => {
+                Ok(RemoteUnauthenticatedAuditResult::RateLimited {
+                    retry_after_seconds,
+                })
+            }
+        }
+    }
+
+    #[must_use]
+    pub(super) fn unauthenticated_admission_key(&self) -> &str {
+        self.remote_addr
+            .as_deref()
+            .unwrap_or("<unknown-remote-address>")
+    }
+
     pub(super) async fn amend_recorded_failure(
         &self,
         state: &DaemonHttpState,
@@ -200,6 +250,24 @@ pub(super) fn unavailable_response(error: &CliError) -> Response {
         })),
     )
         .into_response()
+}
+
+pub(super) fn unauthenticated_rate_limited_response(retry_after_seconds: u64) -> Response {
+    let mut response = (
+        StatusCode::TOO_MANY_REQUESTS,
+        Json(serde_json::json!({
+            "error": {
+                "code": "REMOTE_AUTH_RATE_LIMIT",
+                "message": REMOTE_UNAUTHENTICATED_RATE_LIMIT_MESSAGE,
+            }
+        })),
+    )
+        .into_response();
+    let retry_after = retry_after_seconds.max(1).to_string();
+    if let Ok(value) = HeaderValue::from_str(&retry_after) {
+        response.headers_mut().insert(RETRY_AFTER, value);
+    }
+    response
 }
 
 #[expect(

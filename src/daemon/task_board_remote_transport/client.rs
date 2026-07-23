@@ -11,8 +11,10 @@ use serde::de::DeserializeOwned;
 use crate::daemon::remote_auth::REMOTE_CLIENT_ID_HEADER;
 
 use super::credentials::{RemoteExecutionCredentialError, RemoteExecutionCredentialResolver};
+#[cfg(test)]
+use super::routes::HEARTBEAT_PATH;
 use super::routes::{
-    ADVERTISE_PATH, ARTIFACT_PATH, CANCEL_PATH, CLAIM_PATH, HEARTBEAT_PATH, LEASE_RENEW_PATH,
+    ADVERTISE_PATH, ARTIFACT_PATH, CANCEL_PATH, CLAIM_PATH, LEASE_RENEW_PATH,
     OFFER_HTTP_BODY_LIMIT_BYTES, OFFER_PATH, SETTLED_PATH, SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES,
     SOURCE_BUNDLE_PATH, STATUS_PATH,
 };
@@ -21,12 +23,13 @@ use super::tls_pin::pinned_client_config_with_roots;
 use super::tls_pin::{RemoteTlsPinError, pinned_platform_client_config};
 use super::wire::{
     RemoteArtifactFetchRequest, RemoteArtifactFetchResponse, RemoteCancelRequest,
-    RemoteCancelResponse, RemoteClaimRequest, RemoteClaimResponse, RemoteHeartbeatRequest,
-    RemoteHeartbeatResponse, RemoteHostAdvertisement, RemoteLeaseRenewRequest,
-    RemoteLeaseRenewResponse, RemoteOfferRequest, RemoteOfferResponse, RemoteSettledRequest,
-    RemoteSettledResponse, RemoteSourceBundleUploadRequest, RemoteSourceBundleUploadResponse,
-    RemoteStatusRequest, RemoteStatusResponse, RemoteWireError,
+    RemoteCancelResponse, RemoteClaimRequest, RemoteClaimResponse, RemoteHostAdvertisement,
+    RemoteLeaseRenewRequest, RemoteLeaseRenewResponse, RemoteOfferRequest, RemoteOfferResponse,
+    RemoteSettledRequest, RemoteSettledResponse, RemoteSourceBundleUploadRequest,
+    RemoteSourceBundleUploadResponse, RemoteStatusRequest, RemoteStatusResponse, RemoteWireError,
 };
+#[cfg(test)]
+use super::wire::{RemoteHeartbeatRequest, RemoteHeartbeatResponse};
 use super::wire_limits::MAX_REMOTE_LIFECYCLE_JSON_BYTES;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -94,7 +97,11 @@ pub(crate) enum RemoteExecutionHttpError {
     RequestTooLarge,
     ResponseTooLarge,
     Transport,
-    HttpStatus(u16),
+    HttpStatus {
+        status: u16,
+        code: Option<String>,
+        message: Option<String>,
+    },
     Encode,
     Decode,
     Wire(RemoteWireError),
@@ -109,7 +116,22 @@ impl fmt::Display for RemoteExecutionHttpError {
             Self::RequestTooLarge => write!(formatter, "remote execution request is too large"),
             Self::ResponseTooLarge => write!(formatter, "remote execution response is too large"),
             Self::Transport => write!(formatter, "remote execution transport failed"),
-            Self::HttpStatus(status) => write!(formatter, "remote execution HTTP status {status}"),
+            Self::HttpStatus {
+                status,
+                code: Some(code),
+                message: Some(message),
+            } => write!(
+                formatter,
+                "remote execution HTTP status {status}: {code}: {message}"
+            ),
+            Self::HttpStatus {
+                status,
+                code: None,
+                message: None,
+            } => write!(formatter, "remote execution HTTP status {status}"),
+            Self::HttpStatus { status, .. } => {
+                write!(formatter, "remote execution HTTP status {status}")
+            }
             Self::Encode => write!(formatter, "remote execution request encoding failed"),
             Self::Decode => write!(formatter, "remote execution response decoding failed"),
             Self::Wire(error) => write!(formatter, "{error}"),
@@ -127,7 +149,6 @@ impl From<RemoteWireError> for RemoteExecutionHttpError {
 
 pub(crate) struct RemoteExecutionHttpClient {
     config: RemoteExecutionHttpClientConfig,
-    credentials: RemoteExecutionCredentialResolver,
     client: reqwest::Client,
 }
 
@@ -177,11 +198,7 @@ impl RemoteExecutionHttpClient {
             .use_preconfigured_tls(tls)
             .build()
             .map_err(|_| RemoteExecutionHttpError::Config)?;
-        Ok(Self {
-            config,
-            credentials: RemoteExecutionCredentialResolver,
-            client,
-        })
+        Ok(Self { config, client })
     }
 
     pub(crate) async fn advertise(
@@ -199,6 +216,7 @@ impl RemoteExecutionHttpClient {
         Ok(response)
     }
 
+    #[cfg(test)]
     pub(crate) async fn heartbeat(
         &self,
         request: &RemoteHeartbeatRequest,
@@ -360,10 +378,9 @@ impl RemoteExecutionHttpClient {
             .endpoint
             .join(path)
             .map_err(|_| RemoteExecutionHttpError::Config)?;
-        let credential = self
-            .credentials
-            .resolve(&self.config.credential_reference)
-            .map_err(RemoteExecutionHttpError::Credential)?;
+        let credential =
+            RemoteExecutionCredentialResolver::resolve(&self.config.credential_reference)
+                .map_err(RemoteExecutionHttpError::Credential)?;
         let mut builder = self
             .client
             .request(method, url)
@@ -382,12 +399,31 @@ impl RemoteExecutionHttpClient {
             .await
             .map_err(|_| RemoteExecutionHttpError::Transport)?;
         if !response.status().is_success() {
-            return Err(RemoteExecutionHttpError::HttpStatus(
-                response.status().as_u16(),
-            ));
+            return Err(http_status_error(response).await);
         }
         let bytes = bounded_response(response, max_response_bytes).await?;
         serde_json::from_slice(&bytes).map_err(|_| RemoteExecutionHttpError::Decode)
+    }
+}
+
+async fn http_status_error(response: reqwest::Response) -> RemoteExecutionHttpError {
+    let status = response.status().as_u16();
+    let error = bounded_response(response, 4 * 1024)
+        .await
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+        .and_then(|body| {
+            let error = body.get("error")?;
+            Some((
+                error.get("code")?.as_str()?.to_owned(),
+                error.get("message")?.as_str()?.to_owned(),
+            ))
+        });
+    let (code, message) = error.map_or((None, None), |(code, message)| (Some(code), Some(message)));
+    RemoteExecutionHttpError::HttpStatus {
+        status,
+        code,
+        message,
     }
 }
 

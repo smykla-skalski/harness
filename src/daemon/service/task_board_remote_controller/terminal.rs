@@ -22,7 +22,7 @@ pub(super) async fn finish_terminal_assignment(
     client: &RemoteExecutionControllerClient,
     assignment: &TaskBoardRemoteAssignmentRecord,
 ) -> Result<bool, CliError> {
-    finish_terminal_assignment_with(
+    Box::pin(finish_terminal_assignment_with(
         db,
         assignment,
         || fetch_manifest(db, client, assignment),
@@ -30,7 +30,7 @@ pub(super) async fn finish_terminal_assignment(
             client
                 .observe_cleanup(db, &request)
                 .await
-                .map(|_| ())
+                .map(|outcome| outcome.is_some())
                 .map_err(controller_database_error)
         },
         |request| async move {
@@ -40,7 +40,7 @@ pub(super) async fn finish_terminal_assignment(
                 .map(|_| ())
                 .map_err(controller_database_error)
         },
-    )
+    ))
     .await
 }
 
@@ -64,7 +64,7 @@ where
     ObserveCleanup: FnOnce(
         crate::daemon::task_board_remote_transport::wire_cleanup::RemoteCleanupObservationRequest,
     ) -> CleanupFuture,
-    CleanupFuture: Future<Output = Result<(), CliError>>,
+    CleanupFuture: Future<Output = Result<bool, CliError>>,
     Settle: FnOnce(
         crate::daemon::task_board_remote_transport::wire::RemoteSettledRequest,
     ) -> SettleFuture,
@@ -87,8 +87,7 @@ where
             return Ok(false);
         }
         let request = requests::cleanup_observation_request(&settlement)?;
-        observe_cleanup(request).await?;
-        return Ok(true);
+        return observe_cleanup(request).await;
     }
     if handoff_ready {
         let current = db
@@ -107,7 +106,7 @@ where
         TerminalHandoff::Ready => {}
         TerminalHandoff::NeedsResultAdoption => {
             fetch_manifest().await?;
-            if !adopt_terminal_result(db, assignment, &parent).await? {
+            if !Box::pin(adopt_terminal_result(db, assignment, &parent)).await? {
                 return Ok(false);
             }
         }
@@ -174,18 +173,18 @@ async fn adopt_terminal_result(
     let outcome = if assignment.phase == TaskBoardExecutionPhase::Implementation
         && assignment.state == TaskBoardRemoteAssignmentState::Completed
     {
-        import_and_adopt_task_board_remote_implementation_result(
+        Box::pin(import_and_adopt_task_board_remote_implementation_result(
             db,
             &assignment.assignment_id,
             assignment.fencing_epoch,
-        )
+        ))
         .await?
     } else {
-        db.adopt_task_board_remote_terminal_result(
+        Box::pin(db.adopt_task_board_remote_terminal_result(
             &TaskBoardWorkflowExecutionCas::from(parent),
             &assignment.assignment_id,
             assignment.fencing_epoch,
-        )
+        ))
         .await?
     };
     match outcome {

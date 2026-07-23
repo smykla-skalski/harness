@@ -167,9 +167,11 @@ async fn transient_progress_failure_defers_exact_generation_and_survives_restart
                 &TaskBoardExecutionAttemptCas::from(&fixture.attempt),
                 &fixture.request,
                 &fixture.request.binding.host_id,
-                "2026-07-19T10:00:00Z",
-                "2026-07-19T10:01:00Z",
-                &fixture.request.deadline_at,
+                crate::daemon::db::TaskBoardRemoteOfferWindow::new(
+                    "2026-07-19T10:00:00Z",
+                    "2026-07-19T10:01:00Z",
+                    &fixture.request.deadline_at,
+                ),
             )
             .await
             .expect("offer transient-failure assignment"),
@@ -243,6 +245,7 @@ async fn transient_progress_failure_defers_exact_generation_and_survives_restart
     super::scan::finish_progress_attempt(&reopened, &replay, Ok(false), &mut retry_report)
         .await
         .expect("complete exact deferred generation retry");
+    assert_eq!(retry_report.verified_assignments, 1);
     assert!(
         !reopened
             .task_board_remote_controller_progression_is_blocked()

@@ -126,9 +126,8 @@ impl ExternalCreateRecoveryClient for FakeSyncClient {
         lease: &dyn ExternalCreateLease,
     ) -> Result<ExternalCreateProbe, CliError> {
         lease.renew().await?;
-        Ok(ExternalCreateProbe::Found(task_from_create_request(
-            self.provider,
-            request,
+        Ok(ExternalCreateProbe::Found(Box::new(
+            task_from_create_request(self.provider, request),
         )))
     }
 }

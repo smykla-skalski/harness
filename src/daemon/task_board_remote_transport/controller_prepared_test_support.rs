@@ -52,9 +52,11 @@ pub(super) async fn prepared_acceptance(item_id: &str) -> PreparedLifecycle {
             &TaskBoardExecutionAttemptCas::from(&prepared.attempt),
             &prepared.offer,
             HOST_ID,
-            &times.offered_at,
-            &times.l1_expires_at,
-            &prepared.offer.deadline_at,
+            crate::daemon::db::TaskBoardRemoteOfferWindow::new(
+                &times.offered_at,
+                &times.l1_expires_at,
+                &prepared.offer.deadline_at,
+            ),
         )
         .await
         .expect("persist truthful remote offer");

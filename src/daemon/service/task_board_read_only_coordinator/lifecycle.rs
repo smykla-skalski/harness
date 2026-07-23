@@ -78,7 +78,7 @@ where
     let attempt = prepare_lifecycle_attempt(db, execution, attempt, now).await?;
     match execution.transition.phase {
         Some(TaskBoardExecutionPhase::Publish) => {
-            reconcile_publish(db, runtime, execution, &attempt, now).await
+            Box::pin(reconcile_publish(db, runtime, execution, &attempt, now)).await
         }
         Some(TaskBoardExecutionPhase::Cleanup) => {
             reconcile_cleanup(db, execution, &attempt, now).await
@@ -148,11 +148,21 @@ where
         };
         return match publish(runtime, execution).await {
             Ok(outcome) => {
-                verify_successful_publish(db, runtime, execution, &claimed, outcome, now).await
+                Box::pin(verify_successful_publish(
+                    db, runtime, execution, &claimed, outcome, now,
+                ))
+                .await
             }
             Err(error) => {
-                settle_ambiguous_publish(db, runtime, execution, &claimed, &error.to_string(), now)
-                    .await
+                Box::pin(settle_ambiguous_publish(
+                    db,
+                    runtime,
+                    execution,
+                    &claimed,
+                    &error.to_string(),
+                    now,
+                ))
+                .await
             }
         };
     }
@@ -164,14 +174,14 @@ where
     if !publish_verification_due(attempt, now)? {
         return Ok(());
     }
-    settle_ambiguous_publish(
+    Box::pin(settle_ambiguous_publish(
         db,
         runtime,
         execution,
         attempt,
         "publish outcome was not durably recorded before recovery",
         now,
-    )
+    ))
     .await
 }
 
@@ -192,14 +202,14 @@ where
             complete_lifecycle(db, execution, attempt, verified, now).await
         }
         Ok(TaskBoardPublishVerification::Absent) if is_write(execution.snapshot.workflow_kind) => {
-            schedule_publish_verification_retry(
+            Box::pin(schedule_publish_verification_retry(
                 db,
                 execution,
                 attempt,
                 "successful approval response was absent during authoritative verification",
                 Some(&published),
                 now,
-            )
+            ))
             .await
         }
         Ok(TaskBoardPublishVerification::Absent) => {
@@ -208,14 +218,14 @@ where
         Err(error)
             if is_write(execution.snapshot.workflow_kind) && error.code() == "WORKFLOW_IO" =>
         {
-            schedule_publish_verification_retry(
+            Box::pin(schedule_publish_verification_retry(
                 db,
                 execution,
                 attempt,
                 &error.to_string(),
                 Some(&published),
                 now,
-            )
+            ))
             .await
         }
         Err(error) if is_write(execution.snapshot.workflow_kind) => {
@@ -385,7 +395,10 @@ where
             complete_lifecycle(db, execution, attempt, outcome, now).await
         }
         Ok(TaskBoardPublishVerification::Absent) if is_write(execution.snapshot.workflow_kind) => {
-            schedule_publish_verification_retry(db, execution, attempt, detail, None, now).await
+            Box::pin(schedule_publish_verification_retry(
+                db, execution, attempt, detail, None, now,
+            ))
+            .await
         }
         Ok(TaskBoardPublishVerification::Absent) => {
             mark_publish_unknown(db, execution, attempt, detail, None, now).await
@@ -393,14 +406,14 @@ where
         Err(error)
             if is_write(execution.snapshot.workflow_kind) && error.code() == "WORKFLOW_IO" =>
         {
-            schedule_publish_verification_retry(
+            Box::pin(schedule_publish_verification_retry(
                 db,
                 execution,
                 attempt,
                 &error.to_string(),
                 None,
                 now,
-            )
+            ))
             .await
         }
         Err(error) => {

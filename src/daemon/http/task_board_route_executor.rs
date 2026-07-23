@@ -52,7 +52,7 @@ pub(crate) async fn dispatch(
         state, async_db,
     ))
     .await?;
-    let result = service::dispatch_task_board_async(&request, async_db).await;
+    let result = Box::pin(service::dispatch_task_board_async(&request, async_db)).await;
     handle_dispatch_result(state, result, async_db).await
 }
 
@@ -136,7 +136,10 @@ pub(crate) async fn run_once_with_trigger(
         ))
         .await;
     }
-    let result = service::run_task_board_orchestrator_once_db(async_db, &request).await;
+    let result = Box::pin(service::run_task_board_orchestrator_once_db(
+        async_db, &request,
+    ))
+    .await;
     handle_run_once_result(state, result, async_db).await
 }
 

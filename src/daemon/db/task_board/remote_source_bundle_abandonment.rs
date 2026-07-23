@@ -84,7 +84,7 @@ impl AsyncDaemonDb {
             &upload.request_sha256,
         )
         .await?;
-        let stored = exact_upload_abandonment(collisions, upload, authenticated_principal)?;
+        let stored = exact_upload_abandonment(&collisions, upload, authenticated_principal)?;
         transaction
             .commit()
             .await
@@ -126,7 +126,7 @@ impl AsyncDaemonDb {
         )
         .await?;
         if let Some(stored) =
-            exact_upload_abandonment(abandonments, request, authenticated_principal)?
+            exact_upload_abandonment(&abandonments, request, authenticated_principal)?
         {
             let verification = stored.request.verified_absence;
             transaction.commit().await.map_err(|error| {
@@ -199,7 +199,8 @@ impl AsyncDaemonDb {
             &request.upload_request_sha256,
         )
         .await?;
-        if let Some(existing) = exact_abandonment(abandonments, request, authenticated_principal)? {
+        if let Some(existing) = exact_abandonment(&abandonments, request, authenticated_principal)?
+        {
             transaction.commit().await.map_err(|error| {
                 db_error(format!("commit replayed source abandonment: {error}"))
             })?;
@@ -247,11 +248,11 @@ impl AsyncDaemonDb {
 }
 
 fn exact_upload_abandonment(
-    collisions: Vec<TaskBoardRemoteSourceBundleAbandonment>,
+    collisions: &[TaskBoardRemoteSourceBundleAbandonment],
     upload: &RemoteSourceBundleUploadRequest,
     principal: &str,
 ) -> Result<Option<TaskBoardRemoteSourceBundleAbandonment>, CliError> {
-    match collisions.as_slice() {
+    match collisions {
         [] => Ok(None),
         [stored] if stored.matches_upload(upload, principal) => Ok(Some(stored.clone())),
         _ => Err(concurrent(
@@ -320,11 +321,11 @@ fn validate_executor_identity(
 }
 
 fn exact_abandonment(
-    collisions: Vec<TaskBoardRemoteSourceBundleAbandonment>,
+    collisions: &[TaskBoardRemoteSourceBundleAbandonment],
     request: &RemoteSourceBundleAbandonRequest,
     principal: &str,
 ) -> Result<Option<TaskBoardRemoteSourceBundleAbandonment>, CliError> {
-    match collisions.as_slice() {
+    match collisions {
         [] => Ok(None),
         [stored] if stored.is_exact_replay(request, principal) => Ok(Some(stored.clone())),
         _ => Err(concurrent(

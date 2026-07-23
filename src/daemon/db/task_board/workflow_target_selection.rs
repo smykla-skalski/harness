@@ -80,7 +80,7 @@ fn build_local_target(
     let mut selected_attempt = attempt.clone();
     selected_attempt.state = TaskBoardAttemptState::Starting;
     selected_attempt.available_at = None;
-    selected_attempt.updated_at = selected_at.to_owned();
+    selected_at.clone_into(&mut selected_attempt.updated_at);
     validate_task_board_attempt_update(attempt, &selected_attempt)
         .map_err(|error| db_error(format!("validate local target attempt: {error}")))?;
     validate_attempt_phase(parent, &selected_attempt)?;
@@ -102,9 +102,9 @@ fn build_local_target(
     );
     selected_parent.available_at = None;
     selected_parent.blocked_reason = None;
-    selected_parent.updated_at = selected_at.to_owned();
+    selected_at.clone_into(&mut selected_parent.updated_at);
     let mut combined = selected_parent.clone();
-    combined.attempts[attempt_index] = selected_attempt.clone();
+    combined.attempts[attempt_index].clone_from(&selected_attempt);
     validate_task_board_execution_target_update(parent, &combined)
         .map_err(|error| db_error(format!("validate local target selection: {error}")))?;
     validate_task_board_workflow_execution(&combined)

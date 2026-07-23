@@ -40,7 +40,7 @@ impl AsyncDaemonDb {
             .begin_immediate_transaction("task board remote claim response")
             .await?;
         let record = require_assignment(&mut transaction, &request.binding.assignment_id).await?;
-        if exact_claim_response(&record, request, authenticated_principal)?.as_ref()
+        if exact_claim_response(&record, request, authenticated_principal).as_ref()
             == Some(response)
         {
             commit_noop(transaction, "replayed remote claim response").await?;
@@ -90,11 +90,11 @@ impl AsyncDaemonDb {
             persist_claim_response(&mut transaction, &record, request, response).await?;
             let claimed_record =
                 require_assignment(&mut transaction, &record.assignment_id).await?;
-            recover_controller_remote_assignment_in_tx(
+            Box::pin(recover_controller_remote_assignment_in_tx(
                 &mut transaction,
                 &claimed_record,
                 observed_at,
-            )
+            ))
             .await?;
             return finish_mutation(transaction, &record.assignment_id, "late claim response")
                 .await;

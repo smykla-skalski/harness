@@ -30,7 +30,7 @@ async fn crash_before_stop_io_restarts_in_stop_only_mode() {
     let pending = fixture
         .db
         .claim_task_board_remote_executor_stop_pending(
-            &TaskBoardRemoteExecutorStopAuthority::Start(permit.clone()),
+            &TaskBoardRemoteExecutorStopAuthority::Start(Box::new(permit.clone())),
             &snapshot,
             TaskBoardRemoteExecutorStopReason::StartAdoptionFailed,
             "2026-07-19T10:00:21Z",
@@ -112,7 +112,7 @@ async fn wrong_run_identity_cannot_persist_a_stop_marker() {
         fixture
             .db
             .claim_task_board_remote_executor_stop_pending(
-                &TaskBoardRemoteExecutorStopAuthority::Start(permit),
+                &TaskBoardRemoteExecutorStopAuthority::Start(Box::new(permit)),
                 &wrong_run,
                 TaskBoardRemoteExecutorStopReason::StartEvidenceInvalid,
                 "2026-07-19T10:00:21Z",
@@ -167,7 +167,7 @@ async fn exact_run_with_invalid_launch_fields_can_stop_and_settle() {
     let pending = fixture
         .db
         .claim_task_board_remote_executor_stop_pending(
-            &TaskBoardRemoteExecutorStopAuthority::Start(permit),
+            &TaskBoardRemoteExecutorStopAuthority::Start(Box::new(permit)),
             &invalid_run,
             TaskBoardRemoteExecutorStopReason::StartEvidenceInvalid,
             "2026-07-19T10:00:21Z",
