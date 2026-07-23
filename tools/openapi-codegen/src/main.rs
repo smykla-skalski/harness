@@ -27,12 +27,22 @@ fn main() -> ExitCode {
     let path = repository_root().join(OUTPUT);
 
     if check {
-        let committed = fs::read_to_string(&path).unwrap_or_default();
-        if committed == rendered {
-            return ExitCode::SUCCESS;
+        let committed = match fs::read_to_string(&path) {
+            Ok(contents) => contents,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                eprintln!("drift: {OUTPUT} is missing - run `mise run openapi:generate`");
+                return ExitCode::FAILURE;
+            }
+            Err(error) => {
+                eprintln!("openapi-codegen: failed to read {OUTPUT}: {error}");
+                return ExitCode::FAILURE;
+            }
+        };
+        if committed != rendered {
+            eprintln!("drift: {OUTPUT} is stale - run `mise run openapi:generate`");
+            return ExitCode::FAILURE;
         }
-        eprintln!("drift: {OUTPUT} is stale - run `mise run openapi:generate`");
-        return ExitCode::FAILURE;
+        return ExitCode::SUCCESS;
     }
 
     if let Some(parent) = path.parent() {
