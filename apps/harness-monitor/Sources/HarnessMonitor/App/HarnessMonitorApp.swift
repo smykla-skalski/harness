@@ -49,6 +49,8 @@ struct HarnessMonitorApp: App {
   @State private var hasRunPerfScenario = false
   @State private var perfScenarioStatus: HarnessMonitorPerfScenarioStatus = .idle
   @State private var perfScenarioFailureReason: String?
+  @State var pendingPairingURL: URL?
+  @State var pendingPairingError: RemoteDaemonPairingInvitationError?
   @AppStorage(HarnessMonitorThemeDefaults.modeKey)
   var themeMode: HarnessMonitorThemeMode = .auto
   @AppStorage(HarnessMonitorTextSize.storageKey)
