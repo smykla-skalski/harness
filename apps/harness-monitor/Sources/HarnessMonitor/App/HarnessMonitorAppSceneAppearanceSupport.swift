@@ -68,3 +68,26 @@ struct HarnessMonitorSceneAppearanceModifier: ViewModifier {
       .tint(HarnessMonitorTheme.accent)
   }
 }
+
+// Toast overlays mount outside `HarnessMonitorSceneAppearanceModifier`, so the
+// `\.fontScale` it injects never reaches them and the toast would render at 1.0
+// whatever the text-size setting. Re-read the same defaults the scene modifier
+// uses so a toast tracks its window's text size.
+private struct HarnessMonitorToastTextScalingModifier: ViewModifier {
+  @AppStorage(HarnessMonitorTextSize.storageKey)
+  private var textSizeIndex = HarnessMonitorTextSize.defaultIndex
+
+  func body(content: Content) -> some View {
+    let normalizedTextSizeIndex = HarnessMonitorTextSize.normalizedIndex(textSizeIndex)
+
+    content
+      .environment(\.harnessTextSizeIndex, normalizedTextSizeIndex)
+      .sessionFontScale(textSizeIndex: normalizedTextSizeIndex)
+  }
+}
+
+extension View {
+  func harnessToastTextScaling() -> some View {
+    modifier(HarnessMonitorToastTextScalingModifier())
+  }
+}

@@ -30,6 +30,7 @@ private struct AcpPermissionAttentionSceneModifier: ViewModifier {
           let attention = attentionState.activeToast
         {
           AcpPermissionAttentionToastView(attention: attention)
+            .harnessToastTextScaling()
             .environment(
               \.acpToastOpenDecisions,
               { @MainActor in

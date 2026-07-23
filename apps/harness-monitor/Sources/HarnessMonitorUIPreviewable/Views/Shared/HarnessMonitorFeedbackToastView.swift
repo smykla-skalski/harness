@@ -172,19 +172,19 @@ struct HarnessMonitorFeedbackToastRow: View {
       VStack(alignment: .leading, spacing: 2) {
         HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
           Text(title)
-            .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
+            .scaledFont(.system(.body, design: .rounded, weight: .semibold))
             .foregroundStyle(HarnessMonitorTheme.ink)
           repeatBadge
         }
         Text(feedback.message)
-          .scaledFont(.caption)
+          .scaledFont(.subheadline)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
       .multilineTextAlignment(.leading)
     } else {
       HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
         Text(feedback.message)
-          .scaledFont(.system(.callout, design: .rounded, weight: .medium))
+          .scaledFont(.system(.body, design: .rounded, weight: .medium))
           .foregroundStyle(HarnessMonitorTheme.ink)
           .multilineTextAlignment(.leading)
           .frame(maxWidth: .infinity, alignment: .leading)
@@ -196,7 +196,7 @@ struct HarnessMonitorFeedbackToastRow: View {
   @ViewBuilder private var repeatBadge: some View {
     if feedback.repeatCount > 1 {
       Text("\(feedback.repeatCount)")
-        .scaledFont(.caption.weight(.semibold))
+        .scaledFont(.subheadline.weight(.semibold))
         .monospacedDigit()
         .foregroundStyle(HarnessMonitorTheme.ink)
         .padding(.horizontal, HarnessMonitorTheme.spacingSM)
@@ -242,7 +242,7 @@ struct HarnessMonitorFeedbackToastRow: View {
           )
           .labelStyle(.titleAndIcon)
           .lineLimit(1)
-          .scaledFont(.system(.caption, design: .rounded, weight: .semibold))
+          .scaledFont(.system(.subheadline, design: .rounded, weight: .semibold))
         }
         .harnessFlatActionButtonStyle(tint: HarnessMonitorTheme.secondaryInk)
         .accessibilityIdentifier(HarnessMonitorAccessibility.actionToastDetailsButton)
@@ -252,7 +252,7 @@ struct HarnessMonitorFeedbackToastRow: View {
         Button("Undo") {
           toast.invokeUndo(id: feedback.id)
         }
-        .scaledFont(.system(.caption, design: .rounded, weight: .semibold))
+        .scaledFont(.system(.subheadline, design: .rounded, weight: .semibold))
         .harnessFlatActionButtonStyle(tint: HarnessMonitorTheme.accent)
         .accessibilityLabel("Undo")
         .accessibilityIdentifier(HarnessMonitorAccessibility.actionToastUndoButton)
@@ -266,7 +266,7 @@ struct HarnessMonitorFeedbackToastRow: View {
       Divider()
       if let summary = details.summary {
         Text(summary)
-          .scaledFont(.caption)
+          .scaledFont(.subheadline)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
       ForEach(Array(details.rows.enumerated()), id: \.offset) { _, row in

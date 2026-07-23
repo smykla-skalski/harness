@@ -55,11 +55,11 @@ public struct AcpPermissionAttentionToastView: View {
 
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
           Text(attention.toastMessage)
-            .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
+            .scaledFont(.system(.body, design: .rounded, weight: .semibold))
             .foregroundStyle(HarnessMonitorTheme.ink)
             .multilineTextAlignment(.leading)
           Text(requestSummary)
-            .scaledFont(.caption)
+            .scaledFont(.subheadline)
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -70,7 +70,7 @@ public struct AcpPermissionAttentionToastView: View {
           Label("Open Workspace", systemImage: "arrow.up.right.square")
             .labelStyle(.titleAndIcon)
             .lineLimit(1)
-            .scaledFont(.system(.caption, design: .rounded, weight: .semibold))
+            .scaledFont(.system(.subheadline, design: .rounded, weight: .semibold))
         }
         .harnessFlatActionButtonStyle(tint: HarnessMonitorTheme.ink)
         .fixedSize(horizontal: true, vertical: false)
