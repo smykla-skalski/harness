@@ -157,7 +157,11 @@ struct TaskBoardRouteContentSourceTests {
     #expect(contextMenuActionsSource.contains("openURL(url)"))
     #expect(overviewViewSource.contains("@Environment(\\.openURL)"))
     #expect(contextMenuSource.contains("Menu(\"Move to...\")"))
-    #expect(contextMenuSource.contains("ForEach(TaskBoardInboxLane.allCases)"))
+    #expect(
+      contextMenuSource.contains(
+        "ForEach(TaskBoardInboxLane.allCases.filter { $0 != .umbrella })"
+      )
+    )
     #expect(contextMenuSource.contains("Button(scope.deleteLabel, role: .destructive)"))
     #expect(contextMenuSource.contains("!actions.canDelete(scope.cardIDs)"))
     #expect(contextMenuSource.contains("actions.deleteTargets?(targets)"))
