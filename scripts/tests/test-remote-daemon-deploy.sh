@@ -123,4 +123,21 @@ if [[ "$forwarded_candidate" == "$link_candidate" ]]; then
   fail "controller received the symlink path instead of the dereferenced real path"
 fi
 
+# A relative controller override is rejected before any sudo execution, so a
+# planted binary in the current directory cannot be run as root.
+rm -f "$ctrl_args"
+set +e
+reject_out="$(
+  PATH="$fakebin:$PATH" \
+    HARNESS_REMOTE_SYSTEMD_CONTROLLER="relative-controller" \
+    HARNESS_REMOTE_DAEMON_CANDIDATE="$candidate" \
+    "$deploy_script" --dry-run 2>&1
+)"
+reject_rc=$?
+set -e
+[[ "$reject_rc" -ne 0 ]] || fail "relative controller path was accepted"
+grep -q 'must be an absolute path' <<<"$reject_out" \
+  || fail "relative controller did not report the absolute-path requirement"
+[[ ! -e "$ctrl_args" ]] || fail "relative controller was executed"
+
 printf 'test-remote-daemon-deploy: ok\n'

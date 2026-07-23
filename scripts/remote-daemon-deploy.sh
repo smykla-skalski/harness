@@ -25,7 +25,7 @@ passthrough=("$@")
 # HARNESS_REMOTE_SYSTEMD_UNIT default so the controller never sees --unit twice.
 dry_run=0
 passthrough_sets_unit=0
-for arg in "${passthrough[@]+"${passthrough[@]}"}"; do
+for arg in "${passthrough[@]}"; do
   case "$arg" in
     --dry-run) dry_run=1 ;;
     --unit | --unit=*) passthrough_sets_unit=1 ;;
@@ -54,6 +54,13 @@ if (( dry_run == 0 )) && [[ ! -f "$candidate" || ! -x "$candidate" ]]; then
   printf 'activate it first with: mise run install:harness:daemon (or set HARNESS_REMOTE_DAEMON_CANDIDATE)\n' >&2
   exit 1
 fi
+# run_controller sudo-executes this path, so a relative override could run a
+# binary from the current directory as root. Require an absolute path.
+if [[ "$controller" != /* ]]; then
+  printf 'harness-systemd controller must be an absolute path, got %s\n' "$controller" >&2
+  printf 'set HARNESS_REMOTE_SYSTEMD_CONTROLLER to an absolute path\n' >&2
+  exit 1
+fi
 if [[ ! -f "$controller" || ! -x "$controller" ]]; then
   printf 'harness-systemd controller is not an executable file at %s\n' "$controller" >&2
   printf 'install it once with the runbook in docs/remote-systemd-upgrades.md\n' >&2
@@ -75,6 +82,6 @@ printf 'upgrading %s -> %s via %s\n' "$target_binary" "$candidate" "$controller"
 run_controller "$controller" upgrade \
   --candidate-path "$candidate" \
   --binary-path "$target_binary" \
-  "${unit_args[@]+"${unit_args[@]}"}" \
+  "${unit_args[@]}" \
   --json \
-  "${passthrough[@]+"${passthrough[@]}"}"
+  "${passthrough[@]}"
