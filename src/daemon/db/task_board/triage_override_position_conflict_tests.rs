@@ -135,3 +135,33 @@ async fn set_lane_position_allows_a_same_lane_reorder_while_overridden() {
     assert_eq!(result.item.status, TaskBoardStatus::Todo);
     assert_eq!(result.item.lane_position, Some(0));
 }
+
+#[tokio::test]
+async fn set_lane_position_allows_a_lifecycle_exit_while_overridden() {
+    let (_directory, db) = connect().await;
+    seed_with_override(&db, "item-1", TriageVerdict::Todo).await;
+    let before_revision = revision(&db, "item-1").await;
+    let before_seq = seq(&db).await;
+
+    let result = db
+        .set_task_board_lane_position(TaskBoardLanePositionInput {
+            item_id: "item-1".into(),
+            status: Some(TaskBoardStatus::Done),
+            lane_position: 0,
+            actor: "human-1".into(),
+            expected_item_revision: before_revision,
+            expected_items_change_seq: before_seq,
+        })
+        .await
+        .expect("a lifecycle exit is allowed while overridden");
+    assert_eq!(result.item.status, TaskBoardStatus::Done);
+    assert_eq!(result.item.lane_position, Some(0));
+
+    let active_override: Option<String> =
+        query_scalar("SELECT triage_override_verdict FROM task_board_items WHERE item_id = ?1")
+            .bind("item-1")
+            .fetch_one(db.pool())
+            .await
+            .expect("read override");
+    assert_eq!(active_override.as_deref(), Some("todo"));
+}

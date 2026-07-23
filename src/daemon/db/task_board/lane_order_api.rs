@@ -287,20 +287,20 @@ fn ensure_expected_revision(item_id: &str, actual: i64, expected: i64) -> Result
     .into())
 }
 
-/// A manual position write that would move the item into a lane conflicting
-/// with its active override is rejected atomically, matching how the
-/// general update path rejects a conflicting direct status write --
-/// [override outcome, manual rank provenance] are separate axes, so this
-/// API can freely re-rank an item within its current lane, or set a fresh
-/// manual anchor there, but must never let a caller relocate a
-/// triage-overridden item to the other lane out from under the override. A
-/// same-lane request (no status move at all) is always allowed.
+/// A manual position write between Backlog and Todo that conflicts with an
+/// active override is rejected atomically. Lifecycle exits remain allowed
+/// because the override becomes dormant outside those triage lanes.
 fn reject_if_destination_conflicts_with_active_override(
     current_status: TaskBoardStatus,
     requested_status: TaskBoardStatus,
     existing_override: Option<&TaskBoardTriageOverride>,
 ) -> Result<(), CliError> {
-    if requested_status == current_status {
+    if requested_status == current_status
+        || !matches!(
+            requested_status,
+            TaskBoardStatus::Backlog | TaskBoardStatus::Todo
+        )
+    {
         return Ok(());
     }
     let Some(existing_override) = existing_override else {
