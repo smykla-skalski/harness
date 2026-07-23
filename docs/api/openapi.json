@@ -482,10 +482,1390 @@
         },
         "x-websocket-method": "runtime_session.resolve"
       }
+    },
+    "/v1/sessions": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "operationId": "get_sessions",
+        "responses": {
+          "200": {
+            "description": "All sessions across projects",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SessionSummary"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "sessions"
+      },
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "operationId": "post_session_start",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionStartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Session started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionMutationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "session.start"
+      }
+    },
+    "/v1/sessions/adopt": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "operationId": "post_session_adopt",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdoptSessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "External session adopted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionMutationResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A session already exists for the adopted directory; body is `{\"error\": \"already-attached\", \"session_id\": ...}`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionAdHocError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Adoption request could not be validated; body `error` is one of `layout-violation`, `unsupported-schema-version`, or `origin-mismatch`, each with its own context fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionAdHocError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "session.adopt"
+      }
+    },
+    "/v1/sessions/{session_id}": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "operationId": "get_session",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "description": "Set to `core` for the reduced core view; any other value or omission returns the full detail",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "session.detail"
+      },
+      "delete": {
+        "tags": [
+          "sessions"
+        ],
+        "operationId": "delete_session",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Session deleted"
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session not found; body is `{\"error\": \"session not found\"}`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionAdHocError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "session.delete"
+      }
+    },
+    "/v1/sessions/{session_id}/archive": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "operationId": "post_session_archive",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionArchiveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Session archived",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionArchiveResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "session.archive"
+      }
+    },
+    "/v1/sessions/{session_id}/end": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "operationId": "post_end_session",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionEndRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Session ended",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "session.end"
+      }
+    },
+    "/v1/sessions/{session_id}/join": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "operationId": "post_session_join",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionJoinRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Agent joined the session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionMutationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "session.join"
+      }
+    },
+    "/v1/sessions/{session_id}/leave": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "operationId": "post_leave_session",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionLeaveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Agent left the session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "session.leave"
+      }
+    },
+    "/v1/sessions/{session_id}/observe": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "operationId": "post_observe_session",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Optional observe options; the body may be omitted",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObserveSessionRequest"
+              }
+            }
+          },
+          "required": false
+        },
+        "responses": {
+          "200": {
+            "description": "Observer attached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "session.observe"
+      }
+    },
+    "/v1/sessions/{session_id}/runtime-session": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "operationId": "post_runtime_session",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentRuntimeSessionRegistrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Runtime session registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRuntimeSessionRegistrationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "session.runtime_session"
+      }
+    },
+    "/v1/sessions/{session_id}/timeline": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "operationId": "get_timeline",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "known_revision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "before_recorded_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before_entry_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after_recorded_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after_entry_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Timeline window",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelineWindowResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "session.timeline"
+      }
+    },
+    "/v1/sessions/{session_id}/title": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "operationId": "post_session_title",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionTitleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Session title updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionMutationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "session.title"
+      }
     }
   },
   "components": {
     "schemas": {
+      "AckResult": {
+        "type": "string",
+        "enum": [
+          "accepted",
+          "rejected",
+          "deferred",
+          "expired"
+        ]
+      },
+      "AdoptSessionRequest": {
+        "type": "object",
+        "required": [
+          "session_root"
+        ],
+        "properties": {
+          "bookmark_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "session_root": {
+            "type": "string"
+          }
+        }
+      },
+      "AgentDisconnectedSchema": {
+        "type": "object",
+        "description": "Serialized disconnected-agent status object.",
+        "required": [
+          "state",
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "$ref": "#/components/schemas/DisconnectReasonSchema"
+          },
+          "state": {
+            "type": "string",
+            "description": "Always `disconnected`."
+          },
+          "stderr_tail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AgentPendingUserPrompt": {
+        "type": "object",
+        "required": [
+          "tool_name"
+        ],
+        "properties": {
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Compatibility summary for clients that still expect a single-line prompt\nmessage."
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AskUserQuestionPrompt"
+            }
+          },
+          "tool_name": {
+            "type": "string"
+          },
+          "waiting_since": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AgentPersona": {
+        "type": "object",
+        "description": "A predefined agent definition that shapes an agent's role and focus.",
+        "required": [
+          "identifier",
+          "name",
+          "symbol",
+          "description"
+        ],
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "What this persona does, shown in detail views."
+          },
+          "identifier": {
+            "type": "string",
+            "description": "Unique slug (e.g. `code-reviewer`, `test-writer`)."
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable display name."
+          },
+          "symbol": {
+            "$ref": "#/components/schemas/PersonaSymbol",
+            "description": "Icon for visual identification."
+          }
+        }
+      },
+      "AgentRegistrationWire": {
+        "type": "object",
+        "required": [
+          "session_agent_id",
+          "name",
+          "runtime",
+          "role",
+          "joined_at",
+          "updated_at",
+          "status"
+        ],
+        "properties": {
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "current_task_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "descriptor_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "joined_at": {
+            "type": "string"
+          },
+          "last_activity_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "managed_agent_family": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ManagedAgentKind"
+              }
+            ]
+          },
+          "managed_agent_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "persona": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AgentPersona"
+              }
+            ]
+          },
+          "role": {
+            "$ref": "#/components/schemas/SessionRole"
+          },
+          "runtime": {
+            "$ref": "#/components/schemas/RuntimeKindSchema"
+          },
+          "runtime_capabilities": {
+            "$ref": "#/components/schemas/RuntimeCapabilities"
+          },
+          "runtime_session_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "runtime_session_title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "session_agent_id": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AgentStatusSchema"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        }
+      },
+      "AgentRuntimeSessionRegistrationRequest": {
+        "type": "object",
+        "required": [
+          "managed_agent_id",
+          "runtime",
+          "runtime_session_id",
+          "project_dir"
+        ],
+        "properties": {
+          "managed_agent_id": {
+            "type": "string"
+          },
+          "project_dir": {
+            "type": "string"
+          },
+          "runtime": {
+            "type": "string"
+          },
+          "runtime_session_id": {
+            "type": "string"
+          }
+        }
+      },
+      "AgentRuntimeSessionRegistrationResponse": {
+        "type": "object",
+        "required": [
+          "registered"
+        ],
+        "properties": {
+          "registered": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AgentStatusSchema": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/AgentStatusStateSchema"
+          },
+          {
+            "$ref": "#/components/schemas/AgentDisconnectedSchema"
+          }
+        ],
+        "description": "Serialized agent status: a bare status string or a disconnected object."
+      },
+      "AgentStatusStateSchema": {
+        "type": "string",
+        "description": "Bare live-agent status strings.",
+        "enum": [
+          "active",
+          "idle",
+          "awaiting_review",
+          "removed"
+        ]
+      },
+      "AgentToolActivitySummary": {
+        "type": "object",
+        "required": [
+          "agent_id",
+          "runtime",
+          "tool_invocation_count",
+          "tool_result_count",
+          "tool_error_count",
+          "recent_tools"
+        ],
+        "properties": {
+          "agent_id": {
+            "type": "string"
+          },
+          "latest_event_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "latest_tool_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pending_user_prompt": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AgentPendingUserPrompt"
+              }
+            ]
+          },
+          "recent_tools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "runtime": {
+            "type": "string"
+          },
+          "tool_error_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "tool_invocation_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "tool_result_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "ArbitrationOutcome": {
+        "type": "object",
+        "description": "Leader arbitration result for a task that exhausted the three-round\nreview cycle with outstanding disputed points.",
+        "required": [
+          "arbiter_agent_id",
+          "verdict",
+          "summary",
+          "recorded_at"
+        ],
+        "properties": {
+          "arbiter_agent_id": {
+            "type": "string"
+          },
+          "recorded_at": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/ReviewVerdict"
+          }
+        }
+      },
+      "AskUserQuestionOption": {
+        "type": "object",
+        "description": "An option in an `AskUserQuestion` prompt.",
+        "required": [
+          "label"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "AskUserQuestionPrompt": {
+        "type": "object",
+        "description": "An `AskUserQuestion` prompt with header, options, multi-select.",
+        "required": [
+          "question"
+        ],
+        "properties": {
+          "header": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "multi_select": {
+            "type": "boolean"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AskUserQuestionOption"
+            }
+          },
+          "question": {
+            "type": "string"
+          }
+        }
+      },
+      "AutoPromotionPolicy": {
+        "type": "object",
+        "required": [
+          "role_order",
+          "priority_preset_id"
+        ],
+        "properties": {
+          "priority_preset_id": {
+            "type": "string"
+          },
+          "role_order": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SessionRole"
+            }
+          }
+        }
+      },
+      "AwaitingReview": {
+        "type": "object",
+        "description": "Metadata attached when a worker submits a task for review and the task\nreturns to the queue awaiting a reviewer claim.",
+        "required": [
+          "queued_at",
+          "submitter_agent_id"
+        ],
+        "properties": {
+          "queued_at": {
+            "type": "string",
+            "description": "ISO-8601 timestamp when the task entered the awaiting-review state."
+          },
+          "required_consensus": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Number of distinct-runtime reviewers required to close consensus.",
+            "minimum": 0
+          },
+          "submitter_agent_id": {
+            "type": "string",
+            "description": "Agent id of the worker that submitted for review."
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional summary text the worker attached on submission."
+          }
+        }
+      },
       "DaemonControlResponse": {
         "type": "object",
         "required": [
@@ -575,6 +1955,67 @@
             "type": "string"
           }
         }
+      },
+      "DeliveryConfig": {
+        "type": "object",
+        "required": [
+          "max_retries"
+        ],
+        "properties": {
+          "idempotency_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "max_retries": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "retry_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "DisconnectReasonSchema": {
+        "type": "object",
+        "description": "Serialized disconnect reason: `{ \"kind\", \"code\"?, \"signal\"? }`.",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "code": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "kind": {
+            "type": "string",
+            "description": "Snake-case reason discriminant (for example `process_exited`)."
+          },
+          "signal": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "FixSafety": {
+        "type": "string",
+        "description": "Safety level for automated fixes.",
+        "enum": [
+          "auto_fix_safe",
+          "auto_fix_guarded",
+          "triage_required",
+          "advisory_only"
+        ]
       },
       "GitHubApiDiagnostics": {
         "type": "object",
@@ -778,6 +2219,151 @@
           }
         }
       },
+      "HookIntegrationDescriptor": {
+        "type": "object",
+        "description": "One user-visible hook interception point for signal pickup.",
+        "required": [
+          "name",
+          "typical_latency_seconds",
+          "supports_context_injection"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "supports_context_injection": {
+            "type": "boolean"
+          },
+          "typical_latency_seconds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "IssueCategory": {
+        "type": "string",
+        "description": "Category of an observed issue.",
+        "enum": [
+          "hook_failure",
+          "cli_error",
+          "tool_error",
+          "build_error",
+          "workflow_error",
+          "skill_behavior",
+          "subagent_issue",
+          "unexpected_behavior",
+          "data_integrity",
+          "naming_error",
+          "user_frustration",
+          "agent_coordination"
+        ]
+      },
+      "IssueCode": {
+        "type": "string",
+        "description": "Stable internal identity for a classified issue family.",
+        "enum": [
+          "hook_denied_tool_call",
+          "harness_cli_error_output",
+          "tool_usage_error_output",
+          "build_or_lint_failure",
+          "workflow_state_error_output",
+          "pod_container_runtime_failure",
+          "auth_flow_triggered",
+          "direct_kubectl_validate_usage",
+          "shell_alias_interference",
+          "payload_wrapped_in_json_tags",
+          "python_traceback_output",
+          "suite_deviation_detected",
+          "release_kumactl_binary_used",
+          "python_used_in_bash_output",
+          "corporate_cluster_context_detected",
+          "harness_hook_code_triggered",
+          "manifest_runtime_failure",
+          "harness_create_command_failure",
+          "non_zero_exit_code",
+          "subagent_permission_failure",
+          "subagent_manual_recovery",
+          "manual_payload_recovery",
+          "missing_claude_session_id",
+          "empty_kubeconfig",
+          "incomplete_writer_output",
+          "user_frustration_detected",
+          "invalid_harness_subcommand_used",
+          "python_used_in_bash_tool_use",
+          "unverified_recursive_remove",
+          "raw_cluster_make_target_used",
+          "unauthorized_git_commit_during_run",
+          "manual_kubeconfig_construction",
+          "manual_export_construction",
+          "manual_env_prefix_construction",
+          "manifest_fix_prompt_shown",
+          "validator_install_prompt_shown",
+          "runtime_deviation_prompt_shown",
+          "wrong_skill_cross_reference",
+          "file_edit_churn",
+          "short_skill_name_in_skill_file",
+          "absolute_manifest_path_used",
+          "direct_managed_file_write",
+          "manifest_created_during_run",
+          "direct_task_output_file_read",
+          "harness_infrastructure_misconfiguration",
+          "missing_connection_or_env_var",
+          "sleep_prefix_before_harness_command",
+          "jq_error_in_command_output",
+          "closeout_verdict_pending",
+          "runner_state_event_not_supported",
+          "runner_state_machine_stale",
+          "uncommitted_source_code_edit",
+          "resource_not_cleaned_up_before_group_end",
+          "repeated_kubectl_query_for_same_resource",
+          "group_reported_without_capture",
+          "verification_output_truncated",
+          "agent_stalled_progress",
+          "agent_repeated_error",
+          "agent_guard_denial_loop",
+          "api_rate_limit_detected",
+          "agent_skill_misuse",
+          "cross_agent_file_conflict"
+        ]
+      },
+      "IssueSeverity": {
+        "type": "string",
+        "description": "Severity level of an observed issue, ordered for filtering.",
+        "enum": [
+          "low",
+          "medium",
+          "critical"
+        ]
+      },
+      "LeaderJoinPolicy": {
+        "type": "object",
+        "required": [
+          "require_explicit_fallback_role"
+        ],
+        "properties": {
+          "require_explicit_fallback_role": {
+            "type": "boolean"
+          }
+        }
+      },
+      "LeaderRecoveryPolicy": {
+        "type": "object",
+        "required": [
+          "manual_recovery_allowed"
+        ],
+        "properties": {
+          "manual_recovery_allowed": {
+            "type": "boolean"
+          },
+          "preset_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "LogLevelResponse": {
         "type": "object",
         "required": [
@@ -792,6 +2378,281 @@
             "type": "string"
           }
         }
+      },
+      "ManagedAgentKind": {
+        "type": "string",
+        "description": "Transport family for a daemon-managed agent reference.",
+        "enum": [
+          "tui",
+          "acp",
+          "codex"
+        ]
+      },
+      "ObserveSessionRequest": {
+        "type": "object",
+        "properties": {
+          "actor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ObserverActiveWorker": {
+        "type": "object",
+        "required": [
+          "issue_id",
+          "target_file",
+          "started_at"
+        ],
+        "properties": {
+          "agent_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "issue_id": {
+            "type": "string"
+          },
+          "runtime": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "started_at": {
+            "type": "string"
+          },
+          "target_file": {
+            "type": "string"
+          }
+        }
+      },
+      "ObserverAgentSessionSummary": {
+        "type": "object",
+        "required": [
+          "agent_id",
+          "runtime",
+          "cursor"
+        ],
+        "properties": {
+          "agent_id": {
+            "type": "string"
+          },
+          "cursor": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "last_activity": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "log_path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "runtime": {
+            "type": "string"
+          }
+        }
+      },
+      "ObserverOpenIssue": {
+        "type": "object",
+        "required": [
+          "issue_id",
+          "code",
+          "severity",
+          "category",
+          "summary",
+          "fingerprint",
+          "first_seen_line",
+          "occurrence_count",
+          "last_seen_line",
+          "fix_safety"
+        ],
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/IssueCategory"
+          },
+          "code": {
+            "$ref": "#/components/schemas/IssueCode"
+          },
+          "evidence_excerpt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fingerprint": {
+            "type": "string"
+          },
+          "first_seen_line": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "fix_safety": {
+            "$ref": "#/components/schemas/FixSafety"
+          },
+          "issue_id": {
+            "type": "string"
+          },
+          "last_seen_line": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "occurrence_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "severity": {
+            "$ref": "#/components/schemas/IssueSeverity"
+          },
+          "summary": {
+            "type": "string"
+          }
+        }
+      },
+      "ObserverSummary": {
+        "type": "object",
+        "required": [
+          "observe_id",
+          "last_scan_time",
+          "open_issue_count",
+          "resolved_issue_count",
+          "muted_code_count",
+          "active_worker_count",
+          "open_issues",
+          "muted_codes",
+          "active_workers",
+          "agent_sessions"
+        ],
+        "properties": {
+          "active_worker_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "active_workers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObserverActiveWorker"
+            }
+          },
+          "agent_sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObserverAgentSessionSummary"
+            }
+          },
+          "last_scan_time": {
+            "type": "string"
+          },
+          "muted_code_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "muted_codes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueCode"
+            }
+          },
+          "observe_id": {
+            "type": "string"
+          },
+          "open_issue_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "open_issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObserverOpenIssue"
+            }
+          },
+          "resolved_issue_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "PendingLeaderTransfer": {
+        "type": "object",
+        "description": "A pending leadership transfer initiated by a non-leader actor.",
+        "required": [
+          "requested_by",
+          "current_leader_id",
+          "new_leader_id",
+          "requested_at"
+        ],
+        "properties": {
+          "current_leader_id": {
+            "type": "string"
+          },
+          "new_leader_id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requested_at": {
+            "type": "string"
+          },
+          "requested_by": {
+            "type": "string"
+          }
+        }
+      },
+      "PersonaSymbol": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "A system SF Symbol identified by name (e.g. `magnifyingglass.circle.fill`).",
+            "required": [
+              "name",
+              "type"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "sf_symbol"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "An image baked into the app's asset catalog.",
+            "required": [
+              "name",
+              "type"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "asset"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Icon source for a persona, supporting system SF Symbols or bundled assets."
       },
       "ProjectSummary": {
         "type": "object",
@@ -866,6 +2727,176 @@
           }
         }
       },
+      "ReviewClaim": {
+        "type": "object",
+        "description": "Set of reviewers currently holding or having completed a claim on the task.",
+        "properties": {
+          "reviewers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewerEntry"
+            }
+          }
+        }
+      },
+      "ReviewConsensus": {
+        "type": "object",
+        "description": "Aggregated quorum consensus once `required_consensus` distinct-runtime\nreviewers have submitted compatible verdicts.",
+        "required": [
+          "verdict",
+          "summary",
+          "closed_at"
+        ],
+        "properties": {
+          "closed_at": {
+            "type": "string"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewPoint"
+            }
+          },
+          "reviewer_agent_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/ReviewVerdict"
+          }
+        }
+      },
+      "ReviewPoint": {
+        "type": "object",
+        "description": "A single numbered review point the worker may agree to or dispute.",
+        "required": [
+          "point_id",
+          "text"
+        ],
+        "properties": {
+          "point_id": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ReviewPointState"
+          },
+          "text": {
+            "type": "string"
+          },
+          "worker_note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ReviewPointState": {
+        "type": "string",
+        "description": "Per-point review feedback state.",
+        "enum": [
+          "open",
+          "agreed",
+          "disputed",
+          "resolved"
+        ]
+      },
+      "ReviewVerdict": {
+        "type": "string",
+        "description": "Verdict a reviewer chooses on submission.",
+        "enum": [
+          "approve",
+          "request_changes",
+          "reject"
+        ]
+      },
+      "ReviewerEntry": {
+        "type": "object",
+        "description": "One entry in a task's reviewer claim.",
+        "required": [
+          "reviewer_agent_id",
+          "reviewer_runtime",
+          "claimed_at"
+        ],
+        "properties": {
+          "claimed_at": {
+            "type": "string"
+          },
+          "reviewer_agent_id": {
+            "type": "string"
+          },
+          "reviewer_runtime": {
+            "type": "string"
+          },
+          "submitted_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "RuntimeCapabilities": {
+        "type": "object",
+        "description": "Serializable runtime capability metadata exposed to daemon clients.",
+        "required": [
+          "runtime",
+          "supports_native_transcript",
+          "supports_signal_delivery",
+          "supports_context_injection",
+          "typical_signal_latency_seconds"
+        ],
+        "properties": {
+          "hook_points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HookIntegrationDescriptor"
+            }
+          },
+          "runtime": {
+            "type": "string"
+          },
+          "supports_context_injection": {
+            "type": "boolean"
+          },
+          "supports_native_transcript": {
+            "type": "boolean"
+          },
+          "supports_readiness_signal": {
+            "type": "boolean"
+          },
+          "supports_signal_delivery": {
+            "type": "boolean"
+          },
+          "typical_signal_latency_seconds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "RuntimeKindSchema": {
+        "type": "object",
+        "required": [
+          "kind",
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Runtime identifier within the family."
+          },
+          "kind": {
+            "type": "string",
+            "description": "Runtime family, `tui` or `acp`."
+          }
+        }
+      },
       "RuntimeSessionResolutionResponse": {
         "type": "object",
         "description": "Wire-level outcome of a runtime-session lookup.\n\nReturned by `GET /v1/runtime-sessions/resolve`. `resolved` is `None` when\nno live agent matches; `Some` carries the single unambiguous match. The\ndaemon surfaces ambiguity as a `session_ambiguous` error instead of\npopulating this response with multiple entries.",
@@ -882,6 +2913,627 @@
           }
         }
       },
+      "SessionAdHocError": {
+        "type": "object",
+        "description": "Ad-hoc error body emitted by a few session endpoints that predate the\nstandard [`DaemonErrorBody`] envelope. It always carries a short string\n`error` tag or message; some responses add variant-specific fields, which\nthe owning operation documents. The schema leaves additional properties\nopen so those variant fields validate.",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error tag or message, for example `already-attached` or\n`session not found`."
+          }
+        }
+      },
+      "SessionArchiveRequest": {
+        "type": "object",
+        "required": [
+          "actor"
+        ],
+        "properties": {
+          "actor": {
+            "type": "string"
+          }
+        }
+      },
+      "SessionArchiveResponse": {
+        "type": "object",
+        "required": [
+          "session_id",
+          "archived_at"
+        ],
+        "properties": {
+          "archived_at": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          }
+        }
+      },
+      "SessionDetail": {
+        "type": "object",
+        "required": [
+          "session",
+          "agents",
+          "tasks",
+          "signals",
+          "agent_activity"
+        ],
+        "properties": {
+          "agent_activity": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentToolActivitySummary"
+            }
+          },
+          "agents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentRegistrationWire"
+            }
+          },
+          "observer": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ObserverSummary"
+              }
+            ]
+          },
+          "session": {
+            "$ref": "#/components/schemas/SessionSummary"
+          },
+          "signals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SessionSignalRecord"
+            }
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkItem"
+            }
+          }
+        }
+      },
+      "SessionEndRequest": {
+        "type": "object",
+        "required": [
+          "actor"
+        ],
+        "properties": {
+          "actor": {
+            "type": "string"
+          }
+        }
+      },
+      "SessionJoinRequest": {
+        "type": "object",
+        "required": [
+          "runtime",
+          "role",
+          "project_dir"
+        ],
+        "properties": {
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fallback_role": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SessionRole"
+              }
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "persona": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Persona identifier to resolve and attach to the agent registration."
+          },
+          "project_dir": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/SessionRole"
+          },
+          "runtime": {
+            "type": "string"
+          }
+        }
+      },
+      "SessionLeaveRequest": {
+        "type": "object",
+        "required": [
+          "agent_id"
+        ],
+        "properties": {
+          "agent_id": {
+            "type": "string"
+          }
+        }
+      },
+      "SessionMetrics": {
+        "type": "object",
+        "description": "Lightweight rollup metrics for session summaries.",
+        "properties": {
+          "active_agent_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "agent_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "arbitration_task_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "awaiting_review_agent_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "awaiting_review_task_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "blocked_task_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "completed_task_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "idle_agent_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "in_progress_task_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "in_review_task_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "open_task_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "SessionMutationResponse": {
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/SessionState"
+          }
+        }
+      },
+      "SessionPolicy": {
+        "type": "object",
+        "required": [
+          "leader_join",
+          "auto_promotion",
+          "degraded_recovery"
+        ],
+        "properties": {
+          "auto_promotion": {
+            "$ref": "#/components/schemas/AutoPromotionPolicy"
+          },
+          "degraded_recovery": {
+            "$ref": "#/components/schemas/LeaderRecoveryPolicy"
+          },
+          "leader_join": {
+            "$ref": "#/components/schemas/LeaderJoinPolicy"
+          }
+        }
+      },
+      "SessionRole": {
+        "type": "string",
+        "description": "Role an agent holds within a session.",
+        "enum": [
+          "leader",
+          "observer",
+          "worker",
+          "reviewer",
+          "improver"
+        ]
+      },
+      "SessionSignalRecord": {
+        "type": "object",
+        "description": "A signal visible within a multi-agent session.",
+        "required": [
+          "runtime",
+          "agent_id",
+          "session_id",
+          "status",
+          "signal"
+        ],
+        "properties": {
+          "acknowledgment": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SignalAck"
+              }
+            ]
+          },
+          "agent_id": {
+            "type": "string"
+          },
+          "runtime": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "signal": {
+            "$ref": "#/components/schemas/Signal"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SessionSignalStatus"
+          }
+        }
+      },
+      "SessionSignalStatus": {
+        "type": "string",
+        "description": "Session-visible signal status for CLI and daemon rendering.",
+        "enum": [
+          "pending",
+          "delivered",
+          "rejected",
+          "deferred",
+          "expired"
+        ]
+      },
+      "SessionStartRequest": {
+        "type": "object",
+        "required": [
+          "context",
+          "project_dir"
+        ],
+        "properties": {
+          "base_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "context": {
+            "type": "string"
+          },
+          "policy_preset": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project_dir": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "SessionState": {
+        "type": "object",
+        "description": "Main versioned state document for a multi-agent orchestration session.",
+        "required": [
+          "schema_version",
+          "session_id",
+          "context",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "adopted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Timestamp when this session was adopted from an external origin."
+          },
+          "agents": {
+            "type": "object",
+            "description": "Registered agents keyed by agent ID.",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/AgentRegistrationWire"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "archived_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Timestamp when the session was archived."
+          },
+          "branch_ref": {
+            "type": "string",
+            "description": "Git branch owned by this session (`harness/<sid>`)."
+          },
+          "context": {
+            "type": "string",
+            "description": "Human-readable session goal."
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "external_origin": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Path of the external session directory this session was adopted from."
+          },
+          "last_activity_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Most recent observed session activity."
+          },
+          "leader_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Agent ID of the current leader."
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/SessionMetrics",
+            "description": "Cached counts for fast daemon and UI list rendering."
+          },
+          "observe_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Observe state identifier associated with this session."
+          },
+          "origin_path": {
+            "type": "string",
+            "description": "User's original repository root (pre-worktree)."
+          },
+          "pending_leader_transfer": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PendingLeaderTransfer",
+                "description": "Pending leadership transfer request awaiting confirmation."
+              }
+            ]
+          },
+          "policy": {
+            "$ref": "#/components/schemas/SessionPolicy"
+          },
+          "project_name": {
+            "type": "string",
+            "description": "Canonicalized directory-component name (matches `SessionLayout::project_name`)."
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "shared_path": {
+            "type": "string",
+            "description": "Per-session shared directory for cross-agent artefacts."
+          },
+          "state_version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Monotonically increasing counter for optimistic concurrency.",
+            "minimum": 0
+          },
+          "status": {
+            "$ref": "#/components/schemas/SessionStatus"
+          },
+          "tasks": {
+            "type": "object",
+            "description": "Work items keyed by task ID.",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/WorkItem"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "title": {
+            "type": "string",
+            "description": "Short human-readable session name."
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "worktree_path": {
+            "type": "string",
+            "description": "Per-session worktree directory (`<sessions_root>/<project>/<sid>/workspace`)."
+          }
+        }
+      },
+      "SessionStatus": {
+        "type": "string",
+        "description": "Session lifecycle status.",
+        "enum": [
+          "awaiting_leader",
+          "active",
+          "paused",
+          "leaderless_degraded",
+          "ended"
+        ]
+      },
+      "SessionSummary": {
+        "type": "object",
+        "required": [
+          "project_id",
+          "project_name",
+          "context_root",
+          "worktree_path",
+          "shared_path",
+          "origin_path",
+          "branch_ref",
+          "session_id",
+          "title",
+          "context",
+          "status",
+          "created_at",
+          "updated_at",
+          "metrics"
+        ],
+        "properties": {
+          "adopted_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "branch_ref": {
+            "type": "string"
+          },
+          "context": {
+            "type": "string"
+          },
+          "context_root": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "external_origin": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_activity_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "leader_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/SessionMetrics"
+          },
+          "observe_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "origin_path": {
+            "type": "string"
+          },
+          "pending_leader_transfer": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PendingLeaderTransfer"
+              }
+            ]
+          },
+          "project_dir": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "project_name": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "shared_path": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SessionStatus"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "worktree_path": {
+            "type": "string"
+          }
+        }
+      },
+      "SessionTitleRequest": {
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "properties": {
+          "title": {
+            "type": "string"
+          }
+        }
+      },
       "SetLogLevelRequest": {
         "type": "object",
         "required": [
@@ -889,6 +3541,510 @@
         ],
         "properties": {
           "level": {
+            "type": "string"
+          }
+        }
+      },
+      "Signal": {
+        "type": "object",
+        "description": "A signal sent to an agent session.",
+        "required": [
+          "signal_id",
+          "version",
+          "created_at",
+          "expires_at",
+          "source_agent",
+          "command",
+          "priority",
+          "payload",
+          "delivery"
+        ],
+        "properties": {
+          "command": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/DeliveryConfig"
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/SignalPayload"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/SignalPriority"
+          },
+          "signal_id": {
+            "type": "string"
+          },
+          "source_agent": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "SignalAck": {
+        "type": "object",
+        "required": [
+          "signal_id",
+          "acknowledged_at",
+          "result",
+          "agent",
+          "session_id"
+        ],
+        "properties": {
+          "acknowledged_at": {
+            "type": "string"
+          },
+          "agent": {
+            "type": "string"
+          },
+          "details": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "result": {
+            "$ref": "#/components/schemas/AckResult"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "signal_id": {
+            "type": "string"
+          }
+        }
+      },
+      "SignalPayload": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "action_hint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "metadata": {},
+          "related_files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "SignalPriority": {
+        "type": "string",
+        "enum": [
+          "low",
+          "normal",
+          "high",
+          "urgent"
+        ]
+      },
+      "TaskCheckpointSummary": {
+        "type": "object",
+        "description": "Snapshot of the latest checkpoint for a task.",
+        "required": [
+          "checkpoint_id",
+          "recorded_at",
+          "summary",
+          "progress"
+        ],
+        "properties": {
+          "actor_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "checkpoint_id": {
+            "type": "string"
+          },
+          "progress": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "recorded_at": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        }
+      },
+      "TaskNote": {
+        "type": "object",
+        "description": "A note attached to a work item status transition.",
+        "required": [
+          "timestamp",
+          "text"
+        ],
+        "properties": {
+          "agent_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        }
+      },
+      "TaskQueuePolicy": {
+        "type": "string",
+        "description": "Whether a queued task can move to another free worker before its selected\nworker becomes available.",
+        "enum": [
+          "locked",
+          "reassign_when_free"
+        ]
+      },
+      "TaskSeverity": {
+        "type": "string",
+        "description": "Severity level for a work item.",
+        "enum": [
+          "low",
+          "medium",
+          "high",
+          "critical"
+        ]
+      },
+      "TaskSource": {
+        "type": "string",
+        "description": "Source that introduced a work item.",
+        "enum": [
+          "manual",
+          "observe",
+          "signal",
+          "system",
+          "improver"
+        ]
+      },
+      "TaskStatus": {
+        "type": "string",
+        "description": "Status of a work item.",
+        "enum": [
+          "open",
+          "in_progress",
+          "awaiting_review",
+          "in_review",
+          "done",
+          "blocked"
+        ]
+      },
+      "TimelineCursor": {
+        "type": "object",
+        "required": [
+          "recorded_at",
+          "entry_id"
+        ],
+        "properties": {
+          "entry_id": {
+            "type": "string"
+          },
+          "recorded_at": {
+            "type": "string"
+          }
+        }
+      },
+      "TimelineEntry": {
+        "type": "object",
+        "required": [
+          "entry_id",
+          "recorded_at",
+          "kind",
+          "session_id",
+          "summary",
+          "payload"
+        ],
+        "properties": {
+          "agent_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "entry_id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "payload": {},
+          "recorded_at": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "task_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "TimelineWindowResponse": {
+        "type": "object",
+        "required": [
+          "revision",
+          "total_count",
+          "window_start",
+          "window_end",
+          "has_older",
+          "has_newer",
+          "unchanged"
+        ],
+        "properties": {
+          "entries": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/TimelineEntry"
+            }
+          },
+          "has_newer": {
+            "type": "boolean"
+          },
+          "has_older": {
+            "type": "boolean"
+          },
+          "newest_cursor": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TimelineCursor"
+              }
+            ]
+          },
+          "oldest_cursor": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TimelineCursor"
+              }
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "total_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unchanged": {
+            "type": "boolean"
+          },
+          "window_end": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "window_start": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "WorkItem": {
+        "type": "object",
+        "description": "A work item tracked within a session.",
+        "required": [
+          "task_id",
+          "title",
+          "severity",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "arbitration": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ArbitrationOutcome",
+                "description": "Leader arbitration outcome once recorded."
+              }
+            ]
+          },
+          "assigned_to": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "awaiting_review": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AwaitingReview",
+                "description": "Metadata for the awaiting-review queue entry."
+              }
+            ]
+          },
+          "blocked_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "checkpoint_summary": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TaskCheckpointSummary"
+              }
+            ]
+          },
+          "completed_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "consensus": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReviewConsensus",
+                "description": "Closed quorum consensus, set once `required_consensus` reviewers agree."
+              }
+            ]
+          },
+          "context": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "created_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "deleted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Tombstone timestamp for tasks deleted from active session views while\npreserving their historical identity and timeline."
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskNote"
+            }
+          },
+          "observe_issue_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "queue_policy": {
+            "$ref": "#/components/schemas/TaskQueuePolicy"
+          },
+          "queued_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "review_claim": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReviewClaim",
+                "description": "Active reviewer claim, including distinct-runtime reviewer entries."
+              }
+            ]
+          },
+          "review_history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewConsensus"
+            },
+            "description": "Per-round consensus history: each entry is the merged-and-responded\nconsensus from one completed round, pushed here before\n`task.consensus` is cleared so per-point agree/dispute state and\nworker notes survive across rounds."
+          },
+          "review_round": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Review round counter; increments each time a reworked task goes back to review.",
+            "minimum": 0
+          },
+          "severity": {
+            "$ref": "#/components/schemas/TaskSeverity"
+          },
+          "source": {
+            "$ref": "#/components/schemas/TaskSource"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "suggested_fix": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "suggested_persona": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Persona hint to bias routing when assigning to a worker."
+          },
+          "task_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at": {
             "type": "string"
           }
         }

@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use super::SessionRole;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SessionPolicy {
     pub leader_join: LeaderJoinPolicy,
     pub auto_promotion: AutoPromotionPolicy,
@@ -33,17 +34,20 @@ impl Default for SessionPolicy {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct LeaderJoinPolicy {
     pub require_explicit_fallback_role: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AutoPromotionPolicy {
     pub role_order: Vec<SessionRole>,
     pub priority_preset_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct LeaderRecoveryPolicy {
     pub preset_id: Option<String>,
     pub manual_recovery_allowed: bool,

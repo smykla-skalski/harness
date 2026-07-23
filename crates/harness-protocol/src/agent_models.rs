@@ -36,6 +36,7 @@ pub fn hook_agent_for_runtime_name(name: &str) -> Option<HookAgent> {
     clippy::struct_excessive_bools,
     reason = "each bool is an independent capability flag in a serialized protocol type"
 )]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct RuntimeCapabilities {
     pub runtime: String,
     pub supports_native_transcript: bool,
@@ -50,6 +51,7 @@ pub struct RuntimeCapabilities {
 
 /// One user-visible hook interception point for signal pickup.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct HookIntegrationDescriptor {
     pub name: String,
     pub typical_latency_seconds: u64,
@@ -58,6 +60,7 @@ pub struct HookIntegrationDescriptor {
 
 /// A signal sent to an agent session.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Signal {
     pub signal_id: String,
     pub version: u32,
@@ -72,6 +75,7 @@ pub struct Signal {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum SignalPriority {
     Low,
     Normal,
@@ -80,6 +84,7 @@ pub enum SignalPriority {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SignalPayload {
     pub message: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -91,6 +96,7 @@ pub struct SignalPayload {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct DeliveryConfig {
     pub max_retries: u32,
     #[serde(default)]
@@ -100,6 +106,7 @@ pub struct DeliveryConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SignalAck {
     pub signal_id: String,
     pub acknowledged_at: String,
@@ -112,6 +119,7 @@ pub struct SignalAck {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum AckResult {
     Accepted,
     Rejected,

@@ -36,6 +36,7 @@ tracing = "0.1.44"
 user_dirs = "0.2.0"
 uzers = { version = "0.12.2", default-features = false }
 uuid = { version = "1.18.1", features = ["v4"] }
+utoipa = { version = "5.5.0", optional = true }
 walkdir = "2.5.0"
 
 [dev-dependencies]
@@ -47,6 +48,7 @@ default = ["standalone-worker"]
 bridge-runtime = []
 daemon-runtime = []
 standalone-worker = []
+openapi = ["dep:utoipa"]
 tokio-console = ["harness-telemetry/tokio-console"]
 
 [lints.clippy]

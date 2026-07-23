@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 /// Category of an observed issue.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum IssueCategory {
     HookFailure,
     CliError,
@@ -100,6 +101,7 @@ impl IssueCategory {
 /// Severity level of an observed issue, ordered for filtering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum IssueSeverity {
     Low = 0,
     Medium = 1,
@@ -234,6 +236,7 @@ impl Confidence {
 /// Safety level for automated fixes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum FixSafety {
     AutoFixSafe,
     AutoFixGuarded,

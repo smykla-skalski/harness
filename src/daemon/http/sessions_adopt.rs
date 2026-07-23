@@ -19,9 +19,22 @@ use crate::workspace::layout::sessions_root;
 
 use super::DaemonHttpState;
 use super::auth::require_auth;
+#[cfg(feature = "openapi")]
+use super::openapi::SessionAdHocError;
 use super::response::{extract_request_id, timed_json};
 use crate::daemon::protocol::http_paths;
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/adopt",
+    tag = "sessions",
+    request_body = AdoptSessionRequest,
+    responses(
+        (status = 200, description = "External session adopted", body = SessionMutationResponse),
+        (status = 409, description = "A session already exists for the adopted directory; body is `{\"error\": \"already-attached\", \"session_id\": ...}`", body = SessionAdHocError),
+        (status = 422, description = "Adoption request could not be validated; body `error` is one of `layout-violation`, `unsupported-schema-version`, or `origin-mismatch`, each with its own context fields", body = SessionAdHocError),
+    ),
+))]
 pub(super) async fn post_session_adopt(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,

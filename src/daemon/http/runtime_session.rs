@@ -15,6 +15,9 @@ use super::auth::require_auth;
 use super::response::{extract_request_id, timed_json};
 use super::{DaemonHttpState, sessions::broadcast_observe_session};
 
+#[cfg(feature = "openapi")]
+use super::openapi::DaemonErrorBody;
+
 async fn runtime_session_response(
     state: &DaemonHttpState,
     session_id: &str,
@@ -32,6 +35,17 @@ async fn runtime_session_response(
     Ok(AgentRuntimeSessionRegistrationResponse { registered })
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/runtime-session",
+    tag = "sessions",
+    params(("session_id" = String, Path, description = "Session identifier")),
+    request_body = AgentRuntimeSessionRegistrationRequest,
+    responses(
+        (status = 200, description = "Runtime session registered", body = AgentRuntimeSessionRegistrationResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_runtime_session(
     Path(session_id): Path<String>,
     headers: HeaderMap,

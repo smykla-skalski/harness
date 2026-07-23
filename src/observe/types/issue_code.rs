@@ -6,6 +6,7 @@ use sha2::{Digest, Sha256};
 /// Stable internal identity for a classified issue family.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum IssueCode {
     HookDeniedToolCall,
     HarnessCliErrorOutput,
