@@ -43,10 +43,16 @@ public struct GitHubDataChangedPayload: Codable, Equatable, Sendable {
 public struct TaskBoardUpdatedPayload: Codable, Equatable, Sendable {
   public let revision: UInt64
   public let scopes: [String]
+  public let automation: TaskBoardAutomationSnapshot?
 
-  public init(revision: UInt64, scopes: [String]) {
+  public init(
+    revision: UInt64,
+    scopes: [String],
+    automation: TaskBoardAutomationSnapshot? = nil
+  ) {
     self.revision = revision
     self.scopes = scopes
+    self.automation = automation
   }
 }
 

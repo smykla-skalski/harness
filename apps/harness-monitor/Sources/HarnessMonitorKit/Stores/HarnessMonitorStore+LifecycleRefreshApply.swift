@@ -9,7 +9,6 @@ extension HarnessMonitorStore {
     let preserveSelection = options.preserveSelection
     let allowPreviewReadySelection = options.allowPreviewReadySelection
     let recordConnectionTelemetry = options.recordConnectionTelemetry
-    let isInitialConnect = options.isInitialConnect
     cancelInitialTaskBoardConfirmationRefresh()
     let measuredDiagnostics = refreshSnapshot.diagnostics
     let measuredProjects = refreshSnapshot.projects
@@ -29,11 +28,11 @@ extension HarnessMonitorStore {
       items: refreshSnapshot.taskBoardItems,
       orchestratorStatus: refreshSnapshot.taskBoardOrchestratorStatus,
       stepModeConfirmationRevision: refreshSnapshot.stepModeConfirmationRevision,
-      isInitialConnect: isInitialConnect
+      isInitialConnect: options.isInitialConnect
     )
-    let didChangeTaskBoardSnapshot =
-      globalTaskBoardItems != resolvedTaskBoardSnapshot.items
-      || globalTaskBoardOrchestratorStatus != resolvedTaskBoardSnapshot.orchestratorStatus
+    let measuredAutomationSnapshot = refreshSnapshot.taskBoardOrchestratorStatus
+      .measured?.value?.automation
+    let didChangeTaskBoardSnapshot = taskBoardSnapshotChanged(from: resolvedTaskBoardSnapshot)
 
     withUISyncBatch {
       diagnostics = measuredDiagnostics.value
@@ -53,6 +52,7 @@ extension HarnessMonitorStore {
       }
       globalTaskBoardItems = resolvedTaskBoardSnapshot.items
       globalTaskBoardOrchestratorStatus = resolvedTaskBoardSnapshot.orchestratorStatus
+      mergeTaskBoardAutomationSnapshot(measuredAutomationSnapshot)
     }
     if didChangeTaskBoardSnapshot {
       scheduleTaskBoardSnapshotCacheWrite(
@@ -111,6 +111,12 @@ extension HarnessMonitorStore {
     var shouldScheduleConfirmation: Bool {
       !preservedItemIDs.isEmpty || preservedStatus
     }
+  }
+
+  func taskBoardSnapshotChanged(from snapshot: ResolvedTaskBoardRefreshSnapshot) -> Bool {
+    globalTaskBoardItems != snapshot.items
+      || globalTaskBoardOrchestratorStatus?.withoutAutomationSnapshot
+        != snapshot.orchestratorStatus?.withoutAutomationSnapshot
   }
 
   func resolvedTaskBoardRefreshSnapshot(
@@ -257,6 +263,7 @@ extension HarnessMonitorStore {
     var tick = TaskBoardConfirmationTick(
       resolvedItems: globalTaskBoardItems,
       resolvedStatus: globalTaskBoardOrchestratorStatus,
+      automationSnapshot: nil,
       shouldApply: false,
       shouldKeepWaiting: false
     )
@@ -311,6 +318,7 @@ extension HarnessMonitorStore {
       return
     }
     if measuredStatus.value != nil || reachedDeadline {
+      tick.automationSnapshot = measuredStatus.value?.automation
       tick.resolvedStatus = reconcileTaskBoardOrchestratorStatus(
         measuredStatus.value,
         snapshotConfirmationRevision: snapshot.stepModeConfirmationRevision
@@ -324,10 +332,12 @@ extension HarnessMonitorStore {
   func commitTaskBoardConfirmationTick(_ tick: TaskBoardConfirmationTick) {
     let didChangeTaskBoardSnapshot =
       globalTaskBoardItems != tick.resolvedItems
-      || globalTaskBoardOrchestratorStatus != tick.resolvedStatus
+      || globalTaskBoardOrchestratorStatus?.withoutAutomationSnapshot
+        != tick.resolvedStatus?.withoutAutomationSnapshot
     withUISyncBatch {
       self.globalTaskBoardItems = tick.resolvedItems
       self.globalTaskBoardOrchestratorStatus = tick.resolvedStatus
+      mergeTaskBoardAutomationSnapshot(tick.automationSnapshot)
     }
     if didChangeTaskBoardSnapshot {
       scheduleTaskBoardSnapshotCacheWrite(

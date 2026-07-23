@@ -54,6 +54,7 @@ extension HarnessMonitorStore {
       }
       recordRequestSuccess()
       globalTaskBoardOrchestratorStatus = measuredStatus.value
+      mergeTaskBoardAutomationSnapshot(measuredStatus.value.automation)
       await refreshTaskBoardDashboardSnapshot(using: client, fallbackStatus: measuredStatus.value)
       presentSuccessFeedback(actionName)
       return true
@@ -68,6 +69,7 @@ extension HarnessMonitorStore {
     fallbackStatus: TaskBoardOrchestratorStatus? = nil
   ) {
     let resolvedItems = snapshot.items.value ?? globalTaskBoardItems
+    let measuredAutomationSnapshot = snapshot.orchestratorStatus.measured?.value?.automation
     let snapshotStatus =
       if let measuredStatus = snapshot.orchestratorStatus.measured {
         measuredStatus.value ?? fallbackStatus
@@ -80,13 +82,15 @@ extension HarnessMonitorStore {
     )
     let didChangeTaskBoardSnapshot =
       globalTaskBoardItems != resolvedItems
-      || globalTaskBoardOrchestratorStatus != resolvedStatus
+      || globalTaskBoardOrchestratorStatus?.withoutAutomationSnapshot
+        != resolvedStatus?.withoutAutomationSnapshot
 
     withUISyncBatch {
       // Explicit task-board refreshes may clear an authoritative empty result, but
       // unavailable endpoints must not erase the last visible board snapshot.
       globalTaskBoardItems = resolvedItems
       globalTaskBoardOrchestratorStatus = resolvedStatus
+      mergeTaskBoardAutomationSnapshot(measuredAutomationSnapshot)
     }
     if didChangeTaskBoardSnapshot {
       scheduleTaskBoardSnapshotCacheWrite(

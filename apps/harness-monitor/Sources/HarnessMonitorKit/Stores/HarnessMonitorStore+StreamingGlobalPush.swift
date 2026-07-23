@@ -67,6 +67,7 @@ extension HarnessMonitorStore {
     if contentUI.dashboard.taskBoardRevision != payload.revision {
       contentUI.dashboard.taskBoardRevision = payload.revision
     }
+    mergeTaskBoardAutomationSnapshot(payload.automation)
   }
 
   func mergedSessionsApplyingDelta(

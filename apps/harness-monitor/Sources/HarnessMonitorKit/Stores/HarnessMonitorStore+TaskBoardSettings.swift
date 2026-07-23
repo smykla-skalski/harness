@@ -169,6 +169,7 @@ extension HarnessMonitorStore {
           currentTick: status.currentTick,
           lastRun: status.lastRun,
           workflowExecutionCounts: status.workflowExecutionCounts,
+          automation: status.automation,
           settings: orchestratorSettings
         )
       }

@@ -172,10 +172,12 @@ const OPEN_STRING_ENUMS: &[&str] = &[
     "FixSafety",
     // task_board types.rs foundation enums adopted as the app's open TaskBoardOpenEnum
     // conformers (listed by Swift name: AgentMode is renamed to TaskBoardAgentMode).
-    // Both already model an unknown(String) catch-all app-side; TaskBoardPriority stays
-    // closed (default emit). Their .title moves to a hand extension.
+    // Status and agent mode already modeled an unknown(String) catch-all app-side;
+    // workflow kind is open so a newer daemon cannot break item decoding.
+    // TaskBoardPriority stays closed (default emit). Their .title moves to a hand extension.
     "TaskBoardStatus",
     "TaskBoardAgentMode",
+    "TaskBoardWorkflowKind",
 ];
 
 /// Emit an open Swift enum conforming to `TaskBoardOpenEnum` (which supplies the
@@ -1912,6 +1914,26 @@ fn is_skip_default_optional(struct_name: &str, field_name: &str) -> bool {
         .any(|(owner, field)| *owner == struct_name && *field == field_name)
 }
 
+/// Bare `#[serde(default)]` value fields whose Rust type has a manual, nonzero
+/// `Default` implementation and whose immediate Swift hand model already owns
+/// that canonical default. The generated wire keeps these values optional so a
+/// legacy payload's absence reaches the hand model as `nil`, without copying
+/// the nested default literals into codegen. Entries are assertion-guarded in
+/// `build_fields`: they must remain non-optional bare-default fields for which
+/// codegen cannot otherwise resolve a decoder fallback.
+const HAND_MODEL_DEFAULT_OPTIONAL_FIELDS: &[(&str, &str)] = &[
+    ("TaskBoardOrchestratorSettings", "scheduling"),
+    ("TaskBoardOrchestratorSettings", "retry"),
+    ("TaskBoardOrchestratorSettings", "reviewers"),
+];
+
+/// Whether `(struct_name, field_name)` is in `HAND_MODEL_DEFAULT_OPTIONAL_FIELDS`.
+fn is_hand_model_default_optional(struct_name: &str, field_name: &str) -> bool {
+    HAND_MODEL_DEFAULT_OPTIONAL_FIELDS
+        .iter()
+        .any(|(owner, field)| *owner == struct_name && *field == field_name)
+}
+
 /// `(Rust struct name, Rust field name)` pairs dropped from the generated wire
 /// type because the app does not reuse them (the hand model omits them). Decode
 /// stays faithful: `JSONDecoder` ignores keys with no matching property, so an
@@ -1955,15 +1977,9 @@ const OMITTED_WIRE_FIELDS: &[(&str, &str)] = &[
     // lists (Vec<ExternalSyncField>, a daemon-only enum with no Swift mirror).
     ("ExternalSyncOperation", "changed_fields"),
     ("ExternalSyncOperation", "unsupported_fields"),
-    // task-board automation: the current Monitor hand models do not surface the daemon's v36
-    // workflow-kind, automation settings, or compact status snapshot yet. Keep their wire
-    // adapters on the existing app shape; JSONDecoder safely ignores these response keys.
-    // execution_repository is surfaced: GitHub imports leave project_id empty and carry the
-    // repository here, so the card needs it to label the source repo instead of the agent mode.
-    ("TaskBoardItem", "workflow_kind"),
-    ("TaskBoardOrchestratorSettings", "scheduling"),
-    ("TaskBoardOrchestratorSettings", "retry"),
-    ("TaskBoardOrchestratorSettings", "reviewers"),
+    // Remote-routing configuration is not consumed by the initial automation
+    // inspector mapping. JSONDecoder safely ignores these response keys while
+    // the automation status, workflow kind, and scheduler settings ship.
     ("TaskBoardOrchestratorSettings", "repositories"),
     ("TaskBoardOrchestratorSettings", "execution_hosts"),
     ("TaskBoardOrchestratorSettings", "local_execution_host"),
@@ -1972,7 +1988,6 @@ const OMITTED_WIRE_FIELDS: &[(&str, &str)] = &[
         "TaskBoardOrchestratorSettingsUpdateRequest",
         "local_execution_host",
     ),
-    ("TaskBoardOrchestratorStatus", "automation"),
 ];
 
 /// Whether `(struct_name, field_name)` is in `OMITTED_WIRE_FIELDS`.
@@ -2047,13 +2062,20 @@ fn build_fields(
             rust_type_to_swift(&field.ty)
         };
         let rust_ident = type_ident(&field.ty);
-        // An app-optional value field (see SKIP_DEFAULT_OPTIONAL_FIELDS): drop the
-        // `?? Default()` coalesce so an omitted value decodes to nil. The guard
-        // keeps the list honest - a listed field must be a `*::is_default` skip
-        // field, the only shape where absence and the default are interchangeable.
-        let force_optional = is_skip_default_optional(struct_name, &name);
+        let natural_decode_default = field_decode_default(
+            &swift_type,
+            rust_ident.as_deref(),
+            &serde,
+            defaults,
+            symbols,
+        );
+        // App-optional value fields drop any `?? Default()` coalesce so an omitted
+        // value decodes to nil. Each allow-list has source-shape guards that keep
+        // the exception narrow and force maintenance when the Rust contract or
+        // codegen's default resolution changes.
+        let skip_default_optional = is_skip_default_optional(struct_name, &name);
         assert!(
-            !force_optional
+            !skip_default_optional
                 || serde
                     .skip_serializing_if
                     .as_deref()
@@ -2061,17 +2083,23 @@ fn build_fields(
             "SKIP_DEFAULT_OPTIONAL_FIELDS entry `{struct_name}.{name}` lacks a \
              `*::is_default` skip predicate; it cannot drop a defaulted value"
         );
+        let hand_model_default_optional = is_hand_model_default_optional(struct_name, &name);
+        assert!(
+            !hand_model_default_optional
+                || (!swift_type.optional
+                    && serde.has_default
+                    && serde.default_fn.is_none()
+                    && serde.skip_serializing_if.is_none()
+                    && natural_decode_default.is_none()),
+            "HAND_MODEL_DEFAULT_OPTIONAL_FIELDS entry `{struct_name}.{name}` must remain a \
+             non-optional bare `#[serde(default)]` field with no codegen-resolved fallback"
+        );
+        let force_optional = skip_default_optional || hand_model_default_optional;
         let optional = swift_type.optional || force_optional;
         let decode_default = if force_optional {
             None
         } else {
-            field_decode_default(
-                &swift_type,
-                rust_ident.as_deref(),
-                &serde,
-                defaults,
-                symbols,
-            )
+            natural_decode_default
         };
         let init_default = field_init_default(
             optional,
@@ -2540,14 +2568,18 @@ const TASK_BOARD_TYPES_SOURCE: &str = include_str!("../src/task_board/types.rs")
 const TASK_BOARD_LANE_SOURCE: &str = include_str!("../src/task_board/lane.rs");
 const TASK_BOARD_PROGRESS_ROLLUP_SOURCE: &str =
     include_str!("../src/task_board/progress_rollup.rs");
+const TASK_BOARD_WORKFLOW_SOURCE: &str = include_str!("../src/task_board/automation/workflow.rs");
 const TASK_BOARD_ENUMS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardEnums.generated.swift";
-// The task-board foundation enums in types.rs that every item/summary/request
-// references. The rich TaskBoardItem and the other types.rs structs are excluded
-// by the allow-list; so is TaskBoardItemKind, which is hand-written (see
-// EXTERNAL_SWIFT_TYPES) because its Unknown(String) variant carries a raw wire
-// value the string-enum emitter cannot model. TaskBoardStatus/AgentMode emit
-// open, TaskBoardPriority closed.
-const TASK_BOARD_ENUMS_EMIT_ONLY: &[&str] = &["TaskBoardStatus", "TaskBoardPriority", "AgentMode"];
+// The task-board foundation enums that every item/summary/request references.
+// TaskBoardItemKind stays hand-written because its Unknown(String) variant
+// carries a raw value the string-enum emitter cannot model. TaskBoardStatus and
+// Status, AgentMode, and WorkflowKind emit open; TaskBoardPriority is closed.
+const TASK_BOARD_ENUMS_EMIT_ONLY: &[&str] = &[
+    "TaskBoardStatus",
+    "TaskBoardPriority",
+    "AgentMode",
+    "TaskBoardWorkflowKind",
+];
 const TASK_BOARD_SUMMARY_SOURCE: &str = include_str!("../src/task_board/summary.rs");
 const TASK_BOARD_SUMMARY_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardSummaryWireTypes.generated.swift";
 // The audit, project and machine summary structs - all over primitives plus the
@@ -2561,10 +2593,12 @@ const TASK_BOARD_SUMMARY_EMIT_ONLY: &[&str] = &[
 ];
 const TASK_BOARD_ITEM_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardItemWireTypes.generated.swift";
 // The core TaskBoardItem and its nested structs/enums from types.rs, plus the
-// items-list and explicit-position response wrappers from the protocol facade. References the adopted
-// TaskBoardStatus/TaskBoardPriority/TaskBoardAgentMode enums bare; the two closed
-// enums here (ExternalRefProvider, TaskBoardWorkflowStatus) take the suffix. The
-// *Wire types own the faithful daemon decode; the rich hand models keep their shape.
+// items-list and explicit-position response wrappers from the protocol facade.
+// References the adopted TaskBoardStatus/TaskBoardPriority/TaskBoardAgentMode/
+// TaskBoardWorkflowKind enums bare; the two closed enums here
+// (ExternalRefProvider, TaskBoardWorkflowStatus) take the suffix. The *Wire types
+// own the faithful daemon decode, while the workflow source resolves the
+// workflow-kind serde default without emitting the rest of its graph.
 const TASK_BOARD_ITEM_EMIT_ONLY: &[&str] = &[
     "TaskBoardItem",
     "TaskBoardLaneOrigin",
@@ -2857,6 +2891,39 @@ const ORCHESTRATOR_EMIT_ONLY: &[&str] = &[
     "TaskBoardHeldDispatchSummary",
     "TaskBoardHeldDispatchItem",
 ];
+const TASK_BOARD_AUTOMATION_STATUS_SOURCE: &str =
+    include_str!("../src/task_board/automation/status.rs");
+const TASK_BOARD_AUTOMATION_SETTINGS_SOURCE: &str =
+    include_str!("../src/task_board/automation/settings.rs");
+const TASK_BOARD_AUTOMATION_PROTOCOL_SOURCE: &str =
+    include_str!("../src/daemon/protocol/task_board_automation.rs");
+const TASK_BOARD_AUTOMATION_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardAutomationWireTypes.generated.swift";
+// Independent compact status, paged history/detail/metrics reads, and local
+// automation settings. PR7-owned host, repository-routing, admission, transport,
+// and force-cancel types intentionally remain outside this allow-list.
+const TASK_BOARD_AUTOMATION_EMIT_ONLY: &[&str] = &[
+    "TaskBoardAutomationDesiredMode",
+    "TaskBoardAutomationAdmissionState",
+    "TaskBoardAutomationEffectiveState",
+    "TaskBoardAutomationRunTrigger",
+    "TaskBoardAutomationRunState",
+    "TaskBoardAutomationRunOutcome",
+    "TaskBoardAutomationScope",
+    "TaskBoardAutomationQueueSummary",
+    "TaskBoardAutomationRunInfo",
+    "TaskBoardAutomationHistoryRequest",
+    "TaskBoardAutomationHistoryResponse",
+    "TaskBoardAutomationRunStage",
+    "TaskBoardAutomationRunDetail",
+    "TaskBoardAutomationMetrics",
+    "TaskBoardAutomationSnapshot",
+    "TaskBoardAutomationSchedulingSettings",
+    "TaskBoardAutomationRetrySettings",
+    "TaskBoardReviewerProfile",
+    "TaskBoardReviewerRule",
+    "TaskBoardReviewerSettings",
+    "TaskBoardAutomationRunDetailRequest",
+];
 const GIT_RUNTIME_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardGitRuntimeWireTypes.generated.swift";
 // The git runtime config tree (runtime-config get/update + secret handoff). The config/profile/
 // signing-config/override structs come from runtime_config.rs; the prepare response wrapper comes
@@ -3076,9 +3143,9 @@ fn modules() -> Vec<GeneratedModule> {
         },
         GeneratedModule {
             output: TASK_BOARD_ENUMS_OUTPUT,
-            description: "the Rust task-board status, priority and agent-mode enums",
+            description: "the Rust task-board status, priority, agent-mode and workflow-kind enums",
             defaults: &[],
-            sources: &[TASK_BOARD_TYPES_SOURCE],
+            sources: &[TASK_BOARD_TYPES_SOURCE, TASK_BOARD_WORKFLOW_SOURCE],
         },
         GeneratedModule {
             output: TASK_BOARD_SUMMARY_OUTPUT,
@@ -3095,6 +3162,7 @@ fn modules() -> Vec<GeneratedModule> {
                 TASK_BOARD_LANE_SOURCE,
                 TASK_BOARD_PROTOCOL_SOURCE,
                 TASK_BOARD_PROGRESS_ROLLUP_SOURCE,
+                TASK_BOARD_WORKFLOW_SOURCE,
             ],
         },
         GeneratedModule {
@@ -3228,6 +3296,19 @@ fn modules() -> Vec<GeneratedModule> {
             sources: &[ORCHESTRATOR_TYPES_SOURCE, POLICY_SOURCE],
         },
         GeneratedModule {
+            output: TASK_BOARD_AUTOMATION_OUTPUT,
+            description: "the independent Rust task-board automation status, history, metrics and settings types",
+            defaults: &[
+                TASK_BOARD_AUTOMATION_STATUS_SOURCE,
+                TASK_BOARD_AUTOMATION_SETTINGS_SOURCE,
+            ],
+            sources: &[
+                TASK_BOARD_AUTOMATION_STATUS_SOURCE,
+                TASK_BOARD_AUTOMATION_SETTINGS_SOURCE,
+                TASK_BOARD_AUTOMATION_PROTOCOL_SOURCE,
+            ],
+        },
+        GeneratedModule {
             output: GIT_RUNTIME_OUTPUT,
             description: "the Rust task-board git runtime config and secret-handoff response",
             defaults: &[TASK_BOARD_CREDENTIAL_SOURCE],
@@ -3320,6 +3401,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         SYNC_SUMMARY_OUTPUT => SYNC_SUMMARY_EMIT_ONLY,
         GITHUB_CONFIG_OUTPUT => GITHUB_CONFIG_EMIT_ONLY,
         ORCHESTRATOR_OUTPUT => ORCHESTRATOR_EMIT_ONLY,
+        TASK_BOARD_AUTOMATION_OUTPUT => TASK_BOARD_AUTOMATION_EMIT_ONLY,
         GIT_RUNTIME_OUTPUT => GIT_RUNTIME_EMIT_ONLY,
         GIT_SIGNING_VERIFY_OUTPUT => GIT_SIGNING_VERIFY_EMIT_ONLY,
         ACP_EVENT_BATCH_OUTPUT => ACP_EVENT_BATCH_EMIT_ONLY,
@@ -3858,6 +3940,55 @@ pub struct Drop { pub other: String }
     }
 
     #[test]
+    fn hand_model_defaults_keep_listed_automation_settings_optional() {
+        let source = r"
+            #[derive(Serialize, Deserialize)]
+            pub struct TaskBoardOrchestratorSettings {
+                #[serde(default)]
+                pub scheduling: TaskBoardAutomationSchedulingSettings,
+                #[serde(default)]
+                pub retry: TaskBoardAutomationRetrySettings,
+                #[serde(default)]
+                pub reviewers: TaskBoardReviewerSettings,
+                pub policy_version: String,
+            }
+        ";
+        let symbols = build_symbol_table(&[source]);
+        let defaults = DefaultLiterals::new();
+        let file = syn::parse_file(source).expect("source parses");
+        let item = file
+            .items
+            .iter()
+            .find_map(|item| match item {
+                Item::Struct(item) if item.ident == "TaskBoardOrchestratorSettings" => {
+                    Some(item.clone())
+                }
+                _ => None,
+            })
+            .expect("orchestrator settings present");
+        let spec = build_struct(&item, &defaults, &symbols).expect("struct builds");
+
+        for property in ["scheduling", "retry", "reviewers"] {
+            let field = spec
+                .fields
+                .iter()
+                .find(|field| field.property == property)
+                .expect("hand-model-default field present");
+            assert!(field.optional, "{property} reaches the hand model as nil");
+            assert_eq!(field.decode_default, None, "no duplicated default literal");
+            assert_eq!(field.init_default.as_deref(), Some("nil"));
+        }
+
+        let policy_version = spec
+            .fields
+            .iter()
+            .find(|field| field.property == "policyVersion")
+            .expect("strict field present");
+        assert!(!policy_version.optional, "unrelated required fields stay strict");
+        assert_eq!(policy_version.decode_default, None);
+    }
+
+    #[test]
     fn omitted_wire_field_is_dropped_from_struct() {
         // DispatchPlan.lifecycle is in OMITTED_WIRE_FIELDS: the app does not read it,
         // so the wire type drops the field and the daemon's key is ignored on decode.
@@ -3889,7 +4020,7 @@ pub struct Drop { pub other: String }
     }
 
     #[test]
-    fn automation_snapshot_is_deferred_from_monitor_status_wire() {
+    fn automation_snapshot_is_emitted_in_monitor_status_wire() {
         let source = r"
             #[derive(Serialize, Deserialize)]
             pub struct TaskBoardOrchestratorStatus {
@@ -3917,7 +4048,7 @@ pub struct Drop { pub other: String }
             .map(|field| field.property.as_str())
             .collect();
 
-        assert_eq!(properties, vec!["enabled"], "automation is deferred");
+        assert_eq!(properties, vec!["enabled", "automation"]);
     }
 
     #[test]

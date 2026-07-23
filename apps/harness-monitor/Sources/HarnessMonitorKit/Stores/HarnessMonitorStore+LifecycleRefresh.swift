@@ -387,6 +387,7 @@ struct RefreshApplyOptions {
 struct TaskBoardConfirmationTick {
   var resolvedItems: [TaskBoardItem]
   var resolvedStatus: TaskBoardOrchestratorStatus?
+  var automationSnapshot: TaskBoardAutomationSnapshot?
   var shouldApply: Bool
   var shouldKeepWaiting: Bool
 }

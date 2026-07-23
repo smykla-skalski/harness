@@ -23,6 +23,8 @@ struct TaskBoardItemWireDecodingTests {
     #expect(item.status == .inProgress)
     #expect(item.priority == .high)
     #expect(item.agentMode == .interactive)
+    #expect(item.workflowKind == .prFix)
+    #expect(item.executionRepository == "acme/widget")
     #expect(item.tags == ["urgent"])
     #expect(item.importedFromProvider == .gitHub)
 
@@ -54,6 +56,8 @@ struct TaskBoardItemWireDecodingTests {
     #expect(item.status == .todo)
     #expect(item.priority == .medium)
     #expect(item.agentMode == .headless)
+    #expect(item.workflowKind == .defaultTask)
+    #expect(item.executionRepository == nil)
     #expect(item.tags.isEmpty)
     #expect(item.externalRefs.isEmpty)
     #expect(item.importedFromProvider == nil)
@@ -61,6 +65,26 @@ struct TaskBoardItemWireDecodingTests {
     #expect(item.workflow == nil)
     #expect(item.usage.inputTokens == nil)
     #expect(item.deletedAt == nil)
+  }
+
+  @Test("preserves an unknown workflow kind without rejecting the item")
+  func decodesUnknownWorkflowKind() throws {
+    let payload = """
+      {
+        "schema_version": 1,
+        "id": "task-future",
+        "title": "Future",
+        "workflow_kind": "future_workflow",
+        "created_at": "a",
+        "updated_at": "b"
+      }
+      """
+    let item = try decoder.decode(
+      TaskBoardItemWire.self,
+      from: Data(payload.utf8)
+    )
+
+    #expect(item.workflowKind == .unknown("future_workflow"))
   }
 
   @Test("maps a decoded wire item to the rich hand model")
@@ -234,6 +258,8 @@ private let fullItemPayloadFixture = """
     "project_id": "owner/repo",
     "target_project_types": ["rust"],
     "agent_mode": "interactive",
+    "workflow_kind": "pr_fix",
+    "execution_repository": "acme/widget",
     "external_refs": [
       {
         "provider": "github",

@@ -67,9 +67,10 @@ public final class HarnessMonitorStore {
     didSet { if oldValue != globalTaskBoardItems { scheduleUISync([.contentDashboard]) } }
   }
   public var globalTaskBoardOrchestratorStatus: TaskBoardOrchestratorStatus? {
-    didSet {
-      if oldValue != globalTaskBoardOrchestratorStatus { scheduleUISync([.contentDashboard]) }
-    }
+    didSet { syncDashboardIfChanged(oldValue, globalTaskBoardOrchestratorStatus) }
+  }
+  public var globalTaskBoardAutomationSnapshot: TaskBoardAutomationSnapshot? {
+    didSet { syncDashboardIfChanged(oldValue, globalTaskBoardAutomationSnapshot) }
   }
   public var globalTaskBoardSyncSummary: TaskBoardSyncSummary? {
     didSet { if oldValue != globalTaskBoardSyncSummary { scheduleUISync([.contentDashboard]) } }
@@ -78,9 +79,7 @@ public final class HarnessMonitorStore {
     didSet { if oldValue != globalTaskBoardDispatchSummary { scheduleUISync([.contentDashboard]) } }
   }
   public var globalTaskBoardEvaluationSummary: TaskBoardEvaluationSummary? {
-    didSet {
-      if oldValue != globalTaskBoardEvaluationSummary { scheduleUISync([.contentDashboard]) }
-    }
+    didSet { syncDashboardIfChanged(oldValue, globalTaskBoardEvaluationSummary) }
   }
   public var globalTaskBoardItemAuditSummary: TaskBoardAuditSummary? {
     didSet {
@@ -400,5 +399,14 @@ public final class HarnessMonitorStore {
     }
     self.persistenceError = persistenceError
     applyEnvironmentConfigurationAndStartInitialWork()
+  }
+}
+
+extension HarnessMonitorStore {
+  fileprivate func syncDashboardIfChanged<Value: Equatable>(
+    _ previous: Value,
+    _ current: Value
+  ) {
+    if previous != current { scheduleUISync([.contentDashboard]) }
   }
 }

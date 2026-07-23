@@ -286,7 +286,7 @@ private func encodedOrchestratorStatus(
   guard let orchestratorStatus else {
     return Data()
   }
-  return try Codecs.encoder.encode(orchestratorStatus)
+  return try Codecs.encoder.encode(orchestratorStatus.withoutAutomationSnapshot)
 }
 
 @Model

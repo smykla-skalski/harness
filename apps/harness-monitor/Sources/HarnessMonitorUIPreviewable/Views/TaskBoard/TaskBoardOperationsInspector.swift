@@ -54,11 +54,14 @@ struct TaskBoardOperationsInspector: View {
         .frame(maxHeight: .infinity)
 
       ScrollView(.vertical) {
-        TaskBoardOperationsPanel(
-          store: store,
-          taskBoardItems: isVisible ? taskBoardItems : [],
-          isActive: isVisible
-        )
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+          TaskBoardAutomationInspector(store: store, isActive: isVisible)
+          TaskBoardOperationsPanel(
+            store: store,
+            taskBoardItems: isVisible ? taskBoardItems : [],
+            isActive: isVisible
+          )
+        }
         .padding(HarnessMonitorTheme.spacingLG)
         .frame(maxWidth: .infinity, alignment: .topLeading)
       }
