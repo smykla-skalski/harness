@@ -16,12 +16,12 @@ struct HarnessMonitorFeedbackToastDetailRow: View {
   var body: some View {
     HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
       Text("\(row.label):")
-        .scaledFont(.caption2.weight(.semibold))
+        .scaledFont(.subheadline.weight(.semibold))
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .frame(width: 60, alignment: .leading)
+        .frame(width: 66, alignment: .leading)
 
       Text(row.value)
-        .scaledFont(.caption.monospaced())
+        .scaledFont(.subheadline.monospaced())
         .foregroundStyle(HarnessMonitorTheme.ink)
         .lineLimit(1)
         .truncationMode(.middle)
@@ -55,7 +55,7 @@ struct HarnessMonitorFeedbackToastPrimaryActionLabel: View {
       }
     }
     .lineLimit(1)
-    .scaledFont(.system(.caption, design: .rounded, weight: .semibold))
+    .scaledFont(.system(.subheadline, design: .rounded, weight: .semibold))
   }
 }
 

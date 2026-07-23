@@ -313,6 +313,7 @@ private struct HarnessMonitorWindowShellToastOverlay: View {
     Group {
       if let toast, !toast.activeFeedback(in: position).isEmpty {
         HarnessMonitorFeedbackToastView(toast: toast, position: position)
+          .harnessToastTextScaling()
           .padding(verticalEdge, HarnessMonitorTheme.spacingSM)
           .padding(.trailing, HarnessMonitorTheme.spacingLG)
       }
