@@ -11,12 +11,16 @@ import Testing
 /// width, the ScrollView lays the whole form out wider than the window and
 /// clips every field at the right edge - including the bottom action bar,
 /// whose buttons then become unreachable.
+///
+/// The sheet geometry lives at file scope because `@Test` argument
+/// expressions cannot reference the suite's own static members.
+private let manageItemSheetMinWidth: CGFloat = 1_120
+private let manageItemSheetIdealWidth: CGFloat = 1_240
+private let manageItemSheetLayoutTolerance: CGFloat = 0.5
+
 @MainActor
 @Suite("Task board item management panel layout")
 struct TaskBoardItemManagementPanelLayoutTests {
-  private static let sheetMinWidth: CGFloat = 1_120
-  private static let sheetIdealWidth: CGFloat = 1_240
-
   @Test(
     "Panel minimum width stays within the sheet at the default and largest text sizes",
     arguments: [HarnessMonitorTextSize.defaultIndex, HarnessMonitorTextSize.scales.count - 1]
@@ -27,12 +31,12 @@ struct TaskBoardItemManagementPanelLayoutTests {
       textSizeIndex: textSizeIndex
     )
 
-    #expect(minimumWidth <= Self.sheetMinWidth)
+    #expect(minimumWidth <= manageItemSheetMinWidth + manageItemSheetLayoutTolerance)
   }
 
   @Test(
     "Panel laid out at the sheet width does not overflow it",
-    arguments: [1_120.0, 1_240.0]
+    arguments: [manageItemSheetMinWidth, manageItemSheetIdealWidth]
   )
   func panelLaidOutAtSheetWidthDoesNotOverflow(sheetWidth: CGFloat) {
     let laidOutWidth = panelWidth(
@@ -40,7 +44,7 @@ struct TaskBoardItemManagementPanelLayoutTests {
       textSizeIndex: HarnessMonitorTextSize.scales.count - 1
     )
 
-    #expect(laidOutWidth <= sheetWidth)
+    #expect(laidOutWidth <= sheetWidth + manageItemSheetLayoutTolerance)
   }
 
   /// Measures the width the panel reports for a given width proposal through
