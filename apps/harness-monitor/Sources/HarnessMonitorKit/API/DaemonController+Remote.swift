@@ -20,7 +20,7 @@ extension DaemonController {
         await httpClient.shutdown()
         try await requireNotCancelled(releasing: webSocketClient)
         return webSocketClient
-      case .unavailable, .timedOut:
+      case .unavailable, .timedOut, .cancelled:
         try await requireNotCancelled(releasing: httpClient)
         return httpClient
       }

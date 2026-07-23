@@ -6,6 +6,7 @@ extension DaemonController {
     case upgraded(any HarnessMonitorClientProtocol)
     case unavailable
     case timedOut
+    case cancelled
   }
 
   /// Cancellation cannot unwind an in-flight `health()` RPC on its own: the RPC
@@ -58,7 +59,7 @@ extension DaemonController {
     switch outcome {
     case .upgraded, .unavailable:
       return outcome
-    case .timedOut:
+    case .timedOut, .cancelled:
       attempt.cancel()
       // A connect that already resumed can still finish after cancel. Shut the
       // late client down without blocking startup on that finish.
@@ -67,51 +68,98 @@ extension DaemonController {
           await webSocketClient.shutdown()
         }
       }
-      return .timedOut
+      return outcome
     }
   }
 
+  /// `attempt` is unstructured, and awaiting a non-throwing task's value is not
+  /// cancellable, so the race has to observe the caller's cancellation itself.
+  /// Without the handler a cancelled bootstrap still waits out the grace period.
   private func raceAutoTransportAttempt(
     _ attempt: Task<(any HarnessMonitorClientProtocol)?, Never>,
     gracePeriod: Duration
   ) async -> AutoTransportBootstrapOutcome {
+    let race = AutoTransportRace()
     var graceTimer: Task<Void, Never>?
-    let outcome: AutoTransportBootstrapOutcome = await withCheckedContinuation { continuation in
-      let finish = OnceResume(continuation)
-      Task {
-        if let webSocketClient = await attempt.value {
-          finish.resume(returning: .upgraded(webSocketClient))
-        } else {
-          finish.resume(returning: .unavailable)
-        }
-      }
-      graceTimer = Task {
-        do {
-          try await Task.sleep(for: gracePeriod)
-        } catch {
+    let outcome = await withTaskCancellationHandler {
+      await withCheckedContinuation { continuation in
+        guard race.install(continuation) else {
           return
         }
-        finish.resume(returning: .timedOut)
+        Task {
+          if let webSocketClient = await attempt.value {
+            race.finish(.upgraded(webSocketClient))
+          } else {
+            race.finish(.unavailable)
+          }
+        }
+        graceTimer = Task {
+          do {
+            try await Task.sleep(for: gracePeriod)
+          } catch {
+            return
+          }
+          race.finish(.timedOut)
+        }
       }
+    } onCancel: {
+      race.finish(.cancelled)
     }
     graceTimer?.cancel()
     return outcome
   }
 }
 
-/// Resumes a checked continuation at most once across concurrent race branches.
-private final class OnceResume<T: Sendable>: Sendable {
-  private let continuation: Mutex<CheckedContinuation<T, Never>?>
+/// Delivers the first of the race's branches to the awaiting continuation and
+/// drops the rest. `onCancel` can fire before the continuation exists, so a
+/// finish that arrives early is held until `install` can hand it over.
+private final class AutoTransportRace: Sendable {
+  private typealias Outcome = DaemonController.AutoTransportBootstrapOutcome
 
-  init(_ continuation: CheckedContinuation<T, Never>) {
-    self.continuation = Mutex(continuation)
+  private enum State {
+    case idle
+    case waiting(CheckedContinuation<Outcome, Never>)
+    case finishedEarly(Outcome)
+    case delivered
   }
 
-  func resume(returning value: T) {
-    let pending = continuation.withLock { stored in
-      defer { stored = nil }
-      return stored
+  private let state = Mutex<State>(.idle)
+
+  /// Returns false when the race already finished, meaning the caller must not
+  /// start the branches because the continuation is spoken for.
+  func install(_ continuation: CheckedContinuation<Outcome, Never>) -> Bool {
+    let early: Outcome? = state.withLock { current in
+      switch current {
+      case .idle:
+        current = .waiting(continuation)
+        return nil
+      case .finishedEarly(let outcome):
+        current = .delivered
+        return outcome
+      case .waiting, .delivered:
+        return nil
+      }
     }
-    pending?.resume(returning: value)
+    guard let early else {
+      return true
+    }
+    continuation.resume(returning: early)
+    return false
+  }
+
+  func finish(_ outcome: Outcome) {
+    let pending: CheckedContinuation<Outcome, Never>? = state.withLock { current in
+      switch current {
+      case .idle:
+        current = .finishedEarly(outcome)
+        return nil
+      case .waiting(let continuation):
+        current = .delivered
+        return continuation
+      case .finishedEarly, .delivered:
+        return nil
+      }
+    }
+    pending?.resume(returning: outcome)
   }
 }
