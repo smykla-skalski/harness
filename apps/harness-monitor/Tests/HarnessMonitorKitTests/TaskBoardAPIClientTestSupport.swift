@@ -68,6 +68,10 @@ let sampleTaskBoardAutomationMetricsText = #"""
   }
   """#
 
+let sampleTaskBoardAutomationForceCancelText = #"""
+  {"disposition":"accepted_pending"}
+  """#
+
 private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
   .taskBoardCapabilities: .object([
     "storage": .string("database"),
@@ -122,6 +126,8 @@ private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
   .taskBoardOrchestratorRuns: fixtureJSONValue(sampleTaskBoardAutomationHistoryText),
   .taskBoardOrchestratorRunDetail: fixtureJSONValue(sampleTaskBoardAutomationDetailText),
   .taskBoardOrchestratorMetrics: fixtureJSONValue(sampleTaskBoardAutomationMetricsText),
+  .taskBoardOrchestratorForceCancel:
+    fixtureJSONValue(sampleTaskBoardAutomationForceCancelText),
   .taskBoardOrchestratorRuntimeConfigGet: .object(sampleTaskBoardGitRuntimeConfigJSON),
   .taskBoardOrchestratorRuntimeConfigUpdate: .object(sampleTaskBoardGitRuntimeConfigJSON),
   .taskBoardOrchestratorGitHubTokensSync: .object(sampleGitHubTokensSyncJSON),
@@ -245,6 +251,8 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
       sampleTaskBoardAutomationHistoryText,
     Route("/v1/task-board/orchestrator/metrics", method: "GET"):
       sampleTaskBoardAutomationMetricsText,
+    Route("/v1/task-board/orchestrator/force-cancel", method: "POST"):
+      sampleTaskBoardAutomationForceCancelText,
     Route("/v1/task-board/orchestrator/runtime-config"): sampleTaskBoardGitRuntimeConfigText,
     Route("/v1/task-board/orchestrator/github-tokens"): sampleGitHubTokensSyncText,
     Route("/v1/task-board/orchestrator/todoist-token"): sampleTodoistTokenSyncText,

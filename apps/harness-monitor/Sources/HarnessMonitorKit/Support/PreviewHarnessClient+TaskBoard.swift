@@ -138,6 +138,13 @@ extension PreviewHarnessClient {
     try await performActionDelay()
     return await state.runTaskBoardOrchestratorOnce(request: request)
   }
+
+  public func forceCancelTaskBoardAutomation(
+    request _: TaskBoardAutomationForceCancelRequest
+  ) async throws -> TaskBoardAutomationForceCancelResponse {
+    try await performActionDelay()
+    return TaskBoardAutomationForceCancelResponse(disposition: .acceptedPending)
+  }
 }
 
 extension TaskBoardStatus {

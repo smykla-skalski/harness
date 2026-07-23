@@ -12,14 +12,17 @@
 //! - `HARNESS_FEATURE_REVIEWS_BACKGROUND_AUTO=1` enables background Reviews
 //!   policy runs. It is off by default because it can approve or merge GitHub
 //!   pull requests without a same-moment user confirmation.
-//! - `HARNESS_FEATURE_TASK_BOARD_AUTOMATION_V2=1` enables the durable Task Board
-//!   automation engine while it completes staged rollout validation.
+//! - `HARNESS_FEATURE_TASK_BOARD_AUTOMATION_V2=0` disables the durable Task Board
+//!   automation engine and retains the legacy orchestrator compatibility path.
+//!   Without an override, the durable path is enabled.
 //! - `harness-daemon serve --disable-acp` / `--enable-acp` applies the same
 //!   gate as a process-scoped override without mutating the caller shell env.
 //!
 //! Resolution order: explicit process-scoped daemon override (when supplied)
-//! wins over env vars, env vars over the disabled-by-default baseline. Truthy
-//! values match the existing harness convention used by `HARNESS_OTEL_EXPORT`.
+//! wins over env vars, and env vars override each feature's default baseline.
+//! ACP and durable Task Board automation default on; suite hooks and background
+//! Reviews automation default off. Truthy values match the existing harness
+//! convention used by `HARNESS_OTEL_EXPORT`.
 //!
 //! Removal trigger: drop this whole module, the CLI arg on `BootstrapArgs`,
 //! and the `flags` parameter threaded through
@@ -49,7 +52,7 @@ pub fn acp_enabled_from_env() -> bool {
     if let Some(value) = *acp_runtime_override_slot() {
         return value;
     }
-    normalized_env_value(ACP_ENV).is_none_or(|value| env_value_truthy(&value))
+    env_enabled_by_default(ACP_ENV)
 }
 
 /// Whether Reviews policy runs may start or resume from background triggers.
@@ -61,7 +64,7 @@ pub fn reviews_background_auto_enabled_from_env() -> bool {
 /// Whether the durable Task Board automation engine may admit work.
 #[must_use]
 pub fn task_board_automation_v2_enabled_from_env() -> bool {
-    env_truthy(TASK_BOARD_AUTOMATION_V2_ENV)
+    env_enabled_by_default(TASK_BOARD_AUTOMATION_V2_ENV)
 }
 
 /// Apply a process-scoped ACP enablement override for the lifetime of the guard.
@@ -142,6 +145,10 @@ fn env_truthy(name: &str) -> bool {
     normalized_env_value(name).is_some_and(|value| env_value_truthy(&value))
 }
 
+fn env_enabled_by_default(name: &str) -> bool {
+    normalized_env_value(name).is_none_or(|value| env_value_truthy(&value))
+}
+
 fn env_value_truthy(value: &str) -> bool {
     matches!(
         value.to_ascii_lowercase().as_str(),
@@ -168,13 +175,13 @@ mod tests {
     }
 
     #[test]
-    fn defaults_to_all_disabled() {
+    fn defaults_match_feature_rollout_baselines() {
         with_clean_env(|| {
             let flags = RuntimeHookFlags::from_env();
             assert!(!flags.suite_hooks);
             assert!(acp_enabled_from_env());
             assert!(!reviews_background_auto_enabled_from_env());
-            assert!(!task_board_automation_v2_enabled_from_env());
+            assert!(task_board_automation_v2_enabled_from_env());
         });
     }
 
@@ -244,13 +251,22 @@ mod tests {
     }
 
     #[test]
-    fn task_board_automation_v2_flag_uses_same_truthy_env_convention() {
-        temp_env::with_var(TASK_BOARD_AUTOMATION_V2_ENV, Some("1"), || {
-            assert!(task_board_automation_v2_enabled_from_env());
-        });
-        temp_env::with_var(TASK_BOARD_AUTOMATION_V2_ENV, Some("false"), || {
-            assert!(!task_board_automation_v2_enabled_from_env());
-        });
+    fn task_board_automation_v2_defaults_on_and_accepts_explicit_overrides() {
+        for value in [None, Some(""), Some(" \t ")] {
+            temp_env::with_var(TASK_BOARD_AUTOMATION_V2_ENV, value, || {
+                assert!(task_board_automation_v2_enabled_from_env());
+            });
+        }
+        for value in ["1", "true", "TRUE", "yes", "on"] {
+            temp_env::with_var(TASK_BOARD_AUTOMATION_V2_ENV, Some(value), || {
+                assert!(task_board_automation_v2_enabled_from_env());
+            });
+        }
+        for value in ["0", "false", "FALSE", "no", "off"] {
+            temp_env::with_var(TASK_BOARD_AUTOMATION_V2_ENV, Some(value), || {
+                assert!(!task_board_automation_v2_enabled_from_env());
+            });
+        }
     }
 
     #[test]

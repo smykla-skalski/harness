@@ -261,7 +261,7 @@ async fn commit_atomic_cas_noop(
     })
 }
 
-fn validate_atomic_execution_attempt_update(
+pub(super) fn validate_atomic_execution_attempt_update(
     current: &TaskBoardWorkflowExecutionRecord,
     updated_execution: &TaskBoardWorkflowExecutionRecord,
     current_attempt: &TaskBoardExecutionAttemptRecord,

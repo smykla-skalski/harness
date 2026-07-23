@@ -35,6 +35,16 @@ extension HarnessMonitorAPIClient {
     )
   }
 
+  public func forceCancelTaskBoardAutomation(
+    request: TaskBoardAutomationForceCancelRequest
+  ) async throws -> TaskBoardAutomationForceCancelResponse {
+    try await post(
+      "/v1/task-board/orchestrator/force-cancel",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
+  }
+
   private func taskBoardAutomationPathSegment(_ value: String) throws -> String {
     let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))
     guard let encoded = value.addingPercentEncoding(withAllowedCharacters: allowed) else {

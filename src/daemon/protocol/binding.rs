@@ -8,13 +8,13 @@ use super::{
     AgentRemoveRequest, CodexRunRequest, ImproverApplyRequest, LeaderTransferRequest,
     ObserveSessionRequest, RoleChangeRequest, SessionArchiveRequest, SessionEndRequest,
     SignalCancelRequest, SignalSendRequest, TaskArbitrateRequest, TaskAssignRequest,
-    TaskBoardDispatchRequest, TaskBoardEvaluateRequest, TaskBoardOrchestratorRunOnceRequest,
-    TaskBoardPlanApproveRequest, TaskBoardPlanRevokeRequest, TaskBoardResetItemPositionRequest,
-    TaskBoardSetItemPositionRequest, TaskCheckpointRequest, TaskClaimReviewRequest,
-    TaskCreateRequest, TaskDeleteRequest, TaskDropRequest, TaskQueuePolicyRequest,
-    TaskRespondReviewRequest, TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
-    TaskUpdateRequest, VoiceAudioChunkRequest, VoiceSessionFinishRequest, VoiceSessionStartRequest,
-    VoiceTranscriptUpdateRequest,
+    TaskBoardAutomationForceCancelRequest, TaskBoardDispatchRequest, TaskBoardEvaluateRequest,
+    TaskBoardOrchestratorRunOnceRequest, TaskBoardPlanApproveRequest, TaskBoardPlanRevokeRequest,
+    TaskBoardResetItemPositionRequest, TaskBoardSetItemPositionRequest, TaskCheckpointRequest,
+    TaskClaimReviewRequest, TaskCreateRequest, TaskDeleteRequest, TaskDropRequest,
+    TaskQueuePolicyRequest, TaskRespondReviewRequest, TaskSubmitForReviewRequest,
+    TaskSubmitReviewRequest, TaskUpdateRequest, VoiceAudioChunkRequest, VoiceSessionFinishRequest,
+    VoiceSessionStartRequest, VoiceTranscriptUpdateRequest,
 };
 
 /// Rebind actor-bearing daemon requests to the authenticated control-plane
@@ -230,6 +230,12 @@ impl ControlPlaneActorRequest for TaskBoardOrchestratorRunOnceRequest {
     }
 }
 
+impl ControlPlaneActorRequest for TaskBoardAutomationForceCancelRequest {
+    fn bind_control_plane_actor(&mut self) {
+        bind_optional_control_plane_actor(&mut self.actor);
+    }
+}
+
 impl ControlPlaneActorRequest for TaskBoardPlanApproveRequest {
     fn bind_control_plane_actor(&mut self) {
         bind_required_control_plane_actor(&mut self.approved_by);
@@ -298,6 +304,30 @@ mod tests {
         let mut request = TaskBoardOrchestratorRunOnceRequest {
             actor: Some("imposter".into()),
             ..Default::default()
+        };
+        request.bind_control_plane_actor();
+        assert_eq!(request.actor.as_deref(), Some(CONTROL_PLANE_ACTOR_ID));
+    }
+
+    #[test]
+    fn actor_binding_force_cancel_clears_caller_supplied_actor() {
+        let mut request = TaskBoardAutomationForceCancelRequest {
+            target: crate::task_board::TaskBoardAutomationCancelTarget {
+                execution_id: "execution-1".into(),
+                item_id: "item-1".into(),
+                workflow_kind: crate::task_board::TaskBoardWorkflowKind::Review,
+                assignment_id: "assignment-1".into(),
+                host_id: "host-1".into(),
+                fencing_epoch: 1,
+                action_key: "review:one".into(),
+                attempt: 1,
+                idempotency_key: "attempt-1".into(),
+                assignment_state: "running".into(),
+                expected_record_sha256: "a".repeat(64),
+                cancel_pending: false,
+            },
+            reason: "cancel".into(),
+            actor: Some("imposter".into()),
         };
         request.bind_control_plane_actor();
         assert_eq!(request.actor.as_deref(), Some(CONTROL_PLANE_ACTOR_ID));

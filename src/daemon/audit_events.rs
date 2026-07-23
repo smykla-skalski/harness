@@ -113,6 +113,16 @@ async fn persist_audit_event(async_db: &AsyncDaemonDb, event: &HarnessMonitorAud
     }
 }
 
+pub(crate) async fn persist_audit_event_once_strict(
+    async_db: &AsyncDaemonDb,
+    event: &HarnessMonitorAuditEvent,
+) -> Result<(), CliError> {
+    if async_db.insert_audit_event_if_absent(event).await? {
+        broadcast_audit_event(event);
+    }
+    Ok(())
+}
+
 #[expect(
     clippy::cognitive_complexity,
     reason = "audit push broadcasting has explicit early returns for each failure mode"

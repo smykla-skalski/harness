@@ -93,7 +93,7 @@ indirect enum AuditPayloadNode {
         children: children,
         prettyJSON: value.prettyPrintedJSONString()
       )
-    case .bool, .null, .number, .string:
+    case .bool, .null, .number, .string, .unsignedInteger:
       return .leaf(label: label, summary: AuditPayloadSummary(value: value))
     }
   }
@@ -120,6 +120,9 @@ struct AuditPayloadSummary: Sendable {
       let formatted = Self.formatNumber(number)
       displayValue = formatted
       copyValue = formatted
+    case .unsignedInteger(let number):
+      displayValue = String(number)
+      copyValue = displayValue
     case .string(let text):
       displayValue = text
       copyValue = text

@@ -1,4 +1,5 @@
 use crate::daemon::protocol::{
+    TaskBoardAutomationForceCancelRequest, TaskBoardAutomationForceCancelResponse,
     TaskBoardAutomationHistoryRequest, TaskBoardAutomationMetricsResponse,
     TaskBoardAutomationRunDetailResponse, TaskBoardAutomationRunsResponse,
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitHubTokensSyncResponse,
@@ -73,6 +74,17 @@ pub(crate) async fn automation_metrics(
     require_async_db(state, "task board automation metrics")?
         .task_board_automation_metrics()
         .await
+}
+
+pub(crate) async fn force_cancel_automation(
+    state: &DaemonHttpState,
+    request: &TaskBoardAutomationForceCancelRequest,
+) -> Result<TaskBoardAutomationForceCancelResponse, CliError> {
+    service::force_cancel_task_board_automation_db(
+        require_async_db(state, "task board automation force cancel")?,
+        request,
+    )
+    .await
 }
 
 pub(crate) async fn orchestrator_settings(

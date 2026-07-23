@@ -155,6 +155,17 @@ struct TaskBoardOrchestratorWireDecodingTests {
     #expect(snapshot.effectiveState == .idle)
     #expect(snapshot.queue.cleanupRequired == 9)
     #expect(snapshot.activeRun == nil)
+    #expect(snapshot.cancelableTargets.isEmpty)
+    #expect(!snapshot.cancelableTargetsTruncated)
+  }
+
+  @Test("force-cancel response preserves a future disposition")
+  func forceCancelResponsePreservesFutureDisposition() throws {
+    let data = Data(#"{"disposition":"already_cancelled"}"#.utf8)
+
+    let response = try decoder.decode(TaskBoardAutomationForceCancelResponse.self, from: data)
+
+    #expect(response.disposition == .unknown("already_cancelled"))
   }
 
   private func expectAutomationDefaults(_ settings: TaskBoardOrchestratorSettings) {

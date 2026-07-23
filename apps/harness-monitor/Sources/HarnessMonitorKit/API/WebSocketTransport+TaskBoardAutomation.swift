@@ -24,4 +24,12 @@ extension WebSocketTransport {
     let value = try await rpc(method: .taskBoardOrchestratorMetrics)
     return try decodePolicyWire(value)
   }
+
+  public func forceCancelTaskBoardAutomation(
+    request: TaskBoardAutomationForceCancelRequest
+  ) async throws -> TaskBoardAutomationForceCancelResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .taskBoardOrchestratorForceCancel, params: params)
+    return try decodePolicyWire(value)
+  }
 }

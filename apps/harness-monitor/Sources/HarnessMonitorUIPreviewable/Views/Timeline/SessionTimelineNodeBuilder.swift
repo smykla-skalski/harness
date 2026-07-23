@@ -232,7 +232,7 @@ struct SessionTimelineNodeBuilder {
         keys.formUnion(flattenPayloadKeys(in: value, prefix: prefix))
       }
       return keys
-    case .bool, .null, .number, .string:
+    case .bool, .null, .number, .string, .unsignedInteger:
       if let prefix {
         return [prefix]
       }

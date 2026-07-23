@@ -308,6 +308,18 @@ harness task-board orchestrator settings --dispatch-status-filter todo --json
 harness task-board orchestrator settings --project-dir <project-dir> --json
 ```
 
+The durable automation engine is enabled by default. Set
+`HARNESS_FEATURE_TASK_BOARD_AUTOMATION_V2=0` on the daemon process to retain the
+legacy compatibility path. Supported disabling values are `0`, `false`, `no`,
+and `off`; supported enabling values are `1`, `true`, `yes`, and `on`
+(case-insensitive). Blank and whitespace-only values are unset and therefore
+keep the default enabled. Enabling the durable path preserves an explicit
+durable stop. On durable startup, a control row that remains pristine adopts
+current legacy running intent. An explicit durable stop makes that row
+non-pristine, so later startups preserve the stop. That explicitly stopped
+control remains idle without creating wake or run records until an operator
+starts it.
+
 Defaults are conservative: workflows enabled for default tasks, PR fixes, PR
 reviews, and dependency updates; `dry_run_default=true`; and
 `dispatch_status_filter=todo`. `run-once` records a `dispatch` phase, executes
@@ -319,6 +331,15 @@ act as the repository fallback when `HARNESS_GITHUB_REPOSITORY` or
 `GITHUB_REPOSITORY` is unset. `--apply` overrides the dry-run default for that
 tick. Failures persist a failed last-run summary instead of silently dropping
 tick state.
+
+Harness Monitor exposes the same automation contract from the Task Board. The
+Manual surface starts, stops, or runs one reconciliation and lists up to 100
+eligible remote workflow bindings. An admin can force-cancel one exact binding;
+the daemon fences the request by execution, assignment, host, epoch, action,
+attempt, idempotency key, state, and record digest, so a stale selection is
+rejected instead of cancelling replacement work. The History surface pages
+durable runs and opens their stage details, while the overview shows the compact
+mode, admission, queue, active-run, and heartbeat state.
 
 When GitHub automations are enabled, the same tick also reuses the dispatched
 session worktree to manage the PR lifecycle for repo-scoped items. Harness

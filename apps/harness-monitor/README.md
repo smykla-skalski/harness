@@ -148,6 +148,21 @@ HARNESS_MONITOR_BUILD_LANE=bart-dev mise run monitor:build
 HARNESS_MONITOR_RUNTIME_LANE=bart-dev mise run monitor:daemon:dev
 ```
 
+## Task Board automation
+
+The Task Board Automation inspector consumes the daemon's durable snapshot. Its
+Manual surface provides start, stop, run-once, and exact-target remote force
+cancel controls; its History surface pages durable runs and their stage detail.
+Remote force cancel requires an `admin` profile scope. Monitor rechecks the full
+execution/assignment/host/fence/action/attempt/idempotency/state/digest binding
+immediately before transport and suppresses stale or already-pending selections;
+the daemon applies the same exact binding fence. The target list is bounded to
+100 entries and displays a truncation warning when more are eligible.
+
+See the [Task Board workflow guide](../../docs/agent-guides/task-board-workflow.md#orchestrator)
+for the daemon's default-on behavior, explicit-stop preservation, legacy-intent
+migration, and compatibility override.
+
 ## Reviews Auto policies
 
 The active Policy Canvas workflow named `reviews_auto` now drives Reviews Auto end to end. The same authored workflow powers the **Auto** button in the Reviews detail view and daemon-side background starts when refreshed pull requests match the workflow.

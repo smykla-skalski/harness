@@ -172,6 +172,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       status: TaskBoardStatus?,
       projectDir: String?
     )
+    case forceCancelTaskBoardAutomation(request: TaskBoardAutomationForceCancelRequest)
     case dispatchTaskBoard(
       dryRun: Bool,
       status: TaskBoardStatus?,

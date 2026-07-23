@@ -13,6 +13,7 @@ mod open_db;
 mod policy_bootstrap;
 mod remote;
 mod shutdown_signals;
+mod task_board_automation_startup;
 mod task_board_migration;
 #[cfg(test)]
 pub(crate) mod test_support;
@@ -83,6 +84,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         let _ = state::clear_manifest_for_pid(process_id());
         return Err(error);
     }
+    task_board_automation_startup::initialize_control_before_serving(&async_db).await?;
     let manifest = persist_manifest(&manifest)?;
     audit::record_daemon_started(async_db.get(), &endpoint, config.sandboxed).await;
     schedule_probe_cache_refresh();

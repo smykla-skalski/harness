@@ -133,6 +133,69 @@ struct TaskBoardAutomationInspectorActions: Equatable {
   }
 
   @MainActor
+  func requestForceCancel(
+    _ target: TaskBoardAutomationCancelTarget,
+    isPresentationCurrent: Bool,
+    forceCancelBlockedReason: String?,
+    cachedTargets: [TaskBoardAutomationCancelTargetPresentation],
+    currentTargets: [TaskBoardAutomationCancelTarget]
+  ) {
+    if let rejection = forceCancelRejection(
+      target,
+      isPresentationCurrent: isPresentationCurrent,
+      forceCancelBlockedReason: forceCancelBlockedReason,
+      cachedTargets: cachedTargets,
+      currentTargets: currentTargets
+    ) {
+      store.presentFailureFeedback(rejection)
+      return
+    }
+    state.pendingForceCancelTarget = target
+  }
+
+  @MainActor
+  func enqueueForceCancel(
+    target: TaskBoardAutomationCancelTarget,
+    isPresentationCurrent: Bool,
+    forceCancelBlockedReason: String?,
+    cachedTargets: [TaskBoardAutomationCancelTargetPresentation],
+    currentTargets: [TaskBoardAutomationCancelTarget]
+  ) {
+    if let rejection = forceCancelRejection(
+      target,
+      isPresentationCurrent: isPresentationCurrent,
+      forceCancelBlockedReason: forceCancelBlockedReason,
+      cachedTargets: cachedTargets,
+      currentTargets: currentTargets
+    ) {
+      store.presentFailureFeedback(rejection)
+      return
+    }
+    guard let request = state.beginAction(.forceCancel) else {
+      store.presentFailureFeedback("Another automation action is in progress")
+      return
+    }
+
+    let state = state
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Force-cancelling remote task-board workflow") {
+        let succeeded = await store.forceCancelTaskBoardAutomation(
+          request: TaskBoardAutomationForceCancelRequest(
+            target: target,
+            reason: "Cancelled from Harness Monitor"
+          )
+        )
+        await MainActor.run {
+          if state.completeAction(request), succeeded {
+            state.resetRemoteData()
+            enqueueVisibleLoads()
+          }
+        }
+      }
+    )
+  }
+
+  @MainActor
   private var isOnline: Bool {
     store.contentUI.dashboard.connectionState == .online
   }
@@ -153,7 +216,45 @@ struct TaskBoardAutomationInspectorActions: Equatable {
       "Stopping task-board automation"
     case .runOnce:
       "Running task-board automation once"
+    case .forceCancel:
+      "Force-cancelling remote task-board workflow"
     }
+  }
+
+  private func hasCurrentCancelTarget(
+    _ target: TaskBoardAutomationCancelTarget,
+    cachedTargets: [TaskBoardAutomationCancelTargetPresentation],
+    currentTargets: [TaskBoardAutomationCancelTarget]
+  ) -> Bool {
+    cachedTargets.contains { $0.target == target }
+      && currentTargets.contains(target)
+  }
+
+  @MainActor
+  private func forceCancelRejection(
+    _ target: TaskBoardAutomationCancelTarget,
+    isPresentationCurrent: Bool,
+    forceCancelBlockedReason: String?,
+    cachedTargets: [TaskBoardAutomationCancelTargetPresentation],
+    currentTargets: [TaskBoardAutomationCancelTarget]
+  ) -> String? {
+    if !isPresentationCurrent {
+      return "Automation status changed. Refresh and try again."
+    }
+    if let forceCancelBlockedReason {
+      return forceCancelBlockedReason
+    }
+    if target.cancelPending {
+      return "Cancellation is already pending"
+    }
+    if !hasCurrentCancelTarget(
+      target,
+      cachedTargets: cachedTargets,
+      currentTargets: currentTargets
+    ) {
+      return "Cancellation target changed. Refresh and try again."
+    }
+    return state.activeAction == nil ? nil : "Another automation action is in progress"
   }
 }
 
@@ -171,5 +272,7 @@ private func performCurrentTaskBoardAutomationControl(
     return await store.stopTaskBoardOrchestrator()
   case .runOnce:
     return await store.runTaskBoardOrchestratorOnce()
+  case .forceCancel:
+    return nil
   }
 }

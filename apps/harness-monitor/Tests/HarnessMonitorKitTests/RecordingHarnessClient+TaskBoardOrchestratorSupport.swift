@@ -3,6 +3,13 @@ import Foundation
 @testable import HarnessMonitorKit
 
 extension RecordingHarnessClient {
+  func forceCancelTaskBoardAutomation(
+    request: TaskBoardAutomationForceCancelRequest
+  ) async throws -> TaskBoardAutomationForceCancelResponse {
+    calls.append(.forceCancelTaskBoardAutomation(request: request))
+    return TaskBoardAutomationForceCancelResponse(disposition: .acceptedPending)
+  }
+
   func sampleTaskBoardHostMachine() -> TaskBoardHostMachine {
     TaskBoardHostMachine(
       id: "recording-host-local",

@@ -50,11 +50,15 @@ struct TaskBoardAutomationPresentationTests {
     let missing = await availability(snapshot: nil)
     let offline = await availability(snapshot: snapshot(), isOnline: false)
     let readOnly = await availability(snapshot: snapshot(), isWriteAuthorized: false)
+    let operatorOnly = await availability(snapshot: snapshot(), isAdminAuthorized: false)
     let busy = await availability(snapshot: snapshot(), isGloballyBusy: true)
     #expect(missing.controlBlockedReason != nil)
     #expect(offline.controlBlockedReason != nil)
     #expect(readOnly.controlBlockedReason != nil)
+    #expect(operatorOnly.controlBlockedReason == nil)
+    #expect(operatorOnly.forceCancelBlockedReason == "Force cancel requires admin access")
     #expect(busy.controlBlockedReason != nil)
+    #expect(busy.forceCancelBlockedReason != nil)
 
     let stale = await availability(
       snapshot: snapshot(
@@ -73,6 +77,35 @@ struct TaskBoardAutomationPresentationTests {
     let available = await availability(snapshot: snapshot())
     #expect(available.controlBlockedReason == nil)
     #expect(!available.isSnapshotStale)
+    #expect(available.forceCancelBlockedReason == nil)
+  }
+
+  @Test("Force-cancel presentation preserves every exact target and truncation warning")
+  func forceCancelPresentationPreservesExactTargets() async {
+    let first = cancelTarget(executionID: "execution-1")
+    let pending = cancelTarget(executionID: "execution-2", cancelPending: true)
+    let presentation = await TaskBoardAutomationInspectorPresentationWorker().compute(
+      input: input(
+        snapshot: snapshot(
+          cancelableTargets: [first, pending],
+          cancelableTargetsTruncated: true
+        )
+      )
+    )
+
+    #expect(presentation.cancelTargets.map(\.target) == [first, pending])
+    #expect(presentation.cancelTargets[0].execution.contains("execution-1"))
+    #expect(
+      presentation.cancelTargets[0].forceCancelAccessibilityLabel
+        == "Force cancel item-7, execution execution-1, on host host-7"
+    )
+    #expect(presentation.cancelTargets[1].state == "Cancellation pending")
+    #expect(presentation.cancelTargetsTruncated)
+    #expect(
+      !presentation.cancelTargets
+        .flatMap { [$0.execution, $0.assignment, $0.binding] }
+        .contains(where: { $0.contains("digest-7") })
+    )
   }
 
   @MainActor
@@ -123,6 +156,7 @@ struct TaskBoardAutomationPresentationTests {
       referenceDate: Date(timeIntervalSince1970: 60)
     )
     let offline = input(snapshot: snapshot(), isOnline: false)
+    let operatorOnly = input(snapshot: snapshot(), isAdminAuthorized: false)
     let presentedAvailability = worker.controlAvailability(presented)
 
     #expect(
@@ -137,6 +171,13 @@ struct TaskBoardAutomationPresentationTests {
         comparedWith: offline,
         cachedAvailability: presentedAvailability,
         currentAvailability: worker.controlAvailability(offline)
+      )
+    )
+    #expect(
+      !presented.remainsCurrent(
+        comparedWith: operatorOnly,
+        cachedAvailability: presentedAvailability,
+        currentAvailability: worker.controlAvailability(operatorOnly)
       )
     )
 
@@ -244,9 +285,12 @@ struct TaskBoardAutomationPresentationTests {
       metrics: TaskBoardAutomationMetrics(runsTotal: 1)
     )
 
+    state.pendingForceCancelTarget = cancelTarget()
+
     state.resetRemoteData()
     #expect(state.runs.isEmpty)
     #expect(state.metrics == nil)
+    #expect(state.pendingForceCancelTarget == nil)
 
     let currentAction = try #require(state.beginAction(.start))
     #expect(!state.isCurrentAction(staleAction))
@@ -270,6 +314,7 @@ struct TaskBoardAutomationPresentationTests {
     snapshot: TaskBoardAutomationSnapshot?,
     isOnline: Bool = true,
     isWriteAuthorized: Bool = true,
+    isAdminAuthorized: Bool = true,
     isGloballyBusy: Bool = false
   ) async -> TaskBoardAutomationControlAvailability {
     let presentation = await TaskBoardAutomationInspectorPresentationWorker().compute(
@@ -277,6 +322,7 @@ struct TaskBoardAutomationPresentationTests {
         snapshot: snapshot,
         isOnline: isOnline,
         isWriteAuthorized: isWriteAuthorized,
+        isAdminAuthorized: isAdminAuthorized,
         isGloballyBusy: isGloballyBusy
       )
     )
@@ -289,6 +335,7 @@ struct TaskBoardAutomationPresentationTests {
     referenceDate: Date = Date(timeIntervalSince1970: 0),
     isOnline: Bool = true,
     isWriteAuthorized: Bool = true,
+    isAdminAuthorized: Bool = true,
     isGloballyBusy: Bool = false
   ) -> TaskBoardAutomationPresentationInput {
     TaskBoardAutomationPresentationInput(
@@ -301,6 +348,7 @@ struct TaskBoardAutomationPresentationTests {
       reconcileIntervalSeconds: 60,
       isOnline: isOnline,
       isWriteAuthorized: isWriteAuthorized,
+      isAdminAuthorized: isAdminAuthorized,
       isGloballyBusy: isGloballyBusy
     )
   }
@@ -315,6 +363,7 @@ struct TaskBoardAutomationPresentationTests {
       reconcileIntervalSeconds: 60,
       isOnline: true,
       isWriteAuthorized: true,
+      isAdminAuthorized: true,
       isGloballyBusy: false
     )
   }
@@ -323,7 +372,9 @@ struct TaskBoardAutomationPresentationTests {
     desiredMode: TaskBoardAutomationDesiredMode = .off,
     admissionState: TaskBoardAutomationAdmissionState = .stopped,
     heartbeatAgeSeconds: UInt64 = 0,
-    cleanupRequired: UInt = 0
+    cleanupRequired: UInt = 0,
+    cancelableTargets: [TaskBoardAutomationCancelTarget] = [],
+    cancelableTargetsTruncated: Bool = false
   ) -> TaskBoardAutomationSnapshot {
     TaskBoardAutomationSnapshot(
       revision: 1,
@@ -335,7 +386,29 @@ struct TaskBoardAutomationPresentationTests {
       heartbeatAgeSeconds: heartbeatAgeSeconds,
       settingsRevision: 1,
       policyRevision: 1,
-      queue: TaskBoardAutomationQueueSummary(cleanupRequired: cleanupRequired)
+      queue: TaskBoardAutomationQueueSummary(cleanupRequired: cleanupRequired),
+      cancelableTargets: cancelableTargets,
+      cancelableTargetsTruncated: cancelableTargetsTruncated
+    )
+  }
+
+  private func cancelTarget(
+    executionID: String = "execution-7",
+    cancelPending: Bool = false
+  ) -> TaskBoardAutomationCancelTarget {
+    TaskBoardAutomationCancelTarget(
+      executionId: executionID,
+      itemId: "item-7",
+      workflowKind: .prReview,
+      assignmentId: "assignment-7",
+      hostId: "host-7",
+      fencingEpoch: 7,
+      actionKey: "review",
+      attempt: 2,
+      idempotencyKey: "idempotency-7",
+      assignmentState: "running",
+      expectedRecordSha256: "digest-7",
+      cancelPending: cancelPending
     )
   }
 

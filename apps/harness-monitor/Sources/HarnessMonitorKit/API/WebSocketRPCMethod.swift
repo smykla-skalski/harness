@@ -69,6 +69,7 @@ enum WebSocketRPCMethod: String, CaseIterable, Equatable, Sendable {
   case taskBoardOrchestratorRuns = "task_board.orchestrator_runs"
   case taskBoardOrchestratorRunDetail = "task_board.orchestrator_run_detail"
   case taskBoardOrchestratorMetrics = "task_board.orchestrator_metrics"
+  case taskBoardOrchestratorForceCancel = "task_board.orchestrator_force_cancel"
   case taskBoardOrchestratorRuntimeConfigGet = "task_board.orchestrator_runtime_config_get"
   case taskBoardOrchestratorRuntimeConfigUpdate = "task_board.orchestrator_runtime_config_update"
   case taskBoardOrchestratorGitHubTokensSync = "task_board.orchestrator_github_tokens_sync"

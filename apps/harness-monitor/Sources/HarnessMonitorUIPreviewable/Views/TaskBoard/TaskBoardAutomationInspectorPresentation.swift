@@ -67,8 +67,23 @@ struct TaskBoardAutomationRunDetailPresentation: Equatable, Sendable {
   let error: String?
 }
 
+struct TaskBoardAutomationCancelTargetPresentation: Identifiable, Equatable, Sendable {
+  let id: String
+  let target: TaskBoardAutomationCancelTarget
+  let title: String
+  let state: String
+  let execution: String
+  let assignment: String
+  let binding: String
+
+  var forceCancelAccessibilityLabel: String {
+    "Force cancel \(title), execution \(target.executionId), on host \(target.hostId)"
+  }
+}
+
 struct TaskBoardAutomationControlAvailability: Equatable, Sendable {
   let controlBlockedReason: String?
+  let forceCancelBlockedReason: String?
   let isSnapshotStale: Bool
 }
 
@@ -82,6 +97,7 @@ struct TaskBoardAutomationPresentationInput: Equatable, Sendable {
   let reconcileIntervalSeconds: UInt64
   let isOnline: Bool
   let isWriteAuthorized: Bool
+  let isAdminAuthorized: Bool
   let isGloballyBusy: Bool
 
   func remainsCurrent(
@@ -102,6 +118,7 @@ struct TaskBoardAutomationPresentationInput: Equatable, Sendable {
       && reconcileIntervalSeconds == other.reconcileIntervalSeconds
       && isOnline == other.isOnline
       && isWriteAuthorized == other.isWriteAuthorized
+      && isAdminAuthorized == other.isAdminAuthorized
       && isGloballyBusy == other.isGloballyBusy
   }
 }
@@ -117,8 +134,11 @@ struct TaskBoardAutomationPresentation: Equatable, Sendable {
     historyRuns: [],
     detail: nil,
     metricRows: [],
+    cancelTargets: [],
+    cancelTargetsTruncated: false,
     controlAvailability: TaskBoardAutomationControlAvailability(
       controlBlockedReason: "Waiting for automation status",
+      forceCancelBlockedReason: "Waiting for automation status",
       isSnapshotStale: true
     ),
     isDegraded: false
@@ -133,6 +153,8 @@ struct TaskBoardAutomationPresentation: Equatable, Sendable {
   let historyRuns: [TaskBoardAutomationRunRow]
   let detail: TaskBoardAutomationRunDetailPresentation?
   let metricRows: [TaskBoardAutomationValueRow]
+  let cancelTargets: [TaskBoardAutomationCancelTargetPresentation]
+  let cancelTargetsTruncated: Bool
   let controlAvailability: TaskBoardAutomationControlAvailability
   let isDegraded: Bool
 }

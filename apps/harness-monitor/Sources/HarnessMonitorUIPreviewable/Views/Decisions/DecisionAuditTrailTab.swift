@@ -248,7 +248,7 @@ struct DecisionAuditTrailPayloadPresentation: Equatable, Sendable {
           return nested
         }
       }
-    case .bool, .null, .number, .string:
+    case .bool, .null, .number, .string, .unsignedInteger:
       return nil
     }
 

@@ -62,6 +62,9 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
   ) async throws -> TaskBoardAutomationHistoryResponse
   func taskBoardAutomationRunDetail(runID: String) async throws -> TaskBoardAutomationRunDetail
   func taskBoardAutomationMetrics() async throws -> TaskBoardAutomationMetrics
+  func forceCancelTaskBoardAutomation(
+    request: TaskBoardAutomationForceCancelRequest
+  ) async throws -> TaskBoardAutomationForceCancelResponse
   func taskBoardGitRuntimeConfig() async throws -> TaskBoardGitRuntimeConfig
   func updateTaskBoardGitRuntimeConfig(
     request: TaskBoardGitRuntimeConfig

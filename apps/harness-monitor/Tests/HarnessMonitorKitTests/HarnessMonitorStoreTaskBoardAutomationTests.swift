@@ -36,6 +36,51 @@ struct HarnessMonitorStoreTaskBoardAutomationTests {
     #expect(store.globalTaskBoardAutomationSnapshot?.observedAt == "2026-07-19T12:02:00Z")
   }
 
+  @Test("Force cancel sends the exact target and refreshes automation status")
+  func forceCancelSendsExactTargetAndRefreshes() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    let target = cancelTarget()
+    store.mergeTaskBoardAutomationSnapshot(snapshot(revision: 7, cancelableTargets: [target]))
+    let initialStatusReads = client.readCallCount(.taskBoardOrchestratorStatus)
+    let request = TaskBoardAutomationForceCancelRequest(
+      target: target,
+      reason: "operator requested cleanup"
+    )
+
+    let succeeded = await store.forceCancelTaskBoardAutomation(request: request)
+
+    #expect(succeeded)
+    #expect(client.recordedCalls() == [.forceCancelTaskBoardAutomation(request: request)])
+    #expect(client.readCallCount(.taskBoardOrchestratorStatus) > initialStatusReads)
+  }
+
+  @Test("Force cancel rejects stale or pending targets before transport")
+  func forceCancelRejectsStaleOrPendingTargets() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    let current = cancelTarget()
+    store.mergeTaskBoardAutomationSnapshot(snapshot(revision: 7, cancelableTargets: [current]))
+    let stale = cancelTarget(expectedRecordSHA256: "digest-changed")
+
+    let staleSucceeded = await store.forceCancelTaskBoardAutomation(
+      request: TaskBoardAutomationForceCancelRequest(target: stale, reason: "stale")
+    )
+    store.mergeTaskBoardAutomationSnapshot(
+      snapshot(revision: 8, cancelableTargets: [cancelTarget(cancelPending: true)])
+    )
+    let pendingSucceeded = await store.forceCancelTaskBoardAutomation(
+      request: TaskBoardAutomationForceCancelRequest(
+        target: cancelTarget(cancelPending: true),
+        reason: "duplicate"
+      )
+    )
+
+    #expect(!staleSucceeded)
+    #expect(!pendingSucceeded)
+    #expect(client.recordedCalls().isEmpty)
+  }
+
   @Test("Disconnect keeps embedded cached status from reviving automation controls")
   func offlineTransitionClearsAutomationStatus() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
@@ -92,7 +137,8 @@ struct HarnessMonitorStoreTaskBoardAutomationTests {
 
   private func snapshot(
     revision: UInt64,
-    observedAt: String = "2026-07-19T12:00:00Z"
+    observedAt: String = "2026-07-19T12:00:00Z",
+    cancelableTargets: [TaskBoardAutomationCancelTarget] = []
   ) -> TaskBoardAutomationSnapshot {
     TaskBoardAutomationSnapshot(
       revision: revision,
@@ -103,7 +149,28 @@ struct HarnessMonitorStoreTaskBoardAutomationTests {
       heartbeatAt: "2026-07-19T12:00:00Z",
       settingsRevision: 1,
       policyRevision: 1,
-      queue: TaskBoardAutomationQueueSummary()
+      queue: TaskBoardAutomationQueueSummary(),
+      cancelableTargets: cancelableTargets
+    )
+  }
+
+  private func cancelTarget(
+    expectedRecordSHA256: String = "digest-7",
+    cancelPending: Bool = false
+  ) -> TaskBoardAutomationCancelTarget {
+    TaskBoardAutomationCancelTarget(
+      executionId: "execution-7",
+      itemId: "item-7",
+      workflowKind: .prReview,
+      assignmentId: "assignment-7",
+      hostId: "host-7",
+      fencingEpoch: 7,
+      actionKey: "review",
+      attempt: 2,
+      idempotencyKey: "idempotency-7",
+      assignmentState: "running",
+      expectedRecordSha256: expectedRecordSHA256,
+      cancelPending: cancelPending
     )
   }
 

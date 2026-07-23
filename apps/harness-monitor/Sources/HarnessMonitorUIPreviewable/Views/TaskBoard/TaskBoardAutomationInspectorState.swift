@@ -19,6 +19,7 @@ enum TaskBoardAutomationInspectorAction: String, Equatable, Sendable {
   case start
   case stop
   case runOnce
+  case forceCancel
 }
 
 enum TaskBoardAutomationHistoryLoad: Equatable {
@@ -61,6 +62,7 @@ final class TaskBoardAutomationInspectorState {
   var selectedRunID: String?
   var detail: TaskBoardAutomationRunDetail?
   var metrics: TaskBoardAutomationMetrics?
+  var pendingForceCancelTarget: TaskBoardAutomationCancelTarget?
   private(set) var presentationRevision: UInt64 = 0
   private var historyGeneration: UInt64 = 0
   private var detailGeneration: UInt64 = 0
@@ -176,6 +178,7 @@ final class TaskBoardAutomationInspectorState {
     detail = nil
     metrics = nil
     activeAction = nil
+    pendingForceCancelTarget = nil
     presentationRevision &+= 1
   }
 

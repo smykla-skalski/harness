@@ -3,11 +3,11 @@ use std::pin::Pin;
 
 use crate::daemon::http::{DaemonHttpState, task_board_route_executor};
 use crate::daemon::protocol::{
-    TaskBoardAutomationHistoryRequest, TaskBoardAutomationRunDetailRequest,
-    TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
-    TaskBoardOpenRouterTokenSyncRequest, TaskBoardOrchestratorRunOnceRequest,
-    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardTodoistTokenSyncRequest, WsRequest,
-    WsResponse, ws_methods,
+    TaskBoardAutomationForceCancelRequest, TaskBoardAutomationHistoryRequest,
+    TaskBoardAutomationRunDetailRequest, TaskBoardGitHubTokensSyncRequest,
+    TaskBoardGitRuntimeConfig, TaskBoardOpenRouterTokenSyncRequest,
+    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
+    TaskBoardTodoistTokenSyncRequest, WsRequest, WsResponse, ws_methods,
 };
 
 use super::super::mutations::dispatch_query_result;
@@ -40,6 +40,9 @@ pub(super) async fn dispatch_method(
         }
         ws_methods::TASK_BOARD_ORCHESTRATOR_METRICS => {
             Some(dispatch_task_board_automation_metrics(request, state).await)
+        }
+        ws_methods::TASK_BOARD_ORCHESTRATOR_FORCE_CANCEL => {
+            Some(dispatch_task_board_automation_force_cancel(request, state).await)
         }
         ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_GET => {
             Some(dispatch_task_board_orchestrator_settings_get(request, state).await)
@@ -164,6 +167,20 @@ pub(super) async fn dispatch_task_board_automation_metrics(
     dispatch_query_result(
         &request.id,
         task_board_route_executor::automation_metrics(state).await,
+    )
+}
+
+async fn dispatch_task_board_automation_force_cancel(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Ok(body) = parse_control_plane_params::<TaskBoardAutomationForceCancelRequest>(request)
+    else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::force_cancel_automation(state, &body).await,
     )
 }
 

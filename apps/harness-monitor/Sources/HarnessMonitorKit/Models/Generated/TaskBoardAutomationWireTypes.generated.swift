@@ -280,6 +280,51 @@ public struct TaskBoardAutomationMetrics: Codable, Equatable, Sendable {
   }
 }
 
+public struct TaskBoardAutomationCancelTarget: Codable, Equatable, Sendable {
+  public var executionId: String
+  public var itemId: String
+  public var workflowKind: TaskBoardWorkflowKind
+  public var assignmentId: String
+  public var hostId: String
+  public var fencingEpoch: UInt64
+  public var actionKey: String
+  public var attempt: UInt32
+  public var idempotencyKey: String
+  public var assignmentState: String
+  public var expectedRecordSha256: String
+  public var cancelPending: Bool
+
+  public init(executionId: String, itemId: String, workflowKind: TaskBoardWorkflowKind, assignmentId: String, hostId: String, fencingEpoch: UInt64, actionKey: String, attempt: UInt32, idempotencyKey: String, assignmentState: String, expectedRecordSha256: String, cancelPending: Bool) {
+    self.executionId = executionId
+    self.itemId = itemId
+    self.workflowKind = workflowKind
+    self.assignmentId = assignmentId
+    self.hostId = hostId
+    self.fencingEpoch = fencingEpoch
+    self.actionKey = actionKey
+    self.attempt = attempt
+    self.idempotencyKey = idempotencyKey
+    self.assignmentState = assignmentState
+    self.expectedRecordSha256 = expectedRecordSha256
+    self.cancelPending = cancelPending
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case executionId = "execution_id"
+    case itemId = "item_id"
+    case workflowKind = "workflow_kind"
+    case assignmentId = "assignment_id"
+    case hostId = "host_id"
+    case fencingEpoch = "fencing_epoch"
+    case actionKey = "action_key"
+    case attempt
+    case idempotencyKey = "idempotency_key"
+    case assignmentState = "assignment_state"
+    case expectedRecordSha256 = "expected_record_sha256"
+    case cancelPending = "cancel_pending"
+  }
+}
+
 public struct TaskBoardAutomationSnapshot: Codable, Equatable, Sendable {
   public var schemaVersion: UInt32
   public var revision: UInt64
@@ -297,9 +342,11 @@ public struct TaskBoardAutomationSnapshot: Codable, Equatable, Sendable {
   public var policyRevision: UInt64
   public var queue: TaskBoardAutomationQueueSummary
   public var activeRun: TaskBoardAutomationRunInfo?
+  public var cancelableTargets: [TaskBoardAutomationCancelTarget]
+  public var cancelableTargetsTruncated: Bool
   public var blockedReason: String?
 
-  public init(schemaVersion: UInt32 = 1, revision: UInt64, desiredMode: TaskBoardAutomationDesiredMode, admissionState: TaskBoardAutomationAdmissionState, effectiveState: TaskBoardAutomationEffectiveState, observedAt: String, heartbeatAt: String, heartbeatAgeSeconds: UInt64? = nil, nextRunAt: String? = nil, nextRetryAt: String? = nil, lastSuccessAt: String? = nil, lastReconciliationAt: String? = nil, settingsRevision: UInt64, policyRevision: UInt64, queue: TaskBoardAutomationQueueSummary, activeRun: TaskBoardAutomationRunInfo? = nil, blockedReason: String? = nil) {
+  public init(schemaVersion: UInt32 = 1, revision: UInt64, desiredMode: TaskBoardAutomationDesiredMode, admissionState: TaskBoardAutomationAdmissionState, effectiveState: TaskBoardAutomationEffectiveState, observedAt: String, heartbeatAt: String, heartbeatAgeSeconds: UInt64? = nil, nextRunAt: String? = nil, nextRetryAt: String? = nil, lastSuccessAt: String? = nil, lastReconciliationAt: String? = nil, settingsRevision: UInt64, policyRevision: UInt64, queue: TaskBoardAutomationQueueSummary, activeRun: TaskBoardAutomationRunInfo? = nil, cancelableTargets: [TaskBoardAutomationCancelTarget] = [], cancelableTargetsTruncated: Bool = false, blockedReason: String? = nil) {
     self.schemaVersion = schemaVersion
     self.revision = revision
     self.desiredMode = desiredMode
@@ -316,6 +363,8 @@ public struct TaskBoardAutomationSnapshot: Codable, Equatable, Sendable {
     self.policyRevision = policyRevision
     self.queue = queue
     self.activeRun = activeRun
+    self.cancelableTargets = cancelableTargets
+    self.cancelableTargetsTruncated = cancelableTargetsTruncated
     self.blockedReason = blockedReason
   }
 
@@ -337,6 +386,8 @@ public struct TaskBoardAutomationSnapshot: Codable, Equatable, Sendable {
     policyRevision = try container.decode(UInt64.self, forKey: .policyRevision)
     queue = try container.decode(TaskBoardAutomationQueueSummary.self, forKey: .queue)
     activeRun = try container.decodeIfPresent(TaskBoardAutomationRunInfo.self, forKey: .activeRun)
+    cancelableTargets = try container.decodeIfPresent([TaskBoardAutomationCancelTarget].self, forKey: .cancelableTargets) ?? []
+    cancelableTargetsTruncated = try container.decodeIfPresent(Bool.self, forKey: .cancelableTargetsTruncated) ?? false
     blockedReason = try container.decodeIfPresent(String.self, forKey: .blockedReason)
   }
 
@@ -357,6 +408,8 @@ public struct TaskBoardAutomationSnapshot: Codable, Equatable, Sendable {
     case policyRevision = "policy_revision"
     case queue
     case activeRun = "active_run"
+    case cancelableTargets = "cancelable_targets"
+    case cancelableTargetsTruncated = "cancelable_targets_truncated"
     case blockedReason = "blocked_reason"
   }
 }
@@ -496,5 +549,67 @@ public struct TaskBoardAutomationRunDetailRequest: Codable, Equatable, Sendable 
 
   enum CodingKeys: String, CodingKey {
     case runId = "run_id"
+  }
+}
+
+public struct TaskBoardAutomationForceCancelRequest: Codable, Equatable, Sendable {
+  public var target: TaskBoardAutomationCancelTarget
+  public var reason: String
+  public var actor: String?
+
+  public init(target: TaskBoardAutomationCancelTarget, reason: String, actor: String? = nil) {
+    self.target = target
+    self.reason = reason
+    self.actor = actor
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case target
+    case reason
+    case actor
+  }
+}
+
+public enum TaskBoardAutomationForceCancelDisposition: TaskBoardOpenEnum, CaseIterable, Identifiable {
+  case acceptedPending
+  case cancelled
+  case replayedPending
+  case replayedCancelled
+  case unknown(String)
+
+  public static let allCases: [Self] = [.acceptedPending, .cancelled, .replayedPending, .replayedCancelled]
+
+  public var rawValue: String {
+    switch self {
+    case .acceptedPending: "accepted_pending"
+    case .cancelled: "cancelled"
+    case .replayedPending: "replayed_pending"
+    case .replayedCancelled: "replayed_cancelled"
+    case .unknown(let raw): raw
+    }
+  }
+
+  public init(rawValue: String) {
+    switch rawValue {
+    case "accepted_pending": self = .acceptedPending
+    case "cancelled": self = .cancelled
+    case "replayed_pending": self = .replayedPending
+    case "replayed_cancelled": self = .replayedCancelled
+    default: self = .unknown(rawValue)
+    }
+  }
+
+  public var id: String { rawValue }
+}
+
+public struct TaskBoardAutomationForceCancelResponse: Codable, Equatable, Sendable {
+  public var disposition: TaskBoardAutomationForceCancelDisposition
+
+  public init(disposition: TaskBoardAutomationForceCancelDisposition) {
+    self.disposition = disposition
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case disposition
   }
 }

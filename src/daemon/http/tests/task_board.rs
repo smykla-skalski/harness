@@ -14,18 +14,22 @@ use super::*;
 #[test]
 fn task_board_http_dispatch_evaluate_and_run_once_use_real_state() {
     let sandbox = tempdir().expect("tempdir");
-    harness_testkit::with_isolated_harness_env(sandbox.path(), || {
-        let runtime = tokio::runtime::Runtime::new().expect("runtime");
-        runtime.block_on(run_task_board_http_flow(sandbox.path()));
+    without_durable_task_board_automation(|| {
+        harness_testkit::with_isolated_harness_env(sandbox.path(), || {
+            let runtime = tokio::runtime::Runtime::new().expect("runtime");
+            runtime.block_on(run_task_board_http_flow(sandbox.path()));
+        });
     });
 }
 
 #[test]
 fn task_board_http_step_mode_holds_worker_until_delivery() {
     let sandbox = tempdir().expect("tempdir");
-    harness_testkit::with_isolated_harness_env(sandbox.path(), || {
-        let runtime = tokio::runtime::Runtime::new().expect("runtime");
-        runtime.block_on(run_task_board_step_mode_hold(sandbox.path()));
+    without_durable_task_board_automation(|| {
+        harness_testkit::with_isolated_harness_env(sandbox.path(), || {
+            let runtime = tokio::runtime::Runtime::new().expect("runtime");
+            runtime.block_on(run_task_board_step_mode_hold(sandbox.path()));
+        });
     });
 }
 

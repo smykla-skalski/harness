@@ -18,8 +18,9 @@ use crate::task_board::{
     TaskBoardAutomationRunTrigger, TaskBoardAutomationWakeCause, TaskBoardAutomationWakeEntityKind,
     TaskBoardAutomationWakeEvent, TaskBoardAutomationWakePayload,
     TaskBoardAutomationWakeRecoveryReason, TaskBoardAutomationWakeRequest,
-    TaskBoardOrchestratorSettings, TaskBoardOrchestratorState,
 };
+
+use super::super::task_board_automation_startup::initialize_control_from_legacy_intent;
 
 const MINIMUM_TICK_INTERVAL: Duration = Duration::from_secs(1);
 const MAX_COORDINATOR_BACKOFF_SECONDS: u64 = 3_600;
@@ -186,34 +187,6 @@ async fn maintain_automation_state(
     let expired = db.recover_stale_task_board_automation_runs(now).await?;
     db.finish_task_board_automation_drain_if_idle(now).await?;
     Ok(expired)
-}
-
-async fn initialize_control_from_legacy_intent(
-    db: &AsyncDaemonDb,
-    now: chrono::DateTime<Utc>,
-) -> Result<(), CliError> {
-    let state = db.task_board_orchestrator_state().await?;
-    let settings = db.task_board_orchestrator_settings().await?;
-    db.initialize_task_board_automation_control_from_legacy_intent(
-        desired_mode_for_legacy_intent(&state, &settings),
-        now,
-    )
-    .await?;
-    Ok(())
-}
-
-const fn desired_mode_for_legacy_intent(
-    state: &TaskBoardOrchestratorState,
-    settings: &TaskBoardOrchestratorSettings,
-) -> TaskBoardAutomationDesiredMode {
-    if !state.enabled || !state.running {
-        return TaskBoardAutomationDesiredMode::Off;
-    }
-    if settings.step_mode {
-        TaskBoardAutomationDesiredMode::Step
-    } else {
-        TaskBoardAutomationDesiredMode::Continuous
-    }
 }
 
 async fn run_loop_tick(
