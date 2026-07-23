@@ -175,7 +175,7 @@ final class TaskBoardTriageInspectorState {
   ) {
     let reason =
       if let triageOverride = response.triageOverride,
-        triageOverride.actor != "[redacted]"
+        triageOverride.actor != SupervisorAuditSensitiveKeys.redactionPlaceholder
       {
         triageOverride.reason ?? ""
       } else {

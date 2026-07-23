@@ -9,7 +9,7 @@ use crate::task_board::{
     TaskBoardTriageOverride,
 };
 
-use super::remote_redaction::redact_known_secrets;
+use super::remote_redaction::{REDACTION_PLACEHOLDER, redact_known_secrets};
 
 const BODY_PREVIEW_CHAR_LIMIT: usize = 180;
 const BODY_PREVIEW_PREFIX_LIMIT: usize = BODY_PREVIEW_CHAR_LIMIT - 3;
@@ -176,18 +176,9 @@ fn redact_triage_record(record: TaskBoardTriageDecisionRecord) -> TaskBoardTriag
 /// A remote viewer may see that a triage override is active plus its verdict
 /// and `set_at` timestamp, but the setting actor and any free-text reason are
 /// sensitive and must be redacted.
-/// Stands in for the real actor on a remote-viewer projection. `actor` is a
-/// canonical, non-empty field on the persisted domain type -- an empty
-/// string would satisfy the Rust type but violate the invariant every other
-/// producer of a `TaskBoardTriageOverride` upholds, and a client rendering
-/// it directly would show a blank identity. This marker is itself
-/// canonical (non-empty, bounded, no control characters), so a redacted
-/// value is still a valid domain record, just not the real one.
-const REDACTED_TRIAGE_OVERRIDE_ACTOR: &str = "[redacted]";
-
 fn redact_triage_override(override_: TaskBoardTriageOverride) -> TaskBoardTriageOverride {
     TaskBoardTriageOverride {
-        actor: REDACTED_TRIAGE_OVERRIDE_ACTOR.to_string(),
+        actor: REDACTION_PLACEHOLDER.to_string(),
         reason: None,
         ..override_
     }
