@@ -1,4 +1,30 @@
+import Foundation
 import SwiftUI
+
+enum TaskBoardAutomationAccessibility {
+  static func runRowID(for runID: String) -> String {
+    "harness.task-board.automation.run.\(escapedIdentifierSegment(runID))"
+  }
+
+  static func stageRowID(for stageID: String) -> String {
+    "harness.task-board.automation.stage.\(escapedIdentifierSegment(stageID))"
+  }
+
+  private static func escapedIdentifierSegment(_ value: String) -> String {
+    guard !value.isEmpty else { return "~" }
+    return value.utf8.map { byte in
+      if byte == 45 || byte == 46 || byte == 95
+        || (48...57).contains(byte)
+        || (65...90).contains(byte)
+        || (97...122).contains(byte)
+      {
+        return String(decoding: [byte], as: UTF8.self)
+      }
+      return String(format: "~%02X", byte)
+    }
+    .joined()
+  }
+}
 
 extension TaskBoardAutomationTone {
   var color: Color {
@@ -82,9 +108,11 @@ struct TaskBoardAutomationPlaceholder: View {
       if showsProgress {
         ProgressView()
           .controlSize(.small)
+          .accessibilityHidden(true)
       } else {
         Image(systemName: systemImage)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .accessibilityHidden(true)
       }
       Text(title)
         .font(.caption)

@@ -138,7 +138,7 @@ struct TaskBoardAutomationHistoryView: View {
     .help(isDetailAuthorized ? "Inspect run detail" : "Run detail requires operator write access")
     .accessibilityElement(children: .combine)
     .accessibilityValue("\(run.state), started \(run.accessibilityTimestamp)")
-    .accessibilityIdentifier("harness.task-board.automation.run.\(run.id)")
+    .accessibilityIdentifier(TaskBoardAutomationAccessibility.runRowID(for: run.id))
   }
 
   @ViewBuilder private var detailContent: some View {
@@ -224,6 +224,6 @@ struct TaskBoardAutomationHistoryView: View {
     .padding(HarnessMonitorTheme.spacingSM)
     .background(HarnessMonitorTheme.ink.opacity(0.04), in: .rect(cornerRadius: 8))
     .accessibilityElement(children: .combine)
-    .accessibilityIdentifier("harness.task-board.automation.stage.\(stage.id)")
+    .accessibilityIdentifier(TaskBoardAutomationAccessibility.stageRowID(for: stage.id))
   }
 }

@@ -171,6 +171,38 @@ struct TaskBoardAutomationPresentationTests {
     )
   }
 
+  @Test("Automation accessibility identifiers safely encode daemon IDs")
+  func automationAccessibilityIdentifiersEncodeDynamicSegments() {
+    #expect(
+      TaskBoardAutomationAccessibility.runRowID(for: "run/42 ?#%")
+        == "harness.task-board.automation.run.run~2F42~20~3F~23~25"
+    )
+    #expect(
+      TaskBoardAutomationAccessibility.stageRowID(for: "run/42 ?#%:7")
+        == "harness.task-board.automation.stage.run~2F42~20~3F~23~25~3A7"
+    )
+    #expect(
+      TaskBoardAutomationAccessibility.runRowID(for: "run~2F42")
+        != TaskBoardAutomationAccessibility.runRowID(for: "run/42")
+    )
+    #expect(
+      TaskBoardAutomationAccessibility.runRowID(for: "run/a")
+        != TaskBoardAutomationAccessibility.runRowID(for: "run:a")
+    )
+    #expect(
+      TaskBoardAutomationAccessibility.runRowID(for: "Run")
+        != TaskBoardAutomationAccessibility.runRowID(for: "run")
+    )
+    #expect(
+      TaskBoardAutomationAccessibility.runRowID(for: "rún")
+        == "harness.task-board.automation.run.r~C3~BAn"
+    )
+    #expect(
+      TaskBoardAutomationAccessibility.runRowID(for: "")
+        == "harness.task-board.automation.run.~"
+    )
+  }
+
   @MainActor
   @Test("Disconnect clears remote history and rejects stale completions")
   func disconnectClearsRemoteInspectorState() throws {
