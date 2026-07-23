@@ -13,7 +13,7 @@ extension DaemonController {
   /// handler a cancelled probe sits until the 120s RPC timeout. Shutting the
   /// transport down from `onCancel` fails the pending request and lets the
   /// attempt return promptly.
-  static func defaultWebSocketBootstrap(
+  public static func defaultWebSocketBootstrap(
     _ connection: HarnessMonitorConnection
   ) async -> (any HarnessMonitorClientProtocol)? {
     let transport = WebSocketTransport(connection: connection)
