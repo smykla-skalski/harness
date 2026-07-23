@@ -20,7 +20,7 @@ mod record;
 pub(crate) use controller_operation::TaskBoardRemoteControllerOperationToken;
 pub(super) use decode::phase_label;
 pub(crate) use outcomes::{TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome};
-pub(super) use persistence::insert_assignment_in_tx;
+pub(super) use persistence::{RemoteAssignmentInsertInput, insert_assignment_in_tx};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TaskBoardRemoteAssignmentRecord {

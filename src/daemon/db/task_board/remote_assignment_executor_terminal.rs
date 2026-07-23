@@ -1,7 +1,8 @@
 use sqlx::{Sqlite, Transaction, query, query_scalar};
 
 use super::remote_artifacts::{
-    exact_artifact_replay, insert_artifact_in_tx, load_artifact_in_tx, validate_artifact_evidence,
+    TaskBoardRemoteArtifactStoreInput, exact_artifact_replay, insert_artifact_in_tx,
+    load_artifact_in_tx, validate_artifact_evidence,
 };
 use super::remote_assignment_lease::{commit_noop, finish_mutation, require_assignment};
 use super::remote_assignment_lifecycle_owner::TaskBoardRemoteExecutorLifecycleOwner;
@@ -240,17 +241,16 @@ async fn insert_terminal_artifacts(
         .as_deref()
         .ok_or_else(|| db_error("remote executor terminal has no principal"))?;
     for artifact in artifacts {
-        insert_artifact_in_tx(
-            transaction,
-            &offer.binding,
+        let input = TaskBoardRemoteArtifactStoreInput {
+            binding: &offer.binding,
             lease_id,
-            &offer.request_sha256,
-            &artifact.entry,
-            &artifact.content,
-            principal,
-            &response.observed_at,
-        )
-        .await?;
+            offer_request_sha256: &offer.request_sha256,
+            artifact: &artifact.entry,
+            content: &artifact.content,
+            authenticated_principal: principal,
+            stored_at: &response.observed_at,
+        };
+        insert_artifact_in_tx(transaction, &input).await?;
     }
     Ok(())
 }
@@ -345,6 +345,9 @@ async fn terminal_replay_matches(
         .authenticated_principal
         .as_deref()
         .unwrap_or_default();
+    let Some(offer) = record.offer.as_ref() else {
+        return Ok(false);
+    };
     for artifact in artifacts {
         let Some(stored) = load_artifact_in_tx(
             transaction,
@@ -356,14 +359,16 @@ async fn terminal_replay_matches(
         else {
             return Ok(false);
         };
-        if !exact_artifact_replay(
-            &stored,
+        let input = TaskBoardRemoteArtifactStoreInput {
+            binding: &offer.binding,
             lease_id,
-            offer_digest,
-            principal,
-            &artifact.entry,
-            &artifact.content,
-        ) {
+            offer_request_sha256: offer_digest,
+            artifact: &artifact.entry,
+            content: &artifact.content,
+            authenticated_principal: principal,
+            stored_at: &response.observed_at,
+        };
+        if !exact_artifact_replay(&stored, &input) {
             return Ok(false);
         }
     }

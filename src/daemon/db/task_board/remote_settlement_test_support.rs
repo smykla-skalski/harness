@@ -1,8 +1,8 @@
 use sha2::{Digest, Sha256};
 use sqlx::query;
 
-use super::TaskBoardRemoteMutationOutcome;
 use super::remote_assignment_test_support::*;
+use super::{TaskBoardRemoteArtifactStoreInput, TaskBoardRemoteMutationOutcome};
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteArtifactEntry, RemoteArtifactFetchRequest, RemoteArtifactManifest,
     RemoteAssignmentWireState, RemoteLease, RemoteSettledRequest, RemoteStatusResponse,
@@ -59,30 +59,28 @@ pub(super) async fn store_and_verify_artifact(
     completed: &super::TaskBoardRemoteAssignmentRecord,
     entry: &RemoteArtifactEntry,
 ) -> RemoteArtifactFetchRequest {
+    let lease_id = completed.lease_id.as_deref().expect("lease");
+    let stored_input = TaskBoardRemoteArtifactStoreInput {
+        binding: &fixture.request.binding,
+        lease_id,
+        offer_request_sha256: &fixture.request.request_sha256,
+        artifact: entry,
+        content: ARTIFACT_BYTES,
+        authenticated_principal: PRINCIPAL,
+        stored_at: "2026-07-19T10:00:45Z",
+    };
     let stored = fixture
         .db
-        .store_task_board_remote_artifact(
-            &fixture.request.binding,
-            completed.lease_id.as_deref().expect("lease"),
-            &fixture.request.request_sha256,
-            entry,
-            ARTIFACT_BYTES,
-            PRINCIPAL,
-            "2026-07-19T10:00:45Z",
-        )
+        .store_task_board_remote_artifact(&stored_input)
         .await
         .expect("store immutable artifact");
+    let replay_input = TaskBoardRemoteArtifactStoreInput {
+        stored_at: "2026-07-19T10:00:49Z",
+        ..stored_input
+    };
     let replay = fixture
         .db
-        .store_task_board_remote_artifact(
-            &fixture.request.binding,
-            completed.lease_id.as_deref().expect("lease"),
-            &fixture.request.request_sha256,
-            entry,
-            ARTIFACT_BYTES,
-            PRINCIPAL,
-            "2026-07-19T10:00:49Z",
-        )
+        .store_task_board_remote_artifact(&replay_input)
         .await
         .expect("replay immutable artifact store");
     assert_eq!(replay, stored);

@@ -35,6 +35,14 @@ pub(crate) struct TaskBoardRemoteExecutorLifecycleClaim {
     pub(crate) stop_only: bool,
 }
 
+pub(super) struct ExecutorLifecycleOwnerEvidence {
+    pub(super) instance_id: Option<String>,
+    pub(super) owner_epoch: Option<i64>,
+    pub(super) acquired_at: Option<String>,
+    pub(super) expires_at: Option<String>,
+    pub(super) sha256: Option<String>,
+}
+
 impl AsyncDaemonDb {
     pub(crate) async fn claim_task_board_remote_executor_lifecycle_owner(
         &self,
@@ -122,15 +130,17 @@ pub(crate) fn executor_lifecycle_owner(
     record.executor_lifecycle_owner.clone()
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn decode_executor_lifecycle_owner(
     record: &TaskBoardRemoteAssignmentRecord,
-    instance_id: Option<String>,
-    owner_epoch: Option<i64>,
-    acquired_at: Option<String>,
-    expires_at: Option<String>,
-    sha256: Option<String>,
+    evidence: ExecutorLifecycleOwnerEvidence,
 ) -> Result<Option<TaskBoardRemoteExecutorLifecycleOwner>, CliError> {
+    let ExecutorLifecycleOwnerEvidence {
+        instance_id,
+        owner_epoch,
+        acquired_at,
+        expires_at,
+        sha256,
+    } = evidence;
     let (instance_id, owner_epoch, acquired_at, expires_at, sha256) =
         match (instance_id, owner_epoch, acquired_at, expires_at, sha256) {
             (None, None, None, None, None) => return Ok(None),

@@ -78,7 +78,7 @@ fn extra_object_bundle(fixture: &Fixture) -> (Vec<u8>, String) {
 
 fn extra_object_limits(max_object_bytes: usize) -> GitBundleContentLimits {
     GitBundleContentLimits {
-        max_inflated_object_bytes: u64::try_from(max_object_bytes).expect("object size"),
+        inflated_object_bytes: u64::try_from(max_object_bytes).expect("object size"),
         ..GitBundleContentLimits::REMOTE_RESULT
     }
 }

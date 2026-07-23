@@ -54,10 +54,18 @@ pub(super) async fn execute_and_reconcile_remote_worker(
     if record.state == TaskBoardRemoteAssignmentState::Claimed && permit.is_none() {
         return stop_pre_permit_remote_run(state, db, &record, &snapshot).await;
     }
-    validate_or_stop(
-        state, db, &record, offer, identity, permit, workspace, &snapshot,
-    )
-    .await?;
+    if let Err(error) = validate_run_snapshot(&snapshot, offer, identity, workspace) {
+        let validation_error = error.to_string();
+        if let Err(stop_error) =
+            stop_invalid_remote_run_if_fenced(state, db, &record, permit, &snapshot).await
+        {
+            return Err(CliErrorKind::workflow_io(format!(
+                "validate remote worker start: {validation_error}; stop invalid worker: {stop_error}"
+            ))
+            .into());
+        }
+        return Err(error);
+    }
     if record.state == TaskBoardRemoteAssignmentState::Claimed {
         let permit = permit
             .ok_or_else(|| concurrent("claimed remote worker has no durable Start I/O permit"))?;
@@ -225,32 +233,17 @@ fn concurrent_owned(message: String) -> CliError {
     CliErrorKind::concurrent_modification(message).into()
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn validate_or_stop(
+async fn stop_invalid_remote_run_if_fenced(
     state: &DaemonHttpState,
     db: &AsyncDaemonDb,
     record: &TaskBoardRemoteAssignmentRecord,
-    offer: &RemoteOfferRequest,
-    identity: &RemoteWorkerIdentity,
     permit: Option<&TaskBoardRemoteExecutorStartIoPermit>,
-    workspace: &Path,
     snapshot: &CodexRunSnapshot,
 ) -> Result<(), CliError> {
-    let Err(error) = validate_run_snapshot(snapshot, offer, identity, workspace) else {
-        return Ok(());
-    };
     if let Some((stop_authority, reason)) = invalid_run_stop_source(record, permit)? {
-        let validation_error = error.to_string();
-        if let Err(stop_error) =
-            claim_and_settle_invalid_remote_run(state, db, &stop_authority, snapshot, reason).await
-        {
-            return Err(CliErrorKind::workflow_io(format!(
-                "validate remote worker start: {validation_error}; stop invalid worker: {stop_error}"
-            ))
-            .into());
-        }
+        claim_and_settle_invalid_remote_run(state, db, &stop_authority, snapshot, reason).await?;
     }
-    Err(error)
+    Ok(())
 }
 
 fn invalid_run_stop_source(

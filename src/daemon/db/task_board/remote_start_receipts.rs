@@ -53,15 +53,18 @@ pub(crate) struct TaskBoardRemoteExecutorStartReceipt {
     pub(crate) sha256: String,
 }
 
-#[allow(clippy::too_many_arguments)]
+pub(super) struct InitialLifecycleOwner<'a> {
+    pub(super) instance_id: &'a str,
+    pub(super) acquired_at: &'a str,
+    pub(super) expires_at: &'a str,
+}
+
 pub(super) fn start_receipt(
     record: &TaskBoardRemoteAssignmentRecord,
     permit: &TaskBoardRemoteExecutorStartIoPermit,
     project_dir: &str,
     started_at: &str,
-    owner_instance_id: &str,
-    owner_acquired_at: &str,
-    owner_expires_at: &str,
+    owner: &InitialLifecycleOwner<'_>,
 ) -> Result<TaskBoardRemoteExecutorStartReceipt, CliError> {
     let offer = record.require_offer()?;
     let claim_receipt = record
@@ -91,10 +94,10 @@ pub(super) fn start_receipt(
             .ok_or_else(|| db_error("remote executor start receipt has no executor revision"))?,
         executor_checkout_path: required(record.executor_checkout_path.as_ref(), "checkout")?,
         source: offer.source.clone(),
-        initial_owner_instance_id: owner_instance_id.into(),
+        initial_owner_instance_id: owner.instance_id.into(),
         initial_owner_epoch: 1,
-        initial_owner_acquired_at: owner_acquired_at.into(),
-        initial_owner_expires_at: owner_expires_at.into(),
+        initial_owner_acquired_at: owner.acquired_at.into(),
+        initial_owner_expires_at: owner.expires_at.into(),
         sha256: String::new(),
     };
     validate_receipt_evidence(record, &receipt)?;

@@ -1,4 +1,4 @@
-use super::remote_assignment_model::insert_assignment_in_tx;
+use super::remote_assignment_model::{RemoteAssignmentInsertInput, insert_assignment_in_tx};
 use super::remote_assignment_test_support::{
     DEADLINE, HOST, LEASE_EXPIRES, NOW, PRINCIPAL, SOURCE_REVISION, detached_offer,
 };
@@ -149,20 +149,9 @@ async fn protected_source_backlog_never_starves_later_expiry_after_restart() {
     let mut first_protected = None;
     for index in 0..129_u64 {
         let (offer, content) = protected_offer(&fixture.request, index);
-        insert_assignment_in_tx(
-            &mut transaction,
-            &offer,
-            PRINCIPAL,
-            NOW,
-            None,
-            LEASE_EXPIRES,
-            DEADLINE,
-            None,
-            None,
-            None,
-        )
-        .await
-        .expect("insert protected source assignment");
+        insert_assignment_in_tx(&mut transaction, &test_assignment(&offer))
+            .await
+            .expect("insert protected source assignment");
         persist_outbound_source_in_tx(&mut transaction, &offer, Some(&content), NOW)
             .await
             .expect("persist protected source bytes");
@@ -180,20 +169,9 @@ async fn protected_source_backlog_never_starves_later_expiry_after_restart() {
     );
     actionable.request_sha256.clear();
     let actionable = actionable.seal().expect("seal actionable expiry");
-    insert_assignment_in_tx(
-        &mut transaction,
-        &actionable,
-        PRINCIPAL,
-        NOW,
-        None,
-        LEASE_EXPIRES,
-        DEADLINE,
-        None,
-        None,
-        None,
-    )
-    .await
-    .expect("insert actionable expiry");
+    insert_assignment_in_tx(&mut transaction, &test_assignment(&actionable))
+        .await
+        .expect("insert actionable expiry");
     transaction
         .commit()
         .await
@@ -245,6 +223,20 @@ fn protected_offer(template: &RemoteOfferRequest, index: u64) -> (RemoteOfferReq
     );
     offer.request_sha256.clear();
     (offer.seal().expect("seal protected source offer"), content)
+}
+
+fn test_assignment(offer: &RemoteOfferRequest) -> RemoteAssignmentInsertInput<'_> {
+    RemoteAssignmentInsertInput {
+        request: offer,
+        principal: PRINCIPAL,
+        offered_at: NOW,
+        lease_id: None,
+        lease_expires_at: LEASE_EXPIRES,
+        deadline_at: DEADLINE,
+        executor_configuration_revision: None,
+        executor_checkout_path: None,
+        lifecycle_trust: None,
+    }
 }
 
 async fn assert_recovery_defers(

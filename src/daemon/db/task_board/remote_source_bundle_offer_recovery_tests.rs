@@ -2,7 +2,8 @@ use super::remote_assignment_inbox::PREDECESSOR_OFFER_NOT_RECEIVED;
 use super::remote_assignment_test_support::{DEADLINE, HOST, LEASE_EXPIRES, NOW};
 use super::remote_outbound_source_tests::snapshot_offer;
 use super::{
-    TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome, TaskBoardRemoteOperationTrustFence,
+    TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome,
+    TaskBoardRemoteOperationTrustFence, TaskBoardRemoteSourceOfferReassignment,
 };
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::tests::task_board::{
@@ -48,18 +49,23 @@ async fn uploaded_source_and_absent_predecessor_offer_reassign_after_restart() {
         .cloned()
         .expect("predecessor attempt remains current");
     let replacement = successor_offer(&setup.offer, &parent, &trust);
+    let expected_execution = TaskBoardWorkflowExecutionCas::from(&parent);
+    let expected_attempt = TaskBoardExecutionAttemptCas::from(&attempt);
+    let reassignment = TaskBoardRemoteSourceOfferReassignment {
+        expected_execution: &expected_execution,
+        expected_attempt: &expected_attempt,
+        replacement: &replacement,
+        authenticated_principal: HOST,
+        trust: &trust,
+        offered_at: OFFERED_AT,
+        lease_expires_at: SUCCESSOR_LEASE_EXPIRES,
+    };
 
     let TaskBoardRemoteOfferOutcome::Created(created) = restarted
         .reassign_rejected_task_board_remote_source_bundle_offer(
-            &TaskBoardWorkflowExecutionCas::from(&parent),
-            &TaskBoardExecutionAttemptCas::from(&attempt),
+            &reassignment,
             &setup.offer,
             &rejection,
-            &replacement,
-            HOST,
-            &trust,
-            OFFERED_AT,
-            SUCCESSOR_LEASE_EXPIRES,
         )
         .await
         .expect("reassign exact uploaded bytes after authoritative offer absence")
@@ -76,15 +82,9 @@ async fn uploaded_source_and_absent_predecessor_offer_reassign_after_restart() {
     assert!(matches!(
         restarted
             .reassign_rejected_task_board_remote_source_bundle_offer(
-                &TaskBoardWorkflowExecutionCas::from(&parent),
-                &TaskBoardExecutionAttemptCas::from(&attempt),
+                &reassignment,
                 &setup.offer,
                 &rejection,
-                &replacement,
-                HOST,
-                &trust,
-                OFFERED_AT,
-                SUCCESSOR_LEASE_EXPIRES,
             )
             .await
             .expect("replay exact source offer reassignment"),

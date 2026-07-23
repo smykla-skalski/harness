@@ -25,6 +25,21 @@ pub(super) fn register(registry: &mut ToolRegistry) {
                 input_schema: id_only_schema,
             },
             TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_POSITION_GET,
+                description: "Fetch one task-board item's canonical lane position snapshot.",
+                input_schema: id_only_schema,
+            },
+            TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_POSITION_SET,
+                description: "Set one task-board item's explicit lane position.",
+                input_schema: position_set_schema,
+            },
+            TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_POSITION_RESET,
+                description: "Reset one task-board item to its derived lane position.",
+                input_schema: position_reset_schema,
+            },
+            TaskBoardToolDescriptor {
                 name: ws_methods::TASK_BOARD_UPDATE,
                 description: "Update a task-board item by id.",
                 input_schema: update_schema,
@@ -149,6 +164,40 @@ fn id_only_schema() -> Value {
             "id": { "type": "string" }
         },
         "required": ["id"],
+        "additionalProperties": false
+    })
+}
+
+fn position_set_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "id": { "type": "string" },
+            "status": { "type": "string" },
+            "lane_position": { "type": "integer", "minimum": 0, "maximum": u32::MAX },
+            "expected_item_revision": { "type": "integer", "minimum": 0 },
+            "expected_items_change_seq": { "type": "integer", "minimum": 0 }
+        },
+        "required": [
+            "id",
+            "status",
+            "lane_position",
+            "expected_item_revision",
+            "expected_items_change_seq"
+        ],
+        "additionalProperties": false
+    })
+}
+
+fn position_reset_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "id": { "type": "string" },
+            "expected_item_revision": { "type": "integer", "minimum": 0 },
+            "expected_items_change_seq": { "type": "integer", "minimum": 0 }
+        },
+        "required": ["id", "expected_item_revision", "expected_items_change_seq"],
         "additionalProperties": false
     })
 }

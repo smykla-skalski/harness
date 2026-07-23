@@ -9,16 +9,15 @@ use super::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, canonical_time, concurrent, load_assignment_in_tx,
 };
 use super::remote_operation_trust::{
-    TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence,
-    claim_controller_operation_trust_in_tx,
+    TaskBoardRemoteOperationKind, claim_controller_operation_trust_in_tx,
 };
 use super::workflow_executions::{load_execution_in_tx, update_execution_in_tx};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_transport::wire::{
-    RemoteAttemptBinding, RemoteCancelRequest, RemoteLeaseRenewRequest,
-};
+use crate::daemon::task_board_remote_transport::wire::RemoteAttemptBinding;
 #[cfg(test)]
-use crate::daemon::task_board_remote_transport::wire::{RemoteClaimRequest, RemoteOfferRequest};
+use crate::daemon::task_board_remote_transport::wire::{
+    RemoteCancelRequest, RemoteClaimRequest, RemoteLeaseRenewRequest, RemoteOfferRequest,
+};
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE, TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TASK_BOARD_REMOTE_CANCEL_IO_AUTHORITY_RESOURCE,
@@ -28,6 +27,9 @@ use crate::task_board::{
     TaskBoardExecutionState, TaskBoardRemoteAssignmentState, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionRecord, validate_task_board_workflow_execution,
 };
+
+mod request;
+pub(super) use request::{RemoteIoAuthorityClaim, RemoteIoAuthorityRequestEvidence};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TaskBoardRemoteIoAuthorityKind {
@@ -55,19 +57,13 @@ impl AsyncDaemonDb {
         request
             .validate()
             .map_err(|error| db_error(format!("validate remote offer I/O authority: {error}")))?;
-        self.claim_remote_io_authority(
-            &request.binding,
-            &request.request_sha256,
-            &request.request_sha256,
-            None,
-            authenticated_principal,
-            TaskBoardRemoteIoAuthorityKind::Offer,
+        let claim = RemoteIoAuthorityClaim {
+            request: RemoteIoAuthorityRequestEvidence::Offer(request),
+            principal: authenticated_principal,
             authority_at,
-            None,
-            None,
-            None,
-        )
-        .await
+            expected_trust: None,
+        };
+        self.claim_remote_io_authority(&claim).await
     }
 
     #[cfg(test)]
@@ -80,19 +76,13 @@ impl AsyncDaemonDb {
         request
             .validate()
             .map_err(|error| db_error(format!("validate remote claim I/O authority: {error}")))?;
-        self.claim_remote_io_authority(
-            &request.binding,
-            &request.request_sha256,
-            &request.offer_request_sha256,
-            Some(&request.lease_id),
-            authenticated_principal,
-            TaskBoardRemoteIoAuthorityKind::Claim,
+        let claim = RemoteIoAuthorityClaim {
+            request: RemoteIoAuthorityRequestEvidence::Claim(request),
+            principal: authenticated_principal,
             authority_at,
-            None,
-            None,
-            None,
-        )
-        .await
+            expected_trust: None,
+        };
+        self.claim_remote_io_authority(&claim).await
     }
 
     #[cfg(test)]
@@ -105,19 +95,13 @@ impl AsyncDaemonDb {
         request
             .validate()
             .map_err(|error| db_error(format!("validate remote renewal I/O authority: {error}")))?;
-        self.claim_remote_io_authority(
-            &request.binding,
-            &request.request_sha256,
-            &request.offer_request_sha256,
-            Some(&request.lease_id),
-            authenticated_principal,
-            TaskBoardRemoteIoAuthorityKind::Renew,
+        let claim = RemoteIoAuthorityClaim {
+            request: RemoteIoAuthorityRequestEvidence::Renew(request),
+            principal: authenticated_principal,
             authority_at,
-            Some(request),
-            None,
-            None,
-        )
-        .await
+            expected_trust: None,
+        };
+        self.claim_remote_io_authority(&claim).await
     }
 
     #[cfg(test)]
@@ -130,35 +114,23 @@ impl AsyncDaemonDb {
         request
             .validate()
             .map_err(|error| db_error(format!("validate remote cancel I/O authority: {error}")))?;
-        self.claim_remote_io_authority(
-            &request.binding,
-            &request.request_sha256,
-            &request.offer_request_sha256,
-            Some(&request.lease_id),
-            authenticated_principal,
-            TaskBoardRemoteIoAuthorityKind::Cancel,
+        let claim = RemoteIoAuthorityClaim {
+            request: RemoteIoAuthorityRequestEvidence::Cancel(request),
+            principal: authenticated_principal,
             authority_at,
-            None,
-            Some(request),
-            None,
-        )
-        .await
+            expected_trust: None,
+        };
+        self.claim_remote_io_authority(&claim).await
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub(super) async fn claim_remote_io_authority(
         &self,
-        binding: &RemoteAttemptBinding,
-        operation_digest: &str,
-        offer_digest: &str,
-        lease_id: Option<&str>,
-        principal: &str,
-        kind: TaskBoardRemoteIoAuthorityKind,
-        authority_at: &str,
-        renew_request: Option<&RemoteLeaseRenewRequest>,
-        cancel_request: Option<&RemoteCancelRequest>,
-        expected_trust: Option<&TaskBoardRemoteOperationTrustFence>,
+        claim: &RemoteIoAuthorityClaim<'_>,
     ) -> Result<Option<TaskBoardRemoteIoAuthority>, CliError> {
+        let request = claim.request;
+        let binding = request.binding();
+        let operation_digest = request.operation_digest();
+        let kind = request.kind();
         let mut transaction = self
             .begin_immediate_transaction("task board remote I/O authority")
             .await?;
@@ -171,13 +143,13 @@ impl AsyncDaemonDb {
         validate_authority_assignment(
             &assignment,
             binding,
-            offer_digest,
-            lease_id,
-            principal,
+            request.offer_digest(),
+            request.lease_id(),
+            claim.principal,
             kind,
         )?;
-        if let Some(request) = renew_request
-            && renew_request_for_record(&assignment)? != *request
+        if let Some(renew) = request.renew_request()
+            && renew_request_for_record(&assignment)? != *renew
         {
             return Err(concurrent(
                 "remote renewal request differs from deterministic durable evidence",
@@ -207,19 +179,19 @@ impl AsyncDaemonDb {
             &assignment,
             operation_kind(kind),
             operation_digest,
-            expected_trust,
+            claim.expected_trust,
         )
         .await?;
         journal_cancel_claim_in_tx(
             &mut transaction,
             &binding.assignment_id,
-            cancel_request,
-            authority_at,
+            request.cancel_request(),
+            claim.authority_at,
         )
         .await?;
         let resource = authority_resource(kind);
         if let Some(current) = parent.ownership.resources.get(resource) {
-            ensure_authority_window(&assignment, authority_at)?;
+            ensure_authority_window(&assignment, claim.authority_at)?;
             if current == operation_digest && no_other_authority(&parent, kind) {
                 commit_noop(transaction, "replayed remote I/O authority").await?;
                 return Ok(Some(authority(binding, kind, operation_digest)));
@@ -231,13 +203,13 @@ impl AsyncDaemonDb {
                 "remote workflow has another active I/O authority",
             ));
         }
-        ensure_authority_window(&assignment, authority_at)?;
+        ensure_authority_window(&assignment, claim.authority_at)?;
         let mut updated = parent.clone();
         updated
             .ownership
             .resources
             .insert(resource.into(), operation_digest.into());
-        updated.updated_at = monotonic_time(&parent.updated_at, authority_at)?;
+        updated.updated_at = monotonic_time(&parent.updated_at, claim.authority_at)?;
         validate_task_board_workflow_execution(&updated)
             .map_err(|error| db_error(format!("validate remote I/O authority: {error}")))?;
         let expected = TaskBoardWorkflowExecutionCas::from(&parent);

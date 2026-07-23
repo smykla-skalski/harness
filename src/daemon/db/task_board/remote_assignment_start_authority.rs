@@ -226,15 +226,12 @@ impl AsyncDaemonDb {
             return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
         }
         let owner_expires_at = lifecycle_owner_expiry(owner_at)?;
-        let receipt = start_receipt(
-            &record,
-            permit,
-            &project_dir,
-            started_at,
-            owner_instance_id,
-            owner_at,
-            &owner_expires_at,
-        )?;
+        let initial_owner = super::remote_start_receipts::InitialLifecycleOwner {
+            instance_id: owner_instance_id,
+            acquired_at: owner_at,
+            expires_at: &owner_expires_at,
+        };
+        let receipt = start_receipt(&record, permit, &project_dir, started_at, &initial_owner)?;
         if !durable_start_receipt_run_matches(&mut transaction, &record, &receipt).await? {
             commit_noop(transaction, "stale durable remote executor start").await?;
             return Ok(TaskBoardRemoteMutationOutcome::Stale(record));

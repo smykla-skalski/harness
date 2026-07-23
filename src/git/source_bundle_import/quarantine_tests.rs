@@ -67,7 +67,7 @@ fn plan_for_bytes(fixture: &Fixture, bytes: &[u8]) -> (GitSourceBundleImportPlan
 
 fn extra_object_limits(max_object_bytes: usize) -> GitBundleContentLimits {
     GitBundleContentLimits {
-        max_inflated_object_bytes: u64::try_from(max_object_bytes).expect("object size"),
+        inflated_object_bytes: u64::try_from(max_object_bytes).expect("object size"),
         ..GitBundleContentLimits::REMOTE_RESULT
     }
 }

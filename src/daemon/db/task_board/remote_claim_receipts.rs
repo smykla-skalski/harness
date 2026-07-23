@@ -15,6 +15,18 @@ pub(crate) struct TaskBoardRemoteClaimReceipt {
     pub(crate) sha256: String,
 }
 
+pub(super) struct ClaimReceiptDecodeInput<'a> {
+    pub(super) assignment_id: &'a str,
+    pub(super) fencing_epoch: u64,
+    pub(super) offer:
+        Option<&'a crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest>,
+    pub(super) principal: Option<&'a str>,
+    pub(super) claimed_at: Option<&'a str>,
+    pub(super) request_sha256: Option<&'a str>,
+    pub(super) response_json: Option<&'a str>,
+    pub(super) receipt_sha256: Option<&'a str>,
+}
+
 impl AsyncDaemonDb {
     pub(crate) async fn exact_task_board_remote_claim_receipt(
         &self,
@@ -92,33 +104,32 @@ pub(super) fn claim_receipt_values(
     Ok((response_json, sha256))
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn decode_claim_receipt(
-    assignment_id: &str,
-    fencing_epoch: u64,
-    offer: Option<&crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest>,
-    principal: Option<&str>,
-    claimed_at: Option<&str>,
-    request_sha256: Option<String>,
-    response_json: Option<String>,
-    receipt_sha256: Option<String>,
+    input: &ClaimReceiptDecodeInput<'_>,
 ) -> Result<Option<TaskBoardRemoteClaimReceipt>, CliError> {
-    let (request_sha256, response_json, receipt_sha256) =
-        match (request_sha256, response_json, receipt_sha256) {
-            (Some(request), Some(response), Some(receipt)) => (request, response, receipt),
-            (None, None, None) => return Ok(None),
-            _ => return Err(db_error("remote claim receipt is incomplete")),
-        };
-    let offer = offer.ok_or_else(|| db_error("remote claim receipt has no offer"))?;
-    let principal = principal.ok_or_else(|| db_error("remote claim receipt has no principal"))?;
-    let response = serde_json::from_str::<RemoteClaimResponse>(&response_json)
+    let (request_sha256, response_json, receipt_sha256) = match (
+        input.request_sha256,
+        input.response_json,
+        input.receipt_sha256,
+    ) {
+        (Some(request), Some(response), Some(receipt)) => (request, response, receipt),
+        (None, None, None) => return Ok(None),
+        _ => return Err(db_error("remote claim receipt is incomplete")),
+    };
+    let offer = input
+        .offer
+        .ok_or_else(|| db_error("remote claim receipt has no offer"))?;
+    let principal = input
+        .principal
+        .ok_or_else(|| db_error("remote claim receipt has no principal"))?;
+    let response = serde_json::from_str::<RemoteClaimResponse>(response_json)
         .map_err(|error| db_error(format!("decode remote claim receipt: {error}")))?;
     let request = RemoteClaimRequest {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: offer.binding.clone(),
         lease_id: response.lease.lease_id.clone(),
         offer_request_sha256: offer.request_sha256.clone(),
-        request_sha256: request_sha256.clone(),
+        request_sha256: request_sha256.to_owned(),
     };
     request
         .validate()
@@ -126,14 +137,14 @@ pub(super) fn decode_claim_receipt(
     response
         .validate(&request)
         .map_err(|error| db_error(format!("validate remote claim receipt response: {error}")))?;
-    if claimed_at != Some(response.claimed_at.as_str())
+    if input.claimed_at != Some(response.claimed_at.as_str())
         || receipt_sha256
             != receipt_digest(
-                assignment_id,
-                fencing_epoch,
+                input.assignment_id,
+                input.fencing_epoch,
                 principal,
-                &request_sha256,
-                &response_json,
+                request_sha256,
+                response_json,
             )
     {
         return Err(db_error(
@@ -141,9 +152,9 @@ pub(super) fn decode_claim_receipt(
         ));
     }
     Ok(Some(TaskBoardRemoteClaimReceipt {
-        request_sha256,
+        request_sha256: request_sha256.to_owned(),
         response,
-        sha256: receipt_sha256,
+        sha256: receipt_sha256.to_owned(),
     }))
 }
 

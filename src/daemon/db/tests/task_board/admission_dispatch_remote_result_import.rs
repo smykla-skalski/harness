@@ -13,7 +13,8 @@ use super::*;
 use crate::daemon::db::task_board::remote_assignment_test_support::claim_request;
 use crate::daemon::db::task_board::{
     REMOTE_IMPLEMENTATION_BUNDLE_MEDIA_TYPE, REMOTE_IMPLEMENTATION_BUNDLE_PATH,
-    REMOTE_RESULT_ARTIFACT_MEDIA_TYPE, REMOTE_RESULT_ARTIFACT_PATH, TaskBoardRemoteMutationOutcome,
+    REMOTE_RESULT_ARTIFACT_MEDIA_TYPE, REMOTE_RESULT_ARTIFACT_PATH,
+    TaskBoardRemoteArtifactStoreInput, TaskBoardRemoteMutationOutcome,
     TaskBoardRemoteResultImportRequest, TaskBoardRemoteResultImportState,
 };
 use crate::daemon::service::import_task_board_remote_implementation_result;
@@ -224,17 +225,18 @@ async fn store_artifact(
         .await
         .expect("load terminal assignment")
         .expect("terminal assignment");
+    let input = TaskBoardRemoteArtifactStoreInput {
+        binding: &prepared.offer.binding,
+        lease_id: assignment.lease_id.as_deref().expect("terminal lease"),
+        offer_request_sha256: &prepared.offer.request_sha256,
+        artifact: entry,
+        content,
+        authenticated_principal: PRINCIPAL,
+        stored_at: "2026-07-19T10:00:06Z",
+    };
     prepared
         .db
-        .store_task_board_remote_artifact(
-            &prepared.offer.binding,
-            assignment.lease_id.as_deref().expect("terminal lease"),
-            &prepared.offer.request_sha256,
-            entry,
-            content,
-            PRINCIPAL,
-            "2026-07-19T10:00:06Z",
-        )
+        .store_task_board_remote_artifact(&input)
         .await
         .expect("store fetched implementation artifact");
 }

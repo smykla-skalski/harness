@@ -95,7 +95,7 @@ impl GitBundleExportPlan {
 
     fn export_with_ref(&self, max_bytes: u64) -> GitResult<GitBundleExport> {
         let limits = GitBundleContentLimits {
-            max_bundle_bytes: max_bytes.min(GitBundleContentLimits::REMOTE_RESULT.max_bundle_bytes),
+            bundle_bytes: max_bytes.min(GitBundleContentLimits::REMOTE_RESULT.bundle_bytes),
             ..GitBundleContentLimits::REMOTE_RESULT
         };
         let excluded = format!("^{}", self.base_revision);
@@ -108,18 +108,17 @@ impl GitBundleExportPlan {
                 self.advertised_ref.as_str(),
                 excluded.as_str(),
             ],
-            limits.max_bundle_bytes,
+            limits.bundle_bytes,
         )?;
         let bytes = output.stdout;
         require_bounded_bundle(&self.worktree, &bytes, limits)?;
         {
-            let staged =
-                GitBundleStaging::prepare(&self.coordinates, &bytes, limits.max_bundle_bytes)?;
+            let staged = GitBundleStaging::prepare(&self.coordinates, &bytes, limits.bundle_bytes)?;
             let staged_path = staged.path()?;
             self.git_contract_bounded_with_input(
                 ["bundle", "verify", staged_path],
                 &[],
-                limits.max_bundle_bytes,
+                limits.bundle_bytes,
             )?;
         }
         self.require_exact_head(&bytes)?;

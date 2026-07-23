@@ -25,6 +25,56 @@ pub(crate) struct TaskBoardRemoteOfferReceipt {
     pub(crate) received_at: String,
 }
 
+#[derive(Debug, Clone, Copy)]
+enum OfferReceiptOutcome<'a> {
+    Accepted {
+        lease_id: &'a str,
+        lease_expires_at: &'a str,
+    },
+    Rejected {
+        code: &'a str,
+    },
+}
+
+struct OfferReceiptInput<'a> {
+    request: &'a RemoteOfferRequest,
+    principal: &'a str,
+    outcome: OfferReceiptOutcome<'a>,
+    received_at: &'a str,
+}
+
+impl<'a> OfferReceiptOutcome<'a> {
+    const fn disposition(self) -> &'static str {
+        match self {
+            Self::Accepted { .. } => "accepted",
+            Self::Rejected { .. } => "rejected",
+        }
+    }
+
+    const fn initial_lease_id(self) -> Option<&'a str> {
+        match self {
+            Self::Accepted { lease_id, .. } => Some(lease_id),
+            Self::Rejected { .. } => None,
+        }
+    }
+
+    const fn initial_lease_expires_at(self) -> Option<&'a str> {
+        match self {
+            Self::Accepted {
+                lease_expires_at, ..
+            } => Some(lease_expires_at),
+            Self::Rejected { .. } => None,
+        }
+    }
+
+    const fn rejection_code(self) -> Option<&'a str> {
+        match self {
+            Self::Accepted { .. } => None,
+            Self::Rejected { code } => Some(code),
+        }
+    }
+}
+
 impl TaskBoardRemoteOfferReceipt {
     pub(crate) fn is_exact_replay(&self, request: &RemoteOfferRequest, principal: &str) -> bool {
         self.request == *request && self.authenticated_principal == principal
@@ -208,17 +258,16 @@ pub(super) async fn ensure_accepted_offer_receipt_in_tx(
     lease_expires_at: &str,
     received_at: &str,
 ) -> Result<TaskBoardRemoteOfferReceipt, CliError> {
-    ensure_offer_receipt_in_tx(
-        transaction,
+    let input = OfferReceiptInput {
         request,
         principal,
-        "accepted",
-        Some(lease_id),
-        Some(lease_expires_at),
-        None,
+        outcome: OfferReceiptOutcome::Accepted {
+            lease_id,
+            lease_expires_at,
+        },
         received_at,
-    )
-    .await
+    };
+    ensure_offer_receipt_in_tx(transaction, &input).await
 }
 
 pub(super) async fn ensure_rejected_offer_receipt_in_tx(
@@ -229,37 +278,29 @@ pub(super) async fn ensure_rejected_offer_receipt_in_tx(
     received_at: &str,
 ) -> Result<TaskBoardRemoteOfferReceipt, CliError> {
     validate_rejection_code(rejection_code)?;
-    ensure_offer_receipt_in_tx(
-        transaction,
+    let input = OfferReceiptInput {
         request,
         principal,
-        "rejected",
-        None,
-        None,
-        Some(rejection_code),
+        outcome: OfferReceiptOutcome::Rejected {
+            code: rejection_code,
+        },
         received_at,
-    )
-    .await
+    };
+    ensure_offer_receipt_in_tx(transaction, &input).await
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn ensure_offer_receipt_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
-    request: &RemoteOfferRequest,
-    principal: &str,
-    disposition: &str,
-    initial_lease_id: Option<&str>,
-    initial_lease_expires_at: Option<&str>,
-    rejection_code: Option<&str>,
-    received_at: &str,
+    input: &OfferReceiptInput<'_>,
 ) -> Result<TaskBoardRemoteOfferReceipt, CliError> {
-    let receipts = load_offer_receipt_collisions_in_tx(transaction, request).await?;
+    let receipts = load_offer_receipt_collisions_in_tx(transaction, input.request).await?;
     if let [receipt] = receipts.as_slice() {
-        let exact = receipt.is_exact_replay(request, principal)
-            && receipt_disposition(receipt) == disposition
-            && receipt.initial_lease_id.as_deref() == initial_lease_id
-            && receipt.initial_lease_expires_at.as_deref() == initial_lease_expires_at
-            && receipt.rejection_code.as_deref() == rejection_code;
+        let exact = receipt.is_exact_replay(input.request, input.principal)
+            && receipt_disposition(receipt) == input.outcome.disposition()
+            && receipt.initial_lease_id.as_deref() == input.outcome.initial_lease_id()
+            && receipt.initial_lease_expires_at.as_deref()
+                == input.outcome.initial_lease_expires_at()
+            && receipt.rejection_code.as_deref() == input.outcome.rejection_code();
         if exact {
             return Ok(receipt.clone());
         }
@@ -274,36 +315,19 @@ async fn ensure_offer_receipt_in_tx(
         )
         .into());
     }
-    insert_offer_receipt_in_tx(
-        transaction,
-        request,
-        principal,
-        disposition,
-        initial_lease_id,
-        initial_lease_expires_at,
-        rejection_code,
-        received_at,
-    )
-    .await?;
-    load_offer_receipt_in_tx(transaction, &request.binding.assignment_id)
+    insert_offer_receipt_in_tx(transaction, input).await?;
+    load_offer_receipt_in_tx(transaction, &input.request.binding.assignment_id)
         .await?
         .ok_or_else(|| db_error("persisted remote offer receipt disappeared"))
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn insert_offer_receipt_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
-    request: &RemoteOfferRequest,
-    principal: &str,
-    disposition: &str,
-    initial_lease_id: Option<&str>,
-    initial_lease_expires_at: Option<&str>,
-    rejection_code: Option<&str>,
-    received_at: &str,
+    input: &OfferReceiptInput<'_>,
 ) -> Result<(), CliError> {
-    let request_json = serde_json::to_string(request)
+    let request_json = serde_json::to_string(input.request)
         .map_err(|error| db_error(format!("serialize remote offer receipt: {error}")))?;
-    let binding = &request.binding;
+    let binding = &input.request.binding;
     query(
         "INSERT INTO task_board_remote_offer_receipts (
            assignment_id, execution_id, phase, action_key, attempt, idempotency_key,
@@ -333,14 +357,14 @@ async fn insert_offer_receipt_in_tx(
         "offer receipt configuration revision",
     )?)
     .bind(&binding.execution_record_sha256)
-    .bind(&request.request_sha256)
+    .bind(&input.request.request_sha256)
     .bind(request_json)
-    .bind(principal)
-    .bind(disposition)
-    .bind(initial_lease_id)
-    .bind(initial_lease_expires_at)
-    .bind(rejection_code)
-    .bind(received_at)
+    .bind(input.principal)
+    .bind(input.outcome.disposition())
+    .bind(input.outcome.initial_lease_id())
+    .bind(input.outcome.initial_lease_expires_at())
+    .bind(input.outcome.rejection_code())
+    .bind(input.received_at)
     .execute(transaction.as_mut())
     .await
     .map(|_| ())

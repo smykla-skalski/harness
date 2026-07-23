@@ -4,25 +4,33 @@ use super::{phase_label, to_i64};
 use crate::daemon::db::{CliError, TaskBoardRemoteLifecycleTrustSnapshot, db_error};
 use crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest;
 
-#[allow(clippy::too_many_arguments)]
+pub(in crate::daemon::db::task_board) struct RemoteAssignmentInsertInput<'a> {
+    pub(in crate::daemon::db::task_board) request: &'a RemoteOfferRequest,
+    pub(in crate::daemon::db::task_board) principal: &'a str,
+    pub(in crate::daemon::db::task_board) offered_at: &'a str,
+    pub(in crate::daemon::db::task_board) lease_id: Option<&'a str>,
+    pub(in crate::daemon::db::task_board) lease_expires_at: &'a str,
+    pub(in crate::daemon::db::task_board) deadline_at: &'a str,
+    pub(in crate::daemon::db::task_board) executor_configuration_revision: Option<u64>,
+    pub(in crate::daemon::db::task_board) executor_checkout_path: Option<&'a str>,
+    pub(in crate::daemon::db::task_board) lifecycle_trust:
+        Option<&'a TaskBoardRemoteLifecycleTrustSnapshot>,
+}
+
 pub(crate) async fn insert_assignment_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
-    request: &RemoteOfferRequest,
-    principal: &str,
-    offered_at: &str,
-    lease_id: Option<&str>,
-    lease_expires_at: &str,
-    deadline_at: &str,
-    executor_configuration_revision: Option<u64>,
-    executor_checkout_path: Option<&str>,
-    lifecycle_trust: Option<&TaskBoardRemoteLifecycleTrustSnapshot>,
+    input: &RemoteAssignmentInsertInput<'_>,
 ) -> Result<(), CliError> {
-    let request_json = serde_json::to_string(request)
+    let request_json = serde_json::to_string(input.request)
         .map_err(|error| db_error(format!("serialize remote offer: {error}")))?;
-    let lifecycle_trust_json = lifecycle_trust
+    let lifecycle_trust_json = input
+        .lifecycle_trust
         .map(TaskBoardRemoteLifecycleTrustSnapshot::encoded)
         .transpose()?;
-    let lifecycle_trust_sha256 = lifecycle_trust.map(|trust| trust.snapshot_sha256.as_str());
+    let lifecycle_trust_sha256 = input
+        .lifecycle_trust
+        .map(|trust| trust.snapshot_sha256.as_str());
+    let request = input.request;
     query(
         "INSERT INTO task_board_remote_assignments (
            assignment_id, execution_id, phase, action_key, attempt, idempotency_key,
@@ -53,17 +61,18 @@ pub(crate) async fn insert_assignment_in_tx(
     .bind(&request.binding.execution_record_sha256)
     .bind(&request.request_sha256)
     .bind(request_json)
-    .bind(principal)
-    .bind(offered_at)
-    .bind(lease_id)
-    .bind(lease_expires_at)
-    .bind(deadline_at)
+    .bind(input.principal)
+    .bind(input.offered_at)
+    .bind(input.lease_id)
+    .bind(input.lease_expires_at)
+    .bind(input.deadline_at)
     .bind(
-        executor_configuration_revision
+        input
+            .executor_configuration_revision
             .map(|revision| to_i64(revision, "executor configuration revision"))
             .transpose()?,
     )
-    .bind(executor_checkout_path)
+    .bind(input.executor_checkout_path)
     .bind(lifecycle_trust_json)
     .bind(lifecycle_trust_sha256)
     .execute(transaction.as_mut())

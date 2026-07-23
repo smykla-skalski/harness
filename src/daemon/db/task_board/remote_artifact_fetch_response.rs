@@ -1,6 +1,7 @@
 use super::remote_artifacts::{
-    TaskBoardRemoteArtifact, exact_artifact_replay, insert_artifact_in_tx, load_artifact_in_tx,
-    manifest_entry, require_artifact_assignment, validate_artifact_evidence,
+    TaskBoardRemoteArtifact, TaskBoardRemoteArtifactStoreInput, exact_artifact_replay,
+    insert_artifact_in_tx, load_artifact_in_tx, manifest_entry, require_artifact_assignment,
+    validate_artifact_evidence,
 };
 use super::remote_assignment_lease::require_assignment;
 use super::remote_assignment_model::{canonical_time, concurrent, nonblank};
@@ -46,6 +47,15 @@ impl AsyncDaemonDb {
             artifact,
         )?;
         validate_artifact_evidence(&request.offer_request_sha256, artifact, &content)?;
+        let input = TaskBoardRemoteArtifactStoreInput {
+            binding: &request.binding,
+            lease_id: &request.lease_id,
+            offer_request_sha256: &request.offer_request_sha256,
+            artifact,
+            content: &content,
+            authenticated_principal,
+            stored_at,
+        };
         let existing = load_artifact_in_tx(
             &mut transaction,
             &request.binding.assignment_id,
@@ -53,16 +63,10 @@ impl AsyncDaemonDb {
             &request.relative_path,
         )
         .await?;
-        if existing.as_ref().is_some_and(|stored| {
-            !exact_artifact_replay(
-                stored,
-                &request.lease_id,
-                &request.offer_request_sha256,
-                authenticated_principal,
-                artifact,
-                &content,
-            )
-        }) {
+        if existing
+            .as_ref()
+            .is_some_and(|stored| !exact_artifact_replay(stored, &input))
+        {
             return Err(concurrent(
                 "remote artifact path conflicts with immutable content evidence",
             ));
@@ -77,17 +81,7 @@ impl AsyncDaemonDb {
         let stored = if let Some(existing) = existing {
             existing
         } else {
-            insert_artifact_in_tx(
-                &mut transaction,
-                &request.binding,
-                &request.lease_id,
-                &request.offer_request_sha256,
-                artifact,
-                &content,
-                authenticated_principal,
-                stored_at,
-            )
-            .await?;
+            insert_artifact_in_tx(&mut transaction, &input).await?;
             load_artifact_in_tx(
                 &mut transaction,
                 &request.binding.assignment_id,

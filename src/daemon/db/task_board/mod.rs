@@ -237,7 +237,7 @@ pub(crate) use lane_order_api::{
     TaskBoardLaneMutationResult, TaskBoardLanePositionInput, TaskBoardLaneResetInput,
 };
 #[allow(unused_imports)]
-pub(crate) use remote_artifacts::TaskBoardRemoteArtifact;
+pub(crate) use remote_artifacts::{TaskBoardRemoteArtifact, TaskBoardRemoteArtifactStoreInput};
 pub(crate) use remote_assignment_controller_scan::{
     TaskBoardRemoteControllerScanItem, TaskBoardRemoteControllerScanStep,
 };
@@ -300,6 +300,7 @@ pub(crate) use remote_settlement_receipts::TaskBoardRemoteSettlementReceipt;
 pub(crate) use remote_source_bundle_abandonment::TaskBoardRemoteSourceBundleAbandonment;
 #[allow(unused_imports)]
 pub(crate) use remote_source_bundle_prior::TaskBoardRemotePriorPhaseBundle;
+pub(crate) use remote_source_bundle_reassignment::TaskBoardRemoteSourceOfferReassignment;
 #[allow(unused_imports)]
 pub(crate) use remote_source_bundles::TaskBoardRemoteSourceBundle;
 #[allow(unused_imports)]

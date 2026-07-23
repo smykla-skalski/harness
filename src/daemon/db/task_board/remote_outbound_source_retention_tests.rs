@@ -293,20 +293,20 @@ async fn insert_successor(
     offer: &RemoteOfferRequest,
     content: &[u8],
 ) {
-    insert_assignment_in_tx(
-        transaction,
-        offer,
-        HOST,
-        HANDOFF_AT,
-        None,
-        SUCCESSOR_LEASE_EXPIRES,
-        DEADLINE,
-        None,
-        None,
-        None,
-    )
-    .await
-    .expect("insert pristine successor");
+    let assignment = super::remote_assignment_model::RemoteAssignmentInsertInput {
+        request: offer,
+        principal: HOST,
+        offered_at: HANDOFF_AT,
+        lease_id: None,
+        lease_expires_at: SUCCESSOR_LEASE_EXPIRES,
+        deadline_at: DEADLINE,
+        executor_configuration_revision: None,
+        executor_checkout_path: None,
+        lifecycle_trust: None,
+    };
+    insert_assignment_in_tx(transaction, &assignment)
+        .await
+        .expect("insert pristine successor");
     persist_outbound_source_in_tx(transaction, offer, Some(content), HANDOFF_AT)
         .await
         .expect("persist successor source bytes");
