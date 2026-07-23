@@ -42,7 +42,8 @@ pub struct DaemonErrorDetail {
 #[openapi(
     info(
         title = "Harness daemon API",
-        description = "REST API served by the Harness daemon (harness-daemon). The API is dual-transport: most endpoints mirror a WebSocket JSON-RPC method, recorded per operation as the `x-websocket-method` extension. Generated from annotated handlers - do not edit docs/api/openapi.json by hand; regenerate with `mise run openapi:generate`."
+        description = "REST API served by the Harness daemon (harness-daemon). The API is dual-transport: most endpoints mirror a WebSocket JSON-RPC method, recorded per operation as the `x-websocket-method` extension. Generated from annotated handlers - do not edit docs/api/openapi.json by hand; regenerate with `mise run openapi:generate`.",
+        license(name = "MIT")
     ),
     components(schemas(DaemonErrorBody, DaemonErrorDetail))
 )]
