@@ -113,6 +113,54 @@ fn websocket_extension_matches_contract_parity() {
 }
 
 #[test]
+fn every_operation_documents_cross_cutting_responses() {
+    let doc = openapi_json_value();
+    let shared = doc
+        .pointer("/components/responses")
+        .and_then(serde_json::Value::as_object)
+        .expect("components/responses is defined once");
+    for name in [
+        "RemoteAuthRequired",
+        "RemoteRequestUriTooLong",
+        "RemoteRequestBodyTooLarge",
+        "RemoteRequestHeadersTooLarge",
+        "RemoteRequestThrottled",
+        "RemoteServiceUnavailable",
+        "RemoteRequestTimedOut",
+    ] {
+        assert!(
+            shared.contains_key(name),
+            "shared response {name} must be defined"
+        );
+    }
+
+    // Statuses the middleware can return for any route regardless of body.
+    let always = ["401", "414", "429", "431", "503", "504"];
+    let paths = doc
+        .get("paths")
+        .and_then(serde_json::Value::as_object)
+        .expect("generated document has a paths object");
+    for (path, item) in paths {
+        let item = item.as_object().expect("path item is an object");
+        for method in HTTP_METHODS {
+            let Some(operation) = item.get(method).and_then(serde_json::Value::as_object) else {
+                continue;
+            };
+            let responses = operation
+                .get("responses")
+                .and_then(serde_json::Value::as_object)
+                .unwrap_or_else(|| panic!("{method} {path} has no responses"));
+            for status in always {
+                assert!(
+                    responses.contains_key(status),
+                    "{method} {path} must reference the cross-cutting {status} response"
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn docs_describe_openapi_generation_workflow() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
     let agents = super::super::helpers::read_repo_file(root, "AGENTS.md");

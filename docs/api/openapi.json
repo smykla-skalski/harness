@@ -37,14 +37,22 @@
             }
           },
           "401": {
-            "description": "Missing or invalid daemon token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DaemonErrorBody"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
           }
         },
         "x-websocket-method": "daemon.log_level"
@@ -86,14 +94,25 @@
             }
           },
           "401": {
-            "description": "Missing or invalid daemon token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DaemonErrorBody"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
           }
         },
         "x-websocket-method": "daemon.set_log_level"
@@ -127,14 +146,22 @@
             }
           },
           "401": {
-            "description": "Missing or invalid daemon token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DaemonErrorBody"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
           }
         },
         "x-websocket-method": "daemon.stop"
@@ -178,14 +205,25 @@
             }
           },
           "401": {
-            "description": "Missing or invalid daemon token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DaemonErrorBody"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
           }
         }
       }
@@ -208,14 +246,22 @@
             }
           },
           "401": {
-            "description": "Missing or invalid daemon token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DaemonErrorBody"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
           }
         },
         "x-websocket-method": "github.status"
@@ -249,14 +295,22 @@
             }
           },
           "401": {
-            "description": "Missing or invalid daemon token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DaemonErrorBody"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
           }
         },
         "x-websocket-method": "health"
@@ -293,14 +347,22 @@
             }
           },
           "401": {
-            "description": "Missing or invalid daemon token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DaemonErrorBody"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
           }
         },
         "x-websocket-method": "projects"
@@ -334,14 +396,22 @@
             }
           },
           "401": {
-            "description": "Missing or invalid daemon token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DaemonErrorBody"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
           }
         }
       }
@@ -392,14 +462,22 @@
             }
           },
           "401": {
-            "description": "Missing or invalid daemon token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DaemonErrorBody"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
           }
         },
         "x-websocket-method": "runtime_session.resolve"
@@ -845,6 +923,78 @@
           "total_session_count": {
             "type": "integer",
             "minimum": 0
+          }
+        }
+      }
+    },
+    "responses": {
+      "RemoteAuthRequired": {
+        "description": "Missing, invalid, or unauthorized daemon credentials",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/DaemonErrorBody"
+            }
+          }
+        }
+      },
+      "RemoteRequestUriTooLong": {
+        "description": "Request URI exceeds the configured remote limit",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/DaemonErrorBody"
+            }
+          }
+        }
+      },
+      "RemoteRequestBodyTooLarge": {
+        "description": "Request body exceeds the configured remote limit",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/DaemonErrorBody"
+            }
+          }
+        }
+      },
+      "RemoteRequestHeadersTooLarge": {
+        "description": "Request headers exceed the configured remote limit",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/DaemonErrorBody"
+            }
+          }
+        }
+      },
+      "RemoteRequestThrottled": {
+        "description": "Remote request or connection concurrency limit reached",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/DaemonErrorBody"
+            }
+          }
+        }
+      },
+      "RemoteServiceUnavailable": {
+        "description": "Remote auth store or request limits unavailable",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/DaemonErrorBody"
+            }
+          }
+        }
+      },
+      "RemoteRequestTimedOut": {
+        "description": "Remote request exceeded the configured timeout",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/DaemonErrorBody"
+            }
           }
         }
       }

@@ -87,6 +87,7 @@ pub fn openapi_json_value() -> serde_json::Value {
     let mut doc =
         serde_json::to_value(openapi_document()).expect("openapi document serializes to json");
     inject_websocket_methods(&mut doc);
+    inject_cross_cutting_responses(&mut doc);
     inject_provenance(&mut doc);
     doc
 }
@@ -167,4 +168,139 @@ fn contract_ws_method(method: HttpRouteMethod, path: &str) -> Option<&'static st
         .iter()
         .find(|route| route.method == method && route.path == path)
         .and_then(|route| route.parity.ws_method())
+}
+
+/// A response the daemon's auth, admission, or body-limit middleware can return
+/// before any handler runs. All share the [`DaemonErrorBody`] shape.
+struct SharedResponse {
+    component: &'static str,
+    status: &'static str,
+    description: &'static str,
+    requires_body: bool,
+}
+
+/// Cross-cutting responses produced by remote-mode middleware. They are
+/// identical for every route, so they are defined once under
+/// `components/responses` and referenced from every operation instead of being
+/// repeated in each `#[utoipa::path]`.
+const SHARED_RESPONSES: &[SharedResponse] = &[
+    SharedResponse {
+        component: "RemoteAuthRequired",
+        status: "401",
+        description: "Missing, invalid, or unauthorized daemon credentials",
+        requires_body: false,
+    },
+    SharedResponse {
+        component: "RemoteRequestUriTooLong",
+        status: "414",
+        description: "Request URI exceeds the configured remote limit",
+        requires_body: false,
+    },
+    SharedResponse {
+        component: "RemoteRequestBodyTooLarge",
+        status: "413",
+        description: "Request body exceeds the configured remote limit",
+        requires_body: true,
+    },
+    SharedResponse {
+        component: "RemoteRequestHeadersTooLarge",
+        status: "431",
+        description: "Request headers exceed the configured remote limit",
+        requires_body: false,
+    },
+    SharedResponse {
+        component: "RemoteRequestThrottled",
+        status: "429",
+        description: "Remote request or connection concurrency limit reached",
+        requires_body: false,
+    },
+    SharedResponse {
+        component: "RemoteServiceUnavailable",
+        status: "503",
+        description: "Remote auth store or request limits unavailable",
+        requires_body: false,
+    },
+    SharedResponse {
+        component: "RemoteRequestTimedOut",
+        status: "504",
+        description: "Remote request exceeded the configured timeout",
+        requires_body: false,
+    },
+];
+
+/// Document the cross-cutting middleware responses once and reference them from
+/// every operation, so the schema reflects what a client can receive before a
+/// handler runs without repeating the set per route. Body-size limits only
+/// apply to operations that carry a request body.
+fn inject_cross_cutting_responses(doc: &mut serde_json::Value) {
+    define_shared_responses(doc);
+    reference_shared_responses(doc);
+}
+
+fn define_shared_responses(doc: &mut serde_json::Value) {
+    let Some(components) = doc
+        .get_mut("components")
+        .and_then(serde_json::Value::as_object_mut)
+    else {
+        return;
+    };
+    let mut responses = serde_json::Map::new();
+    for shared in SHARED_RESPONSES {
+        responses.insert(
+            shared.component.to_owned(),
+            serde_json::json!({
+                "description": shared.description,
+                "content": {
+                    "application/json": {
+                        "schema": { "$ref": "#/components/schemas/DaemonErrorBody" }
+                    }
+                }
+            }),
+        );
+    }
+    components.insert("responses".to_owned(), serde_json::Value::Object(responses));
+}
+
+fn reference_shared_responses(doc: &mut serde_json::Value) {
+    let Some(paths) = doc
+        .get_mut("paths")
+        .and_then(serde_json::Value::as_object_mut)
+    else {
+        return;
+    };
+    for item in paths.values_mut() {
+        let Some(item) = item.as_object_mut() else {
+            continue;
+        };
+        for (method, operation) in item.iter_mut() {
+            if parse_route_method(method).is_none() {
+                continue;
+            }
+            if let Some(operation) = operation.as_object_mut() {
+                add_shared_response_refs(operation);
+            }
+        }
+    }
+}
+
+fn add_shared_response_refs(operation: &mut serde_json::Map<String, serde_json::Value>) {
+    let has_body = operation.contains_key("requestBody");
+    let responses = operation
+        .entry("responses")
+        .or_insert_with(|| serde_json::Value::Object(serde_json::Map::new()));
+    let Some(responses) = responses.as_object_mut() else {
+        return;
+    };
+    for shared in SHARED_RESPONSES {
+        if shared.requires_body && !has_body {
+            continue;
+        }
+        responses
+            .entry(shared.status.to_owned())
+            .or_insert_with(|| {
+                serde_json::json!({
+                    "$ref": format!("#/components/responses/{}", shared.component)
+                })
+            });
+    }
 }

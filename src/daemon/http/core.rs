@@ -78,7 +78,6 @@ pub(crate) struct RuntimeSessionResolutionQuery {
     tag = "daemon",
     responses(
         (status = 200, description = "Daemon health snapshot", body = HealthResponse),
-        (status = 401, description = "Missing or invalid daemon token", body = DaemonErrorBody),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 ))]
@@ -104,7 +103,6 @@ pub(super) async fn get_health(
     tag = "daemon",
     responses(
         (status = 200, description = "Readiness probe", body = ReadinessResponse),
-        (status = 401, description = "Missing or invalid daemon token", body = DaemonErrorBody),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 ))]
@@ -131,7 +129,6 @@ pub(super) async fn get_ready(
     params(RuntimeSessionResolutionQuery),
     responses(
         (status = 200, description = "Runtime-session resolution outcome", body = RuntimeSessionResolutionResponse),
-        (status = 401, description = "Missing or invalid daemon token", body = DaemonErrorBody),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 ))]
@@ -190,7 +187,6 @@ pub(super) async fn get_diagnostics(
     tag = "daemon",
     responses(
         (status = 200, description = "GitHub API usage diagnostics", body = GitHubApiDiagnostics),
-        (status = 401, description = "Missing or invalid daemon token", body = DaemonErrorBody),
     ),
 ))]
 pub(super) async fn get_github_status(
@@ -248,7 +244,6 @@ pub(super) async fn get_runtimes_probe(
     tag = "daemon",
     responses(
         (status = 200, description = "Daemon shutdown acknowledged", body = DaemonControlResponse),
-        (status = 401, description = "Missing or invalid daemon token", body = DaemonErrorBody),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 ))]
@@ -275,7 +270,6 @@ pub(super) async fn post_stop_daemon(
     request_body = DaemonTelemetryRequest,
     responses(
         (status = 200, description = "Telemetry recorded", body = DaemonTelemetryResponse),
-        (status = 401, description = "Missing or invalid daemon token", body = DaemonErrorBody),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 ))]
@@ -355,7 +349,6 @@ async fn post_bridge_reconfigure(
     tag = "daemon",
     responses(
         (status = 200, description = "Current daemon log level", body = LogLevelResponse),
-        (status = 401, description = "Missing or invalid daemon token", body = DaemonErrorBody),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 ))]
@@ -384,7 +377,6 @@ pub(super) async fn get_log_level(
     request_body = SetLogLevelRequest,
     responses(
         (status = 200, description = "Updated daemon log level", body = LogLevelResponse),
-        (status = 401, description = "Missing or invalid daemon token", body = DaemonErrorBody),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 ))]
@@ -430,7 +422,6 @@ pub(super) async fn put_log_level(
     tag = "daemon",
     responses(
         (status = 200, description = "Projects and their worktrees", body = Vec<ProjectSummary>),
-        (status = 401, description = "Missing or invalid daemon token", body = DaemonErrorBody),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 ))]
