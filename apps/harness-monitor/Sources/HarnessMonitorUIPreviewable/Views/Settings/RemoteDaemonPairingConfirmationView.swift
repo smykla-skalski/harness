@@ -71,11 +71,13 @@ public struct RemoteDaemonPairingConfirmationView: View {
       LabeledContent("Scopes", value: invitation.scopes.joined(separator: ", "))
         .textSelection(.enabled)
 
-      LabeledContent("Code Expires", value: expirationText)
-        .foregroundStyle(expirationColor)
+      LabeledContent("Code Expires") {
+        Text(expirationText)
+          .foregroundStyle(expirationColor)
+      }
 
       TextField("Client name", text: $displayName)
-        .textFieldStyle(.roundedBorder)
+        .harnessNativeFormControl()
         .labelsHidden()
         .accessibilityLabel("Client name")
         .accessibilityIdentifier(HarnessMonitorAccessibility.remotePairSheetClientNameField)
@@ -97,7 +99,7 @@ public struct RemoteDaemonPairingConfirmationView: View {
         onPair(name.isEmpty ? "Harness Monitor on macOS" : name)
       }
       .keyboardShortcut(.defaultAction)
-      .buttonStyle(.borderedProminent)
+      .harnessActionButtonStyle(variant: .prominent)
       .accessibilityIdentifier(HarnessMonitorAccessibility.remotePairSheetPairButton)
     }
     .frame(maxWidth: .infinity, alignment: .trailing)
