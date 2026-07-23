@@ -83,21 +83,25 @@ pub struct TaskCheckpointRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SessionEndRequest {
     pub actor: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SessionArchiveRequest {
     pub actor: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SessionLeaveRequest {
     pub agent_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SessionTitleRequest {
     pub title: String,
 }
@@ -112,11 +116,13 @@ pub struct SignalSendRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ObserveSessionRequest {
     pub actor: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SessionStartRequest {
     #[serde(default)]
     pub title: String,
@@ -131,6 +137,7 @@ pub struct SessionStartRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SessionJoinRequest {
     pub runtime: String,
     pub role: SessionRole,
@@ -215,17 +222,20 @@ pub struct ImproverApplyRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SessionMutationResponse {
     pub state: SessionState,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SessionArchiveResponse {
     pub session_id: String,
     pub archived_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AdoptSessionRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bookmark_id: Option<String>,
@@ -233,6 +243,7 @@ pub struct AdoptSessionRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AgentRuntimeSessionRegistrationRequest {
     pub managed_agent_id: String,
     pub runtime: String,
@@ -261,6 +272,7 @@ mod tests {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AgentRuntimeSessionRegistrationResponse {
     pub registered: bool,
 }

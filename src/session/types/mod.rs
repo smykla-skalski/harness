@@ -19,8 +19,8 @@ mod task_tests;
 mod test_support;
 
 pub use agents::{
-    AgentPersona, AgentRegistration, AgentStatus, ManagedAgentKind, ManagedAgentRef,
-    PendingLeaderTransfer, PersonaSymbol, SessionRole,
+    AgentPersona, AgentRegistration, AgentRegistrationWire, AgentStatus, ManagedAgentKind,
+    ManagedAgentRef, PendingLeaderTransfer, PersonaSymbol, SessionRole,
 };
 pub use events::{SessionLogEntry, SessionSignalRecord, SessionSignalStatus, SessionTransition};
 pub use identity::{

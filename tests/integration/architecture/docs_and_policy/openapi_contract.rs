@@ -30,6 +30,19 @@ const DOCUMENTED_ROUTES: &[(&str, &str)] = &[
     ("GET", "/v1/github/status"),
     ("GET", "/v1/projects"),
     ("GET", "/v1/runtime-sessions/resolve"),
+    ("GET", "/v1/sessions"),
+    ("POST", "/v1/sessions"),
+    ("POST", "/v1/sessions/adopt"),
+    ("GET", "/v1/sessions/{session_id}"),
+    ("DELETE", "/v1/sessions/{session_id}"),
+    ("GET", "/v1/sessions/{session_id}/timeline"),
+    ("POST", "/v1/sessions/{session_id}/join"),
+    ("POST", "/v1/sessions/{session_id}/runtime-session"),
+    ("POST", "/v1/sessions/{session_id}/title"),
+    ("POST", "/v1/sessions/{session_id}/end"),
+    ("POST", "/v1/sessions/{session_id}/archive"),
+    ("POST", "/v1/sessions/{session_id}/leave"),
+    ("POST", "/v1/sessions/{session_id}/observe"),
 ];
 
 fn documented_operations() -> BTreeSet<(String, String)> {

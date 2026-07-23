@@ -19,6 +19,20 @@ use super::auth::{authorize_control_request, require_auth};
 use super::response::{extract_request_id, timed_json};
 use super::{DaemonHttpState, run_acp_agent_blocking};
 
+#[cfg(feature = "openapi")]
+use super::openapi::DaemonErrorBody;
+
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/end",
+    tag = "sessions",
+    params(("session_id" = String, Path, description = "Session identifier")),
+    request_body = SessionEndRequest,
+    responses(
+        (status = 200, description = "Session ended", body = SessionDetail),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_end_session(
     Path(session_id): Path<String>,
     headers: HeaderMap,
@@ -37,6 +51,17 @@ pub(super) async fn post_end_session(
     timed_json("POST", http_paths::SESSION_END, &request_id, start, result)
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/archive",
+    tag = "sessions",
+    params(("session_id" = String, Path, description = "Session identifier")),
+    request_body = SessionArchiveRequest,
+    responses(
+        (status = 200, description = "Session archived", body = SessionArchiveResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_session_archive(
     Path(session_id): Path<String>,
     headers: HeaderMap,
@@ -85,6 +110,17 @@ fn log_archive_acp_stop_failure(error: &CliError, session_id: &str) {
     );
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/leave",
+    tag = "sessions",
+    params(("session_id" = String, Path, description = "Session identifier")),
+    request_body = SessionLeaveRequest,
+    responses(
+        (status = 200, description = "Agent left the session", body = SessionDetail),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_leave_session(
     Path(session_id): Path<String>,
     headers: HeaderMap,
@@ -109,6 +145,17 @@ pub(super) async fn post_leave_session(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/observe",
+    tag = "sessions",
+    params(("session_id" = String, Path, description = "Session identifier")),
+    request_body(content = ObserveSessionRequest, description = "Optional observe options; the body may be omitted"),
+    responses(
+        (status = 200, description = "Observer attached", body = SessionDetail),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_observe_session(
     Path(session_id): Path<String>,
     headers: HeaderMap,
@@ -165,6 +212,16 @@ pub(super) async fn broadcast_observe_session(state: &DaemonHttpState, session_i
     service::broadcast_session_snapshot(&state.sender, session_id, db_ref);
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions",
+    tag = "sessions",
+    request_body = SessionStartRequest,
+    responses(
+        (status = 200, description = "Session started", body = SessionMutationResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_session_start(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -182,6 +239,17 @@ pub(super) async fn post_session_start(
     timed_json("POST", http_paths::SESSIONS, &request_id, start, result)
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/join",
+    tag = "sessions",
+    params(("session_id" = String, Path, description = "Session identifier")),
+    request_body = SessionJoinRequest,
+    responses(
+        (status = 200, description = "Agent joined the session", body = SessionMutationResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_session_join(
     Path(session_id): Path<String>,
     headers: HeaderMap,
@@ -200,6 +268,17 @@ pub(super) async fn post_session_join(
     timed_json("POST", http_paths::SESSION_JOIN, &request_id, start, result)
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/title",
+    tag = "sessions",
+    params(("session_id" = String, Path, description = "Session identifier")),
+    request_body = SessionTitleRequest,
+    responses(
+        (status = 200, description = "Session title updated", body = SessionMutationResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_session_title(
     Path(session_id): Path<String>,
     headers: HeaderMap,
@@ -354,6 +433,17 @@ fn session_mutation_response(session_state: SessionState) -> SessionMutationResp
     }
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    delete,
+    path = "/v1/sessions/{session_id}",
+    tag = "sessions",
+    params(("session_id" = String, Path, description = "Session identifier")),
+    responses(
+        (status = 204, description = "Session deleted"),
+        (status = 404, description = "Session not found"),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn delete_session(
     Path(session_id): Path<String>,
     headers: HeaderMap,

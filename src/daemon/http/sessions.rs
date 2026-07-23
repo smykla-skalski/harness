@@ -18,6 +18,11 @@ use super::response::{extract_request_id, timed_json};
 use super::runtime_session::post_runtime_session;
 use super::{DaemonHttpState, require_async_db};
 
+#[cfg(feature = "openapi")]
+use super::openapi::DaemonErrorBody;
+#[cfg(feature = "openapi")]
+use crate::daemon::protocol::SessionSummary;
+
 pub(super) use super::sessions_mutations::{
     broadcast_observe_session, delete_session, post_end_session, post_leave_session,
     post_observe_session, post_session_archive, post_session_join, post_session_start,
@@ -55,6 +60,8 @@ pub(super) fn session_routes() -> Router<DaemonHttpState> {
         .route(http_paths::SESSION_OBSERVE, post(post_observe_session))
 }
 
+#[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
+#[cfg_attr(feature = "openapi", into_params(parameter_in = Query))]
 #[derive(Debug, Default, serde::Deserialize)]
 pub(super) struct SessionScopeQuery {
     #[serde(default)]
@@ -109,6 +116,15 @@ fn timeline_cursor(
     }
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/v1/sessions",
+    tag = "sessions",
+    responses(
+        (status = 200, description = "All sessions across projects", body = Vec<SessionSummary>),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn get_sessions(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -125,6 +141,19 @@ pub(super) async fn get_sessions(
     timed_json("GET", http_paths::SESSIONS, &request_id, start, result)
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/v1/sessions/{session_id}",
+    tag = "sessions",
+    params(
+        ("session_id" = String, Path, description = "Session identifier"),
+        SessionScopeQuery,
+    ),
+    responses(
+        (status = 200, description = "Session detail", body = SessionDetail),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn get_session(
     Path(session_id): Path<String>,
     query: Query<SessionScopeQuery>,
@@ -177,6 +206,19 @@ async fn read_session_detail(
     service::session_detail_async(session_id, Some(async_db)).await
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/v1/sessions/{session_id}/timeline",
+    tag = "sessions",
+    params(
+        ("session_id" = String, Path, description = "Session identifier"),
+        SessionScopeQuery,
+    ),
+    responses(
+        (status = 200, description = "Timeline window", body = TimelineWindowResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn get_timeline(
     Path(session_id): Path<String>,
     query: Query<SessionScopeQuery>,

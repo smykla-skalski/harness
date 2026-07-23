@@ -63,6 +63,24 @@ struct HarnessDaemonApi;
 ))]
 struct CoreApi;
 
+#[derive(utoipa::OpenApi)]
+#[openapi(paths(
+    super::sessions::get_sessions,
+    super::sessions_mutations::post_session_start,
+    super::sessions_adopt::post_session_adopt,
+    super::sessions::get_session,
+    super::sessions_mutations::delete_session,
+    super::sessions::get_timeline,
+    super::sessions_mutations::post_session_join,
+    super::runtime_session::post_runtime_session,
+    super::sessions_mutations::post_session_title,
+    super::sessions_mutations::post_end_session,
+    super::sessions_mutations::post_session_archive,
+    super::sessions_mutations::post_leave_session,
+    super::sessions_mutations::post_observe_session,
+))]
+struct SessionsApi;
+
 /// Build the typed `OpenAPI` document from every domain aggregator.
 ///
 /// Aggregators merge in registration order; component schemas deduplicate by
@@ -72,6 +90,7 @@ struct CoreApi;
 pub fn openapi_document() -> utoipa::openapi::OpenApi {
     let mut doc = HarnessDaemonApi::openapi();
     doc.merge(CoreApi::openapi());
+    doc.merge(SessionsApi::openapi());
     env!("CARGO_PKG_VERSION").clone_into(&mut doc.info.version);
     doc
 }

@@ -9,6 +9,8 @@ use crate::github_api::{GitHubApiStatus, GitHubRateResource};
 use crate::hooks::protocol::payloads::AskUserQuestionPrompt;
 use crate::observe::types::{FixSafety, IssueCategory, IssueCode, IssueSeverity};
 use crate::session::service::ResolvedRuntimeSessionAgent;
+#[cfg(feature = "openapi")]
+use crate::session::types::AgentRegistrationWire;
 use crate::session::types::{
     AgentRegistration, PendingLeaderTransfer, SessionMetrics, SessionSignalRecord, SessionStatus,
     WorkItem,
@@ -254,6 +256,7 @@ pub struct ProjectSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SessionSummary {
     pub project_id: String,
     pub project_name: String,
@@ -281,6 +284,7 @@ pub struct SessionSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ObserverSummary {
     pub observe_id: String,
     pub last_scan_time: String,
@@ -295,6 +299,7 @@ pub struct ObserverSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ObserverOpenIssue {
     pub issue_id: String,
     pub code: IssueCode,
@@ -310,6 +315,7 @@ pub struct ObserverOpenIssue {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ObserverActiveWorker {
     pub issue_id: String,
     pub target_file: String,
@@ -319,6 +325,7 @@ pub struct ObserverActiveWorker {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ObserverAgentSessionSummary {
     pub agent_id: String,
     pub runtime: String,
@@ -328,6 +335,7 @@ pub struct ObserverAgentSessionSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AgentPendingUserPrompt {
     pub tool_name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -341,6 +349,7 @@ pub struct AgentPendingUserPrompt {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AgentToolActivitySummary {
     pub agent_id: String,
     pub runtime: String,
@@ -355,8 +364,10 @@ pub struct AgentToolActivitySummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SessionDetail {
     pub session: SessionSummary,
+    #[cfg_attr(feature = "openapi", schema(value_type = Vec<AgentRegistrationWire>))]
     pub agents: Vec<AgentRegistration>,
     pub tasks: Vec<WorkItem>,
     pub signals: Vec<SessionSignalRecord>,
@@ -365,6 +376,7 @@ pub struct SessionDetail {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TimelineEntry {
     pub entry_id: String,
     pub recorded_at: String,
@@ -377,6 +389,7 @@ pub struct TimelineEntry {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TimelineCursor {
     pub recorded_at: String,
     pub entry_id: String,
@@ -397,6 +410,7 @@ pub struct TimelineWindowRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TimelineWindowResponse {
     pub revision: i64,
     pub total_count: usize,

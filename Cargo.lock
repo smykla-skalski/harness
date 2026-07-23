@@ -3848,6 +3848,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "user_dirs",
+ "utoipa",
  "uuid",
  "uzers",
  "walkdir",
