@@ -75,7 +75,11 @@ extension DaemonController {
         }
       }
       graceTimer = Task {
-        try? await Task.sleep(for: gracePeriod)
+        do {
+          try await Task.sleep(for: gracePeriod)
+        } catch {
+          return
+        }
         finish.resume(returning: .timedOut)
       }
     }
