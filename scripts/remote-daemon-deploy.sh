@@ -16,15 +16,26 @@ controller="${HARNESS_REMOTE_SYSTEMD_CONTROLLER:-/usr/local/bin/harness-systemd}
 target_binary="${HARNESS_REMOTE_DAEMON_BINARY:-/usr/local/bin/harness-daemon}"
 candidate_dir="${HARNESS_INSTALL_BINARY_DIR:-${HOME}/.local/bin}"
 candidate="${HARNESS_REMOTE_DAEMON_CANDIDATE:-${candidate_dir}/harness-daemon}"
+unit="${HARNESS_REMOTE_SYSTEMD_UNIT:-}"
 
 passthrough=("$@")
 
-# A dry run must stay non-mutating, so skip the build+activate and only let the
-# controller report the transaction it would run against the current candidate.
+# Scan the forwarded flags once: a dry run must stay non-mutating (skip the
+# build and activation), and an explicit --unit passthrough wins over the
+# HARNESS_REMOTE_SYSTEMD_UNIT default so the controller never sees --unit twice.
 dry_run=0
+passthrough_sets_unit=0
 for arg in "${passthrough[@]+"${passthrough[@]}"}"; do
-  [[ "$arg" == "--dry-run" ]] && dry_run=1
+  case "$arg" in
+    --dry-run) dry_run=1 ;;
+    --unit | --unit=*) passthrough_sets_unit=1 ;;
+  esac
 done
+
+unit_args=()
+if [[ -n "$unit" ]] && (( passthrough_sets_unit == 0 )); then
+  unit_args=(--unit "$unit")
+fi
 
 if (( dry_run == 0 )); then
   printf 'building and activating the daemon release set\n'
@@ -47,10 +58,11 @@ if [[ ! -f "$controller" || ! -x "$controller" ]]; then
   exit 1
 fi
 
-# The controller must run as root; the candidate is only ever read as data, so
-# it is never elevated.
+# Swapping the binary and driving systemd needs root, but a --dry-run only
+# reports and needs no privilege, so it stays unelevated and never prompts for a
+# password. The candidate is only ever read as data, never executed with sudo.
 run_controller() {
-  if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
+  if (( dry_run == 0 )) && [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
     sudo -- "$@"
   else
     "$@"
@@ -61,5 +73,6 @@ printf 'upgrading %s -> %s via %s\n' "$target_binary" "$candidate" "$controller"
 run_controller "$controller" upgrade \
   --candidate-path "$candidate" \
   --binary-path "$target_binary" \
+  "${unit_args[@]+"${unit_args[@]}"}" \
   --json \
   "${passthrough[@]+"${passthrough[@]}"}"
