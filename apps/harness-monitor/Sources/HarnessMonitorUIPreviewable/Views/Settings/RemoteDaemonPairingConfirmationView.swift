@@ -45,6 +45,7 @@ public struct RemoteDaemonPairingConfirmationView: View {
         .padding(.vertical, HarnessMonitorTheme.spacingMD)
     }
     .frame(width: 420)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.remotePairSheet)
     .onAppear {
       guard displayName.isEmpty else { return }
       displayName = Host.current().localizedName ?? "Harness Monitor on macOS"
@@ -56,6 +57,7 @@ public struct RemoteDaemonPairingConfirmationView: View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       Text("Pair with Remote Daemon")
         .font(.headline)
+        .accessibilityAddTraits(.isHeader)
       Text(invitation.endpoint.absoluteString)
         .font(.subheadline)
         .foregroundStyle(.secondary)
@@ -83,6 +85,7 @@ public struct RemoteDaemonPairingConfirmationView: View {
         .textFieldStyle(.roundedBorder)
         .labelsHidden()
         .accessibilityLabel("Client name")
+        .accessibilityIdentifier(HarnessMonitorAccessibility.remotePairSheetClientNameField)
         .padding(.top, HarnessMonitorTheme.spacingXS)
     }
   }
@@ -93,7 +96,8 @@ public struct RemoteDaemonPairingConfirmationView: View {
       Button("Cancel", role: .cancel) {
         onCancel()
       }
-      .keyboardShortcut(.escape)
+      .keyboardShortcut(.cancelAction)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.remotePairSheetCancelButton)
 
       Button("Pair Remote Daemon") {
         let name = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -101,6 +105,7 @@ public struct RemoteDaemonPairingConfirmationView: View {
       }
       .keyboardShortcut(.defaultAction)
       .buttonStyle(.borderedProminent)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.remotePairSheetPairButton)
     }
     .frame(maxWidth: .infinity, alignment: .trailing)
   }

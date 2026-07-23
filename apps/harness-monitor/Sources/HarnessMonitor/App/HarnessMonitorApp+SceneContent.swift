@@ -93,11 +93,9 @@ extension HarnessMonitorApp {
             }
           )
         ) {
-          Button("OK") {
-            pendingPairingErrorValue = nil
-            pendingPairingURLValue = nil
-            pendingPairingInvitationValue = nil
-          }
+          // Dismissal runs the isPresented setter above, which clears the
+          // pending pairing state; the button only needs to close the alert.
+          Button("OK") {}
         } message: {
           if let error = pendingPairingErrorValue {
             Text(error.localizedDescription)

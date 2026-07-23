@@ -355,14 +355,6 @@ struct HarnessMonitorApp: App {
     nonmutating set { pendingPairingInvitation = newValue }
   }
 
-  var pendingPairingURLBinding: Binding<URL?> {
-    $pendingPairingURL
-  }
-
-  var pendingPairingErrorBinding: Binding<RemoteDaemonPairingInvitationError?> {
-    $pendingPairingError
-  }
-
   var hasInstalledMainWindowLauncherFlag: Bool {
     get {
       hasInstalledMainWindowLauncher
