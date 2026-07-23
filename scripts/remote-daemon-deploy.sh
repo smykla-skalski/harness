@@ -36,13 +36,13 @@ fi
 if [[ -e "$candidate" ]]; then
   candidate="$(readlink -f -- "$candidate")"
 fi
-if [[ ! -x "$candidate" ]]; then
-  printf 'candidate daemon missing or not executable at %s\n' "$candidate" >&2
+if [[ ! -f "$candidate" || ! -x "$candidate" ]]; then
+  printf 'candidate daemon is not an executable file at %s\n' "$candidate" >&2
   printf 'activate it first with: mise run install:harness:daemon (or set HARNESS_REMOTE_DAEMON_CANDIDATE)\n' >&2
   exit 1
 fi
-if [[ ! -x "$controller" ]]; then
-  printf 'harness-systemd controller missing at %s\n' "$controller" >&2
+if [[ ! -f "$controller" || ! -x "$controller" ]]; then
+  printf 'harness-systemd controller is not an executable file at %s\n' "$controller" >&2
   printf 'install it once with the runbook in docs/remote-systemd-upgrades.md\n' >&2
   exit 1
 fi

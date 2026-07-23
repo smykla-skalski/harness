@@ -221,7 +221,7 @@ run = [
 ]
 
 [tasks."daemon:remote:deploy"]
-description = "Build and activate the daemon release set, then upgrade the live remote systemd unit through the recorded harness-systemd controller (Linux, root; forward --dry-run or --unit NAME after --). Controller rotation stays manual per docs/remote-systemd-upgrades.md"
+description = "Build and activate the daemon release set, then upgrade the live remote systemd unit through the recorded harness-systemd controller (Linux; run as the install user, the controller step self-elevates with sudo; forward --dry-run or --unit NAME after --). Controller rotation stays manual per docs/remote-systemd-upgrades.md"
 run = "./scripts/run-linux-only.sh ./scripts/remote-daemon-deploy.sh"
 
 [tasks."systemd:check"]
