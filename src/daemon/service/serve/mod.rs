@@ -128,11 +128,13 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         ))
         .await?;
     }
-    app_state
-        .codex_controller
-        .reconcile_task_board_admission_workers_after_restart()
-        .await?;
-    let _background = spawn_background_tasks(&app_state, config.poll_interval, shutdown_rx.clone());
+    Box::pin(
+        app_state
+            .codex_controller
+            .reconcile_task_board_admission_workers_after_restart(),
+    )
+    .await?;
+    let _background = spawn_background_tasks(&app_state, config.poll_interval, &shutdown_rx);
 
     let serve_result = http::serve(listener, app_state, shutdown_rx).await;
     audit::record_daemon_stopped(async_db_slot_for_audit.get(), &serve_result).await;

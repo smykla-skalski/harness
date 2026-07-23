@@ -46,7 +46,7 @@ impl AsyncDaemonDb {
         require_source_recovery_operation_fence_in_tx(&mut transaction, trust).await?;
         let collisions =
             load_source_bundle_collisions_in_tx(&mut transaction, &request.offer).await?;
-        if let Some(existing) = exact_source_receipt(collisions, request, authenticated_principal)?
+        if let Some(existing) = exact_source_receipt(&collisions, request, authenticated_principal)?
         {
             if verification.receipt.as_ref() != Some(&existing.response) {
                 return Err(concurrent(
@@ -120,7 +120,7 @@ impl AsyncDaemonDb {
             &request.upload_request_sha256,
         )
         .await?;
-        if let Some(existing) = exact_abandonment(collisions, request, authenticated_principal)? {
+        if let Some(existing) = exact_abandonment(&collisions, request, authenticated_principal)? {
             if existing.response != *response {
                 return Err(concurrent(
                     "source abandonment response changed after immutable storage",
@@ -209,11 +209,11 @@ impl AsyncDaemonDb {
 }
 
 fn exact_source_receipt(
-    collisions: Vec<TaskBoardRemoteSourceBundle>,
+    collisions: &[TaskBoardRemoteSourceBundle],
     request: &RemoteSourceBundleUploadRequest,
     principal: &str,
 ) -> Result<Option<TaskBoardRemoteSourceBundle>, CliError> {
-    match collisions.as_slice() {
+    match collisions {
         [] => Ok(None),
         [stored] if stored.is_exact_replay(request, principal) => Ok(Some(stored.clone())),
         _ => Err(concurrent(
@@ -223,11 +223,11 @@ fn exact_source_receipt(
 }
 
 fn exact_abandonment(
-    collisions: Vec<TaskBoardRemoteSourceBundleAbandonment>,
+    collisions: &[TaskBoardRemoteSourceBundleAbandonment],
     request: &RemoteSourceBundleAbandonRequest,
     principal: &str,
 ) -> Result<Option<TaskBoardRemoteSourceBundleAbandonment>, CliError> {
-    match collisions.as_slice() {
+    match collisions {
         [] => Ok(None),
         [stored] if stored.is_exact_replay(request, principal) => Ok(Some(stored.clone())),
         _ => Err(concurrent(

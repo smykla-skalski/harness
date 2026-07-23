@@ -181,9 +181,7 @@ async fn source_backed_predecessor(label: &str) -> SourceBackedSetup {
                 &offer,
                 Some(&content),
                 HOST,
-                NOW,
-                LEASE_EXPIRES,
-                DEADLINE,
+                crate::daemon::db::TaskBoardRemoteOfferWindow::new(NOW, LEASE_EXPIRES, DEADLINE,),
             )
             .await
             .expect("persist source-backed predecessor"),

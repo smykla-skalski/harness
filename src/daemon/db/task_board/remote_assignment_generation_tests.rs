@@ -18,9 +18,11 @@ async fn controller_offer_rejects_a_caller_supplied_lease_outside_the_sealed_dur
             &crate::task_board::TaskBoardExecutionAttemptCas::from(&fixture.attempt),
             &fixture.request,
             HOST,
-            NOW,
-            "2026-07-19T10:01:01Z",
-            DEADLINE,
+            crate::daemon::db::TaskBoardRemoteOfferWindow::new(
+                NOW,
+                "2026-07-19T10:01:01Z",
+                DEADLINE,
+            ),
         )
         .await
         .expect_err("caller cannot widen the sealed assignment lease");

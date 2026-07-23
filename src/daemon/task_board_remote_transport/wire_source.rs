@@ -268,6 +268,14 @@ fn valid_branch(branch: &str) -> bool {
         && !branch.contains("//")
         && !branch.contains("@{")
         && branch.split('/').all(|component| {
-            !component.is_empty() && !component.starts_with('.') && !component.ends_with(".lock")
+            !component.is_empty() && !component.starts_with('.') && !has_lock_suffix(component)
         })
+}
+
+#[expect(
+    clippy::case_sensitive_file_extension_comparisons,
+    reason = "Git's reserved .lock ref suffix is case-sensitive"
+)]
+fn has_lock_suffix(component: &str) -> bool {
+    component.ends_with(".lock")
 }

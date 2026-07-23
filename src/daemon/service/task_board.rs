@@ -316,7 +316,7 @@ pub(crate) async fn dispatch_task_board_async(
     request: &TaskBoardDispatchRequest,
     async_db: &AsyncDaemonDb,
 ) -> Result<TaskBoardDispatchResponse, CliError> {
-    dispatch::dispatch_task_board_async(request, async_db).await
+    Box::pin(dispatch::dispatch_task_board_async(request, async_db)).await
 }
 
 pub(crate) async fn pick_task_board_dispatch_async(

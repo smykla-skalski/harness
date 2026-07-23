@@ -51,10 +51,6 @@ pub(crate) struct TaskBoardRemoteControllerReport {
     blocked_host_ids: BTreeSet<String>,
 }
 
-#[expect(
-    clippy::large_futures,
-    reason = "boxing controller phases would allocate on every recovery-loop drive"
-)]
 pub(crate) async fn drive_task_board_remote_controller(
     db: &AsyncDaemonDb,
 ) -> Result<TaskBoardRemoteControllerReport, CliError> {
@@ -330,9 +326,11 @@ async fn offer_remote_candidates(
             &prepared.request,
             prepared.source_content.as_deref(),
             &host.config.host_id,
-            &prepared.offered_at,
-            &prepared.lease_expires_at,
-            &prepared.deadline_at,
+            crate::daemon::db::TaskBoardRemoteOfferWindow::new(
+                &prepared.offered_at,
+                &prepared.lease_expires_at,
+                &prepared.deadline_at,
+            ),
         ))
         .await?
         {

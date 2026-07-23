@@ -248,7 +248,8 @@ fn normalize_sql(sql: &str) -> String {
     let mut quoted = None;
     let mut whitespace = false;
     let mut characters = sql.trim().trim_end_matches(';').trim().chars().peekable();
-    while let Some(character) = characters.next() {
+    while characters.peek().is_some() {
+        let character = characters.next().expect("peeked SQL character");
         if let Some(quote) = quoted {
             normalized.push(character);
             if character == quote {
@@ -269,7 +270,8 @@ fn normalize_sql(sql: &str) -> String {
         if character == '/' && characters.peek() == Some(&'*') {
             characters.next();
             let mut previous = None;
-            while let Some(comment_character) = characters.next() {
+            while characters.peek().is_some() {
+                let comment_character = characters.next().expect("peeked SQL comment character");
                 if previous == Some('*') && comment_character == '/' {
                     break;
                 }

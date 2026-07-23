@@ -71,7 +71,7 @@ pub(super) async fn recover_existing(
             .into(),
         ));
     };
-    persist_exact_task(board, &current, task, operations, follow_ups)
+    persist_exact_task(board, &current, *task, operations, follow_ups)
         .await
         .map_err(SyncClientError::Local)
 }

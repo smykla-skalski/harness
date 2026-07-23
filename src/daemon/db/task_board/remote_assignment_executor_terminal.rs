@@ -421,11 +421,11 @@ fn status_request(
 }
 
 trait TerminalWireState {
-    fn is_terminal(self) -> bool;
+    fn is_terminal(&self) -> bool;
 }
 
 impl TerminalWireState for RemoteAssignmentWireState {
-    fn is_terminal(self) -> bool {
+    fn is_terminal(&self) -> bool {
         matches!(
             self,
             Self::Completed | Self::Failed | Self::Cancelled | Self::Superseded | Self::Unknown

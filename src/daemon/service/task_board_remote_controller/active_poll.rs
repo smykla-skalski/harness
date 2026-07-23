@@ -77,18 +77,18 @@ async fn poll_cancel_intent(
                 | RemoteAssignmentWireState::Failed
                 | RemoteAssignmentWireState::Cancelled
         ) {
-            require_cancel_progress(outcome)?;
+            require_cancel_progress(&outcome)?;
             return Ok(true);
         }
     }
     let (_, outcome) = Box::pin(client.cancel(db, request))
         .await
         .map_err(controller_database_error)?;
-    require_cancel_progress(outcome)?;
+    require_cancel_progress(&outcome)?;
     Ok(true)
 }
 
-fn require_cancel_progress(outcome: TaskBoardRemoteMutationOutcome) -> Result<(), CliError> {
+fn require_cancel_progress(outcome: &TaskBoardRemoteMutationOutcome) -> Result<(), CliError> {
     match outcome {
         TaskBoardRemoteMutationOutcome::Updated(_)
         | TaskBoardRemoteMutationOutcome::Replayed(_) => Ok(()),

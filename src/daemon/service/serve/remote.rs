@@ -111,11 +111,13 @@ pub async fn serve_remote_https(
         )
         .await?;
     }
-    app_state
-        .codex_controller
-        .reconcile_task_board_admission_workers_after_restart()
-        .await?;
-    let _background = spawn_background_tasks(&app_state, config.poll_interval, shutdown_rx.clone());
+    Box::pin(
+        app_state
+            .codex_controller
+            .reconcile_task_board_admission_workers_after_restart(),
+    )
+    .await?;
+    let _background = spawn_background_tasks(&app_state, config.poll_interval, &shutdown_rx);
 
     let serve_result = http::serve(listener, app_state, shutdown_rx).await;
     let _ = shutdown_tx.send(true);

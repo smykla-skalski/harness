@@ -190,9 +190,11 @@ pub(super) async fn prepared_controller_fixture() -> (RemoteControllerFixture, C
             &TaskBoardExecutionAttemptCas::from(&fixture.attempt),
             &fixture.request,
             HOST_ID,
-            &times.offered_at,
-            &times.initial_expiry,
-            &fixture.request.deadline_at,
+            crate::daemon::db::TaskBoardRemoteOfferWindow::new(
+                &times.offered_at,
+                &times.initial_expiry,
+                &fixture.request.deadline_at,
+            ),
         )
         .await
         .expect("persist offer before remote I/O");

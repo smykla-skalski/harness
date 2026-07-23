@@ -119,6 +119,34 @@ fn remove_outside_literal(sql: &str, pattern: &str) -> String {
 pub(super) fn current_schema_shape_needs_repair(
     conn: &super::Connection,
 ) -> Result<bool, CliError> {
+    if current_schema_objects_missing(conn)? {
+        return Ok(true);
+    }
+    if super::schema_repairs_external_creates::indexes_need_repair(conn)? {
+        return Ok(true);
+    }
+    if super::schema_repairs_wake_events::indexes_need_repair(conn)? {
+        return Ok(true);
+    }
+    if super::schema_repairs_admission::shape_needs_repair(conn)? {
+        return Ok(true);
+    }
+    if super::schema_repairs_reconciliation_cursors::shape_needs_repair(conn)? {
+        return Ok(true);
+    }
+    if super::schema_repairs_remote_execution::shape_needs_repair(conn)? {
+        return Ok(true);
+    }
+    if super::schema_v44::shape_needs_repair(conn)? {
+        return Ok(true);
+    }
+    if super::schema_repairs_remote_execution_v45::shape_needs_repair(conn)? {
+        return Ok(true);
+    }
+    Ok(false)
+}
+
+fn current_schema_objects_missing(conn: &super::Connection) -> Result<bool, CliError> {
     for table in [
         "policy_workspace",
         "policy_canvases",
@@ -197,27 +225,6 @@ pub(super) fn current_schema_shape_needs_repair(
         if !trigger_exists(conn, trigger)? {
             return Ok(true);
         }
-    }
-    if super::schema_repairs_external_creates::indexes_need_repair(conn)? {
-        return Ok(true);
-    }
-    if super::schema_repairs_wake_events::indexes_need_repair(conn)? {
-        return Ok(true);
-    }
-    if super::schema_repairs_admission::shape_needs_repair(conn)? {
-        return Ok(true);
-    }
-    if super::schema_repairs_reconciliation_cursors::shape_needs_repair(conn)? {
-        return Ok(true);
-    }
-    if super::schema_repairs_remote_execution::shape_needs_repair(conn)? {
-        return Ok(true);
-    }
-    if super::schema_v44::shape_needs_repair(conn)? {
-        return Ok(true);
-    }
-    if super::schema_repairs_remote_execution_v45::shape_needs_repair(conn)? {
-        return Ok(true);
     }
     Ok(false)
 }

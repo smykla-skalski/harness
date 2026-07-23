@@ -162,9 +162,7 @@ async fn offer_expect_err(fixture: &ControllerFixture) -> String {
             &TaskBoardExecutionAttemptCas::from(&fixture.attempt),
             &fixture.request,
             HOST,
-            NOW,
-            LEASE_EXPIRES,
-            DEADLINE,
+            crate::daemon::db::TaskBoardRemoteOfferWindow::new(NOW, LEASE_EXPIRES, DEADLINE),
         )
         .await
         .expect_err("archival identity collision must fail closed")

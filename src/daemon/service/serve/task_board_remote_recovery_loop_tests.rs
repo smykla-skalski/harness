@@ -121,8 +121,17 @@ async fn background_expiry_waits_for_the_last_controller_page() {
     let fixture = poisoned_recovery_fixture(65).await;
     let mut schedule = RecoverySchedule::new(Duration::from_secs(30));
 
-    maintain_remote_recovery_after_coverage(&fixture.db, &mut schedule, true, false, false, true)
-        .await;
+    maintain_remote_recovery_after_coverage(
+        &fixture.db,
+        &mut schedule,
+        ControllerCoverage {
+            incomplete: true,
+            failed: false,
+            progress: ControllerProgress::Idle,
+            pagination_incomplete: true,
+        },
+    )
+    .await;
     assert_eq!(
         fixture
             .db
@@ -141,8 +150,17 @@ async fn background_expiry_waits_for_the_last_controller_page() {
             .expect("load exact active fence before the last controller page")
     );
 
-    maintain_remote_recovery_after_coverage(&fixture.db, &mut schedule, false, false, false, false)
-        .await;
+    maintain_remote_recovery_after_coverage(
+        &fixture.db,
+        &mut schedule,
+        ControllerCoverage {
+            incomplete: false,
+            failed: false,
+            progress: ControllerProgress::Idle,
+            pagination_incomplete: false,
+        },
+    )
+    .await;
     assert_eq!(
         fixture
             .db
@@ -335,9 +353,11 @@ async fn poisoned_recovery_fixture(poison_count: u32) -> RecoveryFixture {
             &TaskBoardExecutionAttemptCas::from(&prepared.attempt),
             &prepared.offer,
             "executor-a",
-            &offered_at,
-            &lease_expires_at,
-            &prepared.offer.deadline_at,
+            crate::daemon::db::TaskBoardRemoteOfferWindow::new(
+                &offered_at,
+                &lease_expires_at,
+                &prepared.offer.deadline_at,
+            ),
         )
         .await
         .expect("persist healthy due assignment");

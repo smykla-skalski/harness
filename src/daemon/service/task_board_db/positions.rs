@@ -36,7 +36,7 @@ pub(crate) async fn set_task_board_item_position_db(
     let result = db
         .set_task_board_lane_position(TaskBoardLanePositionInput {
             item_id: item_id.to_owned(),
-            status: Some(request.status.clone()),
+            status: Some(request.status),
             lane_position: request.lane_position,
             actor: request.actor.clone(),
             expected_item_revision: request.expected_item_revision,

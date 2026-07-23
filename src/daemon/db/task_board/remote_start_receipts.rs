@@ -89,7 +89,7 @@ pub(super) fn start_receipt(
         executor_configuration_revision: record
             .executor_configuration_revision
             .ok_or_else(|| db_error("remote executor start receipt has no executor revision"))?,
-        executor_checkout_path: required(&record.executor_checkout_path, "checkout")?,
+        executor_checkout_path: required(record.executor_checkout_path.as_ref(), "checkout")?,
         source: offer.source.clone(),
         initial_owner_instance_id: owner_instance_id.into(),
         initial_owner_epoch: 1,
@@ -245,7 +245,8 @@ fn validate_receipt_evidence(
             != record
                 .executor_configuration_revision
                 .ok_or_else(|| db_error("remote executor start receipt has no executor revision"))?
-        || receipt.executor_checkout_path != required(&record.executor_checkout_path, "checkout")?
+        || receipt.executor_checkout_path
+            != required(record.executor_checkout_path.as_ref(), "checkout")?
         || receipt.source != offer.source
         || !lower_sha256(&receipt.start_authority_sha256)
         || !lower_sha256(&receipt.start_io_permit_sha256)
@@ -358,9 +359,9 @@ fn receipt_digest(receipt: &TaskBoardRemoteExecutorStartReceipt) -> Result<Strin
     Ok(hex::encode(hasher.finalize()))
 }
 
-fn required(value: &Option<String>, label: &str) -> Result<String, CliError> {
+fn required(value: Option<&String>, label: &str) -> Result<String, CliError> {
     value
-        .clone()
+        .cloned()
         .ok_or_else(|| db_error(format!("remote executor start receipt has no {label}")))
 }
 

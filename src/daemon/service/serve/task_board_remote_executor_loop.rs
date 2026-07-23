@@ -131,6 +131,7 @@ pub(crate) async fn reconcile_task_board_remote_executor_tick(
     Ok(())
 }
 
+#[cfg(test)]
 async fn reconcile_remote_executor_assignment(
     state: &DaemonHttpState,
     db: &AsyncDaemonDb,
@@ -240,7 +241,7 @@ async fn reconcile_active_remote_worker(
         record,
         &offer,
         identity,
-        prepared.action,
+        &prepared.action,
         &prepared.workspace,
     ))
     .await

@@ -26,7 +26,13 @@ fn encoded_receipt_boundary_accepts_exact_max_and_rejects_one_more_byte() {
 
 #[test]
 fn source_bundle_http_boundary_covers_bounded_base64_prompt_and_metadata() {
-    let base64_bytes = (super::wire::MAX_REMOTE_ARTIFACT_BYTES as usize).div_ceil(3) * 4;
+    let artifact_bytes = usize::try_from(super::wire::MAX_REMOTE_ARTIFACT_BYTES)
+        .expect("remote artifact byte ceiling fits usize");
+    assert_eq!(
+        artifact_bytes,
+        super::wire_artifacts::MAX_REMOTE_ARTIFACT_BYTES_USIZE
+    );
+    let base64_bytes = artifact_bytes.div_ceil(3) * 4;
     assert_eq!(
         MAX_REMOTE_SOURCE_BUNDLE_JSON_BYTES,
         MAX_REMOTE_OFFER_JSON_BYTES + base64_bytes + 133

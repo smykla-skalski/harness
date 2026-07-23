@@ -62,7 +62,6 @@ pub(crate) struct RemoteExecutionCredentialResolver;
 
 impl RemoteExecutionCredentialResolver {
     pub(super) fn resolve(
-        self,
         reference: &str,
     ) -> Result<RemoteExecutionCredential, RemoteExecutionCredentialError> {
         match parse_reference(reference)? {

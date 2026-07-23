@@ -108,7 +108,7 @@ pub(super) async fn cleanup_unstarted_executor_provisioning(
     )
     .await?;
     let cleanup_origin = origin.clone();
-    spawn_blocking(move || destroy_executor_session(cleanup_origin, layout))
+    spawn_blocking(move || destroy_executor_session(&cleanup_origin, &layout))
         .await
         .map_err(|error| workflow_io(format!("join remote provisioning cleanup: {error}")))??;
     if resolved.is_some() {
@@ -204,7 +204,7 @@ async fn cleanup_executor_session(
             .ok_or_else(|| concurrent("remote executor cleanup has no frozen checkout path"))?,
     );
     let layout_for_worker = layout.clone();
-    spawn_blocking(move || destroy_executor_session(origin, layout_for_worker))
+    spawn_blocking(move || destroy_executor_session(&origin, &layout_for_worker))
         .await
         .map_err(|error| workflow_io(format!("join remote executor cleanup: {error}")))??;
     db.delete_session_row(&identity.session_id).await?;
@@ -369,7 +369,7 @@ async fn cleanup_orphan_executor_session(
     if !layout.session_root().exists() {
         return Ok(());
     }
-    spawn_blocking(move || destroy_executor_session(origin, layout))
+    spawn_blocking(move || destroy_executor_session(&origin, &layout))
         .await
         .map_err(|error| workflow_io(format!("join remote orphan cleanup: {error}")))?
 }
@@ -431,12 +431,12 @@ fn cleanup_layout(project_dir: &str, session_id: &str) -> Result<SessionLayout, 
     Ok(layout)
 }
 
-fn destroy_executor_session(origin: PathBuf, layout: SessionLayout) -> Result<(), CliError> {
+fn destroy_executor_session(origin: &Path, layout: &SessionLayout) -> Result<(), CliError> {
     if !layout.session_root().exists() {
         return Ok(());
     }
-    session_storage::deregister_active(&layout)?;
-    WorktreeController::destroy(&origin, &layout)
+    session_storage::deregister_active(layout)?;
+    WorktreeController::destroy(origin, layout)
         .map_err(|error| workflow_io(format!("destroy remote executor worktree: {error}")))?;
     if layout.session_root().exists() {
         fs_err::remove_dir_all(layout.session_root())

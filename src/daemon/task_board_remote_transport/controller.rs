@@ -310,14 +310,13 @@ impl RemoteExecutionControllerClient {
             Err(error) => return Err(error.into()),
         };
         let settled_at = self.clock.now();
-        let outcome = db
-            .record_task_board_remote_assignment_cancel(
-                request,
-                &response,
-                &self.host_id,
-                &settled_at,
-            )
-            .await?;
+        let outcome = Box::pin(db.record_task_board_remote_assignment_cancel(
+            request,
+            &response,
+            &self.host_id,
+            &settled_at,
+        ))
+        .await?;
         Ok((response, outcome))
     }
 
@@ -499,6 +498,7 @@ pub(super) fn lifecycle_response_may_be_lost(error: &RemoteExecutionHttpError) -
             | RemoteExecutionHttpError::Wire(_)
     ) || matches!(
         error,
+        // `status` is borrowed by the match, so `contains` receives `&u16` directly.
         RemoteExecutionHttpError::HttpStatus { status, .. } if (500..=599).contains(status)
     )
 }

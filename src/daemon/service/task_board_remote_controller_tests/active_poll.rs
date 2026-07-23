@@ -181,9 +181,11 @@ async fn active_assignment(lease_expires_at: &str) -> TaskBoardRemoteAssignmentR
             &TaskBoardExecutionAttemptCas::from(&fixture.attempt),
             &fixture.request,
             &fixture.request.binding.host_id,
-            "2026-07-19T10:00:00Z",
-            "2026-07-19T10:01:00Z",
-            &fixture.request.deadline_at,
+            crate::daemon::db::TaskBoardRemoteOfferWindow::new(
+                "2026-07-19T10:00:00Z",
+                "2026-07-19T10:01:00Z",
+                &fixture.request.deadline_at,
+            ),
         )
         .await
         .expect("create active-poll assignment")

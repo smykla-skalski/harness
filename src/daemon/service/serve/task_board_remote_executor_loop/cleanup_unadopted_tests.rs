@@ -47,7 +47,7 @@ async fn invalid_unadopted_run_cleans_after_exact_stop_and_settlement_body() {
         let pending = fixture
             .db
             .claim_task_board_remote_executor_stop_pending(
-                &TaskBoardRemoteExecutorStopAuthority::Start(permit),
+                &TaskBoardRemoteExecutorStopAuthority::Start(Box::new(permit)),
                 &invalid,
                 TaskBoardRemoteExecutorStopReason::StartEvidenceInvalid,
                 UNKNOWN_AT,

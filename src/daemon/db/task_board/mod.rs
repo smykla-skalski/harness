@@ -265,6 +265,7 @@ pub(crate) use remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, TaskBoardRemoteControllerOperationToken,
     TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome,
 };
+pub(crate) use remote_assignment_offer::TaskBoardRemoteOfferWindow;
 #[allow(unused_imports)]
 pub(crate) use remote_assignment_recovery::{
     TaskBoardRemoteRecoveryBatch, TaskBoardRemoteRecoveryFailure,

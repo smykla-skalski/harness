@@ -169,10 +169,10 @@ pub(super) fn require_complete_shape(conn: &Connection) -> Result<(), CliError> 
     if classify_shape(conn)? != RemoteSchemaShape::CurrentV43 {
         return Err(incompatible_schema());
     }
-    if indexes_need_repair(conn)? {
-        return Err(db_error(
-            "remote execution schema repair left required indexes missing",
-        ));
+    if let Some(reason) = index_repair_reason(conn)? {
+        return Err(db_error(format!(
+            "remote execution schema repair left required indexes missing: {reason}"
+        )));
     }
     Ok(())
 }
@@ -254,15 +254,21 @@ fn classify_shape(conn: &Connection) -> Result<RemoteSchemaShape, CliError> {
 }
 
 fn indexes_need_repair(conn: &Connection) -> Result<bool, CliError> {
-    let mut needs_repair = object_sql(conn, "index", OBSOLETE_ACTIVE_INDEX)?.is_some();
+    index_repair_reason(conn).map(|reason| reason.is_some())
+}
+
+fn index_repair_reason(conn: &Connection) -> Result<Option<String>, CliError> {
+    let mut reason = object_sql(conn, "index", OBSOLETE_ACTIVE_INDEX)?
+        .is_some()
+        .then(|| format!("obsolete index '{OBSOLETE_ACTIVE_INDEX}' remains"));
     for name in EXPECTED_INDEXES {
         let Some(actual) = object_sql(conn, "index", name)? else {
-            needs_repair = true;
+            reason.get_or_insert_with(|| format!("index '{name}' is absent"));
             continue;
         };
         if normalize_sql(&actual) != objects::expected_index_sql(MIGRATION_SQL, name)? {
             if is_repairable_legacy_index(name, &actual) {
-                needs_repair = true;
+                reason.get_or_insert_with(|| format!("index '{name}' uses a legacy definition"));
                 continue;
             }
             return Err(db_error(format!(
@@ -270,7 +276,7 @@ fn indexes_need_repair(conn: &Connection) -> Result<bool, CliError> {
             )));
         }
     }
-    Ok(needs_repair)
+    Ok(reason)
 }
 
 fn is_repairable_legacy_index(name: &str, actual: &str) -> bool {

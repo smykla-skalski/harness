@@ -93,7 +93,14 @@ pub async fn dispatch_task_board_async(
     let mut failures = Vec::new();
     let hold_worker = async_db.task_board_orchestrator_settings().await?.step_mode;
     for plan in plans.iter().filter(|plan| plan.is_ready()) {
-        match apply_dispatch_plan_async(request, async_db, plan, hold_worker).await {
+        match Box::pin(apply_dispatch_plan_async(
+            request,
+            async_db,
+            plan,
+            hold_worker,
+        ))
+        .await
+        {
             Ok(task) => applied.push(task),
             Err((kind, error)) => {
                 failures.push(DispatchFailure {
@@ -268,7 +275,13 @@ async fn apply_dispatch_plan_async(
     plan: &DispatchPlan,
     hold_worker: bool,
 ) -> Result<DispatchAppliedTask, (DispatchFailureKind, CliError)> {
-    reserve_and_prepare_task_board_dispatch(async_db, request, plan, hold_worker).await
+    Box::pin(reserve_and_prepare_task_board_dispatch(
+        async_db,
+        request,
+        plan,
+        hold_worker,
+    ))
+    .await
 }
 
 #[cfg(test)]

@@ -5,7 +5,6 @@ use super::super::remote_assignment_model::TaskBoardRemoteAssignmentRecord;
 use super::super::remote_assignment_start_authority::{
     TaskBoardRemoteExecutorStartAuthority, TaskBoardRemoteExecutorStartIoPermit,
 };
-use crate::daemon::db::CliError;
 use crate::task_board::TaskBoardRemoteAssignmentState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -30,7 +29,7 @@ impl TaskBoardRemoteExecutorStopReason {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum TaskBoardRemoteExecutorStopAuthority {
-    Start(TaskBoardRemoteExecutorStartIoPermit),
+    Start(Box<TaskBoardRemoteExecutorStartIoPermit>),
     /// A durable run whose Start-I/O permit never persisted (the permit
     /// transaction rolled back after the run side-effect fired) is still fenced
     /// by the start authority acquired before it. This authorizes stopping that
@@ -85,11 +84,11 @@ pub(super) fn source_matches(
     record: &TaskBoardRemoteAssignmentRecord,
     authority: &TaskBoardRemoteExecutorStopAuthority,
     reason: TaskBoardRemoteExecutorStopReason,
-) -> Result<bool, CliError> {
+) -> bool {
     if record.fencing_epoch != authority_fencing_epoch(authority) {
-        return Ok(false);
+        return false;
     }
-    Ok(match authority {
+    match authority {
         TaskBoardRemoteExecutorStopAuthority::Start(authority) => {
             matches!(
                 reason,
@@ -135,7 +134,7 @@ pub(super) fn source_matches(
                 && record.start_receipt.is_some()
                 && record.executor_start_authority_sha256.is_none()
         }
-    })
+    }
 }
 
 pub(super) fn authority_fencing_epoch(authority: &TaskBoardRemoteExecutorStopAuthority) -> u64 {

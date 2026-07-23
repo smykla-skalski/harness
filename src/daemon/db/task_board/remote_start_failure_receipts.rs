@@ -150,9 +150,9 @@ fn validate_failure_receipt_evidence(
         record,
         &expected_authority_sha256,
         &receipt.start_authority_at,
-        required(&record.lease_id, "lease")?.as_str(),
-        required(&record.lease_expires_at, "lease expiry")?.as_str(),
-        required(&record.deadline_at, "deadline")?.as_str(),
+        required(record.lease_id.as_ref(), "lease")?.as_str(),
+        required(record.lease_expires_at.as_ref(), "lease expiry")?.as_str(),
+        required(record.deadline_at.as_ref(), "deadline")?.as_str(),
         &receipt.start_io_permit_at,
     )?;
     if receipt.schema_version != TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION
@@ -195,7 +195,7 @@ fn validate_embedded_status(
     let request = RemoteStatusRequest {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: record.require_offer()?.binding.clone(),
-        lease_id: required(&record.lease_id, "lease")?,
+        lease_id: required(record.lease_id.as_ref(), "lease")?,
         offer_request_sha256: record.require_offer()?.request_sha256.clone(),
         request_sha256: String::new(),
     }
@@ -226,8 +226,8 @@ fn validate_embedded_status(
     Ok(())
 }
 
-fn required(value: &Option<String>, label: &str) -> Result<String, CliError> {
-    value.clone().ok_or_else(|| {
+fn required(value: Option<&String>, label: &str) -> Result<String, CliError> {
+    value.cloned().ok_or_else(|| {
         db_error(format!(
             "remote executor start failure receipt has no {label}"
         ))

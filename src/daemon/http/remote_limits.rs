@@ -65,7 +65,7 @@ impl Default for RemoteRequestLimitConfig {
             max_http_concurrency: 32,
             max_unauthenticated_audit_attempts: 60,
             max_unauthenticated_audit_attempts_per_remote_addr: 5,
-            unauthenticated_audit_window: Duration::from_secs(60),
+            unauthenticated_audit_window: Duration::from_mins(1),
             request_timeout: Duration::from_mins(3),
             max_concurrent_tls_handshakes: DEFAULT_MAX_CONCURRENT_TLS_HANDSHAKES,
             tls_handshake_timeout: DEFAULT_TLS_HANDSHAKE_TIMEOUT,

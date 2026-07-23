@@ -69,7 +69,7 @@ pub(super) async fn execute(
     // read this sync makes hits the API. Background reconciles skip this Requested
     // branch and keep their cache; only the reconcile right after a manual Sync
     // refetches once.
-    if requested_github_read(context, &options, &config) {
+    if requested_github_read(context, options, &config) {
         crate::github_api::refresh_read_generation().await;
     }
     let mut clients =
@@ -100,8 +100,10 @@ pub(super) async fn execute(
         super::super::task_board::ensure_sync_request_can_run(request, &config, &clients)?;
     }
     let run_store = ProviderSyncRunStore::new(db, context.coordinator_fence());
-    let mut batch =
-        sync_external_tasks_scoped_with_recovery(&run_store, options, &clients, plan).await?;
+    let mut batch = Box::pin(sync_external_tasks_scoped_with_recovery(
+        &run_store, options, &clients, plan,
+    ))
+    .await?;
     if !options.dry_run
         && let Err(error) = super::sync_audit::record_external_create_follow_ups(
             db,
@@ -122,7 +124,7 @@ pub(super) async fn execute(
 
 fn requested_github_read(
     context: &TaskBoardSyncRunContext,
-    options: &ExternalSyncOptions,
+    options: ExternalSyncOptions,
     config: &ExternalSyncConfig,
 ) -> bool {
     context.trigger() == TaskBoardSyncAuditTrigger::Requested
@@ -179,13 +181,13 @@ mod tests {
         let requested = TaskBoardSyncRunContext::requested();
 
         assert!(
-            requested_github_read(&requested, &pull, &github),
+            requested_github_read(&requested, pull, &github),
             "a requested GitHub pull with a token must refresh"
         );
         assert!(
             !requested_github_read(
                 &TaskBoardSyncRunContext::orchestrator(None, None, None),
-                &pull,
+                pull,
                 &github,
             ),
             "orchestrator syncs keep their cache"
@@ -193,7 +195,7 @@ mod tests {
         assert!(
             !requested_github_read(
                 &requested,
-                &ExternalSyncOptions {
+                ExternalSyncOptions {
                     provider: Some(ExternalProvider::Todoist),
                     direction: ExternalSyncDirection::Pull,
                     ..ExternalSyncOptions::default()
@@ -205,7 +207,7 @@ mod tests {
         assert!(
             !requested_github_read(
                 &requested,
-                &ExternalSyncOptions {
+                ExternalSyncOptions {
                     direction: ExternalSyncDirection::Push,
                     ..ExternalSyncOptions::default()
                 },
@@ -214,7 +216,7 @@ mod tests {
             "push syncs perform no reads"
         );
         assert!(
-            !requested_github_read(&requested, &pull, &ExternalSyncConfig::default()),
+            !requested_github_read(&requested, pull, &ExternalSyncConfig::default()),
             "no GitHub token means nothing to read"
         );
     }

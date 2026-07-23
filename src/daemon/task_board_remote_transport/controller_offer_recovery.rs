@@ -9,9 +9,9 @@ use crate::daemon::db::{
 #[derive(Debug)]
 pub(crate) enum RemotePredecessorOfferRecoveryOutcome {
     Accepted {
-        outcome: TaskBoardRemoteMutationOutcome,
+        outcome: Box<TaskBoardRemoteMutationOutcome>,
     },
-    Rejected(RemoteOfferResponse),
+    Rejected(Box<RemoteOfferResponse>),
 }
 
 impl RemoteExecutionControllerClient {
@@ -36,12 +36,12 @@ impl RemoteExecutionControllerClient {
                 RemoteOfferDisposition::Accepted => {
                     let record = self.preflight(db, &request.binding.assignment_id).await?;
                     Ok(RemotePredecessorOfferRecoveryOutcome::Accepted {
-                        outcome: TaskBoardRemoteMutationOutcome::Replayed(record),
+                        outcome: Box::new(TaskBoardRemoteMutationOutcome::Replayed(record)),
                     })
                 }
-                RemoteOfferDisposition::Rejected => {
-                    Ok(RemotePredecessorOfferRecoveryOutcome::Rejected(response))
-                }
+                RemoteOfferDisposition::Rejected => Ok(
+                    RemotePredecessorOfferRecoveryOutcome::Rejected(Box::new(response)),
+                ),
             };
         }
         let current = self.current_source_recovery_trust(db).await?;
@@ -62,11 +62,13 @@ impl RemoteExecutionControllerClient {
                     &observed_at,
                 ))
                 .await?;
-                Ok(RemotePredecessorOfferRecoveryOutcome::Accepted { outcome })
+                Ok(RemotePredecessorOfferRecoveryOutcome::Accepted {
+                    outcome: Box::new(outcome),
+                })
             }
-            RemoteOfferDisposition::Rejected => {
-                Ok(RemotePredecessorOfferRecoveryOutcome::Rejected(response))
-            }
+            RemoteOfferDisposition::Rejected => Ok(
+                RemotePredecessorOfferRecoveryOutcome::Rejected(Box::new(response)),
+            ),
         }
     }
 }

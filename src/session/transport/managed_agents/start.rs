@@ -18,6 +18,10 @@ use super::acp_sessions::{AcpCloseSessionArgs, AcpDeleteSessionArgs, AcpSessions
 
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "Clap command variants keep their derived subcommand payloads by value"
+)]
 pub enum SessionAgentsCommand {
     /// Start a managed terminal session or Codex thread.
     Start {

@@ -66,7 +66,7 @@ pub(super) async fn reserve_and_prepare_task_board_dispatch(
                 ))),
             )
         })?;
-    let result = prepare_claimed_task_board_dispatch(db, &claim).await;
+    let result = Box::pin(prepare_claimed_task_board_dispatch(db, &claim)).await;
     if let Err((_, error)) = &result {
         let _ = db
             .release_task_board_dispatch_preparation(&claim, &error.to_string())

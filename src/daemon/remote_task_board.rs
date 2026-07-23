@@ -25,8 +25,8 @@ pub(crate) enum TaskBoardReadListResponse {
 #[derive(Serialize)]
 #[serde(untagged)]
 pub(crate) enum TaskBoardPositionSnapshotResponse {
-    Full(TaskBoardItemPositionSnapshot),
-    Viewer(RemoteViewerTaskBoardPositionSnapshot),
+    Full(Box<TaskBoardItemPositionSnapshot>),
+    Viewer(Box<RemoteViewerTaskBoardPositionSnapshot>),
 }
 
 #[derive(Serialize)]
@@ -109,13 +109,13 @@ pub(crate) fn project_task_board_position_snapshot(
     viewer: bool,
 ) -> TaskBoardPositionSnapshotResponse {
     if viewer {
-        TaskBoardPositionSnapshotResponse::Viewer(RemoteViewerTaskBoardPositionSnapshot {
+        TaskBoardPositionSnapshotResponse::Viewer(Box::new(RemoteViewerTaskBoardPositionSnapshot {
             item: snapshot.item.into(),
             item_revision: snapshot.item_revision,
             items_change_seq: snapshot.items_change_seq,
-        })
+        }))
     } else {
-        TaskBoardPositionSnapshotResponse::Full(snapshot)
+        TaskBoardPositionSnapshotResponse::Full(Box::new(snapshot))
     }
 }
 

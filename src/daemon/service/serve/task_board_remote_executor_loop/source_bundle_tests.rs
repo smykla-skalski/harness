@@ -329,7 +329,7 @@ async fn stop_unadopted_to_unknown(
     let pending = fixture
         .db
         .claim_task_board_remote_executor_stop_pending(
-            &TaskBoardRemoteExecutorStopAuthority::Start(permit),
+            &TaskBoardRemoteExecutorStopAuthority::Start(Box::new(permit)),
             &invalid,
             TaskBoardRemoteExecutorStopReason::StartEvidenceInvalid,
             UNKNOWN_AT,

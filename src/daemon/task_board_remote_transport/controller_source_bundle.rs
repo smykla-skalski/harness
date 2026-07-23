@@ -12,7 +12,7 @@ pub(crate) enum RemoteSourceBundleRecoveryOutcome {
         trust: TaskBoardRemoteOperationTrustFence,
     },
     Abandoned {
-        request: super::wire::RemoteSourceBundleAbandonRequest,
+        request: Box<super::wire::RemoteSourceBundleAbandonRequest>,
         response: super::wire::RemoteSourceBundleAbandonResponse,
         trust: TaskBoardRemoteOperationTrustFence,
     },
@@ -66,7 +66,7 @@ impl RemoteExecutionControllerClient {
             .await?
         {
             return Ok(RemoteSourceBundleRecoveryOutcome::Abandoned {
-                request: stored.request,
+                request: Box::new(stored.request),
                 response: stored.response,
                 trust,
             });
@@ -106,7 +106,7 @@ impl RemoteExecutionControllerClient {
         ))
         .await?;
         Ok(RemoteSourceBundleRecoveryOutcome::Abandoned {
-            request: stored.request,
+            request: Box::new(stored.request),
             response: stored.response,
             trust,
         })

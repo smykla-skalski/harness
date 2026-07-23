@@ -13,6 +13,8 @@ const STAGING_LOCK: &str = "harness-task-board-bundle-staging.lock";
 
 pub(super) struct GitBundleStaging<'a> {
     coordinates: &'a GitRepositoryCoordinates,
+    // Struct fields drop in declaration order: close the file, remove its directory,
+    // then release the cross-process staging lock.
     staged: NamedTempFile,
     _directory: TempDir,
     _lock: File,

@@ -217,6 +217,7 @@ impl RemoteSourceBundleAbandonRequest {
         )
     }
 
+    #[cfg(test)]
     pub(crate) fn validate_compact_authority(
         binding: &RemoteAttemptBinding,
         offer_request_sha256: &str,

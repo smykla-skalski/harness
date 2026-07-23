@@ -379,7 +379,7 @@ async fn a_successfully_stopped_invalid_run_clears_only_the_exact_token() {
         .await
         .expect("load invalid executor run")
         .expect("invalid executor run");
-    let stop_authority = TaskBoardRemoteExecutorStopAuthority::Start(permit.clone());
+    let stop_authority = TaskBoardRemoteExecutorStopAuthority::Start(Box::new(permit.clone()));
     let pending = fixture
         .db
         .claim_task_board_remote_executor_stop_pending(

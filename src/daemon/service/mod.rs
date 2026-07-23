@@ -262,10 +262,10 @@ mod task_board;
 pub(crate) use task_board::{validate_read_only_workflow_launch, validate_write_workflow_launch};
 mod task_board_automation_runtime;
 mod task_board_remote_result_import;
+pub(crate) use task_board_remote_result_import::import_and_adopt_task_board_remote_implementation_result;
+#[cfg(test)]
 pub(crate) use task_board_remote_result_import::{
-    cleanup_task_board_remote_result_import,
-    import_and_adopt_task_board_remote_implementation_result,
-    import_task_board_remote_implementation_result,
+    cleanup_task_board_remote_result_import, import_task_board_remote_implementation_result,
 };
 mod task_board_completion;
 mod task_board_db;

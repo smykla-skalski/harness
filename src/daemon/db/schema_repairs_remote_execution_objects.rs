@@ -83,7 +83,7 @@ mod tests {
         let statement = expected_index_sql(sql, "task_board_remote_assignments_exact_attempt")
             .expect("extract exact index");
 
-        assert!(statement.contains("ON assignments(attempt)"));
-        assert!(!statement.contains("ON assignments(history)"));
+        assert!(statement.contains("on assignments(attempt)"));
+        assert!(!statement.contains("on assignments(history)"));
     }
 }

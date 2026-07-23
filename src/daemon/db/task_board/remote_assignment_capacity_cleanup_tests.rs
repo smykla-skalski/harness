@@ -138,9 +138,11 @@ async fn offer_candidate(
             &TaskBoardExecutionAttemptCas::from(&candidate.attempt),
             &candidate.request,
             HOST,
-            offered_at,
-            &lease_expires_at,
-            &candidate.request.deadline_at,
+            crate::daemon::db::TaskBoardRemoteOfferWindow::new(
+                offered_at,
+                &lease_expires_at,
+                &candidate.request.deadline_at,
+            ),
         )
         .await
         .expect("evaluate decisive controller offer capacity")

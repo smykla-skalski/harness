@@ -62,7 +62,15 @@ async fn run_task_board_orchestrator_once_inner(
     .await;
     let mut prepared = finish_stage(session, 1, "prepare", prepared).await?;
     let mut progress = (None, None);
-    match execute_run(db, &settings, &mut prepared, &mut progress, session).await {
+    match Box::pin(execute_run(
+        db,
+        &settings,
+        &mut prepared,
+        &mut progress,
+        session,
+    ))
+    .await
+    {
         Ok((dispatch, evaluation)) => complete_run(db, prepared, dispatch, evaluation).await,
         Err(error) => {
             record_failed_run(db, &prepared, progress, &error).await?;
@@ -113,7 +121,7 @@ async fn execute_run(
     session: Option<&TaskBoardAutomationRunSession>,
 ) -> Result<(DispatchExecutionSummary, TaskBoardEvaluationSummary), CliError> {
     begin_stage(session, 2, "provider_sync").await?;
-    let sync = sync_github_tasks(db, settings, prepared, session).await;
+    let sync = Box::pin(sync_github_tasks(db, settings, prepared, session)).await;
     finish_stage(session, 2, "provider_sync", sync).await?;
 
     begin_stage(session, 3, "dispatch").await?;

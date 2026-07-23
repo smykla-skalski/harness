@@ -69,7 +69,7 @@ pub(super) struct BackgroundTaskHandles {
 pub(super) fn spawn_background_tasks(
     app_state: &DaemonHttpState,
     poll_interval: Duration,
-    shutdown_rx: tokio_watch::Receiver<bool>,
+    shutdown_rx: &tokio_watch::Receiver<bool>,
 ) -> BackgroundTaskHandles {
     let async_db = app_state.async_db.get().cloned();
     let remote_recovery = async_db.as_ref().map(|_| {

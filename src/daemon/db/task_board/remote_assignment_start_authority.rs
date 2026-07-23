@@ -244,10 +244,12 @@ impl AsyncDaemonDb {
             &record,
             permit,
             &receipt,
-            started_at,
-            owner_instance_id,
-            owner_at,
-            &owner_expires_at,
+            start_adoption::TaskBoardRemoteStartAdoptionContext {
+                started_at,
+                owner_instance_id,
+                owner_at,
+                owner_expires_at: &owner_expires_at,
+            },
         )
         .await?;
         finish_mutation(

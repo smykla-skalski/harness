@@ -180,11 +180,11 @@ async fn adopt_terminal_result(
         ))
         .await?
     } else {
-        db.adopt_task_board_remote_terminal_result(
+        Box::pin(db.adopt_task_board_remote_terminal_result(
             &TaskBoardWorkflowExecutionCas::from(parent),
             &assignment.assignment_id,
             assignment.fencing_epoch,
-        )
+        ))
         .await?
     };
     match outcome {

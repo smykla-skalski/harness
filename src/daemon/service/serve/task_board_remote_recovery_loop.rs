@@ -15,6 +15,18 @@ const MAXIMUM_FALLBACK: Duration = Duration::from_secs(30);
 const MAXIMUM_STARTUP_PAGES: usize = 64;
 const MAXIMUM_FOREGROUND_PAGES: usize = 64;
 
+struct ControllerCoverage {
+    incomplete: bool,
+    failed: bool,
+    progress: ControllerProgress,
+    pagination_incomplete: bool,
+}
+
+enum ControllerProgress {
+    Idle,
+    Progressed,
+}
+
 pub(super) fn spawn_task_board_remote_recovery_loop(
     state: DaemonHttpState,
     fallback_interval: Duration,
@@ -96,6 +108,7 @@ pub(crate) async fn recover_remote_assignments_before_work(
     .into())
 }
 
+#[cfg(test)]
 pub(crate) async fn recover_remote_assignments_at_startup(
     db: &AsyncDaemonDb,
 ) -> Result<(), CliError> {
@@ -149,12 +162,7 @@ async fn maintain_remote_recovery_after_controller(
     db: &AsyncDaemonDb,
     schedule: &mut RecoverySchedule,
 ) {
-    let (
-        controller_incomplete,
-        controller_failed,
-        controller_progressed,
-        controller_pagination_incomplete,
-    ) = match Box::pin(
+    let coverage = match Box::pin(
         crate::daemon::service::task_board_remote_controller::drive_task_board_remote_controller(
             db,
         ),
@@ -165,28 +173,32 @@ async fn maintain_remote_recovery_after_controller(
             for failure in &report.failures {
                 tracing::warn!(error = %failure, "task-board remote controller operation failed");
             }
-            (
-                report.scan_incomplete,
-                report.scan_blocked,
-                report.verified_assignments > 0 || report.offered_attempts > 0,
-                report.scan_incomplete,
-            )
+            ControllerCoverage {
+                incomplete: report.scan_incomplete,
+                failed: report.scan_blocked,
+                progress: if report.verified_assignments > 0 || report.offered_attempts > 0 {
+                    ControllerProgress::Progressed
+                } else {
+                    ControllerProgress::Idle
+                },
+                pagination_incomplete: report.scan_incomplete,
+            }
         }
         Err(error) => {
             tracing::warn!(%error, "task-board remote controller reconciliation failed");
             // We cannot trust a failed controller pass to have advanced its
             // durable cursor. Keep the DB-expiry fallback fenced, but do not
             // turn the unknown failure into a one-second polling loop.
-            (true, true, false, false)
+            ControllerCoverage {
+                incomplete: true,
+                failed: true,
+                progress: ControllerProgress::Idle,
+                pagination_incomplete: false,
+            }
         }
     };
     Box::pin(maintain_remote_recovery_after_coverage(
-        db,
-        schedule,
-        controller_incomplete,
-        controller_failed,
-        controller_progressed,
-        controller_pagination_incomplete,
+        db, schedule, coverage,
     ))
     .await;
 }
@@ -194,18 +206,15 @@ async fn maintain_remote_recovery_after_controller(
 async fn maintain_remote_recovery_after_coverage(
     db: &AsyncDaemonDb,
     schedule: &mut RecoverySchedule,
-    controller_incomplete: bool,
-    controller_failed: bool,
-    controller_progressed: bool,
-    controller_pagination_incomplete: bool,
+    coverage: ControllerCoverage,
 ) {
-    if !controller_incomplete {
+    if !coverage.incomplete {
         Box::pin(maintain_remote_recovery(db, schedule)).await;
     }
     schedule.record_controller_coverage(
-        controller_failed,
-        controller_progressed,
-        controller_pagination_incomplete,
+        coverage.failed,
+        matches!(coverage.progress, ControllerProgress::Progressed),
+        coverage.pagination_incomplete,
     );
 }
 

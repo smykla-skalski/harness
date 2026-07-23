@@ -26,7 +26,7 @@ pub(super) async fn materialize_repository_snapshot(
         return Ok(None);
     };
     let stored = exact_materialized_request(db, record, offer).await?;
-    let content = stored.validate().map_err(wire_error)?;
+    let content = stored.validate().map_err(|error| wire_error(&error))?;
     let plan = GitSourceBundleImportPlan::new(
         repository,
         repository_slug.clone(),
@@ -36,13 +36,15 @@ pub(super) async fn materialize_repository_snapshot(
         bundle.sha256.clone(),
         bundle.size_bytes,
     )
-    .map_err(git_error)?;
+    .map_err(|error| git_error(&error))?;
     let import = plan.clone();
-    spawn_blocking(move || import.verify_and_import_bytes(&content).map_err(git_error))
-        .await
-        .map_err(|error| {
-            CliErrorKind::workflow_io(format!("join remote source import: {error}"))
-        })??;
+    spawn_blocking(move || {
+        import
+            .verify_and_import_bytes(&content)
+            .map_err(|error| git_error(&error))
+    })
+    .await
+    .map_err(|error| CliErrorKind::workflow_io(format!("join remote source import: {error}")))??;
     Ok(Some(plan))
 }
 
@@ -52,7 +54,7 @@ pub(super) async fn cleanup_repository_snapshot_import(
     let Some(plan) = plan else {
         return Ok(());
     };
-    spawn_blocking(move || plan.cleanup_import_ref().map_err(git_error))
+    spawn_blocking(move || plan.cleanup_import_ref().map_err(|error| git_error(&error)))
         .await
         .map_err(|error| {
             CliErrorKind::workflow_io(format!("join remote source import cleanup: {error}"))
@@ -92,7 +94,7 @@ pub(super) async fn apply_prior_phase_bundle(
         result_revision: revision.clone(),
         advertised_ref: advertised_ref.clone(),
         import_ref: import_ref(offer, &bundle.sha256),
-        content: stored.validate().map_err(wire_error)?,
+        content: stored.validate().map_err(|error| wire_error(&error))?,
     };
     spawn_blocking(move || plan.apply())
         .await
@@ -126,7 +128,7 @@ pub(super) async fn cleanup_prior_phase_import_ref(
             bundle.sha256.clone(),
             bundle.size_bytes,
         )
-        .map_err(git_error)?;
+        .map_err(|error| git_error(&error))?;
         return cleanup_repository_snapshot_import(Some(plan)).await;
     }
     let RemoteSourceMaterial::PriorPhaseBundle {
@@ -158,7 +160,7 @@ pub(super) async fn cleanup_prior_phase_import_ref(
             import_ref,
         )
         .and_then(|plan| plan.cleanup_import_ref())
-        .map_err(git_error)
+        .map_err(|error| git_error(&error))
     })
     .await
     .map_err(|error| CliErrorKind::workflow_io(format!("join remote bundle cleanup: {error}")))?
@@ -211,24 +213,26 @@ impl SourceBundleImportPlan {
             self.advertised_ref,
             self.import_ref,
         )
-        .map_err(git_error)?;
+        .map_err(|error| git_error(&error))?;
         plan.verify_and_import_bytes(&self.content)
-            .map_err(git_error)?;
+            .map_err(|error| git_error(&error))?;
         for _ in 0..3 {
-            if plan.state().map_err(git_error)? == GitBundleWorktreeState::AttachedResult {
+            if plan.state().map_err(|error| git_error(&error))?
+                == GitBundleWorktreeState::AttachedResult
+            {
                 break;
             }
-            plan.advance_one().map_err(git_error)?;
+            plan.advance_one().map_err(|error| git_error(&error))?;
         }
-        plan.require_applied().map_err(git_error)?;
+        plan.require_applied().map_err(|error| git_error(&error))?;
         Ok(())
     }
 }
 
-fn git_error(error: crate::git::GitError) -> CliError {
+fn git_error(error: &crate::git::GitError) -> CliError {
     CliErrorKind::workflow_io(format!("apply remote source bundle: {error}")).into()
 }
 
-fn wire_error(error: impl std::fmt::Display) -> CliError {
+fn wire_error(error: &impl std::fmt::Display) -> CliError {
     CliErrorKind::workflow_io(format!("materialize remote source bundle: {error}")).into()
 }

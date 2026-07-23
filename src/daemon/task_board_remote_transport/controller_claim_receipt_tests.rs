@@ -305,9 +305,11 @@ async fn accept_controller_offer(
                 &TaskBoardExecutionAttemptCas::from(&fixture.attempt),
                 &fixture.request,
                 HOST,
-                "2026-07-19T10:00:00Z",
-                INITIAL_EXPIRY,
-                &fixture.request.deadline_at,
+                crate::daemon::db::TaskBoardRemoteOfferWindow::new(
+                    "2026-07-19T10:00:00Z",
+                    INITIAL_EXPIRY,
+                    &fixture.request.deadline_at,
+                ),
             )
             .await
             .expect("persist controller offer"),

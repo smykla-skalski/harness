@@ -66,7 +66,8 @@ async fn recover_pending_dispatches(state: &DaemonHttpState, db: &AsyncDaemonDb)
                 break;
             }
         };
-        if let Err((_, error)) = prepare_claimed_task_board_dispatch(db, &preparation).await
+        if let Err((_, error)) =
+            Box::pin(prepare_claimed_task_board_dispatch(db, &preparation)).await
             && let Err(release_error) = db
                 .release_task_board_dispatch_preparation(&preparation, &error.to_string())
                 .await

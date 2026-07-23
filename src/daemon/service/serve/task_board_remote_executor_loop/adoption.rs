@@ -33,11 +33,11 @@ pub(super) async fn execute_and_reconcile_remote_worker(
     mut record: TaskBoardRemoteAssignmentRecord,
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
-    action: PreparedRemoteWorkerAction,
+    action: &PreparedRemoteWorkerAction,
     workspace: &Path,
 ) -> Result<(), CliError> {
     let snapshot =
-        match execute_remote_worker_action(state, db, offer, identity, &action, workspace).await {
+        match execute_remote_worker_action(state, db, offer, identity, action, workspace).await {
             Ok(snapshot) => snapshot,
             Err(error) => {
                 return match action.fresh_start_permit() {
@@ -186,8 +186,8 @@ fn failed_at_claimed_response(
         offer_request_sha256: offer.request_sha256.clone(),
         status_sha256: String::new(),
         lease: Some(RemoteLease {
-            lease_id: required(&record.lease_id, "lease")?,
-            expires_at: required(&record.lease_expires_at, "lease expiry")?,
+            lease_id: required(record.lease_id.as_deref(), "lease")?,
+            expires_at: required(record.lease_expires_at.as_deref(), "lease expiry")?,
         }),
         result: None,
         output_artifacts: RemoteArtifactManifest::default(),
@@ -215,9 +215,9 @@ fn no_run_start_failure_class(error: &CliError) -> TaskBoardFailureClass {
     }
 }
 
-fn required(value: &Option<String>, label: &str) -> Result<String, CliError> {
+fn required(value: Option<&str>, label: &str) -> Result<String, CliError> {
     value
-        .clone()
+        .map(str::to_owned)
         .ok_or_else(|| concurrent_owned(format!("Failed-at-Claimed status has no {label}")))
 }
 
@@ -265,7 +265,7 @@ fn invalid_run_stop_source(
 > {
     if let Some(start) = start {
         return Ok(Some((
-            TaskBoardRemoteExecutorStopAuthority::Start(start.clone()),
+            TaskBoardRemoteExecutorStopAuthority::Start(Box::new(start.clone())),
             TaskBoardRemoteExecutorStopReason::StartEvidenceInvalid,
         )));
     }
@@ -351,7 +351,7 @@ async fn settle_failed_adoption(
     claim_and_settle_invalid_remote_run(
         state,
         db,
-        &TaskBoardRemoteExecutorStopAuthority::Start(permit.clone()),
+        &TaskBoardRemoteExecutorStopAuthority::Start(Box::new(permit.clone())),
         snapshot,
         reason,
     )

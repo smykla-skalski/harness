@@ -30,7 +30,7 @@ pub(super) fn shape_needs_repair(conn: &Connection) -> Result<bool, CliError> {
 }
 
 pub(super) fn repair_and_stamp(conn: &Connection) -> Result<(), CliError> {
-    super::schema_repairs_remote_execution::require_complete_shape(conn)?;
+    super::schema_repairs_remote_execution::repair_and_stamp(conn)?;
     let transaction = Transaction::new_unchecked(conn, TransactionBehavior::Immediate)
         .map_err(|error| db_error(format!("begin remote execution v45 repair: {error}")))?;
     if shape_needs_repair(&transaction)? {

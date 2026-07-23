@@ -160,9 +160,11 @@ fn prepared_dispatch_resumes_without_duplicate_session_or_task() {
                 linked.workflow.branch.as_deref(),
                 Some(resolved.state.branch_ref.as_str())
             );
+            let canonical_worktree = std::fs::canonicalize(&resolved.state.worktree_path)
+                .expect("canonical resolved worktree");
             assert_eq!(
                 linked.workflow.worktree.as_deref(),
-                resolved.state.worktree_path.to_str()
+                canonical_worktree.to_str()
             );
         });
     });

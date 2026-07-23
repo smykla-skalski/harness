@@ -11,8 +11,10 @@ use serde::de::DeserializeOwned;
 use crate::daemon::remote_auth::REMOTE_CLIENT_ID_HEADER;
 
 use super::credentials::{RemoteExecutionCredentialError, RemoteExecutionCredentialResolver};
+#[cfg(test)]
+use super::routes::HEARTBEAT_PATH;
 use super::routes::{
-    ADVERTISE_PATH, ARTIFACT_PATH, CANCEL_PATH, CLAIM_PATH, HEARTBEAT_PATH, LEASE_RENEW_PATH,
+    ADVERTISE_PATH, ARTIFACT_PATH, CANCEL_PATH, CLAIM_PATH, LEASE_RENEW_PATH,
     OFFER_HTTP_BODY_LIMIT_BYTES, OFFER_PATH, SETTLED_PATH, SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES,
     SOURCE_BUNDLE_PATH, STATUS_PATH,
 };
@@ -21,12 +23,13 @@ use super::tls_pin::pinned_client_config_with_roots;
 use super::tls_pin::{RemoteTlsPinError, pinned_platform_client_config};
 use super::wire::{
     RemoteArtifactFetchRequest, RemoteArtifactFetchResponse, RemoteCancelRequest,
-    RemoteCancelResponse, RemoteClaimRequest, RemoteClaimResponse, RemoteHeartbeatRequest,
-    RemoteHeartbeatResponse, RemoteHostAdvertisement, RemoteLeaseRenewRequest,
-    RemoteLeaseRenewResponse, RemoteOfferRequest, RemoteOfferResponse, RemoteSettledRequest,
-    RemoteSettledResponse, RemoteSourceBundleUploadRequest, RemoteSourceBundleUploadResponse,
-    RemoteStatusRequest, RemoteStatusResponse, RemoteWireError,
+    RemoteCancelResponse, RemoteClaimRequest, RemoteClaimResponse, RemoteHostAdvertisement,
+    RemoteLeaseRenewRequest, RemoteLeaseRenewResponse, RemoteOfferRequest, RemoteOfferResponse,
+    RemoteSettledRequest, RemoteSettledResponse, RemoteSourceBundleUploadRequest,
+    RemoteSourceBundleUploadResponse, RemoteStatusRequest, RemoteStatusResponse, RemoteWireError,
 };
+#[cfg(test)]
+use super::wire::{RemoteHeartbeatRequest, RemoteHeartbeatResponse};
 use super::wire_limits::MAX_REMOTE_LIFECYCLE_JSON_BYTES;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -146,7 +149,6 @@ impl From<RemoteWireError> for RemoteExecutionHttpError {
 
 pub(crate) struct RemoteExecutionHttpClient {
     config: RemoteExecutionHttpClientConfig,
-    credentials: RemoteExecutionCredentialResolver,
     client: reqwest::Client,
 }
 
@@ -196,11 +198,7 @@ impl RemoteExecutionHttpClient {
             .use_preconfigured_tls(tls)
             .build()
             .map_err(|_| RemoteExecutionHttpError::Config)?;
-        Ok(Self {
-            config,
-            credentials: RemoteExecutionCredentialResolver,
-            client,
-        })
+        Ok(Self { config, client })
     }
 
     pub(crate) async fn advertise(
@@ -218,6 +216,7 @@ impl RemoteExecutionHttpClient {
         Ok(response)
     }
 
+    #[cfg(test)]
     pub(crate) async fn heartbeat(
         &self,
         request: &RemoteHeartbeatRequest,
@@ -379,10 +378,9 @@ impl RemoteExecutionHttpClient {
             .endpoint
             .join(path)
             .map_err(|_| RemoteExecutionHttpError::Config)?;
-        let credential = self
-            .credentials
-            .resolve(&self.config.credential_reference)
-            .map_err(RemoteExecutionHttpError::Credential)?;
+        let credential =
+            RemoteExecutionCredentialResolver::resolve(&self.config.credential_reference)
+                .map_err(RemoteExecutionHttpError::Credential)?;
         let mut builder = self
             .client
             .request(method, url)

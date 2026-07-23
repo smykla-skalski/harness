@@ -78,6 +78,7 @@ pub(crate) struct RemoteHeartbeatResponse {
 }
 
 impl RemoteHeartbeatResponse {
+    #[cfg(test)]
     pub(crate) fn validate(
         &self,
         expected: &RemoteHeartbeatRequest,

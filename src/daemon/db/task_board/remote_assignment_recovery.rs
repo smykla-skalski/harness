@@ -331,7 +331,12 @@ async fn recover_one(
         {
             abandon_controller_operation_trust_in_tx(transaction, &assignment).await?;
         }
-        return recover_controller_remote_assignment_in_tx(transaction, &assignment, now).await;
+        return Box::pin(recover_controller_remote_assignment_in_tx(
+            transaction,
+            &assignment,
+            now,
+        ))
+        .await;
     }
     mark_outcome_unknown(transaction, row, now).await
 }

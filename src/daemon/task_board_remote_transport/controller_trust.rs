@@ -5,6 +5,7 @@ use super::controller::{
     RemoteExecutionControllerClient, RemoteExecutionControllerError, binding_error,
 };
 use super::controller_clock::ControllerClock;
+#[cfg(test)]
 use super::wire::{RemoteHeartbeatRequest, RemoteHeartbeatResponse};
 use super::wire_conversion::domain_host_advertisement;
 use crate::daemon::db::{
@@ -99,6 +100,7 @@ impl RemoteExecutionControllerClient {
         .map_err(Into::into)
     }
 
+    #[cfg(test)]
     pub(crate) async fn heartbeat(
         &self,
         db: &AsyncDaemonDb,

@@ -73,7 +73,7 @@ async fn recover_offer_after_source_receipt(
         .map_err(controller_database_error)?
     {
         RemotePredecessorOfferRecoveryOutcome::Accepted { outcome } => Ok(matches!(
-            outcome,
+            *outcome,
             TaskBoardRemoteMutationOutcome::Updated(_)
                 | TaskBoardRemoteMutationOutcome::Replayed(_)
         )),
@@ -106,7 +106,7 @@ async fn reassign_abandoned_source(
         &context.replacement.lease_expires_at,
     ))
     .await
-    .map(reassignment_progressed)
+    .map(|outcome| reassignment_progressed(&outcome))
 }
 
 async fn reassign_rejected_offer(
@@ -129,7 +129,7 @@ async fn reassign_rejected_offer(
         &context.replacement.lease_expires_at,
     ))
     .await
-    .map(reassignment_progressed)
+    .map(|outcome| reassignment_progressed(&outcome))
 }
 
 struct ReassignmentContext {
@@ -205,7 +205,7 @@ async fn exact_outbound_upload(
     }
 }
 
-fn reassignment_progressed(outcome: TaskBoardRemoteOfferOutcome) -> bool {
+fn reassignment_progressed(outcome: &TaskBoardRemoteOfferOutcome) -> bool {
     matches!(
         outcome,
         TaskBoardRemoteOfferOutcome::Created(_) | TaskBoardRemoteOfferOutcome::Replayed(_)

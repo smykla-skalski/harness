@@ -39,7 +39,7 @@ pub(crate) async fn persist_executor_run(
     authority: &TaskBoardRemoteExecutorStartAuthority,
     started_at: &str,
 ) -> (String, TaskBoardRemoteExecutorStartIoPermit) {
-    let project_dir = format!("/tmp/{}", authority.identity.workspace_ref);
+    let project_dir = provisioned_project_dir(fixture, &authority.identity.workspace_ref);
     seed_executor_session(
         fixture,
         assignment,
@@ -71,7 +71,7 @@ pub(crate) async fn persist_pre_permit_executor_run(
     authority: &TaskBoardRemoteExecutorStartAuthority,
     started_at: &str,
 ) -> String {
-    let project_dir = format!("/tmp/{}", authority.identity.workspace_ref);
+    let project_dir = provisioned_project_dir(fixture, &authority.identity.workspace_ref);
     seed_executor_session(
         fixture,
         assignment,
@@ -129,6 +129,14 @@ async fn seed_executor_session(
     session_id: &str,
     project_dir: &str,
 ) {
+    let origin_path = Path::new(
+        assignment
+            .executor_checkout_path
+            .as_deref()
+            .expect("remote executor assignment has a checkout path"),
+    )
+    .canonicalize()
+    .expect("canonicalize remote executor checkout");
     sqlx::query(
         "INSERT OR IGNORE INTO projects (
              project_id, name, project_dir, repository_root, checkout_id,
@@ -154,7 +162,7 @@ async fn seed_executor_session(
         serde_json::json!({
             "session_id": session_id,
             "worktree_path": project_dir,
-            "origin_path": assignment.executor_checkout_path.as_deref(),
+            "origin_path": origin_path,
             "branch_ref": format!("harness/{session_id}"),
         })
         .to_string(),
@@ -167,4 +175,17 @@ async fn seed_executor_session(
     .execute(fixture.db.pool())
     .await
     .expect("seed remote executor session");
+}
+
+fn provisioned_project_dir(fixture: &ExecutorFixture, workspace_ref: &str) -> String {
+    let checkout = fixture._temp.path().join("checkout");
+    let project_dir = checkout.join(workspace_ref);
+    std::fs::create_dir_all(&project_dir).expect("create remote executor fixture worktree");
+    let canonical = project_dir
+        .canonicalize()
+        .expect("canonicalize remote executor fixture worktree");
+    canonical
+        .to_str()
+        .expect("remote executor fixture worktree is UTF-8")
+        .to_owned()
 }

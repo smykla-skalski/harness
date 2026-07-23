@@ -199,14 +199,14 @@ impl AsyncDaemonDb {
         detail: &str,
         failed_at: &str,
     ) -> Result<TaskBoardRemoteResultImportRecord, CliError> {
-        failure::mark_manual_required(
+        Box::pin(failure::mark_manual_required(
             self,
             assignment_id,
             fencing_epoch,
             import_sha256,
             detail,
             failed_at,
-        )
+        ))
         .await
     }
 }

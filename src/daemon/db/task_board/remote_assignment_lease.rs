@@ -37,7 +37,7 @@ impl AsyncDaemonDb {
             .begin_immediate_transaction("task board remote assignment claim")
             .await?;
         let record = require_assignment(&mut transaction, &request.binding.assignment_id).await?;
-        if exact_claim_response(&record, request, authenticated_principal)?.is_some() {
+        if exact_claim_response(&record, request, authenticated_principal).is_some() {
             commit_noop(transaction, "replayed claim").await?;
             return Ok(TaskBoardRemoteMutationOutcome::Replayed(record));
         }

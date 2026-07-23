@@ -347,8 +347,16 @@ fn canonical_ref(value: &str, prefix: &str) -> bool {
         && !value.contains("//")
         && !name.contains("@{")
         && name.split('/').all(|component| {
-            !component.is_empty() && !component.starts_with('.') && !component.ends_with(".lock")
+            !component.is_empty() && !component.starts_with('.') && !has_git_lock_suffix(component)
         })
+}
+
+#[expect(
+    clippy::case_sensitive_file_extension_comparisons,
+    reason = "Git's reserved .lock ref suffix is case-sensitive"
+)]
+fn has_git_lock_suffix(component: &str) -> bool {
+    component.ends_with(".lock")
 }
 
 fn canonical_oid(value: &str, expected_len: usize) -> bool {

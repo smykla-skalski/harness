@@ -167,9 +167,11 @@ async fn transient_progress_failure_defers_exact_generation_and_survives_restart
                 &TaskBoardExecutionAttemptCas::from(&fixture.attempt),
                 &fixture.request,
                 &fixture.request.binding.host_id,
-                "2026-07-19T10:00:00Z",
-                "2026-07-19T10:01:00Z",
-                &fixture.request.deadline_at,
+                crate::daemon::db::TaskBoardRemoteOfferWindow::new(
+                    "2026-07-19T10:00:00Z",
+                    "2026-07-19T10:01:00Z",
+                    &fixture.request.deadline_at,
+                ),
             )
             .await
             .expect("offer transient-failure assignment"),

@@ -117,7 +117,7 @@ pub(super) fn stop_pending(
         executor_configuration_revision: record.executor_configuration_revision.ok_or_else(
             || db_error("remote executor stop has no executor configuration revision"),
         )?,
-        executor_checkout_path: required(&record.executor_checkout_path, "checkout")?,
+        executor_checkout_path: required(record.executor_checkout_path.as_ref(), "checkout")?,
         source: offer.source.clone(),
         reason,
         acquired_at: acquired_at.into(),
@@ -148,7 +148,8 @@ fn validate_stop_pending(
             != record
                 .executor_configuration_revision
                 .ok_or_else(|| db_error("remote executor stop has no executor revision"))?
-        || pending.executor_checkout_path != required(&record.executor_checkout_path, "checkout")?
+        || pending.executor_checkout_path
+            != required(record.executor_checkout_path.as_ref(), "checkout")?
         || pending.source != offer.source
         || pending.session_id != identity.session_id
         || pending.run_id != identity.run_id
@@ -161,7 +162,7 @@ fn validate_stop_pending(
     let authority = stop_source_from_record(record, pending)?;
     if pending.authority_sha256 != authority.sha256()
         || pending.authority_acquired_at != authority.acquired_at()
-        || !source_matches(record, &authority, pending.reason)?
+        || !source_matches(record, &authority, pending.reason)
     {
         return Err(db_error(
             "remote executor stop authority contradicts mutation authority",
@@ -214,6 +215,7 @@ fn stop_source_from_record(
                 ));
             }
             executor_start_io_permit(record)?
+                .map(Box::new)
                 .map(TaskBoardRemoteExecutorStopAuthority::Start)
                 .ok_or_else(|| db_error("remote executor stop has no start authority"))
         }
@@ -294,8 +296,8 @@ pub(in super::super) fn stop_pending_digest(
     Ok(hex::encode(hasher.finalize()))
 }
 
-fn required(value: &Option<String>, label: &str) -> Result<String, CliError> {
+fn required(value: Option<&String>, label: &str) -> Result<String, CliError> {
     value
-        .clone()
+        .cloned()
         .ok_or_else(|| db_error(format!("remote executor stop has no {label}")))
 }
