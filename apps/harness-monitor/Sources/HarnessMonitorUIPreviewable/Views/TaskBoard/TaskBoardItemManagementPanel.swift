@@ -256,66 +256,64 @@ struct TaskBoardItemManagementPanel: View {
   }
 
   var actionButtons: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      actionButtonContent
-    }
-    .fixedSize(horizontal: true, vertical: false)
-  }
+    HarnessMonitorWrapLayout(
+      spacing: HarnessMonitorTheme.spacingSM,
+      lineSpacing: HarnessMonitorTheme.spacingSM
+    ) {
+      Button {
+        submitDraft()
+      } label: {
+        Label(
+          isCreating ? "Create Item" : "Save Item",
+          systemImage: isCreating ? "plus.circle" : "checkmark.circle"
+        )
+        .font(captionSemibold)
+      }
+      .frame(minHeight: metrics.controlMinHeight)
+      .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
+      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+      .disabled(isActionInFlight || !draft.canSubmit || !canSubmit)
+      .accessibilityIdentifier("harness.task-board.manage-item.submit")
 
-  @ViewBuilder var actionButtonContent: some View {
-    Button {
-      submitDraft()
-    } label: {
-      Label(
-        isCreating ? "Create Item" : "Save Item",
-        systemImage: isCreating ? "plus.circle" : "checkmark.circle"
-      )
-      .font(captionSemibold)
-    }
-    .frame(minHeight: metrics.controlMinHeight)
-    .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
-    .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-    .disabled(isActionInFlight || !draft.canSubmit || !canSubmit)
-    .accessibilityIdentifier("harness.task-board.manage-item.submit")
+      if let item {
+        TaskBoardPlanLifecycleActionButtons(
+          item: item,
+          draft: draft,
+          metrics: metrics,
+          isActionInFlight: isActionInFlight,
+          actions: actions
+        )
 
-    if let item {
-      TaskBoardPlanLifecycleActionButtons(
-        item: item,
-        draft: draft,
-        metrics: metrics,
-        isActionInFlight: isActionInFlight,
-        actions: actions
-      )
+        TaskBoardItemLiveActionButtons(
+          item: item,
+          metrics: metrics,
+          captionFont: captionSemibold,
+          isActionInFlight: isActionInFlight,
+          runOnceDryRun: runOnceDryRun,
+          evaluateDryRun: evaluateDryRun,
+          actions: actions,
+          evaluatePreviewState: evaluatePreviewState
+        )
 
-      TaskBoardItemLiveActionButtons(
-        item: item,
+        Button(role: .destructive) {
+          actions.deleteTaskBoardItem(item)
+          dismiss()
+        } label: {
+          Label("Delete", systemImage: "trash")
+            .font(captionSemibold)
+        }
+        .frame(minHeight: metrics.controlMinHeight)
+        .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+        .disabled(isActionInFlight || !actions.canDeleteItem)
+      }
+
+      TaskBoardItemSyncActionButton(
         metrics: metrics,
         captionFont: captionSemibold,
         isActionInFlight: isActionInFlight,
-        runOnceDryRun: runOnceDryRun,
-        evaluateDryRun: evaluateDryRun,
-        actions: actions,
-        evaluatePreviewState: evaluatePreviewState
+        actions: actions
       )
-
-      Button(role: .destructive) {
-        actions.deleteTaskBoardItem(item)
-        dismiss()
-      } label: {
-        Label("Delete", systemImage: "trash")
-          .font(captionSemibold)
-      }
-      .frame(minHeight: metrics.controlMinHeight)
-      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-      .disabled(isActionInFlight || !actions.canDeleteItem)
     }
-
-    TaskBoardItemSyncActionButton(
-      metrics: metrics,
-      captionFont: captionSemibold,
-      isActionInFlight: isActionInFlight,
-      actions: actions
-    )
   }
 
   var isCreating: Bool {
