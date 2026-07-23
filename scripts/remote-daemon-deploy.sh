@@ -42,19 +42,17 @@ if (( dry_run == 0 )); then
   "$ROOT/scripts/build-and-install-release-set.sh" daemon
 fi
 
-# A real upgrade must hand the controller an existing regular executable, and it
-# refuses a symbolic link, so resolve the release-set entrypoint symlink and
-# validate. A --dry-run only renders the plan and never reads the candidate, so
-# skip this entirely to allow previewing the transaction before a build.
-if (( dry_run == 0 )); then
-  if [[ -e "$candidate" ]]; then
-    candidate="$(readlink -f -- "$candidate")"
-  fi
-  if [[ ! -f "$candidate" || ! -x "$candidate" ]]; then
-    printf 'candidate daemon is not an executable file at %s\n' "$candidate" >&2
-    printf 'activate it first with: mise run install:harness:daemon (or set HARNESS_REMOTE_DAEMON_CANDIDATE)\n' >&2
-    exit 1
-  fi
+# The controller needs an absolute --candidate-path even for a dry-run and
+# refuses a symbolic link, so canonicalize to an absolute real path. readlink -m
+# absolutizes a relative override and tolerates a not-yet-built candidate, so a
+# --dry-run can preview before activation.
+candidate="$(readlink -m -- "$candidate")"
+# A real upgrade also needs that path to be an existing regular executable; a
+# --dry-run never reads the candidate, so the existence check is skipped.
+if (( dry_run == 0 )) && [[ ! -f "$candidate" || ! -x "$candidate" ]]; then
+  printf 'candidate daemon is not an executable file at %s\n' "$candidate" >&2
+  printf 'activate it first with: mise run install:harness:daemon (or set HARNESS_REMOTE_DAEMON_CANDIDATE)\n' >&2
+  exit 1
 fi
 if [[ ! -f "$controller" || ! -x "$controller" ]]; then
   printf 'harness-systemd controller is not an executable file at %s\n' "$controller" >&2

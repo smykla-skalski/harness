@@ -213,6 +213,7 @@ if [[ "$mode" != "--lint" ]]; then
   run_quiet_step "Linux-only command shell tests" "$ROOT/scripts/tests/test-run-linux-only.sh"
   run_quiet_step "run-step shell tests" "$ROOT/scripts/tests/test-run-step.sh"
   run_quiet_step "release install shell tests" "$ROOT/scripts/tests/test-release-install.sh"
+  run_quiet_step "remote-daemon-deploy shell tests" "$ROOT/scripts/tests/test-remote-daemon-deploy.sh"
   run_quiet_step "clean-build-caches shell tests" "$ROOT/scripts/tests/test-clean-build-caches.sh"
   run_quiet_step "clean-stale-lanes shell tests" "$ROOT/scripts/tests/test-clean-stale-lanes.sh"
   run_quiet_step "mcp shell tests" "$ROOT/scripts/tests/test-mcp-scripts.sh"
