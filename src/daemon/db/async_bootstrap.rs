@@ -96,6 +96,7 @@ const fn migration_effect_column(migration_version: i64) -> Option<(&'static str
         29 => Some(("task_board_dispatch_intents", "consumed_approval_grant_id")),
         30 => Some(("task_board_items", "workflow_kind")),
         35 => Some(("task_board_execution_hosts", "observed_host_instance_id")),
+        40 => Some(("task_board_items", "tombstone_cause")),
         _ => None,
     }
 }
@@ -143,6 +144,7 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         37 => 43,
         38 => 44,
         39 => 45,
+        40 => 46,
         _ => u64::MAX,
     }
 }

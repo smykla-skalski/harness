@@ -13,6 +13,20 @@ mod test_support;
 #[cfg(test)]
 pub(crate) use test_support::set_schema_init_hook;
 
+#[path = "schema_migration_steps.rs"]
+mod migration_steps;
+use migration_steps::{
+    migrate_v9_to_v10, migrate_v10_to_v11, migrate_v11_to_v12, migrate_v12_to_v13,
+    migrate_v13_to_v14, migrate_v14_to_v15, migrate_v15_to_v16, migrate_v16_to_v17,
+    migrate_v17_to_v18, migrate_v18_to_v19, migrate_v19_to_v20, migrate_v20_to_v21,
+    migrate_v21_to_v22, migrate_v22_to_v23, migrate_v23_to_v24, migrate_v24_to_v25,
+    migrate_v25_to_v26, migrate_v26_to_v27, migrate_v27_to_v28, migrate_v28_to_v29,
+    migrate_v29_to_v30, migrate_v30_to_v31, migrate_v31_to_v32, migrate_v32_to_v33,
+    migrate_v33_to_v34, migrate_v34_to_v35, migrate_v35_to_v36, migrate_v36_to_v37,
+    migrate_v37_to_v38, migrate_v38_to_v39, migrate_v39_to_v40, migrate_v40_to_v41,
+    migrate_v41_to_v42, migrate_v42_to_v43,
+};
+
 static SCHEMA_MIGRATION_LOCK: Mutex<()> = Mutex::new(());
 
 impl DaemonDb {
@@ -117,7 +131,8 @@ impl DaemonDb {
 
     fn apply_pending_migrations(&self, version_number: u8) -> Result<(), CliError> {
         self.apply_pending_migrations_v8_to_v24(version_number)?;
-        self.apply_pending_migrations_v25_to_v45(version_number)
+        self.apply_pending_migrations_v25_to_v45(version_number)?;
+        self.apply_pending_migrations_v46(version_number)
     }
 
     #[expect(
@@ -132,49 +147,49 @@ impl DaemonDb {
             self.migrate_v8_to_v9()?;
         }
         if version_number <= 9 {
-            self.migrate_v9_to_v10()?;
+            migrate_v9_to_v10(&self.conn)?;
         }
         if version_number <= 10 {
-            self.migrate_v10_to_v11()?;
+            migrate_v10_to_v11(&self.conn)?;
         }
         if version_number <= 11 {
-            self.migrate_v11_to_v12()?;
+            migrate_v11_to_v12(&self.conn)?;
         }
         if version_number <= 12 {
-            self.migrate_v12_to_v13()?;
+            migrate_v12_to_v13(&self.conn)?;
         }
         if version_number <= 13 {
-            self.migrate_v13_to_v14()?;
+            migrate_v13_to_v14(&self.conn)?;
         }
         if version_number <= 14 {
-            self.migrate_v14_to_v15()?;
+            migrate_v14_to_v15(&self.conn)?;
         }
         if version_number <= 15 {
-            self.migrate_v15_to_v16()?;
+            migrate_v15_to_v16(&self.conn)?;
         }
         if version_number <= 16 {
-            self.migrate_v16_to_v17()?;
+            migrate_v16_to_v17(&self.conn)?;
         }
         if version_number <= 17 {
-            self.migrate_v17_to_v18()?;
+            migrate_v17_to_v18(&self.conn)?;
         }
         if version_number <= 18 {
-            self.migrate_v18_to_v19()?;
+            migrate_v18_to_v19(&self.conn)?;
         }
         if version_number <= 19 {
-            self.migrate_v19_to_v20()?;
+            migrate_v19_to_v20(&self.conn)?;
         }
         if version_number <= 20 {
-            self.migrate_v20_to_v21()?;
+            migrate_v20_to_v21(&self.conn)?;
         }
         if version_number <= 21 {
-            self.migrate_v21_to_v22()?;
+            migrate_v21_to_v22(&self.conn)?;
         }
         if version_number <= 22 {
-            self.migrate_v22_to_v23()?;
+            migrate_v22_to_v23(&self.conn)?;
         }
         if version_number <= 23 {
-            self.migrate_v23_to_v24()?;
+            migrate_v23_to_v24(&self.conn)?;
         }
         Ok(())
     }
@@ -185,67 +200,74 @@ impl DaemonDb {
     )]
     fn apply_pending_migrations_v25_to_v45(&self, version_number: u8) -> Result<(), CliError> {
         if version_number <= 24 {
-            self.migrate_v24_to_v25()?;
+            migrate_v24_to_v25(&self.conn)?;
         }
         if version_number <= 25 {
-            self.migrate_v25_to_v26()?;
+            migrate_v25_to_v26(&self.conn)?;
         }
         if version_number <= 26 {
-            self.migrate_v26_to_v27()?;
+            migrate_v26_to_v27(&self.conn)?;
         }
         if version_number <= 27 {
-            self.migrate_v27_to_v28()?;
+            migrate_v27_to_v28(&self.conn)?;
         }
         if version_number <= 28 {
-            self.migrate_v28_to_v29()?;
+            migrate_v28_to_v29(&self.conn)?;
         }
         if version_number <= 29 {
-            self.migrate_v29_to_v30()?;
+            migrate_v29_to_v30(&self.conn)?;
         }
         if version_number <= 30 {
-            self.migrate_v30_to_v31()?;
+            migrate_v30_to_v31(&self.conn)?;
         }
         if version_number <= 31 {
-            self.migrate_v31_to_v32()?;
+            migrate_v31_to_v32(&self.conn)?;
         }
         if version_number <= 32 {
-            self.migrate_v32_to_v33()?;
+            migrate_v32_to_v33(&self.conn)?;
         }
         if version_number <= 33 {
-            self.migrate_v33_to_v34()?;
+            migrate_v33_to_v34(&self.conn)?;
         }
         if version_number <= 34 {
-            self.migrate_v34_to_v35()?;
+            migrate_v34_to_v35(&self.conn)?;
         }
         if version_number <= 35 {
-            self.migrate_v35_to_v36()?;
+            migrate_v35_to_v36(&self.conn)?;
         }
         if version_number <= 36 {
-            self.migrate_v36_to_v37()?;
+            migrate_v36_to_v37(&self.conn)?;
         }
         if version_number <= 37 {
-            self.migrate_v37_to_v38()?;
+            migrate_v37_to_v38(&self.conn)?;
         }
         if version_number <= 38 {
-            self.migrate_v38_to_v39()?;
+            migrate_v38_to_v39(&self.conn)?;
         }
         if version_number <= 39 {
-            self.migrate_v39_to_v40()?;
+            migrate_v39_to_v40(&self.conn)?;
         }
         if version_number <= 40 {
-            self.migrate_v40_to_v41()?;
+            migrate_v40_to_v41(&self.conn)?;
         }
         if version_number <= 41 {
-            self.migrate_v41_to_v42()?;
+            migrate_v41_to_v42(&self.conn)?;
         }
         if version_number <= 42 {
-            self.migrate_v42_to_v43()?;
+            migrate_v42_to_v43(&self.conn)?;
         }
         if version_number <= 43 {
             super::schema_v44::run(&self.conn)?;
         }
         if version_number <= 44 {
             super::schema_v45::run(&self.conn)?;
+        }
+        Ok(())
+    }
+
+    fn apply_pending_migrations_v46(&self, version_number: u8) -> Result<(), CliError> {
+        if version_number <= 45 {
+            super::schema_v46::run(&self.conn)?;
         }
         Ok(())
     }
@@ -274,142 +296,6 @@ impl DaemonDb {
             )
             .map_err(|error| db_error(format!("bump schema version to v9: {error}")))?;
         Ok(())
-    }
-
-    fn migrate_v9_to_v10(&self) -> Result<(), CliError> {
-        super::schema_v10::run(&self.conn)
-    }
-
-    fn migrate_v10_to_v11(&self) -> Result<(), CliError> {
-        super::schema_v11::run(&self.conn)
-    }
-
-    fn migrate_v11_to_v12(&self) -> Result<(), CliError> {
-        super::schema_v12::run(&self.conn)
-    }
-
-    fn migrate_v12_to_v13(&self) -> Result<(), CliError> {
-        super::schema_v13::run(&self.conn)
-    }
-
-    fn migrate_v13_to_v14(&self) -> Result<(), CliError> {
-        super::schema_v14::run(&self.conn)
-    }
-
-    fn migrate_v14_to_v15(&self) -> Result<(), CliError> {
-        super::schema_v15::run(&self.conn)
-    }
-
-    fn migrate_v15_to_v16(&self) -> Result<(), CliError> {
-        super::schema_v16::run(&self.conn)
-    }
-
-    fn migrate_v16_to_v17(&self) -> Result<(), CliError> {
-        super::schema_v17::run(&self.conn)
-    }
-
-    fn migrate_v17_to_v18(&self) -> Result<(), CliError> {
-        super::schema_v18::run(&self.conn)
-    }
-
-    fn migrate_v18_to_v19(&self) -> Result<(), CliError> {
-        super::schema_v19::run(&self.conn)
-    }
-
-    fn migrate_v19_to_v20(&self) -> Result<(), CliError> {
-        super::schema_v20::run(&self.conn)
-    }
-
-    fn migrate_v20_to_v21(&self) -> Result<(), CliError> {
-        super::schema_v21::run(&self.conn)
-    }
-
-    fn migrate_v21_to_v22(&self) -> Result<(), CliError> {
-        super::schema_v22::run(&self.conn)
-    }
-
-    fn migrate_v22_to_v23(&self) -> Result<(), CliError> {
-        super::schema_v23::run(&self.conn)
-    }
-
-    fn migrate_v23_to_v24(&self) -> Result<(), CliError> {
-        super::schema_v24::run(&self.conn)
-    }
-
-    fn migrate_v24_to_v25(&self) -> Result<(), CliError> {
-        super::schema_v25::run(&self.conn)
-    }
-
-    fn migrate_v25_to_v26(&self) -> Result<(), CliError> {
-        super::schema_v26::run(&self.conn)
-    }
-
-    fn migrate_v26_to_v27(&self) -> Result<(), CliError> {
-        super::schema_v27::run(&self.conn)
-    }
-
-    fn migrate_v27_to_v28(&self) -> Result<(), CliError> {
-        super::schema_v28::run(&self.conn)
-    }
-
-    fn migrate_v28_to_v29(&self) -> Result<(), CliError> {
-        super::schema_v29::run(&self.conn)
-    }
-
-    fn migrate_v29_to_v30(&self) -> Result<(), CliError> {
-        super::schema_v30::run(&self.conn)
-    }
-
-    fn migrate_v30_to_v31(&self) -> Result<(), CliError> {
-        super::schema_v31::run(&self.conn)
-    }
-
-    fn migrate_v31_to_v32(&self) -> Result<(), CliError> {
-        super::schema_v32::run(&self.conn)
-    }
-
-    fn migrate_v32_to_v33(&self) -> Result<(), CliError> {
-        super::schema_v33::run(&self.conn)
-    }
-
-    fn migrate_v33_to_v34(&self) -> Result<(), CliError> {
-        super::schema_v34::run(&self.conn)
-    }
-
-    fn migrate_v34_to_v35(&self) -> Result<(), CliError> {
-        super::schema_v35::run(&self.conn)
-    }
-
-    fn migrate_v35_to_v36(&self) -> Result<(), CliError> {
-        super::schema_v36::run(&self.conn)
-    }
-
-    fn migrate_v36_to_v37(&self) -> Result<(), CliError> {
-        super::schema_v37::run(&self.conn)
-    }
-
-    fn migrate_v37_to_v38(&self) -> Result<(), CliError> {
-        super::schema_v38::run(&self.conn)
-    }
-
-    fn migrate_v38_to_v39(&self) -> Result<(), CliError> {
-        super::schema_v39::run(&self.conn)
-    }
-
-    fn migrate_v39_to_v40(&self) -> Result<(), CliError> {
-        super::schema_v40::run(&self.conn)
-    }
-
-    fn migrate_v40_to_v41(&self) -> Result<(), CliError> {
-        super::schema_v41::run(&self.conn)
-    }
-
-    fn migrate_v41_to_v42(&self) -> Result<(), CliError> {
-        super::schema_v42::run(&self.conn)
-    }
-
-    fn migrate_v42_to_v43(&self) -> Result<(), CliError> {
-        super::schema_v43::run(&self.conn)
     }
 }
 
