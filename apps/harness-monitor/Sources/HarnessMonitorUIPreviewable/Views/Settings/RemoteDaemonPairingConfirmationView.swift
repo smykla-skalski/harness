@@ -8,6 +8,13 @@ public struct RemoteDaemonPairingConfirmationView: View {
 
   @State private var displayName = ""
 
+  private static let expirationFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateStyle = .medium
+    f.timeStyle = .short
+    return f
+  }()
+
   public init(
     invitation: RemoteDaemonPairingInvitation,
     onPair: @escaping @MainActor @Sendable (String) -> Void,
@@ -74,6 +81,7 @@ public struct RemoteDaemonPairingConfirmationView: View {
       TextField("Client name", text: $displayName)
         .textFieldStyle(.roundedBorder)
         .labelsHidden()
+        .accessibilityLabel("Client name")
         .padding(.top, HarnessMonitorTheme.spacingXS)
     }
   }
@@ -97,10 +105,7 @@ public struct RemoteDaemonPairingConfirmationView: View {
   }
 
   private var expirationText: String {
-    let formatter = DateFormatter()
-    formatter.dateStyle = .medium
-    formatter.timeStyle = .short
-    return formatter.string(from: invitation.expiresAt)
+    Self.expirationFormatter.string(from: invitation.expiresAt)
   }
 
   private var expirationColor: Color {

@@ -68,11 +68,11 @@ extension HarnessMonitorApp {
         }
         .sheet(
           isPresented: Binding(
-            get: { pendingPairingURL != nil },
+            get: { pendingPairingURLValue != nil },
             set: {
               if !$0 {
-                pendingPairingURL = nil
-                pendingPairingError = nil
+                pendingPairingURLValue = nil
+                pendingPairingErrorValue = nil
               }
             }
           )
@@ -82,21 +82,21 @@ extension HarnessMonitorApp {
         .alert(
           "Invalid Pairing Link",
           isPresented: Binding(
-            get: { pendingPairingError != nil },
+            get: { pendingPairingErrorValue != nil },
             set: {
               if !$0 {
-                pendingPairingError = nil
-                pendingPairingURL = nil
+                pendingPairingErrorValue = nil
+                pendingPairingURLValue = nil
               }
             }
           )
         ) {
           Button("OK") {
-            pendingPairingError = nil
-            pendingPairingURL = nil
+            pendingPairingErrorValue = nil
+            pendingPairingURLValue = nil
           }
         } message: {
-          if let error = pendingPairingError {
+          if let error = pendingPairingErrorValue {
             Text(error.localizedDescription)
           }
         }
@@ -114,12 +114,14 @@ extension HarnessMonitorApp {
     {
       do {
         _ = try RemoteDaemonPairingInvitation.decode(url)
-        pendingPairingURL = url
-        pendingPairingError = nil
+        pendingPairingURLValue = url
+        pendingPairingErrorValue = nil
       } catch let error as RemoteDaemonPairingInvitationError {
-        pendingPairingError = error
+        pendingPairingURLValue = nil
+        pendingPairingErrorValue = error
       } catch {
-        pendingPairingError = .invalidPayload
+        pendingPairingURLValue = nil
+        pendingPairingErrorValue = .invalidPayload
       }
       return
     }
@@ -142,7 +144,7 @@ extension HarnessMonitorApp {
 
   @ViewBuilder
   private var pairingConfirmationSheetContent: some View {
-    if let url = pendingPairingURL,
+    if let url = pendingPairingURLValue,
       let invitation = try? RemoteDaemonPairingInvitation.decode(url)
     {
       RemoteDaemonPairingConfirmationView(
@@ -154,10 +156,10 @@ extension HarnessMonitorApp {
           )
           settingsSelectedSectionBinding.wrappedValue = .connection
           openWindow(id: HarnessMonitorWindowID.settings)
-          pendingPairingURL = nil
+          pendingPairingURLValue = nil
         },
         onCancel: {
-          pendingPairingURL = nil
+          pendingPairingURLValue = nil
         }
       )
     }
