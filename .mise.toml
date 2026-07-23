@@ -160,7 +160,7 @@ description = "Run fast integration tests in parallel with process isolation"
 run = [
   "./scripts/cargo-local.sh build -p harness-daemon -p harness-bridge -p harness-mcp",
   "./scripts/run-linux-only.sh ./scripts/cargo-local.sh build -p harness-systemd",
-  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test integration --features full-runtime",
+  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test integration --features full-runtime,openapi",
 ]
 
 [tasks."test:workers"]
@@ -242,9 +242,17 @@ run = [
   "./scripts/cargo-local.sh run --quiet -p policy-codegen --bin policy-codegen -- --check",
 ]
 
+[tasks."openapi:generate"]
+description = "Regenerate docs/api/openapi.json from the annotated daemon HTTP handlers"
+run = "./scripts/cargo-local.sh run --quiet -p openapi-codegen --bin openapi-codegen"
+
+[tasks."openapi:check"]
+description = "Fail if docs/api/openapi.json drifts from the annotated daemon HTTP handlers"
+run = "./scripts/cargo-local.sh run --quiet -p openapi-codegen --bin openapi-codegen -- --check"
+
 [tasks.test]
 description = "Run all fast tests"
-depends = ["test:unit", "test:integration", "test:workers", "codegen:check"]
+depends = ["test:unit", "test:integration", "test:workers", "codegen:check", "openapi:check"]
 
 [tasks."setup:bootstrap"]
 description = "Write runtime bootstrap configs and install the repo-aware wrapper (pass harness setup args after --)"
@@ -302,7 +310,8 @@ run = [
 hide = true
 run = [
   "./scripts/cargo-local.sh clippy -p harness --lib --bins",
-  "./scripts/cargo-local.sh clippy --all-targets -p harness-command -p harness-daemon-client -p harness-protocol -p harness-systemd-protocol -p harness-telemetry -p harness-daemon -p harness-bridge -p harness-mcp -p harness-hook -p policy-codegen",
+  "./scripts/cargo-local.sh clippy --all-targets -p harness-command -p harness-daemon-client -p harness-protocol -p harness-systemd-protocol -p harness-telemetry -p harness-daemon -p harness-bridge -p harness-mcp -p harness-hook -p policy-codegen -p openapi-codegen",
+  "./scripts/cargo-local.sh clippy --all-targets -p harness-daemon --features openapi",
   "./scripts/run-linux-only.sh ./scripts/cargo-local.sh clippy --all-targets -p harness-systemd",
 ]
 

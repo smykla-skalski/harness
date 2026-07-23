@@ -21,6 +21,14 @@ use crate::daemon::service;
 use crate::daemon::websocket::{build_config_payload, ws_upgrade_handler};
 use crate::errors::{CliError, CliErrorKind};
 
+#[cfg(feature = "openapi")]
+use super::openapi::DaemonErrorBody;
+#[cfg(feature = "openapi")]
+use crate::daemon::protocol::{
+    DaemonControlResponse, DaemonTelemetryResponse, HealthResponse, LogLevelResponse,
+    ProjectSummary,
+};
+
 use super::audit::get_audit_events;
 use super::auth::{authenticated_remote_client, require_auth};
 use super::response::{extract_request_id, timed_json};
@@ -56,12 +64,24 @@ pub(super) fn core_routes() -> Router<DaemonHttpState> {
 }
 
 /// Query parameters for `GET /v1/runtime-sessions/resolve`.
+#[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
+#[cfg_attr(feature = "openapi", into_params(parameter_in = Query))]
 #[derive(Debug, serde::Deserialize)]
 pub(crate) struct RuntimeSessionResolutionQuery {
     pub runtime_name: String,
     pub runtime_session_id: String,
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/v1/health",
+    tag = "daemon",
+    responses(
+        (status = 200, description = "Daemon health snapshot", body = HealthResponse),
+        (status = 401, description = "Missing or invalid daemon token", body = DaemonErrorBody),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn get_health(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -78,6 +98,16 @@ pub(super) async fn get_health(
     timed_json("GET", http_paths::HEALTH, &request_id, start, result)
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/v1/ready",
+    tag = "daemon",
+    responses(
+        (status = 200, description = "Readiness probe", body = ReadinessResponse),
+        (status = 401, description = "Missing or invalid daemon token", body = DaemonErrorBody),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn get_ready(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -94,6 +124,17 @@ pub(super) async fn get_ready(
     timed_json("GET", http_paths::READY, &request_id, start, result)
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/v1/runtime-sessions/resolve",
+    tag = "daemon",
+    params(RuntimeSessionResolutionQuery),
+    responses(
+        (status = 200, description = "Runtime-session resolution outcome", body = RuntimeSessionResolutionResponse),
+        (status = 401, description = "Missing or invalid daemon token", body = DaemonErrorBody),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn get_runtime_session_resolution(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -192,7 +233,20 @@ pub(super) async fn get_runtimes_probe(
     )
 }
 
-async fn post_stop_daemon(headers: HeaderMap, State(state): State<DaemonHttpState>) -> Response {
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/daemon/stop",
+    tag = "daemon",
+    responses(
+        (status = 200, description = "Daemon shutdown acknowledged", body = DaemonControlResponse),
+        (status = 401, description = "Missing or invalid daemon token", body = DaemonErrorBody),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_stop_daemon(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
     if let Err(response) = require_auth(&headers, &state) {
@@ -205,6 +259,17 @@ async fn post_stop_daemon(headers: HeaderMap, State(state): State<DaemonHttpStat
     timed_json("POST", http_paths::DAEMON_STOP, &request_id, start, result)
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/daemon/telemetry",
+    tag = "daemon",
+    request_body = DaemonTelemetryRequest,
+    responses(
+        (status = 200, description = "Telemetry recorded", body = DaemonTelemetryResponse),
+        (status = 401, description = "Missing or invalid daemon token", body = DaemonErrorBody),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_daemon_telemetry(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -275,7 +340,20 @@ async fn post_bridge_reconfigure(
     )
 }
 
-async fn get_log_level(headers: HeaderMap, State(state): State<DaemonHttpState>) -> Response {
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/v1/daemon/log-level",
+    tag = "daemon",
+    responses(
+        (status = 200, description = "Current daemon log level", body = LogLevelResponse),
+        (status = 401, description = "Missing or invalid daemon token", body = DaemonErrorBody),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn get_log_level(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
     if let Err(response) = require_auth(&headers, &state) {
@@ -290,7 +368,18 @@ async fn get_log_level(headers: HeaderMap, State(state): State<DaemonHttpState>)
     )
 }
 
-async fn put_log_level(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    put,
+    path = "/v1/daemon/log-level",
+    tag = "daemon",
+    request_body = SetLogLevelRequest,
+    responses(
+        (status = 200, description = "Updated daemon log level", body = LogLevelResponse),
+        (status = 401, description = "Missing or invalid daemon token", body = DaemonErrorBody),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn put_log_level(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<SetLogLevelRequest>,
@@ -326,6 +415,16 @@ async fn put_log_level(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/v1/projects",
+    tag = "daemon",
+    responses(
+        (status = 200, description = "Projects and their worktrees", body = Vec<ProjectSummary>),
+        (status = 401, description = "Missing or invalid daemon token", body = DaemonErrorBody),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn get_projects(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,

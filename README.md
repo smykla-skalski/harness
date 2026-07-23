@@ -192,6 +192,7 @@ mise run check            # default quality gate
 mise run test             # default test aggregate (harness + aff fast tests)
 mise run test:unit        # harness unit tests
 mise run test:integration # harness integration tests
+mise run openapi:check    # daemon OpenAPI schema drift gate (docs/api/openapi.json)
 mise run monitor:test     # generate + lint + test the macOS Harness Monitor app
 ```
 

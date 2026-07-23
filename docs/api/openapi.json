@@ -1,0 +1,678 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Harness daemon API",
+    "description": "REST API served by the Harness daemon (harness-daemon). The API is dual-transport: most endpoints mirror a WebSocket JSON-RPC method, recorded per operation as the `x-websocket-method` extension. Generated from annotated handlers - do not edit docs/api/openapi.json by hand; regenerate with `mise run openapi:generate`.",
+    "license": {
+      "name": ""
+    },
+    "version": "50.0.0"
+  },
+  "paths": {
+    "/v1/daemon/log-level": {
+      "get": {
+        "tags": [
+          "daemon"
+        ],
+        "operationId": "get_log_level",
+        "responses": {
+          "200": {
+            "description": "Current daemon log level",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogLevelResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid daemon token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-websocket-method": "daemon.log_level"
+      },
+      "put": {
+        "tags": [
+          "daemon"
+        ],
+        "operationId": "put_log_level",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetLogLevelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated daemon log level",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogLevelResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid daemon token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-websocket-method": "daemon.set_log_level"
+      }
+    },
+    "/v1/daemon/stop": {
+      "post": {
+        "tags": [
+          "daemon"
+        ],
+        "operationId": "post_stop_daemon",
+        "responses": {
+          "200": {
+            "description": "Daemon shutdown acknowledged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonControlResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid daemon token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-websocket-method": "daemon.stop"
+      }
+    },
+    "/v1/daemon/telemetry": {
+      "post": {
+        "tags": [
+          "daemon"
+        ],
+        "operationId": "post_daemon_telemetry",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DaemonTelemetryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Telemetry recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonTelemetryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid daemon token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/health": {
+      "get": {
+        "tags": [
+          "daemon"
+        ],
+        "operationId": "get_health",
+        "responses": {
+          "200": {
+            "description": "Daemon health snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid daemon token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-websocket-method": "health"
+      }
+    },
+    "/v1/projects": {
+      "get": {
+        "tags": [
+          "daemon"
+        ],
+        "operationId": "get_projects",
+        "responses": {
+          "200": {
+            "description": "Projects and their worktrees",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectSummary"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid daemon token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-websocket-method": "projects"
+      }
+    },
+    "/v1/ready": {
+      "get": {
+        "tags": [
+          "daemon"
+        ],
+        "operationId": "get_ready",
+        "responses": {
+          "200": {
+            "description": "Readiness probe",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid daemon token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/runtime-sessions/resolve": {
+      "get": {
+        "tags": [
+          "daemon"
+        ],
+        "operationId": "get_runtime_session_resolution",
+        "parameters": [
+          {
+            "name": "runtime_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runtime_session_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Runtime-session resolution outcome",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeSessionResolutionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid daemon token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-websocket-method": "runtime_session.resolve"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DaemonControlResponse": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "DaemonErrorBody": {
+        "type": "object",
+        "description": "Error envelope returned by daemon handlers on failure.\n\nMirrors the dominant shape produced by `error_status_and_body`\n(`{\"error\": {\"code\", \"message\", \"details\"}}`). A few endpoints emit\nalternate ad-hoc error shapes for specific conditions; those are noted in\nthe relevant operation descriptions.",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/DaemonErrorDetail"
+          }
+        }
+      },
+      "DaemonErrorDetail": {
+        "type": "object",
+        "description": "Structured error detail carried by [`DaemonErrorBody`].",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Stable machine-readable error code (for example `SESSION_SCOPE_DENIED`)."
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional additional context lines."
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable error message."
+          }
+        }
+      },
+      "DaemonTelemetryKind": {
+        "type": "string",
+        "enum": [
+          "decode_failure"
+        ]
+      },
+      "DaemonTelemetryRequest": {
+        "type": "object",
+        "required": [
+          "kind",
+          "source",
+          "message"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/DaemonTelemetryKind"
+          },
+          "message": {
+            "type": "string"
+          },
+          "sample": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "type": "string"
+          }
+        }
+      },
+      "DaemonTelemetryResponse": {
+        "type": "object",
+        "required": [
+          "recorded_at"
+        ],
+        "properties": {
+          "recorded_at": {
+            "type": "string"
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "required": [
+          "status",
+          "version",
+          "pid",
+          "endpoint",
+          "started_at",
+          "log_level",
+          "project_count",
+          "worktree_count",
+          "session_count"
+        ],
+        "properties": {
+          "endpoint": {
+            "type": "string"
+          },
+          "log_level": {
+            "type": "string"
+          },
+          "pid": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "project_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "session_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "started_at": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "wire_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "worktree_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "LogLevelResponse": {
+        "type": "object",
+        "required": [
+          "level",
+          "filter"
+        ],
+        "properties": {
+          "filter": {
+            "type": "string"
+          },
+          "level": {
+            "type": "string"
+          }
+        }
+      },
+      "ProjectSummary": {
+        "type": "object",
+        "required": [
+          "project_id",
+          "name",
+          "context_root",
+          "active_session_count",
+          "total_session_count",
+          "worktrees"
+        ],
+        "properties": {
+          "active_session_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "context_root": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "project_dir": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "total_session_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "worktrees": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorktreeSummary"
+            }
+          }
+        }
+      },
+      "ReadinessResponse": {
+        "type": "object",
+        "description": "Lightweight readiness probe response.\n\nReturned by `GET /v1/ready`. Confirms the daemon is serving HTTP, the\ncaller is authenticated, and the backing storage slot is wired up - but\nintentionally avoids any database query so short-lived CLI invocations can\nverify readiness cheaply.",
+        "required": [
+          "ready",
+          "daemon_epoch"
+        ],
+        "properties": {
+          "daemon_epoch": {
+            "type": "string"
+          },
+          "ready": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ResolvedRuntimeSessionAgent": {
+        "type": "object",
+        "required": [
+          "orchestration_session_id",
+          "session_agent_id"
+        ],
+        "properties": {
+          "orchestration_session_id": {
+            "type": "string"
+          },
+          "session_agent_id": {
+            "type": "string"
+          }
+        }
+      },
+      "RuntimeSessionResolutionResponse": {
+        "type": "object",
+        "description": "Wire-level outcome of a runtime-session lookup.\n\nReturned by `GET /v1/runtime-sessions/resolve`. `resolved` is `None` when\nno live agent matches; `Some` carries the single unambiguous match. The\ndaemon surfaces ambiguity as a `session_ambiguous` error instead of\npopulating this response with multiple entries.",
+        "properties": {
+          "resolved": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ResolvedRuntimeSessionAgent"
+              }
+            ]
+          }
+        }
+      },
+      "SetLogLevelRequest": {
+        "type": "object",
+        "required": [
+          "level"
+        ],
+        "properties": {
+          "level": {
+            "type": "string"
+          }
+        }
+      },
+      "WorktreeSummary": {
+        "type": "object",
+        "required": [
+          "checkout_id",
+          "name",
+          "checkout_root",
+          "context_root",
+          "active_session_count",
+          "total_session_count"
+        ],
+        "properties": {
+          "active_session_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "checkout_id": {
+            "type": "string"
+          },
+          "checkout_root": {
+            "type": "string"
+          },
+          "context_root": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "total_session_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  },
+  "x-generated-by": {
+    "tool": "tools/openapi-codegen",
+    "command": "mise run openapi:generate",
+    "note": "Generated file. Do not edit by hand - rerun: mise run openapi:generate"
+  }
+}

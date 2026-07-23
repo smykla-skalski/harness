@@ -86,6 +86,15 @@ Validation should match risk:
 - Shared CLI, hook, runtime, or storage behavior: run the focused test and the owning package gate before `mise run check`.
 - `aff` code or aff-owned runtime hooks: include `mise run aff:check`.
 
+## OpenAPI schema
+
+The daemon HTTP API is described by an OpenAPI 3.1 document at
+`docs/api/openapi.json`, generated from `#[utoipa::path]` annotations on the
+handlers plus `#[derive(utoipa::ToSchema)]` on their wire types (behind the
+`openapi` feature). Regenerate it with `mise run openapi:generate` after
+changing an annotated handler or wire type; `mise run openapi:check` fails on
+drift and runs inside `mise run test`. Never edit the generated file by hand.
+
 ## Runtime bootstrap
 
 `mise run setup:bootstrap` installs the repo-aware wrapper and refreshes the project-local runtime configs that Harness owns. When a task changes hook registration or runtime config shape, rerun bootstrap in a temp project or focused test instead of looking for generated skill/plugin outputs.
