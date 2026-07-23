@@ -11,8 +11,6 @@ use serde::de::DeserializeOwned;
 use crate::daemon::remote_auth::REMOTE_CLIENT_ID_HEADER;
 
 use super::credentials::{RemoteExecutionCredentialError, RemoteExecutionCredentialResolver};
-#[cfg(test)]
-use super::routes::HEARTBEAT_PATH;
 use super::routes::{
     ADVERTISE_PATH, ARTIFACT_PATH, CANCEL_PATH, CLAIM_PATH, LEASE_RENEW_PATH,
     OFFER_HTTP_BODY_LIMIT_BYTES, OFFER_PATH, SETTLED_PATH, SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES,
@@ -28,8 +26,6 @@ use super::wire::{
     RemoteSettledRequest, RemoteSettledResponse, RemoteSourceBundleUploadRequest,
     RemoteSourceBundleUploadResponse, RemoteStatusRequest, RemoteStatusResponse, RemoteWireError,
 };
-#[cfg(test)]
-use super::wire::{RemoteHeartbeatRequest, RemoteHeartbeatResponse};
 use super::wire_limits::MAX_REMOTE_LIFECYCLE_JSON_BYTES;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -213,18 +209,6 @@ impl RemoteExecutionHttpClient {
             )
             .await?;
         response.validate()?;
-        Ok(response)
-    }
-
-    #[cfg(test)]
-    pub(crate) async fn heartbeat(
-        &self,
-        request: &RemoteHeartbeatRequest,
-    ) -> Result<RemoteHeartbeatResponse, RemoteExecutionHttpError> {
-        request.validate()?;
-        let response: RemoteHeartbeatResponse =
-            self.post(route_segment(HEARTBEAT_PATH), request).await?;
-        response.validate(request)?;
         Ok(response)
     }
 

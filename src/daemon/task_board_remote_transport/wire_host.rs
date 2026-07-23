@@ -55,39 +55,3 @@ impl RemoteHostAdvertisement {
         Ok(())
     }
 }
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct RemoteHeartbeatRequest {
-    pub(crate) schema_version: u32,
-    pub(crate) host_id: String,
-    pub(crate) host_instance_id: String,
-    pub(crate) active_assignments: u32,
-    pub(crate) sent_at: String,
-    pub(crate) request_sha256: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct RemoteHeartbeatResponse {
-    pub(crate) schema_version: u32,
-    pub(crate) host_id: String,
-    pub(crate) host_instance_id: String,
-    pub(crate) accepted_at: String,
-    pub(crate) next_heartbeat_deadline: String,
-}
-
-impl RemoteHeartbeatResponse {
-    #[cfg(test)]
-    pub(crate) fn validate(
-        &self,
-        expected: &RemoteHeartbeatRequest,
-    ) -> Result<(), RemoteWireError> {
-        require_version(self.schema_version)?;
-        if self.host_id != expected.host_id || self.host_instance_id != expected.host_instance_id {
-            return Err(RemoteWireError::ResultBindingMismatch);
-        }
-        require_canonical_time("accepted_at", &self.accepted_at)?;
-        require_canonical_time("next_heartbeat_deadline", &self.next_heartbeat_deadline)
-    }
-}

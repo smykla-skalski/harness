@@ -36,7 +36,6 @@ pub(super) const TOKEN_ENV: &str = "HARNESS_REMOTE_CONTROLLER_TEST_TOKEN";
 fn controller_transport_api_has_production_entrypoints() {
     let _ = RemoteExecutionControllerClient::connect;
     let _ = RemoteExecutionControllerClient::refresh_observation;
-    let _ = RemoteExecutionControllerClient::heartbeat;
     let _ = RemoteExecutionControllerClient::offer;
     let _ = RemoteExecutionControllerClient::claim;
     let _ = RemoteExecutionControllerClient::renew_lease;

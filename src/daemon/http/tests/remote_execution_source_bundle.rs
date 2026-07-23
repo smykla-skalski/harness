@@ -5,7 +5,7 @@ use super::*;
 use crate::daemon::http::RemoteRequestLimits;
 use crate::daemon::remote_auth::REMOTE_CLIENT_ID_HEADER;
 use crate::daemon::task_board_remote_transport::routes::{
-    DEFAULT_EXECUTION_HTTP_BODY_LIMIT_BYTES, HEARTBEAT_PATH, SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES,
+    CLAIM_PATH, DEFAULT_EXECUTION_HTTP_BODY_LIMIT_BYTES, SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES,
     SOURCE_BUNDLE_RECEIPT_PATH,
 };
 use crate::daemon::task_board_remote_transport::wire::{
@@ -112,15 +112,18 @@ async fn remote_source_bundle_limits_reach_source_routes_without_widening_other_
     .await;
     assert_eq!(oversized_source.status(), StatusCode::PAYLOAD_TOO_LARGE);
 
-    let oversized_heartbeat = authenticated_json_bytes(
+    let oversized_lifecycle_request = authenticated_json_bytes(
         &client,
         &base_url,
-        HEARTBEAT_PATH,
+        CLAIM_PATH,
         HOST_ID,
         vec![b'x'; DEFAULT_EXECUTION_HTTP_BODY_LIMIT_BYTES + 1],
     )
     .await;
-    assert_eq!(oversized_heartbeat.status(), StatusCode::PAYLOAD_TOO_LARGE);
+    assert_eq!(
+        oversized_lifecycle_request.status(),
+        StatusCode::PAYLOAD_TOO_LARGE
+    );
 
     server.abort();
     let _ = server.await;

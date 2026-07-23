@@ -2,9 +2,9 @@ use sha2::{Digest, Sha256};
 
 use super::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteAttemptBinding, RemoteCancelRequest,
-    RemoteClaimRequest, RemoteHeartbeatRequest, RemoteLeaseRenewRequest, RemoteOfferDisposition,
-    RemoteOfferRequest, RemoteOfferResponse, RemoteSettledRequest, RemoteSourceMaterial,
-    RemoteTypedResult, RemoteWireError, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION, test_codex_launch,
+    RemoteClaimRequest, RemoteLeaseRenewRequest, RemoteOfferDisposition, RemoteOfferRequest,
+    RemoteOfferResponse, RemoteSettledRequest, RemoteSourceMaterial, RemoteTypedResult,
+    RemoteWireError, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION, test_codex_launch,
 };
 use crate::task_board::{
     TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardAttemptResultArtifact,
@@ -135,7 +135,6 @@ fn rejected_offer_requires_a_bounded_canonical_reason_token() {
 
 #[test]
 fn every_mutating_request_has_a_sealing_contract() {
-    let _ = RemoteHeartbeatRequest::seal;
     let _ = RemoteClaimRequest::seal;
     let _ = RemoteLeaseRenewRequest::seal;
     let _ = RemoteCancelRequest::seal;

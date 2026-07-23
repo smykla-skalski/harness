@@ -3,18 +3,15 @@ use axum::http::{HeaderMap, Method, StatusCode};
 use axum::response::Response;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use chrono::{Duration, Utc};
 
 use super::routes_status::{mutation_record, status_response, verify_operation_record};
 use super::routes_support::{
-    active_assignments, assignment_route, canonical_time, concurrent, load_assignment, local_host,
-    map_route_error, map_route_result, offer_response, record_lease, route_error,
-    verify_heartbeat_time, verify_route_identity, wire_error,
+    active_assignments, assignment_route, concurrent, load_assignment, local_host, map_route_error,
+    map_route_result, offer_response, record_lease, route_error, verify_route_identity, wire_error,
 };
 use super::wire::{
     RemoteArtifactFetchRequest, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
-    RemoteHeartbeatRequest, RemoteHeartbeatResponse, RemoteLeaseRenewRequest,
-    RemoteLeaseRenewResponse, RemoteOfferRequest, RemoteSettledRequest,
+    RemoteLeaseRenewRequest, RemoteLeaseRenewResponse, RemoteOfferRequest, RemoteSettledRequest,
     RemoteSourceBundleUploadRequest, RemoteStatusRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use super::wire_conversion::host_wire_advertisement;
@@ -24,10 +21,8 @@ use super::wire_limits::{
 };
 use crate::daemon::db::utc_now;
 use crate::daemon::http::{DaemonHttpState, require_async_db, require_execution_remote_client};
-use crate::task_board::TASK_BOARD_REMOTE_HEARTBEAT_TTL_SECONDS;
 
 pub(crate) const ADVERTISE_PATH: &str = "/v1/task-board-execution/advertise";
-pub(crate) const HEARTBEAT_PATH: &str = "/v1/task-board-execution/heartbeat";
 pub(crate) const OFFER_PATH: &str = "/v1/task-board-execution/offers";
 pub(crate) const CLAIM_PATH: &str = "/v1/task-board-execution/claims";
 pub(crate) const LEASE_RENEW_PATH: &str = "/v1/task-board-execution/leases/renew";
@@ -63,10 +58,6 @@ const fn max_body_limit(left: usize, right: usize) -> usize {
 pub(crate) fn execution_routes() -> Router<DaemonHttpState> {
     Router::new()
         .route(ADVERTISE_PATH, get(advertise))
-        .route(
-            HEARTBEAT_PATH,
-            post(heartbeat).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)),
-        )
         .route(
             OFFER_PATH,
             post(offer).layer(DefaultBodyLimit::max(OFFER_HTTP_BODY_LIMIT_BYTES)),
@@ -129,8 +120,7 @@ pub(crate) fn execution_http_body_limit(method: &Method, path: &str) -> Option<u
         (&Method::POST, OFFER_PATH) => Some(OFFER_HTTP_BODY_LIMIT_BYTES),
         (
             &Method::POST,
-            HEARTBEAT_PATH
-            | CLAIM_PATH
+            CLAIM_PATH
             | LEASE_RENEW_PATH
             | STATUS_PATH
             | CANCEL_PATH
@@ -145,7 +135,6 @@ pub(crate) fn execution_http_body_limit(method: &Method, path: &str) -> Option<u
 pub(crate) fn execution_operation(method: &Method, path: &str) -> Option<&'static str> {
     match (method, path) {
         (&Method::GET, ADVERTISE_PATH) => Some("advertise"),
-        (&Method::POST, HEARTBEAT_PATH) => Some("heartbeat"),
         (&Method::POST, OFFER_PATH) => Some("offer"),
         (&Method::POST, SOURCE_BUNDLE_PATH) => Some("upload_source_bundle"),
         (&Method::POST, SOURCE_BUNDLE_RECEIPT_PATH) => Some("verify_source_bundle_receipt"),
@@ -205,47 +194,6 @@ async fn advertise(headers: HeaderMap, State(state): State<DaemonHttpState>) -> 
             let active = active_assignments(db, &host).await?;
             host_wire_advertisement(&host, &state.daemon_epoch, active, utc_now())
                 .map_err(|error| wire_error(&error))
-        }
-        .await,
-    )
-}
-
-async fn heartbeat(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<RemoteHeartbeatRequest>,
-) -> Response {
-    map_route_result(
-        async {
-            request.validate().map_err(|error| wire_error(&error))?;
-            let db = require_async_db(&state, "heartbeat remote execution host")?;
-            let host = local_host(db).await?;
-            let client =
-                require_execution_remote_client(&headers, &state, "heartbeat").map_err(|_| {
-                    crate::errors::CliErrorKind::session_permission_denied(
-                        "remote executor authorization denied",
-                    )
-                })?;
-            verify_route_identity(
-                &host,
-                &state.daemon_epoch,
-                &client.client_id,
-                Some((&request.host_id, &request.host_instance_id)),
-            )?;
-            let now = Utc::now();
-            verify_heartbeat_time(&request.sent_at, now)?;
-            if request.active_assignments != active_assignments(db, &host).await? {
-                return Err(concurrent("remote heartbeat capacity evidence is stale"));
-            }
-            Ok(RemoteHeartbeatResponse {
-                schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
-                host_id: host.host_id,
-                host_instance_id: state.daemon_epoch,
-                accepted_at: canonical_time(now),
-                next_heartbeat_deadline: canonical_time(
-                    now + Duration::seconds(TASK_BOARD_REMOTE_HEARTBEAT_TTL_SECONDS),
-                ),
-            })
         }
         .await,
     )

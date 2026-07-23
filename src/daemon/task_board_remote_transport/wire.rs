@@ -15,9 +15,7 @@ pub(crate) use super::wire_artifacts::MAX_REMOTE_ARTIFACT_BYTES;
 pub(super) use super::wire_artifacts::valid_artifact_path;
 pub(crate) use super::wire_artifacts::{RemoteArtifactEntry, RemoteArtifactManifest};
 
-pub(crate) use super::wire_host::{
-    RemoteHeartbeatRequest, RemoteHeartbeatResponse, RemoteHostAdvertisement,
-};
+pub(crate) use super::wire_host::RemoteHostAdvertisement;
 pub(crate) use super::wire_launch::RemoteCodexLaunchEnvelope;
 #[cfg(test)]
 pub(crate) use super::wire_launch::test_codex_launch;
