@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use crate::daemon::db::{CliError, db_error};
 use crate::task_board::{
-    TaskBoardTriageDecision, TriageCause, TriageReasonCode, TriageVerdict,
+    TaskBoardTriageDecision, TriageCause, TriageReasonCode, TriageVerdict, is_canonical_decided_at,
     is_canonical_evaluator_identity, is_canonical_evidence_fingerprint, is_canonical_reason_detail,
 };
 
@@ -68,6 +68,9 @@ pub(super) async fn record_triage_decision_in_tx(
     if reason_detail.is_some_and(|detail| !is_canonical_reason_detail(detail)) {
         return Err(db_error("triage reason detail is not canonical"));
     }
+    if !is_canonical_decided_at(decided_at) {
+        return Err(db_error("triage decided_at is not canonical"));
+    }
     let generation: i64 = query_scalar(
         "SELECT COALESCE(MAX(generation), 0) + 1 FROM task_board_triage_decisions
          WHERE item_id = ?1",
@@ -127,7 +130,31 @@ pub(super) async fn record_triage_decision_in_tx(
     })
 }
 
+/// Re-validates every canonical-shape field on read, not just the wire enums
+/// `parse_*` already reject: a `sha256:` prefix and correct length alone (the
+/// SQL `CHECK`) do not rule out non-hex characters in the digest, and a row
+/// written by anything other than [`record_triage_decision_in_tx`] could
+/// otherwise carry a fingerprint, identity, or timestamp the rest of this
+/// module never actually produces.
 fn decision_from_row(row: TriageDecisionRow) -> Result<TaskBoardTriageDecision, CliError> {
+    if !is_canonical_evaluator_identity(&row.evaluator_identity) {
+        return Err(db_error("stored triage evaluator identity is not canonical"));
+    }
+    if !is_canonical_evidence_fingerprint(&row.evidence_fingerprint) {
+        return Err(db_error(
+            "stored triage evidence fingerprint is not canonical",
+        ));
+    }
+    if row
+        .reason_detail
+        .as_deref()
+        .is_some_and(|detail| !is_canonical_reason_detail(detail))
+    {
+        return Err(db_error("stored triage reason detail is not canonical"));
+    }
+    if !is_canonical_decided_at(&row.decided_at) {
+        return Err(db_error("stored triage decided_at is not canonical"));
+    }
     Ok(TaskBoardTriageDecision {
         verdict: parse_verdict(&row.verdict)?,
         reason_code: parse_reason_code(&row.reason_code)?,

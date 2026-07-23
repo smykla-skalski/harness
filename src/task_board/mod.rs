@@ -145,8 +145,8 @@ pub use triage::{
     BUILTIN_V1_EVALUATOR_IDENTITY, BUILTIN_V1_EVALUATOR_VERSION, TaskBoardTriageDecision,
     TriageCause, TriageOutcome, TriageReasonCode, TriageVerdict, canonicalize_labels,
     evaluate_builtin_v1, evidence_fingerprint, is_canonical_bounded_text,
-    is_canonical_evaluator_identity, is_canonical_evidence_fingerprint, is_canonical_reason_detail,
-    matched_exclusion_label,
+    is_canonical_decided_at, is_canonical_evaluator_identity, is_canonical_evidence_fingerprint,
+    is_canonical_reason_detail, matched_exclusion_label,
 };
 pub use types::{
     AgentMode, ExternalRef, ExternalRefProvider, ExternalRefSyncState, PlanningState,

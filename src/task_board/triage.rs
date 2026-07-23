@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -204,6 +205,23 @@ pub fn is_canonical_evaluator_identity(value: &str) -> bool {
 #[must_use]
 pub fn is_canonical_reason_detail(value: &str) -> bool {
     is_canonical_bounded_text(value, MAX_REASON_DETAIL_BYTES)
+}
+
+/// Whether `value` has the exact `utc_now()` shape (`YYYY-MM-DDTHH:MM:SSZ`,
+/// no fractional seconds, no non-Z offset) this module's callers always
+/// stamp. Parses via RFC 3339 (rejecting impossible calendar dates and
+/// out-of-range times) then requires the canonical UTC-seconds re-render to
+/// match the input byte-for-byte, so an otherwise-valid but non-canonical
+/// timestamp -- a `+00:00` offset, fractional seconds, a non-UTC offset --
+/// is rejected without weakening the fixed wire format. Used at persistence
+/// trust boundaries so a malformed stored timestamp is rejected before it is
+/// trusted as a decision or supersession instant.
+#[must_use]
+pub fn is_canonical_decided_at(value: &str) -> bool {
+    let Ok(parsed) = DateTime::parse_from_rfc3339(value) else {
+        return false;
+    };
+    parsed.with_timezone(&Utc).format("%Y-%m-%dT%H:%M:%SZ").to_string() == value
 }
 
 const fn priority_tag(priority: TaskBoardPriority) -> &'static [u8] {

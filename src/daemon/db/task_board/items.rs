@@ -2,12 +2,19 @@ use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 use super::ITEMS_CHANGE_SCOPE;
 use super::lane_order::{
-    LaneTransitionKind, LaneTransitionWrite, insert_with_lane_transition_in_tx,
-    record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
+    LaneTransitionKind, LaneTransitionWrite, record_lane_transition_audit_in_tx,
+    replace_with_lane_transition_in_tx,
 };
 use super::mapper::item_from_rows;
 use super::rows::{ExternalRefRow, ItemRow};
-use super::triage_apply::apply_builtin_v1_triage_in_tx;
+use super::triage_apply::{
+    TriageOutcome, apply_builtin_v1_triage_in_tx,
+    clear_stale_automatic_placement_on_human_status_move,
+};
+use super::triage_audit::{
+    record_item_created_audit_in_tx, record_item_updated_audit_in_tx,
+    record_triage_decided_audit_in_tx, record_triage_effect_reapplied_audit_in_tx,
+};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::errors::CliErrorKind;
 use crate::infra::io;
@@ -23,13 +30,15 @@ pub(super) use lifecycle::{
 
 #[path = "items_parent.rs"]
 mod parent;
-use parent::{
-    clear_children_parent_in_tx, ensure_parent_assignment_is_valid_in_tx, next_child_order_in_tx,
-};
+use parent::{ensure_parent_assignment_is_valid_in_tx, next_child_order_in_tx};
+pub(super) use parent::clear_children_parent_in_tx;
 
 #[path = "items_write.rs"]
 mod write;
 pub(super) use write::{insert_item_in_tx, replace_item_in_tx};
+
+#[path = "items_create.rs"]
+mod create;
 
 const SELECT_ITEM: &str = "SELECT * FROM task_board_items WHERE item_id = ?1";
 const SELECT_REFS: &str = "SELECT item_id, position, provider, external_id, url, sync_state_json
@@ -48,38 +57,26 @@ pub(crate) struct TaskBoardItemSnapshot {
     pub(crate) item_revision: i64,
 }
 
-impl AsyncDaemonDb {
-    /// Insert one new Task Board item.
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "sequential create/insert/triage/audit/commit steps, each already its own helper"
-    )]
-    pub(crate) async fn create_task_board_item(
-        &self,
-        mut item: TaskBoardItem,
-    ) -> Result<TaskBoardMutation, CliError> {
-        validate_item(&item)?;
-        item.status = item.status.canonical_persisted_status();
-        validate_item(&item)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board item create")
-            .await?;
-        reject_if_item_exists_in_tx(&mut transaction, &item.id).await?;
-        let inserted = insert_with_lane_transition_in_tx(&mut transaction, item).await?;
-        let write = apply_triage_after_insert_in_tx(&mut transaction, inserted).await?;
-        let change_revision = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
-        record_lane_transition_audit_in_tx(&mut transaction, &write, change_revision).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board item create: {error}")))?;
-        Ok(TaskBoardMutation {
-            item: write.item,
-            item_revision: write.item_revision,
-            change_revision,
-        })
-    }
+/// Which ingress point is driving a triage-evaluating update, so the same
+/// same-call status/placement diff can mean different things: a direct
+/// human override (suppresses placement) versus provider evidence arriving
+/// through create/reconcile/restore (never suppresses on its own).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TaskBoardTriageIngress {
+    None,
+    HumanUpdate,
+    ProviderReconcile,
+}
 
+/// Distinguishes a create from an update for the "ordinary mutation, no
+/// triage outcome either way" audit case, so a create is never reported as
+/// `task_board.item.updated`.
+pub(super) enum TaskBoardMutationKind {
+    Create,
+    Update,
+}
+
+impl AsyncDaemonDb {
     /// Load one Task Board item, including tombstones.
     pub(crate) async fn task_board_item(&self, item_id: &str) -> Result<TaskBoardItem, CliError> {
         self.task_board_item_snapshot(item_id)
@@ -111,6 +108,30 @@ impl AsyncDaemonDb {
         })
     }
 
+    /// Like [`task_board_item`], but returns `Ok(None)` for a genuinely
+    /// missing item instead of an error, so a caller that needs to
+    /// distinguish "not found" from a real database failure -- a
+    /// provider-exclusion restore deciding whether there is anything to
+    /// restore, for example -- does not have to fail closed on every error
+    /// alike.
+    pub(crate) async fn find_task_board_item(
+        &self,
+        item_id: &str,
+    ) -> Result<Option<TaskBoardItem>, CliError> {
+        io::validate_safe_segment(item_id)?;
+        let mut transaction = self
+            .pool()
+            .begin()
+            .await
+            .map_err(|error| db_error(format!("begin task board item load: {error}")))?;
+        let found = load_item_in_tx(&mut transaction, item_id).await?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit task board item load: {error}")))?;
+        Ok(found.map(|(item, _revision)| item))
+    }
+
     /// List active Task Board items in the legacy stable ordering.
     pub(crate) async fn list_task_board_items(
         &self,
@@ -124,15 +145,67 @@ impl AsyncDaemonDb {
         Ok(items)
     }
 
-    /// Atomically load and conditionally mutate one Task Board item.
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "pre-existing sequential mutation/guard chain; triage is one more straight-line step"
-    )]
+    /// Atomically load and conditionally mutate one Task Board item. Never
+    /// evaluates `BuiltInV1`: every internal workflow/lifecycle mutation
+    /// (dispatch, planning, estimates, reviews, GitHub projection, ...) must
+    /// keep using this method so unrelated writes can never become
+    /// accidental triage ingress. The public update API and provider
+    /// create/reconcile/restore use the `_with_triage` methods below
+    /// instead.
     pub(crate) async fn update_task_board_item<F>(
         &self,
         item_id: &str,
         mutate: F,
+    ) -> Result<Option<TaskBoardMutation>, CliError>
+    where
+        F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
+    {
+        self.update_task_board_item_impl(item_id, mutate, TaskBoardTriageIngress::None)
+            .await
+    }
+
+    /// Like [`update_task_board_item`], but also evaluates `BuiltInV1` in the
+    /// same transaction, for the public update API: a same-call status or
+    /// placement change is a direct human effect and suppresses `BuiltInV1`
+    /// placement (decision history still refreshes).
+    pub(crate) async fn update_task_board_item_with_triage<F>(
+        &self,
+        item_id: &str,
+        mutate: F,
+    ) -> Result<Option<TaskBoardMutation>, CliError>
+    where
+        F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
+    {
+        self.update_task_board_item_impl(item_id, mutate, TaskBoardTriageIngress::HumanUpdate)
+            .await
+    }
+
+    /// Like [`update_task_board_item_with_triage`], but for provider
+    /// create/reconcile/restore: a same-call status or placement change
+    /// reflects provider evidence, not a human override, so it never
+    /// suppresses `BuiltInV1` placement on its own. Only a pre-existing
+    /// manual lane anchor still suppresses.
+    pub(crate) async fn update_task_board_item_with_provider_triage<F>(
+        &self,
+        item_id: &str,
+        mutate: F,
+    ) -> Result<Option<TaskBoardMutation>, CliError>
+    where
+        F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
+    {
+        self.update_task_board_item_impl(item_id, mutate, TaskBoardTriageIngress::ProviderReconcile)
+            .await
+    }
+
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "pre-existing sequential mutation/guard chain; triage is one more straight-line step"
+    )]
+    async fn update_task_board_item_impl<F>(
+        &self,
+        item_id: &str,
+        mutate: F,
+        ingress: TaskBoardTriageIngress,
     ) -> Result<Option<TaskBoardMutation>, CliError>
     where
         F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
@@ -180,18 +253,56 @@ impl AsyncDaemonDb {
         if item.deleted_at.is_some() {
             clear_children_parent_in_tx(&mut transaction, item_id).await?;
         }
-        let decided_at = item.updated_at.clone();
-        apply_builtin_v1_triage_in_tx(&mut transaction, &mut item, &decided_at).await?;
-        let write = replace_with_lane_transition_in_tx(
+        if ingress == TaskBoardTriageIngress::HumanUpdate {
+            clear_stale_automatic_placement_on_human_status_move(
+                before.status.canonical_persisted_status(),
+                &mut item,
+            );
+        }
+        let pre_triage_item = item.clone();
+        let outcome = match ingress {
+            TaskBoardTriageIngress::None => None,
+            TaskBoardTriageIngress::HumanUpdate | TaskBoardTriageIngress::ProviderReconcile => {
+                let decided_at = item.updated_at.clone();
+                let direct_effect_this_call = before.status != item.status
+                    || before.lane_position != item.lane_position
+                    || before.lane_origin != item.lane_origin;
+                let suppress_placement = ingress == TaskBoardTriageIngress::HumanUpdate
+                    && direct_effect_this_call;
+                apply_builtin_v1_triage_in_tx(
+                    &mut transaction,
+                    &mut item,
+                    &decided_at,
+                    suppress_placement,
+                )
+                .await?
+            }
+        };
+        let triage_changed_placement = item.status != pre_triage_item.status
+            || item.lane_position != pre_triage_item.lane_position
+            || item.lane_origin != pre_triage_item.lane_origin
+            || item.lane_set_at != pre_triage_item.lane_set_at;
+        let transition_kind = if triage_changed_placement {
+            LaneTransitionKind::Automatic
+        } else {
+            LaneTransitionKind::Generic
+        };
+        let before_triage = before.clone();
+        let write =
+            replace_with_lane_transition_in_tx(&mut transaction, before, revision, item, transition_kind)
+                .await?;
+        let change_revision = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
+        let mutation_kind =
+            (ingress != TaskBoardTriageIngress::None).then_some(TaskBoardMutationKind::Update);
+        record_triage_or_lane_audit_in_tx(
             &mut transaction,
-            before,
-            revision,
-            item,
-            LaneTransitionKind::Generic,
+            &before_triage,
+            outcome.as_ref(),
+            mutation_kind,
+            &write,
+            change_revision,
         )
         .await?;
-        let change_revision = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
-        record_lane_transition_audit_in_tx(&mut transaction, &write, change_revision).await?;
         transaction
             .commit()
             .await
@@ -210,6 +321,7 @@ impl AsyncDaemonDb {
     ) -> Result<TaskBoardMutation, CliError> {
         self.update_task_board_item(item_id, |item| {
             item.deleted_at = Some(utc_now());
+            item.tombstone_cause = Some(crate::task_board::TaskBoardTombstoneCause::Manual);
             Ok(true)
         })
         .await?
@@ -217,41 +329,47 @@ impl AsyncDaemonDb {
     }
 }
 
-async fn reject_if_item_exists_in_tx(
+/// Records exactly one audit event for a write, distinguishing: a fresh
+/// `BuiltInV1` decision; an existing decision whose placement effect was
+/// merely reapplied (never reported as a fresh decision); an ordinary public
+/// mutation through the human or provider ingress paths that produced
+/// neither (always audited, even when the lane tuple did not change, so a
+/// public no-op is never silently unaudited); and a plain internal
+/// lane-only mutation, which keeps the old no-audit-when-unchanged behavior
+/// since internal call sites own their own audits elsewhere.
+async fn record_triage_or_lane_audit_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
-    item_id: &str,
+    before: &TaskBoardItem,
+    outcome: Option<&TriageOutcome>,
+    mutation_kind: Option<TaskBoardMutationKind>,
+    write: &LaneTransitionWrite,
+    items_change_seq: i64,
 ) -> Result<(), CliError> {
-    if load_item_in_tx(transaction, item_id).await?.is_some() {
-        return Err(db_error(format!(
-            "task-board item '{item_id}' already exists"
-        )));
+    match outcome {
+        Some(TriageOutcome::Decided(decision)) => {
+            record_triage_decided_audit_in_tx(transaction, before, decision, write, items_change_seq)
+                .await
+        }
+        Some(TriageOutcome::RetainedEffect(decision)) => {
+            record_triage_effect_reapplied_audit_in_tx(
+                transaction,
+                before,
+                decision,
+                write,
+                items_change_seq,
+            )
+            .await
+        }
+        None => match mutation_kind {
+            Some(TaskBoardMutationKind::Create) => {
+                record_item_created_audit_in_tx(transaction, write, items_change_seq).await
+            }
+            Some(TaskBoardMutationKind::Update) => {
+                record_item_updated_audit_in_tx(transaction, write, items_change_seq).await
+            }
+            None => record_lane_transition_audit_in_tx(transaction, write, items_change_seq).await,
+        },
     }
-    Ok(())
-}
-
-/// Evaluate `BuiltInV1` against a just-inserted item and, only if it changed
-/// status or placement, persist that through a follow-up automatic lane
-/// transition. Returns the original insert write unchanged otherwise, so a
-/// non-promoting create costs no extra revision bump.
-async fn apply_triage_after_insert_in_tx(
-    transaction: &mut Transaction<'_, Sqlite>,
-    inserted: LaneTransitionWrite,
-) -> Result<LaneTransitionWrite, CliError> {
-    let before_triage = inserted.item.clone();
-    let mut item = inserted.item.clone();
-    let decided_at = utc_now();
-    apply_builtin_v1_triage_in_tx(transaction, &mut item, &decided_at).await?;
-    if item == before_triage {
-        return Ok(inserted);
-    }
-    replace_with_lane_transition_in_tx(
-        transaction,
-        before_triage,
-        inserted.item_revision,
-        item,
-        LaneTransitionKind::Automatic,
-    )
-    .await
 }
 
 pub(super) async fn load_item_in_tx(

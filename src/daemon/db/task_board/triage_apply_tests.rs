@@ -1,14 +1,14 @@
 use tempfile::tempdir;
 
-use super::super::items::load_item_in_tx;
-use super::apply_builtin_v1_triage_in_tx;
+use super::super::items::{load_item_in_tx, replace_item_in_tx};
+use super::{apply_builtin_v1_triage_in_tx, triage_cause};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
     BUILTIN_V1_EVALUATOR_IDENTITY, TaskBoardItem, TaskBoardLaneOrigin, TaskBoardPriority,
-    TaskBoardStatus, TriageCause, TriageReasonCode, TriageVerdict,
+    TaskBoardStatus, TaskBoardTriageDecision, TriageCause, TriageReasonCode, TriageVerdict,
 };
 
-async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {
+pub(super) async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {
     let directory = tempdir().expect("tempdir");
     let path = directory.path().join("harness.db");
     let db = AsyncDaemonDb::connect(&path).await.expect("connect db");
@@ -16,10 +16,10 @@ async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {
 }
 
 /// A `work_item_id` placeholder keeps the item ineligible for BuiltInV1 at
-/// seed time, so `db.create_task_board_item` (which itself now runs
-/// BuiltInV1) does not pre-empt the explicit `apply_builtin_v1_triage_in_tx`
-/// call each test exercises. Tests clear it after loading, before applying.
-fn backlog_item(id: &str, tags: Vec<String>) -> TaskBoardItem {
+/// seed time, so the generic, non-triaging `db.create_task_board_item` seed
+/// does not pre-empt the explicit `apply_builtin_v1_triage_in_tx` call each
+/// test exercises. Tests clear it after loading, before applying.
+pub(super) fn backlog_item(id: &str, tags: Vec<String>) -> TaskBoardItem {
     let mut item = TaskBoardItem::new(
         id.into(),
         "Title".into(),
@@ -30,6 +30,34 @@ fn backlog_item(id: &str, tags: Vec<String>) -> TaskBoardItem {
     item.tags = tags;
     item.work_item_id = Some("seed-placeholder".into());
     item
+}
+
+/// Seeds an item, then genuinely decides and persists a Todo verdict for it
+/// (fresh decision, real placement written back to the row), so a later
+/// reload sees a truly congruent starting point. Returns the item id.
+pub(super) async fn seed_decided_todo_item(db: &AsyncDaemonDb) -> &'static str {
+    db.create_task_board_item(backlog_item("item-1", vec!["kind/bug".into()]))
+        .await
+        .expect("seed item");
+
+    let mut transaction = db
+        .begin_immediate_transaction("seed decided todo")
+        .await
+        .expect("begin transaction");
+    let (mut item, revision) = load_item_in_tx(&mut transaction, "item-1")
+        .await
+        .expect("load item")
+        .expect("item exists");
+    item.work_item_id = None;
+    apply_builtin_v1_triage_in_tx(&mut transaction, &mut item, "2026-07-22T01:00:00Z", false)
+        .await
+        .expect("apply triage")
+        .expect("decision recorded");
+    replace_item_in_tx(&mut transaction, &item, revision + 1)
+        .await
+        .expect("persist triaged placement");
+    transaction.commit().await.expect("commit");
+    "item-1"
 }
 
 #[tokio::test]
@@ -48,13 +76,19 @@ async fn eligible_backlog_item_with_a_label_promotes_to_todo_with_automatic_plac
         .expect("load item")
         .expect("item exists");
     item.work_item_id = None;
-    let decision =
-        apply_builtin_v1_triage_in_tx(&mut transaction, &mut item, "2026-07-22T01:00:00Z")
+    let outcome =
+        apply_builtin_v1_triage_in_tx(
+            &mut transaction,
+            &mut item,
+            "2026-07-22T01:00:00Z",
+            false,
+        )
             .await
             .expect("apply triage")
             .expect("decision recorded");
     transaction.commit().await.expect("commit");
 
+    let decision = outcome.decision();
     assert_eq!(decision.verdict, TriageVerdict::Todo);
     assert_eq!(decision.reason_code, TriageReasonCode::MeaningfulLabel);
     assert_eq!(decision.cause, TriageCause::Initial);
@@ -85,13 +119,19 @@ async fn eligible_backlog_item_with_no_labels_stays_in_backlog_as_undecided() {
         .expect("load item")
         .expect("item exists");
     item.work_item_id = None;
-    let decision =
-        apply_builtin_v1_triage_in_tx(&mut transaction, &mut item, "2026-07-22T01:00:00Z")
+    let outcome =
+        apply_builtin_v1_triage_in_tx(
+            &mut transaction,
+            &mut item,
+            "2026-07-22T01:00:00Z",
+            false,
+        )
             .await
             .expect("apply triage")
             .expect("decision recorded");
     transaction.commit().await.expect("commit");
 
+    let decision = outcome.decision();
     assert_eq!(decision.verdict, TriageVerdict::Undecided);
     assert_eq!(decision.reason_code, TriageReasonCode::NoMeaningfulLabels);
     assert_eq!(item.status, TaskBoardStatus::Backlog);
@@ -117,13 +157,19 @@ async fn needs_info_label_stays_undecided_even_with_other_labels() {
         .expect("load item")
         .expect("item exists");
     item.work_item_id = None;
-    let decision =
-        apply_builtin_v1_triage_in_tx(&mut transaction, &mut item, "2026-07-22T01:00:00Z")
+    let outcome =
+        apply_builtin_v1_triage_in_tx(
+            &mut transaction,
+            &mut item,
+            "2026-07-22T01:00:00Z",
+            false,
+        )
             .await
             .expect("apply triage")
             .expect("decision recorded");
     transaction.commit().await.expect("commit");
 
+    let decision = outcome.decision();
     assert_eq!(decision.verdict, TriageVerdict::Undecided);
     assert_eq!(decision.reason_code, TriageReasonCode::NeedsInfoLabel);
     assert_eq!(item.status, TaskBoardStatus::Backlog);
@@ -132,32 +178,16 @@ async fn needs_info_label_stays_undecided_even_with_other_labels() {
 #[tokio::test]
 async fn unchanged_fingerprint_is_idempotent_and_records_no_new_decision() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("item-1", vec!["kind/bug".into()]))
-        .await
-        .expect("seed item");
-
-    let mut first_transaction = db
-        .begin_immediate_transaction("test first pass")
-        .await
-        .expect("begin transaction");
-    let (mut item, _) = load_item_in_tx(&mut first_transaction, "item-1")
-        .await
-        .expect("load item")
-        .expect("item exists");
-    item.work_item_id = None;
-    apply_builtin_v1_triage_in_tx(&mut first_transaction, &mut item, "2026-07-22T01:00:00Z")
-        .await
-        .expect("apply triage")
-        .expect("decision recorded");
-    first_transaction.commit().await.expect("commit first");
+    let item_id = seed_decided_todo_item(&db).await;
 
     // Re-evaluate the same fields again (as an unrelated field update would);
-    // the fingerprint has not changed, so this must be a no-op.
+    // the fingerprint has not changed and the first pass's placement was
+    // genuinely persisted, so this must be a true no-op, not a desync.
     let mut second_transaction = db
         .begin_immediate_transaction("test second pass")
         .await
         .expect("begin transaction");
-    let (mut reloaded, _) = load_item_in_tx(&mut second_transaction, "item-1")
+    let (mut reloaded, _) = load_item_in_tx(&mut second_transaction, item_id)
         .await
         .expect("load item")
         .expect("item exists");
@@ -165,12 +195,24 @@ async fn unchanged_fingerprint_is_idempotent_and_records_no_new_decision() {
         &mut second_transaction,
         &mut reloaded,
         "2026-07-22T02:00:00Z",
+        false,
     )
     .await
     .expect("apply triage");
     second_transaction.commit().await.expect("commit second");
 
-    assert!(repeat.is_none(), "unchanged fingerprint must not re-decide");
+    assert!(
+        repeat.is_none(),
+        "unchanged fingerprint with congruent persisted placement must not re-decide"
+    );
+    let generations: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM task_board_triage_decisions WHERE item_id = ?1",
+    )
+    .bind(item_id)
+    .fetch_one(db.pool())
+    .await
+    .expect("count decision history");
+    assert_eq!(generations, 1, "idempotent re-evaluation must not append history");
 }
 
 #[tokio::test]
@@ -198,14 +240,19 @@ async fn manual_placement_suppresses_status_and_placement_but_not_decision_histo
     item.work_item_id = None;
     // No labels at all -> BuiltInV1 would normally demote to Backlog/Undecided,
     // but a manual anchor must suppress the status/placement effect.
-    let decision =
-        apply_builtin_v1_triage_in_tx(&mut transaction, &mut item, "2026-07-22T01:00:00Z")
+    let outcome =
+        apply_builtin_v1_triage_in_tx(
+            &mut transaction,
+            &mut item,
+            "2026-07-22T01:00:00Z",
+            false,
+        )
             .await
             .expect("apply triage")
             .expect("decision recorded even though placement is suppressed");
     transaction.commit().await.expect("commit");
 
-    assert_eq!(decision.verdict, TriageVerdict::Undecided);
+    assert_eq!(outcome.decision().verdict, TriageVerdict::Undecided);
     assert_eq!(item.status, TaskBoardStatus::Todo);
     assert_eq!(item.lane_position, Some(0));
     assert_eq!(
@@ -225,7 +272,7 @@ async fn fresh_evidence_demotes_a_prior_automatic_todo_verdict_back_to_backlog()
     let mut item = backlog_item("item-1", vec!["kind/bug".into()]);
     item.work_item_id = None;
     let created = db
-        .create_task_board_item(item)
+        .create_task_board_item_with_triage(item)
         .await
         .expect("seed item")
         .item;
@@ -238,7 +285,7 @@ async fn fresh_evidence_demotes_a_prior_automatic_todo_verdict_back_to_backlog()
     );
 
     let mutation = db
-        .update_task_board_item("item-1", |item| {
+        .update_task_board_item_with_triage("item-1", |item| {
             item.tags = Vec::new();
             Ok(true)
         })
@@ -270,7 +317,12 @@ async fn ineligible_umbrella_item_is_never_evaluated() {
         .expect("item exists");
     item.work_item_id = None;
     let decision =
-        apply_builtin_v1_triage_in_tx(&mut transaction, &mut item, "2026-07-22T01:00:00Z")
+        apply_builtin_v1_triage_in_tx(
+            &mut transaction,
+            &mut item,
+            "2026-07-22T01:00:00Z",
+            false,
+        )
             .await
             .expect("apply triage");
     transaction.commit().await.expect("commit");
@@ -303,3 +355,28 @@ fn ranking_prefers_priority_then_created_at_then_id() {
     crate::task_board::sort_task_board_items(&mut items);
     assert_eq!(items[0].id, "a");
 }
+
+#[test]
+fn active_evaluator_change_wins_over_a_simultaneous_fingerprint_change() {
+    let existing = TaskBoardTriageDecision {
+        verdict: TriageVerdict::Todo,
+        reason_code: TriageReasonCode::MeaningfulLabel,
+        reason_detail: None,
+        evaluator_identity: "some-other-evaluator".into(),
+        evaluator_version: 1,
+        evidence_fingerprint: "sha256:old".into(),
+        cause: TriageCause::Initial,
+        decided_at: "2026-07-22T00:00:00Z".into(),
+    };
+
+    let cause = triage_cause(Some(&existing), "sha256:new");
+
+    assert_eq!(
+        cause,
+        Some(TriageCause::ActiveEvaluatorChanged),
+        "a simultaneous evaluator and fingerprint change must report the evaluator change"
+    );
+}
+
+#[path = "triage_apply_retained_effect_tests.rs"]
+mod retained_effect;
