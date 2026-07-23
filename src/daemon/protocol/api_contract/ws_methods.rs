@@ -72,6 +72,7 @@ pub const TASK_BOARD_ORCHESTRATOR_RUN_ONCE: &str = "task_board.orchestrator_run_
 pub const TASK_BOARD_ORCHESTRATOR_RUNS: &str = "task_board.orchestrator_runs";
 pub const TASK_BOARD_ORCHESTRATOR_RUN_DETAIL: &str = "task_board.orchestrator_run_detail";
 pub const TASK_BOARD_ORCHESTRATOR_METRICS: &str = "task_board.orchestrator_metrics";
+pub const TASK_BOARD_ORCHESTRATOR_FORCE_CANCEL: &str = "task_board.orchestrator_force_cancel";
 pub const TASK_BOARD_ORCHESTRATOR_SETTINGS_GET: &str = "task_board.orchestrator_settings_get";
 pub const TASK_BOARD_ORCHESTRATOR_SETTINGS_UPDATE: &str = "task_board.orchestrator_settings_update";
 pub const TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_GET: &str =
@@ -258,6 +259,7 @@ pub const ALL: &[&str] = &[
     TASK_BOARD_ORCHESTRATOR_RUNS,
     TASK_BOARD_ORCHESTRATOR_RUN_DETAIL,
     TASK_BOARD_ORCHESTRATOR_METRICS,
+    TASK_BOARD_ORCHESTRATOR_FORCE_CANCEL,
     TASK_BOARD_ORCHESTRATOR_SETTINGS_GET,
     TASK_BOARD_ORCHESTRATOR_SETTINGS_UPDATE,
     TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_GET,

@@ -16,4 +16,10 @@ extension HarnessMonitorTaskBoardClientProtocol {
   public func taskBoardAutomationMetrics() async throws -> TaskBoardAutomationMetrics {
     throw HarnessMonitorAPIError.server(code: 501, message: "Task board automation unavailable")
   }
+
+  public func forceCancelTaskBoardAutomation(
+    request _: TaskBoardAutomationForceCancelRequest
+  ) async throws -> TaskBoardAutomationForceCancelResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board automation unavailable")
+  }
 }

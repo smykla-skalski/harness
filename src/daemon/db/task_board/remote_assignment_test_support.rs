@@ -28,6 +28,10 @@ pub(crate) use runtime::{
     authorize_and_start_executor, persist_executor_run, persist_pre_permit_executor_run,
 };
 
+#[path = "remote_assignment_test_support/cancel_targets.rs"]
+mod cancel_targets;
+pub(crate) use cancel_targets::seed_cancelable_controller_targets;
+
 pub(crate) const NOW: &str = "2026-07-19T10:00:00Z";
 pub(crate) const CLAIMED_AT: &str = "2026-07-19T10:00:10Z";
 pub(super) const STARTED_AT: &str = "2026-07-19T10:00:20Z";

@@ -5,7 +5,8 @@ use axum::routing::{get, post, put};
 use axum::{Json, Router};
 
 use crate::daemon::protocol::{
-    TaskBoardAutomationHistoryRequest, TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
+    TaskBoardAutomationForceCancelRequest, TaskBoardAutomationHistoryRequest,
+    TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
     TaskBoardGitRuntimeKeyMaterialSyncRequest, TaskBoardGitRuntimeSecretHandoffAckRequest,
     TaskBoardGitSigningVerifyRequest, TaskBoardOpenRouterTokenSyncRequest,
     TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
@@ -51,6 +52,10 @@ pub(super) fn merge_orchestrator_routes(
         .route(
             http_paths::TASK_BOARD_ORCHESTRATOR_METRICS,
             get(get_task_board_automation_metrics),
+        )
+        .route(
+            http_paths::TASK_BOARD_ORCHESTRATOR_FORCE_CANCEL,
+            post(post_task_board_automation_force_cancel),
         )
         .route(
             http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
@@ -219,6 +224,25 @@ async fn get_task_board_automation_metrics(
         &request_id,
         start,
         task_board_route_executor::automation_metrics(&state).await,
+    )
+}
+
+async fn post_task_board_automation_force_cancel(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(mut request): Json<TaskBoardAutomationForceCancelRequest>,
+) -> Response {
+    let (start, request_id) = match authorized_control_request_parts(&headers, &state, &mut request)
+    {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_ORCHESTRATOR_FORCE_CANCEL,
+        &request_id,
+        start,
+        task_board_route_executor::force_cancel_automation(&state, &request).await,
     )
 }
 

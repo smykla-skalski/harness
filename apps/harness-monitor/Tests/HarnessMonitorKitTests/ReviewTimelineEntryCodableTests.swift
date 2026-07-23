@@ -176,7 +176,10 @@ final class ReviewTimelineEntryCodableTests: XCTestCase {
         id: "UNK_001",
         createdAt: "2026-05-22T16:00:00Z",
         typename: "FutureGitHubEvent",
-        rawPayload: .object(["futureField": .string("future value")])
+        rawPayload: .object([
+          "futureField": .string("future value"),
+          "largeInteger": .unsignedInteger(9_007_199_254_740_993),
+        ])
       )
     )
     let round = try roundTrip(entry)

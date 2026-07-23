@@ -26,6 +26,8 @@ extension AnyCodableJSONValue {
       self = .bool(value)
     case .number(let value):
       self = .number(value)
+    case .unsignedInteger(let value):
+      self = .unsignedInteger(value)
     case .string(let value):
       self = .string(value)
     case .array(let items):

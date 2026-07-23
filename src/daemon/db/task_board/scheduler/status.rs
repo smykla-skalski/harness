@@ -1,6 +1,7 @@
 use chrono::{DateTime, Duration, Utc};
 use sqlx::{Sqlite, SqliteConnection, Transaction, query_as};
 
+mod targets;
 mod wake;
 
 use super::super::ORCHESTRATOR_CHANGE_SCOPE;
@@ -26,6 +27,8 @@ struct SnapshotLedger {
     provider_backoff: Option<ProviderBackoff>,
     open_conflict: bool,
     wake: wake::WakeObservation,
+    cancelable_targets: Vec<crate::task_board::TaskBoardAutomationCancelTarget>,
+    cancelable_targets_truncated: bool,
 }
 
 #[derive(sqlx::FromRow)]
@@ -103,17 +106,18 @@ pub(super) async fn snapshot_after_observation(
     policy_revision: u64,
     observed_at: DateTime<Utc>,
 ) -> Result<TaskBoardAutomationSnapshot, CliError> {
-    let ledger = load_snapshot_ledger(transaction.as_mut(), policy_revision).await?;
+    let ledger = load_snapshot_ledger(transaction, policy_revision).await?;
     build_snapshot(&ledger, observed_at)
 }
 
 async fn load_snapshot_ledger(
-    connection: &mut SqliteConnection,
+    transaction: &mut Transaction<'_, Sqlite>,
     policy_revision: u64,
 ) -> Result<SnapshotLedger, CliError> {
+    let connection = transaction.as_mut();
     let (settings_revision, offline_after) = load_settings(connection).await?;
     let control = load_control(connection).await?;
-    Ok(SnapshotLedger {
+    let mut ledger = SnapshotLedger {
         revision: load_revision(connection).await?,
         settings_revision,
         policy_revision,
@@ -123,7 +127,13 @@ async fn load_snapshot_ledger(
         provider_backoff: load_provider_backoff(connection).await?,
         open_conflict: load_open_conflict(connection).await?,
         wake: wake::load(connection).await?,
-    })
+        cancelable_targets: Vec::new(),
+        cancelable_targets_truncated: false,
+    };
+    let target_page = targets::load(transaction).await?;
+    ledger.cancelable_targets = target_page.targets;
+    ledger.cancelable_targets_truncated = target_page.truncated;
+    Ok(ledger)
 }
 
 async fn load_active_policy_revision(connection: &mut SqliteConnection) -> Result<u64, CliError> {
@@ -323,6 +333,8 @@ fn build_snapshot(
         policy_revision: ledger.policy_revision,
         queue: TaskBoardAutomationQueueSummary::default(),
         active_run: facts.active_run,
+        cancelable_targets: ledger.cancelable_targets.clone(),
+        cancelable_targets_truncated: ledger.cancelable_targets_truncated,
         blocked_reason,
     })
 }

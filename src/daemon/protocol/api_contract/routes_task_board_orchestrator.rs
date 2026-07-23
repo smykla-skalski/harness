@@ -16,6 +16,14 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         http_paths::TASK_BOARD_ORCHESTRATOR_METRICS,
         ws_methods::TASK_BOARD_ORCHESTRATOR_METRICS,
     ),
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::TASK_BOARD_ORCHESTRATOR_FORCE_CANCEL,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_ORCHESTRATOR_FORCE_CANCEL,
+        },
+        swift_client_exposed: true,
+    },
 ];
 
 const fn route(

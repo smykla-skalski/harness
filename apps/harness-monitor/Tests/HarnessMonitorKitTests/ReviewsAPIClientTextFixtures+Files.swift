@@ -122,7 +122,10 @@ let sampleReviewsTimelineResponseText =
         "id": "UK_007",
         "created_at": "2026-05-22T10:30:00Z",
         "typename": "MysteryEvent",
-        "raw_payload": { "foo": "bar" }
+        "raw_payload": {
+          "foo": "bar",
+          "largeInteger": 9007199254740993
+        }
       }
     ],
     "page_info": {

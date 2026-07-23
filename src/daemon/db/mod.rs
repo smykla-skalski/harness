@@ -126,6 +126,7 @@ pub(crate) use task_board::remote_assignment_test_support::{
     authorize_and_start_executor as authorize_and_start_remote_executor,
     claim_request as remote_executor_claim_request,
     controller_fixture as remote_controller_fixture, executor_fixture as remote_executor_fixture,
+    seed_cancelable_controller_targets,
 };
 pub(crate) use task_board::workflow_owner;
 #[cfg(test)]

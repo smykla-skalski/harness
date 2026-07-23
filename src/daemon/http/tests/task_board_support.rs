@@ -12,7 +12,7 @@ use crate::task_board::{AgentMode, TaskBoardItem, TaskBoardStatus};
 pub(super) fn without_durable_task_board_automation<R>(body: impl FnOnce() -> R) -> R {
     temp_env::with_var(
         crate::feature_flags::TASK_BOARD_AUTOMATION_V2_ENV,
-        None::<&str>,
+        Some("0"),
         body,
     )
 }

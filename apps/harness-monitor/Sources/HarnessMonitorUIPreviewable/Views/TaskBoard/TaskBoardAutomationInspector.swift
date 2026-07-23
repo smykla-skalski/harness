@@ -11,6 +11,7 @@ struct TaskBoardAutomationPresentationTrigger: Hashable {
   let reconcileIntervalSeconds: UInt64
   let isOnline: Bool
   let isWriteAuthorized: Bool
+  let isAdminAuthorized: Bool
   let isGloballyBusy: Bool
 }
 
@@ -56,6 +57,7 @@ struct TaskBoardAutomationInspector: View {
       reconcileIntervalSeconds: reconcileIntervalSeconds,
       isOnline: dashboard.connectionState == .online,
       isWriteAuthorized: isWriteAuthorized,
+      isAdminAuthorized: isAdminAuthorized,
       isGloballyBusy: dashboard.isBusy
     )
   }
@@ -86,6 +88,7 @@ struct TaskBoardAutomationInspector: View {
       reconcileIntervalSeconds: input.reconcileIntervalSeconds,
       isOnline: input.isOnline,
       isWriteAuthorized: input.isWriteAuthorized,
+      isAdminAuthorized: input.isAdminAuthorized,
       isGloballyBusy: input.isGloballyBusy,
     )
 
@@ -104,7 +107,10 @@ struct TaskBoardAutomationInspector: View {
         }
       }
 
-      surfaceContent(isPresentationCurrent: isPresentationCurrent)
+      surfaceContent(
+        isPresentationCurrent: isPresentationCurrent,
+        currentCancelTargets: input.snapshot?.cancelableTargets ?? []
+      )
     }
     .environment(
       \.taskBoardOperationsRowLabelFont,
@@ -132,12 +138,40 @@ struct TaskBoardAutomationInspector: View {
       guard isActive else { return }
       await relativeTimeClock.run()
     }
+    .confirmationDialog(
+      "Force-cancel this remote workflow?",
+      isPresented: Binding(
+        get: { state.pendingForceCancelTarget != nil },
+        set: { if !$0 { state.pendingForceCancelTarget = nil } }
+      ),
+      presenting: state.pendingForceCancelTarget
+    ) { target in
+      Button("Force Cancel", role: .destructive) {
+        state.pendingForceCancelTarget = nil
+        actions.enqueueForceCancel(
+          target: target,
+          isPresentationCurrent: isPresentationCurrent,
+          forceCancelBlockedReason: cachedPresentation.controlAvailability.forceCancelBlockedReason,
+          cachedTargets: cachedPresentation.cancelTargets,
+          currentTargets: input.snapshot?.cancelableTargets ?? []
+        )
+      }
+      Button("Keep Running", role: .cancel) {}
+    } message: { target in
+      Text(
+        "This cancels execution \(target.executionId) for \(target.itemId) on "
+          + "\(target.hostId) and may require cleanup."
+      )
+    }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.automation")
   }
 
   @ViewBuilder
-  private func surfaceContent(isPresentationCurrent: Bool) -> some View {
+  private func surfaceContent(
+    isPresentationCurrent: Bool,
+    currentCancelTargets: [TaskBoardAutomationCancelTarget]
+  ) -> some View {
     switch state.surface {
     case .automation:
       TaskBoardAutomationStatusView(
@@ -151,7 +185,8 @@ struct TaskBoardAutomationInspector: View {
         metrics: metrics,
         isPresentationCurrent: isPresentationCurrent,
         activeAction: state.activeAction,
-        actions: actions
+        actions: actions,
+        currentCancelTargets: currentCancelTargets
       )
     case .history:
       TaskBoardAutomationHistoryView(
@@ -196,6 +231,11 @@ struct TaskBoardAutomationInspector: View {
     return profile.status == .active
       && profile.role != .viewer
       && profile.scopes.contains("write")
+  }
+
+  var isAdminAuthorized: Bool {
+    guard let profile = store.remoteDaemonProfile else { return true }
+    return profile.status == .active && profile.scopes.contains("admin")
   }
 
 }

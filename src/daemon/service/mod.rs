@@ -260,6 +260,11 @@ mod status;
 mod sync_support;
 mod task_board;
 pub(crate) use task_board::{validate_read_only_workflow_launch, validate_write_workflow_launch};
+mod task_board_automation_force_cancel;
+#[cfg(test)]
+mod task_board_automation_force_cancel_tests;
+#[cfg(test)]
+mod task_board_automation_force_cancel_regression_tests;
 mod task_board_automation_runtime;
 mod task_board_remote_result_import;
 pub(crate) use task_board_remote_result_import::import_and_adopt_task_board_remote_implementation_result;
@@ -394,6 +399,7 @@ pub(crate) use task_board::{
     simulate_policy_pipeline, update_policy_scenario,
 };
 pub(crate) use task_board::{dispatch_task_board_async, pick_task_board_dispatch_async};
+pub(crate) use task_board_automation_force_cancel::force_cancel_task_board_automation_db;
 pub(crate) use task_board_automation_runtime::{
     TaskBoardAutomationRunSession, TaskBoardAutomationRunStart, task_board_automation_snapshot,
 };

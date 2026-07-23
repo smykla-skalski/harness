@@ -28,9 +28,13 @@ extension [String: JSONValue] {
   }
 
   func uint64Value(for key: String) -> UInt64? {
-    guard case .number(let value)? = self[key], value >= 0 else {
+    switch self[key] {
+    case .unsignedInteger(let value):
+      return value
+    case .number(let value) where value >= 0:
+      return UInt64(value)
+    default:
       return nil
     }
-    return UInt64(value)
   }
 }

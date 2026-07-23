@@ -1,3 +1,4 @@
+import HarnessMonitorKit
 import SwiftUI
 
 struct TaskBoardAutomationManualView: View {
@@ -6,6 +7,7 @@ struct TaskBoardAutomationManualView: View {
   let isPresentationCurrent: Bool
   let activeAction: TaskBoardAutomationInspectorAction?
   let actions: TaskBoardAutomationInspectorActions
+  let currentCancelTargets: [TaskBoardAutomationCancelTarget]
 
   var body: some View {
     TaskBoardOperationsCard(title: "Manual controls", metrics: metrics) {
@@ -70,6 +72,14 @@ struct TaskBoardAutomationManualView: View {
         )
       }
 
+      TaskBoardAutomationCancelTargetsView(
+        targets: presentation.cancelTargets,
+        isTruncated: presentation.cancelTargetsTruncated,
+        blockedReason: forceCancelBlockedReason,
+        activeAction: activeAction,
+        onForceCancel: requestForceCancel
+      )
+
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.automation.manual")
@@ -78,6 +88,21 @@ struct TaskBoardAutomationManualView: View {
   private var controlBlockedReason: String? {
     guard isPresentationCurrent else { return "Automation status is updating" }
     return presentation.controlAvailability.controlBlockedReason
+  }
+
+  private var forceCancelBlockedReason: String? {
+    guard isPresentationCurrent else { return "Automation status is updating" }
+    return presentation.controlAvailability.forceCancelBlockedReason
+  }
+
+  private func requestForceCancel(_ target: TaskBoardAutomationCancelTarget) {
+    actions.requestForceCancel(
+      target,
+      isPresentationCurrent: isPresentationCurrent,
+      forceCancelBlockedReason: forceCancelBlockedReason,
+      cachedTargets: presentation.cancelTargets,
+      currentTargets: currentCancelTargets
+    )
   }
 
   private func controlButton(

@@ -56,6 +56,40 @@ extension HarnessMonitorStore {
     }
   }
 
+  @discardableResult
+  public func forceCancelTaskBoardAutomation(
+    request: TaskBoardAutomationForceCancelRequest
+  ) async -> Bool {
+    guard connectionState == .online, let client else { return false }
+    guard isCurrentForceCancelTarget(request.target) else {
+      presentFailureFeedback("Cancellation target changed. Refresh and try again.")
+      return false
+    }
+
+    beginDaemonAction()
+    beginTaskBoardAction()
+    defer {
+      endDaemonAction()
+      endTaskBoardAction()
+    }
+
+    do {
+      let measuredResponse = try await Self.measureOperation {
+        try await client.forceCancelTaskBoardAutomation(request: request)
+      }
+      recordRequestSuccess()
+      await refreshTaskBoardDashboardSnapshot(using: client)
+      presentSuccessFeedback(Self.forceCancelSuccessMessage(measuredResponse.value.disposition))
+      return true
+    } catch is CancellationError {
+      return false
+    } catch {
+      await refreshTaskBoardDashboardSnapshot(using: client)
+      presentFailureFeedback(error.localizedDescription)
+      return false
+    }
+  }
+
   func mergeTaskBoardAutomationSnapshot(_ snapshot: TaskBoardAutomationSnapshot?) {
     guard let snapshot else { return }
     if let current = globalTaskBoardAutomationSnapshot,
@@ -84,6 +118,26 @@ extension HarnessMonitorStore {
       return false
     case (.none, .none):
       return candidate.observedAt > current.observedAt
+    }
+  }
+
+  private func isCurrentForceCancelTarget(
+    _ target: TaskBoardAutomationCancelTarget
+  ) -> Bool {
+    !target.cancelPending
+      && globalTaskBoardAutomationSnapshot?.cancelableTargets.contains(target) == true
+  }
+
+  private static func forceCancelSuccessMessage(
+    _ disposition: TaskBoardAutomationForceCancelDisposition
+  ) -> String {
+    switch disposition {
+    case .acceptedPending, .replayedPending:
+      "Cancellation requested"
+    case .cancelled, .replayedCancelled:
+      "Workflow cancelled"
+    case .unknown:
+      "Cancellation accepted"
     }
   }
 }

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::task_board::{ExternalRefProvider, TaskBoardStatus};
+use crate::task_board::{ExternalRefProvider, TaskBoardStatus, TaskBoardWorkflowKind};
 
 const LEGACY_TASK_BOARD_AUTOMATION_SNAPSHOT_SCHEMA_VERSION: u32 = 1;
 pub const TASK_BOARD_AUTOMATION_SNAPSHOT_SCHEMA_VERSION: u32 = 1;
@@ -165,6 +165,37 @@ pub struct TaskBoardAutomationMetrics {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskBoardAutomationCancelTarget {
+    pub execution_id: String,
+    pub item_id: String,
+    pub workflow_kind: TaskBoardWorkflowKind,
+    pub assignment_id: String,
+    pub host_id: String,
+    pub fencing_epoch: u64,
+    pub action_key: String,
+    pub attempt: u32,
+    pub idempotency_key: String,
+    pub assignment_state: String,
+    pub expected_record_sha256: String,
+    pub cancel_pending: bool,
+}
+
+impl TaskBoardAutomationCancelTarget {
+    #[must_use]
+    pub fn has_same_binding(&self, other: &Self) -> bool {
+        self.execution_id == other.execution_id
+            && self.item_id == other.item_id
+            && self.workflow_kind == other.workflow_kind
+            && self.assignment_id == other.assignment_id
+            && self.host_id == other.host_id
+            && self.fencing_epoch == other.fencing_epoch
+            && self.action_key == other.action_key
+            && self.attempt == other.attempt
+            && self.idempotency_key == other.idempotency_key
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskBoardAutomationSnapshot {
     #[serde(default = "default_snapshot_schema_version")]
     pub schema_version: u32,
@@ -189,12 +220,24 @@ pub struct TaskBoardAutomationSnapshot {
     pub queue: TaskBoardAutomationQueueSummary,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub active_run: Option<TaskBoardAutomationRunInfo>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cancelable_targets: Vec<TaskBoardAutomationCancelTarget>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub cancelable_targets_truncated: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub blocked_reason: Option<String>,
 }
 
 const fn default_snapshot_schema_version() -> u32 {
     LEGACY_TASK_BOARD_AUTOMATION_SNAPSHOT_SCHEMA_VERSION
+}
+
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde skip_serializing_if requires a function taking `&T`"
+)]
+const fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 #[cfg(test)]
@@ -261,6 +304,8 @@ mod tests {
         .expect("decode legacy compact snapshot");
 
         assert_eq!(snapshot.schema_version, 1);
+        assert!(snapshot.cancelable_targets.is_empty());
+        assert!(!snapshot.cancelable_targets_truncated);
     }
 
     #[test]

@@ -6,14 +6,17 @@ use tokio::task::JoinHandle;
 
 use crate::daemon::protocol::http_paths;
 
+use super::task_board_support::without_durable_task_board_automation;
 use super::*;
 
 #[test]
 fn task_board_http_crud_sync_audit_and_orchestrator_routes_use_real_state() {
     let sandbox = tempdir().expect("tempdir");
-    harness_testkit::with_isolated_harness_env(sandbox.path(), || {
-        let runtime = tokio::runtime::Runtime::new().expect("runtime");
-        runtime.block_on(run_flow());
+    without_durable_task_board_automation(|| {
+        harness_testkit::with_isolated_harness_env(sandbox.path(), || {
+            let runtime = tokio::runtime::Runtime::new().expect("runtime");
+            runtime.block_on(run_flow());
+        });
     });
 }
 

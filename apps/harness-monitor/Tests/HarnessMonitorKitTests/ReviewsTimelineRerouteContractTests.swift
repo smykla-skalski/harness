@@ -144,7 +144,15 @@ struct ReviewsTimelineRerouteContractTests {
     }
     #expect(payload.id == "UK_007")
     #expect(payload.typename == "MysteryEvent")
-    #expect(payload.rawPayload == .object(["foo": .string("bar")]))
+    #expect(
+      payload.rawPayload
+        == .object(
+          [
+            "foo": .string("bar"),
+            "largeInteger": .unsignedInteger(9_007_199_254_740_993),
+          ]
+        )
+    )
   }
 
   private func makeHTTPClient() throws -> HarnessMonitorAPIClient {

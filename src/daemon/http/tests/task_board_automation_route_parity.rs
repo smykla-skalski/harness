@@ -9,10 +9,16 @@ use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 
-use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::protocol::{http_paths, ws_methods};
+use crate::daemon::db::{
+    AsyncDaemonDb, accept_remote_controller, claim_remote_controller, remote_controller_fixture,
+};
+use crate::daemon::protocol::{
+    HarnessMonitorAuditEventsRequest, TaskBoardAutomationForceCancelRequest, http_paths, ws_methods,
+};
+use crate::session::types::CONTROL_PLANE_ACTOR_ID;
+use crate::task_board::TaskBoardAutomationDesiredMode;
 
-use super::task_board_route_parity_support::{get_json, serve_http, ws_result};
+use super::task_board_route_parity_support::{get_json, post_json, serve_http, ws_result};
 
 #[test]
 fn automation_observability_http_and_websocket_routes_match() {
@@ -20,6 +26,15 @@ fn automation_observability_http_and_websocket_routes_match() {
     harness_testkit::with_isolated_harness_env(sandbox.path(), || {
         let runtime = tokio::runtime::Runtime::new().expect("runtime");
         runtime.block_on(run_route_parity());
+    });
+}
+
+#[test]
+fn exact_remote_force_cancel_is_durable_across_http_and_websocket() {
+    let sandbox = tempdir().expect("tempdir");
+    harness_testkit::with_isolated_harness_env(sandbox.path(), || {
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(run_force_cancel_parity());
     });
 }
 
@@ -40,6 +55,85 @@ async fn run_route_parity() {
 
     server.abort();
     let _ = server.await;
+}
+
+async fn run_force_cancel_parity() {
+    let fixture = remote_controller_fixture(1).await;
+    fixture
+        .db
+        .initialize_task_board_automation_control_from_legacy_intent(
+            TaskBoardAutomationDesiredMode::Off,
+            Utc::now(),
+        )
+        .await
+        .expect("initialize automation control");
+    let offered = accept_remote_controller(&fixture).await;
+    claim_remote_controller(&fixture, &offered).await;
+    let target = fixture
+        .db
+        .task_board_automation_cancel_target(&fixture.execution.execution_id)
+        .await
+        .expect("load force-cancel target")
+        .expect("force-cancel target exists");
+    let payload = serde_json::to_value(TaskBoardAutomationForceCancelRequest {
+        target,
+        reason: "operator requested exact remote cancellation".into(),
+        actor: Some("spoofed caller".into()),
+    })
+    .expect("encode force-cancel request");
+    let db_path = fixture._temp.path().join("controller.db");
+    let state = super::test_http_state_with_db_path(&db_path, "force-cancel-parity");
+    let (base_url, server) = serve_http(state).await;
+    let client = reqwest::Client::new();
+
+    let http = post_json(
+        &client,
+        &base_url,
+        http_paths::TASK_BOARD_ORCHESTRATOR_FORCE_CANCEL,
+        payload.clone(),
+    )
+    .await;
+    assert_eq!(http["disposition"], "accepted_pending");
+    let pending = fixture
+        .db
+        .task_board_automation_cancel_target(&fixture.execution.execution_id)
+        .await;
+    assert!(
+        pending
+            .expect("load pending force-cancel target")
+            .is_some_and(|target| target.cancel_pending)
+    );
+    let websocket = ws_result(
+        &base_url,
+        "force-cancel-replay",
+        ws_methods::TASK_BOARD_ORCHESTRATOR_FORCE_CANCEL,
+        payload,
+    )
+    .await;
+    assert_eq!(websocket["disposition"], "replayed_pending");
+    assert_bound_force_cancel_audit(&fixture.db).await;
+
+    server.abort();
+    let _ = server.await;
+}
+
+async fn assert_bound_force_cancel_audit(db: &AsyncDaemonDb) {
+    let events = db
+        .load_audit_events(&HarnessMonitorAuditEventsRequest {
+            action_keys: vec!["task_board.automation.execution.force_cancel".into()],
+            ..HarnessMonitorAuditEventsRequest::default()
+        })
+        .await
+        .expect("load force-cancel audit")
+        .events;
+    let [event] = events.as_slice() else {
+        panic!("expected one idempotent force-cancel audit event");
+    };
+    assert_eq!(event.actor.as_deref(), Some(CONTROL_PLANE_ACTOR_ID));
+    assert_eq!(event.outcome, "success");
+    let encoded = serde_json::to_string(event).expect("encode force-cancel audit event");
+    assert!(!encoded.contains("operator requested exact remote cancellation"));
+    assert!(!encoded.contains("spoofed caller"));
 }
 
 async fn assert_history_parity(client: &reqwest::Client, base_url: &str) {

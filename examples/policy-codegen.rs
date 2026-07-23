@@ -178,6 +178,7 @@ const OPEN_STRING_ENUMS: &[&str] = &[
     "TaskBoardStatus",
     "TaskBoardAgentMode",
     "TaskBoardWorkflowKind",
+    "TaskBoardAutomationForceCancelDisposition",
 ];
 
 /// Emit an open Swift enum conforming to `TaskBoardOpenEnum` (which supplies the
@@ -2898,9 +2899,8 @@ const TASK_BOARD_AUTOMATION_SETTINGS_SOURCE: &str =
 const TASK_BOARD_AUTOMATION_PROTOCOL_SOURCE: &str =
     include_str!("../src/daemon/protocol/task_board_automation.rs");
 const TASK_BOARD_AUTOMATION_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardAutomationWireTypes.generated.swift";
-// Independent compact status, paged history/detail/metrics reads, and local
-// automation settings. PR7-owned host, repository-routing, admission, transport,
-// and force-cancel types intentionally remain outside this allow-list.
+// Independent compact status, paged history/detail/metrics reads, local automation
+// settings, and the exact-target force-cancel request/response contract.
 const TASK_BOARD_AUTOMATION_EMIT_ONLY: &[&str] = &[
     "TaskBoardAutomationDesiredMode",
     "TaskBoardAutomationAdmissionState",
@@ -2916,6 +2916,7 @@ const TASK_BOARD_AUTOMATION_EMIT_ONLY: &[&str] = &[
     "TaskBoardAutomationRunStage",
     "TaskBoardAutomationRunDetail",
     "TaskBoardAutomationMetrics",
+    "TaskBoardAutomationCancelTarget",
     "TaskBoardAutomationSnapshot",
     "TaskBoardAutomationSchedulingSettings",
     "TaskBoardAutomationRetrySettings",
@@ -2923,6 +2924,9 @@ const TASK_BOARD_AUTOMATION_EMIT_ONLY: &[&str] = &[
     "TaskBoardReviewerRule",
     "TaskBoardReviewerSettings",
     "TaskBoardAutomationRunDetailRequest",
+    "TaskBoardAutomationForceCancelRequest",
+    "TaskBoardAutomationForceCancelDisposition",
+    "TaskBoardAutomationForceCancelResponse",
 ];
 const GIT_RUNTIME_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardGitRuntimeWireTypes.generated.swift";
 // The git runtime config tree (runtime-config get/update + secret handoff). The config/profile/
@@ -3984,7 +3988,10 @@ pub struct Drop { pub other: String }
             .iter()
             .find(|field| field.property == "policyVersion")
             .expect("strict field present");
-        assert!(!policy_version.optional, "unrelated required fields stay strict");
+        assert!(
+            !policy_version.optional,
+            "unrelated required fields stay strict"
+        );
         assert_eq!(policy_version.decode_default, None);
     }
 

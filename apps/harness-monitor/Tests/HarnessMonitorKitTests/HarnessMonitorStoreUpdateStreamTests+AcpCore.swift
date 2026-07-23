@@ -406,8 +406,12 @@ func jsonString(from value: JSONValue?) -> String? {
 }
 
 func jsonNumber(from value: JSONValue?) -> UInt64? {
-  guard case .number(let number)? = value, number >= 0 else {
+  switch value {
+  case .unsignedInteger(let number):
+    return number
+  case .number(let number) where number >= 0:
+    return UInt64(number)
+  default:
     return nil
   }
-  return UInt64(number)
 }

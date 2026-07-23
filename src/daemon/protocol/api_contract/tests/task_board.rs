@@ -436,6 +436,12 @@ fn task_board_routes_have_complete_ws_parity() {
                 ws_methods::TASK_BOARD_ORCHESTRATOR_METRICS,
                 false,
             ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_ORCHESTRATOR_FORCE_CANCEL,
+                ws_methods::TASK_BOARD_ORCHESTRATOR_FORCE_CANCEL,
+                true,
+            ),
         ]
     );
     let expected_mcp_methods: Vec<_> = super::routes_task_board::ROUTES

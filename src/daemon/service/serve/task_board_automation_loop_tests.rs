@@ -5,7 +5,7 @@ use super::*;
 use crate::daemon::db::{TaskBoardAutomationRunAdmission, TaskBoardRunAcquireRequest};
 use crate::task_board::{
     TaskBoardAutomationScope, TaskBoardAutomationWakePayload, TaskBoardAutomationWakeRequest,
-    TaskBoardItem,
+    TaskBoardItem, TaskBoardOrchestratorSettings, TaskBoardOrchestratorState,
 };
 
 async fn database() -> AsyncDaemonDb {
@@ -225,7 +225,7 @@ async fn startup_bridges_legacy_step_without_an_automatic_recovery_wake() {
 }
 
 #[tokio::test]
-async fn startup_preserves_an_explicit_durable_stop() {
+async fn explicit_stop_stays_idle_across_startup_and_a_tick() {
     let db = database().await;
     db.replace_task_board_orchestrator_state(&TaskBoardOrchestratorState {
         enabled: true,
@@ -242,24 +242,54 @@ async fn startup_preserves_an_explicit_durable_stop() {
         .await
         .expect("finish stop");
 
-    initialize_automation(&db)
+    let control_before = db
+        .task_board_automation_control()
+        .await
+        .expect("load stopped control before restart");
+    let revision_before = db
+        .current_change_sequence()
+        .await
+        .expect("load stopped control revision");
+    let mut change_sequence = initialize_automation(&db)
         .await
         .expect("reinitialize automation");
+    maintain_automation_tick(&db)
+        .await
+        .expect("maintain stopped automation");
+    assert!(
+        !capture_automatic_change_wakes(&db, &mut change_sequence)
+            .await
+            .expect("capture stopped changes")
+    );
 
-    let control = db
+    let control_after = db
         .task_board_automation_control()
         .await
         .expect("load stopped control");
-    assert_eq!(control.desired_mode, TaskBoardAutomationDesiredMode::Off);
+    assert_eq!(control_after, control_before);
     assert_eq!(
-        control.admission_state,
+        db.current_change_sequence()
+            .await
+            .expect("reload stopped control revision"),
+        revision_before
+    );
+    assert_eq!(
+        control_after.desired_mode,
+        TaskBoardAutomationDesiredMode::Off
+    );
+    assert_eq!(
+        control_after.admission_state,
         TaskBoardAutomationAdmissionState::Stopped
     );
-    assert!(
-        db.pending_task_board_automation_wake_events(10)
-            .await
-            .expect("load stopped wakes")
-            .is_empty()
+    let counts = query_as::<_, (i64, i64, i64)>(
+        "SELECT
+            (SELECT COUNT(*) FROM task_board_orchestrator_wake_events),
+            (SELECT COUNT(*) FROM task_board_orchestrator_runs),
+            (SELECT COUNT(*) FROM audit_events)",
+    );
+    assert_eq!(
+        counts.fetch_one(db.pool()).await.expect("count idle rows"),
+        (0, 0, 0)
     );
 }
 

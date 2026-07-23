@@ -29,6 +29,7 @@ public enum JSONValue: Codable, Equatable, Sendable {
   case number(Double)
   case object([String: Self])
   case string(String)
+  case unsignedInteger(UInt64)
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.singleValueContainer()
@@ -36,6 +37,10 @@ public enum JSONValue: Codable, Equatable, Sendable {
       self = .string(value)
     } else if let value = try? container.decode(Bool.self) {
       self = .bool(value)
+    } else if let value = try? container.decode(UInt64.self),
+      value > 9_007_199_254_740_992
+    {
+      self = .unsignedInteger(value)
     } else if let value = try? container.decode(Double.self) {
       self = .number(value)
     } else if let value = try? container.decode([String: Self].self) {
@@ -67,6 +72,8 @@ public enum JSONValue: Codable, Equatable, Sendable {
       try container.encode(value)
     case .string(let value):
       try container.encode(value)
+    case .unsignedInteger(let value):
+      try container.encode(value)
     }
   }
 
@@ -75,7 +82,7 @@ public enum JSONValue: Codable, Equatable, Sendable {
     case .null: true
     case .object(let dict): dict.isEmpty
     case .array(let items): items.isEmpty
-    case .bool, .number, .string: false
+    case .bool, .number, .string, .unsignedInteger: false
     }
   }
 }
