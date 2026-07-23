@@ -27,6 +27,17 @@ pub(crate) struct TaskBoardRemoteArtifact {
     pub(crate) stored_at: String,
 }
 
+#[derive(Debug)]
+pub(crate) struct TaskBoardRemoteArtifactStoreInput<'a> {
+    pub(crate) binding: &'a RemoteAttemptBinding,
+    pub(crate) lease_id: &'a str,
+    pub(crate) offer_request_sha256: &'a str,
+    pub(crate) artifact: &'a RemoteArtifactEntry,
+    pub(crate) content: &'a [u8],
+    pub(crate) authenticated_principal: &'a str,
+    pub(crate) stored_at: &'a str,
+}
+
 impl TaskBoardRemoteArtifact {
     pub(crate) fn response(
         &self,
@@ -99,54 +110,32 @@ impl AsyncDaemonDb {
         Ok(true)
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn store_task_board_remote_artifact(
         &self,
-        binding: &RemoteAttemptBinding,
-        lease_id: &str,
-        offer_request_sha256: &str,
-        artifact: &RemoteArtifactEntry,
-        content: &[u8],
-        authenticated_principal: &str,
-        stored_at: &str,
+        input: &TaskBoardRemoteArtifactStoreInput<'_>,
     ) -> Result<TaskBoardRemoteArtifact, CliError> {
-        validate_artifact_input(
-            binding,
-            lease_id,
-            offer_request_sha256,
-            artifact,
-            content,
-            authenticated_principal,
-            stored_at,
-        )?;
+        validate_artifact_input(input)?;
         let mut transaction = self
             .begin_immediate_transaction("task board remote artifact store")
             .await?;
-        let assignment = require_assignment(&mut transaction, &binding.assignment_id).await?;
+        let assignment = require_assignment(&mut transaction, &input.binding.assignment_id).await?;
         require_artifact_assignment(
             &assignment,
-            binding,
-            lease_id,
-            offer_request_sha256,
-            authenticated_principal,
-            artifact,
+            input.binding,
+            input.lease_id,
+            input.offer_request_sha256,
+            input.authenticated_principal,
+            input.artifact,
         )?;
         if let Some(existing) = load_artifact_in_tx(
             &mut transaction,
-            &binding.assignment_id,
-            binding.fencing_epoch,
-            &artifact.relative_path,
+            &input.binding.assignment_id,
+            input.binding.fencing_epoch,
+            &input.artifact.relative_path,
         )
         .await?
         {
-            if exact_artifact_replay(
-                &existing,
-                lease_id,
-                offer_request_sha256,
-                authenticated_principal,
-                artifact,
-                content,
-            ) {
+            if exact_artifact_replay(&existing, input) {
                 transaction.commit().await.map_err(|error| {
                     db_error(format!("commit replayed remote artifact: {error}"))
                 })?;
@@ -156,22 +145,12 @@ impl AsyncDaemonDb {
                 "remote artifact path conflicts with immutable content evidence",
             ));
         }
-        insert_artifact_in_tx(
-            &mut transaction,
-            binding,
-            lease_id,
-            offer_request_sha256,
-            artifact,
-            content,
-            authenticated_principal,
-            stored_at,
-        )
-        .await?;
+        insert_artifact_in_tx(&mut transaction, input).await?;
         let stored = load_artifact_in_tx(
             &mut transaction,
-            &binding.assignment_id,
-            binding.fencing_epoch,
-            &artifact.relative_path,
+            &input.binding.assignment_id,
+            input.binding.fencing_epoch,
+            &input.artifact.relative_path,
         )
         .await?
         .ok_or_else(|| db_error("persisted remote artifact disappeared"))?;
@@ -230,23 +209,15 @@ impl AsyncDaemonDb {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn validate_artifact_input(
-    binding: &RemoteAttemptBinding,
-    lease_id: &str,
-    offer_request_sha256: &str,
-    artifact: &RemoteArtifactEntry,
-    content: &[u8],
-    principal: &str,
-    stored_at: &str,
-) -> Result<(), CliError> {
-    binding
+fn validate_artifact_input(input: &TaskBoardRemoteArtifactStoreInput<'_>) -> Result<(), CliError> {
+    input
+        .binding
         .validate()
         .map_err(|error| db_error(format!("validate remote artifact binding: {error}")))?;
-    nonblank(lease_id, "remote artifact lease")?;
-    nonblank(principal, "remote artifact principal")?;
-    canonical_time(stored_at, "remote artifact store time")?;
-    validate_artifact_evidence(offer_request_sha256, artifact, content)
+    nonblank(input.lease_id, "remote artifact lease")?;
+    nonblank(input.authenticated_principal, "remote artifact principal")?;
+    canonical_time(input.stored_at, "remote artifact store time")?;
+    validate_artifact_evidence(input.offer_request_sha256, input.artifact, input.content)
 }
 
 pub(super) fn validate_artifact_evidence(
@@ -395,16 +366,9 @@ pub(super) async fn load_artifact_in_tx(
     .transpose()
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) async fn insert_artifact_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
-    binding: &RemoteAttemptBinding,
-    lease_id: &str,
-    offer_request_sha256: &str,
-    artifact: &RemoteArtifactEntry,
-    content: &[u8],
-    authenticated_principal: &str,
-    stored_at: &str,
+    input: &TaskBoardRemoteArtifactStoreInput<'_>,
 ) -> Result<(), CliError> {
     query(
         "INSERT INTO task_board_remote_artifacts (
@@ -413,17 +377,20 @@ pub(super) async fn insert_artifact_in_tx(
            content, stored_at
          ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
     )
-    .bind(&binding.assignment_id)
-    .bind(to_i64(binding.fencing_epoch, "artifact fencing epoch")?)
-    .bind(lease_id)
-    .bind(offer_request_sha256)
-    .bind(authenticated_principal)
-    .bind(&artifact.relative_path)
-    .bind(&artifact.sha256)
-    .bind(i64::try_from(artifact.size_bytes).map_err(|_| db_error("artifact is too large"))?)
-    .bind(&artifact.media_type)
-    .bind(content)
-    .bind(stored_at)
+    .bind(&input.binding.assignment_id)
+    .bind(to_i64(
+        input.binding.fencing_epoch,
+        "artifact fencing epoch",
+    )?)
+    .bind(input.lease_id)
+    .bind(input.offer_request_sha256)
+    .bind(input.authenticated_principal)
+    .bind(&input.artifact.relative_path)
+    .bind(&input.artifact.sha256)
+    .bind(i64::try_from(input.artifact.size_bytes).map_err(|_| db_error("artifact is too large"))?)
+    .bind(&input.artifact.media_type)
+    .bind(input.content)
+    .bind(input.stored_at)
     .execute(transaction.as_mut())
     .await
     .map(|_| ())
@@ -432,15 +399,11 @@ pub(super) async fn insert_artifact_in_tx(
 
 pub(super) fn exact_artifact_replay(
     stored: &TaskBoardRemoteArtifact,
-    lease_id: &str,
-    offer_request_sha256: &str,
-    principal: &str,
-    artifact: &RemoteArtifactEntry,
-    content: &[u8],
+    input: &TaskBoardRemoteArtifactStoreInput<'_>,
 ) -> bool {
-    stored.lease_id == lease_id
-        && stored.offer_request_sha256 == offer_request_sha256
-        && stored.authenticated_principal == principal
-        && stored.artifact == *artifact
-        && stored.content == content
+    stored.lease_id == input.lease_id
+        && stored.offer_request_sha256 == input.offer_request_sha256
+        && stored.authenticated_principal == input.authenticated_principal
+        && stored.artifact == *input.artifact
+        && stored.content == input.content
 }

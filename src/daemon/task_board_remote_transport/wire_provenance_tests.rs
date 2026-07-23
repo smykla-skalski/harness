@@ -14,63 +14,9 @@ use crate::task_board::{
     TaskBoardFailureClass, TaskBoardImplementationResult, TaskBoardLocalAttemptResult,
 };
 
-macro_rules! assert_request_offer_digest {
-    ($request:ident) => {{
-        $request.validate().expect("valid lifecycle request");
-        for invalid in [
-            String::new(),
-            "D".repeat(64),
-            format!("sha256:{}", "d".repeat(64)),
-        ] {
-            let mut noncanonical = $request.clone();
-            noncanonical.offer_request_sha256 = invalid;
-            assert_eq!(
-                noncanonical
-                    .validate()
-                    .expect_err("noncanonical offer digest denied"),
-                RemoteWireError::InvalidDigest("offer_request_sha256")
-            );
-        }
-        let mut tampered = $request.clone();
-        tampered.offer_request_sha256 = "d".repeat(64);
-        assert_eq!(
-            tampered
-                .validate()
-                .expect_err("changed offer digest denied"),
-            RemoteWireError::DigestMismatch("request_sha256")
-        );
-    }};
-}
-
-macro_rules! assert_response_offer_digest {
-    ($response:ident, $request:ident) => {{
-        $response
-            .validate(&$request)
-            .expect("valid lifecycle response");
-        for invalid in [
-            String::new(),
-            "D".repeat(64),
-            format!("sha256:{}", "d".repeat(64)),
-        ] {
-            let mut noncanonical = $response.clone();
-            noncanonical.offer_request_sha256 = invalid;
-            assert_eq!(
-                noncanonical
-                    .validate(&$request)
-                    .expect_err("noncanonical echo denied"),
-                RemoteWireError::InvalidDigest("offer_request_sha256")
-            );
-        }
-        let mut replay = $response.clone();
-        replay.offer_request_sha256 = "d".repeat(64);
-        assert_eq!(
-            replay
-                .validate(&$request)
-                .expect_err("different offer echo denied"),
-            RemoteWireError::ResultBindingMismatch
-        );
-    }};
-}
+#[path = "wire_provenance_offer_digest_tests.rs"]
+mod offer_digest_tests;
+use offer_digest_tests::{assert_request_offer_digest, assert_response_offer_digest};
 
 #[path = "wire_provenance_status_evidence_tests.rs"]
 mod status_evidence_tests;
@@ -81,7 +27,11 @@ fn fetched_artifact_must_match_requested_path_size_and_digest() {
     let entry = artifact("implementation.bundle", content);
     let offer = offer_request().seal().expect("seal offer");
     let request = artifact_request(&offer, entry.clone());
-    assert_request_offer_digest!(request);
+    assert_request_offer_digest(
+        &request,
+        RemoteArtifactFetchRequest::validate,
+        |value, digest| value.offer_request_sha256 = digest,
+    );
     let response = RemoteArtifactFetchResponse {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: request.binding.clone(),
@@ -89,7 +39,12 @@ fn fetched_artifact_must_match_requested_path_size_and_digest() {
         artifact: entry,
         content_base64: base64::engine::general_purpose::STANDARD.encode(content),
     };
-    assert_response_offer_digest!(response, request);
+    assert_response_offer_digest(
+        &response,
+        &request,
+        RemoteArtifactFetchResponse::validate,
+        |value, digest| value.offer_request_sha256 = digest,
+    );
     assert_eq!(
         response.validate(&request).expect("artifact response"),
         content
@@ -113,7 +68,9 @@ fn terminal_status_echoes_the_original_offer_digest() {
     offer.binding.action_key = "implementation:1".into();
     let offer = offer.seal().expect("seal offer");
     let request = status_request(&offer);
-    assert_request_offer_digest!(request);
+    assert_request_offer_digest(&request, RemoteStatusRequest::validate, |value, digest| {
+        value.offer_request_sha256 = digest;
+    });
     let response = RemoteStatusResponse {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: offer.binding,
@@ -138,7 +95,12 @@ fn terminal_status_echoes_the_original_offer_digest() {
     }
     .seal()
     .expect("seal status response");
-    assert_response_offer_digest!(response, request);
+    assert_response_offer_digest(
+        &response,
+        &request,
+        RemoteStatusResponse::validate,
+        |value, digest| value.offer_request_sha256 = digest,
+    );
 }
 
 #[test]
@@ -286,7 +248,12 @@ fn offer_claim_and_renew_echo_exact_original_offer_digest() {
         lease: Some(lease.clone()),
         rejection_code: None,
     };
-    assert_response_offer_digest!(offer_response, offer);
+    assert_response_offer_digest(
+        &offer_response,
+        &offer,
+        RemoteOfferResponse::validate,
+        |value, digest| value.offer_request_sha256 = digest,
+    );
 
     let claim = RemoteClaimRequest {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
@@ -297,7 +264,9 @@ fn offer_claim_and_renew_echo_exact_original_offer_digest() {
     }
     .seal()
     .expect("seal claim");
-    assert_request_offer_digest!(claim);
+    assert_request_offer_digest(&claim, RemoteClaimRequest::validate, |value, digest| {
+        value.offer_request_sha256 = digest;
+    });
     let claim_response = RemoteClaimResponse {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: claim.binding.clone(),
@@ -305,7 +274,12 @@ fn offer_claim_and_renew_echo_exact_original_offer_digest() {
         lease: lease.clone(),
         claimed_at: "2026-07-19T12:01:00Z".into(),
     };
-    assert_response_offer_digest!(claim_response, claim);
+    assert_response_offer_digest(
+        &claim_response,
+        &claim,
+        RemoteClaimResponse::validate,
+        |value, digest| value.offer_request_sha256 = digest,
+    );
 
     let renew = RemoteLeaseRenewRequest {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
@@ -317,21 +291,34 @@ fn offer_claim_and_renew_echo_exact_original_offer_digest() {
     }
     .seal()
     .expect("seal renewal");
-    assert_request_offer_digest!(renew);
+    assert_request_offer_digest(
+        &renew,
+        RemoteLeaseRenewRequest::validate,
+        |value, digest| {
+            value.offer_request_sha256 = digest;
+        },
+    );
     let renewal_response = RemoteLeaseRenewResponse {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: renew.binding.clone(),
         offer_request_sha256: renew.offer_request_sha256.clone(),
         lease,
     };
-    assert_response_offer_digest!(renewal_response, renew);
+    assert_response_offer_digest(
+        &renewal_response,
+        &renew,
+        RemoteLeaseRenewResponse::validate,
+        |value, digest| value.offer_request_sha256 = digest,
+    );
 }
 
 #[test]
 fn status_cancel_settle_and_artifact_fetch_bind_original_offer_digest() {
     let offer = offer_request().seal().expect("seal offer");
     let status = status_request(&offer);
-    assert_request_offer_digest!(status);
+    assert_request_offer_digest(&status, RemoteStatusRequest::validate, |value, digest| {
+        value.offer_request_sha256 = digest;
+    });
 
     let cancel = RemoteCancelRequest {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
@@ -343,7 +330,9 @@ fn status_cancel_settle_and_artifact_fetch_bind_original_offer_digest() {
     }
     .seal()
     .expect("seal cancel");
-    assert_request_offer_digest!(cancel);
+    assert_request_offer_digest(&cancel, RemoteCancelRequest::validate, |value, digest| {
+        value.offer_request_sha256 = digest;
+    });
     let cancel_response = RemoteCancelResponse {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: cancel.binding.clone(),
@@ -357,7 +346,12 @@ fn status_cancel_settle_and_artifact_fetch_bind_original_offer_digest() {
     }
     .seal(&cancel)
     .expect("seal cancel response");
-    assert_response_offer_digest!(cancel_response, cancel);
+    assert_response_offer_digest(
+        &cancel_response,
+        &cancel,
+        RemoteCancelResponse::validate,
+        |value, digest| value.offer_request_sha256 = digest,
+    );
 
     let settled = RemoteSettledRequest {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
@@ -370,7 +364,9 @@ fn status_cancel_settle_and_artifact_fetch_bind_original_offer_digest() {
     }
     .seal()
     .expect("seal settlement");
-    assert_request_offer_digest!(settled);
+    assert_request_offer_digest(&settled, RemoteSettledRequest::validate, |value, digest| {
+        value.offer_request_sha256 = digest;
+    });
     let settled_response = RemoteSettledResponse {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: settled.binding.clone(),
@@ -378,7 +374,12 @@ fn status_cancel_settle_and_artifact_fetch_bind_original_offer_digest() {
         settlement_request_sha256: settled.request_sha256.clone(),
         settled_at: "2026-07-19T12:03:00Z".into(),
     };
-    assert_response_offer_digest!(settled_response, settled);
+    assert_response_offer_digest(
+        &settled_response,
+        &settled,
+        RemoteSettledResponse::validate,
+        |value, digest| value.offer_request_sha256 = digest,
+    );
     let mut malformed_settlement = settled_response.clone();
     malformed_settlement
         .settlement_request_sha256
@@ -395,7 +396,11 @@ fn status_cancel_settle_and_artifact_fetch_bind_original_offer_digest() {
     ));
 
     let fetch = artifact_request(&offer, artifact("result.json", b"result"));
-    assert_request_offer_digest!(fetch);
+    assert_request_offer_digest(
+        &fetch,
+        RemoteArtifactFetchRequest::validate,
+        |value, digest| value.offer_request_sha256 = digest,
+    );
 }
 
 fn failed_status(

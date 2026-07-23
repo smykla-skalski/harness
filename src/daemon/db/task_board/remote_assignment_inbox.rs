@@ -130,22 +130,21 @@ async fn accept_new_host_offer(
     };
     require_source_bundle_in_tx(&mut transaction, request, authenticated_principal).await?;
     let lease_id = format!("remote-lease-{}", Uuid::new_v4().simple());
-    insert_assignment_in_tx(
-        &mut transaction,
+    let assignment = super::remote_assignment_model::RemoteAssignmentInsertInput {
         request,
-        authenticated_principal,
-        accepted_at,
-        Some(&lease_id),
-        &accepted_offer.lease_expires_at,
-        &request.deadline_at,
-        Some(
+        principal: authenticated_principal,
+        offered_at: accepted_at,
+        lease_id: Some(&lease_id),
+        lease_expires_at: &accepted_offer.lease_expires_at,
+        deadline_at: &request.deadline_at,
+        executor_configuration_revision: Some(
             u64::try_from(accepted_offer.settings_revision)
                 .map_err(|_| db_error("local executor settings revision is out of range"))?,
         ),
-        Some(&accepted_offer.checkout_path),
-        None,
-    )
-    .await?;
+        executor_checkout_path: Some(&accepted_offer.checkout_path),
+        lifecycle_trust: None,
+    };
+    insert_assignment_in_tx(&mut transaction, &assignment).await?;
     ensure_accepted_offer_receipt_in_tx(
         &mut transaction,
         request,

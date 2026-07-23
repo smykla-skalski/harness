@@ -172,19 +172,18 @@ impl AsyncDaemonDb {
             .await?;
         let lifecycle_trust =
             capture_lifecycle_trust_for_offer_in_tx(&mut transaction, request).await?;
-        insert_assignment_in_tx(
-            &mut transaction,
+        let assignment = super::remote_assignment_model::RemoteAssignmentInsertInput {
             request,
             principal,
             offered_at,
-            None,
+            lease_id: None,
             lease_expires_at,
             deadline_at,
-            None,
-            None,
-            Some(&lifecycle_trust),
-        )
-        .await?;
+            executor_configuration_revision: None,
+            executor_checkout_path: None,
+            lifecycle_trust: Some(&lifecycle_trust),
+        };
+        insert_assignment_in_tx(&mut transaction, &assignment).await?;
         transaction
             .commit()
             .await

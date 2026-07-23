@@ -18,24 +18,23 @@ mod symlink;
 pub(crate) use io::read_bounded_bundle_file;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(clippy::struct_field_names)]
 pub(crate) struct GitBundleContentLimits {
-    pub(crate) max_bundle_bytes: u64,
-    pub(crate) max_pack_objects: u32,
-    pub(crate) max_changed_paths: usize,
-    pub(crate) max_changed_blob_bytes: u64,
-    pub(crate) max_inflated_object_bytes: u64,
-    pub(crate) max_inflated_pack_bytes: u64,
+    pub(crate) bundle_bytes: u64,
+    pub(crate) pack_objects: u32,
+    pub(crate) changed_paths: usize,
+    pub(crate) changed_blob_bytes: u64,
+    pub(crate) inflated_object_bytes: u64,
+    pub(crate) inflated_pack_bytes: u64,
 }
 
 impl GitBundleContentLimits {
     pub(crate) const REMOTE_RESULT: Self = Self {
-        max_bundle_bytes: MAX_REMOTE_GIT_BUNDLE_BYTES,
-        max_pack_objects: MAX_REMOTE_GIT_BUNDLE_OBJECTS,
-        max_changed_paths: MAX_REMOTE_GIT_CHANGED_PATHS,
-        max_changed_blob_bytes: MAX_REMOTE_GIT_CHANGED_BLOB_BYTES,
-        max_inflated_object_bytes: MAX_REMOTE_GIT_INFLATED_OBJECT_BYTES,
-        max_inflated_pack_bytes: MAX_REMOTE_GIT_INFLATED_PACK_BYTES,
+        bundle_bytes: MAX_REMOTE_GIT_BUNDLE_BYTES,
+        pack_objects: MAX_REMOTE_GIT_BUNDLE_OBJECTS,
+        changed_paths: MAX_REMOTE_GIT_CHANGED_PATHS,
+        changed_blob_bytes: MAX_REMOTE_GIT_CHANGED_BLOB_BYTES,
+        inflated_object_bytes: MAX_REMOTE_GIT_INFLATED_OBJECT_BYTES,
+        inflated_pack_bytes: MAX_REMOTE_GIT_INFLATED_PACK_BYTES,
     };
 }
 
@@ -52,10 +51,10 @@ pub(crate) fn require_bounded_bundle(
     let version = u32::from_be_bytes([pack[4], pack[5], pack[6], pack[7]]);
     let objects = u32::from_be_bytes([pack[8], pack[9], pack[10], pack[11]]);
     if size == 0
-        || size > limits.max_bundle_bytes
+        || size > limits.bundle_bytes
         || !matches!(version, 2 | 3)
         || objects == 0
-        || objects > limits.max_pack_objects
+        || objects > limits.pack_objects
     {
         return Err(GitError::unsafe_state(
             repository,
@@ -182,7 +181,7 @@ fn parse_delta(
         let [header, path] = pair else {
             return Err(delta_error(repository));
         };
-        if entries.len() == limits.max_changed_paths
+        if entries.len() == limits.changed_paths
             || path.is_empty()
             || u64::try_from(path.len())
                 .ok()
@@ -243,7 +242,7 @@ fn parse_tree(
 ) -> GitResult<Vec<ChangedPath>> {
     let mut entries = Vec::new();
     for row in nul_chunks(output) {
-        if entries.len() == limits.max_changed_paths {
+        if entries.len() == limits.changed_paths {
             return Err(tree_error(repository));
         }
         entries.push(parse_tree_entry(repository, row, oid_len)?);
@@ -329,7 +328,7 @@ fn require_bounded_objects<'a>(
             };
             total = total
                 .checked_add(size)
-                .filter(|value| *value <= limits.max_changed_blob_bytes)
+                .filter(|value| *value <= limits.changed_blob_bytes)
                 .ok_or_else(|| {
                     GitError::unsafe_state(
                         repository,
@@ -397,7 +396,7 @@ fn delta_output_limit(
     limits: GitBundleContentLimits,
 ) -> GitResult<u64> {
     let oid_len = u64::try_from(oid_len).map_err(|_| delta_error(repository))?;
-    let paths = u64::try_from(limits.max_changed_paths).map_err(|_| delta_error(repository))?;
+    let paths = u64::try_from(limits.changed_paths).map_err(|_| delta_error(repository))?;
     let entry_bytes = MAX_CHANGED_PATH_BYTES
         .checked_add(20)
         .and_then(|value| value.checked_add(oid_len.checked_mul(2)?))
@@ -413,7 +412,7 @@ fn tree_output_limit(
     limits: GitBundleContentLimits,
 ) -> GitResult<u64> {
     let oid_len = u64::try_from(oid_len).map_err(|_| tree_error(repository))?;
-    let paths = u64::try_from(limits.max_changed_paths).map_err(|_| tree_error(repository))?;
+    let paths = u64::try_from(limits.changed_paths).map_err(|_| tree_error(repository))?;
     let row_bytes = MAX_CHANGED_PATH_BYTES
         .checked_add(16)
         .and_then(|value| value.checked_add(oid_len))

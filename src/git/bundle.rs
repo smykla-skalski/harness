@@ -111,7 +111,7 @@ impl GitBundleImportPlan {
         bundle: &Path,
         limits: GitBundleContentLimits,
     ) -> GitResult<()> {
-        let bytes = read_bounded_bundle_file(bundle, limits.max_bundle_bytes)?;
+        let bytes = read_bounded_bundle_file(bundle, limits.bundle_bytes)?;
         self.verify_and_import_bytes_with_limits(bundle, &bytes, limits)
     }
 
@@ -126,8 +126,7 @@ impl GitBundleImportPlan {
         let output_limit = u64::try_from(bytes.len())
             .map_err(|_| GitError::unsafe_state(bundle, "git bundle length overflowed"))?;
         {
-            let staged =
-                GitBundleStaging::prepare(&self.coordinates, bytes, limits.max_bundle_bytes)?;
+            let staged = GitBundleStaging::prepare(&self.coordinates, bytes, limits.bundle_bytes)?;
             let staged_path = staged.path()?;
             self.git_contract_bounded_with_input(
                 ["bundle", "verify", staged_path],

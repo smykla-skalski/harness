@@ -8,8 +8,10 @@ use super::super::remote_start_tests::{
     PreparedRemoteOffer, offer_remote, prepare_remote_offer_with_policy,
     prepare_remote_offer_with_retry,
 };
-use crate::daemon::db::task_board::TaskBoardRemoteMutationOutcome;
 use crate::daemon::db::task_board::remote_assignment_test_support::claim_request;
+use crate::daemon::db::task_board::{
+    TaskBoardRemoteArtifactStoreInput, TaskBoardRemoteMutationOutcome,
+};
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteAssignmentWireState, RemoteClaimResponse,
     RemoteLease, RemoteStatusResponse, RemoteTypedResult, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
@@ -173,18 +175,19 @@ pub(super) async fn store_result(candidate: &CompletedCandidate) {
         .await
         .expect("load terminal assignment")
         .expect("terminal assignment");
+    let input = TaskBoardRemoteArtifactStoreInput {
+        binding: &candidate.prepared.offer.binding,
+        lease_id: assignment.lease_id.as_deref().expect("assignment lease"),
+        offer_request_sha256: &candidate.prepared.offer.request_sha256,
+        artifact: &candidate.entry,
+        content: &candidate.content,
+        authenticated_principal: PRINCIPAL,
+        stored_at: "2026-07-19T10:00:06Z",
+    };
     candidate
         .prepared
         .db
-        .store_task_board_remote_artifact(
-            &candidate.prepared.offer.binding,
-            assignment.lease_id.as_deref().expect("assignment lease"),
-            &candidate.prepared.offer.request_sha256,
-            &candidate.entry,
-            &candidate.content,
-            PRINCIPAL,
-            "2026-07-19T10:00:06Z",
-        )
+        .store_task_board_remote_artifact(&input)
         .await
         .expect("store fetched remote result");
 }

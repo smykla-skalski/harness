@@ -24,11 +24,8 @@ struct DecodedRow {
 struct EvidenceBlobs {
     start_receipt_json: Option<String>,
     start_receipt_sha256: Option<String>,
-    owner_instance_id: Option<String>,
-    owner_epoch: Option<i64>,
-    owner_acquired_at: Option<String>,
-    owner_expires_at: Option<String>,
-    owner_sha256: Option<String>,
+    lifecycle_owner:
+        super::super::remote_assignment_lifecycle_owner::ExecutorLifecycleOwnerEvidence,
     stop_pending_json: Option<String>,
     stop_pending_sha256: Option<String>,
 }
@@ -84,16 +81,17 @@ fn decode_control_evidence(
     row: &RemoteAssignmentRow,
     decoded: &mut DecodedRow,
 ) -> Result<(), CliError> {
-    decoded.claim_receipt = super::super::remote_claim_receipts::decode_claim_receipt(
-        &row.assignment_id,
-        decoded.fencing_epoch,
-        decoded.offer.as_ref(),
-        row.authenticated_principal.as_deref(),
-        row.claimed_at.as_deref(),
-        row.claim_request_sha256.clone(),
-        row.claim_response_json.clone(),
-        row.claim_receipt_sha256.clone(),
-    )?;
+    let input = super::super::remote_claim_receipts::ClaimReceiptDecodeInput {
+        assignment_id: &row.assignment_id,
+        fencing_epoch: decoded.fencing_epoch,
+        offer: decoded.offer.as_ref(),
+        principal: row.authenticated_principal.as_deref(),
+        claimed_at: row.claimed_at.as_deref(),
+        request_sha256: row.claim_request_sha256.as_deref(),
+        response_json: row.claim_response_json.as_deref(),
+        receipt_sha256: row.claim_receipt_sha256.as_deref(),
+    };
+    decoded.claim_receipt = super::super::remote_claim_receipts::decode_claim_receipt(&input)?;
     let lifecycle_trust = super::super::remote_lifecycle_trust::decode_lifecycle_trust(
         row.controller_lifecycle_trust_json.clone(),
         row.controller_lifecycle_trust_sha256.clone(),
@@ -221,11 +219,7 @@ fn attach_evidence(
     };
     let owner = super::super::remote_assignment_lifecycle_owner::decode_executor_lifecycle_owner(
         &record,
-        evidence.owner_instance_id,
-        evidence.owner_epoch,
-        evidence.owner_acquired_at,
-        evidence.owner_expires_at,
-        evidence.owner_sha256,
+        evidence.lifecycle_owner,
     )?;
     let record = TaskBoardRemoteAssignmentRecord {
         executor_lifecycle_owner: owner,
@@ -248,11 +242,14 @@ impl EvidenceBlobs {
         Self {
             start_receipt_json: row.executor_start_receipt_json.clone(),
             start_receipt_sha256: row.executor_start_receipt_sha256.clone(),
-            owner_instance_id: row.executor_lifecycle_owner_instance_id.clone(),
-            owner_epoch: row.executor_lifecycle_owner_epoch,
-            owner_acquired_at: row.executor_lifecycle_owner_acquired_at.clone(),
-            owner_expires_at: row.executor_lifecycle_owner_expires_at.clone(),
-            owner_sha256: row.executor_lifecycle_owner_sha256.clone(),
+            lifecycle_owner:
+                super::super::remote_assignment_lifecycle_owner::ExecutorLifecycleOwnerEvidence {
+                    instance_id: row.executor_lifecycle_owner_instance_id.clone(),
+                    owner_epoch: row.executor_lifecycle_owner_epoch,
+                    acquired_at: row.executor_lifecycle_owner_acquired_at.clone(),
+                    expires_at: row.executor_lifecycle_owner_expires_at.clone(),
+                    sha256: row.executor_lifecycle_owner_sha256.clone(),
+                },
             stop_pending_json: row.executor_stop_pending_json.clone(),
             stop_pending_sha256: row.executor_stop_pending_sha256.clone(),
         }

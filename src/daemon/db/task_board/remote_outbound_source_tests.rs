@@ -1,6 +1,6 @@
 use sha2::{Digest as _, Sha256};
 
-use super::remote_assignment_model::insert_assignment_in_tx;
+use super::remote_assignment_model::{RemoteAssignmentInsertInput, insert_assignment_in_tx};
 use super::remote_assignment_test_support::{
     DEADLINE, INSTANCE, LEASE_EXPIRES, NOW, PRINCIPAL, REPOSITORY, SOURCE_REVISION,
     executor_fixture,
@@ -25,20 +25,9 @@ async fn outbound_source_is_atomic_with_assignment_and_restart_replay() {
         .begin_immediate_transaction("test outbound source insert")
         .await
         .expect("begin outbound source insert");
-    insert_assignment_in_tx(
-        &mut transaction,
-        &offer,
-        PRINCIPAL,
-        NOW,
-        None,
-        LEASE_EXPIRES,
-        DEADLINE,
-        None,
-        None,
-        None,
-    )
-    .await
-    .expect("insert exact outbound assignment");
+    insert_assignment_in_tx(&mut transaction, &test_assignment(&offer))
+        .await
+        .expect("insert exact outbound assignment");
     persist_outbound_source_in_tx(&mut transaction, &offer, Some(&content), NOW)
         .await
         .expect("persist exact outbound source");
@@ -107,20 +96,9 @@ async fn missing_outbound_bytes_roll_back_the_assignment_generation() {
         .begin_immediate_transaction("test missing outbound source")
         .await
         .expect("begin missing outbound source");
-    insert_assignment_in_tx(
-        &mut transaction,
-        &offer,
-        PRINCIPAL,
-        NOW,
-        None,
-        LEASE_EXPIRES,
-        DEADLINE,
-        None,
-        None,
-        None,
-    )
-    .await
-    .expect("insert provisional assignment");
+    insert_assignment_in_tx(&mut transaction, &test_assignment(&offer))
+        .await
+        .expect("insert provisional assignment");
     assert!(
         persist_outbound_source_in_tx(&mut transaction, &offer, None, NOW)
             .await
@@ -135,6 +113,20 @@ async fn missing_outbound_bytes_roll_back_the_assignment_generation() {
             .expect("load rolled back assignment")
             .is_none()
     );
+}
+
+fn test_assignment(offer: &RemoteOfferRequest) -> RemoteAssignmentInsertInput<'_> {
+    RemoteAssignmentInsertInput {
+        request: offer,
+        principal: PRINCIPAL,
+        offered_at: NOW,
+        lease_id: None,
+        lease_expires_at: LEASE_EXPIRES,
+        deadline_at: DEADLINE,
+        executor_configuration_revision: None,
+        executor_checkout_path: None,
+        lifecycle_trust: None,
+    }
 }
 
 pub(super) async fn source_recovery_owns(db: &AsyncDaemonDb, offer: &RemoteOfferRequest) -> bool {

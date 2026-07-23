@@ -21,8 +21,6 @@ use crate::daemon::task_board_remote_transport::wire::{
     RemoteSourceBundleAbandonResponse, RemoteSourceBundleReceiptVerificationResponse,
     RemoteSourceBundleUploadRequest,
 };
-use crate::task_board::{TaskBoardExecutionAttemptCas, TaskBoardWorkflowExecutionCas};
-
 impl AsyncDaemonDb {
     pub(crate) async fn adopt_verified_task_board_remote_source_bundle_receipt(
         &self,
@@ -177,32 +175,21 @@ impl AsyncDaemonDb {
         Ok(stored)
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn reassign_rejected_task_board_remote_source_bundle_offer(
         &self,
-        expected_execution: &TaskBoardWorkflowExecutionCas,
-        expected_attempt: &TaskBoardExecutionAttemptCas,
+        reassignment: &super::remote_source_bundle_reassignment::TaskBoardRemoteSourceOfferReassignment<
+            '_,
+        >,
         predecessor: &RemoteOfferRequest,
         rejection: &RemoteOfferResponse,
-        replacement: &RemoteOfferRequest,
-        authenticated_principal: &str,
-        trust: &TaskBoardRemoteOperationTrustFence,
-        offered_at: &str,
-        lease_expires_at: &str,
     ) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
         Box::pin(self.reassign_task_board_remote_source_bundle_offer(
-            expected_execution,
-            expected_attempt,
+            reassignment,
             super::remote_source_bundle_reassignment_evidence::SourceReassignmentEvidence::OfferRejection {
                 request: predecessor,
                 response: rejection,
-                observed_at: offered_at,
+                observed_at: reassignment.offered_at,
             },
-            replacement,
-            authenticated_principal,
-            trust,
-            offered_at,
-            lease_expires_at,
         ))
         .await
     }

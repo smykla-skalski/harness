@@ -2,6 +2,7 @@ use super::{canonical_now, controller_database_error, missing_execution, request
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome,
     TaskBoardRemoteOfferOutcome, TaskBoardRemoteOperationTrustFence,
+    TaskBoardRemoteSourceOfferReassignment,
 };
 use crate::daemon::task_board_remote_transport::controller::RemoteExecutionControllerClient;
 use crate::daemon::task_board_remote_transport::controller_offer_recovery::RemotePredecessorOfferRecoveryOutcome;
@@ -94,16 +95,21 @@ async fn reassign_abandoned_source(
     trust: &TaskBoardRemoteOperationTrustFence,
 ) -> Result<bool, CliError> {
     let context = reassignment_context(db, assignment, &request.offer, trust).await?;
+    let expected_execution = TaskBoardWorkflowExecutionCas::from(&context.execution);
+    let expected_attempt = TaskBoardExecutionAttemptCas::from(&context.attempt);
+    let reassignment = TaskBoardRemoteSourceOfferReassignment {
+        expected_execution: &expected_execution,
+        expected_attempt: &expected_attempt,
+        replacement: &context.replacement.request,
+        authenticated_principal: &assignment.host_id,
+        trust,
+        offered_at: &context.replacement.offered_at,
+        lease_expires_at: &context.replacement.lease_expires_at,
+    };
     Box::pin(db.reassign_abandoned_task_board_remote_source_bundle_offer(
-        &TaskBoardWorkflowExecutionCas::from(&context.execution),
-        &TaskBoardExecutionAttemptCas::from(&context.attempt),
+        &reassignment,
         request,
         response,
-        &context.replacement.request,
-        &assignment.host_id,
-        trust,
-        &context.replacement.offered_at,
-        &context.replacement.lease_expires_at,
     ))
     .await
     .map(|outcome| reassignment_progressed(&outcome))
@@ -117,16 +123,21 @@ async fn reassign_rejected_offer(
     trust: &TaskBoardRemoteOperationTrustFence,
 ) -> Result<bool, CliError> {
     let context = reassignment_context(db, assignment, offer, trust).await?;
+    let expected_execution = TaskBoardWorkflowExecutionCas::from(&context.execution);
+    let expected_attempt = TaskBoardExecutionAttemptCas::from(&context.attempt);
+    let reassignment = TaskBoardRemoteSourceOfferReassignment {
+        expected_execution: &expected_execution,
+        expected_attempt: &expected_attempt,
+        replacement: &context.replacement.request,
+        authenticated_principal: &assignment.host_id,
+        trust,
+        offered_at: &context.replacement.offered_at,
+        lease_expires_at: &context.replacement.lease_expires_at,
+    };
     Box::pin(db.reassign_rejected_task_board_remote_source_bundle_offer(
-        &TaskBoardWorkflowExecutionCas::from(&context.execution),
-        &TaskBoardExecutionAttemptCas::from(&context.attempt),
+        &reassignment,
         offer,
         response,
-        &context.replacement.request,
-        &assignment.host_id,
-        trust,
-        &context.replacement.offered_at,
-        &context.replacement.lease_expires_at,
     ))
     .await
     .map(|outcome| reassignment_progressed(&outcome))

@@ -6,7 +6,7 @@ fn rejects_excess_changed_paths_before_ref_or_worktree_mutation() {
     let mut fixture = Fixture::new(false);
     fixture.extend_result("second.txt", "second\n");
     let limits = GitBundleContentLimits {
-        max_changed_paths: 1,
+        changed_paths: 1,
         ..GitBundleContentLimits::REMOTE_RESULT
     };
 
@@ -22,7 +22,7 @@ fn rejects_excess_changed_paths_before_ref_or_worktree_mutation() {
 fn rejects_excess_materialized_bytes_before_ref_or_worktree_mutation() {
     let fixture = Fixture::new(false);
     let limits = GitBundleContentLimits {
-        max_changed_blob_bytes: 1,
+        changed_blob_bytes: 1,
         ..GitBundleContentLimits::REMOTE_RESULT
     };
 

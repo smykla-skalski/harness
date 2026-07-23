@@ -225,19 +225,18 @@ async fn persist_remote_offer_in_tx(
     )?;
     update_execution_in_tx(transaction, input.expected_execution, &updated_parent).await?;
     update_attempt_in_tx(transaction, input.expected_attempt, &updated_attempt).await?;
-    insert_assignment_in_tx(
-        transaction,
-        input.request,
-        input.authenticated_principal,
-        window.offered,
-        None,
-        window.lease_expires,
-        window.deadline,
-        None,
-        None,
-        Some(input.lifecycle_trust),
-    )
-    .await?;
+    let assignment = super::remote_assignment_model::RemoteAssignmentInsertInput {
+        request: input.request,
+        principal: input.authenticated_principal,
+        offered_at: window.offered,
+        lease_id: None,
+        lease_expires_at: window.lease_expires,
+        deadline_at: window.deadline,
+        executor_configuration_revision: None,
+        executor_checkout_path: None,
+        lifecycle_trust: Some(input.lifecycle_trust),
+    };
+    insert_assignment_in_tx(transaction, &assignment).await?;
     persist_outbound_source_in_tx(
         transaction,
         input.request,

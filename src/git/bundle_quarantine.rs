@@ -219,7 +219,7 @@ fn pack_object_count(worktree: &Path, pack: &Path) -> GitResult<u32> {
 }
 
 fn verify_pack_output_limit(worktree: &Path, limits: GitBundleContentLimits) -> GitResult<u64> {
-    u64::from(limits.max_pack_objects)
+    u64::from(limits.pack_objects)
         .checked_mul(256)
         .and_then(|value| value.checked_add(16 * 1024))
         .ok_or_else(|| GitError::unsafe_state(worktree, "Git pack output limit overflowed"))
@@ -227,14 +227,14 @@ fn verify_pack_output_limit(worktree: &Path, limits: GitBundleContentLimits) -> 
 
 fn process_limits(worktree: &Path, limits: GitBundleContentLimits) -> GitResult<GitProcessLimits> {
     let file_bytes = limits
-        .max_bundle_bytes
-        .checked_add(limits.max_inflated_pack_bytes)
+        .bundle_bytes
+        .checked_add(limits.inflated_pack_bytes)
         .and_then(|value| value.checked_add(16 * 1024 * 1024))
         .ok_or_else(|| resource_error(worktree))?;
     let address_space_bytes = limits
-        .max_inflated_pack_bytes
+        .inflated_pack_bytes
         .checked_mul(3)
-        .and_then(|value| value.checked_add(limits.max_bundle_bytes))
+        .and_then(|value| value.checked_add(limits.bundle_bytes))
         .and_then(|value| value.checked_add(64 * 1024 * 1024))
         .ok_or_else(|| resource_error(worktree))?;
     Ok(GitProcessLimits {
@@ -243,7 +243,7 @@ fn process_limits(worktree: &Path, limits: GitBundleContentLimits) -> GitResult<
         address_space_bytes,
         // No single Git allocation may exceed the whole inflated-pack budget; this leaves
         // ample headroom over one inflated object yet rejects a delta bomb before inflation.
-        alloc_limit_bytes: limits.max_inflated_pack_bytes,
+        alloc_limit_bytes: limits.inflated_pack_bytes,
         file_bytes,
     })
 }
@@ -268,12 +268,12 @@ fn require_inflated_sizes(
             continue;
         }
         let size = parse_object_row(worktree, &fields)?;
-        if !objects.insert(oid) || size > limits.max_inflated_object_bytes {
+        if !objects.insert(oid) || size > limits.inflated_object_bytes {
             return Err(inflated_error(worktree));
         }
         total = total
             .checked_add(size)
-            .filter(|value| *value <= limits.max_inflated_pack_bytes)
+            .filter(|value| *value <= limits.inflated_pack_bytes)
             .ok_or_else(|| inflated_error(worktree))?;
     }
     if objects.len() == usize::try_from(expected).unwrap_or(usize::MAX) {

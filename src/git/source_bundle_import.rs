@@ -151,7 +151,7 @@ impl GitSourceBundleImportPlan {
         let exact = canonical_oid(&self.revision, oid_len)
             && canonical_digest(&self.bundle_sha256)
             && self.bundle_size > 0
-            && self.bundle_size <= GitBundleContentLimits::REMOTE_RESULT.max_bundle_bytes
+            && self.bundle_size <= GitBundleContentLimits::REMOTE_RESULT.bundle_bytes
             && self.advertised_ref == exact_ref
             && canonical_import_ref(&self.import_ref, &self.bundle_sha256);
         if !exact {

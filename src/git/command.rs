@@ -364,26 +364,14 @@ fn apply_process_limits(command: &mut Command, limits: GitProcessLimits) {
     unsafe {
         command.pre_exec(move || {
             set_resource_limit(libc::RLIMIT_CPU, limits.cpu_seconds)?;
-            set_address_space_limit(limits.address_space_bytes)?;
+            // macOS rejects lowering RLIMIT_AS below the pre-exec child's current
+            // usage. Linux accepts it, while GIT_ALLOC_LIMIT remains the
+            // cross-platform transient-allocation guard.
+            #[cfg(target_os = "linux")]
+            set_resource_limit(libc::RLIMIT_AS, limits.address_space_bytes)?;
             set_resource_limit(libc::RLIMIT_FSIZE, limits.file_bytes)
         });
     }
-}
-
-// macOS rejects setrlimit(RLIMIT_AS) with EINVAL (it won't lower the cap below the
-// pre-exec child's current usage); Linux permits it, so this cap is Linux-only. Off Linux
-// GIT_ALLOC_LIMIT (set in apply_process_limits) is the transient-memory guard: it rejects
-// an oversized single allocation before inflation, while the post-hoc verify-pack sizes and
-// the CPU/wall-clock budget remain the backstops.
-#[cfg(target_os = "linux")]
-fn set_address_space_limit(bytes: u64) -> io::Result<()> {
-    set_resource_limit(libc::RLIMIT_AS, bytes)
-}
-
-#[cfg(not(target_os = "linux"))]
-#[allow(clippy::unnecessary_wraps)]
-fn set_address_space_limit(_bytes: u64) -> io::Result<()> {
-    Ok(())
 }
 
 #[cfg(target_os = "linux")]

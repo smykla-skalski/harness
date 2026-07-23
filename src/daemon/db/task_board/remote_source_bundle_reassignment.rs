@@ -43,77 +43,67 @@ use crate::task_board::{
 use replay::replayed_replacement_in_tx;
 use storage::{require_no_replacement_collision_in_tx, supersede_predecessor_in_tx};
 
+pub(crate) struct TaskBoardRemoteSourceOfferReassignment<'a> {
+    pub(crate) expected_execution: &'a TaskBoardWorkflowExecutionCas,
+    pub(crate) expected_attempt: &'a TaskBoardExecutionAttemptCas,
+    pub(crate) replacement: &'a RemoteOfferRequest,
+    pub(crate) authenticated_principal: &'a str,
+    pub(crate) trust: &'a TaskBoardRemoteOperationTrustFence,
+    pub(crate) offered_at: &'a str,
+    pub(crate) lease_expires_at: &'a str,
+}
+
 impl AsyncDaemonDb {
-    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn reassign_abandoned_task_board_remote_source_bundle_offer(
         &self,
-        expected_execution: &TaskBoardWorkflowExecutionCas,
-        expected_attempt: &TaskBoardExecutionAttemptCas,
+        reassignment: &TaskBoardRemoteSourceOfferReassignment<'_>,
         abandonment_request: &RemoteSourceBundleAbandonRequest,
         abandonment_response: &RemoteSourceBundleAbandonResponse,
-        replacement: &RemoteOfferRequest,
-        authenticated_principal: &str,
-        trust: &TaskBoardRemoteOperationTrustFence,
-        offered_at: &str,
-        lease_expires_at: &str,
     ) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
         Box::pin(self.reassign_task_board_remote_source_bundle_offer(
-            expected_execution,
-            expected_attempt,
+            reassignment,
             SourceReassignmentEvidence::Abandonment {
                 request: abandonment_request,
                 response: abandonment_response,
             },
-            replacement,
-            authenticated_principal,
-            trust,
-            offered_at,
-            lease_expires_at,
         ))
         .await
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub(super) async fn reassign_task_board_remote_source_bundle_offer(
         &self,
-        expected_execution: &TaskBoardWorkflowExecutionCas,
-        expected_attempt: &TaskBoardExecutionAttemptCas,
+        reassignment: &TaskBoardRemoteSourceOfferReassignment<'_>,
         evidence: SourceReassignmentEvidence<'_>,
-        replacement: &RemoteOfferRequest,
-        authenticated_principal: &str,
-        trust: &TaskBoardRemoteOperationTrustFence,
-        offered_at: &str,
-        lease_expires_at: &str,
     ) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
         validate_reassignment_input(
             evidence,
-            replacement,
-            authenticated_principal,
-            trust,
-            offered_at,
-            lease_expires_at,
+            reassignment.replacement,
+            reassignment.authenticated_principal,
+            reassignment.trust,
+            reassignment.offered_at,
+            reassignment.lease_expires_at,
         )?;
         let mut transaction = self
             .begin_immediate_transaction("task board remote source offer reassignment")
             .await?;
-        require_source_recovery_operation_fence_in_tx(&mut transaction, trust).await?;
+        require_source_recovery_operation_fence_in_tx(&mut transaction, reassignment.trust).await?;
         // The successor identity must not collide with an archived legacy row
         // before the idempotent replay or a fresh successor is created.
         require_no_archival_collision_in_tx(
             &mut transaction,
-            &replacement.binding.assignment_id,
-            &replacement.binding.idempotency_key,
-            Some(&replacement.request_sha256),
-            &replacement.binding.execution_id,
-            replacement.binding.fencing_epoch,
+            &reassignment.replacement.binding.assignment_id,
+            &reassignment.replacement.binding.idempotency_key,
+            Some(&reassignment.replacement.request_sha256),
+            &reassignment.replacement.binding.execution_id,
+            reassignment.replacement.binding.fencing_epoch,
         )
         .await?;
         if let Some(replayed) = Box::pin(replayed_replacement_in_tx(
             &mut transaction,
             evidence,
-            replacement,
-            authenticated_principal,
-            trust,
+            reassignment.replacement,
+            reassignment.authenticated_principal,
+            reassignment.trust,
         ))
         .await?
         {
@@ -124,16 +114,24 @@ impl AsyncDaemonDb {
             })?;
             return Ok(TaskBoardRemoteOfferOutcome::Replayed(replayed));
         }
-        let parent =
-            exact_parent_in_tx(&mut transaction, expected_execution, expected_attempt).await?;
-        let predecessor =
-            exact_predecessor_in_tx(&mut transaction, evidence, authenticated_principal, trust)
-                .await?;
+        let parent = exact_parent_in_tx(
+            &mut transaction,
+            reassignment.expected_execution,
+            reassignment.expected_attempt,
+        )
+        .await?;
+        let predecessor = exact_predecessor_in_tx(
+            &mut transaction,
+            evidence,
+            reassignment.authenticated_principal,
+            reassignment.trust,
+        )
+        .await?;
         let parent = settle_predecessor_offer_authority_in_tx(
             &mut transaction,
             &predecessor,
             &parent,
-            offered_at,
+            reassignment.offered_at,
         )
         .await?;
         let source_content =
@@ -142,27 +140,30 @@ impl AsyncDaemonDb {
         validate_replacement(
             &parent,
             &predecessor,
-            expected_execution,
-            replacement,
-            trust,
+            reassignment.expected_execution,
+            reassignment.replacement,
+            reassignment.trust,
         )?;
-        require_no_replacement_collision_in_tx(&mut transaction, &predecessor, replacement).await?;
-        let lifecycle_trust =
-            capture_lifecycle_trust_for_offer_in_tx(&mut transaction, replacement).await?;
-        let created = persist_reassigned_offer_in_tx(
+        require_no_replacement_collision_in_tx(
             &mut transaction,
-            PersistReassignedOfferInput {
-                predecessor: &predecessor,
-                parent: &parent,
-                replacement,
-                authenticated_principal,
-                source_content: &source_content,
-                offered_at,
-                lease_expires_at,
-                lifecycle_trust: &lifecycle_trust,
-            },
+            &predecessor,
+            reassignment.replacement,
         )
         .await?;
+        let lifecycle_trust =
+            capture_lifecycle_trust_for_offer_in_tx(&mut transaction, reassignment.replacement)
+                .await?;
+        let persistence = PersistReassignedOfferInput {
+            predecessor: &predecessor,
+            parent: &parent,
+            replacement: reassignment.replacement,
+            authenticated_principal: reassignment.authenticated_principal,
+            source_content: &source_content,
+            offered_at: reassignment.offered_at,
+            lease_expires_at: reassignment.lease_expires_at,
+            lifecycle_trust: &lifecycle_trust,
+        };
+        let created = persist_reassigned_offer_in_tx(&mut transaction, &persistence).await?;
         transaction.commit().await.map_err(|error| {
             db_error(format!("commit remote source offer reassignment: {error}"))
         })?;
@@ -183,7 +184,7 @@ struct PersistReassignedOfferInput<'a> {
 
 async fn persist_reassigned_offer_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
-    input: PersistReassignedOfferInput<'_>,
+    input: &PersistReassignedOfferInput<'_>,
 ) -> Result<TaskBoardRemoteAssignmentRecord, CliError> {
     let updated = replacement_parent(input.parent, input.replacement, input.offered_at)?;
     validate_task_board_remote_target_reassignment(input.parent, &updated)
@@ -195,19 +196,18 @@ async fn persist_reassigned_offer_in_tx(
         &updated,
     )
     .await?;
-    insert_assignment_in_tx(
-        transaction,
-        input.replacement,
-        input.authenticated_principal,
-        input.offered_at,
-        None,
-        input.lease_expires_at,
-        &input.replacement.deadline_at,
-        None,
-        None,
-        Some(input.lifecycle_trust),
-    )
-    .await?;
+    let assignment = super::remote_assignment_model::RemoteAssignmentInsertInput {
+        request: input.replacement,
+        principal: input.authenticated_principal,
+        offered_at: input.offered_at,
+        lease_id: None,
+        lease_expires_at: input.lease_expires_at,
+        deadline_at: &input.replacement.deadline_at,
+        executor_configuration_revision: None,
+        executor_checkout_path: None,
+        lifecycle_trust: Some(input.lifecycle_trust),
+    };
+    insert_assignment_in_tx(transaction, &assignment).await?;
     persist_outbound_source_in_tx(
         transaction,
         input.replacement,

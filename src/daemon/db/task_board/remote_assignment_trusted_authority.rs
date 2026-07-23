@@ -1,6 +1,5 @@
-use super::TaskBoardRemoteIoAuthority;
 use super::remote_assignment_io_authority::{
-    TaskBoardRemoteIoAuthorityKind, require_authority_parent,
+    RemoteIoAuthorityClaim, RemoteIoAuthorityRequestEvidence, require_authority_parent,
 };
 use super::remote_assignment_lease::{commit_noop, renew_request_for_record};
 use super::remote_assignment_model::{concurrent, load_assignment_in_tx};
@@ -8,6 +7,7 @@ use super::remote_operation_trust::{
     TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence,
     require_pending_operation_replay_trust_in_tx,
 };
+use super::{TaskBoardRemoteIoAuthority, TaskBoardRemoteIoAuthorityKind};
 use crate::daemon::db::{AsyncDaemonDb, CliError, TaskBoardRemoteHostTrustFence};
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteCancelRequest, RemoteClaimRequest, RemoteLeaseRenewRequest, RemoteOfferRequest,
@@ -25,19 +25,13 @@ impl AsyncDaemonDb {
         request.validate().map_err(|error| {
             crate::daemon::db::db_error(format!("validate remote offer I/O authority: {error}"))
         })?;
-        self.claim_remote_io_authority(
-            &request.binding,
-            &request.request_sha256,
-            &request.request_sha256,
-            None,
-            authenticated_principal,
-            TaskBoardRemoteIoAuthorityKind::Offer,
+        let claim = RemoteIoAuthorityClaim {
+            request: RemoteIoAuthorityRequestEvidence::Offer(request),
+            principal: authenticated_principal,
             authority_at,
-            None,
-            None,
-            Some(trust),
-        )
-        .await
+            expected_trust: Some(trust),
+        };
+        self.claim_remote_io_authority(&claim).await
     }
 
     pub(crate) async fn claim_task_board_remote_claim_io_authority_fenced(
@@ -50,19 +44,13 @@ impl AsyncDaemonDb {
         request.validate().map_err(|error| {
             crate::daemon::db::db_error(format!("validate remote claim I/O authority: {error}"))
         })?;
-        self.claim_remote_io_authority(
-            &request.binding,
-            &request.request_sha256,
-            &request.offer_request_sha256,
-            Some(&request.lease_id),
-            authenticated_principal,
-            TaskBoardRemoteIoAuthorityKind::Claim,
+        let claim = RemoteIoAuthorityClaim {
+            request: RemoteIoAuthorityRequestEvidence::Claim(request),
+            principal: authenticated_principal,
             authority_at,
-            None,
-            None,
-            Some(trust),
-        )
-        .await
+            expected_trust: Some(trust),
+        };
+        self.claim_remote_io_authority(&claim).await
     }
 
     pub(crate) async fn claim_task_board_remote_renew_io_authority_fenced(
@@ -75,19 +63,13 @@ impl AsyncDaemonDb {
         request.validate().map_err(|error| {
             crate::daemon::db::db_error(format!("validate remote renewal I/O authority: {error}"))
         })?;
-        self.claim_remote_io_authority(
-            &request.binding,
-            &request.request_sha256,
-            &request.offer_request_sha256,
-            Some(&request.lease_id),
-            authenticated_principal,
-            TaskBoardRemoteIoAuthorityKind::Renew,
+        let claim = RemoteIoAuthorityClaim {
+            request: RemoteIoAuthorityRequestEvidence::Renew(request),
+            principal: authenticated_principal,
             authority_at,
-            Some(request),
-            None,
-            Some(trust),
-        )
-        .await
+            expected_trust: Some(trust),
+        };
+        self.claim_remote_io_authority(&claim).await
     }
 
     pub(crate) async fn claim_task_board_remote_cancel_io_authority_fenced(
@@ -100,19 +82,13 @@ impl AsyncDaemonDb {
         request.validate().map_err(|error| {
             crate::daemon::db::db_error(format!("validate remote cancel I/O authority: {error}"))
         })?;
-        self.claim_remote_io_authority(
-            &request.binding,
-            &request.request_sha256,
-            &request.offer_request_sha256,
-            Some(&request.lease_id),
-            authenticated_principal,
-            TaskBoardRemoteIoAuthorityKind::Cancel,
+        let claim = RemoteIoAuthorityClaim {
+            request: RemoteIoAuthorityRequestEvidence::Cancel(request),
+            principal: authenticated_principal,
             authority_at,
-            None,
-            Some(request),
-            Some(trust),
-        )
-        .await
+            expected_trust: Some(trust),
+        };
+        self.claim_remote_io_authority(&claim).await
     }
 
     pub(crate) async fn require_pending_task_board_remote_renew_replay_authority_fenced(
