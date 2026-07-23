@@ -18,8 +18,10 @@ extension DaemonController {
       switch await bootstrapAutoTransport(connection: connection) {
       case .upgraded(let webSocketClient):
         await httpClient.shutdown()
+        try await requireNotCancelled(releasing: webSocketClient)
         return webSocketClient
       case .unavailable, .timedOut:
+        try await requireNotCancelled(releasing: httpClient)
         return httpClient
       }
     }
@@ -28,6 +30,7 @@ extension DaemonController {
       return webSocketClient
     }
     await httpClient.shutdown()
+    try Task.checkCancellation()
     throw DaemonControlError.commandFailed("WebSocket connection failed")
   }
 

@@ -6,12 +6,6 @@ public struct DaemonController: DaemonControlling {
   static let managedStaleManifestDefaultGracePeriod: Duration = .seconds(5)
   public static let managedLaunchAgentBTMSettleDelayDefault: Duration = .milliseconds(500)
 
-  enum AutoTransportBootstrapOutcome: Sendable {
-    case upgraded(any HarnessMonitorClientProtocol)
-    case unavailable
-    case timedOut
-  }
-
   let environment: HarnessMonitorEnvironment
   let sessionFactory: @Sendable (HarnessMonitorConnection) -> any HarnessMonitorClientProtocol
   let webSocketBootstrapper:
@@ -48,15 +42,7 @@ public struct DaemonController: DaemonControlling {
     webSocketBootstrapper:
       @escaping @Sendable (HarnessMonitorConnection) async
       -> (any HarnessMonitorClientProtocol)? = {
-        let transport = WebSocketTransport(connection: $0)
-        do {
-          try await transport.connect()
-          _ = try await transport.health()
-          return transport
-        } catch {
-          await transport.shutdown()
-          return nil
-        }
+        await Self.defaultWebSocketBootstrap($0)
       },
     endpointProbe: @escaping @Sendable (URL) async -> Bool = {
       await Self.defaultEndpointProbe($0)
@@ -178,6 +164,10 @@ public struct DaemonController: DaemonControlling {
         )
         return wsClient
       }
+      // A cancelled attempt also reports nil. Surfacing that as a connection
+      // failure would make callers toast an offline banner and schedule a
+      // reconnect for work they themselves called off.
+      try Task.checkCancellation()
       throw DaemonControlError.commandFailed("WebSocket connection failed")
     }
 
@@ -197,6 +187,7 @@ public struct DaemonController: DaemonControlling {
         HarnessMonitorLogger.lifecycle.trace(
           "Upgraded daemon transport to WebSocket for \(connection.endpoint.absoluteString, privacy: .public)"
         )
+        try await requireNotCancelled(releasing: wsClient)
         return wsClient
       case .timedOut:
         let gracePeriod = String(describing: autoTransportWebSocketGracePeriod)
@@ -209,6 +200,7 @@ public struct DaemonController: DaemonControlling {
       case .unavailable:
         break
       }
+      try await requireNotCancelled(releasing: httpClient)
       return httpClient
     }
 
@@ -219,42 +211,8 @@ public struct DaemonController: DaemonControlling {
       )
       return wsClient
     }
+    try Task.checkCancellation()
     throw DaemonControlError.commandFailed("WebSocket connection failed")
-  }
-
-  func bootstrapAutoTransport(
-    connection: HarnessMonitorConnection
-  ) async -> AutoTransportBootstrapOutcome {
-    await withTaskGroup(
-      of: AutoTransportBootstrapOutcome.self,
-      returning: AutoTransportBootstrapOutcome.self
-    ) { group in
-      group.addTask {
-        if let wsClient = await webSocketBootstrapper(connection) {
-          return .upgraded(wsClient)
-        }
-        return .unavailable
-      }
-      let gracePeriod = autoTransportWebSocketGracePeriod
-      group.addTask {
-        try? await Task.sleep(for: gracePeriod)
-        return .timedOut
-      }
-
-      let outcome = await group.next() ?? .unavailable
-      group.cancelAll()
-      // Cancellation cannot unwind a WebSocket connect that already resumed, so
-      // the losing branch can still land a connected client. Drop it on the
-      // floor and it keeps a socket and heartbeat alive for the whole session.
-      if case .timedOut = outcome {
-        for await pending in group {
-          if case .upgraded(let webSocketClient) = pending {
-            await webSocketClient.shutdown()
-          }
-        }
-      }
-      return outcome
-    }
   }
 
   public func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState {
