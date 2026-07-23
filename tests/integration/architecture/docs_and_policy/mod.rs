@@ -5,6 +5,8 @@ use super::helpers::{
 };
 
 mod monitor_build_phases;
+#[cfg(feature = "openapi")]
+mod openapi_contract;
 mod policy_rules;
 mod version_sync;
 

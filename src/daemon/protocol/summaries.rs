@@ -21,6 +21,7 @@ use harness_protocol::managed_agents::acp::AcpRuntimeProbeResponse;
 pub const DAEMON_WIRE_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct HealthResponse {
     pub status: String,
     pub version: String,
@@ -40,6 +41,7 @@ fn default_wire_version() -> u32 {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct DaemonControlResponse {
     pub status: String,
 }
@@ -51,6 +53,7 @@ pub struct DaemonControlResponse {
 /// intentionally avoids any database query so short-lived CLI invocations can
 /// verify readiness cheaply.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReadinessResponse {
     pub ready: bool,
     pub daemon_epoch: String,
@@ -63,17 +66,20 @@ pub struct ReadinessResponse {
 /// daemon surfaces ambiguity as a `session_ambiguous` error instead of
 /// populating this response with multiple entries.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct RuntimeSessionResolutionResponse {
     pub resolved: Option<ResolvedRuntimeSessionAgent>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct LogLevelResponse {
     pub level: String,
     pub filter: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SetLogLevelRequest {
     pub level: String,
 }
@@ -90,6 +96,7 @@ pub struct HostBridgeReconfigureRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum DaemonTelemetryKind {
     DecodeFailure,
 }
@@ -104,6 +111,7 @@ impl DaemonTelemetryKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct DaemonTelemetryRequest {
     pub kind: DaemonTelemetryKind,
     pub source: String,
@@ -113,6 +121,7 @@ pub struct DaemonTelemetryRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct DaemonTelemetryResponse {
     pub recorded_at: String,
 }
@@ -218,6 +227,7 @@ fn github_resource_name(resource: GitHubRateResource) -> String {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct WorktreeSummary {
     pub checkout_id: String,
     pub name: String,
@@ -228,6 +238,7 @@ pub struct WorktreeSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ProjectSummary {
     pub project_id: String,
     pub name: String,
