@@ -114,7 +114,7 @@ extension DaemonController {
 /// drops the rest. `onCancel` can fire before the continuation exists, so a
 /// finish that arrives early is held until `install` can hand it over.
 private final class AutoTransportRace: Sendable {
-  private typealias Outcome = DaemonController.AutoTransportBootstrapOutcome
+  fileprivate typealias Outcome = DaemonController.AutoTransportBootstrapOutcome
 
   private enum State {
     case idle
