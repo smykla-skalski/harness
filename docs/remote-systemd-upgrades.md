@@ -17,6 +17,8 @@ sudo /usr/local/bin/harness-systemd upgrade \
 
 Always execute the controller path recorded by `harness-systemd install`. Never invoke the new daemon candidate with `sudo`; the controller validates candidate bytes as data and rejects any controller path, controller digest, daemon path, daemon digest, release identity, or lifecycle protocol version that does not match the root-owned pair record before creating transaction state.
 
+On a host with the Harness repo checked out, `mise run daemon:remote:deploy` builds and activates the daemon release set and then runs exactly this controller upgrade against the activated binary. Forward `--dry-run` to report the transaction without mutating anything, or `--unit NAME` for a non-default unit. It never rotates the controller: a newer `harness-systemd` still needs the `install` rotation described next.
+
 After installing a newer trusted `harness-systemd` executable, rerun `harness-systemd install` while the lifecycle is idle to rotate the controller side of the pair record. Rotation preserves the proven unit and daemon binding, requires a strictly newer controller release, and rejects same-release, stale, or writable controller candidates. An armed transaction is never rotated: its immutable copied controller and existing recovery arm remain authoritative until recovery completes.
 
 The compatibility routes `harness-daemon remote install-systemd|upgrade-systemd|rollback-systemd|recover-systemd|uninstall-systemd|status` sibling-exec `harness-systemd` with the original raw arguments. The daemon package does not compile or execute lifecycle implementation code.
