@@ -105,4 +105,22 @@ HARNESS_REMOTE_SYSTEMD_UNIT=envunit \
 [[ "$(count_lines '--unit' "$ctrl_args")" -eq 1 ]] || fail "env unit not injected once"
 grep -qx -- 'envunit' "$ctrl_args" || fail "env unit value missing"
 
+# The default release-set candidate is a symlink (install-release-set.sh
+# publishes stable entrypoints as symlinks) and the controller refuses one, so a
+# real run must forward the dereferenced real path, not the symlink.
+rm -f "$build_marker" "$ctrl_args"
+link_candidate="$SANDBOX/link-daemon"
+ln -sf "$candidate" "$link_candidate"
+real_candidate="$(readlink -m -- "$candidate")"
+PATH="$fakebin:$PATH" \
+  HARNESS_REMOTE_SYSTEMD_CONTROLLER="$controller" \
+  HARNESS_REMOTE_DAEMON_CANDIDATE="$link_candidate" \
+  "$deploy_script" >/dev/null
+forwarded_candidate="$(awk '/^--candidate-path$/{getline; print; exit}' "$ctrl_args")"
+[[ "$forwarded_candidate" == "$real_candidate" ]] \
+  || fail "controller got '$forwarded_candidate', expected real path '$real_candidate'"
+if [[ "$forwarded_candidate" == "$link_candidate" ]]; then
+  fail "controller received the symlink path instead of the dereferenced real path"
+fi
+
 printf 'test-remote-daemon-deploy: ok\n'
