@@ -150,6 +150,7 @@ extension HarnessMonitorStore {
       let measuredStatus = try await Self.measureOperation {
         try await client.taskBoardOrchestratorStatus()
       }
+      recordRequestSuccess()
       return measuredStatus.value.heldDispatches.items.contains { $0.boardItemId == itemID }
     } catch {
       return true
