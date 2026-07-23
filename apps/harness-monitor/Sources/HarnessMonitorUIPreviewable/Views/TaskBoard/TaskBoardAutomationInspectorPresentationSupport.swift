@@ -36,7 +36,7 @@ extension TaskBoardAutomationInspectorPresentationWorker {
     let magnitude = abs(delta)
     let value: String
     if magnitude < 60 {
-      return "just now"
+      return delta > 0 ? "in <1m" : "just now"
     } else if magnitude < 3_600 {
       value = "\(Int(magnitude / 60))m"
     } else if magnitude < 86_400 {

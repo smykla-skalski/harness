@@ -171,6 +171,33 @@ struct TaskBoardAutomationPresentationTests {
     )
   }
 
+  @Test("Relative timestamps distinguish future schedules from past events")
+  func relativeTimestampsDistinguishFutureAndPast() {
+    let worker = TaskBoardAutomationInspectorPresentationWorker.self
+    let referenceDate = Date(timeIntervalSince1970: 60)
+
+    #expect(
+      worker.relativeTimestamp("1970-01-01T00:01:30Z", referenceDate: referenceDate)
+        == "in <1m"
+    )
+    #expect(
+      worker.relativeTimestamp("1970-01-01T00:01:00Z", referenceDate: referenceDate)
+        == "just now"
+    )
+    #expect(
+      worker.relativeTimestamp("1970-01-01T00:00:30Z", referenceDate: referenceDate)
+        == "just now"
+    )
+    #expect(
+      worker.relativeTimestamp("1970-01-01T00:02:00Z", referenceDate: referenceDate)
+        == "in 1m"
+    )
+    #expect(
+      worker.relativeTimestamp("1970-01-01T00:00:00Z", referenceDate: referenceDate)
+        == "1m ago"
+    )
+  }
+
   @Test("Automation accessibility identifiers safely encode daemon IDs")
   func automationAccessibilityIdentifiersEncodeDynamicSegments() {
     #expect(
