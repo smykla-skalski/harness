@@ -2,28 +2,11 @@ use serde::Serialize;
 
 use super::wire::{
     RemoteArtifactFetchRequest, RemoteAssignmentWireState, RemoteCancelRequest, RemoteClaimRequest,
-    RemoteHeartbeatRequest, RemoteLeaseRenewRequest, RemoteOfferRequest, RemoteSettledRequest,
-    RemoteStatusRequest, RemoteWireError, domain_digest, require_canonical_time, require_digest,
-    require_text, require_version, valid_artifact_path,
+    RemoteLeaseRenewRequest, RemoteOfferRequest, RemoteSettledRequest, RemoteStatusRequest,
+    RemoteWireError, domain_digest, require_canonical_time, require_digest, require_text,
+    require_version, valid_artifact_path,
 };
 use super::wire_limits::{MAX_REMOTE_OFFER_JSON_BYTES, require_serialized_size};
-
-impl RemoteHeartbeatRequest {
-    #[cfg(test)]
-    pub(crate) fn seal(self) -> Result<Self, RemoteWireError> {
-        seal_request(self, |value| &mut value.request_sha256)
-    }
-
-    pub(crate) fn validate(&self) -> Result<(), RemoteWireError> {
-        validate_request(
-            self,
-            self.schema_version,
-            &self.request_sha256,
-            validate_heartbeat_payload,
-            |value| &mut value.request_sha256,
-        )
-    }
-}
 
 impl RemoteOfferRequest {
     pub(crate) fn seal(self) -> Result<Self, RemoteWireError> {
@@ -135,12 +118,6 @@ impl RemoteArtifactFetchRequest {
             |value| &mut value.request_sha256,
         )
     }
-}
-
-fn validate_heartbeat_payload(value: &RemoteHeartbeatRequest) -> Result<(), RemoteWireError> {
-    require_text("host_id", &value.host_id)?;
-    require_text("host_instance_id", &value.host_instance_id)?;
-    require_canonical_time("sent_at", &value.sent_at)
 }
 
 fn validate_offer_payload(value: &RemoteOfferRequest) -> Result<(), RemoteWireError> {

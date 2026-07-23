@@ -282,18 +282,6 @@ pub(super) fn pinned_controller_with_times(
     )
 }
 
-pub(super) fn pinned_controller_with_retained_trust(
-    endpoint: &str,
-    tls: &TestTlsMaterial,
-    trust: TaskBoardRemoteHostTrustFence,
-) -> RemoteExecutionControllerClient {
-    RemoteExecutionControllerClient::new_for_tests_with_retained_trust(
-        HOST_ID,
-        pinned_client(endpoint, tls, HOST_ID),
-        trust,
-    )
-}
-
 pub(crate) fn remote_host_config(
     endpoint: &str,
     tls: &TestTlsMaterial,

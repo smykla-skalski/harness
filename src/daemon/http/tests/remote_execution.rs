@@ -70,6 +70,13 @@ async fn private_executor_routes_require_exact_execution_identity() {
     assert_eq!(advertisement.active_assignments, 0);
     advertisement.validate().expect("valid advertisement");
 
+    let removed_heartbeat = client
+        .post(format!("{base_url}/v1/task-board-execution/heartbeat"))
+        .send()
+        .await
+        .expect("removed heartbeat route");
+    assert_eq!(removed_heartbeat.status(), StatusCode::NOT_FOUND);
+
     server.abort();
     let _ = server.await;
 }

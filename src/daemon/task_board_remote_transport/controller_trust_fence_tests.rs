@@ -1,7 +1,6 @@
 use super::controller_authority_test_support::{
-    HOST_ID, TOKEN_ENV, accepted_offer, central_offer, pinned_controller,
-    pinned_controller_with_retained_trust, pinned_controller_with_times, spawn_barrier_server,
-    spawn_probe_server, test_tls_material,
+    TOKEN_ENV, accepted_offer, central_offer, pinned_controller, pinned_controller_with_times,
+    spawn_barrier_server, test_tls_material,
 };
 use super::controller_prepared_test_support::{
     claim_request, claim_response, completed_status, persist_claim, prepared_acceptance,
@@ -9,7 +8,6 @@ use super::controller_prepared_test_support::{
 };
 use super::controller_settlement_tests::{settlement, settlement_ready_controller};
 use super::controller_tests::{cancel_request, cancel_response};
-use super::wire::{RemoteHeartbeatRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::TaskBoardRemoteAssignmentState;
 
@@ -322,37 +320,6 @@ async fn settlement_response_cannot_cross_a_host_trust_rotation() {
     );
 }
 
-#[tokio::test]
-async fn disabled_host_rejects_heartbeat_before_io() {
-    let fixture = crate::daemon::db::remote_controller_fixture(1).await;
-    let trust = fixture
-        .db
-        .task_board_remote_host_trust_fence(HOST_ID)
-        .await
-        .expect("load retained heartbeat trust");
-    let tls = test_tls_material();
-    let (endpoint, requests) = spawn_probe_server(&tls).await;
-    let controller = pinned_controller_with_retained_trust(&endpoint, &tls, trust);
-    disable_host(&fixture.db).await;
-    let request = RemoteHeartbeatRequest {
-        schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
-        host_id: HOST_ID.into(),
-        host_instance_id: "instance-a".into(),
-        active_assignments: 0,
-        sent_at: crate::daemon::db::utc_now(),
-        request_sha256: String::new(),
-    }
-    .seal()
-    .expect("seal heartbeat");
-
-    let error = controller
-        .heartbeat(&fixture.db, &request)
-        .await
-        .expect_err("disabled host must reject heartbeat before I/O");
-    assert!(error.to_string().contains("disabled"));
-    assert_eq!(requests.await.expect("heartbeat request count"), 0);
-}
-
 async fn rotate_host_trust(db: &AsyncDaemonDb) {
     let mut settings = db
         .task_board_orchestrator_settings()
@@ -368,21 +335,6 @@ async fn rotate_host_trust(db: &AsyncDaemonDb) {
     db.replace_task_board_orchestrator_settings(&settings)
         .await
         .expect("rotate host trust");
-}
-
-async fn disable_host(db: &AsyncDaemonDb) {
-    let mut settings = db
-        .task_board_orchestrator_settings()
-        .await
-        .expect("load host settings");
-    settings
-        .execution_hosts
-        .first_mut()
-        .expect("configured remote host")
-        .enabled = false;
-    db.replace_task_board_orchestrator_settings(&settings)
-        .await
-        .expect("disable host");
 }
 
 async fn load_assignment(

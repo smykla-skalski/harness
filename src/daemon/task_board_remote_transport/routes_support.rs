@@ -1,7 +1,6 @@
 use axum::Json;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse as _, Response};
-use chrono::{DateTime, Duration, SecondsFormat, Utc};
 
 use super::wire::{
     RemoteAttemptBinding, RemoteLease, RemoteOfferDisposition, RemoteOfferRequest,
@@ -14,9 +13,8 @@ use crate::daemon::db::{
 use crate::daemon::http::{DaemonHttpState, require_async_db, require_execution_remote_client};
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::{
-    TASK_BOARD_REMOTE_HEARTBEAT_TTL_SECONDS, TaskBoardLocalExecutionHostConfig,
-    TaskBoardOrchestratorSettings, TaskBoardRemoteAssignmentState,
-    validate_local_execution_host_config,
+    TaskBoardLocalExecutionHostConfig, TaskBoardOrchestratorSettings,
+    TaskBoardRemoteAssignmentState, validate_local_execution_host_config,
 };
 
 pub(super) async fn assignment_route<'a>(
@@ -211,21 +209,6 @@ pub(super) async fn load_assignment(
     db.task_board_remote_assignment(assignment_id)
         .await?
         .ok_or_else(|| concurrent("remote assignment does not exist"))
-}
-
-pub(super) fn verify_heartbeat_time(value: &str, now: DateTime<Utc>) -> Result<(), CliError> {
-    let sent = DateTime::parse_from_rfc3339(value)
-        .map(DateTime::<Utc>::from)
-        .map_err(|_| CliErrorKind::workflow_parse("remote heartbeat time is invalid"))?;
-    if sent <= now && sent >= now - Duration::seconds(TASK_BOARD_REMOTE_HEARTBEAT_TTL_SECONDS) {
-        Ok(())
-    } else {
-        Err(concurrent("remote heartbeat is outside its accepted TTL"))
-    }
-}
-
-pub(super) fn canonical_time(value: DateTime<Utc>) -> String {
-    value.to_rfc3339_opts(SecondsFormat::AutoSi, true)
 }
 
 pub(super) fn required(value: Option<String>, field: &'static str) -> Result<String, CliError> {

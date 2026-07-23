@@ -5,8 +5,6 @@ use super::controller::{
     RemoteExecutionControllerClient, RemoteExecutionControllerError, binding_error,
 };
 use super::controller_clock::ControllerClock;
-#[cfg(test)]
-use super::wire::{RemoteHeartbeatRequest, RemoteHeartbeatResponse};
 use super::wire_conversion::domain_host_advertisement;
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteHostSelection, TaskBoardRemoteHostTrustFence,
@@ -51,20 +49,6 @@ impl RemoteExecutionControllerClient {
     }
 
     #[cfg(test)]
-    pub(super) fn new_for_tests_with_retained_trust(
-        host_id: &str,
-        client: RemoteExecutionHttpClient,
-        trust: TaskBoardRemoteHostTrustFence,
-    ) -> Self {
-        Self {
-            host_id: host_id.to_string(),
-            client,
-            clock: ControllerClock::System,
-            retained_trust: Some(trust),
-        }
-    }
-
-    #[cfg(test)]
     pub(super) fn new_for_tests_with_retained_trust_and_times(
         host_id: &str,
         client: RemoteExecutionHttpClient,
@@ -98,27 +82,6 @@ impl RemoteExecutionControllerClient {
         )
         .await
         .map_err(Into::into)
-    }
-
-    #[cfg(test)]
-    pub(crate) async fn heartbeat(
-        &self,
-        db: &AsyncDaemonDb,
-        request: &RemoteHeartbeatRequest,
-    ) -> Result<RemoteHeartbeatResponse, RemoteExecutionControllerError> {
-        // Disabling a host clears its observation, so the operation fence would otherwise
-        // reject with "no observed instance"; check the enabled state first for a clear reason.
-        let host = db.task_board_remote_host_trust_fence(&self.host_id).await?;
-        if !host.config.enabled {
-            return Err(binding_error("remote execution host is disabled").into());
-        }
-        let trust = self.current_operation_trust(db).await?;
-        if request.host_id != self.host_id
-            || request.host_instance_id != trust.observed_host_instance_id
-        {
-            return Err(binding_error("remote heartbeat identity mismatched").into());
-        }
-        self.client.heartbeat(request).await.map_err(Into::into)
     }
 
     pub(super) async fn current_operation_trust(

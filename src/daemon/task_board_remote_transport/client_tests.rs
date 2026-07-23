@@ -171,7 +171,6 @@ async fn renewed_leaf_with_the_same_spki_remains_pinned() {
 fn complete_private_client_contract_is_reachable_for_coordinator_integration() {
     let _ = RemoteExecutionHttpClient::new;
     let _ = RemoteExecutionHttpClient::advertise;
-    let _ = RemoteExecutionHttpClient::heartbeat;
     let _ = RemoteExecutionHttpClient::offer;
     let _ = RemoteExecutionHttpClient::upload_source_bundle;
     let _ = RemoteExecutionHttpClient::claim;

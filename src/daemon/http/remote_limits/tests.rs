@@ -14,8 +14,8 @@ use tokio::sync::Notify;
 use super::*;
 use crate::daemon::protocol::http_paths;
 use crate::daemon::task_board_remote_transport::routes::{
-    DEFAULT_EXECUTION_HTTP_BODY_LIMIT_BYTES, HEARTBEAT_PATH, OFFER_HTTP_BODY_LIMIT_BYTES,
-    OFFER_PATH, SOURCE_BUNDLE_ABANDON_HTTP_BODY_LIMIT_BYTES, SOURCE_BUNDLE_ABANDON_PATH,
+    CLAIM_PATH, DEFAULT_EXECUTION_HTTP_BODY_LIMIT_BYTES, OFFER_HTTP_BODY_LIMIT_BYTES, OFFER_PATH,
+    SOURCE_BUNDLE_ABANDON_HTTP_BODY_LIMIT_BYTES, SOURCE_BUNDLE_ABANDON_PATH,
     SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES, SOURCE_BUNDLE_PATH, SOURCE_BUNDLE_RECEIPT_PATH,
 };
 
@@ -111,7 +111,7 @@ fn remote_http_body_limit_uses_exact_route_contracts_and_operator_ceiling() {
     );
     assert_eq!(
         effective_remote_http_body_limit(
-            &body_limit_request(Method::POST, HEARTBEAT_PATH),
+            &body_limit_request(Method::POST, CLAIM_PATH),
             MAX_REMOTE_HTTP_BODY_LIMIT_BYTES,
         ),
         DEFAULT_EXECUTION_HTTP_BODY_LIMIT_BYTES,
