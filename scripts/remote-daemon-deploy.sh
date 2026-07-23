@@ -31,6 +31,11 @@ if (( dry_run == 0 )); then
   "$ROOT/scripts/build-and-install-release-set.sh" daemon
 fi
 
+# The controller refuses a symbolic-link candidate, and the release-set
+# entrypoint is a symlink into the active generation, so hand it the real file.
+if [[ -e "$candidate" ]]; then
+  candidate="$(readlink -f -- "$candidate")"
+fi
 if [[ ! -x "$candidate" ]]; then
   printf 'candidate daemon missing or not executable at %s\n' "$candidate" >&2
   printf 'activate it first with: mise run install:harness:daemon (or set HARNESS_REMOTE_DAEMON_CANDIDATE)\n' >&2
