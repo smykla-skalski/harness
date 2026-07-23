@@ -93,6 +93,8 @@ mod remote_assignment_status_settlement_tests;
 mod remote_assignment_stop_fence;
 mod remote_assignment_terminal;
 mod remote_assignment_terminal_handoff;
+mod triage_apply;
+mod triage_decisions;
 pub(crate) use remote_assignment_terminal_handoff::{
     exact_active_remote_target, parent_points_to_assignment,
 };

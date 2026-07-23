@@ -5,7 +5,8 @@ use serde_json::Value;
 use super::rows::{ExternalRefRow, ItemRow, MachineRow};
 use crate::daemon::db::{CliError, db_error};
 use crate::task_board::{
-    ExternalRef, Machine, TaskBoardItem, TaskBoardLaneOrigin, validate_lane_placement,
+    ExternalRef, Machine, TaskBoardItem, TaskBoardLaneOrigin, TaskBoardTombstoneCause,
+    validate_lane_placement,
 };
 
 pub(super) fn item_from_rows(
@@ -18,6 +19,7 @@ pub(super) fn item_from_rows(
     let lane_position = optional_u32(row.lane_position, "task board lane position")?;
     let lane_origin = lane_origin_from_row(&row)?;
     let lane_set_at = row.lane_set_at.clone();
+    let tombstone_cause = tombstone_cause_from_row(row.tombstone_cause.as_deref())?;
     let item = TaskBoardItem {
         schema_version,
         id: row.item_id,
@@ -63,9 +65,23 @@ pub(super) fn item_from_rows(
         created_at: row.created_at,
         updated_at: row.updated_at,
         deleted_at: row.deleted_at,
+        tombstone_cause,
     };
     validate_lane_placement(&item).map_err(db_error)?;
     Ok((item, revision))
+}
+
+fn tombstone_cause_from_row(
+    value: Option<&str>,
+) -> Result<Option<TaskBoardTombstoneCause>, CliError> {
+    match value {
+        None => Ok(None),
+        Some("manual") => Ok(Some(TaskBoardTombstoneCause::Manual)),
+        Some("provider_exclusion") => Ok(Some(TaskBoardTombstoneCause::ProviderExclusion)),
+        Some(other) => Err(db_error(format!(
+            "parse task board tombstone cause: unknown value '{other}'"
+        ))),
+    }
 }
 
 fn lane_origin_from_row(row: &ItemRow) -> Result<Option<TaskBoardLaneOrigin>, CliError> {

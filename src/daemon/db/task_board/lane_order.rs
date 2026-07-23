@@ -428,13 +428,13 @@ async fn clear_changed_anchors_in_tx(
 }
 
 #[derive(Debug)]
-struct LaneEntry {
+pub(super) struct LaneEntry {
     before: TaskBoardItem,
-    item: TaskBoardItem,
+    pub(super) item: TaskBoardItem,
     revision: i64,
 }
 
-async fn load_lane_entries_in_tx(
+pub(super) async fn load_lane_entries_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     source: Option<TaskBoardStatus>,
     destination: Option<TaskBoardStatus>,

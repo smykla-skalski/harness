@@ -2,18 +2,17 @@ use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 use super::ITEMS_CHANGE_SCOPE;
 use super::lane_order::{
-    LaneTransitionKind, insert_with_lane_transition_in_tx, record_lane_transition_audit_in_tx,
-    replace_with_lane_transition_in_tx,
+    LaneTransitionKind, LaneTransitionWrite, insert_with_lane_transition_in_tx,
+    record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
 };
-use super::mapper::{item_from_rows, label, to_json};
+use super::mapper::item_from_rows;
 use super::rows::{ExternalRefRow, ItemRow};
+use super::triage_apply::apply_builtin_v1_triage_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::errors::CliErrorKind;
 use crate::infra::io;
 use crate::task_board::types::{CURRENT_TASK_BOARD_ITEM_VERSION, MAX_TASK_BOARD_ESTIMATE};
-use crate::task_board::{
-    TaskBoardItem, TaskBoardLaneOrigin, TaskBoardStatus, validate_lane_placement,
-};
+use crate::task_board::{TaskBoardItem, TaskBoardStatus, validate_lane_placement};
 
 #[path = "items_lifecycle.rs"]
 mod lifecycle;
@@ -27,6 +26,10 @@ mod parent;
 use parent::{
     clear_children_parent_in_tx, ensure_parent_assignment_is_valid_in_tx, next_child_order_in_tx,
 };
+
+#[path = "items_write.rs"]
+mod write;
+pub(super) use write::{insert_item_in_tx, replace_item_in_tx};
 
 const SELECT_ITEM: &str = "SELECT * FROM task_board_items WHERE item_id = ?1";
 const SELECT_REFS: &str = "SELECT item_id, position, provider, external_id, url, sync_state_json
@@ -47,6 +50,10 @@ pub(crate) struct TaskBoardItemSnapshot {
 
 impl AsyncDaemonDb {
     /// Insert one new Task Board item.
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "sequential create/insert/triage/audit/commit steps, each already its own helper"
+    )]
     pub(crate) async fn create_task_board_item(
         &self,
         mut item: TaskBoardItem,
@@ -57,13 +64,9 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board item create")
             .await?;
-        if load_item_in_tx(&mut transaction, &item.id).await?.is_some() {
-            return Err(db_error(format!(
-                "task-board item '{}' already exists",
-                item.id
-            )));
-        }
-        let write = insert_with_lane_transition_in_tx(&mut transaction, item).await?;
+        reject_if_item_exists_in_tx(&mut transaction, &item.id).await?;
+        let inserted = insert_with_lane_transition_in_tx(&mut transaction, item).await?;
+        let write = apply_triage_after_insert_in_tx(&mut transaction, inserted).await?;
         let change_revision = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
         record_lane_transition_audit_in_tx(&mut transaction, &write, change_revision).await?;
         transaction
@@ -122,6 +125,10 @@ impl AsyncDaemonDb {
     }
 
     /// Atomically load and conditionally mutate one Task Board item.
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "pre-existing sequential mutation/guard chain; triage is one more straight-line step"
+    )]
     pub(crate) async fn update_task_board_item<F>(
         &self,
         item_id: &str,
@@ -173,6 +180,8 @@ impl AsyncDaemonDb {
         if item.deleted_at.is_some() {
             clear_children_parent_in_tx(&mut transaction, item_id).await?;
         }
+        let decided_at = item.updated_at.clone();
+        apply_builtin_v1_triage_in_tx(&mut transaction, &mut item, &decided_at).await?;
         let write = replace_with_lane_transition_in_tx(
             &mut transaction,
             before,
@@ -208,6 +217,43 @@ impl AsyncDaemonDb {
     }
 }
 
+async fn reject_if_item_exists_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    item_id: &str,
+) -> Result<(), CliError> {
+    if load_item_in_tx(transaction, item_id).await?.is_some() {
+        return Err(db_error(format!(
+            "task-board item '{item_id}' already exists"
+        )));
+    }
+    Ok(())
+}
+
+/// Evaluate `BuiltInV1` against a just-inserted item and, only if it changed
+/// status or placement, persist that through a follow-up automatic lane
+/// transition. Returns the original insert write unchanged otherwise, so a
+/// non-promoting create costs no extra revision bump.
+async fn apply_triage_after_insert_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    inserted: LaneTransitionWrite,
+) -> Result<LaneTransitionWrite, CliError> {
+    let before_triage = inserted.item.clone();
+    let mut item = inserted.item.clone();
+    let decided_at = utc_now();
+    apply_builtin_v1_triage_in_tx(transaction, &mut item, &decided_at).await?;
+    if item == before_triage {
+        return Ok(inserted);
+    }
+    replace_with_lane_transition_in_tx(
+        transaction,
+        before_triage,
+        inserted.item_revision,
+        item,
+        LaneTransitionKind::Automatic,
+    )
+    .await
+}
+
 pub(super) async fn load_item_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     item_id: &str,
@@ -226,178 +272,6 @@ pub(super) async fn load_item_in_tx(
         .await
         .map_err(|error| db_error(format!("load task board refs '{item_id}': {error}")))?;
     item_from_rows(row, refs).map(Some)
-}
-
-pub(super) async fn insert_item_in_tx(
-    transaction: &mut Transaction<'_, Sqlite>,
-    item: &TaskBoardItem,
-    revision: i64,
-) -> Result<(), CliError> {
-    query(
-        "INSERT INTO task_board_items (
-        item_id, schema_version, title, body, status, priority, tags_json, project_id,
-        target_project_types_json, agent_mode, workflow_kind, execution_repository,
-        estimated_tokens, estimated_cost_microusd, imported_from_provider, planning_json,
-        workflow_json, session_id, work_item_id, usage_json, parent_item_id, child_order,
-        created_at, updated_at, deleted_at, revision, kind, lane_position, lane_origin,
-        lane_actor, lane_producer, lane_set_at
-    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
-        ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28,
-        ?29, ?30, ?31, ?32)",
-    )
-    .bind(&item.id)
-    .bind(i64::from(item.schema_version))
-    .bind(&item.title)
-    .bind(&item.body)
-    .bind(label(item.status, "task board status")?)
-    .bind(label(item.priority, "task board priority")?)
-    .bind(to_json(&item.tags, "task board tags")?)
-    .bind(&item.project_id)
-    .bind(to_json(
-        &item.target_project_types,
-        "task board project types",
-    )?)
-    .bind(label(item.agent_mode, "task board agent mode")?)
-    .bind(label(item.workflow_kind, "task board workflow kind")?)
-    .bind(&item.execution_repository)
-    .bind(optional_u64_as_i64(
-        item.estimated_tokens,
-        "task board estimated tokens",
-    )?)
-    .bind(optional_u64_as_i64(
-        item.estimated_cost_microusd,
-        "task board estimated cost",
-    )?)
-    .bind(
-        item.imported_from_provider
-            .map(|provider| label(provider, "task board imported provider"))
-            .transpose()?,
-    )
-    .bind(to_json(&item.planning, "task board planning state")?)
-    .bind(to_json(&item.workflow, "task board workflow state")?)
-    .bind(&item.session_id)
-    .bind(&item.work_item_id)
-    .bind(to_json(&item.usage, "task board usage")?)
-    .bind(&item.parent_item_id)
-    .bind(i64::from(item.child_order))
-    .bind(&item.created_at)
-    .bind(&item.updated_at)
-    .bind(&item.deleted_at)
-    .bind(revision)
-    .bind(label(item.kind.clone(), "task board kind")?)
-    .bind(item.lane_position.map(i64::from))
-    .bind(lane_origin_label(item.lane_origin.as_ref()))
-    .bind(lane_actor(item.lane_origin.as_ref()))
-    .bind(lane_producer(item.lane_origin.as_ref()))
-    .bind(&item.lane_set_at)
-    .execute(transaction.as_mut())
-    .await
-    .map_err(|error| db_error(format!("insert task board item '{}': {error}", item.id)))?;
-    insert_refs(transaction, item).await
-}
-
-pub(super) async fn replace_item_in_tx(
-    transaction: &mut Transaction<'_, Sqlite>,
-    item: &TaskBoardItem,
-    revision: i64,
-) -> Result<(), CliError> {
-    validate_item(item)?;
-    query(
-        "UPDATE task_board_items SET
-        schema_version = ?2, title = ?3, body = ?4, status = ?5, priority = ?6,
-        tags_json = ?7, project_id = ?8, target_project_types_json = ?9,
-        agent_mode = ?10, workflow_kind = ?11, execution_repository = ?12,
-        estimated_tokens = ?13, estimated_cost_microusd = ?14,
-        imported_from_provider = ?15, planning_json = ?16, workflow_json = ?17,
-        session_id = ?18, work_item_id = ?19, usage_json = ?20, parent_item_id = ?21,
-        child_order = ?22, created_at = ?23, updated_at = ?24, deleted_at = ?25,
-        revision = ?26, kind = ?27, lane_position = ?28, lane_origin = ?29,
-        lane_actor = ?30, lane_producer = ?31, lane_set_at = ?32
-        WHERE item_id = ?1",
-    )
-    .bind(&item.id)
-    .bind(i64::from(item.schema_version))
-    .bind(&item.title)
-    .bind(&item.body)
-    .bind(label(item.status, "task board status")?)
-    .bind(label(item.priority, "task board priority")?)
-    .bind(to_json(&item.tags, "task board tags")?)
-    .bind(&item.project_id)
-    .bind(to_json(
-        &item.target_project_types,
-        "task board project types",
-    )?)
-    .bind(label(item.agent_mode, "task board agent mode")?)
-    .bind(label(item.workflow_kind, "task board workflow kind")?)
-    .bind(&item.execution_repository)
-    .bind(optional_u64_as_i64(
-        item.estimated_tokens,
-        "task board estimated tokens",
-    )?)
-    .bind(optional_u64_as_i64(
-        item.estimated_cost_microusd,
-        "task board estimated cost",
-    )?)
-    .bind(
-        item.imported_from_provider
-            .map(|provider| label(provider, "task board imported provider"))
-            .transpose()?,
-    )
-    .bind(to_json(&item.planning, "task board planning state")?)
-    .bind(to_json(&item.workflow, "task board workflow state")?)
-    .bind(&item.session_id)
-    .bind(&item.work_item_id)
-    .bind(to_json(&item.usage, "task board usage")?)
-    .bind(&item.parent_item_id)
-    .bind(i64::from(item.child_order))
-    .bind(&item.created_at)
-    .bind(&item.updated_at)
-    .bind(&item.deleted_at)
-    .bind(revision)
-    .bind(label(item.kind.clone(), "task board kind")?)
-    .bind(item.lane_position.map(i64::from))
-    .bind(lane_origin_label(item.lane_origin.as_ref()))
-    .bind(lane_actor(item.lane_origin.as_ref()))
-    .bind(lane_producer(item.lane_origin.as_ref()))
-    .bind(&item.lane_set_at)
-    .execute(transaction.as_mut())
-    .await
-    .map_err(|error| db_error(format!("replace task board item '{}': {error}", item.id)))?;
-    query("DELETE FROM task_board_external_refs WHERE item_id = ?1")
-        .bind(&item.id)
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("clear task board refs '{}': {error}", item.id)))?;
-    insert_refs(transaction, item).await
-}
-
-async fn insert_refs(
-    transaction: &mut Transaction<'_, Sqlite>,
-    item: &TaskBoardItem,
-) -> Result<(), CliError> {
-    for (position, reference) in item.external_refs.iter().enumerate() {
-        query(
-            "INSERT INTO task_board_external_refs (
-            item_id, position, provider, external_id, url, sync_state_json
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        )
-        .bind(&item.id)
-        .bind(i64::try_from(position).unwrap_or(i64::MAX))
-        .bind(label(reference.provider, "task board external provider")?)
-        .bind(&reference.external_id)
-        .bind(&reference.url)
-        .bind(
-            reference
-                .sync_state
-                .as_ref()
-                .map(|state| to_json(state, "task board external sync state"))
-                .transpose()?,
-        )
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("insert task board refs '{}': {error}", item.id)))?;
-    }
-    Ok(())
 }
 
 pub(super) async fn bump_change_in_tx(
@@ -443,7 +317,7 @@ pub(super) async fn items_change_sequence_in_tx(
         .map(|sequence| sequence.unwrap_or(0))
 }
 
-fn validate_item(item: &TaskBoardItem) -> Result<(), CliError> {
+pub(super) fn validate_item(item: &TaskBoardItem) -> Result<(), CliError> {
     io::validate_safe_segment(&item.id)?;
     if item.schema_version != CURRENT_TASK_BOARD_ITEM_VERSION {
         return Err(CliErrorKind::workflow_version(format!(
@@ -451,6 +325,12 @@ fn validate_item(item: &TaskBoardItem) -> Result<(), CliError> {
             item.id, item.schema_version
         ))
         .into());
+    }
+    if item.title.trim().is_empty() {
+        return Err(db_error(format!(
+            "task-board item '{}' must have a non-blank title",
+            item.id
+        )));
     }
     if item
         .estimated_tokens
@@ -472,28 +352,4 @@ fn validate_item(item: &TaskBoardItem) -> Result<(), CliError> {
     }
     validate_lane_placement(item).map_err(db_error)?;
     Ok(())
-}
-
-fn lane_origin_label(origin: Option<&TaskBoardLaneOrigin>) -> Option<&'static str> {
-    match origin {
-        Some(TaskBoardLaneOrigin::Manual { .. }) => Some("manual"),
-        Some(TaskBoardLaneOrigin::Automatic { .. }) => Some("automatic"),
-        None => None,
-    }
-}
-
-fn lane_actor(origin: Option<&TaskBoardLaneOrigin>) -> Option<&str> {
-    origin.and_then(TaskBoardLaneOrigin::actor)
-}
-
-fn lane_producer(origin: Option<&TaskBoardLaneOrigin>) -> Option<&str> {
-    origin.and_then(TaskBoardLaneOrigin::producer)
-}
-
-fn optional_u64_as_i64(value: Option<u64>, context: &str) -> Result<Option<i64>, CliError> {
-    value
-        .map(|value| {
-            i64::try_from(value).map_err(|error| db_error(format!("store {context}: {error}")))
-        })
-        .transpose()
 }
