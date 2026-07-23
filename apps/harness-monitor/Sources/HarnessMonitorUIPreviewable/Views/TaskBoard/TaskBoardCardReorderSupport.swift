@@ -1,5 +1,11 @@
 import HarnessMonitorKit
 
+enum TaskBoardCardReorderDropDecision: Equatable {
+  case proceed(TaskBoardCardReorderPlan)
+  case noChange
+  case reject(String)
+}
+
 /// Same-lane reorder plan: a card dropped on another card within its own lane.
 /// The daemon's lane-position contract (`place_in_destination` in
 /// `lane_order.rs`) removes the dragged item from its current slot first, then
@@ -19,13 +25,40 @@ struct TaskBoardCardReorderPlan: Equatable {
     insertAfterHovered: Bool
   ) -> Self? {
     guard
+      case .proceed(let plan) = dropDecision(
+        isEnabled: true,
+        draggedItemID: draggedItemID,
+        lane: lane,
+        apiItems: apiItems,
+        hoveredItemID: hoveredItemID,
+        insertAfterHovered: insertAfterHovered
+      )
+    else {
+      return nil
+    }
+    return plan
+  }
+
+  static func dropDecision(
+    isEnabled: Bool,
+    draggedItemID: String?,
+    lane: TaskBoardInboxLane,
+    apiItems: [TaskBoardItem],
+    hoveredItemID: String,
+    insertAfterHovered: Bool
+  ) -> TaskBoardCardReorderDropDecision {
+    guard isEnabled else {
+      return .reject("Cannot reorder task: it can no longer move within this lane")
+    }
+    guard
       lane != .umbrella,
+      let draggedItemID,
       let draggedIndex = apiItems.firstIndex(where: { $0.id == draggedItemID }),
       let hoveredIndex = apiItems.firstIndex(where: { $0.id == hoveredItemID }),
       TaskBoardInboxLane(taskBoardItem: apiItems[draggedIndex]) == lane,
       TaskBoardInboxLane(taskBoardItem: apiItems[hoveredIndex]) == lane
     else {
-      return nil
+      return .reject("Cannot reorder task: the board changed before the drop completed")
     }
     let placement = TaskBoardRelativeLanePlacement(
       anchorItemID: hoveredItemID,
@@ -37,12 +70,14 @@ struct TaskBoardCardReorderPlan: Equatable {
         orderedItemIDs: apiItems.map(\.id)
       ) != nil
     else {
-      return nil
+      return .noChange
     }
-    return Self(
-      itemID: draggedItemID,
-      status: apiItems[draggedIndex].status,
-      placement: placement
+    return .proceed(
+      Self(
+        itemID: draggedItemID,
+        status: apiItems[draggedIndex].status,
+        placement: placement
+      )
     )
   }
 }

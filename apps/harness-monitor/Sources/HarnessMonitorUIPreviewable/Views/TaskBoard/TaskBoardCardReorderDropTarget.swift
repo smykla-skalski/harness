@@ -25,19 +25,21 @@ struct TaskBoardCardReorderDropTarget: ViewModifier {
         isEnabled: isEnabled
       ) { _, session in
         defer { clearInsertionHint() }
-        guard isEnabled, let draggedItemID else { return }
-        guard
-          let plan = TaskBoardCardReorderPlan.resolve(
-            draggedItemID: draggedItemID,
-            lane: lane,
-            apiItems: apiItems,
-            hoveredItemID: hoveredItemID,
-            insertAfterHovered: insertsAfter(session)
-          )
-        else {
-          return
+        switch TaskBoardCardReorderPlan.dropDecision(
+          isEnabled: isEnabled,
+          draggedItemID: draggedItemID,
+          lane: lane,
+          apiItems: apiItems,
+          hoveredItemID: hoveredItemID,
+          insertAfterHovered: insertsAfter(session)
+        ) {
+        case .proceed(let plan):
+          actions.reorderTaskBoardItem(plan)
+        case .noChange:
+          break
+        case .reject(let reason):
+          actions.reportDropRejection(reason)
         }
-        actions.reorderTaskBoardItem(plan)
       }
       .dropConfiguration { _ in
         DropConfiguration(operation: .move)

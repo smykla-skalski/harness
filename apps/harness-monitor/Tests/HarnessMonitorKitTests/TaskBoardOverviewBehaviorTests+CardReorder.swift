@@ -132,6 +132,55 @@ extension TaskBoardOverviewBehaviorTests {
     )
   }
 
+  @Test("Reorder drop decision distinguishes no-op from rejected delivery")
+  func reorderDropDecisionDistinguishesNoOpFromRejectedDelivery() {
+    let items = reorderFixture()
+
+    #expect(
+      TaskBoardCardReorderPlan.dropDecision(
+        isEnabled: true,
+        draggedItemID: "a",
+        lane: .todo,
+        apiItems: items,
+        hoveredItemID: "b",
+        insertAfterHovered: false
+      ) == .noChange
+    )
+    #expect(
+      TaskBoardCardReorderPlan.dropDecision(
+        isEnabled: true,
+        draggedItemID: "missing",
+        lane: .todo,
+        apiItems: items,
+        hoveredItemID: "b",
+        insertAfterHovered: false
+      )
+        == .reject("Cannot reorder task: the board changed before the drop completed")
+    )
+    #expect(
+      TaskBoardCardReorderPlan.dropDecision(
+        isEnabled: true,
+        draggedItemID: nil,
+        lane: .todo,
+        apiItems: items,
+        hoveredItemID: "b",
+        insertAfterHovered: false
+      )
+        == .reject("Cannot reorder task: the board changed before the drop completed")
+    )
+    #expect(
+      TaskBoardCardReorderPlan.dropDecision(
+        isEnabled: false,
+        draggedItemID: "a",
+        lane: .todo,
+        apiItems: items,
+        hoveredItemID: "b",
+        insertAfterHovered: false
+      )
+        == .reject("Cannot reorder task: it can no longer move within this lane")
+    )
+  }
+
   @Test("Reorder plan drops the first card to the end when dropped below the last card")
   func reorderPlanMovesFirstCardToEnd() throws {
     let items = reorderFixture()
