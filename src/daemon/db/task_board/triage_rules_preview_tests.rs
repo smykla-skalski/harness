@@ -160,3 +160,40 @@ async fn an_active_override_never_reports_a_governing_placement_change() {
     assert_eq!(entry.candidate_verdict, TriageVerdict::Undecided);
     assert!(!entry.governs_placement_change, "override still wins regardless of the candidate");
 }
+
+/// A manually anchored item is skipped for placement by both the single-item
+/// choke point and bulk reevaluation (see `reevaluate_one_item_in_tx`'s
+/// `manually_placed` gate), so preview must never report it as governing a
+/// placement change even when the candidate's verdict disagrees with the
+/// item's live decision.
+#[tokio::test]
+async fn a_manually_anchored_item_never_reports_a_governing_placement_change() {
+    let (_directory, db) = connect().await;
+    db.create_task_board_item(backlog_item("anchored", vec!["kind/bug".into()]))
+        .await
+        .expect("create item");
+    sqlx::query(
+        "UPDATE task_board_items SET
+             status = 'backlog', lane_position = 0, lane_origin = 'manual',
+             lane_actor = 'human-1', lane_set_at = '2026-07-24T00:00:00Z'
+         WHERE item_id = 'anchored'",
+    )
+    .execute(db.pool())
+    .await
+    .expect("anchor item manually in backlog");
+
+    let result = db
+        .preview_task_board_triage_rules(bug_rule_set())
+        .await
+        .expect("preview");
+    let entry = result
+        .diff
+        .iter()
+        .find(|entry| entry.item_id == "anchored")
+        .expect("entry present");
+    assert_eq!(entry.candidate_verdict, TriageVerdict::Todo);
+    assert!(
+        !entry.governs_placement_change,
+        "a manual anchor is never displaced by a rule set, so preview must not claim it would be"
+    );
+}

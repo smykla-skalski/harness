@@ -4,7 +4,7 @@ use super::triage_rules_bulk_load::{
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
-    TaskBoardTriageEffectiveSource, TriageRuleMatch, TriageRuleSetPreviewDiffEntry,
+    TaskBoardLaneOrigin, TaskBoardTriageEffectiveSource, TriageRuleMatch, TriageRuleSetPreviewDiffEntry,
     TriageRuleSetPreviewResult, TriageRuleSetV1, evaluate_triage_rule_set, validate_triage_rule_set,
 };
 
@@ -61,7 +61,13 @@ fn diff_entry(
     } else {
         (None, None)
     };
+    let manually_placed = entry
+        .item
+        .lane_origin
+        .as_ref()
+        .is_some_and(TaskBoardLaneOrigin::is_manual);
     let governs_placement_change = entry.override_.is_none()
+        && !manually_placed
         && live_effective_verdict != Some(evaluation.verdict);
     TriageRuleSetPreviewDiffEntry {
         item_id: entry.item.id,
