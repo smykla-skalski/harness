@@ -184,6 +184,7 @@ pub struct TaskBoardAuditRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyPipelineSaveDraftRequest {
     pub document: PolicyPipelineDocument,
     #[serde(default)]
@@ -193,12 +194,15 @@ pub struct PolicyPipelineSaveDraftRequest {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
+#[cfg_attr(feature = "openapi", into_params(parameter_in = Query))]
 pub struct PolicyPipelineGetRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub canvas_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyPipelineSimulateRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub document: Option<PolicyPipelineDocument>,
@@ -207,6 +211,7 @@ pub struct PolicyPipelineSimulateRequest {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyPipelineGoLiveDiffRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub document: Option<PolicyPipelineDocument>,
@@ -215,12 +220,15 @@ pub struct PolicyPipelineGoLiveDiffRequest {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
+#[cfg_attr(feature = "openapi", into_params(parameter_in = Query))]
 pub struct PolicyPipelineAuditRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub canvas_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyPipelineReplayRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub canvas_id: Option<String>,
@@ -229,6 +237,7 @@ pub struct PolicyPipelineReplayRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyCanvasSummary {
     pub canvas_id: String,
     pub title: String,
@@ -252,6 +261,7 @@ pub struct PolicyCanvasSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyCanvasWorkspaceResponse {
     pub schema_version: u32,
     pub active_canvas_id: String,
@@ -272,6 +282,7 @@ const fn default_global_policy_enforcement_enabled() -> bool {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyPipelineMakeLiveResponse {
     pub document: PolicyPipelineDocument,
     pub trace_id: String,
@@ -280,12 +291,14 @@ pub struct PolicyPipelineMakeLiveResponse {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyCanvasCreateRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyCanvasDuplicateRequest {
     pub canvas_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -293,33 +306,39 @@ pub struct PolicyCanvasDuplicateRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyCanvasRenameRequest {
     pub canvas_id: String,
     pub title: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyCanvasSetActiveRequest {
     pub canvas_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyCanvasDeleteRequest {
     pub canvas_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyCanvasSetGlobalEnforcementRequest {
     pub enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyScenarioCreateRequest {
     pub name: String,
     pub input: PolicyInput,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyScenarioUpdateRequest {
     pub id: String,
     pub name: String,
@@ -327,6 +346,7 @@ pub struct PolicyScenarioUpdateRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyScenarioDeleteRequest {
     pub id: String,
 }
@@ -434,12 +454,14 @@ pub type PolicyPipelineGoLiveDiffResponse = PolicyPipelineGoLiveDiff;
 pub type PolicyPipelineReplayResponse = PolicyPipelineReplayResult;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyCanvasExportRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub canvas_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyCanvasExportResponse {
     pub canvas_id: String,
     pub title: String,
@@ -447,6 +469,7 @@ pub struct PolicyCanvasExportResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyCanvasImportRequest {
     pub document: PolicyPipelineDocument,
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -105,6 +105,7 @@ pub(crate) const UNSAFE_HIGH_RISK_ACTIONS: [PolicyAction; 3] = [
 ];
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyGraph {
     pub schema_version: u16,
     pub revision: u64,
@@ -119,6 +120,7 @@ pub struct PolicyGraph {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum PolicyGraphMode {
     #[default]
     Draft,
@@ -127,6 +129,7 @@ pub enum PolicyGraphMode {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyGraphNode {
     pub id: PolicyGraphNodeId,
     pub label: String,
@@ -143,6 +146,7 @@ pub struct PolicyGraphNode {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum PolicyGraphNodeKind {
     Trigger {
         workflow: String,
@@ -190,6 +194,7 @@ pub enum PolicyGraphNodeKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum PolicyGraphDecision {
     Allow,
     Deny,
@@ -197,6 +202,7 @@ pub enum PolicyGraphDecision {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum PolicyEvidenceField {
     ChecksGreen,
     BranchProtectionAllowsMerge,
@@ -219,6 +225,7 @@ pub enum PolicyEvidenceField {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "predicate", rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum PolicyEvidencePredicate {
     IsTrue,
     IsFalse,
@@ -229,6 +236,7 @@ pub enum PolicyEvidencePredicate {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyEvidenceCheck {
     pub field: PolicyEvidenceField,
     pub pass: PolicyEvidencePredicate,
@@ -237,17 +245,20 @@ pub struct PolicyEvidenceCheck {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyIfThenElseCondition {
     pub field: PolicyEvidenceField,
     pub predicate: PolicyEvidencePredicate,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicySwitchNode {
     pub arms: Vec<PolicySwitchArm>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicySwitchArm {
     pub port: PolicyGraphPortId,
     pub field: PolicyEvidenceField,
@@ -255,6 +266,7 @@ pub struct PolicySwitchArm {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyGraphEdge {
     pub id: PolicyGraphEdgeId,
     pub from_node: PolicyGraphNodeId,
@@ -269,6 +281,7 @@ pub struct PolicyGraphEdge {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "condition", rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum PolicyGraphEdgeCondition {
     #[default]
     Always,
@@ -291,6 +304,7 @@ pub enum PolicyGraphEdgeCondition {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyGraphGroup {
     pub id: PolicyGraphGroupId,
     pub label: String,
@@ -303,6 +317,7 @@ pub struct PolicyGraphGroup {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyGraphLayout {
     #[serde(
         default = "defaults::default_policy_graph_zoom",
@@ -329,6 +344,7 @@ impl Default for PolicyGraphLayout {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyGraphNodeLayout {
     pub node_id: PolicyGraphNodeId,
     pub x: i32,
@@ -339,12 +355,14 @@ pub struct PolicyGraphNodeLayout {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum PolicyGraphNodeLayoutSource {
     Auto,
     Manual,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyGraphValidationReport {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub issues: Vec<PolicyGraphValidationIssue>,
@@ -352,6 +370,7 @@ pub struct PolicyGraphValidationReport {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "issue", rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum PolicyGraphValidationIssue {
     UnsupportedSchemaVersion {
         expected: u16,
@@ -392,12 +411,14 @@ pub enum PolicyGraphValidationIssue {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum PolicyGraphPortDirection {
     Input,
     Output,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyGraphSimulation {
     pub mode: PolicyGraphMode,
     pub decision: PolicyDecision,
@@ -414,6 +435,7 @@ pub struct PolicyGraphSimulation {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicySimulationTrace {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entry_node_id: Option<String>,
@@ -433,18 +455,21 @@ pub type PolicyPipelineValidationIssue = PolicyGraphValidationIssue;
 pub type PolicyPipelineValidationCode = PolicyGraphValidationIssue;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyPipelinePort {
     pub id: PolicyGraphPortId,
     pub label: String,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyCanvasPoint {
     pub x: i32,
     pub y: i32,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyCanvasRect {
     pub x: i32,
     pub y: i32,

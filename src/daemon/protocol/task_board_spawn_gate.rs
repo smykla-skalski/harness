@@ -7,22 +7,26 @@ use serde::{Deserialize, Serialize};
 use crate::task_board::PolicyApprovalGrant;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyCanvasSetSpawnRequiresLivePolicyRequest {
     pub enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyCanvasSetSpawnKillSwitchRequest {
     pub enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyApprovalGrantsListResponse {
     #[serde(default)]
     pub grants: Vec<PolicyApprovalGrant>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyApprovalGrantResolveRequest {
     pub grant_id: String,
     pub approve: bool,
@@ -31,11 +35,13 @@ pub struct PolicyApprovalGrantResolveRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyApprovalGrantResolveResponse {
     pub grant: PolicyApprovalGrant,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyApprovalGrantRevokeRequest {
     pub grant_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -43,6 +49,7 @@ pub struct PolicyApprovalGrantRevokeRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyApprovalGrantRevokeResponse {
     pub grant: PolicyApprovalGrant,
 }
