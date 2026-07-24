@@ -5,7 +5,7 @@
 rust = "nightly-2026-05-19"
 ripgrep = "15.1.0"
 shellcheck = "0.11.0"
-tuist = "4.195.0"
+tuist = "4.202.6"
 xcbeautify = "3.2.1"
 "aqua:mozilla/sccache" = "0.16.0"
 "aqua:nextest-rs/nextest/cargo-nextest" = "0.9.140"
