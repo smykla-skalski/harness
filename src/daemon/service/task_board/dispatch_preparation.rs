@@ -8,12 +8,13 @@ use tokio::time::sleep;
 use crate::daemon::db::{
     AsyncDaemonDb, ClaimedTaskBoardDispatchPreparation, ReservedTaskBoardDispatch,
 };
+use crate::daemon::index::{self, DiscoveredProject};
 use crate::daemon::protocol::{SessionStartRequest, TaskBoardDispatchRequest, TaskCreateRequest};
 use crate::daemon::service::{
-    build_log_entry, create_task_with_id_async, ensure_project_registered_async, session_service,
-    start_session_direct_async,
+    build_log_entry, create_task_with_id_async, session_service, start_session_direct_async,
 };
 use crate::errors::{CliError, CliErrorKind};
+use crate::sandbox;
 use crate::session::storage as session_storage;
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionState};
 use crate::task_board::{
@@ -261,7 +262,10 @@ async fn recover_prepared_session(
     let Some(recovered) = recovered else {
         return Ok(false);
     };
-    let project_id = ensure_project_registered_async(db, &recovered.origin).await?;
+    // The origin-touching project discovery already ran inside the security scope
+    // in recover_session_artifacts; only the DB write remains here.
+    db.sync_project(&recovered.project).await?;
+    let project_id = recovered.project.project_id.clone();
     db.create_session_record(&project_id, &recovered.state)
         .await?;
     db.append_log_entry(&build_log_entry(
@@ -284,18 +288,21 @@ struct PreparedSessionRecoveryRequest {
 }
 
 struct RecoveredPreparedSession {
-    origin: PathBuf,
+    project: DiscoveredProject,
     state: SessionState,
 }
 
 fn recover_session_artifacts(
     request: &PreparedSessionRecoveryRequest,
 ) -> Result<Option<RecoveredPreparedSession>, CliError> {
-    let origin = Path::new(&request.project_dir)
-        .canonicalize()
-        .map_err(|error| {
-            CliErrorKind::workflow_io(format!("resolve prepared dispatch project: {error}"))
-        })?;
+    // Sandboxed callers store a bookmark id as project_dir; resolve it the way
+    // session_setup does and hold the scope while the origin worktree below is
+    // probed or destroyed and its project identity is discovered. The scope
+    // drops when this function returns, so every read of the origin path must
+    // finish before then - the caller only writes the discovered project to
+    // the DB, which does not touch the origin.
+    let project_scope = sandbox::resolve_project_input(&request.project_dir)?;
+    let origin = project_scope.path().to_path_buf();
     let layout = session_storage::layout_from_project_dir(&origin, &request.session_id)?;
     if !layout.state_file().exists() {
         clear_incomplete_session_artifacts(&origin, &layout)?;
@@ -315,8 +322,13 @@ fn recover_session_artifacts(
         .into());
     }
     session_storage::register_active(&layout)?;
+    // Auxiliary discovery file; the DB sync in the caller is authoritative, so a
+    // write hiccup here must not block an otherwise-valid recovery. Matches the
+    // best-effort call on the session-start path.
+    let _ = session_storage::record_project_origin(&origin);
+    let project = index::discovered_project_for_checkout(&origin);
     Ok(Some(RecoveredPreparedSession {
-        origin,
+        project,
         state: state.clone(),
     }))
 }

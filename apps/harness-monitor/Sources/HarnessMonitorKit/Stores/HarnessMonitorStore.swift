@@ -14,6 +14,7 @@ public final class HarnessMonitorStore {
   public let toast: ToastSlice
   @ObservationIgnored public let supervisorToolbarSlice: SupervisorToolbarSlice
   public let bookmarkStore: BookmarkStore?
+  public let repositoryDirectoryStore: RepositoryDirectoryStore?
   @ObservationIgnored var supervisorStack: SupervisorStack?
   @ObservationIgnored var supervisorBindings = SupervisorBindings()
   @ObservationIgnored var supervisorStartTask: Task<Void, Never>?
@@ -370,6 +371,7 @@ public final class HarnessMonitorStore {
     (self.sidebarUI, self.toast) = (SidebarUISlice(), ToastSlice())
     self.supervisorToolbarSlice = SupervisorToolbarSlice()
     self.bookmarkStore = Self.makeBookmarkStore()
+    self.repositoryDirectoryStore = Self.makeRepositoryDirectoryStore()
     (self.daemonController, self.daemonOwnership) = (daemonController, daemonOwnership)
     (self.fileViewer, self.voiceCapture) = (fileViewer, voiceCapture)
     self.taskBoardSettingsWorker = taskBoardSettingsWorker

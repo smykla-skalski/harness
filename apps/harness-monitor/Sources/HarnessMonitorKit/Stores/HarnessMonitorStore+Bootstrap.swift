@@ -103,6 +103,29 @@ extension HarnessMonitorStore {
     #endif
   }
 
+  // Shares the bookmark store's container so a repository's associated bookmark
+  // id resolves against the same app-group bookmarks file.
+  static func makeRepositoryDirectoryStore() -> RepositoryDirectoryStore? {
+    #if DEBUG
+      let environment = ProcessInfo.processInfo.environment
+      if environment["XCTestConfigurationFilePath"] != nil
+        || environment["HARNESS_MONITOR_UI_TESTS"] == "1"
+      {
+        return RepositoryDirectoryStore(containerURL: debugBookmarkStoreContainerURL())
+      }
+    #endif
+    if let groupContainer = SandboxPaths.appGroupContainerURL() {
+      return RepositoryDirectoryStore(containerURL: groupContainer)
+    }
+    #if DEBUG
+      return RepositoryDirectoryStore(
+        containerURL: SandboxPaths.debugBookmarkFallbackContainerURL()
+      )
+    #else
+      return nil
+    #endif
+  }
+
   #if DEBUG
     static func debugBookmarkStoreContainerURL() -> URL {
       SandboxPaths.debugBookmarkFallbackContainerURL()

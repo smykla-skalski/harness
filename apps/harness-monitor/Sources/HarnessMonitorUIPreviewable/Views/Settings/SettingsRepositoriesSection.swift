@@ -164,6 +164,10 @@ struct SettingsRepositoriesSection: View {
           statusSection(message: saveWarning, color: .orange)
         }
         RepositoriesMonitoredSection(draft: draftBinding)
+        SettingsRepositoryWorkingDirectoriesSection(
+          store: store,
+          repositories: draft.rows.map(\.id)
+        )
         if isFullyExpanded {
           organizationImportSection
           if !draft.legacyOrganizations.isEmpty {

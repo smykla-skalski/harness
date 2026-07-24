@@ -21,6 +21,11 @@ public enum SandboxPaths {
       .appendingPathComponent("bookmarks.json")
   }
 
+  public static func repositoryDirectoriesFileURL(containerURL: URL) -> URL {
+    containerURL.appendingPathComponent("sandbox", isDirectory: true)
+      .appendingPathComponent("repository-directories.json")
+  }
+
   #if DEBUG
     public static func debugBookmarkFallbackContainerURL() -> URL {
       let containerURL = FileManager.default.temporaryDirectory

@@ -138,6 +138,14 @@ struct HarnessMonitorStoreSheetTests {
     #expect(sheet.id == "newCodexAgent:\(PreviewFixtures.previewSessionID)")
   }
 
+  @Test("resolveRepositoryDirectories sheet id encodes repositories")
+  func resolveRepositoryDirectoriesSheetIdEncodesRepositories() {
+    let sheet = HarnessMonitorStore.PresentedSheet.resolveRepositoryDirectories(
+      repositories: ["acme/widgets", "other/repo"]
+    )
+    #expect(sheet.id == "resolveRepositoryDirectories:acme/widgets,other/repo")
+  }
+
   @Test("Setting createTask sheet replaces a prior sendSignal sheet")
   func createTaskReplacesPriorSheet() async {
     let store = await makeBootstrappedStore()
@@ -180,6 +188,7 @@ struct HarnessMonitorStoreSheetTests {
     case .taskActions: break
     case .leaderTransfer: break
     case .newCodexAgent: break
+    case .resolveRepositoryDirectories: break
     }
   }
 
