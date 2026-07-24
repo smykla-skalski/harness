@@ -1,0 +1,415 @@
+//! gix-backed runtime that obtains a full working copy (clone + checkout).
+//!
+//! Unlike the reviews bare/blobless clone, this produces a real working tree
+//! valid as a session `origin`. Obtain is idempotent: a present, reusable
+//! checkout is returned as-is (its `last_used_at` bumped so GC keeps it), and
+//! is only cloned when missing and cloning is allowed. The per-repo mutex
+//! serializes same-repo callers so two deliveries never double-clone.
+
+use std::collections::BTreeMap;
+use std::fs;
+use std::io::Result as IoResult;
+use std::path::{Path, PathBuf};
+use std::process;
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::time::Instant;
+
+use chrono::Utc;
+use gix::progress::Discard;
+use tokio::fs as tokio_fs;
+use tokio::sync::Mutex;
+use tokio::task::spawn_blocking;
+
+use super::progress::{WorkingCopyProgress, WorkingCopyProgressSink};
+use super::{WorkingCopyKey, WorkingCopyRegistry, WorkingCopyRegistryEntry, WorkingCopyRoot};
+
+/// Outcome of a successful obtain: the checkout path plus whether a fresh
+/// clone happened (`false` means an existing copy was reused).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ObtainedWorkingCopy {
+    pub checkout_path: PathBuf,
+    pub cloned: bool,
+}
+
+/// Failure modes the runtime exposes to callers.
+#[derive(Debug, thiserror::Error)]
+pub enum WorkingCopyRuntimeError {
+    #[error("gix clone failed: {0}")]
+    Clone(String),
+    #[error("gix checkout failed: {0}")]
+    Checkout(String),
+    #[error("io error: {0}")]
+    Io(String),
+    #[error("join error: {0}")]
+    Join(String),
+}
+
+/// Per-process runtime that owns the on-disk working-copies root and the
+/// per-repo mutex map. Construct one instance and share it via `Arc`.
+#[derive(Debug)]
+pub struct WorkingCopyRuntime {
+    root: WorkingCopyRoot,
+    locks: Mutex<BTreeMap<WorkingCopyKey, Arc<Mutex<()>>>>,
+    registry_lock: Mutex<()>,
+}
+
+impl WorkingCopyRuntime {
+    #[must_use]
+    pub fn new(root: WorkingCopyRoot) -> Self {
+        Self {
+            root,
+            locks: Mutex::new(BTreeMap::new()),
+            registry_lock: Mutex::new(()),
+        }
+    }
+
+    async fn lock_for(&self, key: &WorkingCopyKey) -> Arc<Mutex<()>> {
+        let mut map = self.locks.lock().await;
+        Arc::clone(
+            map.entry(key.clone())
+                .or_insert_with(|| Arc::new(Mutex::new(()))),
+        )
+    }
+
+    /// Obtain a working copy for `repo_full_name`, authenticated via `token`.
+    /// A present, reusable checkout is returned without touching the network.
+    /// When missing, it is cloned only if `allow_clone` is set - otherwise
+    /// `Ok(None)` signals "not present" so callers (delivery) can fall back to
+    /// asking the user rather than triggering a surprise multi-minute clone.
+    ///
+    /// # Errors
+    /// Returns [`WorkingCopyRuntimeError`] on network, IO, or gix failures.
+    pub async fn obtain(
+        self: &Arc<Self>,
+        repo_full_name: &str,
+        token: &str,
+        allow_clone: bool,
+        sink: Arc<dyn WorkingCopyProgressSink>,
+    ) -> Result<Option<ObtainedWorkingCopy>, WorkingCopyRuntimeError> {
+        let url = format!("https://x-access-token:{token}@github.com/{repo_full_name}.git");
+        self.obtain_with_url(repo_full_name, url, allow_clone, sink)
+            .await
+    }
+
+    /// Same as [`obtain`] but accepts a fully-formed URL. Used by tests with
+    /// `file://` fixtures. The URL may embed a secret, so it is never logged.
+    ///
+    /// # Errors
+    /// Returns [`WorkingCopyRuntimeError`] on network, IO, or gix failures.
+    pub async fn obtain_with_url(
+        self: &Arc<Self>,
+        repo_full_name: &str,
+        clone_url: String,
+        allow_clone: bool,
+        sink: Arc<dyn WorkingCopyProgressSink>,
+    ) -> Result<Option<ObtainedWorkingCopy>, WorkingCopyRuntimeError> {
+        let key = WorkingCopyKey::new(repo_full_name);
+        let checkout_path = key.checkout_path(&self.root.path);
+        let repo_label = repo_full_name.to_string();
+        let lock = self.lock_for(&key).await;
+        let _guard = lock.lock().await;
+
+        ensure_root_dir(&self.root.path).await?;
+
+        if is_reusable_checkout(&checkout_path).await {
+            self.record_entry(&key, &repo_label, &checkout_path, false)
+                .await?;
+            return Ok(Some(ObtainedWorkingCopy {
+                checkout_path,
+                cloned: false,
+            }));
+        }
+        if !allow_clone {
+            return Ok(None);
+        }
+        // A leftover directory from a failed prior clone is not reusable;
+        // clear it so the fresh clone starts clean.
+        if checkout_path.exists() {
+            tokio_fs::remove_dir_all(&checkout_path)
+                .await
+                .map_err(|error| WorkingCopyRuntimeError::Io(error.to_string()))?;
+        }
+
+        sink.report(WorkingCopyProgress::Started {
+            repo_full_name: repo_label.clone(),
+        });
+        let start = Instant::now();
+        let task_path = checkout_path.clone();
+        let result = spawn_blocking(move || run_clone_checkout(&clone_url, &task_path))
+            .await
+            .map_err(|join| WorkingCopyRuntimeError::Join(join.to_string()))?;
+
+        match result {
+            Ok(()) => {
+                sink.report(WorkingCopyProgress::Completed {
+                    repo_full_name: repo_label.clone(),
+                    duration: start.elapsed(),
+                });
+                self.record_entry(&key, &repo_label, &checkout_path, true)
+                    .await?;
+                Ok(Some(ObtainedWorkingCopy {
+                    checkout_path,
+                    cloned: true,
+                }))
+            }
+            Err(error) => {
+                let _ = tokio_fs::remove_dir_all(&checkout_path).await;
+                sink.report(WorkingCopyProgress::Failed {
+                    repo_full_name: repo_label,
+                    message: error.to_string(),
+                });
+                Err(error)
+            }
+        }
+    }
+
+    /// Upsert the registry row and bump `last_used_at`. Recomputes the on-disk
+    /// size only when a fresh clone happened or the row is new - the common
+    /// reuse path just bumps the timestamp so it stays cheap on delivery.
+    async fn record_entry(
+        &self,
+        key: &WorkingCopyKey,
+        repo_full_name: &str,
+        checkout_path: &Path,
+        recompute_size: bool,
+    ) -> Result<(), WorkingCopyRuntimeError> {
+        let _guard = self.registry_lock.lock().await;
+        let registry_path = self.root.registry_path();
+        let checkout_path = checkout_path.to_path_buf();
+        let key = key.clone();
+        let repo_full_name = repo_full_name.to_string();
+        spawn_blocking(move || {
+            let mut registry = load_registry_lenient(&registry_path);
+            let now = Utc::now();
+            let existing = registry.entries.get(&key);
+            let size = if recompute_size || existing.is_none() {
+                directory_size(&checkout_path).unwrap_or(0)
+            } else {
+                existing.map_or(0, |entry| entry.size_bytes)
+            };
+            let created_at = existing.map_or(now, |entry| entry.created_at);
+            registry.insert_or_update(
+                key,
+                WorkingCopyRegistryEntry {
+                    repo_full_name,
+                    checkout_path,
+                    size_bytes: size,
+                    created_at,
+                    last_used_at: now,
+                },
+            );
+            let body = serde_json::to_vec_pretty(&registry).map_err(|e| e.to_string())?;
+            write_registry_atomically(&registry_path, &body)?;
+            Ok::<(), String>(())
+        })
+        .await
+        .map_err(|join| WorkingCopyRuntimeError::Join(join.to_string()))?
+        .map_err(WorkingCopyRuntimeError::Io)
+    }
+}
+
+async fn ensure_root_dir(path: &Path) -> Result<(), WorkingCopyRuntimeError> {
+    if path.exists() {
+        return Ok(());
+    }
+    tokio_fs::create_dir_all(path)
+        .await
+        .map_err(|error| WorkingCopyRuntimeError::Io(error.to_string()))
+}
+
+/// A directory is reusable only if gix can open it as a repo with a working
+/// tree. A partial checkout from a failed clone fails this and gets recloned.
+async fn is_reusable_checkout(path: &Path) -> bool {
+    if !path.exists() {
+        return false;
+    }
+    let path = path.to_path_buf();
+    spawn_blocking(move || gix::open(&path).is_ok_and(|repo| repo.workdir().is_some()))
+        .await
+        .unwrap_or(false)
+}
+
+fn load_registry_lenient(registry_path: &Path) -> WorkingCopyRegistry {
+    if registry_path.exists() {
+        let raw = fs::read(registry_path).unwrap_or_default();
+        serde_json::from_slice::<WorkingCopyRegistry>(&raw).unwrap_or_default()
+    } else {
+        WorkingCopyRegistry::default()
+    }
+}
+
+/// Walk `path` recursively summing file sizes. Best-effort - any unreadable
+/// entry is silently skipped.
+fn directory_size(path: &Path) -> IoResult<u64> {
+    fn walk(p: &Path) -> IoResult<u64> {
+        let meta = fs::symlink_metadata(p)?;
+        if meta.is_file() {
+            return Ok(meta.len());
+        }
+        if !meta.is_dir() {
+            return Ok(0);
+        }
+        let mut total = 0_u64;
+        for entry in fs::read_dir(p)?.flatten() {
+            if let Ok(sub) = walk(&entry.path()) {
+                total = total.saturating_add(sub);
+            }
+        }
+        Ok(total)
+    }
+    walk(path)
+}
+
+fn write_registry_atomically(registry_path: &Path, body: &[u8]) -> Result<(), String> {
+    let parent = registry_path
+        .parent()
+        .ok_or_else(|| format!("registry path has no parent: {}", registry_path.display()))?;
+    fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    let tmp_path = registry_path.with_extension(format!("json.tmp.{}", process::id()));
+    fs::write(&tmp_path, body).map_err(|e| e.to_string())?;
+    fs::rename(&tmp_path, registry_path).map_err(|e| {
+        let _ = fs::remove_file(&tmp_path);
+        e.to_string()
+    })?;
+    Ok(())
+}
+
+/// Synchronous gix clone + checkout executed inside `spawn_blocking`.
+fn run_clone_checkout(clone_url: &str, checkout_path: &Path) -> Result<(), WorkingCopyRuntimeError> {
+    if let Some(parent) = checkout_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| WorkingCopyRuntimeError::Io(e.to_string()))?;
+    }
+    let interrupted = AtomicBool::new(false);
+    let mut prepare = gix::prepare_clone(clone_url, checkout_path)
+        .map_err(|e| WorkingCopyRuntimeError::Clone(e.to_string()))?;
+    let (mut checkout, _fetch) = prepare
+        .fetch_then_checkout(Discard, &interrupted)
+        .map_err(|e| WorkingCopyRuntimeError::Clone(e.to_string()))?;
+    let (_repo, _outcome) = checkout
+        .main_worktree(Discard, &interrupted)
+        .map_err(|e| WorkingCopyRuntimeError::Checkout(e.to_string()))?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex as StdMutex;
+
+    #[derive(Default)]
+    struct RecordingSink {
+        events: StdMutex<Vec<WorkingCopyProgress>>,
+    }
+
+    impl WorkingCopyProgressSink for RecordingSink {
+        fn report(&self, event: WorkingCopyProgress) {
+            self.events.lock().unwrap().push(event);
+        }
+    }
+
+    impl RecordingSink {
+        fn snapshot(&self) -> Vec<WorkingCopyProgress> {
+            self.events.lock().unwrap().clone()
+        }
+    }
+
+    fn set_test_user(repo_path: &Path) {
+        use std::io::Write;
+        let mut f = std::fs::OpenOptions::new()
+            .append(true)
+            .open(repo_path.join("config"))
+            .expect("open repo config");
+        writeln!(f, "[user]\n\tname = Test\n\temail = test@example.com").expect("write user");
+    }
+
+    fn make_source_repo(path: &Path) -> gix::ObjectId {
+        gix::init_bare(path).expect("init bare");
+        set_test_user(path);
+        let repo = gix::open(path).expect("reopen bare");
+        let blob_oid = repo.write_blob(b"hello fixture\n").expect("blob").detach();
+        let mut tree = gix::objs::Tree::empty();
+        tree.entries.push(gix::objs::tree::Entry {
+            mode: gix::objs::tree::EntryKind::Blob.into(),
+            filename: "fixture.txt".into(),
+            oid: blob_oid,
+        });
+        let tree_oid = repo.write_object(&tree).expect("tree").detach();
+        repo.commit(
+            "refs/heads/main",
+            "fixture commit",
+            tree_oid,
+            Vec::<gix::ObjectId>::new(),
+        )
+        .expect("commit")
+        .detach()
+    }
+
+    #[tokio::test]
+    async fn obtain_clones_checks_out_working_tree_then_reuses() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let source = dir.path().join("source.git");
+        make_source_repo(&source);
+
+        let root = WorkingCopyRoot::new(dir.path().join("working-copies"));
+        let runtime = Arc::new(WorkingCopyRuntime::new(root));
+        let sink = Arc::new(RecordingSink::default());
+        let url = format!("file://{}", source.display());
+
+        let first = runtime
+            .obtain_with_url(
+                "fixture/source",
+                url.clone(),
+                true,
+                sink.clone() as Arc<dyn WorkingCopyProgressSink>,
+            )
+            .await
+            .expect("obtain")
+            .expect("present");
+        assert!(first.cloned);
+        // A real working tree: the committed file is on disk, checked out.
+        assert!(first.checkout_path.join("fixture.txt").exists());
+        assert!(first.checkout_path.join(".git").exists());
+
+        let events = sink.snapshot();
+        assert!(matches!(
+            events.first(),
+            Some(WorkingCopyProgress::Started { .. })
+        ));
+        assert!(matches!(
+            events.last(),
+            Some(WorkingCopyProgress::Completed { .. })
+        ));
+
+        // Second obtain reuses the existing checkout - no clone, no events.
+        let reuse_sink = Arc::new(RecordingSink::default());
+        let second = runtime
+            .obtain_with_url(
+                "fixture/source",
+                url,
+                true,
+                reuse_sink.clone() as Arc<dyn WorkingCopyProgressSink>,
+            )
+            .await
+            .expect("obtain")
+            .expect("present");
+        assert!(!second.cloned);
+        assert_eq!(second.checkout_path, first.checkout_path);
+        assert!(reuse_sink.snapshot().is_empty());
+    }
+
+    #[tokio::test]
+    async fn obtain_without_allow_clone_returns_none_when_absent() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = WorkingCopyRoot::new(dir.path().join("working-copies"));
+        let runtime = Arc::new(WorkingCopyRuntime::new(root));
+        let sink: Arc<dyn WorkingCopyProgressSink> =
+            Arc::new(super::super::progress::DiscardProgressSink);
+
+        let outcome = runtime
+            .obtain_with_url("fixture/missing", "file:///nonexistent".into(), false, sink)
+            .await
+            .expect("obtain");
+        assert!(outcome.is_none());
+    }
+}

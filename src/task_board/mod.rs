@@ -28,6 +28,7 @@ pub mod triage_override;
 pub mod triage_rules;
 pub mod types;
 mod worker_prompt;
+pub mod working_copy;
 
 pub use automation::*;
 pub use dispatch::{
