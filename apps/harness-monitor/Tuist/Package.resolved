@@ -33,8 +33,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/open-telemetry/opentelemetry-swift",
       "state" : {
-        "revision" : "df57cc4fd0b4cf4f9d715253c6aaba4b6912f7e0",
-        "version" : "2.3.0"
+        "revision" : "9a6d6a8aed22c415bb1673206e337824635f818b",
+        "version" : "2.5.0"
       }
     },
     {
