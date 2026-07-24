@@ -43,6 +43,22 @@ const DOCUMENTED_ROUTES: &[(&str, &str)] = &[
     ("POST", "/v1/sessions/{session_id}/archive"),
     ("POST", "/v1/sessions/{session_id}/leave"),
     ("POST", "/v1/sessions/{session_id}/observe"),
+    ("POST", "/v1/sessions/{session_id}/task"),
+    ("POST", "/v1/sessions/{session_id}/tasks/{task_id}"),
+    ("POST", "/v1/sessions/{session_id}/tasks/{task_id}/assign"),
+    ("POST", "/v1/sessions/{session_id}/tasks/{task_id}/drop"),
+    ("POST", "/v1/sessions/{session_id}/tasks/{task_id}/queue-policy"),
+    ("POST", "/v1/sessions/{session_id}/tasks/{task_id}/status"),
+    ("POST", "/v1/sessions/{session_id}/tasks/{task_id}/checkpoint"),
+    ("POST", "/v1/sessions/{session_id}/tasks/{task_id}/submit-for-review"),
+    ("POST", "/v1/sessions/{session_id}/tasks/{task_id}/claim-review"),
+    ("POST", "/v1/sessions/{session_id}/tasks/{task_id}/submit-review"),
+    ("POST", "/v1/sessions/{session_id}/tasks/{task_id}/respond-review"),
+    ("POST", "/v1/sessions/{session_id}/tasks/{task_id}/arbitrate"),
+    ("POST", "/v1/sessions/{session_id}/agents/{session_agent_id}/role"),
+    ("POST", "/v1/sessions/{session_id}/agents/{session_agent_id}/remove"),
+    ("POST", "/v1/sessions/{session_id}/leader"),
+    ("POST", "/v1/sessions/{session_id}/improver/apply"),
 ];
 
 fn documented_operations() -> BTreeSet<(String, String)> {

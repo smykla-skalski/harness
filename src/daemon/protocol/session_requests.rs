@@ -8,6 +8,7 @@ use crate::session::types::{
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct RoleChangeRequest {
     pub actor: String,
     pub role: SessionRole,
@@ -15,11 +16,13 @@ pub struct RoleChangeRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AgentRemoveRequest {
     pub actor: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct LeaderTransferRequest {
     pub actor: String,
     pub new_leader_id: String,
@@ -27,6 +30,7 @@ pub struct LeaderTransferRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskCreateRequest {
     pub actor: String,
     pub title: String,
@@ -36,17 +40,20 @@ pub struct TaskCreateRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskDeleteRequest {
     pub actor: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskAssignRequest {
     pub actor: String,
     pub agent_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskDropRequest {
     pub actor: String,
     pub target: TaskDropTarget,
@@ -57,18 +64,21 @@ pub struct TaskDropRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(tag = "target_type", rename_all = "snake_case")]
 pub enum TaskDropTarget {
     Agent { agent_id: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskQueuePolicyRequest {
     pub actor: String,
     pub queue_policy: TaskQueuePolicy,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskUpdateRequest {
     pub actor: String,
     pub status: TaskStatus,
@@ -76,6 +86,7 @@ pub struct TaskUpdateRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskCheckpointRequest {
     pub actor: String,
     pub summary: String,
@@ -169,6 +180,7 @@ pub struct SignalCancelRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskSubmitForReviewRequest {
     pub actor: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -178,11 +190,13 @@ pub struct TaskSubmitForReviewRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskClaimReviewRequest {
     pub actor: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskSubmitReviewRequest {
     pub actor: String,
     pub verdict: ReviewVerdict,
@@ -192,6 +206,7 @@ pub struct TaskSubmitReviewRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskRespondReviewRequest {
     pub actor: String,
     #[serde(default)]
@@ -203,6 +218,7 @@ pub struct TaskRespondReviewRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskArbitrateRequest {
     pub actor: String,
     pub verdict: ReviewVerdict,
@@ -210,6 +226,7 @@ pub struct TaskArbitrateRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ImproverApplyRequest {
     pub actor: String,
     pub issue_id: String,

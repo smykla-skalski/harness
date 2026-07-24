@@ -6,8 +6,8 @@ use crate::daemon::service;
 
 use super::DaemonHttpState;
 
-mod mutations;
-mod review;
+pub(super) mod mutations;
+pub(super) mod review;
 
 pub(super) use mutations::{
     post_task_assign, post_task_checkpoint, post_task_create, post_task_delete, post_task_drop,
