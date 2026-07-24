@@ -7,8 +7,7 @@ use serde::Deserialize;
 
 use crate::daemon::protocol::{
     TASK_BOARD_TRIAGE_HISTORY_INVALID_PARAMS, TaskBoardClearTriageOverrideRequest,
-    TaskBoardSetTriageOverrideRequest, TaskBoardTriageCurrentResponse, TaskBoardTriageHistoryRequest,
-    TaskBoardTriageHistoryResponse, TaskBoardTriageOverrideMutationResponse, http_paths,
+    TaskBoardSetTriageOverrideRequest, TaskBoardTriageHistoryRequest, http_paths,
 };
 use crate::daemon::remote_task_board::{
     project_task_board_triage_current, project_task_board_triage_history,
@@ -18,6 +17,11 @@ use crate::errors::{CliError, CliErrorKind};
 use super::super::DaemonHttpState;
 #[cfg(feature = "openapi")]
 use super::super::openapi::DaemonErrorBody;
+#[cfg(feature = "openapi")]
+use crate::daemon::protocol::{
+    TaskBoardTriageCurrentResponse, TaskBoardTriageHistoryResponse,
+    TaskBoardTriageOverrideMutationResponse,
+};
 use super::super::response::timed_json;
 use super::super::task_board_route_executor;
 use super::items::{authenticated_task_board_read, authorized_control_request_parts};

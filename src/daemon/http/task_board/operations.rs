@@ -5,10 +5,10 @@ use axum::response::Response;
 
 use crate::daemon::protocol::{
     TaskBoardAuditRequest, TaskBoardCatalogRequest, TaskBoardDispatchDeliverRequest,
-    TaskBoardDispatchDeliverResponse, TaskBoardDispatchPickResponse, TaskBoardDispatchRequest,
-    TaskBoardEvaluateRequest, TaskBoardHostSetProjectTypesRequest,
+    TaskBoardDispatchRequest, TaskBoardEvaluateRequest, TaskBoardHostSetProjectTypesRequest,
     TaskBoardSyncRequest, http_paths,
 };
+#[cfg(feature = "openapi")]
 use crate::task_board::{
     DispatchExecutionSummary, Machine, TaskBoardAuditSummary, TaskBoardEvaluationSummary,
     TaskBoardMachineSummary, TaskBoardProjectSummary, TaskBoardSyncSummary,
@@ -17,6 +17,8 @@ use crate::task_board::{
 use super::super::DaemonHttpState;
 #[cfg(feature = "openapi")]
 use super::super::openapi::DaemonErrorBody;
+#[cfg(feature = "openapi")]
+use crate::daemon::protocol::{TaskBoardDispatchDeliverResponse, TaskBoardDispatchPickResponse};
 use super::super::response::timed_json;
 use super::super::task_board_route_executor;
 use super::items::{

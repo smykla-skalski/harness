@@ -10,14 +10,18 @@ use axum::response::Response;
 use axum::routing::{get, post};
 
 use crate::daemon::protocol::{
-    PolicyApprovalGrantResolveRequest, PolicyApprovalGrantResolveResponse,
-    PolicyApprovalGrantRevokeRequest, PolicyApprovalGrantRevokeResponse,
-    PolicyApprovalGrantsListResponse, PolicyCanvasSetSpawnKillSwitchRequest,
-    PolicyCanvasSetSpawnRequiresLivePolicyRequest, PolicyCanvasWorkspaceResponse, http_paths,
+    PolicyApprovalGrantResolveRequest, PolicyApprovalGrantRevokeRequest,
+    PolicyCanvasSetSpawnKillSwitchRequest, PolicyCanvasSetSpawnRequiresLivePolicyRequest,
+    http_paths,
 };
 
 #[cfg(feature = "openapi")]
 use super::super::openapi::DaemonErrorBody;
+#[cfg(feature = "openapi")]
+use crate::daemon::protocol::{
+    PolicyApprovalGrantResolveResponse, PolicyApprovalGrantRevokeResponse,
+    PolicyApprovalGrantsListResponse, PolicyCanvasWorkspaceResponse,
+};
 use super::super::response::timed_json;
 use super::super::{DaemonHttpState, require_async_db, task_board_route_executor};
 use super::authenticated_request;

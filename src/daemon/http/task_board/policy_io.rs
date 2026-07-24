@@ -6,13 +6,17 @@ use axum::response::Response;
 use axum::routing::post;
 
 use crate::daemon::protocol::{
-    PolicyCanvasExportRequest, PolicyCanvasExportResponse, PolicyCanvasImportRequest,
-    PolicyCanvasImportResponse, PolicyCanvasWorkspaceResponse, PolicyTransferBundle,
-    PolicyTransferDumpRequest, PolicyTransferImportRequest, http_paths,
+    PolicyCanvasExportRequest, PolicyCanvasImportRequest, PolicyTransferDumpRequest,
+    PolicyTransferImportRequest, http_paths,
 };
 
 #[cfg(feature = "openapi")]
 use super::super::openapi::DaemonErrorBody;
+#[cfg(feature = "openapi")]
+use crate::daemon::protocol::{
+    PolicyCanvasExportResponse, PolicyCanvasImportResponse, PolicyCanvasWorkspaceResponse,
+    PolicyTransferBundle,
+};
 use super::super::response::timed_json;
 use super::super::{DaemonHttpState, require_async_db, task_board_route_executor};
 use super::authenticated_request;

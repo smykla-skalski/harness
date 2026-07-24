@@ -7,15 +7,14 @@ use axum::response::Response;
 use serde::Deserialize;
 
 use crate::daemon::protocol::{
-    ControlPlaneActorRequest, TaskBoardCapabilitiesResponse, TaskBoardCreateItemRequest,
-    TaskBoardDeleteItemRequest, TaskBoardGetItemRequest, TaskBoardListItemsRequest,
-    TaskBoardListItemsResponse, TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest,
-    TaskBoardPlanningResponse, TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest,
+    ControlPlaneActorRequest, TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest,
+    TaskBoardGetItemRequest, TaskBoardListItemsRequest, TaskBoardPlanApproveRequest,
+    TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest,
     TaskBoardUpdateItemRequest, http_paths,
 };
 use crate::daemon::remote_task_board::{project_task_board_item, project_task_board_list};
 use crate::daemon::remote_viewer::is_remote_viewer;
-use crate::task_board::{TaskBoardItem, TaskBoardStatus};
+use crate::task_board::TaskBoardStatus;
 
 use super::super::DaemonHttpState;
 use super::super::auth::{authenticated_remote_client, authorize_control_request, require_auth};
@@ -23,6 +22,12 @@ use super::super::response::{extract_request_id, timed_json};
 use super::super::task_board_route_executor;
 #[cfg(feature = "openapi")]
 use super::super::openapi::DaemonErrorBody;
+#[cfg(feature = "openapi")]
+use crate::daemon::protocol::{
+    TaskBoardCapabilitiesResponse, TaskBoardListItemsResponse, TaskBoardPlanningResponse,
+};
+#[cfg(feature = "openapi")]
+use crate::task_board::TaskBoardItem;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]

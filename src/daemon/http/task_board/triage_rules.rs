@@ -6,9 +6,9 @@ use serde::Deserialize;
 
 use crate::daemon::protocol::{
     TaskBoardActivateTriageRulesRequest, TaskBoardPreviewTriageRulesRequest,
-    TaskBoardSaveTriageRulesDraftRequest, TaskBoardTriageRulesAuditResponse,
-    TaskBoardTriageRulesDraftResponse, TaskBoardTriageRulesRevisionsResponse, http_paths,
+    TaskBoardSaveTriageRulesDraftRequest, http_paths,
 };
+#[cfg(feature = "openapi")]
 use crate::task_board::{
     TriageRuleSetActivationResult, TriageRuleSetDraftSaveResult, TriageRuleSetPreviewResult,
 };
@@ -16,6 +16,11 @@ use crate::task_board::{
 use super::super::DaemonHttpState;
 #[cfg(feature = "openapi")]
 use super::super::openapi::DaemonErrorBody;
+#[cfg(feature = "openapi")]
+use crate::daemon::protocol::{
+    TaskBoardTriageRulesAuditResponse, TaskBoardTriageRulesDraftResponse,
+    TaskBoardTriageRulesRevisionsResponse,
+};
 use super::super::response::timed_json;
 use super::super::task_board_route_executor;
 use super::items::{authenticated_task_board_read, authorized_control_request_parts};

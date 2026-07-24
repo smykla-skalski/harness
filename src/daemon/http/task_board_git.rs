@@ -6,12 +6,11 @@ use axum::{Json, Router};
 
 use crate::daemon::protocol::{
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
-    TaskBoardGitRuntimeKeyMaterialSyncRequest, TaskBoardGitRuntimeKeyMaterialSyncResponse,
-    TaskBoardGitRuntimeSecretHandoffAckRequest, TaskBoardGitRuntimeSecretHandoffAckResponse,
-    TaskBoardGitRuntimeSecretHandoffPrepareResponse, TaskBoardGitSigningVerifyRequest,
-    TaskBoardGitSigningVerifyResponse, TaskBoardOpenRouterTokenSyncRequest,
+    TaskBoardGitRuntimeKeyMaterialSyncRequest, TaskBoardGitRuntimeSecretHandoffAckRequest,
+    TaskBoardGitSigningVerifyRequest, TaskBoardOpenRouterTokenSyncRequest,
     TaskBoardTodoistTokenSyncRequest, http_paths,
 };
+#[cfg(feature = "openapi")]
 use crate::task_board::{
     TaskBoardGitHubTokensSyncResponse, TaskBoardGitIdentityDefaults,
     TaskBoardOpenRouterTokenSyncResponse, TaskBoardTodoistTokenSyncResponse,
@@ -20,6 +19,11 @@ use crate::task_board::{
 use super::DaemonHttpState;
 #[cfg(feature = "openapi")]
 use super::openapi::DaemonErrorBody;
+#[cfg(feature = "openapi")]
+use crate::daemon::protocol::{
+    TaskBoardGitRuntimeKeyMaterialSyncResponse, TaskBoardGitRuntimeSecretHandoffAckResponse,
+    TaskBoardGitRuntimeSecretHandoffPrepareResponse, TaskBoardGitSigningVerifyResponse,
+};
 use super::response::timed_json;
 use super::task_board::authenticated_request;
 use super::task_board_route_executor;
