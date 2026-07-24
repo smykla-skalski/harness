@@ -322,7 +322,10 @@ fn recover_session_artifacts(
         .into());
     }
     session_storage::register_active(&layout)?;
-    session_storage::record_project_origin(&origin)?;
+    // Auxiliary discovery file; the DB sync in the caller is authoritative, so a
+    // write hiccup here must not block an otherwise-valid recovery. Matches the
+    // best-effort call on the session-start path.
+    let _ = session_storage::record_project_origin(&origin);
     let project = index::discovered_project_for_checkout(&origin);
     Ok(Some(RecoveredPreparedSession {
         project,
