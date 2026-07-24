@@ -6,7 +6,7 @@
     "license": {
       "name": "MIT"
     },
-    "version": "50.0.0"
+    "version": "50.1.0"
   },
   "paths": {
     "/v1/audit/events": {
@@ -12343,6 +12343,79 @@
           }
         },
         "x-websocket-method": "task_board.sync"
+      }
+    },
+    "/v1/task-board/triage/escalations/{escalation_id}/verdict": {
+      "post": {
+        "tags": [
+          "task-board"
+        ],
+        "summary": "No control-plane session auth: the caller is the daemon's own spawned\nescalation worker, authenticated entirely by `verdict_token` matching the\nrow this escalation's executor claim minted. See the route catalog's\n`Exempt` entry for this path for the full rationale.",
+        "operationId": "post_task_board_triage_escalation_verdict",
+        "parameters": [
+          {
+            "name": "escalation_id",
+            "in": "path",
+            "description": "Triage escalation identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskBoardTriageEscalationVerdictRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Verdict outcome; `accepted: false` carries the rejection reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskBoardTriageEscalationVerdictResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
       }
     },
     "/v1/task-board/triage/rules/activate": {
@@ -31462,6 +31535,47 @@
           "pending",
           "running"
         ]
+      },
+      "TaskBoardTriageEscalationVerdictRequest": {
+        "type": "object",
+        "description": "Request body for `POST /v1/task-board/triage/escalations/{escalation_id}/verdict`.\nHTTP-only, never exposed to remote or Swift clients (see the route\ncatalog's `Exempt` classification for this path) -- the only caller is\nthe daemon's own spawned escalation worker, via the\n`harness task-board triage-escalation report` CLI subcommand.\n`verdict_token` is the single-use credential minted when the executor\nclaimed this escalation; it is the entire authentication for this\nendpoint, not the control-plane session.",
+        "required": [
+          "verdict_token",
+          "evidence_fingerprint",
+          "verdict"
+        ],
+        "properties": {
+          "evidence_fingerprint": {
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/TriageVerdict"
+          },
+          "verdict_token": {
+            "type": "string"
+          }
+        }
+      },
+      "TaskBoardTriageEscalationVerdictResponse": {
+        "type": "object",
+        "description": "Response for the same endpoint. `accepted: false` always means nothing\nwas written to `task_board_triage_decisions` -- only the escalation\nrow's own status changed.",
+        "required": [
+          "accepted"
+        ],
+        "properties": {
+          "accepted": {
+            "type": "boolean"
+          },
+          "rejected_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
       },
       "TaskBoardTriageHistoryResponse": {
         "type": "object",
