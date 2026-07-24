@@ -14,6 +14,7 @@ use crate::daemon::service::{
     start_session_direct_async,
 };
 use crate::errors::{CliError, CliErrorKind};
+use crate::sandbox;
 use crate::session::storage as session_storage;
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionState};
 use crate::task_board::{
@@ -291,11 +292,11 @@ struct RecoveredPreparedSession {
 fn recover_session_artifacts(
     request: &PreparedSessionRecoveryRequest,
 ) -> Result<Option<RecoveredPreparedSession>, CliError> {
-    let origin = Path::new(&request.project_dir)
-        .canonicalize()
-        .map_err(|error| {
-            CliErrorKind::workflow_io(format!("resolve prepared dispatch project: {error}"))
-        })?;
+    // Sandboxed callers store a bookmark id as project_dir; resolve it the way
+    // session_setup does and hold the scope while the origin worktree below is
+    // probed or destroyed.
+    let project_scope = sandbox::resolve_project_input(&request.project_dir)?;
+    let origin = project_scope.path().to_path_buf();
     let layout = session_storage::layout_from_project_dir(&origin, &request.session_id)?;
     if !layout.state_file().exists() {
         clear_incomplete_session_artifacts(&origin, &layout)?;
