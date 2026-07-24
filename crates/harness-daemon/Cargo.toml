@@ -87,7 +87,7 @@ core-foundation = "0.10"
 security-framework = "3"
 
 [dev-dependencies]
-assert_cmd = "=2.2.0"
+assert_cmd = "=2.2.2"
 temp-env = { version = "=0.3.6", features = ["async_closure"] }
 tempfile = "=3.27.0"
 
