@@ -452,10 +452,24 @@ async fn abnormal_exit_populates_disconnect_reason_and_stderr_tail() {
             unreachable!();
         };
         assert!(matches!(stderr_tail.as_deref(), Some(tail) if tail.contains("boom")));
-        let saw_process_incident = (0..32).any(|_| match events.try_recv() {
-            Ok(event) => event.event == "acp_process_incident",
-            Err(_) => false,
-        });
+        // The incident event is published just after the status flips to
+        // Disconnected, so a fixed count of non-blocking drains finishes in
+        // microseconds and loses the race. Wait for it on the same deadline
+        // every other condition here waits on.
+        let incident_deadline = Instant::now() + ACP_CONDITION_DEADLINE;
+        let saw_process_incident = loop {
+            match events.try_recv() {
+                Ok(event) if event.event == "acp_process_incident" => break true,
+                Ok(_) | Err(broadcast::error::TryRecvError::Lagged(_)) => {}
+                Err(broadcast::error::TryRecvError::Closed) => break false,
+                Err(broadcast::error::TryRecvError::Empty) => {
+                    if Instant::now() >= incident_deadline {
+                        break false;
+                    }
+                    std::thread::sleep(Duration::from_millis(50));
+                }
+            }
+        };
         assert!(saw_process_incident, "expected acp_process_incident event");
     });
 }
