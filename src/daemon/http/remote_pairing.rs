@@ -26,7 +26,10 @@ use crate::workspace::utc_now;
 use super::response::{extract_request_id, timed_json, timed_response};
 use super::{DaemonConnectInfo, DaemonHttpState};
 
-mod status;
+#[cfg(feature = "openapi")]
+use super::openapi::DaemonErrorBody;
+
+pub(super) mod status;
 
 pub(super) fn remote_pairing_routes() -> Router<DaemonHttpState> {
     Router::new()
@@ -35,6 +38,7 @@ pub(super) fn remote_pairing_routes() -> Router<DaemonHttpState> {
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemotePairClaimHttpRequest {
     code: String,
     domain: String,
@@ -44,6 +48,7 @@ pub(crate) struct RemotePairClaimHttpRequest {
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemotePairClaimHttpResponse {
     client_id: String,
     display_name: String,
@@ -57,6 +62,20 @@ pub(crate) struct RemotePairClaimHttpResponse {
     reviews_query: Option<ReviewsQueryRequest>,
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/remote/pair/claim",
+    tag = "pairing",
+    request_body = RemotePairClaimHttpRequest,
+    description = "Claim a one-time pairing code to mint a remote client credential. Public: no daemon credentials, guarded by domain, TTL, and rate limits. Error bodies use an ad-hoc error object carrying code and message but no details field.",
+    responses(
+        (status = 200, description = "Pairing claimed; issued client credential", body = RemotePairClaimHttpResponse),
+        (status = 400, description = "Malformed claim request", body = DaemonErrorBody),
+        (status = 403, description = "Pairing domain rejected", body = DaemonErrorBody),
+        (status = 409, description = "Pairing code already claimed", body = DaemonErrorBody),
+        (status = 410, description = "Pairing code expired", body = DaemonErrorBody),
+    ),
+))]
 async fn post_remote_pair_claim(
     ConnectInfo(connect_info): ConnectInfo<DaemonConnectInfo>,
     headers: HeaderMap,

@@ -16,6 +16,9 @@ use super::DaemonHttpState;
 use super::auth::{authorize_control_request, require_auth};
 use super::response::{extract_request_id, timed_json};
 
+#[cfg(feature = "openapi")]
+use super::openapi::{DaemonErrorBody, OkResponse};
+
 pub(super) fn signal_routes() -> Router<DaemonHttpState> {
     Router::new()
         .route(http_paths::SESSION_SIGNAL_SEND, post(post_send_signal))
@@ -23,6 +26,17 @@ pub(super) fn signal_routes() -> Router<DaemonHttpState> {
         .route(http_paths::SESSION_SIGNAL_ACK, post(post_signal_ack))
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/signal",
+    tag = "sessions",
+    params(("session_id" = String, Path, description = "Session identifier")),
+    request_body = SignalSendRequest,
+    responses(
+        (status = 200, description = "Signal delivered; updated session detail", body = SessionDetail),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_send_signal(
     Path(session_id): Path<String>,
     headers: HeaderMap,
@@ -77,6 +91,17 @@ async fn send_signal_response(
     result
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/signal-cancel",
+    tag = "sessions",
+    params(("session_id" = String, Path, description = "Session identifier")),
+    request_body = SignalCancelRequest,
+    responses(
+        (status = 200, description = "Signal cancelled; updated session detail", body = SessionDetail),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_cancel_signal(
     Path(session_id): Path<String>,
     headers: HeaderMap,
@@ -98,6 +123,17 @@ pub(super) async fn post_cancel_signal(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/signal-ack",
+    tag = "sessions",
+    params(("session_id" = String, Path, description = "Session identifier")),
+    request_body = SignalAckRequest,
+    responses(
+        (status = 200, description = "Signal acknowledgment recorded", body = OkResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_signal_ack(
     Path(session_id): Path<String>,
     headers: HeaderMap,

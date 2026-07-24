@@ -139,26 +139,36 @@ pub(crate) fn execution_http_body_limit(method: &Method, path: &str) -> Option<u
     }
 }
 
-/// Recognise a remote-execution transport route. Re-exported under
-/// `http::openapi` (openapi feature only) so the contract test can accept
-/// documented transport routes, which sit outside `HTTP_API_CONTRACT` by
-/// design; the transport module itself stays crate-internal.
+/// Every remote-execution transport operation as `(method, path,
+/// operation_id)`. The auth recognizer ([`execution_operation`]) and the
+/// OpenAPI contract test both read this table, so a documented transport route
+/// cannot drift from the recognized set. Re-exported under `http::openapi`
+/// (openapi feature only); the transport module itself stays crate-internal.
+pub const EXECUTION_OPERATIONS: &[(Method, &str, &str)] = &[
+    (Method::GET, ADVERTISE_PATH, "advertise"),
+    (Method::POST, OFFER_PATH, "offer"),
+    (Method::POST, SOURCE_BUNDLE_PATH, "upload_source_bundle"),
+    (Method::POST, SOURCE_BUNDLE_RECEIPT_PATH, "verify_source_bundle_receipt"),
+    (Method::POST, SOURCE_BUNDLE_ABANDON_PATH, "abandon_source_bundle"),
+    (Method::POST, CLAIM_PATH, "claim"),
+    (Method::POST, LEASE_RENEW_PATH, "renew_lease"),
+    (Method::POST, STATUS_PATH, "status"),
+    (Method::POST, CANCEL_PATH, "cancel"),
+    (Method::POST, SETTLED_PATH, "settled"),
+    (Method::POST, ARTIFACT_PATH, "fetch_artifact"),
+    (
+        Method::POST,
+        super::routes_cleanup::CLEANUP_OBSERVATION_PATH,
+        "observe_cleanup",
+    ),
+];
+
+/// Recognise a remote-execution transport route, returning its operation id.
 pub fn execution_operation(method: &Method, path: &str) -> Option<&'static str> {
-    match (method, path) {
-        (&Method::GET, ADVERTISE_PATH) => Some("advertise"),
-        (&Method::POST, OFFER_PATH) => Some("offer"),
-        (&Method::POST, SOURCE_BUNDLE_PATH) => Some("upload_source_bundle"),
-        (&Method::POST, SOURCE_BUNDLE_RECEIPT_PATH) => Some("verify_source_bundle_receipt"),
-        (&Method::POST, SOURCE_BUNDLE_ABANDON_PATH) => Some("abandon_source_bundle"),
-        (&Method::POST, CLAIM_PATH) => Some("claim"),
-        (&Method::POST, LEASE_RENEW_PATH) => Some("renew_lease"),
-        (&Method::POST, STATUS_PATH) => Some("status"),
-        (&Method::POST, CANCEL_PATH) => Some("cancel"),
-        (&Method::POST, SETTLED_PATH) => Some("settled"),
-        (&Method::POST, ARTIFACT_PATH) => Some("fetch_artifact"),
-        (&Method::POST, super::routes_cleanup::CLEANUP_OBSERVATION_PATH) => Some("observe_cleanup"),
-        _ => None,
-    }
+    EXECUTION_OPERATIONS
+        .iter()
+        .find(|entry| entry.0 == *method && entry.1 == path)
+        .map(|entry| entry.2)
 }
 
 #[cfg_attr(feature = "openapi", utoipa::path(

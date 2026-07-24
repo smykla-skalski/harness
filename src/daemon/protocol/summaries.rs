@@ -87,6 +87,7 @@ pub struct SetLogLevelRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct HostBridgeReconfigureRequest {
     #[serde(default)]
     pub enable: Vec<String>,
@@ -129,6 +130,7 @@ pub struct DaemonTelemetryResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct DaemonDiagnosticsReport {
     pub health: Option<HealthResponse>,
     pub manifest: Option<DaemonManifest>,

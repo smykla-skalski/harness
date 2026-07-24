@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct OpenRouterModelEntry {
     pub id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -12,6 +13,7 @@ pub struct OpenRouterModelEntry {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct OpenRouterModelCatalogResponse {
     pub models: Vec<OpenRouterModelEntry>,
     pub fetched_at: String,
@@ -20,6 +22,7 @@ pub struct OpenRouterModelCatalogResponse {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum OpenRouterModelCatalogSource {
     Live,
     Cache,

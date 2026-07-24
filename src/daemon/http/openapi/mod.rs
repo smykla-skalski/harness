@@ -16,13 +16,18 @@ use utoipa::OpenApi;
 use crate::daemon::protocol::{HTTP_API_CONTRACT, HttpRouteMethod};
 
 mod policy_api;
+mod remote_pairing_api;
+mod signals_voice_api;
 mod task_board_api;
 mod task_board_execution_api;
 
-/// Route recogniser for the remote-execution transport, surfaced here (only
-/// under the `openapi` feature) so the contract test can accept documented
-/// transport routes while the transport module stays `pub(crate)`.
-pub use crate::daemon::task_board_remote_transport::routes::execution_operation;
+/// Route recogniser and full operation table for the remote-execution
+/// transport, surfaced here (only under the `openapi` feature) so the contract
+/// test can accept and enumerate documented transport routes while the
+/// transport module stays `pub(crate)`.
+pub use crate::daemon::task_board_remote_transport::routes::{
+    EXECUTION_OPERATIONS, execution_operation,
+};
 
 /// Error envelope returned by daemon handlers on failure.
 ///
@@ -88,6 +93,12 @@ struct HarnessDaemonApi;
     super::core::get_github_status,
     super::core::get_projects,
     super::core::get_runtime_session_resolution,
+    super::core::get_diagnostics,
+    super::core::get_config,
+    super::core::get_runtimes_probe,
+    super::core::post_bridge_reconfigure,
+    super::audit::get_audit_events,
+    super::openrouter_models::get_openrouter_models,
 ))]
 struct CoreApi;
 
@@ -210,6 +221,8 @@ pub fn openapi_document() -> utoipa::openapi::OpenApi {
     doc.merge(task_board_api::TaskBoardApi::openapi());
     doc.merge(task_board_execution_api::TaskBoardExecutionApi::openapi());
     doc.merge(policy_api::PolicyApi::openapi());
+    doc.merge(remote_pairing_api::RemotePairingApi::openapi());
+    doc.merge(signals_voice_api::SignalsVoiceApi::openapi());
     env!("CARGO_PKG_VERSION").clone_into(&mut doc.info.version);
     doc
 }

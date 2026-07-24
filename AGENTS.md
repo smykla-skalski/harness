@@ -95,6 +95,12 @@ handlers plus `#[derive(utoipa::ToSchema)]` on their wire types (behind the
 changing an annotated handler or wire type; `mise run openapi:check` fails on
 drift and runs inside `mise run test`. Never edit the generated file by hand.
 
+Coverage is complete: every non-exempt daemon HTTP route is annotated, and the
+`documented_operations_match_contract` integration test fails if a new handler
+ships without a schema entry. A genuinely non-documentable route - a WebSocket
+upgrade or a server-sent event stream - must instead be listed in
+`OPENAPI_EXEMPT` with a reason.
+
 ## Runtime bootstrap
 
 `mise run setup:bootstrap` installs the repo-aware wrapper and refreshes the project-local runtime configs that Harness owns. When a task changes hook registration or runtime config shape, rerun bootstrap in a temp project or focused test instead of looking for generated skill/plugin outputs.

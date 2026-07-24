@@ -53,6 +53,7 @@ impl HarnessMonitorAuditEventsRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct HarnessMonitorAuditEvent {
     pub id: String,
     pub recorded_at: String,
@@ -80,6 +81,7 @@ pub struct HarnessMonitorAuditEvent {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct HarnessMonitorAuditEventsResponse {
     pub events: Vec<HarnessMonitorAuditEvent>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

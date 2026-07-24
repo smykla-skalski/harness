@@ -13,10 +13,24 @@ use super::DaemonHttpState;
 use super::auth::require_auth;
 use super::response::{extract_request_id, timed_json};
 
+#[cfg(feature = "openapi")]
+use super::openapi::DaemonErrorBody;
+#[cfg(feature = "openapi")]
+use crate::daemon::protocol::OpenRouterModelCatalogResponse;
+
 pub(super) fn openrouter_model_routes() -> Router<DaemonHttpState> {
     Router::new().route(http_paths::OPENROUTER_MODELS, get(get_openrouter_models))
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/v1/openrouter/models",
+    tag = "daemon",
+    responses(
+        (status = 200, description = "OpenRouter model catalog", body = OpenRouterModelCatalogResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 async fn get_openrouter_models(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
