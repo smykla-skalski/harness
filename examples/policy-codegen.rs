@@ -2571,6 +2571,7 @@ const WEBSOCKET_EMIT_ONLY: &[&str] = &[
 const SESSION_TASKS_SOURCE: &str = include_str!("../src/session/types/tasks.rs");
 const TASK_BOARD_PROTOCOL_SOURCE: &str = include_str!("../src/daemon/protocol/task_board.rs");
 const TASK_BOARD_TYPES_SOURCE: &str = include_str!("../src/task_board/types.rs");
+const TASK_BOARD_ITEM_FIELDS_SOURCE: &str = include_str!("../src/task_board/item_fields.rs");
 const TASK_BOARD_LANE_SOURCE: &str = include_str!("../src/task_board/lane.rs");
 const TASK_BOARD_PROGRESS_ROLLUP_SOURCE: &str =
     include_str!("../src/task_board/progress_rollup.rs");
@@ -2598,8 +2599,9 @@ const TASK_BOARD_SUMMARY_EMIT_ONLY: &[&str] = &[
     "TaskBoardMachineSummary",
 ];
 const TASK_BOARD_ITEM_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardItemWireTypes.generated.swift";
-// The core TaskBoardItem and its nested structs/enums from types.rs, plus the
-// items-list and explicit-position response wrappers from the protocol facade.
+// The core TaskBoardItem from types.rs and its nested structs/enums (external
+// ref, planning, usage) from item_fields.rs, plus the items-list and
+// explicit-position response wrappers from the protocol facade.
 // References the adopted TaskBoardStatus/TaskBoardPriority/TaskBoardAgentMode/
 // TaskBoardWorkflowKind enums bare; the two closed enums here
 // (ExternalRefProvider, TaskBoardWorkflowStatus, TaskBoardTombstoneCause) take
@@ -3233,6 +3235,7 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[
                 TASK_BOARD_TYPES_SOURCE,
+                TASK_BOARD_ITEM_FIELDS_SOURCE,
                 TASK_BOARD_LANE_SOURCE,
                 TASK_BOARD_PROTOCOL_SOURCE,
                 TASK_BOARD_PROGRESS_ROLLUP_SOURCE,
