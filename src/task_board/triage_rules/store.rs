@@ -5,6 +5,7 @@ use crate::task_board::triage::TriageVerdict;
 use crate::task_board::triage_override::TaskBoardTriageEffectiveSource;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TriageRuleSetDraft {
     pub rules: TriageRuleSetV1,
     pub revision: i64,
@@ -13,6 +14,7 @@ pub struct TriageRuleSetDraft {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TriageRuleSetDraftSaveResult {
     pub validation: TriageRuleSetValidationReport,
     pub persisted: bool,
@@ -21,6 +23,7 @@ pub struct TriageRuleSetDraftSaveResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TriageRuleSetRevisionSummary {
     pub revision: i64,
     pub schema_version: u16,
@@ -34,12 +37,14 @@ pub struct TriageRuleSetRevisionSummary {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TriageRuleSetRevisionStatus {
     Active,
     Superseded,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TriageRuleSetAuditEntry {
     pub audit_id: String,
     pub kind: TriageRuleSetAuditKind,
@@ -55,6 +60,7 @@ pub struct TriageRuleSetAuditEntry {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TriageRuleSetAuditKind {
     Activated,
     ActivationRejected,
@@ -62,6 +68,7 @@ pub enum TriageRuleSetAuditKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TriageRuleSetActivationResult {
     pub validation: TriageRuleSetValidationReport,
     pub activated: bool,
@@ -74,6 +81,7 @@ pub struct TriageRuleSetActivationResult {
 /// current backlog -- never persists anything, whether or not the candidate
 /// is valid.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TriageRuleSetPreviewResult {
     pub validation: TriageRuleSetValidationReport,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -81,6 +89,7 @@ pub struct TriageRuleSetPreviewResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TriageRuleSetPreviewDiffEntry {
     pub item_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -12,6 +12,7 @@ use crate::task_board::types::ExternalRefProvider;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "issue", rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TriageRuleSetValidationIssue {
     UnsupportedSchemaVersion { expected: u16, actual: u16 },
     TooManyRules { max: usize, actual: usize },
@@ -25,6 +26,7 @@ pub enum TriageRuleSetValidationIssue {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TriageRuleSetValidationReport {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub issues: Vec<TriageRuleSetValidationIssue>,

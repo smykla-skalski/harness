@@ -6,19 +6,36 @@ use serde::Deserialize;
 
 use crate::daemon::protocol::{
     TaskBoardActivateTriageRulesRequest, TaskBoardPreviewTriageRulesRequest,
-    TaskBoardSaveTriageRulesDraftRequest, http_paths,
+    TaskBoardSaveTriageRulesDraftRequest, TaskBoardTriageRulesAuditResponse,
+    TaskBoardTriageRulesDraftResponse, TaskBoardTriageRulesRevisionsResponse, http_paths,
+};
+use crate::task_board::{
+    TriageRuleSetActivationResult, TriageRuleSetDraftSaveResult, TriageRuleSetPreviewResult,
 };
 
 use super::super::DaemonHttpState;
+#[cfg(feature = "openapi")]
+use super::super::openapi::DaemonErrorBody;
 use super::super::response::timed_json;
 use super::super::task_board_route_executor;
 use super::items::{authenticated_task_board_read, authorized_control_request_parts};
 
 #[derive(Debug, Clone, Default, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
+#[cfg_attr(feature = "openapi", into_params(parameter_in = Query))]
 pub(super) struct TaskBoardTriageRulesListQuery {
     pub limit: Option<u32>,
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/v1/task-board/triage/rules/draft",
+    tag = "task-board",
+    responses(
+        (status = 200, description = "Current pending triage rule-set draft, if one exists", body = TaskBoardTriageRulesDraftResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn get_task_board_triage_rules_draft(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -36,6 +53,16 @@ pub(super) async fn get_task_board_triage_rules_draft(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    put,
+    path = "/v1/task-board/triage/rules/draft",
+    tag = "task-board",
+    request_body = TaskBoardSaveTriageRulesDraftRequest,
+    responses(
+        (status = 200, description = "Validation outcome and, when valid, the persisted draft revision", body = TriageRuleSetDraftSaveResult),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn put_task_board_triage_rules_draft(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -55,6 +82,16 @@ pub(super) async fn put_task_board_triage_rules_draft(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/task-board/triage/rules/preview",
+    tag = "task-board",
+    request_body = TaskBoardPreviewTriageRulesRequest,
+    responses(
+        (status = 200, description = "Validation outcome and the non-persisting placement diff for the candidate rule set", body = TriageRuleSetPreviewResult),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_task_board_triage_rules_preview(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -73,6 +110,16 @@ pub(super) async fn post_task_board_triage_rules_preview(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/task-board/triage/rules/activate",
+    tag = "task-board",
+    request_body = TaskBoardActivateTriageRulesRequest,
+    responses(
+        (status = 200, description = "Validation outcome and, when activated, the new active revision and re-evaluated item count", body = TriageRuleSetActivationResult),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_task_board_triage_rules_activate(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -92,6 +139,16 @@ pub(super) async fn post_task_board_triage_rules_activate(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/v1/task-board/triage/rules/revisions",
+    tag = "task-board",
+    params(TaskBoardTriageRulesListQuery),
+    responses(
+        (status = 200, description = "Recent triage rule-set revisions, newest first", body = TaskBoardTriageRulesRevisionsResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn get_task_board_triage_rules_revisions(
     Query(query): Query<TaskBoardTriageRulesListQuery>,
     headers: HeaderMap,
@@ -110,6 +167,16 @@ pub(super) async fn get_task_board_triage_rules_revisions(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/v1/task-board/triage/rules/audit",
+    tag = "task-board",
+    params(TaskBoardTriageRulesListQuery),
+    responses(
+        (status = 200, description = "Recent triage rule-set audit entries, newest first", body = TaskBoardTriageRulesAuditResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn get_task_board_triage_rules_audit(
     Query(query): Query<TaskBoardTriageRulesListQuery>,
     headers: HeaderMap,

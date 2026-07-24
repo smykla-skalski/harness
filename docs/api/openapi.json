@@ -9058,6 +9058,361 @@
         },
         "x-websocket-method": "task_board.sync"
       }
+    },
+    "/v1/task-board/triage/rules/activate": {
+      "post": {
+        "tags": [
+          "task-board"
+        ],
+        "operationId": "post_task_board_triage_rules_activate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskBoardActivateTriageRulesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Validation outcome and, when activated, the new active revision and re-evaluated item count",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriageRuleSetActivationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "task_board.triage_rules_activate"
+      }
+    },
+    "/v1/task-board/triage/rules/audit": {
+      "get": {
+        "tags": [
+          "task-board"
+        ],
+        "operationId": "get_task_board_triage_rules_audit",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent triage rule-set audit entries, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskBoardTriageRulesAuditResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "task_board.triage_rules_audit"
+      }
+    },
+    "/v1/task-board/triage/rules/draft": {
+      "get": {
+        "tags": [
+          "task-board"
+        ],
+        "operationId": "get_task_board_triage_rules_draft",
+        "responses": {
+          "200": {
+            "description": "Current pending triage rule-set draft, if one exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskBoardTriageRulesDraftResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "task_board.triage_rules_draft_get"
+      },
+      "put": {
+        "tags": [
+          "task-board"
+        ],
+        "operationId": "put_task_board_triage_rules_draft",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskBoardSaveTriageRulesDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Validation outcome and, when valid, the persisted draft revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriageRuleSetDraftSaveResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "task_board.triage_rules_draft_save"
+      }
+    },
+    "/v1/task-board/triage/rules/preview": {
+      "post": {
+        "tags": [
+          "task-board"
+        ],
+        "operationId": "post_task_board_triage_rules_preview",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskBoardPreviewTriageRulesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Validation outcome and the non-persisting placement diff for the candidate rule set",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriageRuleSetPreviewResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "task_board.triage_rules_preview"
+      }
+    },
+    "/v1/task-board/triage/rules/revisions": {
+      "get": {
+        "tags": [
+          "task-board"
+        ],
+        "operationId": "get_task_board_triage_rules_revisions",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent triage rule-set revisions, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskBoardTriageRulesRevisionsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "task_board.triage_rules_revisions"
+      }
     }
   },
   "components": {
@@ -17883,6 +18238,33 @@
           }
         }
       },
+      "TaskBoardActivateTriageRulesRequest": {
+        "type": "object",
+        "description": "Request for `POST /v1/task-board/triage/rules/activate`. `rules: None`\ndeactivates back to the `BuiltInV1` default; `expected_active_revision`\nis `None` when no custom rule set currently governs.",
+        "properties": {
+          "actor": {
+            "type": "string",
+            "description": "Bound to the authenticated control-plane principal at the transport edge."
+          },
+          "expected_active_revision": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "rules": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TriageRuleSetV1"
+              }
+            ]
+          }
+        }
+      },
       "TaskBoardAuditSummary": {
         "type": "object",
         "required": [
@@ -20765,6 +21147,18 @@
           }
         }
       },
+      "TaskBoardPreviewTriageRulesRequest": {
+        "type": "object",
+        "description": "Request for `POST /v1/task-board/triage/rules/preview`. Never persists\nanything, whether or not `rules` is valid.",
+        "required": [
+          "rules"
+        ],
+        "properties": {
+          "rules": {
+            "$ref": "#/components/schemas/TriageRuleSetV1"
+          }
+        }
+      },
       "TaskBoardPriority": {
         "type": "string",
         "enum": [
@@ -21206,6 +21600,29 @@
             "type": "integer",
             "format": "int32",
             "minimum": 0
+          }
+        }
+      },
+      "TaskBoardSaveTriageRulesDraftRequest": {
+        "type": "object",
+        "description": "Request for `PUT /v1/task-board/triage/rules/draft`. `expected_revision`\nis `None` when saving over an empty slot (no draft yet).",
+        "required": [
+          "rules"
+        ],
+        "properties": {
+          "actor": {
+            "type": "string",
+            "description": "Bound to the authenticated control-plane principal at the transport edge."
+          },
+          "expected_revision": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "rules": {
+            "$ref": "#/components/schemas/TriageRuleSetV1"
           }
         }
       },
@@ -21661,6 +22078,46 @@
                 "$ref": "#/components/schemas/TaskBoardTriageOverride"
               }
             ]
+          }
+        }
+      },
+      "TaskBoardTriageRulesAuditResponse": {
+        "type": "object",
+        "description": "Response for `GET /v1/task-board/triage/rules/audit`.",
+        "properties": {
+          "audit": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TriageRuleSetAuditEntry"
+            }
+          }
+        }
+      },
+      "TaskBoardTriageRulesDraftResponse": {
+        "type": "object",
+        "description": "Response for `GET /v1/task-board/triage/rules/draft`.",
+        "properties": {
+          "draft": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TriageRuleSetDraft"
+              }
+            ]
+          }
+        }
+      },
+      "TaskBoardTriageRulesRevisionsResponse": {
+        "type": "object",
+        "description": "Response for `GET /v1/task-board/triage/rules/revisions`.",
+        "properties": {
+          "revisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TriageRuleSetRevisionSummary"
+            }
           }
         }
       },
@@ -22657,6 +23114,42 @@
           "active_evaluator_changed"
         ]
       },
+      "TriagePriorityAction": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "keep"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "priority",
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "set_to"
+                ]
+              },
+              "priority": {
+                "$ref": "#/components/schemas/TaskBoardPriority"
+              }
+            }
+          }
+        ]
+      },
       "TriageReasonCode": {
         "type": "string",
         "description": "Closed, ordered reason codes. `NeedsInfoLabel` and `NoMeaningfulLabels` are\nevaluated in that order before falling through to `MeaningfulLabel`; those\nthree are `BuiltInV1`-only. `RuleMatched` and `RuleSetDefault` are the\nruntime-authored-rules evaluator's reason codes -- the matched rule id (or\nnothing, for the default) travels in the decision's `reason_detail`.",
@@ -22667,6 +23160,770 @@
           "rule_matched",
           "rule_set_default"
         ]
+      },
+      "TriageRule": {
+        "type": "object",
+        "required": [
+          "id",
+          "outcome"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/TriageRuleOutcome"
+          },
+          "when": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TriageRuleCondition"
+            },
+            "description": "Conjunction (AND) of closed, typed predicates. Empty matches every\neligible item -- a valid, if unusual, catch-all."
+          }
+        }
+      },
+      "TriageRuleCondition": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "labels",
+              "fact"
+            ],
+            "properties": {
+              "fact": {
+                "type": "string",
+                "enum": [
+                  "labels_has_any"
+                ]
+              },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "labels",
+              "fact"
+            ],
+            "properties": {
+              "fact": {
+                "type": "string",
+                "enum": [
+                  "labels_has_all"
+                ]
+              },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "labels",
+              "fact"
+            ],
+            "properties": {
+              "fact": {
+                "type": "string",
+                "enum": [
+                  "labels_has_none"
+                ]
+              },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "priority",
+              "fact"
+            ],
+            "properties": {
+              "fact": {
+                "type": "string",
+                "enum": [
+                  "priority_equals"
+                ]
+              },
+              "priority": {
+                "$ref": "#/components/schemas/TaskBoardPriority"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "value",
+              "fact"
+            ],
+            "properties": {
+              "fact": {
+                "type": "string",
+                "enum": [
+                  "execution_repository_equals"
+                ]
+              },
+              "value": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "fact"
+            ],
+            "properties": {
+              "fact": {
+                "type": "string",
+                "enum": [
+                  "execution_repository_is_present"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "fact"
+            ],
+            "properties": {
+              "fact": {
+                "type": "string",
+                "enum": [
+                  "execution_repository_is_missing"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "value",
+              "fact"
+            ],
+            "properties": {
+              "fact": {
+                "type": "string",
+                "enum": [
+                  "project_id_equals"
+                ]
+              },
+              "value": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "fact"
+            ],
+            "properties": {
+              "fact": {
+                "type": "string",
+                "enum": [
+                  "project_id_is_present"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "fact"
+            ],
+            "properties": {
+              "fact": {
+                "type": "string",
+                "enum": [
+                  "project_id_is_missing"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "types",
+              "fact"
+            ],
+            "properties": {
+              "fact": {
+                "type": "string",
+                "enum": [
+                  "target_project_types_has_any"
+                ]
+              },
+              "types": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "types",
+              "fact"
+            ],
+            "properties": {
+              "fact": {
+                "type": "string",
+                "enum": [
+                  "target_project_types_has_none"
+                ]
+              },
+              "types": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "provider",
+              "fact"
+            ],
+            "properties": {
+              "fact": {
+                "type": "string",
+                "enum": [
+                  "imported_from_provider_equals"
+                ]
+              },
+              "provider": {
+                "$ref": "#/components/schemas/ExternalRefProvider"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "fact"
+            ],
+            "properties": {
+              "fact": {
+                "type": "string",
+                "enum": [
+                  "imported_from_provider_is_missing"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "The closed, typed condition vocabulary over stable Task Board facts.\nEvery eligible item is already a dispatchable `Task` in Backlog or Todo\n(see `triage_eligible`), so `kind` carries no discriminating power here\nand is deliberately not part of this vocabulary. Title and body are free\ntext and deliberately excluded too -- conditions are closed and typed,\nnever a regex or arbitrary expression over prose."
+      },
+      "TriageRuleOutcome": {
+        "type": "object",
+        "required": [
+          "verdict"
+        ],
+        "properties": {
+          "priority_action": {
+            "$ref": "#/components/schemas/TriagePriorityAction"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/TriageVerdict"
+          }
+        }
+      },
+      "TriageRuleSetActivationResult": {
+        "type": "object",
+        "required": [
+          "validation",
+          "activated",
+          "reevaluated_item_count"
+        ],
+        "properties": {
+          "activated": {
+            "type": "boolean"
+          },
+          "reevaluated_item_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "revision": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "validation": {
+            "$ref": "#/components/schemas/TriageRuleSetValidationReport"
+          }
+        }
+      },
+      "TriageRuleSetAuditEntry": {
+        "type": "object",
+        "required": [
+          "audit_id",
+          "kind",
+          "actor",
+          "recorded_at"
+        ],
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "audit_id": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TriageRuleSetAuditKind"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recorded_at": {
+            "type": "string"
+          },
+          "reevaluated_item_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "revision": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "TriageRuleSetAuditKind": {
+        "type": "string",
+        "enum": [
+          "activated",
+          "activation_rejected",
+          "deactivated"
+        ]
+      },
+      "TriageRuleSetDraft": {
+        "type": "object",
+        "required": [
+          "rules",
+          "revision",
+          "actor",
+          "updated_at"
+        ],
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rules": {
+            "$ref": "#/components/schemas/TriageRuleSetV1"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        }
+      },
+      "TriageRuleSetDraftSaveResult": {
+        "type": "object",
+        "required": [
+          "validation",
+          "persisted"
+        ],
+        "properties": {
+          "persisted": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "validation": {
+            "$ref": "#/components/schemas/TriageRuleSetValidationReport"
+          }
+        }
+      },
+      "TriageRuleSetPreviewDiffEntry": {
+        "type": "object",
+        "required": [
+          "item_id",
+          "candidate_verdict",
+          "governs_placement_change"
+        ],
+        "properties": {
+          "candidate_matched_rule_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "candidate_verdict": {
+            "$ref": "#/components/schemas/TriageVerdict"
+          },
+          "governs_placement_change": {
+            "type": "boolean",
+            "description": "Whether the item's actual governing outcome would change if this\ncandidate were activated right now. Always `false` while an active\nhuman override governs placement -- the override keeps winning\nregardless of which automatic evaluator sits underneath it."
+          },
+          "item_id": {
+            "type": "string"
+          },
+          "live_effective_source": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TaskBoardTriageEffectiveSource"
+              }
+            ]
+          },
+          "live_effective_verdict": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TriageVerdict"
+              }
+            ]
+          }
+        }
+      },
+      "TriageRuleSetPreviewResult": {
+        "type": "object",
+        "description": "Non-mutating evaluation of a candidate against one frozen read of the\ncurrent backlog -- never persists anything, whether or not the candidate\nis valid.",
+        "required": [
+          "validation"
+        ],
+        "properties": {
+          "diff": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TriageRuleSetPreviewDiffEntry"
+            }
+          },
+          "validation": {
+            "$ref": "#/components/schemas/TriageRuleSetValidationReport"
+          }
+        }
+      },
+      "TriageRuleSetRevisionStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "superseded"
+        ]
+      },
+      "TriageRuleSetRevisionSummary": {
+        "type": "object",
+        "required": [
+          "revision",
+          "schema_version",
+          "rule_count",
+          "status",
+          "actor",
+          "activated_at"
+        ],
+        "properties": {
+          "activated_at": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rule_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "status": {
+            "$ref": "#/components/schemas/TriageRuleSetRevisionStatus"
+          },
+          "superseded_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "TriageRuleSetV1": {
+        "type": "object",
+        "description": "A durable, versioned, ordered candidate rule set. Authored order is\nevaluation order (first matching rule wins) and is itself part of the\ncandidate's canonical, persisted identity -- reordering two rules is a\nreal change, not a no-op.",
+        "required": [
+          "schema_version",
+          "rules",
+          "default_outcome"
+        ],
+        "properties": {
+          "default_outcome": {
+            "$ref": "#/components/schemas/TriageRuleOutcome"
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TriageRule"
+            }
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "TriageRuleSetValidationIssue": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "expected",
+              "actual",
+              "issue"
+            ],
+            "properties": {
+              "actual": {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 0
+              },
+              "expected": {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 0
+              },
+              "issue": {
+                "type": "string",
+                "enum": [
+                  "unsupported_schema_version"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "max",
+              "actual",
+              "issue"
+            ],
+            "properties": {
+              "actual": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "issue": {
+                "type": "string",
+                "enum": [
+                  "too_many_rules"
+                ]
+              },
+              "max": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "index",
+              "issue"
+            ],
+            "properties": {
+              "index": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "issue": {
+                "type": "string",
+                "enum": [
+                  "malformed_rule_id"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "rule_id",
+              "issue"
+            ],
+            "properties": {
+              "issue": {
+                "type": "string",
+                "enum": [
+                  "duplicate_rule_id"
+                ]
+              },
+              "rule_id": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "rule_id",
+              "max",
+              "actual",
+              "issue"
+            ],
+            "properties": {
+              "actual": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "issue": {
+                "type": "string",
+                "enum": [
+                  "too_many_conditions"
+                ]
+              },
+              "max": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "rule_id": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "rule_id",
+              "condition_index",
+              "issue"
+            ],
+            "properties": {
+              "condition_index": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "issue": {
+                "type": "string",
+                "enum": [
+                  "malformed_condition"
+                ]
+              },
+              "rule_id": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "rule_id",
+              "duplicate_of",
+              "issue"
+            ],
+            "properties": {
+              "duplicate_of": {
+                "type": "string"
+              },
+              "issue": {
+                "type": "string",
+                "enum": [
+                  "duplicate_selector"
+                ]
+              },
+              "rule_id": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "rule_id",
+              "issue"
+            ],
+            "properties": {
+              "issue": {
+                "type": "string",
+                "enum": [
+                  "self_contradictory_rule"
+                ]
+              },
+              "rule_id": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "rule_id",
+              "shadowed_by",
+              "issue"
+            ],
+            "properties": {
+              "issue": {
+                "type": "string",
+                "enum": [
+                  "shadowed_rule"
+                ]
+              },
+              "rule_id": {
+                "type": "string"
+              },
+              "shadowed_by": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "TriageRuleSetValidationReport": {
+        "type": "object",
+        "properties": {
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TriageRuleSetValidationIssue"
+            }
+          }
+        }
       },
       "TriageVerdict": {
         "type": "string",
