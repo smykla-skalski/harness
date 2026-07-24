@@ -85,6 +85,18 @@ struct RemoteDaemonPairingInvitationTests {
     #expect(!RemoteDaemonPairingInvitation.isRemotePairingLink(relayOnPair))
   }
 
+  @Test("Leaves an ambiguous both-marker payload for the router")
+  func ignoresAmbiguousBothMarkerPayload() throws {
+    let ambiguous = try payloadURL(
+      object: [
+        "server_spki_sha256": Self.validPin,
+        "publicKeyFingerprint": "00:11:22:33:44:55:66:77",
+      ],
+      host: "pair"
+    )
+    #expect(!RemoteDaemonPairingInvitation.isRemotePairingLink(ambiguous))
+  }
+
   @Test("Rejects remote-daemon classification for non-pairing hosts and junk payloads")
   func rejectsRemoteClassificationForNonPairingHostsAndJunk() throws {
     let remotePayloadOnRoute = try invitationURL(

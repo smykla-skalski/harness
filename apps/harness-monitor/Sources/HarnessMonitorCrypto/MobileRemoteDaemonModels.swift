@@ -189,6 +189,23 @@ public enum MobilePairingLink: Equatable, Sendable {
     return host == canonicalHost || host == legacyRemoteHost
   }
 
+  /// True when `url` is an unambiguous remote-daemon pairing link — a supported
+  /// pairing host whose single payload carries the remote marker and not the
+  /// relay marker. A caller that only pairs with a remote daemon (the watch)
+  /// uses this to forward remote links while leaving relay or ambiguous links,
+  /// which share the `pair` host, alone.
+  public static func isRemotePairingLink(_ url: URL) -> Bool {
+    guard supports(url), let flow = classifyFlow(url) else {
+      return false
+    }
+    switch flow {
+    case .remote:
+      return true
+    case .relay:
+      return false
+    }
+  }
+
   public static func decode(_ url: URL, now: Date = .now) throws -> Self {
     guard supports(url) else {
       throw MobilePairingError.unsupportedURL(url.absoluteString)

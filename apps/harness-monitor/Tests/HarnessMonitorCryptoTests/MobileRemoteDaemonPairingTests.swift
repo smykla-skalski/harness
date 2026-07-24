@@ -76,6 +76,27 @@ final class MobileRemoteDaemonPairingTests: XCTestCase {
     XCTAssertThrowsError(try MobilePairingLink.decode(url, now: now))
   }
 
+  func testIsRemotePairingLinkSelectsRemoteFlowByPayload() throws {
+    let now = Date(timeIntervalSince1970: 1_752_124_400)
+    let remote = try remoteInvitationURL(now: now)
+    let legacyRemote = try remoteInvitationURL(now: now, host: "remote-pair")
+    let relay = try MobilePairingInvitationCodec.encode(makePairingInvitation(now: now))
+    let ambiguous = try payloadURL(object: [
+      "server_spki_sha256": testSPKIPin,
+      "publicKeyFingerprint": "00:11:22:33:44:55:66:77",
+    ])
+    let remoteOnRoute = try payloadURL(
+      object: ["server_spki_sha256": testSPKIPin],
+      host: "reviews"
+    )
+
+    XCTAssertTrue(MobilePairingLink.isRemotePairingLink(remote))
+    XCTAssertTrue(MobilePairingLink.isRemotePairingLink(legacyRemote))
+    XCTAssertFalse(MobilePairingLink.isRemotePairingLink(relay))
+    XCTAssertFalse(MobilePairingLink.isRemotePairingLink(ambiguous))
+    XCTAssertFalse(MobilePairingLink.isRemotePairingLink(remoteOnRoute))
+  }
+
   func testManualPayloadNormalizesRemoteAndRelayInvitations() throws {
     let now = Date(timeIntervalSince1970: 1_752_124_400)
     let remoteURL = try remoteInvitationURL(now: now)

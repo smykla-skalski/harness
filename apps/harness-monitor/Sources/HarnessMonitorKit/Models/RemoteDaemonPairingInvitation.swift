@@ -118,18 +118,24 @@ public struct RemoteDaemonPairingInvitation: Codable, Equatable, Sendable {
     return host == "pair" || host == "remote-pair"
   }
 
-  /// True when `url` is a remote-daemon pairing link: a `harness://` pairing
-  /// host carrying a payload with the `server_spki_sha256` marker. The flow is
-  /// chosen from the payload, not the host — the `pair` host is shared with
-  /// relay invitations, which carry `publicKeyFingerprint` instead. A payload
-  /// that carries the marker but is otherwise malformed still returns true so
-  /// the caller can reject it with a clear pairing error rather than routing it
-  /// elsewhere; a payload without the marker is left for the deep-link router.
+  /// True when `url` is an unambiguous remote-daemon pairing link: a `harness://`
+  /// pairing host whose payload carries the remote marker `server_spki_sha256`
+  /// and not the relay marker `publicKeyFingerprint`. The flow is chosen from
+  /// the payload, not the host — the `pair` host is shared with relay
+  /// invitations. A payload carrying both markers is ambiguous and left for the
+  /// router rather than decoded as remote, since `Codable` decoding would
+  /// otherwise ignore the relay marker and accept it. A remote payload that is
+  /// otherwise malformed still returns true so the caller surfaces a clear
+  /// pairing error; a payload without the remote marker is left for the router.
   public static func isRemotePairingLink(_ url: URL) -> Bool {
-    guard url.scheme?.lowercased() == "harness", isPairingHost(url.host) else {
+    guard
+      url.scheme?.lowercased() == "harness",
+      isPairingHost(url.host),
+      let object = payloadObject(from: url)
+    else {
       return false
     }
-    return payloadObject(from: url)?["server_spki_sha256"] != nil
+    return object["server_spki_sha256"] != nil && object["publicKeyFingerprint"] == nil
   }
 
   private static func payloadObject(from url: URL) -> [String: Any]? {
