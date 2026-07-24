@@ -24,14 +24,20 @@ use crate::daemon::protocol::{
     TaskBoardOrchestratorStatusResponse, TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest,
     TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse,
     TaskBoardProjectsResponse, TaskBoardResetItemPositionRequest, TaskBoardSetItemPositionRequest,
-    TaskBoardSetTriageOverrideRequest, TaskBoardSyncRequest, TaskBoardSyncResponse,
-    TaskBoardTodoistTokenSyncRequest, TaskBoardTodoistTokenSyncResponse,
+    TaskBoardActivateTriageRulesRequest, TaskBoardPreviewTriageRulesRequest,
+    TaskBoardSaveTriageRulesDraftRequest, TaskBoardSetTriageOverrideRequest, TaskBoardSyncRequest,
+    TaskBoardSyncResponse, TaskBoardTodoistTokenSyncRequest, TaskBoardTodoistTokenSyncResponse,
     TaskBoardTriageCurrentResponse, TaskBoardTriageHistoryResponse,
-    TaskBoardTriageOverrideMutationResponse, TaskBoardUpdateItemRequest, http_paths,
+    TaskBoardTriageOverrideMutationResponse, TaskBoardTriageRulesAuditResponse,
+    TaskBoardTriageRulesDraftResponse, TaskBoardTriageRulesRevisionsResponse,
+    TaskBoardUpdateItemRequest, http_paths,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io;
-use crate::task_board::{TaskBoardItem, TaskBoardStatus};
+use crate::task_board::{
+    TaskBoardItem, TaskBoardStatus, TriageRuleSetActivationResult, TriageRuleSetDraftSaveResult,
+    TriageRuleSetPreviewResult,
+};
 
 use super::DaemonClient;
 
@@ -139,6 +145,57 @@ impl DaemonClient {
     ) -> Result<TaskBoardTriageOverrideMutationResponse, CliError> {
         io::validate_safe_segment(item_id)?;
         self.post(&item_action_path(item_id, "triage/override/clear"), request)
+    }
+
+    pub fn get_task_board_triage_rules_draft(
+        &self,
+    ) -> Result<TaskBoardTriageRulesDraftResponse, CliError> {
+        self.get(http_paths::TASK_BOARD_TRIAGE_RULES_DRAFT)
+    }
+
+    pub fn save_task_board_triage_rules_draft(
+        &self,
+        request: &TaskBoardSaveTriageRulesDraftRequest,
+    ) -> Result<TriageRuleSetDraftSaveResult, CliError> {
+        self.put(http_paths::TASK_BOARD_TRIAGE_RULES_DRAFT, request)
+    }
+
+    pub fn preview_task_board_triage_rules(
+        &self,
+        request: &TaskBoardPreviewTriageRulesRequest,
+    ) -> Result<TriageRuleSetPreviewResult, CliError> {
+        self.post(http_paths::TASK_BOARD_TRIAGE_RULES_PREVIEW, request)
+    }
+
+    pub fn activate_task_board_triage_rules(
+        &self,
+        request: &TaskBoardActivateTriageRulesRequest,
+    ) -> Result<TriageRuleSetActivationResult, CliError> {
+        self.post(http_paths::TASK_BOARD_TRIAGE_RULES_ACTIVATE, request)
+    }
+
+    pub fn get_task_board_triage_rules_revisions(
+        &self,
+        limit: Option<u32>,
+    ) -> Result<TaskBoardTriageRulesRevisionsResponse, CliError> {
+        let limit = limit.map(|value| value.to_string());
+        let mut query = Vec::with_capacity(1);
+        if let Some(value) = limit.as_deref() {
+            query.push(("limit", value));
+        }
+        self.get_with_query(http_paths::TASK_BOARD_TRIAGE_RULES_REVISIONS, &query)
+    }
+
+    pub fn get_task_board_triage_rules_audit(
+        &self,
+        limit: Option<u32>,
+    ) -> Result<TaskBoardTriageRulesAuditResponse, CliError> {
+        let limit = limit.map(|value| value.to_string());
+        let mut query = Vec::with_capacity(1);
+        if let Some(value) = limit.as_deref() {
+            query.push(("limit", value));
+        }
+        self.get_with_query(http_paths::TASK_BOARD_TRIAGE_RULES_AUDIT, &query)
     }
 
     pub fn update_task_board_item(

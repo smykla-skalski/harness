@@ -6,10 +6,10 @@ use crate::task_board::{TaskBoardItem, TaskBoardStatus, TaskBoardTriageOverride}
 use super::super::ITEMS_CHANGE_SCOPE;
 use super::super::lane_order::{LaneTransitionKind, replace_with_lane_transition_in_tx};
 use super::super::triage_apply::{
-    TriageOutcome, apply_builtin_v1_triage_in_tx,
-    clear_stale_automatic_placement_on_human_status_move, override_implied_status,
+    TriageOutcome, clear_stale_automatic_placement_on_human_status_move, override_implied_status,
     reapply_active_override_outcome_in_tx,
 };
+use super::super::triage_apply_rules::apply_active_triage_in_tx;
 use super::lifecycle::ensure_estimates_are_editable_in_tx;
 use super::{
     TaskBoardMutation, TaskBoardMutationKind, TaskBoardTriageIngress,
@@ -200,7 +200,7 @@ async fn apply_update_triage_in_tx(
                 || before.lane_origin != item.lane_origin;
             let suppress_placement =
                 ingress == TaskBoardTriageIngress::HumanUpdate && direct_effect_this_call;
-            apply_builtin_v1_triage_in_tx(
+            apply_active_triage_in_tx(
                 transaction,
                 item,
                 &decided_at,

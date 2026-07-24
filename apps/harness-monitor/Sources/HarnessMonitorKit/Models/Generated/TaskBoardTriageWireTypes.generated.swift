@@ -15,6 +15,8 @@ public enum TriageReasonCode: String, Codable, Equatable, Sendable, CaseIterable
   case needsInfoLabel = "needs_info_label"
   case noMeaningfulLabels = "no_meaningful_labels"
   case meaningfulLabel = "meaningful_label"
+  case ruleMatched = "rule_matched"
+  case ruleSetDefault = "rule_set_default"
 
   public var id: String { rawValue }
 }

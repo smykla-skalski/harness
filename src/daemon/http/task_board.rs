@@ -12,6 +12,7 @@ mod policy_io;
 mod policy_spawn_gate;
 mod positions;
 mod triage;
+mod triage_rules;
 
 pub(super) use self::items::{authenticated_request, authorized_control_request_parts};
 pub(super) use self::policy_io::{
@@ -38,6 +39,35 @@ use self::triage::{
     get_task_board_item_triage, get_task_board_item_triage_history,
     post_task_board_item_triage_override_clear, put_task_board_item_triage_override,
 };
+use self::triage_rules::{
+    get_task_board_triage_rules_audit, get_task_board_triage_rules_draft,
+    get_task_board_triage_rules_revisions, post_task_board_triage_rules_activate,
+    post_task_board_triage_rules_preview, put_task_board_triage_rules_draft,
+};
+
+fn task_board_triage_rules_routes() -> Router<DaemonHttpState> {
+    Router::new()
+        .route(
+            http_paths::TASK_BOARD_TRIAGE_RULES_DRAFT,
+            get(get_task_board_triage_rules_draft).put(put_task_board_triage_rules_draft),
+        )
+        .route(
+            http_paths::TASK_BOARD_TRIAGE_RULES_PREVIEW,
+            post(post_task_board_triage_rules_preview),
+        )
+        .route(
+            http_paths::TASK_BOARD_TRIAGE_RULES_ACTIVATE,
+            post(post_task_board_triage_rules_activate),
+        )
+        .route(
+            http_paths::TASK_BOARD_TRIAGE_RULES_REVISIONS,
+            get(get_task_board_triage_rules_revisions),
+        )
+        .route(
+            http_paths::TASK_BOARD_TRIAGE_RULES_AUDIT,
+            get(get_task_board_triage_rules_audit),
+        )
+}
 
 fn task_board_host_routes() -> Router<DaemonHttpState> {
     Router::new()
@@ -95,6 +125,7 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
             http_paths::TASK_BOARD_ITEM_TRIAGE_OVERRIDE_CLEAR,
             post(post_task_board_item_triage_override_clear),
         )
+        .merge(task_board_triage_rules_routes())
         .route(
             http_paths::TASK_BOARD_PLAN_BEGIN,
             post(post_task_board_plan_begin),

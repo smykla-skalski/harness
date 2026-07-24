@@ -2650,6 +2650,42 @@ const TASK_BOARD_TRIAGE_EMIT_ONLY: &[&str] = &[
     "TaskBoardClearTriageOverrideRequest",
     "TaskBoardTriageOverrideMutationResponse",
 ];
+const TASK_BOARD_TRIAGE_RULES_SOURCE: &str = include_str!("../src/task_board/triage_rules.rs");
+const TASK_BOARD_TRIAGE_RULES_VALIDATION_SOURCE: &str =
+    include_str!("../src/task_board/triage_rules/validation.rs");
+const TASK_BOARD_TRIAGE_RULES_STORE_SOURCE: &str =
+    include_str!("../src/task_board/triage_rules/store.rs");
+const TASK_BOARD_TRIAGE_RULES_PROTOCOL_SOURCE: &str =
+    include_str!("../src/daemon/protocol/task_board_triage_rules.rs");
+const TASK_BOARD_TRIAGE_RULES_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardTriageRulesWireTypes.generated.swift";
+// The runtime-authored TriageRuleSetV1 domain (rule, condition, outcome,
+// priority action, validation report/issue), its store-layer draft/revision/
+// audit/preview types, and the protocol request/response wrappers for the
+// draft/preview/activate/revisions/audit routes.
+const TASK_BOARD_TRIAGE_RULES_EMIT_ONLY: &[&str] = &[
+    "TriageRuleSetV1",
+    "TriageRule",
+    "TriageRuleCondition",
+    "TriageRuleOutcome",
+    "TriagePriorityAction",
+    "TriageRuleSetValidationReport",
+    "TriageRuleSetValidationIssue",
+    "TriageRuleSetDraft",
+    "TriageRuleSetDraftSaveResult",
+    "TriageRuleSetActivationResult",
+    "TriageRuleSetPreviewResult",
+    "TriageRuleSetPreviewDiffEntry",
+    "TriageRuleSetRevisionSummary",
+    "TriageRuleSetRevisionStatus",
+    "TriageRuleSetAuditEntry",
+    "TriageRuleSetAuditKind",
+    "TaskBoardTriageRulesDraftResponse",
+    "TaskBoardSaveTriageRulesDraftRequest",
+    "TaskBoardPreviewTriageRulesRequest",
+    "TaskBoardActivateTriageRulesRequest",
+    "TaskBoardTriageRulesRevisionsResponse",
+    "TaskBoardTriageRulesAuditResponse",
+];
 const TASK_BOARD_MACHINES_SOURCE: &str = include_str!("../src/task_board/machines.rs");
 const TASK_BOARD_MACHINES_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardMachineWireTypes.generated.swift";
 // The host Machine struct (Swift hand TaskBoardHostMachine); references the adopted
@@ -3214,6 +3250,22 @@ fn modules() -> Vec<GeneratedModule> {
             ],
         },
         GeneratedModule {
+            output: TASK_BOARD_TRIAGE_RULES_OUTPUT,
+            description: "the Rust runtime-authored task-board triage rule set domain, its store types, and its read/mutation protocol responses",
+            defaults: &[
+                TASK_BOARD_TRIAGE_RULES_SOURCE,
+                TASK_BOARD_TRIAGE_RULES_VALIDATION_SOURCE,
+                TASK_BOARD_TRIAGE_RULES_STORE_SOURCE,
+            ],
+            sources: &[
+                TASK_BOARD_TRIAGE_RULES_SOURCE,
+                TASK_BOARD_TRIAGE_RULES_VALIDATION_SOURCE,
+                TASK_BOARD_TRIAGE_RULES_STORE_SOURCE,
+                TASK_BOARD_TRIAGE_RULES_PROTOCOL_SOURCE,
+                TASK_BOARD_TRIAGE_SOURCE,
+            ],
+        },
+        GeneratedModule {
             output: TASK_BOARD_MACHINES_OUTPUT,
             description: "the Rust task-board host machine type",
             defaults: &[],
@@ -3426,6 +3478,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         TASK_BOARD_SUMMARY_OUTPUT => TASK_BOARD_SUMMARY_EMIT_ONLY,
         TASK_BOARD_ITEM_OUTPUT => TASK_BOARD_ITEM_EMIT_ONLY,
         TASK_BOARD_TRIAGE_OUTPUT => TASK_BOARD_TRIAGE_EMIT_ONLY,
+        TASK_BOARD_TRIAGE_RULES_OUTPUT => TASK_BOARD_TRIAGE_RULES_EMIT_ONLY,
         TASK_BOARD_MACHINES_OUTPUT => TASK_BOARD_MACHINES_EMIT_ONLY,
         TASK_BOARD_PLANNING_OUTPUT => TASK_BOARD_PLANNING_EMIT_ONLY,
         TASK_BOARD_EVALUATION_OUTPUT => TASK_BOARD_EVALUATION_EMIT_ONLY,

@@ -5,8 +5,9 @@ use super::super::items::{load_item_in_tx, replace_item_in_tx};
 use super::{apply_builtin_v1_triage_in_tx, triage_cause};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
-    BUILTIN_V1_EVALUATOR_IDENTITY, TaskBoardItem, TaskBoardLaneOrigin, TaskBoardPriority,
-    TaskBoardStatus, TaskBoardTriageDecision, TriageCause, TriageReasonCode, TriageVerdict,
+    BUILTIN_V1_EVALUATOR_IDENTITY, BUILTIN_V1_EVALUATOR_VERSION, TaskBoardItem,
+    TaskBoardLaneOrigin, TaskBoardPriority, TaskBoardStatus, TaskBoardTriageDecision, TriageCause,
+    TriageReasonCode, TriageVerdict,
 };
 
 pub(super) async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {
@@ -447,7 +448,12 @@ fn active_evaluator_change_wins_over_a_simultaneous_fingerprint_change() {
         decided_at: "2026-07-22T00:00:00Z".into(),
     };
 
-    let cause = triage_cause(Some(&existing), "sha256:new");
+    let cause = triage_cause(
+        Some(&existing),
+        "sha256:new",
+        BUILTIN_V1_EVALUATOR_IDENTITY,
+        BUILTIN_V1_EVALUATOR_VERSION,
+    );
 
     assert_eq!(
         cause,

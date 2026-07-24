@@ -24,6 +24,7 @@ pub mod summary;
 pub mod transport;
 pub mod triage;
 pub mod triage_override;
+pub mod triage_rules;
 pub mod types;
 mod worker_prompt;
 
@@ -154,6 +155,17 @@ pub use triage_override::{
     TaskBoardTriageEffectiveOutcome, TaskBoardTriageEffectiveSource, TaskBoardTriageOverride,
     effective_triage_outcome, is_canonical_override_actor, is_canonical_override_reason,
     suppress_placement_for_override,
+};
+pub use triage_rules::{
+    MAX_CONDITIONS_PER_RULE, MAX_LABEL_CONDITION_ITEMS, MAX_RULE_ID_BYTES,
+    MAX_STRING_CONDITION_BYTES, MAX_TRIAGE_RULES, RUNTIME_RULES_EVALUATOR_IDENTITY,
+    TRIAGE_RULE_SET_SCHEMA_VERSION, TriagePriorityAction, TriageRule, TriageRuleCondition,
+    TriageRuleEvaluation, TriageRuleMatch, TriageRuleOutcome, TriageRuleSetActivationResult,
+    TriageRuleSetAuditEntry, TriageRuleSetAuditKind, TriageRuleSetDraft,
+    TriageRuleSetDraftSaveResult, TriageRuleSetPreviewDiffEntry, TriageRuleSetPreviewResult,
+    TriageRuleSetRevisionStatus, TriageRuleSetRevisionSummary, TriageRuleSetV1,
+    TriageRuleSetValidationIssue, TriageRuleSetValidationReport, evaluate_triage_rule_set,
+    is_canonical_rule_id, validate_triage_rule_set,
 };
 pub use types::{
     AgentMode, ExternalRef, ExternalRefProvider, ExternalRefSyncState, PlanningState,

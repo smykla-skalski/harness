@@ -29,6 +29,14 @@ actor PreviewHarnessClientState {
   var taskBoardTriageDecisionsByItemID: [String: [TaskBoardTriageDecisionRecord]]
   /// The active triage override per item id, if any. Empty by default.
   var taskBoardTriageOverrideByItemID: [String: TaskBoardTriageOverride]
+  /// The in-progress runtime triage rule set candidate, if one has been saved.
+  var taskBoardTriageRuleSetDraft: TriageRuleSetDraft?
+  /// The activated rule set governing triage, if any custom rule set is
+  /// active; `nil` means `BuiltInV1` governs, matching the daemon default.
+  var taskBoardActiveTriageRuleSet: TriageRuleSetV1?
+  var taskBoardActiveTriageRuleSetRevision: Int64?
+  var taskBoardTriageRuleSetRevisions: [TriageRuleSetRevisionSummary]
+  var taskBoardTriageRuleSetAudit: [TriageRuleSetAuditEntry]
   var reviewItems: [ReviewItem]
   var taskBoardHostRegistry: [TaskBoardHostMachine]
   var nextAgentTuiSequence: Int
@@ -77,6 +85,11 @@ actor PreviewHarnessClientState {
     )
     self.taskBoardTriageDecisionsByItemID = [:]
     self.taskBoardTriageOverrideByItemID = [:]
+    self.taskBoardTriageRuleSetDraft = nil
+    self.taskBoardActiveTriageRuleSet = nil
+    self.taskBoardActiveTriageRuleSetRevision = nil
+    self.taskBoardTriageRuleSetRevisions = []
+    self.taskBoardTriageRuleSetAudit = []
     self.reviewItems = fixtures.reviewsResponse.items
     self.taskBoardHostRegistry = [
       TaskBoardHostMachine(

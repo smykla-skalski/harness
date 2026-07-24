@@ -33,4 +33,52 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         },
         swift_client_exposed: true,
     },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
+        path: http_paths::TASK_BOARD_TRIAGE_RULES_DRAFT,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_TRIAGE_RULES_DRAFT_GET,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Put,
+        path: http_paths::TASK_BOARD_TRIAGE_RULES_DRAFT,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_TRIAGE_RULES_DRAFT_SAVE,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::TASK_BOARD_TRIAGE_RULES_PREVIEW,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_TRIAGE_RULES_PREVIEW,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::TASK_BOARD_TRIAGE_RULES_ACTIVATE,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_TRIAGE_RULES_ACTIVATE,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
+        path: http_paths::TASK_BOARD_TRIAGE_RULES_REVISIONS,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_TRIAGE_RULES_REVISIONS,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
+        path: http_paths::TASK_BOARD_TRIAGE_RULES_AUDIT,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_TRIAGE_RULES_AUDIT,
+        },
+        swift_client_exposed: true,
+    },
 ];

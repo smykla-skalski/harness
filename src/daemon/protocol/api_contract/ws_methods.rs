@@ -52,6 +52,12 @@ pub const TASK_BOARD_TRIAGE_GET: &str = "task_board.triage_get";
 pub const TASK_BOARD_TRIAGE_HISTORY: &str = "task_board.triage_history";
 pub const TASK_BOARD_TRIAGE_OVERRIDE_SET: &str = "task_board.triage_override_set";
 pub const TASK_BOARD_TRIAGE_OVERRIDE_CLEAR: &str = "task_board.triage_override_clear";
+pub const TASK_BOARD_TRIAGE_RULES_DRAFT_GET: &str = "task_board.triage_rules_draft_get";
+pub const TASK_BOARD_TRIAGE_RULES_DRAFT_SAVE: &str = "task_board.triage_rules_draft_save";
+pub const TASK_BOARD_TRIAGE_RULES_PREVIEW: &str = "task_board.triage_rules_preview";
+pub const TASK_BOARD_TRIAGE_RULES_ACTIVATE: &str = "task_board.triage_rules_activate";
+pub const TASK_BOARD_TRIAGE_RULES_REVISIONS: &str = "task_board.triage_rules_revisions";
+pub const TASK_BOARD_TRIAGE_RULES_AUDIT: &str = "task_board.triage_rules_audit";
 pub const TASK_BOARD_UPDATE: &str = "task_board.update";
 pub const TASK_BOARD_DELETE: &str = "task_board.delete";
 pub const TASK_BOARD_PLAN_BEGIN: &str = "task_board.plan_begin";
@@ -243,6 +249,12 @@ pub const ALL: &[&str] = &[
     TASK_BOARD_TRIAGE_HISTORY,
     TASK_BOARD_TRIAGE_OVERRIDE_SET,
     TASK_BOARD_TRIAGE_OVERRIDE_CLEAR,
+    TASK_BOARD_TRIAGE_RULES_DRAFT_GET,
+    TASK_BOARD_TRIAGE_RULES_DRAFT_SAVE,
+    TASK_BOARD_TRIAGE_RULES_PREVIEW,
+    TASK_BOARD_TRIAGE_RULES_ACTIVATE,
+    TASK_BOARD_TRIAGE_RULES_REVISIONS,
+    TASK_BOARD_TRIAGE_RULES_AUDIT,
     TASK_BOARD_UPDATE,
     TASK_BOARD_DELETE,
     TASK_BOARD_PLAN_BEGIN,

@@ -445,6 +445,42 @@ fn task_board_routes_have_complete_ws_parity() {
             ),
             (
                 HttpRouteMethod::Get,
+                http_paths::TASK_BOARD_TRIAGE_RULES_DRAFT,
+                ws_methods::TASK_BOARD_TRIAGE_RULES_DRAFT_GET,
+                true,
+            ),
+            (
+                HttpRouteMethod::Put,
+                http_paths::TASK_BOARD_TRIAGE_RULES_DRAFT,
+                ws_methods::TASK_BOARD_TRIAGE_RULES_DRAFT_SAVE,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_TRIAGE_RULES_PREVIEW,
+                ws_methods::TASK_BOARD_TRIAGE_RULES_PREVIEW,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_TRIAGE_RULES_ACTIVATE,
+                ws_methods::TASK_BOARD_TRIAGE_RULES_ACTIVATE,
+                true,
+            ),
+            (
+                HttpRouteMethod::Get,
+                http_paths::TASK_BOARD_TRIAGE_RULES_REVISIONS,
+                ws_methods::TASK_BOARD_TRIAGE_RULES_REVISIONS,
+                true,
+            ),
+            (
+                HttpRouteMethod::Get,
+                http_paths::TASK_BOARD_TRIAGE_RULES_AUDIT,
+                ws_methods::TASK_BOARD_TRIAGE_RULES_AUDIT,
+                true,
+            ),
+            (
+                HttpRouteMethod::Get,
                 http_paths::TASK_BOARD_ORCHESTRATOR_RUNS,
                 ws_methods::TASK_BOARD_ORCHESTRATOR_RUNS,
                 false,

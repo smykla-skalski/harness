@@ -25,6 +25,10 @@ extension TriageReasonCode {
       "No meaningful label"
     case .meaningfulLabel:
       "Meaningful label"
+    case .ruleMatched:
+      "Rule matched"
+    case .ruleSetDefault:
+      "Rule set default"
     }
   }
 }

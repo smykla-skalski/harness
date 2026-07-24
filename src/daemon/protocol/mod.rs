@@ -14,6 +14,7 @@ mod task_board_item_requests;
 mod task_board_spawn_gate;
 mod task_board_steps;
 mod task_board_triage;
+mod task_board_triage_rules;
 #[cfg(test)]
 mod tests;
 mod voice;
@@ -38,5 +39,6 @@ pub use task_board_item_requests::*;
 pub use task_board_spawn_gate::*;
 pub use task_board_steps::*;
 pub use task_board_triage::*;
+pub use task_board_triage_rules::*;
 pub use voice::*;
 pub use websocket::*;

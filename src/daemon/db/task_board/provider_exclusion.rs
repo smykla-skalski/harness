@@ -8,9 +8,8 @@ use super::items::{
 };
 use super::lane_order::{LaneTransitionKind, replace_with_lane_transition_in_tx};
 use super::provider_sync_conflicts::replace_open_sync_conflicts_in_connection;
-use super::triage_apply::{
-    TriageOutcome, apply_builtin_v1_triage_in_tx, reapply_active_override_outcome_in_tx,
-};
+use super::triage_apply::{TriageOutcome, reapply_active_override_outcome_in_tx};
+use super::triage_apply_rules::apply_active_triage_in_tx;
 use super::triage_audit::{
     ProviderExclusionConflictAudit, record_provider_exclusion_hidden_audit_in_tx,
     record_provider_exclusion_restored_audit_in_tx,
@@ -455,7 +454,7 @@ async fn reconcile_restore_triage_in_tx(
 ) -> Result<(Option<TriageOutcome>, LaneTransitionKind), CliError> {
     let pre_triage_item = item.clone();
     let outcome =
-        apply_builtin_v1_triage_in_tx(transaction, item, decided_at, false, existing_override)
+        apply_active_triage_in_tx(transaction, item, decided_at, false, existing_override)
             .await?;
     let override_reapply_transition =
         reapply_active_override_outcome_in_tx(transaction, item, existing_override, decided_at)

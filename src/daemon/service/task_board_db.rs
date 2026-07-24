@@ -40,6 +40,7 @@ mod reviews_sync;
 mod sync_audit;
 mod sync_run_context;
 mod triage_reads;
+mod triage_rules_reads;
 
 use estimate_validation::{validate_estimate, validate_update_estimates};
 pub(crate) use list_items::list_task_board_items_db;
@@ -58,6 +59,11 @@ pub(crate) use sync_run_context::TaskBoardSyncRunContext;
 pub(crate) use triage_reads::{
     clear_task_board_triage_override_db, get_task_board_item_triage_current_db,
     get_task_board_item_triage_history_db, set_task_board_triage_override_db,
+};
+pub(crate) use triage_rules_reads::{
+    activate_task_board_triage_rules_db, get_task_board_triage_rules_audit_db,
+    get_task_board_triage_rules_draft_db, get_task_board_triage_rules_revisions_db,
+    preview_task_board_triage_rules_db, save_task_board_triage_rules_draft_db,
 };
 
 pub(crate) async fn create_task_board_item_db(

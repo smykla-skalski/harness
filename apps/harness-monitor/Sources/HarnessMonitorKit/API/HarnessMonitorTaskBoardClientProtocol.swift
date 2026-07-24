@@ -24,6 +24,19 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
     id: String,
     request: TaskBoardClearTriageOverrideRequest
   ) async throws -> TaskBoardTriageOverrideMutationResponse
+  func taskBoardTriageRulesDraft() async throws -> TaskBoardTriageRulesDraftResponse
+  func saveTaskBoardTriageRulesDraft(
+    request: TaskBoardSaveTriageRulesDraftRequest
+  ) async throws -> TriageRuleSetDraftSaveResult
+  func previewTaskBoardTriageRules(
+    request: TaskBoardPreviewTriageRulesRequest
+  ) async throws -> TriageRuleSetPreviewResult
+  func activateTaskBoardTriageRules(
+    request: TaskBoardActivateTriageRulesRequest
+  ) async throws -> TriageRuleSetActivationResult
+  func taskBoardTriageRulesRevisions(limit: UInt32?) async throws
+    -> TaskBoardTriageRulesRevisionsResponse
+  func taskBoardTriageRulesAudit(limit: UInt32?) async throws -> TaskBoardTriageRulesAuditResponse
   func createTaskBoardItem(request: TaskBoardCreateItemRequest) async throws -> TaskBoardItem
   func updateTaskBoardItem(
     id: String,

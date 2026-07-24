@@ -2,12 +2,13 @@ use sqlx::{Sqlite, Transaction};
 
 use super::dispatch_intents::helpers::has_active_dispatch_reservation_in_tx;
 use super::lane_order::{LaneTransitionKind, load_lane_entries_in_tx};
+use super::triage_cause::triage_cause;
 use super::triage_decisions::{current_triage_decision_in_tx, record_triage_decision_in_tx};
 use crate::daemon::db::{CliError, db_error};
 use crate::task_board::{
     BUILTIN_V1_EVALUATOR_IDENTITY, BUILTIN_V1_EVALUATOR_VERSION, OVERRIDE_PLACEMENT_PRODUCER,
     TaskBoardItem, TaskBoardLaneOrigin, TaskBoardStatus, TaskBoardTriageDecision,
-    TaskBoardTriageOverride, TriageCause, TriageVerdict, evaluate_builtin_v1, evidence_fingerprint,
+    TaskBoardTriageOverride, TriageVerdict, evaluate_builtin_v1, evidence_fingerprint,
     sort_task_board_items, suppress_placement_for_override,
 };
 
@@ -94,7 +95,12 @@ pub(super) async fn apply_builtin_v1_triage_in_tx(
     let override_active = suppress_placement_for_override(existing_override);
     let fingerprint = evidence_fingerprint(item);
     let existing = current_triage_decision_in_tx(transaction, &item.id).await?;
-    let Some(cause) = triage_cause(existing.as_ref(), &fingerprint) else {
+    let Some(cause) = triage_cause(
+        existing.as_ref(),
+        &fingerprint,
+        BUILTIN_V1_EVALUATOR_IDENTITY,
+        BUILTIN_V1_EVALUATOR_VERSION,
+    ) else {
         // Nothing new to decide (same evaluator, same evidence). A genuinely
         // unchanged item is a true no-op, but an out-of-band mutation in
         // this same call (a provider-exclusion restore resetting status
@@ -105,7 +111,9 @@ pub(super) async fn apply_builtin_v1_triage_in_tx(
         // unranked or in Backlog; a genuinely unchanged item still reports
         // no decision at all.
         return match existing {
-            Some(existing) if !placement_matches_verdict(item, existing.verdict) => {
+            Some(existing)
+                if !placement_matches_verdict(item, existing.verdict, BUILTIN_V1_EVALUATOR_IDENTITY) =>
+            {
                 let manually_placed = item
                     .lane_origin
                     .as_ref()
@@ -118,8 +126,14 @@ pub(super) async fn apply_builtin_v1_triage_in_tx(
                     // enclosing mutation still gets its own ordinary audit.
                     Ok(None)
                 } else {
-                    apply_placement_effect_in_tx(transaction, item, existing.verdict, decided_at)
-                        .await?;
+                    apply_placement_effect_in_tx(
+                        transaction,
+                        item,
+                        existing.verdict,
+                        decided_at,
+                        BUILTIN_V1_EVALUATOR_IDENTITY,
+                    )
+                    .await?;
                     Ok(Some(TriageOutcome::RetainedEffect(existing)))
                 }
             }
@@ -145,7 +159,14 @@ pub(super) async fn apply_builtin_v1_triage_in_tx(
         .as_ref()
         .is_some_and(TaskBoardLaneOrigin::is_manual);
     if !manually_placed && !suppress_placement && !override_active {
-        apply_placement_effect_in_tx(transaction, item, outcome.verdict, decided_at).await?;
+        apply_placement_effect_in_tx(
+            transaction,
+            item,
+            outcome.verdict,
+            decided_at,
+            BUILTIN_V1_EVALUATOR_IDENTITY,
+        )
+        .await?;
     }
     Ok(Some(TriageOutcome::Decided(decision)))
 }
@@ -169,7 +190,12 @@ pub(super) async fn ensure_current_triage_decision_in_tx(
     }
     let fingerprint = evidence_fingerprint(item);
     let existing = current_triage_decision_in_tx(transaction, &item.id).await?;
-    let Some(cause) = triage_cause(existing.as_ref(), &fingerprint) else {
+    let Some(cause) = triage_cause(
+        existing.as_ref(),
+        &fingerprint,
+        BUILTIN_V1_EVALUATOR_IDENTITY,
+        BUILTIN_V1_EVALUATOR_VERSION,
+    ) else {
         return Ok(existing.map(EnsuredTriageDecision::Existing));
     };
     let outcome = evaluate_builtin_v1(item);
@@ -189,38 +215,20 @@ pub(super) async fn ensure_current_triage_decision_in_tx(
     Ok(Some(EnsuredTriageDecision::Decided(decision)))
 }
 
-/// An evaluator upgrade takes precedence over a simultaneous fingerprint
-/// change: if both differ from the existing decision at once, the cause
-/// reported is `ActiveEvaluatorChanged`, not `FingerprintChanged`, since the
-/// evaluator identity/version change is the more significant reason a new
-/// decision is warranted.
-fn triage_cause(
-    existing: Option<&TaskBoardTriageDecision>,
-    fingerprint: &str,
-) -> Option<TriageCause> {
-    match existing {
-        None => Some(TriageCause::Initial),
-        Some(existing)
-            if existing.evaluator_identity != BUILTIN_V1_EVALUATOR_IDENTITY
-                || existing.evaluator_version != BUILTIN_V1_EVALUATOR_VERSION =>
-        {
-            Some(TriageCause::ActiveEvaluatorChanged)
-        }
-        Some(existing) if existing.evidence_fingerprint != fingerprint => {
-            Some(TriageCause::FingerprintChanged)
-        }
-        Some(_) => None,
-    }
-}
-
+/// `producer` is the evaluator identity stamped onto a Todo promotion's
+/// `lane_origin` -- the caller's active evaluator (`BuiltInV1` or the
+/// currently active rule set), so a later unchanged touch's
+/// `placement_matches_verdict(..., producer)` congruence check agrees with
+/// what was actually stamped instead of permanently disagreeing with it.
 pub(super) async fn apply_placement_effect_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     item: &mut TaskBoardItem,
     verdict: TriageVerdict,
     decided_at: &str,
+    producer: &str,
 ) -> Result<(), CliError> {
     match verdict {
-        TriageVerdict::Todo => promote_to_todo_in_tx(transaction, item, decided_at).await,
+        TriageVerdict::Todo => promote_to_todo_in_tx(transaction, item, decided_at, producer).await,
         TriageVerdict::Undecided => {
             demote_automatic_todo_to_backlog(item);
             Ok(())
@@ -332,6 +340,7 @@ async fn promote_to_todo_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     item: &mut TaskBoardItem,
     decided_at: &str,
+    producer: &str,
 ) -> Result<(), CliError> {
     let status = item.status.canonical_persisted_status();
     if status != TaskBoardStatus::Backlog && status != TaskBoardStatus::Todo {
@@ -341,7 +350,7 @@ async fn promote_to_todo_in_tx(
     item.status = TaskBoardStatus::Todo;
     item.lane_position = Some(position);
     item.lane_origin = Some(TaskBoardLaneOrigin::Automatic {
-        producer: BUILTIN_V1_EVALUATOR_IDENTITY.to_string(),
+        producer: producer.to_string(),
     });
     item.lane_set_at = Some(decided_at.to_string());
     Ok(())
@@ -430,7 +439,11 @@ pub(super) fn clear_stale_automatic_placement_on_human_status_move(
 /// unchanged evaluation. A manually anchored item is never "congruent" here
 /// on its own terms -- the caller checks `lane_origin` separately and treats
 /// a manual anchor as suppressed, never as a placement to reapply.
-fn placement_matches_verdict(item: &TaskBoardItem, verdict: TriageVerdict) -> bool {
+pub(super) fn placement_matches_verdict(
+    item: &TaskBoardItem,
+    verdict: TriageVerdict,
+    expected_producer: &str,
+) -> bool {
     match verdict {
         TriageVerdict::Todo => {
             item.status.canonical_persisted_status() == TaskBoardStatus::Todo
@@ -439,7 +452,7 @@ fn placement_matches_verdict(item: &TaskBoardItem, verdict: TriageVerdict) -> bo
                 && matches!(
                     &item.lane_origin,
                     Some(TaskBoardLaneOrigin::Automatic { producer })
-                        if producer == BUILTIN_V1_EVALUATOR_IDENTITY
+                        if producer == expected_producer
                 )
         }
         TriageVerdict::Undecided => {
