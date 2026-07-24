@@ -75,8 +75,32 @@ struct HarnessMonitorStoreTaskBoardWorkingDirectoryTests {
       TaskBoardWorkingDirectoryResolver.ItemNeed(
         hasExistingSession: true, executionRepository: "gather-existing/repo"),
     ]
-    let unresolved = await store.unresolvedTaskBoardRepositories(items: items)
+    let unresolved = await store.unresolvedTaskBoardRepositories(
+      items: items,
+      daemonSandboxed: true
+    )
     #expect(unresolved == ["gather-unmapped/repo"])
+  }
+
+  @Test("A stale association that no longer resolves still needs a directory")
+  func staleAssociationCountsAsUnresolved() async throws {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    try await store.repositoryDirectoryStore?.associate(
+      repository: "stale-case/repo",
+      bookmarkID: "B-does-not-resolve"
+    )
+    let items = [
+      TaskBoardWorkingDirectoryResolver.ItemNeed(
+        hasExistingSession: false, executionRepository: "stale-case/repo")
+    ]
+    // Non-sandboxed delivery must live-resolve the bookmark; a record that no
+    // longer resolves has to re-prompt instead of being filtered out as
+    // associated, which is what previously made Deliver silently no-op.
+    let unresolved = await store.unresolvedTaskBoardRepositories(
+      items: items,
+      daemonSandboxed: false
+    )
+    #expect(unresolved == ["stale-case/repo"])
   }
 
   @Test("Choosing a folder associates it with the repository")

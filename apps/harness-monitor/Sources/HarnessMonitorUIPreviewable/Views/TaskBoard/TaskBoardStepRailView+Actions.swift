@@ -79,8 +79,16 @@ extension TaskBoardStepRailView {
           daemonSandboxed: daemonSandboxed
         )
         switch decision {
-        case .needsWorkingDirectory:
-          let unresolved = await store.unresolvedTaskBoardRepositories(items: itemNeeds)
+        case .needsWorkingDirectory(let repository):
+          var unresolved = await store.unresolvedTaskBoardRepositories(
+            items: itemNeeds,
+            daemonSandboxed: daemonSandboxed
+          )
+          // Guarantee the item just delivered is prompted for even if the
+          // consolidated gather returns nothing, so Deliver never silently no-ops.
+          if !unresolved.contains(repository) {
+            unresolved.append(repository)
+          }
           await MainActor.run {
             store.presentResolveRepositoryDirectories(repositories: unresolved)
             state.finish()

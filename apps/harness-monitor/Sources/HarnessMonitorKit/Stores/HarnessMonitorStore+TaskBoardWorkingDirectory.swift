@@ -32,14 +32,37 @@ extension HarnessMonitorStore {
   /// Distinct repositories among `items` that still need a local working
   /// directory, deduplicated by slug so the sheet shows one row per repository.
   public func unresolvedTaskBoardRepositories(
-    items: [TaskBoardWorkingDirectoryResolver.ItemNeed]
+    items: [TaskBoardWorkingDirectoryResolver.ItemNeed],
+    daemonSandboxed: Bool
   ) async -> [String] {
-    let associated = Set(
-      (await repositoryDirectoryStore?.allAssociations().map(\.repository)) ?? []
-    )
-    return TaskBoardWorkingDirectoryResolver.unresolvedRepositories(items: items) {
-      associated.contains($0)
+    // "Resolved" has to mean the same thing the dispatch decision uses: an
+    // association whose working directory actually resolves for this daemon. A
+    // record whose bookmark no longer resolves (folder moved or deleted) must
+    // re-prompt, not get filtered out as already associated - otherwise Deliver
+    // would silently do nothing.
+    var resolved: Set<String> = []
+    for repository in distinctCreateRepositories(items) {
+      if await associatedProjectDir(for: repository, daemonSandboxed: daemonSandboxed) != nil {
+        resolved.insert(repository)
+      }
     }
+    return TaskBoardWorkingDirectoryResolver.unresolvedRepositories(items: items) {
+      resolved.contains($0)
+    }
+  }
+
+  private func distinctCreateRepositories(
+    _ items: [TaskBoardWorkingDirectoryResolver.ItemNeed]
+  ) -> Set<String> {
+    Set(
+      items
+        .filter { !$0.hasExistingSession }
+        .compactMap { item in
+          guard let raw = item.executionRepository else { return nil }
+          let normalized = RepositoryDirectoryStore.normalizedRepository(raw)
+          return normalized.isEmpty ? nil : normalized
+        }
+    )
   }
 
   private func associatedProjectDir(
