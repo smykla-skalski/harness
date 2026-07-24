@@ -61,18 +61,18 @@ url = "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellche
 url_api = "https://api.github.com/repos/koalaman/shellcheck/releases/assets/279056932"
 
 [[tools.tuist]]
-version = "4.195.0"
+version = "4.202.6"
 backend = "aqua:tuist/tuist"
 
 [tools.tuist."platforms.linux-x64"]
-checksum = "sha256:294f82ee689e3a0e13b386b928a1ade3041358f5bda609b390080c4c917c64de"
-url = "https://github.com/tuist/tuist/releases/download/4.195.0/tuist-linux-x86_64.tar.gz"
-url_api = "https://api.github.com/repos/tuist/tuist/releases/assets/423070317"
+checksum = "sha256:662c3df87d46ab42532d12f9d7a1c9416cd25509f517a6b560fe0a0ca420f695"
+url = "https://github.com/tuist/tuist/releases/download/4.202.6/tuist-linux-x86_64.tar.gz"
+url_api = "https://api.github.com/repos/tuist/tuist/releases/assets/485076225"
 
 [tools.tuist."platforms.macos-arm64"]
-checksum = "sha256:773a4de6b242b182c4a908024f92bf516270dcc26b3d0d1cc661ade242bd7c24"
-url = "https://github.com/tuist/tuist/releases/download/4.195.0/tuist.zip"
-url_api = "https://api.github.com/repos/tuist/tuist/releases/assets/423070322"
+checksum = "sha256:f28569258cb92f92965884f86b74935332dbc5d6a3ed8b8a41d17b69782056de"
+url = "https://github.com/tuist/tuist/releases/download/4.202.6/tuist.zip"
+url_api = "https://api.github.com/repos/tuist/tuist/releases/assets/485076227"
 
 [[tools.xcbeautify]]
 version = "3.2.1"
