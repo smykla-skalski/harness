@@ -24,6 +24,8 @@ private struct HarnessMonitorSheetMetrics {
       Self(minWidth: 520, idealWidth: 620, minHeight: 560)
     case .leaderTransfer:
       Self(minWidth: 460, idealWidth: 540, minHeight: 420)
+    case .resolveRepositoryDirectories:
+      Self(minWidth: 520, idealWidth: 620, minHeight: 400)
     }
   }
 }
@@ -75,6 +77,8 @@ struct HarnessMonitorSheetRouter: View {
       TaskActionsSheet(store: store, sessionID: sessionID, taskID: taskID)
     case .leaderTransfer(let sessionID):
       LeaderTransferSheet(store: store, sessionID: sessionID)
+    case .resolveRepositoryDirectories(let repositories):
+      ResolveRepositoryDirectoriesSheet(store: store, repositories: repositories)
     }
   }
 

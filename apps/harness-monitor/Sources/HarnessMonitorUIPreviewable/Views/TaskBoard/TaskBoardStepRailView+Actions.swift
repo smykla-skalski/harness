@@ -58,22 +58,47 @@ extension TaskBoardStepRailView {
     else { return }
     stepRailState.preserveFlowIdentity(itemID: itemID)
     let isAlreadyHeld = status.heldDispatches.items.contains { $0.boardItemId == itemID }
-    let projectDir = status.settings.projectDir
+    let globalProjectDir = status.settings.projectDir
+    let item = taskBoardItems.first { $0.id == itemID }
+    let hasExistingSession = item?.sessionId != nil
+    let executionRepository = item?.executionRepository
+    let daemonSandboxed = store.daemonStatus?.manifest?.sandboxed ?? false
+    let itemNeeds = taskBoardItems.map {
+      TaskBoardWorkingDirectoryResolver.ItemNeed(
+        hasExistingSession: $0.sessionId != nil,
+        executionRepository: $0.executionRepository
+      )
+    }
     let state = stepRailState
     HarnessMonitorAsyncWorkQueue.shared.submit(
       .init(title: "Delivering task-board item") {
-        let delivery = await store.prepareAndDeliverTaskBoardDispatch(
-          request: TaskBoardDispatchRequest(
-            itemId: itemID,
-            dryRun: false,
-            projectDir: projectDir
-          ),
-          isAlreadyHeld: isAlreadyHeld
+        let decision = await store.taskBoardDeliveryDirectory(
+          hasExistingSession: hasExistingSession,
+          executionRepository: executionRepository,
+          globalProjectDir: globalProjectDir,
+          daemonSandboxed: daemonSandboxed
         )
-        await MainActor.run {
-          state.requestApprovalRefresh()
-          state.delivery = delivery
-          state.finish()
+        switch decision {
+        case .needsWorkingDirectory:
+          let unresolved = await store.unresolvedTaskBoardRepositories(items: itemNeeds)
+          await MainActor.run {
+            store.presentResolveRepositoryDirectories(repositories: unresolved)
+            state.finish()
+          }
+        case .dispatch(let projectDir):
+          let delivery = await store.prepareAndDeliverTaskBoardDispatch(
+            request: TaskBoardDispatchRequest(
+              itemId: itemID,
+              dryRun: false,
+              projectDir: projectDir
+            ),
+            isAlreadyHeld: isAlreadyHeld
+          )
+          await MainActor.run {
+            state.requestApprovalRefresh()
+            state.delivery = delivery
+            state.finish()
+          }
         }
       }
     )

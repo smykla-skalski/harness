@@ -57,4 +57,43 @@ struct HarnessMonitorStoreTaskBoardWorkingDirectoryTests {
     )
     #expect(decision == .dispatch(projectDir: "/tmp/global"))
   }
+
+  @Test("Unresolved repositories exclude associated and existing-session items")
+  func unresolvedRepositoriesExcludeAssociatedAndExisting() async throws {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    try await store.repositoryDirectoryStore?.associate(
+      repository: "gather-mapped/repo",
+      bookmarkID: "B-gather"
+    )
+    let items = [
+      TaskBoardWorkingDirectoryResolver.ItemNeed(
+        hasExistingSession: false, executionRepository: "gather-mapped/repo"),
+      TaskBoardWorkingDirectoryResolver.ItemNeed(
+        hasExistingSession: false, executionRepository: "gather-unmapped/repo"),
+      TaskBoardWorkingDirectoryResolver.ItemNeed(
+        hasExistingSession: false, executionRepository: "gather-unmapped/repo"),
+      TaskBoardWorkingDirectoryResolver.ItemNeed(
+        hasExistingSession: true, executionRepository: "gather-existing/repo"),
+    ]
+    let unresolved = await store.unresolvedTaskBoardRepositories(items: items)
+    #expect(unresolved == ["gather-unmapped/repo"])
+  }
+
+  @Test("Choosing a folder associates it with the repository")
+  func choosingFolderAssociatesRepository() async throws {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    let folder = FileManager.default.temporaryDirectory
+      .appendingPathComponent("resolve-assoc-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+
+    let saved = await store.resolveRepositoryWorkingDirectory(
+      repository: "Assoc-Case/Repo",
+      from: .success([folder])
+    )
+    #expect(saved)
+    let bookmarkID = await store.repositoryDirectoryStore?.bookmarkID(
+      forRepository: "assoc-case/repo"
+    )
+    #expect(bookmarkID != nil)
+  }
 }

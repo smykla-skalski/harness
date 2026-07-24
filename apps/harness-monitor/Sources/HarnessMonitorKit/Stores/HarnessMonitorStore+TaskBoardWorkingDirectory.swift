@@ -29,6 +29,19 @@ extension HarnessMonitorStore {
     )
   }
 
+  /// Distinct repositories among `items` that still need a local working
+  /// directory, deduplicated by slug so the sheet shows one row per repository.
+  public func unresolvedTaskBoardRepositories(
+    items: [TaskBoardWorkingDirectoryResolver.ItemNeed]
+  ) async -> [String] {
+    let associated = Set(
+      (await repositoryDirectoryStore?.allAssociations().map(\.repository)) ?? []
+    )
+    return TaskBoardWorkingDirectoryResolver.unresolvedRepositories(items: items) {
+      associated.contains($0)
+    }
+  }
+
   private func associatedProjectDir(
     for executionRepository: String?,
     daemonSandboxed: Bool
