@@ -21,6 +21,8 @@ mod task_board_orchestrator_loop;
 mod task_board_remote_executor_loop;
 #[path = "task_board_remote_recovery_loop.rs"]
 mod task_board_remote_recovery_loop;
+#[path = "task_board_triage_escalation_loop.rs"]
+mod task_board_triage_escalation_loop;
 
 use super::acp_inspect_publisher::spawn_acp_inspect_publisher;
 use super::github_data_change_publisher::spawn_github_data_change_publisher;
@@ -37,6 +39,7 @@ pub(crate) use task_board_remote_recovery_loop::{
     recover_remote_assignments_at_startup_with_controller,
     recover_remote_assignments_before_local_work,
 };
+use task_board_triage_escalation_loop::spawn_task_board_triage_escalation_loop;
 
 /// Spawn the single broadcast fan-out task and return the prepared-event
 /// channel that connection relays and SSE streams subscribe to. The task is the
@@ -64,6 +67,7 @@ pub(super) struct BackgroundTaskHandles {
     pub _task_board_orchestrator_loop: Option<JoinHandle<()>>,
     pub _task_board_remote_executor_loop: Option<JoinHandle<()>>,
     pub _task_board_remote_recovery_loop: Option<JoinHandle<()>>,
+    pub _task_board_triage_escalation_loop: Option<JoinHandle<()>>,
 }
 
 pub(super) fn spawn_background_tasks(
@@ -115,5 +119,10 @@ pub(super) fn spawn_background_tasks(
             )
         }),
         _task_board_remote_recovery_loop: remote_recovery,
+        _task_board_triage_escalation_loop: app_state.async_db.get().map(|db| {
+            let config = crate::feature_flags::task_board_triage_escalation_config_from_env();
+            db.set_triage_escalation_config(config);
+            spawn_task_board_triage_escalation_loop(app_state.clone(), config, shutdown_rx.clone())
+        }),
     }
 }

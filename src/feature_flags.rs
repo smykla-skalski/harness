@@ -33,6 +33,7 @@
 
 use std::sync::{Mutex, MutexGuard};
 
+use crate::task_board::TaskBoardTriageEscalationConfig;
 use crate::workspace::normalized_env_value;
 
 /// Env var that re-enables suite-lifecycle hooks in generated configs.
@@ -43,6 +44,17 @@ pub const ACP_ENV: &str = "HARNESS_FEATURE_ACP";
 pub const REVIEWS_BACKGROUND_AUTO_ENV: &str = "HARNESS_FEATURE_REVIEWS_BACKGROUND_AUTO";
 /// Env var that enables the durable Task Board automation engine.
 pub const TASK_BOARD_AUTOMATION_V2_ENV: &str = "HARNESS_FEATURE_TASK_BOARD_AUTOMATION_V2";
+/// Env var that enables triage escalation to an agent.
+pub const TASK_BOARD_TRIAGE_ESCALATION_ENV: &str = "HARNESS_FEATURE_TASK_BOARD_TRIAGE_ESCALATION";
+/// Env var bounding concurrent escalation executor runs.
+pub const TASK_BOARD_TRIAGE_ESCALATION_MAX_CONCURRENT_ENV: &str =
+    "HARNESS_TASK_BOARD_TRIAGE_ESCALATION_MAX_CONCURRENT";
+/// Env var bounding the total enqueued-but-unresolved escalation queue depth.
+pub const TASK_BOARD_TRIAGE_ESCALATION_MAX_PENDING_ENV: &str =
+    "HARNESS_TASK_BOARD_TRIAGE_ESCALATION_MAX_PENDING";
+/// Env var bounding how long a claimed escalation may run before timing out.
+pub const TASK_BOARD_TRIAGE_ESCALATION_TIMEOUT_SECONDS_ENV: &str =
+    "HARNESS_TASK_BOARD_TRIAGE_ESCALATION_TIMEOUT_SECONDS";
 
 static ACP_RUNTIME_OVERRIDE: Mutex<Option<bool>> = Mutex::new(None);
 
@@ -65,6 +77,57 @@ pub fn reviews_background_auto_enabled_from_env() -> bool {
 #[must_use]
 pub fn task_board_automation_v2_enabled_from_env() -> bool {
     env_enabled_by_default(TASK_BOARD_AUTOMATION_V2_ENV)
+}
+
+/// Ceiling for `HARNESS_TASK_BOARD_TRIAGE_ESCALATION_TIMEOUT_SECONDS`, well
+/// under `chrono::Duration::seconds`'s own panic bound (`i64::MAX / 1000`).
+/// A raw unclamped override -- someone reaching for "disable the timeout" --
+/// would otherwise panic the sweep on its first tick and wedge the whole
+/// escalation loop task permanently (a daemon restart re-reads the same env
+/// and dies again).
+const TASK_BOARD_TRIAGE_ESCALATION_MAX_TIMEOUT_SECONDS: u64 = 3600;
+
+/// Resolve the triage escalation feature's bounded config from env vars,
+/// once at daemon startup. Off by default -- see
+/// [`TaskBoardTriageEscalationConfig::disabled`] for why. A malformed
+/// numeric override falls back to the compiled-in default rather than
+/// failing daemon startup over a tuning knob; `max_concurrent`/`max_pending`
+/// are floored at 1 (a 0 would silently disable the feature while
+/// `enabled: true`) and `timeout_seconds` is capped, both regardless of
+/// whether the override parsed or fell back to the default.
+#[must_use]
+pub fn task_board_triage_escalation_config_from_env() -> TaskBoardTriageEscalationConfig {
+    let defaults = TaskBoardTriageEscalationConfig::disabled();
+    TaskBoardTriageEscalationConfig {
+        enabled: env_truthy(TASK_BOARD_TRIAGE_ESCALATION_ENV),
+        max_concurrent: env_usize(
+            TASK_BOARD_TRIAGE_ESCALATION_MAX_CONCURRENT_ENV,
+            defaults.max_concurrent,
+        )
+        .max(1),
+        max_pending: env_usize(
+            TASK_BOARD_TRIAGE_ESCALATION_MAX_PENDING_ENV,
+            defaults.max_pending,
+        )
+        .max(1),
+        timeout_seconds: env_u64(
+            TASK_BOARD_TRIAGE_ESCALATION_TIMEOUT_SECONDS_ENV,
+            defaults.timeout_seconds,
+        )
+        .clamp(1, TASK_BOARD_TRIAGE_ESCALATION_MAX_TIMEOUT_SECONDS),
+    }
+}
+
+fn env_usize(name: &str, default: usize) -> usize {
+    normalized_env_value(name)
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(default)
+}
+
+fn env_u64(name: &str, default: u64) -> u64 {
+    normalized_env_value(name)
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(default)
 }
 
 /// Apply a process-scoped ACP enablement override for the lifetime of the guard.
