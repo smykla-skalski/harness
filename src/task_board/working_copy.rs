@@ -198,16 +198,15 @@ impl WorkingCopyRegistry {
 /// One row in the Settings/sheet projection of the working-copy registry.
 /// Carries the checkout `path` because the app forwards it verbatim as the
 /// session `project_dir`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct WorkingCopyListEntry {
     pub repo_full_name: String,
     pub repo_key_segment: String,
     pub path: String,
     pub size_bytes: u64,
-    #[cfg_attr(feature = "openapi", schema(value_type = String, format = DateTime))]
+    #[schema(value_type = String, format = DateTime)]
     pub created_at: DateTime<Utc>,
-    #[cfg_attr(feature = "openapi", schema(value_type = String, format = DateTime))]
+    #[schema(value_type = String, format = DateTime)]
     pub last_used_at: DateTime<Utc>,
 }
 

@@ -32,6 +32,10 @@ pub(super) fn load_registry(root: &WorkingCopyRoot) -> Result<WorkingCopyRegistr
     })
 }
 
+// Test-only: production writes go through the runtime's locked atomic path
+// (`WorkingCopyRuntime::with_registry_mut`); only the injectable GC/list test
+// helpers persist a registry directly.
+#[cfg(test)]
 pub(super) fn save_registry(
     root: &WorkingCopyRoot,
     registry: &WorkingCopyRegistry,

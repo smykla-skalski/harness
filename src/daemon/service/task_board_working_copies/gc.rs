@@ -12,9 +12,14 @@ use std::fs;
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::working_copy::{
     WORKING_COPY_DISK_BUDGET_MB, WORKING_COPY_MAX_AGE_DAYS, WorkingCopyKey, WorkingCopyRegistry,
-    WorkingCopyRegistryEntry, WorkingCopyRoot,
+    WorkingCopyRegistryEntry,
 };
 
+// The injectable-root GC helper and the loaders it drives are test-only;
+// production GC routes registry writes through the runtime lock.
+#[cfg(test)]
+use crate::task_board::working_copy::WorkingCopyRoot;
+#[cfg(test)]
 use super::store::{load_registry, save_registry};
 
 /// One-shot GC pass over the working-copy registry, using the plan defaults.
@@ -44,6 +49,7 @@ pub async fn run_task_board_working_copy_gc() -> Result<WorkingCopyGcReport, Cli
 ///
 /// # Errors
 /// Returns `CliError` when the registry can't be loaded or saved.
+#[cfg(test)]
 pub fn run_task_board_working_copy_gc_with(
     root: &WorkingCopyRoot,
     now: chrono::DateTime<chrono::Utc>,
