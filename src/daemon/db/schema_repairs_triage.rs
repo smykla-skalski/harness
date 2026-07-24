@@ -3,6 +3,13 @@ use rusqlite::{OptionalExtension, Transaction, TransactionBehavior};
 use super::{CliError, Connection, db_error};
 
 const MIGRATION_SQL: &str = include_str!("migrations/0040_daemon_v46_task_board_triage.sql");
+/// `task_board_triage_decisions` and its two indexes were recreated (wider
+/// `reason_code` values) by migration 0042/v48. A database already migrated
+/// past v46 legitimately carries this shape instead of the original one, so
+/// [`shape_needs_repair`] and [`require_complete_shape`] accept either as
+/// complete -- only a shape matching neither is treated as corrupt.
+const MIGRATION_SQL_V48: &str =
+    include_str!("migrations/0042_daemon_v48_task_board_triage_rules.sql");
 const OBJECTS_MARKER: &str = "CREATE TABLE IF NOT EXISTS task_board_triage_decisions";
 const TOMBSTONE_CAUSE_DEFINITION: &str = "
 tombstone_cause TEXT
@@ -46,12 +53,17 @@ pub(super) fn shape_needs_repair(conn: &Connection) -> Result<bool, CliError> {
         let Some(actual) = object_sql(conn, shape)? else {
             return Ok(true);
         };
-        let expected = expected_object_sql(shape)?;
-        if normalize_sql(&actual) != expected {
+        if !matches_a_known_good_shape(shape, &actual)? {
             return Err(incompatible_shape(shape.name));
         }
     }
     Ok(false)
+}
+
+fn matches_a_known_good_shape(shape: &ObjectShape, actual: &str) -> Result<bool, CliError> {
+    let actual = normalize_sql(actual);
+    Ok(actual == expected_object_sql(shape, MIGRATION_SQL)?
+        || actual == expected_object_sql(shape, MIGRATION_SQL_V48)?)
 }
 
 pub(super) fn repair_and_stamp(conn: &Connection) -> Result<(), CliError> {
@@ -72,7 +84,7 @@ pub(super) fn require_complete_shape(conn: &Connection) -> Result<(), CliError> 
     for shape in OBJECT_SHAPES {
         let actual = object_sql(conn, shape)?
             .ok_or_else(|| db_error(format!("missing task-board triage {}", shape.name)))?;
-        if normalize_sql(&actual) != expected_object_sql(shape)? {
+        if !matches_a_known_good_shape(shape, &actual)? {
             return Err(incompatible_shape(shape.name));
         }
     }
@@ -154,9 +166,9 @@ fn object_sql(conn: &Connection, shape: &ObjectShape) -> Result<Option<String>, 
     .map_err(|error| db_error(format!("read task-board triage {}: {error}", shape.name)))
 }
 
-fn expected_object_sql(shape: &ObjectShape) -> Result<String, CliError> {
+fn expected_object_sql(shape: &ObjectShape, source: &str) -> Result<String, CliError> {
     let prefix = format!("CREATE {} IF NOT EXISTS {}", shape.create_kind, shape.name);
-    let tail = MIGRATION_SQL
+    let tail = source
         .split_once(&prefix)
         .map(|(_, tail)| tail)
         .ok_or_else(|| db_error(format!("triage migration is missing {}", shape.name)))?;
@@ -185,3 +197,7 @@ fn incompatible_shape(name: &str) -> CliError {
 fn normalize_sql(sql: &str) -> String {
     super::schema_repairs::normalize_schema_sql(sql)
 }
+
+#[cfg(test)]
+#[path = "schema_repairs_triage_tests.rs"]
+mod tests;
