@@ -12,7 +12,7 @@
 # accident. To bump: pick a current nightly date, update this file, update
 # `.mise.toml` (`rust = "nightly-YYYY-MM-DD"`) to match, then run any cargo
 # command once to install the toolchain.
-channel = "nightly-2026-05-19"
+channel = "nightly-2026-07-24"
 components = ["rustfmt", "clippy", "rust-src"]
 profile = "minimal"
 targets = ["aarch64-apple-darwin"]
