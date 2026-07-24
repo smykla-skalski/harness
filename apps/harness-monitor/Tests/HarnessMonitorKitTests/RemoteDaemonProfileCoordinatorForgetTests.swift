@@ -55,32 +55,8 @@ struct RemoteDaemonProfileCoordinatorForgetTests {
     #expect(try tokenStore.loadToken(profileID: profile.id) == "server-issued-token")
   }
 
-  @Test("Metadata rollback failure still restores the token")
-  func metadataRollbackFailureRestoresToken() async throws {
-    let profile = try remoteProfileFixture()
-    let originalState = RemoteDaemonProfileState(
-      profiles: [profile],
-      activeProfileID: profile.id
-    )
-    let repository = SaveFailingRemoteDaemonProfileStore(state: originalState)
-    let tokenStore = RecordingRemoteDaemonTokenStore()
-    try tokenStore.saveToken("server-issued-token", profileID: profile.id)
-    let coordinator = RemoteDaemonProfileCoordinator(
-      repository: repository,
-      tokenStore: tokenStore,
-      revoker: SuccessfulRemoteDaemonRevoker()
-    )
-
-    await #expect(throws: RemoteDaemonForgetTestError.metadataSave) {
-      _ = try await coordinator.forgetActiveProfile()
-    }
-
-    #expect(try repository.load() == originalState)
-    #expect(try tokenStore.loadToken(profileID: profile.id) == "server-issued-token")
-  }
-
-  @Test("Token deletion failure does not retry deletion or save metadata")
-  func tokenDeletionFailureStopsBeforeMetadata() async throws {
+  @Test("Metadata save failure never deletes the token")
+  func metadataSaveFailureLeavesTokenIntact() async throws {
     let profile = try remoteProfileFixture()
     let originalState = RemoteDaemonProfileState(
       profiles: [profile],
@@ -97,13 +73,13 @@ struct RemoteDaemonProfileCoordinatorForgetTests {
       revoker: SuccessfulRemoteDaemonRevoker()
     )
 
-    await #expect(throws: RemoteDaemonForgetTestError.tokenDeletion) {
+    await #expect(throws: RemoteDaemonForgetTestError.metadataSave) {
       _ = try await coordinator.forgetActiveProfile()
     }
 
-    #expect(repository.saveCallCount == 0)
-    #expect(tokenStore.deleteCallCount == 1)
+    #expect(tokenStore.deleteCallCount == 0)
     #expect(try tokenStore.loadToken(profileID: profile.id) == "server-issued-token")
+    #expect(try repository.load() == originalState)
   }
 
   @Test("Unreadable active token still forgets locally without revoking")
@@ -209,16 +185,10 @@ private final class DeleteFailingRemoteDaemonTokenStore:
 private final class SaveFailingRemoteDaemonProfileStore:
   RemoteDaemonProfilePersisting, @unchecked Sendable
 {
-  private let lock = NSLock()
   private let state: RemoteDaemonProfileState
-  private var recordedSaveCallCount = 0
 
   init(state: RemoteDaemonProfileState) {
     self.state = state
-  }
-
-  var saveCallCount: Int {
-    lock.withLock { recordedSaveCallCount }
   }
 
   func load() throws -> RemoteDaemonProfileState {
@@ -226,7 +196,6 @@ private final class SaveFailingRemoteDaemonProfileStore:
   }
 
   func save(_ state: RemoteDaemonProfileState) throws {
-    lock.withLock { recordedSaveCallCount += 1 }
     throw RemoteDaemonForgetTestError.metadataSave
   }
 }

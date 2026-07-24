@@ -85,16 +85,19 @@ public actor RemoteDaemonProfileCoordinator {
     var forgottenState = originalState
     forgottenState.profiles.removeAll { $0.id == activeProfileID }
     forgottenState.activeProfileID = nil
-    do {
-      try tokenStore.deleteToken(profileID: activeProfileID)
-    } catch {
-      restoreToken(token, profileID: activeProfileID)
-      throw error
-    }
+    // Persist the profile removal before deleting the Keychain token. Deleting last means a
+    // failure never has to restore a token we might not have read back; the defensive re-save
+    // undoes a non-atomic partial write.
     do {
       try repository.save(forgottenState)
     } catch {
-      rollbackForget(state: originalState, token: token, profileID: activeProfileID)
+      try? repository.save(originalState)
+      throw error
+    }
+    do {
+      try tokenStore.deleteToken(profileID: activeProfileID)
+    } catch {
+      try? repository.save(originalState)
       throw error
     }
     return RemoteDaemonForgetOutcome(profile: profile, serverRevoked: serverRevoked)
@@ -166,21 +169,6 @@ public actor RemoteDaemonProfileCoordinator {
       } else {
         try? tokenStore.deleteToken(profileID: replacedToken.profileID)
       }
-    }
-  }
-
-  private func rollbackForget(
-    state: RemoteDaemonProfileState,
-    token: String?,
-    profileID: UUID
-  ) {
-    try? repository.save(state)
-    restoreToken(token, profileID: profileID)
-  }
-
-  private func restoreToken(_ token: String?, profileID: UUID) {
-    if let token {
-      try? tokenStore.saveToken(token, profileID: profileID)
     }
   }
 }
