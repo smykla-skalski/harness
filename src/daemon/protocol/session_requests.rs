@@ -90,6 +90,9 @@ pub struct TaskUpdateRequest {
 pub struct TaskCheckpointRequest {
     pub actor: String,
     pub summary: String,
+    // The daemon rejects progress above 100 (`ensure_valid_progress`); bound
+    // the schema so a generated client sees the ceiling it must not exceed.
+    #[cfg_attr(feature = "openapi", schema(maximum = 100))]
     pub progress: u8,
 }
 
