@@ -1,6 +1,6 @@
 use axum::Json;
 use axum::Router;
-use axum::extract::{Query, State};
+use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::Response;
 use axum::routing::{get, post};
@@ -8,13 +8,13 @@ use axum::routing::{get, post};
 use crate::daemon::protocol::{
     PolicyCanvasCreateRequest, PolicyCanvasDeleteRequest, PolicyCanvasDuplicateRequest,
     PolicyCanvasRenameRequest, PolicyCanvasSetActiveRequest,
-    PolicyCanvasSetGlobalEnforcementRequest, PolicyPipelineAuditRequest, PolicyPipelineGetRequest,
-    PolicyPipelineGoLiveDiffRequest, PolicyPipelineMakeLiveRequest, PolicyPipelinePromoteRequest,
-    PolicyPipelineReplayRequest, PolicyPipelineSaveDraftRequest, PolicyPipelineSimulateRequest,
+    PolicyCanvasSetGlobalEnforcementRequest, PolicyCanvasWorkspaceResponse,
     PolicyScenarioCreateRequest, PolicyScenarioDeleteRequest, PolicyScenarioUpdateRequest,
     http_paths,
 };
 
+#[cfg(feature = "openapi")]
+use super::super::openapi::DaemonErrorBody;
 use super::super::response::timed_json;
 use super::super::{DaemonHttpState, require_async_db, task_board_route_executor};
 use super::authenticated_request;
@@ -50,19 +50,6 @@ pub(super) fn merge_policy_routes(router: Router<DaemonHttpState>) -> Router<Dae
             post(post_policy_canvas_set_global_enforcement),
         )
         .route(
-            http_paths::POLICY_PIPELINE,
-            get(get_policy_pipeline).put(put_policy_pipeline_draft),
-        )
-        .route(http_paths::POLICY_SIMULATE, post(post_policy_simulate))
-        .route(http_paths::POLICY_PROMOTE, post(post_policy_promote))
-        .route(http_paths::POLICY_MAKE_LIVE, post(post_policy_make_live))
-        .route(
-            http_paths::POLICY_GO_LIVE_DIFF,
-            post(post_policy_go_live_diff),
-        )
-        .route(http_paths::POLICY_REPLAY, post(post_policy_replay))
-        .route(http_paths::POLICY_AUDIT, get(get_policy_audit))
-        .route(
             http_paths::POLICY_SCENARIOS_CREATE,
             post(post_policy_scenario_create),
         )
@@ -80,28 +67,15 @@ pub(super) fn merge_policy_routes(router: Router<DaemonHttpState>) -> Router<Dae
         )
 }
 
-pub(super) async fn get_policy_pipeline(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Query(request): Query<PolicyPipelineGetRequest>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    let pipeline = match require_async_db(&state, "policy pipeline") {
-        Ok(db) => task_board_route_executor::policy_pipeline(db, &request).await,
-        Err(error) => Err(error),
-    };
-    timed_json(
-        "GET",
-        http_paths::POLICY_PIPELINE,
-        &request_id,
-        start,
-        pipeline,
-    )
-}
-
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/v1/policy-canvases",
+    tag = "policy",
+    responses(
+        (status = 200, description = "The full policy-canvas workspace", body = PolicyCanvasWorkspaceResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn get_policy_canvas_workspace(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -123,6 +97,16 @@ pub(super) async fn get_policy_canvas_workspace(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/policy-canvases/create",
+    tag = "policy",
+    request_body = PolicyCanvasCreateRequest,
+    responses(
+        (status = 200, description = "Workspace after creating the canvas", body = PolicyCanvasWorkspaceResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_policy_canvas_create(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -145,6 +129,16 @@ pub(super) async fn post_policy_canvas_create(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/policy-canvases/duplicate",
+    tag = "policy",
+    request_body = PolicyCanvasDuplicateRequest,
+    responses(
+        (status = 200, description = "Workspace after duplicating the canvas", body = PolicyCanvasWorkspaceResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_policy_canvas_duplicate(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -167,6 +161,16 @@ pub(super) async fn post_policy_canvas_duplicate(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/policy-canvases/rename",
+    tag = "policy",
+    request_body = PolicyCanvasRenameRequest,
+    responses(
+        (status = 200, description = "Workspace after renaming the canvas", body = PolicyCanvasWorkspaceResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_policy_canvas_rename(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -189,6 +193,16 @@ pub(super) async fn post_policy_canvas_rename(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/policy-canvases/active",
+    tag = "policy",
+    request_body = PolicyCanvasSetActiveRequest,
+    responses(
+        (status = 200, description = "Workspace after selecting the active canvas", body = PolicyCanvasWorkspaceResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_policy_canvas_set_active(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -211,6 +225,16 @@ pub(super) async fn post_policy_canvas_set_active(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/policy-canvases/delete",
+    tag = "policy",
+    request_body = PolicyCanvasDeleteRequest,
+    responses(
+        (status = 200, description = "Workspace after deleting the canvas", body = PolicyCanvasWorkspaceResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_policy_canvas_delete(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -233,6 +257,16 @@ pub(super) async fn post_policy_canvas_delete(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/policy-canvases/global-enforcement",
+    tag = "policy",
+    request_body = PolicyCanvasSetGlobalEnforcementRequest,
+    responses(
+        (status = 200, description = "Workspace after toggling global enforcement", body = PolicyCanvasWorkspaceResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_policy_canvas_set_global_enforcement(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -257,154 +291,16 @@ pub(super) async fn post_policy_canvas_set_global_enforcement(
     )
 }
 
-pub(super) async fn put_policy_pipeline_draft(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<PolicyPipelineSaveDraftRequest>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    let pipeline = match require_async_db(&state, "policy pipeline save draft") {
-        Ok(db) => task_board_route_executor::save_policy_pipeline_draft(db, &request).await,
-        Err(error) => Err(error),
-    };
-    timed_json(
-        "PUT",
-        http_paths::POLICY_PIPELINE,
-        &request_id,
-        start,
-        pipeline,
-    )
-}
-
-pub(super) async fn post_policy_simulate(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<PolicyPipelineSimulateRequest>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    let pipeline = match require_async_db(&state, "policy pipeline simulate") {
-        Ok(db) => task_board_route_executor::simulate_policy_pipeline(db, &request).await,
-        Err(error) => Err(error),
-    };
-    timed_json(
-        "POST",
-        http_paths::POLICY_SIMULATE,
-        &request_id,
-        start,
-        pipeline,
-    )
-}
-
-pub(super) async fn post_policy_promote(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<PolicyPipelinePromoteRequest>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    let pipeline = match require_async_db(&state, "policy pipeline promote") {
-        Ok(db) => task_board_route_executor::promote_policy_pipeline(db, &request).await,
-        Err(error) => Err(error),
-    };
-    timed_json(
-        "POST",
-        http_paths::POLICY_PROMOTE,
-        &request_id,
-        start,
-        pipeline,
-    )
-}
-
-pub(super) async fn post_policy_make_live(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<PolicyPipelineMakeLiveRequest>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    let pipeline = match require_async_db(&state, "policy pipeline make live") {
-        Ok(db) => task_board_route_executor::make_live_policy_pipeline(db, &request).await,
-        Err(error) => Err(error),
-    };
-    timed_json(
-        "POST",
-        http_paths::POLICY_MAKE_LIVE,
-        &request_id,
-        start,
-        pipeline,
-    )
-}
-
-pub(super) async fn post_policy_go_live_diff(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<PolicyPipelineGoLiveDiffRequest>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    let diff = match require_async_db(&state, "policy pipeline go live diff") {
-        Ok(db) => task_board_route_executor::go_live_diff_policy_pipeline(db, &request).await,
-        Err(error) => Err(error),
-    };
-    timed_json(
-        "POST",
-        http_paths::POLICY_GO_LIVE_DIFF,
-        &request_id,
-        start,
-        diff,
-    )
-}
-
-pub(super) async fn post_policy_replay(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<PolicyPipelineReplayRequest>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    let replay = match require_async_db(&state, "policy pipeline replay") {
-        Ok(db) => task_board_route_executor::replay_policy_pipeline(db, &request).await,
-        Err(error) => Err(error),
-    };
-    timed_json(
-        "POST",
-        http_paths::POLICY_REPLAY,
-        &request_id,
-        start,
-        replay,
-    )
-}
-
-pub(super) async fn get_policy_audit(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Query(request): Query<PolicyPipelineAuditRequest>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    let audit = match require_async_db(&state, "policy pipeline audit") {
-        Ok(db) => task_board_route_executor::audit_policy_pipeline(db, &request).await,
-        Err(error) => Err(error),
-    };
-    timed_json("GET", http_paths::POLICY_AUDIT, &request_id, start, audit)
-}
-
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/policy-scenarios/create",
+    tag = "policy",
+    request_body = PolicyScenarioCreateRequest,
+    responses(
+        (status = 200, description = "Workspace after creating the scenario", body = PolicyCanvasWorkspaceResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_policy_scenario_create(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -427,6 +323,16 @@ pub(super) async fn post_policy_scenario_create(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/policy-scenarios/update",
+    tag = "policy",
+    request_body = PolicyScenarioUpdateRequest,
+    responses(
+        (status = 200, description = "Workspace after updating the scenario", body = PolicyCanvasWorkspaceResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_policy_scenario_update(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -449,6 +355,16 @@ pub(super) async fn post_policy_scenario_update(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/policy-scenarios/delete",
+    tag = "policy",
+    request_body = PolicyScenarioDeleteRequest,
+    responses(
+        (status = 200, description = "Workspace after deleting the scenario", body = PolicyCanvasWorkspaceResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_policy_scenario_delete(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -471,6 +387,15 @@ pub(super) async fn post_policy_scenario_delete(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/policy-scenarios/reset",
+    tag = "policy",
+    responses(
+        (status = 200, description = "Workspace after resetting scenarios to the built-in set", body = PolicyCanvasWorkspaceResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_policy_scenario_reset(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,

@@ -28,6 +28,7 @@ impl PolicyGate for GraphPolicyGate {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyPipelineSaveResponse {
     pub document: PolicyGraph,
     pub validation: PolicyGraphValidationReport,
@@ -36,6 +37,7 @@ pub struct PolicyPipelineSaveResponse {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyPipelinePromoteRequest {
     pub revision: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -45,12 +47,14 @@ pub struct PolicyPipelinePromoteRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyPipelinePromoteResponse {
     pub document: PolicyGraph,
     pub trace_id: String,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyPipelineMakeLiveRequest {
     pub revision: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -67,6 +71,7 @@ pub struct PolicyPipelineMakeLiveResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyPipelineGoLiveDiffEntry {
     pub scenario_id: String,
     pub scenario_name: String,
@@ -78,6 +83,7 @@ pub struct PolicyPipelineGoLiveDiffEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyPipelineGoLiveDiff {
     pub has_live_policy: bool,
     pub changed_count: usize,
@@ -86,6 +92,7 @@ pub struct PolicyPipelineGoLiveDiff {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyPipelineSimulatedDecision {
     #[serde(default)]
     pub scenario_id: String,
@@ -102,6 +109,7 @@ pub struct PolicyPipelineSimulatedDecision {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyPipelineSimulationResult {
     pub revision: u64,
     pub trace_id: String,
@@ -117,6 +125,7 @@ pub struct PolicyPipelineSimulationResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyPipelineAuditSummary {
     pub active_revision: u64,
     pub mode: PolicyGraphMode,

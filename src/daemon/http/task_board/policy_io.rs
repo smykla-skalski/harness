@@ -6,10 +6,13 @@ use axum::response::Response;
 use axum::routing::post;
 
 use crate::daemon::protocol::{
-    PolicyCanvasExportRequest, PolicyCanvasImportRequest, PolicyTransferDumpRequest,
-    PolicyTransferImportRequest, http_paths,
+    PolicyCanvasExportRequest, PolicyCanvasExportResponse, PolicyCanvasImportRequest,
+    PolicyCanvasImportResponse, PolicyCanvasWorkspaceResponse, PolicyTransferBundle,
+    PolicyTransferDumpRequest, PolicyTransferImportRequest, http_paths,
 };
 
+#[cfg(feature = "openapi")]
+use super::super::openapi::DaemonErrorBody;
 use super::super::response::timed_json;
 use super::super::{DaemonHttpState, require_async_db, task_board_route_executor};
 use super::authenticated_request;
@@ -46,6 +49,16 @@ pub(in crate::daemon::http) fn policy_transfer_http_body_limit(
     }
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/policies/dump",
+    tag = "policy",
+    request_body = PolicyTransferDumpRequest,
+    responses(
+        (status = 200, description = "Exact transfer bundle for the selected policies", body = PolicyTransferBundle),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_policy_dump(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -62,6 +75,16 @@ pub(super) async fn post_policy_dump(
     timed_json("POST", http_paths::POLICIES_DUMP, &request_id, start, dump)
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/policy-canvases/export",
+    tag = "policy",
+    request_body = PolicyCanvasExportRequest,
+    responses(
+        (status = 200, description = "The exported canvas document", body = PolicyCanvasExportResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_policy_export(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -84,6 +107,16 @@ pub(super) async fn post_policy_export(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/policy-canvases/import",
+    tag = "policy",
+    request_body = PolicyCanvasImportRequest,
+    responses(
+        (status = 200, description = "Workspace after importing the canvas document", body = PolicyCanvasImportResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_policy_import(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -106,6 +139,16 @@ pub(super) async fn post_policy_import(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/policies/import",
+    tag = "policy",
+    request_body = PolicyTransferImportRequest,
+    responses(
+        (status = 200, description = "Workspace after importing the transfer bundle", body = PolicyCanvasWorkspaceResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_policy_import_batch(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,

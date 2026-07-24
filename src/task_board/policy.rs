@@ -9,6 +9,7 @@ pub const DEFAULT_AUTO_MERGE_RISK_THRESHOLD: u8 = 40;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum PolicyAction {
     Sync,
     Triage,
@@ -78,6 +79,7 @@ pub enum PolicyReasonCode {
 /// grant exists yet for the gate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum PolicyApprovalState {
     Pending,
     Approved,
@@ -90,6 +92,7 @@ pub enum PolicyApprovalState {
 /// approved | denied | revoked, then an approved grant is consumed once at
 /// dispatch reservation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyApprovalGrant {
     pub id: String,
     pub board_item_id: String,
@@ -117,12 +120,14 @@ pub struct PolicyApprovalGrant {
 /// their state here; simulation and replay supply fixture state so those paths
 /// stay deterministic.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyApprovalGrantState {
     pub node_id: String,
     pub state: PolicyApprovalState,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyEvidence {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub checks_green: Option<bool>,
@@ -161,6 +166,7 @@ pub struct PolicyEvidence {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicySubject {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub task_board_item_id: Option<String>,
@@ -190,6 +196,7 @@ pub struct PolicySubject {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyInput {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workflow: Option<String>,
