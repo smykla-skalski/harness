@@ -13,7 +13,7 @@ path = "src/main.rs"
 test = false
 
 [dependencies]
-agent-client-protocol = "=1.2.0"
+agent-client-protocol = "=1.3.0"
 agent-client-protocol-http = { version = "=1.2.0", default-features = false, features = ["client"], optional = true }
 arc-swap = "1.9.1"
 async-stream = "0.3.6"
