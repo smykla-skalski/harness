@@ -93,7 +93,7 @@ struct HarnessMonitorAppBundleMetadataTests {
       appSource.components(separatedBy: "mutationGate: pairingMutationGate").count == 3
     )
     #expect(appSource.contains(".onOpenURL"))
-    #expect(appSource.contains("MobilePairingLink.isRemotePairingLink(url)"))
+    #expect(appSource.contains("MobilePairingLink.isRemotePairingDeepLink(url)"))
     #expect(appSource.contains("pairingReceiver.start"))
 
     let rootViewSource = try String(

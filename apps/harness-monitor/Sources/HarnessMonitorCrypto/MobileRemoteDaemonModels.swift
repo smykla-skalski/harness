@@ -206,6 +206,22 @@ public enum MobilePairingLink: Equatable, Sendable {
     }
   }
 
+  /// True when a remote-daemon-only surface (the watch) should handle `url` as a
+  /// pairing attempt rather than ignore it. The legacy `remote-pair` host only
+  /// ever carried remote-daemon invitations, so any link on it qualifies — a
+  /// corrupt legacy link still surfaces a pairing error instead of being
+  /// silently dropped. On the shared `pair` host the payload decides via
+  /// `isRemotePairingLink`, so relay and ambiguous links are left alone.
+  public static func isRemotePairingDeepLink(_ url: URL) -> Bool {
+    guard url.scheme?.lowercased() == MobilePairingInvitationCodec.urlScheme else {
+      return false
+    }
+    if url.host?.lowercased() == legacyRemoteHost {
+      return true
+    }
+    return isRemotePairingLink(url)
+  }
+
   public static func decode(_ url: URL, now: Date = .now) throws -> Self {
     guard supports(url) else {
       throw MobilePairingError.unsupportedURL(url.absoluteString)

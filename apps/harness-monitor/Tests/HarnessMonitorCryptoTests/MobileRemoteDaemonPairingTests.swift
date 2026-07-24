@@ -107,6 +107,23 @@ final class MobileRemoteDaemonPairingTests: XCTestCase {
     XCTAssertFalse(MobilePairingLink.isRemotePairingLink(remoteOnRoute))
   }
 
+  func testIsRemotePairingDeepLinkAlwaysHandlesLegacyHost() throws {
+    let now = Date(timeIntervalSince1970: 1_752_124_400)
+    let validLegacy = try remoteInvitationURL(now: now, host: "remote-pair")
+    let corruptLegacy = try XCTUnwrap(URL(string: "harness://remote-pair?payload=not-a-payload"))
+    let remoteOnPair = try remoteInvitationURL(now: now)
+    let relayOnPair = try MobilePairingInvitationCodec.encode(makePairingInvitation(now: now))
+    let corruptOnPair = try XCTUnwrap(URL(string: "harness://pair?payload=not-a-payload"))
+    let reviewsRoute = try XCTUnwrap(URL(string: "harness://reviews/octo/repo/1"))
+
+    XCTAssertTrue(MobilePairingLink.isRemotePairingDeepLink(validLegacy))
+    XCTAssertTrue(MobilePairingLink.isRemotePairingDeepLink(corruptLegacy))
+    XCTAssertTrue(MobilePairingLink.isRemotePairingDeepLink(remoteOnPair))
+    XCTAssertFalse(MobilePairingLink.isRemotePairingDeepLink(relayOnPair))
+    XCTAssertFalse(MobilePairingLink.isRemotePairingDeepLink(corruptOnPair))
+    XCTAssertFalse(MobilePairingLink.isRemotePairingDeepLink(reviewsRoute))
+  }
+
   func testAmbiguousPayloadRejectionSurfacesReadableMessage() throws {
     let ambiguous = try payloadURL(object: [
       "server_spki_sha256": testSPKIPin,
