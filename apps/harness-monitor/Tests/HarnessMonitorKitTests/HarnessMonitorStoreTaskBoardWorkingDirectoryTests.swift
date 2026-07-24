@@ -154,4 +154,70 @@ struct HarnessMonitorStoreTaskBoardWorkingDirectoryTests {
     let afterRemove = await store.repositoryWorkingDirectoryPaths()
     #expect(afterRemove["paths-case/repo"] == nil)
   }
+
+  @Test("A daemon-obtained working copy resolves delivery without prompting")
+  func managedWorkingCopyResolvesDelivery() async {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    let client = RecordingHarnessClient()
+    client.setTaskBoardWorkingCopies([
+      WorkingCopyListEntry(
+        repoFullName: "obtained/repo",
+        repoKeySegment: "seg__obtained/repo",
+        path: "/managed/obtained/repo",
+        sizeBytes: 2048,
+        createdAt: "2026-07-24T00:00:00Z",
+        lastUsedAt: "2026-07-24T00:00:00Z"
+      )
+    ])
+    store.client = client
+    let decision = await store.taskBoardDeliveryDirectory(
+      hasExistingSession: false,
+      executionRepository: "Obtained/Repo",
+      globalProjectDir: "/tmp/global",
+      daemonSandboxed: true
+    )
+    #expect(decision == .dispatch(projectDir: "/managed/obtained/repo"))
+  }
+
+  @Test("Unresolved repositories exclude ones with a working copy")
+  func managedWorkingCopyExcludedFromUnresolved() async {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    let client = RecordingHarnessClient()
+    client.setTaskBoardWorkingCopies([
+      WorkingCopyListEntry(
+        repoFullName: "managed/repo",
+        repoKeySegment: "seg__managed/repo",
+        path: "/managed/managed/repo",
+        sizeBytes: 2048,
+        createdAt: "2026-07-24T00:00:00Z",
+        lastUsedAt: "2026-07-24T00:00:00Z"
+      )
+    ])
+    store.client = client
+    let items = [
+      TaskBoardWorkingDirectoryResolver.ItemNeed(
+        hasExistingSession: false, executionRepository: "managed/repo"),
+      TaskBoardWorkingDirectoryResolver.ItemNeed(
+        hasExistingSession: false, executionRepository: "unmanaged/repo"),
+    ]
+    let unresolved = await store.unresolvedTaskBoardRepositories(
+      items: items,
+      daemonSandboxed: true
+    )
+    #expect(unresolved == ["unmanaged/repo"])
+  }
+
+  @Test("Obtain, list, and reclaim a working copy round-trip")
+  func workingCopyStoreRoundTrip() async throws {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    let client = RecordingHarnessClient()
+    store.client = client
+
+    let obtained = await store.obtainRepositoryWorkingCopy(repository: "round/trip")
+    let entry = try #require(obtained)
+    #expect(await store.listRepositoryWorkingCopies().contains { $0.repoFullName == "round/trip" })
+
+    #expect(await store.deleteRepositoryWorkingCopy(repoKeySegment: entry.repoKeySegment))
+    #expect(await store.listRepositoryWorkingCopies().isEmpty)
+  }
 }

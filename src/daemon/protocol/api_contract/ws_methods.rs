@@ -75,6 +75,9 @@ pub const TASK_BOARD_MACHINES: &str = "task_board.machines";
 pub const TASK_BOARD_HOST_LOCAL: &str = "task_board.host_local";
 pub const TASK_BOARD_HOST_LIST: &str = "task_board.host_list";
 pub const TASK_BOARD_HOST_SET_PROJECT_TYPES: &str = "task_board.host_set_project_types";
+pub const TASK_BOARD_WORKING_COPIES_LIST: &str = "task_board.working_copies_list";
+pub const TASK_BOARD_WORKING_COPIES_OBTAIN: &str = "task_board.working_copies_obtain";
+pub const TASK_BOARD_WORKING_COPIES_DELETE: &str = "task_board.working_copies_delete";
 pub const TASK_BOARD_ORCHESTRATOR_STATUS: &str = "task_board.orchestrator_status";
 pub const TASK_BOARD_ORCHESTRATOR_START: &str = "task_board.orchestrator_start";
 pub const TASK_BOARD_ORCHESTRATOR_STOP: &str = "task_board.orchestrator_stop";
@@ -276,6 +279,9 @@ pub const ALL: &[&str] = &[
     TASK_BOARD_HOST_LOCAL,
     TASK_BOARD_HOST_LIST,
     TASK_BOARD_HOST_SET_PROJECT_TYPES,
+    TASK_BOARD_WORKING_COPIES_LIST,
+    TASK_BOARD_WORKING_COPIES_OBTAIN,
+    TASK_BOARD_WORKING_COPIES_DELETE,
     TASK_BOARD_ORCHESTRATOR_STATUS,
     TASK_BOARD_ORCHESTRATOR_START,
     TASK_BOARD_ORCHESTRATOR_STOP,

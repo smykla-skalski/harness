@@ -29,7 +29,8 @@ use crate::daemon::db::{AsyncDaemonDb, DaemonDb, canonical_db_unavailable};
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::remote_pairing::{RemotePairingRateLimiter, RemotePairingStatusRateLimiter};
 use crate::daemon::service::{
-    WakeDispatch, register_local_clone_progress_sender, run_local_clone_gc,
+    WakeDispatch, register_local_clone_progress_sender, register_task_board_working_copy_progress_sender,
+    run_local_clone_gc, run_task_board_working_copy_gc,
 };
 use crate::daemon::state::DaemonManifest;
 use crate::daemon::websocket::{PreparedBroadcast, ReplayBuffer};
@@ -367,6 +368,30 @@ where
                 target = "harness::daemon::startup",
                 error = %error,
                 "local-clone gc failed at daemon startup"
+            ),
+        }
+    });
+
+    // Same wiring for task-board working copies: progress on the shared WS
+    // channel plus a best-effort startup GC to bound checkout disk use.
+    register_task_board_working_copy_progress_sender(state.sender.clone());
+    tokio::spawn(async {
+        match run_task_board_working_copy_gc().await {
+            Ok(report) => {
+                if report.targets > 0 {
+                    tracing::info!(
+                        target = "harness::daemon::startup",
+                        targets = report.targets,
+                        removed = report.removed,
+                        bytes_freed = report.bytes_freed,
+                        "task-board working-copy gc finished"
+                    );
+                }
+            }
+            Err(error) => tracing::warn!(
+                target = "harness::daemon::startup",
+                error = %error,
+                "task-board working-copy gc failed at daemon startup"
             ),
         }
     });

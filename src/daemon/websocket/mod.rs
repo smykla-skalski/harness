@@ -19,6 +19,7 @@ mod session_start_tests;
 #[cfg(test)]
 mod signal_tests;
 mod task_board;
+mod task_board_working_copies;
 #[cfg(test)]
 mod telemetry_tests;
 #[cfg(test)]

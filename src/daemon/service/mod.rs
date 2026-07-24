@@ -296,6 +296,7 @@ mod task_board_sync_tests;
 mod task_board_workflow_execution;
 #[cfg(test)]
 mod task_board_workflow_execution_tests;
+mod task_board_working_copies;
 #[cfg(test)]
 mod task_board_workflow_repository_tests;
 mod task_board_workflow_review;
@@ -453,6 +454,11 @@ pub use task_board_runtime::{
 pub use task_board_runtime::{
     task_board_git_runtime_config, update_task_board_git_runtime_config,
     verify_task_board_git_signing,
+};
+pub use task_board_working_copies::{
+    WorkingCopyGcReport, delete_task_board_working_copy, list_task_board_working_copies,
+    obtain_task_board_working_copy, register_task_board_working_copy_progress_sender,
+    run_task_board_working_copy_gc,
 };
 pub use wake_route::WakeDispatch;
 pub(crate) use wake_route::{WakeEventLevel, record_wake_event};

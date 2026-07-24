@@ -74,6 +74,12 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
   func setTaskBoardHostProjectTypes(
     request: TaskBoardHostSetProjectTypesRequest
   ) async throws -> TaskBoardHostMachine
+  func taskBoardWorkingCopies() async throws -> [WorkingCopyListEntry]
+  func obtainTaskBoardWorkingCopy(
+    repository: String,
+    allowClone: Bool
+  ) async throws -> WorkingCopyListEntry?
+  func deleteTaskBoardWorkingCopy(repoKeySegment: String) async throws
   func taskBoardOrchestratorStatus() async throws -> TaskBoardOrchestratorStatus
   func startTaskBoardOrchestrator() async throws -> TaskBoardOrchestratorStatus
   func stopTaskBoardOrchestrator() async throws -> TaskBoardOrchestratorStatus
@@ -322,6 +328,21 @@ extension HarnessMonitorTaskBoardClientProtocol {
     request _: TaskBoardHostSetProjectTypesRequest
   ) async throws -> TaskBoardHostMachine {
     throw HarnessMonitorAPIError.server(code: 501, message: "Task board host unavailable")
+  }
+
+  public func taskBoardWorkingCopies() async throws -> [WorkingCopyListEntry] {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board working copies unavailable")
+  }
+
+  public func obtainTaskBoardWorkingCopy(
+    repository _: String,
+    allowClone _: Bool
+  ) async throws -> WorkingCopyListEntry? {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board working copies unavailable")
+  }
+
+  public func deleteTaskBoardWorkingCopy(repoKeySegment _: String) async throws {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board working copies unavailable")
   }
 
   public func taskBoardGitRuntimeConfig() async throws -> TaskBoardGitRuntimeConfig {

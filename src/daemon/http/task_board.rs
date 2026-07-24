@@ -14,6 +14,7 @@ pub(super) mod policy_spawn_gate;
 pub(super) mod positions;
 pub(super) mod triage;
 pub(super) mod triage_rules;
+pub(super) mod working_copies;
 
 pub(super) use self::items::{authenticated_request, authorized_control_request_parts};
 pub(super) use self::policy_io::{
@@ -80,6 +81,8 @@ pub(super) fn task_board_routes() -> OpenApiRouter<DaemonHttpState> {
         .routes(routes!(operations::get_task_board_machines))
         .merge(task_board_host_routes());
     merge_policy_pipeline_routes(merge_policy_spawn_gate_routes(merge_policy_io_routes(
-        merge_policy_routes(merge_git_routes(merge_orchestrator_routes(router))),
+        merge_policy_routes(merge_git_routes(merge_orchestrator_routes(
+            working_copies::merge_working_copy_routes(router),
+        ))),
     )))
 }
