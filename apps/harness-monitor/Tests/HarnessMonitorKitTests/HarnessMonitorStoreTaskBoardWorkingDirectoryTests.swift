@@ -96,4 +96,23 @@ struct HarnessMonitorStoreTaskBoardWorkingDirectoryTests {
     )
     #expect(bookmarkID != nil)
   }
+
+  @Test("Working directory paths resolve and clear per repository")
+  func workingDirectoryPathsResolveAndClear() async throws {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    let folder = FileManager.default.temporaryDirectory
+      .appendingPathComponent("wd-paths-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    _ = await store.resolveRepositoryWorkingDirectory(
+      repository: "paths-case/repo",
+      from: .success([folder])
+    )
+
+    let paths = await store.repositoryWorkingDirectoryPaths()
+    #expect(paths["paths-case/repo"] != nil)
+
+    await store.removeRepositoryWorkingDirectory(repository: "Paths-Case/Repo")
+    let afterRemove = await store.repositoryWorkingDirectoryPaths()
+    #expect(afterRemove["paths-case/repo"] == nil)
+  }
 }

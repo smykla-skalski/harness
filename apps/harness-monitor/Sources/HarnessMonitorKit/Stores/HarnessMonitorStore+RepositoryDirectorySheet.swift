@@ -8,6 +8,34 @@ extension HarnessMonitorStore {
     presentedSheet = .resolveRepositoryDirectories(repositories: repositories)
   }
 
+  /// Current working directory for each associated repository, as a displayable
+  /// filesystem path resolved from its bookmark record. Repositories whose
+  /// bookmark is missing are omitted.
+  public func repositoryWorkingDirectoryPaths() async -> [String: String] {
+    guard let repositoryDirectoryStore, let bookmarkStore else { return [:] }
+    let associations = await repositoryDirectoryStore.allAssociations()
+    let pathByBookmarkID = Dictionary(
+      await bookmarkStore.all().map { ($0.id, $0.lastResolvedPath) },
+      uniquingKeysWith: { first, _ in first }
+    )
+    return Dictionary(
+      associations.compactMap { association in
+        pathByBookmarkID[association.bookmarkID].map { (association.repository, $0) }
+      },
+      uniquingKeysWith: { first, _ in first }
+    )
+  }
+
+  /// Forgets the working directory associated with `repository`.
+  public func removeRepositoryWorkingDirectory(repository: String) async {
+    guard let repositoryDirectoryStore else { return }
+    do {
+      try await repositoryDirectoryStore.removeAssociation(forRepository: repository)
+    } catch {
+      presentFailureFeedback("Could not remove working directory: \(error.localizedDescription)")
+    }
+  }
+
   /// Associates the folder the user picked with `repository`, storing the
   /// security-scoped bookmark so later deliveries reuse it without prompting.
   @discardableResult
