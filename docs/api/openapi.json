@@ -22658,11 +22658,13 @@
       },
       "TriageReasonCode": {
         "type": "string",
-        "description": "Closed, ordered reason codes. `NeedsInfoLabel` and `NoMeaningfulLabels` are\nevaluated in that order before falling through to `MeaningfulLabel`.",
+        "description": "Closed, ordered reason codes. `NeedsInfoLabel` and `NoMeaningfulLabels` are\nevaluated in that order before falling through to `MeaningfulLabel`; those\nthree are `BuiltInV1`-only. `RuleMatched` and `RuleSetDefault` are the\nruntime-authored-rules evaluator's reason codes -- the matched rule id (or\nnothing, for the default) travels in the decision's `reason_detail`.",
         "enum": [
           "needs_info_label",
           "no_meaningful_labels",
-          "meaningful_label"
+          "meaningful_label",
+          "rule_matched",
+          "rule_set_default"
         ]
       },
       "TriageVerdict": {
