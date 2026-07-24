@@ -269,6 +269,77 @@ fn session_start_honors_custom_base_ref() {
     });
 }
 
+/// A sandboxed daemon may reach the origin only while a folder grant is held,
+/// and the grant is gone once preparation returns. The identity the caller
+/// registers has to be captured before then.
+#[test]
+fn prepare_session_captures_project_identity_before_the_grant_drops() {
+    with_temp_worktree_project(|repository, worktree| {
+        let prepared = crate::daemon::service::session_setup::prepare_session(
+            &crate::daemon::protocol::SessionStartRequest {
+                title: "worktree identity".into(),
+                context: "capture identity under the grant".into(),
+                session_id: Some("00000000-0000-4000-8000-000000000104".into()),
+                project_dir: worktree.to_string_lossy().into_owned(),
+                policy_preset: None,
+                base_ref: None,
+            },
+        )
+        .expect("prepare session in a linked worktree");
+
+        assert_eq!(prepared.project.name, "repository");
+        assert_eq!(
+            prepared.project.repository_root.as_deref(),
+            Some(repository.canonicalize().expect("canonicalize").as_path())
+        );
+        assert!(prepared.project.is_worktree, "worktree status must survive");
+    });
+}
+
+#[test]
+fn start_session_direct_registers_worktree_under_its_repository() {
+    with_temp_worktree_project(|_repository, worktree| {
+        let db = setup_db_with_project(worktree);
+        start_session_direct(
+            &crate::daemon::protocol::SessionStartRequest {
+                title: "worktree registration".into(),
+                context: "registers under the repository".into(),
+                session_id: Some("00000000-0000-4000-8000-000000000105".into()),
+                project_dir: worktree.to_string_lossy().into_owned(),
+                policy_preset: None,
+                base_ref: None,
+            },
+            Some(&db),
+        )
+        .expect("start session in a linked worktree");
+
+        let summaries = db.list_project_summaries().expect("project summaries");
+        let summary = summaries.first().expect("registered project");
+        assert_eq!(summary.name, "repository");
+        assert_eq!(
+            summary.worktrees.first().map(|entry| entry.name.as_str()),
+            Some("feature-worktree")
+        );
+    });
+}
+
+fn with_temp_worktree_project<F: FnOnce(&Path, &Path)>(test_fn: F) {
+    let tmp = tempdir().expect("tempdir");
+    with_isolated_harness_env(tmp.path(), || {
+        temp_env::with_var(
+            "CLAUDE_SESSION_ID",
+            Some("77d13b08-1651-541b-a3fc-26cab59e0aea"),
+            || {
+                let repository = tmp.path().join("repository");
+                init_git_with_seed_commit(&repository);
+                let worktree = tmp.path().join("feature-worktree");
+                harness_testkit::add_git_worktree(&repository, &worktree, "feature");
+                test_fn(&repository, &worktree);
+            },
+        );
+    });
+}
+
 fn unset_local_git_identity(project: &Path) {
     run_git(project, &["config", "--unset", "user.email"]);
     run_git(project, &["config", "--unset", "user.name"]);

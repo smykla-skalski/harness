@@ -54,6 +54,20 @@ pub fn init_git_repo_with_branches(path: &Path, branch_name: &str) {
     run_git(path, &["checkout", &default_branch]);
 }
 
+/// Add a linked worktree at `worktree_path` checked out on a new `branch_name`
+/// off the current HEAD of the repository at `repo_path`.
+///
+/// # Panics
+///
+/// Panics on any git failure.
+pub fn add_git_worktree(repo_path: &Path, worktree_path: &Path, branch_name: &str) {
+    let worktree = worktree_path.to_string_lossy().into_owned();
+    run_git(
+        repo_path,
+        &["worktree", "add", "-b", branch_name, worktree.as_str()],
+    );
+}
+
 #[must_use]
 pub fn git_head_sha(repo_path: &Path, reference: &str) -> String {
     run_git_output(repo_path, &["rev-parse", reference])

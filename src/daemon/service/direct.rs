@@ -5,9 +5,8 @@ use super::session_setup::{
 };
 use super::session_teardown::destroy_session_artifacts;
 use super::{
-    CliError, Path, SessionState, agents_service, build_log_entry, index, record_signal_ack,
-    resolve_hook_agent, session_not_found, session_service, session_storage,
-    sync_file_state_from_async_db, utc_now,
+    CliError, Path, SessionState, agents_service, build_log_entry, record_signal_ack,
+    resolve_hook_agent, session_not_found, session_service, sync_file_state_from_async_db, utc_now,
 };
 use crate::errors::CliErrorKind;
 use crate::session::types::ManagedAgentRef;
@@ -43,16 +42,15 @@ pub fn start_session_direct(
     let PreparedSession {
         layout,
         canonical_origin,
+        project,
         state,
     } = prepared;
 
-    let project_id = match ensure_project_registered(db, &canonical_origin) {
-        Ok(id) => id,
-        Err(error) => {
-            rollback_session_artifacts(&canonical_origin, &layout);
-            return Err(error);
-        }
-    };
+    let project_id = project.project_id.clone();
+    if let Err(error) = db.sync_project(&project) {
+        rollback_session_artifacts(&canonical_origin, &layout);
+        return Err(error);
+    }
     if let Err(error) = db.create_session_record(&project_id, &state) {
         rollback_session_artifacts(&canonical_origin, &layout);
         return Err(error);
@@ -90,16 +88,15 @@ pub(crate) async fn start_session_direct_async(
     let PreparedSession {
         layout,
         canonical_origin,
+        project,
         state,
     } = prepared;
 
-    let project_id = match ensure_project_registered_async(async_db, &canonical_origin).await {
-        Ok(id) => id,
-        Err(error) => {
-            rollback_session_artifacts_async(canonical_origin, layout).await;
-            return Err(error);
-        }
-    };
+    let project_id = project.project_id.clone();
+    if let Err(error) = async_db.sync_project(&project).await {
+        rollback_session_artifacts_async(canonical_origin, layout).await;
+        return Err(error);
+    }
     if let Err(error) = async_db.create_session_record(&project_id, &state).await {
         rollback_session_artifacts_async(canonical_origin, layout).await;
         return Err(error);
@@ -117,25 +114,6 @@ pub(crate) async fn start_session_direct_async(
     Ok(state)
 }
 
-pub(crate) fn ensure_project_registered(
-    db: &super::db::DaemonDb,
-    project_dir: &Path,
-) -> Result<String, CliError> {
-    session_storage::record_project_origin(project_dir)?;
-    let project = index::discovered_project_for_checkout(project_dir);
-    db.sync_project(&project)?;
-    Ok(project.project_id)
-}
-
-pub(crate) async fn ensure_project_registered_async(
-    async_db: &super::db::AsyncDaemonDb,
-    project_dir: &Path,
-) -> Result<String, CliError> {
-    session_storage::record_project_origin(project_dir)?;
-    let project = index::discovered_project_for_checkout(project_dir);
-    async_db.sync_project(&project).await?;
-    Ok(project.project_id)
-}
 /// Join an existing session, writing directly to `SQLite` when a DB is available.
 ///
 /// # Errors
