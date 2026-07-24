@@ -139,6 +139,7 @@ impl From<AgentTuiInputRequest> for RawAgentTuiInputRequest {
 /// accepted; the validation lives in the handler, so the schema documents both
 /// as optional.
 #[derive(serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+#[allow(dead_code)]
 pub struct AgentTuiInputRequestSchema {
     #[serde(default)]
     pub input: Option<AgentTuiInput>,

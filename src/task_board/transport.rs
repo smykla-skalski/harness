@@ -21,6 +21,7 @@ mod planning;
 mod policy;
 mod policy_io;
 mod sync;
+mod triage_escalation;
 
 pub use dispatch::{TaskBoardDispatchDeliverArgs, TaskBoardDispatchPickArgs};
 pub use evaluate::TaskBoardEvaluateArgs;
@@ -36,6 +37,7 @@ pub use policy::{
     TaskBoardPolicyJsonArgs, TaskBoardPolicyToggleArgs,
 };
 pub use policy_io::{TaskBoardPolicyDumpArgs, TaskBoardPolicyImportArgs};
+pub use triage_escalation::TaskBoardTriageEscalationReportArgs;
 
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]
@@ -91,6 +93,20 @@ pub enum TaskBoardCommand {
         #[command(subcommand)]
         command: TaskBoardPolicyCommand,
     },
+    /// Triage escalation commands. The daemon's own spawned escalation
+    /// worker is the only real caller.
+    TriageEscalation {
+        #[command(subcommand)]
+        command: TaskBoardTriageEscalationCommand,
+    },
+}
+
+/// Grouped `task-board triage-escalation` commands.
+#[derive(Debug, Clone, Subcommand)]
+#[non_exhaustive]
+pub enum TaskBoardTriageEscalationCommand {
+    /// Report a triage escalation verdict back to the daemon.
+    Report(TaskBoardTriageEscalationReportArgs),
 }
 
 #[derive(Debug, Clone, Args)]
@@ -271,6 +287,15 @@ impl Execute for TaskBoardCommand {
             Self::Host { command } => command.execute(context),
             Self::Orchestrator { command } => command.execute(context),
             Self::Policy { command } => command.execute(context),
+            Self::TriageEscalation { command } => command.execute(context),
+        }
+    }
+}
+
+impl Execute for TaskBoardTriageEscalationCommand {
+    fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
+        match self {
+            Self::Report(args) => args.execute(context),
         }
     }
 }

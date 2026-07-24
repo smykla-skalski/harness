@@ -145,7 +145,7 @@ pub(super) async fn post_task_board_working_copies_delete(
     )
 }
 
-/// Wire the working-copy endpoints onto the task-board OpenAPI router; the
+/// Wire the working-copy endpoints onto the task-board `OpenAPI` router; the
 /// paths come from each handler's `#[utoipa::path]` annotation.
 pub(super) fn merge_working_copy_routes(
     router: OpenApiRouter<DaemonHttpState>,

@@ -44,6 +44,8 @@ pub enum TriageVerdict {
 /// three are `BuiltInV1`-only. `RuleMatched` and `RuleSetDefault` are the
 /// runtime-authored-rules evaluator's reason codes -- the matched rule id (or
 /// nothing, for the default) travels in the decision's `reason_detail`.
+/// `AgentVerdict` is the agent-escalation evaluator's only reason code -- the
+/// agent's bounded rationale travels in `reason_detail`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[derive(utoipa::ToSchema)]
@@ -53,6 +55,7 @@ pub enum TriageReasonCode {
     MeaningfulLabel,
     RuleMatched,
     RuleSetDefault,
+    AgentVerdict,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -97,6 +97,10 @@ impl WorkingCopyRuntime {
     ///
     /// # Errors
     /// Returns [`WorkingCopyRuntimeError`] on network, IO, or gix failures.
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "obtain coordinates reuse detection, stale-checkout cleanup, clone gating, and progress reporting under one per-key lock"
+    )]
     pub async fn obtain_with_url(
         self: &Arc<Self>,
         repo_full_name: &str,

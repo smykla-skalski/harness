@@ -1,4 +1,4 @@
-use crate::task_board::{TaskBoardTriageDecision, TriageCause};
+use crate::task_board::{AGENT_V1_EVALUATOR_IDENTITY, TaskBoardTriageDecision, TriageCause};
 
 /// Whatever `triage_cause` needs to compare against a candidate evaluator
 /// and evidence fingerprint. Implemented once by the full decision type
@@ -38,6 +38,23 @@ pub(super) fn triage_cause<T: DecidedEvaluatorFingerprint>(
 ) -> Option<TriageCause> {
     match existing {
         None => Some(TriageCause::Initial),
+        // An agent-reported verdict is pinned to its own evidence
+        // fingerprint, not to "the active evaluator" -- there is no active
+        // agent evaluator the ingress choke point ever selects between
+        // (`AGENT_V1` is a one-off report, never dispatched to by
+        // `apply_active_triage_in_tx`), so identity/version comparison
+        // never applies to it. Without this arm, every ordinary ingress
+        // touch after an agent verdict would see a bare identity mismatch
+        // against `BuiltInV1`/rules and re-decide, demoting the agent's
+        // placement back to Backlog and re-enqueuing a fresh (paid)
+        // escalation for evidence that has not actually changed.
+        Some(existing) if existing.evaluator_identity() == AGENT_V1_EVALUATOR_IDENTITY => {
+            if existing.evidence_fingerprint() == fingerprint {
+                None
+            } else {
+                Some(TriageCause::FingerprintChanged)
+            }
+        }
         Some(existing)
             if existing.evaluator_identity() != active_evaluator_identity
                 || existing.evaluator_version() != active_evaluator_version =>

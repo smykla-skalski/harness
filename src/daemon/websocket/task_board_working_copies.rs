@@ -6,11 +6,27 @@
 
 use serde::de::DeserializeOwned;
 
-use crate::daemon::protocol::{WsRequest, WsResponse};
+use crate::daemon::protocol::{WsRequest, WsResponse, ws_methods};
 use crate::daemon::service;
 
 use super::frames::error_response;
 use super::mutations::dispatch_query_result;
+
+pub(crate) async fn dispatch_method(request: &WsRequest) -> Option<WsResponse> {
+    match request.method.as_str() {
+        ws_methods::TASK_BOARD_WORKING_COPIES_LIST => Some(dispatch_query_result(
+            &request.id,
+            service::list_task_board_working_copies().await,
+        )),
+        ws_methods::TASK_BOARD_WORKING_COPIES_OBTAIN => {
+            Some(dispatch_task_board_working_copies_obtain(request).await)
+        }
+        ws_methods::TASK_BOARD_WORKING_COPIES_DELETE => {
+            Some(dispatch_task_board_working_copies_delete(request).await)
+        }
+        _ => None,
+    }
+}
 
 #[derive(serde::Deserialize)]
 struct ObtainWorkingCopyPayload {

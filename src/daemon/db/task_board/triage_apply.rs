@@ -111,8 +111,13 @@ pub(super) async fn apply_builtin_v1_triage_in_tx(
         // unranked or in Backlog; a genuinely unchanged item still reports
         // no decision at all.
         return match existing {
+            // The retained decision's own evaluator identity is the correct
+            // placement producer here, not this call's active evaluator --
+            // a retained `AGENT_V1` decision must re-apply placement under
+            // `AGENT_V1`, or every later touch churns it back through
+            // `BuiltInV1`'s identity (the #334 F1 lesson, generalized).
             Some(existing)
-                if !placement_matches_verdict(item, existing.verdict, BUILTIN_V1_EVALUATOR_IDENTITY) =>
+                if !placement_matches_verdict(item, existing.verdict, &existing.evaluator_identity) =>
             {
                 let manually_placed = item
                     .lane_origin
@@ -126,12 +131,13 @@ pub(super) async fn apply_builtin_v1_triage_in_tx(
                     // enclosing mutation still gets its own ordinary audit.
                     Ok(None)
                 } else {
+                    let producer = existing.evaluator_identity.clone();
                     apply_placement_effect_in_tx(
                         transaction,
                         item,
                         existing.verdict,
                         decided_at,
-                        BUILTIN_V1_EVALUATOR_IDENTITY,
+                        &producer,
                     )
                     .await?;
                     Ok(Some(TriageOutcome::RetainedEffect(existing)))

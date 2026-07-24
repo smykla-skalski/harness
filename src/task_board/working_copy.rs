@@ -161,6 +161,7 @@ impl WorkingCopyRegistry {
     /// 1. Drop entries whose `last_used_at` is older than `max_age`.
     /// 2. If total size is still above `max_disk_bytes`, drop LRU entries
     ///    until under budget.
+    #[must_use]
     pub fn pick_gc_targets(
         &self,
         now: DateTime<Utc>,

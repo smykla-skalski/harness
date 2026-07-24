@@ -483,3 +483,34 @@ fn stale_bound_run_blocks_task() {
         .expect("session");
     assert_eq!(state.tasks["task-1"].status, TaskStatus::Blocked);
 }
+
+/// A standalone run persists `session_id` as NULL and resurrects with the
+/// run id (see `async_standalone_codex_run_persists_a_null_session_and_falls_back_on_load`),
+/// so the identity `start_standalone_run_with_id` reserves under -- and
+/// returns -- must be that same run id, or a second same-id call stops
+/// being idempotent the moment the row is reloaded from the database.
+#[tokio::test(flavor = "multi_thread")]
+async fn standalone_run_reserves_under_its_reloadable_identity() {
+    with_isolated_async_harness_env(|_| async move {
+        let (controller, _db, tempdir) =
+            controller_with_async_session_state(sample_session_state_with_open_task()).await;
+        let scratch = tempdir.path().join("standalone-scratch");
+        std::fs::create_dir_all(&scratch).expect("create scratch dir");
+        let snapshot = controller
+            .start_standalone_run_with_id(
+                &scratch.display().to_string(),
+                &durable_run_request(),
+                "codex-standalone-1".into(),
+            )
+            .expect("start standalone run");
+        assert_eq!(
+            snapshot.session_id, "codex-standalone-1",
+            "standalone identity must match what a DB reload yields"
+        );
+        let reloaded = controller
+            .load_run("codex-standalone-1")
+            .expect("reload standalone run");
+        assert_eq!(reloaded.session_id, snapshot.session_id);
+    })
+    .await;
+}

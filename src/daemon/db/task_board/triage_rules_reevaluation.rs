@@ -112,17 +112,23 @@ async fn reevaluate_one_item_in_tx(
         )
         .await?;
     } else if !manually_placed {
-        let desynced = cause.is_some()
-            || !placement_matches_verdict(&item, decided.verdict, decided.evaluator_identity);
-        if desynced {
-            apply_placement_effect_in_tx(
-                transaction,
-                &mut item,
-                decided.verdict,
-                now,
-                decided.evaluator_identity,
-            )
-            .await?;
+        // A fresh decision (`cause.is_some()`) always places under this
+        // touch's active evaluator. A retained decision (`cause` is `None`,
+        // for instance a pinned `AGENT_V1` verdict this reevaluation must
+        // not disturb) places under ITS OWN evaluator identity and verdict,
+        // never the active evaluator's hypothetical, unrecorded outcome --
+        // otherwise a rule-set activation would churn an agent-placed Todo
+        // back to Backlog on every activation without ever recording why.
+        let (retained_verdict, retained_producer) = match &cause {
+            Some(_) => (decided.verdict, decided.evaluator_identity),
+            None => match current_decision.as_ref() {
+                Some(existing) => (existing.verdict, existing.evaluator_identity.as_str()),
+                None => (decided.verdict, decided.evaluator_identity),
+            },
+        };
+        if !placement_matches_verdict(&item, retained_verdict, retained_producer) {
+            apply_placement_effect_in_tx(transaction, &mut item, retained_verdict, now, retained_producer)
+                .await?;
         }
     }
     let changed = item.status != before.status

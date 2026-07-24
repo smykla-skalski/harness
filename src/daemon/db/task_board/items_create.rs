@@ -82,6 +82,8 @@ impl AsyncDaemonDb {
             mutation_kind,
             &write,
             change_revision,
+            false,
+            &self.triage_escalation_config(),
         )
         .await?;
         transaction

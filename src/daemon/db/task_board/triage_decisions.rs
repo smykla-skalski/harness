@@ -199,6 +199,7 @@ const fn reason_code_wire(reason_code: TriageReasonCode) -> &'static str {
         TriageReasonCode::MeaningfulLabel => "meaningful_label",
         TriageReasonCode::RuleMatched => "rule_matched",
         TriageReasonCode::RuleSetDefault => "rule_set_default",
+        TriageReasonCode::AgentVerdict => "agent_verdict",
     }
 }
 
@@ -209,6 +210,7 @@ fn parse_reason_code(value: &str) -> Result<TriageReasonCode, CliError> {
         "meaningful_label" => Ok(TriageReasonCode::MeaningfulLabel),
         "rule_matched" => Ok(TriageReasonCode::RuleMatched),
         "rule_set_default" => Ok(TriageReasonCode::RuleSetDefault),
+        "agent_verdict" => Ok(TriageReasonCode::AgentVerdict),
         other => Err(db_error(format!(
             "unknown stored triage reason code '{other}'"
         ))),

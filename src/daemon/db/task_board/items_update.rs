@@ -152,6 +152,8 @@ impl AsyncDaemonDb {
             mutation_kind,
             &write,
             change_revision,
+            existing_override.is_some(),
+            &self.triage_escalation_config(),
         )
         .await?;
         transaction

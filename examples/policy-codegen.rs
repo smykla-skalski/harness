@@ -2632,6 +2632,8 @@ const TASK_BOARD_ITEM_EMIT_ONLY: &[&str] = &[
 const TASK_BOARD_TRIAGE_SOURCE: &str = include_str!("../src/task_board/triage.rs");
 const TASK_BOARD_TRIAGE_OVERRIDE_SOURCE: &str =
     include_str!("../src/task_board/triage_override.rs");
+const TASK_BOARD_TRIAGE_ESCALATION_SOURCE: &str =
+    include_str!("../src/task_board/triage_escalation.rs");
 const TASK_BOARD_TRIAGE_PROTOCOL_SOURCE: &str =
     include_str!("../src/daemon/protocol/task_board_triage.rs");
 const TASK_BOARD_TRIAGE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardTriageWireTypes.generated.swift";
@@ -2655,6 +2657,7 @@ const TASK_BOARD_TRIAGE_EMIT_ONLY: &[&str] = &[
     "TaskBoardSetTriageOverrideRequest",
     "TaskBoardClearTriageOverrideRequest",
     "TaskBoardTriageOverrideMutationResponse",
+    "TaskBoardTriageEscalationStatus",
 ];
 const TASK_BOARD_TRIAGE_RULES_SOURCE: &str = include_str!("../src/task_board/triage_rules.rs");
 const TASK_BOARD_TRIAGE_RULES_VALIDATION_SOURCE: &str =
@@ -3259,6 +3262,7 @@ fn modules() -> Vec<GeneratedModule> {
             sources: &[
                 TASK_BOARD_TRIAGE_SOURCE,
                 TASK_BOARD_TRIAGE_OVERRIDE_SOURCE,
+                TASK_BOARD_TRIAGE_ESCALATION_SOURCE,
                 TASK_BOARD_TRIAGE_PROTOCOL_SOURCE,
             ],
         },

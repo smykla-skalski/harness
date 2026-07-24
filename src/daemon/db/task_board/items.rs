@@ -9,13 +9,15 @@ use super::triage_audit::{
     record_item_created_audit_in_tx, record_item_updated_audit_in_tx,
     record_triage_decided_audit_in_tx, record_triage_effect_reapplied_audit_in_tx,
 };
+use super::triage_escalation_enqueue::maybe_enqueue_triage_escalation_in_tx;
 use super::triage_override::triage_override_from_item_row;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::errors::CliErrorKind;
 use crate::infra::io;
 use crate::task_board::types::{CURRENT_TASK_BOARD_ITEM_VERSION, MAX_TASK_BOARD_ESTIMATE};
 use crate::task_board::{
-    TaskBoardItem, TaskBoardStatus, TaskBoardTriageOverride, validate_lane_placement,
+    TaskBoardItem, TaskBoardStatus, TaskBoardTriageEscalationConfig, TaskBoardTriageOverride,
+    validate_lane_placement,
 };
 
 #[path = "items_lifecycle.rs"]
@@ -169,6 +171,11 @@ impl AsyncDaemonDb {
 /// public no-op is never silently unaudited); and a plain internal
 /// lane-only mutation, which keeps the old no-audit-when-unchanged behavior
 /// since internal call sites own their own audits elsewhere.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the escalation eligibility fields are only needed on the Decided branch, but every \
+              ingress call site already has all of them in hand"
+)]
 async fn record_triage_or_lane_audit_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     before: &TaskBoardItem,
@@ -176,9 +183,20 @@ async fn record_triage_or_lane_audit_in_tx(
     mutation_kind: Option<TaskBoardMutationKind>,
     write: &LaneTransitionWrite,
     items_change_seq: i64,
+    override_active: bool,
+    escalation_config: &TaskBoardTriageEscalationConfig,
 ) -> Result<(), CliError> {
     match outcome {
         Some(TriageOutcome::Decided(decision)) => {
+            maybe_enqueue_triage_escalation_in_tx(
+                transaction,
+                &before.id,
+                decision,
+                override_active,
+                escalation_config,
+                &decision.decided_at,
+            )
+            .await?;
             record_triage_decided_audit_in_tx(
                 transaction,
                 before,

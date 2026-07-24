@@ -2,6 +2,7 @@ mod api;
 mod connection;
 mod http;
 mod task_board;
+mod task_board_orchestrator;
 
 #[cfg(test)]
 mod api_tests;

@@ -1,8 +1,8 @@
 use serde::{Deserialize, Deserializer, Serialize, de};
 
 use crate::task_board::{
-    TaskBoardTriageDecisionRecord, TaskBoardTriageEffectiveOutcome, TaskBoardTriageOverride,
-    TriageVerdict,
+    TaskBoardTriageDecisionRecord, TaskBoardTriageEffectiveOutcome, TaskBoardTriageEscalationStatus,
+    TaskBoardTriageOverride, TriageVerdict,
 };
 
 use super::{TaskBoardItemPositionSnapshot, TaskBoardShiftedItemRevision};
@@ -28,6 +28,12 @@ pub struct TaskBoardTriageCurrentResponse {
     pub triage_override: Option<TaskBoardTriageOverride>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effective: Option<TaskBoardTriageEffectiveOutcome>,
+    /// Set only while an escalation for this item is `Pending` or `Running`
+    /// -- a terminal escalation's effect is either `current`/`effective`
+    /// changing (a landed verdict) or nothing, so there is nothing useful to
+    /// surface here once it resolves.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending_escalation_status: Option<TaskBoardTriageEscalationStatus>,
 }
 
 /// Request for `PUT /v1/task-board/items/{item_id}/triage/override`.

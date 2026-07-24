@@ -35,15 +35,34 @@ fn remote_http_authz_matrix_enforces_every_private_route() {
         ]
     );
 
-    for route in HTTP_API_CONTRACT
-        .iter()
-        .filter(|route| !is_public_pairing_route(route))
-    {
+    for route in HTTP_API_CONTRACT.iter().filter(|route| {
+        !is_public_pairing_route(route) && !is_never_remote_authorizable_route(route)
+    }) {
         assert_missing_credentials_denied(&state, route);
         let required_scope = required_scope(route);
         assert_insufficient_scope_denied(&state, route, required_scope);
         assert_allowed_scope_accepted(&state, route, required_scope);
     }
+
+    // The one deliberate exception has no scope at all, so it must deny
+    // every remote caller outright -- missing credentials denies it the
+    // same way as any other route, but even a fully authenticated admin
+    // client must still be refused, since `remote_http_scopes` returning
+    // `None` for this path is exactly what keeps it unreachable.
+    for route in HTTP_API_CONTRACT
+        .iter()
+        .filter(|route| is_never_remote_authorizable_route(route))
+    {
+        assert_missing_credentials_denied(&state, route);
+        assert!(remote_http_scopes(route).is_none());
+        let response = authorize_http_route(&remote_headers("admin"), &state, route)
+            .expect_err("a route with no remote scope contract must deny every caller");
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+}
+
+fn is_never_remote_authorizable_route(route: &HttpApiRouteContract) -> bool {
+    route.path == http_paths::TASK_BOARD_TRIAGE_ESCALATION_VERDICT
 }
 
 #[tokio::test]

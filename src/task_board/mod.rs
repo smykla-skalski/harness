@@ -24,6 +24,8 @@ pub mod store;
 pub mod summary;
 pub mod transport;
 pub mod triage;
+pub mod triage_escalation;
+mod triage_escalation_prompt;
 pub mod triage_override;
 pub mod triage_rules;
 pub mod types;
@@ -153,6 +155,11 @@ pub use triage::{
     is_canonical_evaluator_identity, is_canonical_evidence_fingerprint, is_canonical_reason_detail,
     is_exclusion_label, matched_exclusion_label,
 };
+pub use triage_escalation::{
+    AGENT_V1_EVALUATOR_IDENTITY, AGENT_V1_EVALUATOR_VERSION, TaskBoardTriageEscalationConfig,
+    TaskBoardTriageEscalationRejectReason, TaskBoardTriageEscalationStatus,
+    TaskBoardTriageEscalationVerdictOutcome,
+};
 pub use triage_override::{
     TaskBoardTriageEffectiveOutcome, TaskBoardTriageEffectiveSource, TaskBoardTriageOverride,
     effective_triage_outcome, is_canonical_override_actor, is_canonical_override_reason,
@@ -176,6 +183,8 @@ pub use types::{
     AgentMode, TaskBoardItem, TaskBoardPriority, TaskBoardStatus, TaskBoardTombstoneCause,
     TaskBoardWorkflowState, TaskBoardWorkflowStatus,
 };
+#[cfg(any(test, feature = "daemon-runtime"))]
+pub(crate) use triage_escalation_prompt::render_triage_escalation_prompt;
 pub(crate) use worker_prompt::plan_worker_prompt;
 #[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use worker_prompt::{WorkerPromptContext, render_worker_prompt};

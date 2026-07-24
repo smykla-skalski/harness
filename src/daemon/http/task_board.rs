@@ -13,6 +13,7 @@ pub(super) mod policy_pipeline;
 pub(super) mod policy_spawn_gate;
 pub(super) mod positions;
 pub(super) mod triage;
+pub(super) mod triage_escalation;
 pub(super) mod triage_rules;
 pub(super) mod working_copies;
 
@@ -66,6 +67,9 @@ pub(super) fn task_board_routes() -> OpenApiRouter<DaemonHttpState> {
         .routes(routes!(triage::get_task_board_item_triage_history))
         .routes(routes!(triage::put_task_board_item_triage_override))
         .routes(routes!(triage::post_task_board_item_triage_override_clear))
+        .routes(routes!(
+            triage_escalation::post_task_board_triage_escalation_verdict
+        ))
         .merge(task_board_triage_rules_routes())
         .routes(routes!(items::post_task_board_plan_begin))
         .routes(routes!(items::post_task_board_plan_submit))

@@ -17,6 +17,7 @@ public enum TriageReasonCode: String, Codable, Equatable, Sendable, CaseIterable
   case meaningfulLabel = "meaningful_label"
   case ruleMatched = "rule_matched"
   case ruleSetDefault = "rule_set_default"
+  case agentVerdict = "agent_verdict"
 
   public var id: String { rawValue }
 }
@@ -117,21 +118,31 @@ public struct TaskBoardTriageEffectiveOutcome: Codable, Equatable, Sendable {
   }
 }
 
+public enum TaskBoardTriageEscalationStatus: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case pending = "pending"
+  case running = "running"
+
+  public var id: String { rawValue }
+}
+
 public struct TaskBoardTriageCurrentResponse: Codable, Equatable, Sendable {
   public var current: TaskBoardTriageDecisionRecord?
   public var triageOverride: TaskBoardTriageOverride?
   public var effective: TaskBoardTriageEffectiveOutcome?
+  public var pendingEscalationStatus: TaskBoardTriageEscalationStatus?
 
-  public init(current: TaskBoardTriageDecisionRecord? = nil, triageOverride: TaskBoardTriageOverride? = nil, effective: TaskBoardTriageEffectiveOutcome? = nil) {
+  public init(current: TaskBoardTriageDecisionRecord? = nil, triageOverride: TaskBoardTriageOverride? = nil, effective: TaskBoardTriageEffectiveOutcome? = nil, pendingEscalationStatus: TaskBoardTriageEscalationStatus? = nil) {
     self.current = current
     self.triageOverride = triageOverride
     self.effective = effective
+    self.pendingEscalationStatus = pendingEscalationStatus
   }
 
   enum CodingKeys: String, CodingKey {
     case current
     case triageOverride = "triage_override"
     case effective
+    case pendingEscalationStatus = "pending_escalation_status"
   }
 }
 

@@ -40,6 +40,9 @@ pub(crate) async fn dispatch_task_board_method(
     if let Some(response) = triage_rules::dispatch_method(request, state).await {
         return Some(response);
     }
+    if let Some(response) = super::task_board_working_copies::dispatch_method(request).await {
+        return Some(response);
+    }
     match request.method.as_str() {
         ws_methods::TASK_BOARD_CREATE => {
             Some(Box::pin(dispatch_task_board_create(request, state)).await)
@@ -111,18 +114,6 @@ pub(crate) async fn dispatch_task_board_method(
         ws_methods::TASK_BOARD_HOST_SET_PROJECT_TYPES => {
             Some(dispatch_task_board_host_set_project_types(request, state).await)
         }
-        ws_methods::TASK_BOARD_WORKING_COPIES_LIST => Some(dispatch_query_result(
-            &request.id,
-            crate::daemon::service::list_task_board_working_copies().await,
-        )),
-        ws_methods::TASK_BOARD_WORKING_COPIES_OBTAIN => Some(
-            super::task_board_working_copies::dispatch_task_board_working_copies_obtain(request)
-                .await,
-        ),
-        ws_methods::TASK_BOARD_WORKING_COPIES_DELETE => Some(
-            super::task_board_working_copies::dispatch_task_board_working_copies_delete(request)
-                .await,
-        ),
         ws_methods::TASK_BOARD_GIT_IDENTITY_DEFAULTS => {
             Some(dispatch_task_board_git_identity_defaults(request).await)
         }

@@ -95,17 +95,64 @@ impl CodexControllerHandle {
         request: &CodexRunRequest,
         run_id: String,
     ) -> Result<CodexRunSnapshot, CliError> {
+        let session_id = session_id.to_string();
+        let label = session_id.clone();
+        self.finish_starting_run(run_id, &label, move |controller, run_id| {
+            controller.prepare_durable_run(&session_id, request, run_id)
+        })
+    }
+
+    /// Start a run with no owning Harness session at all. The run's own id
+    /// is its identity everywhere a session id would appear -- the
+    /// reservation/idempotency check, the snapshot's `session_id` display
+    /// field, and (via the NULL-`session_id` persistence fallback) the row
+    /// resurrected from the database -- so a repeated same-id call stays
+    /// idempotent across persistence. `project_dir` is supplied directly by
+    /// the caller instead of being derived from a session's worktree. Used
+    /// by standalone one-shot report runs (triage escalation) that have no
+    /// interactive session to join and no repository to work in.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the snapshot cannot be persisted.
+    pub(crate) fn start_standalone_run_with_id(
+        &self,
+        project_dir: &str,
+        request: &CodexRunRequest,
+        run_id: String,
+    ) -> Result<CodexRunSnapshot, CliError> {
+        let project_dir = project_dir.to_string();
+        let reservation_label = run_id.clone();
+        self.finish_starting_run(run_id, &reservation_label, move |controller, run_id| {
+            controller.prepare_standalone_run(&project_dir, request, run_id)
+        })
+    }
+
+    /// Shared reservation/commit/worker-spawn tail for
+    /// [`Self::start_run_with_id`] and [`Self::start_standalone_run_with_id`].
+    /// `label` is the value `ensure_run_belongs_to_session` compares a
+    /// reused run's stored `session_id` against -- for a standalone run this
+    /// is the run id itself, which is both what
+    /// [`Self::prepare_standalone_run`] stamps into the snapshot's
+    /// `session_id` field and what the database load fallback yields for a
+    /// persisted NULL `session_id` row, so the comparison holds before and
+    /// after a reload.
+    fn finish_starting_run(
+        &self,
+        run_id: String,
+        label: &str,
+        prepare: impl FnOnce(&Self, String) -> Result<CodexRunSnapshot, CliError>,
+    ) -> Result<CodexRunSnapshot, CliError> {
         validate_safe_segment(&run_id)?;
         let reservation = match self.state.active_runs.reserve(run_id.clone())? {
             ActiveRunRegistration::Acquired(reservation) => reservation,
             ActiveRunRegistration::Waiting(waiter) => {
-                return ensure_run_belongs_to_session(waiter.wait()?, session_id);
+                return ensure_run_belongs_to_session(waiter.wait()?, label);
             }
             ActiveRunRegistration::Active => {
-                return ensure_run_belongs_to_session(self.load_run(&run_id)?, session_id);
+                return ensure_run_belongs_to_session(self.load_run(&run_id)?, label);
             }
         };
-        let snapshot = match self.prepare_durable_run(session_id, request, run_id) {
+        let snapshot = match prepare(self, run_id) {
             Ok(snapshot) => snapshot,
             Err(error) => {
                 reservation.abort(&error);
@@ -126,10 +173,6 @@ impl CodexControllerHandle {
         Ok(snapshot)
     }
 
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "durable run preparation coordinates validation, agent registration, persistence, and rollback"
-    )]
     fn prepare_durable_run(
         &self,
         session_id: &str,
@@ -148,7 +191,7 @@ impl CodexControllerHandle {
             run_id,
             project_dir,
             prompt,
-            registration.agent_id.clone(),
+            Some(registration.agent_id.clone()),
             display_name,
         );
         if let Err(error) = self.save_and_broadcast(&snapshot) {
@@ -160,19 +203,38 @@ impl CodexControllerHandle {
             );
             return Err(error);
         }
-        tracing::info!(
-            session_id,
-            run_id = %snapshot.run_id,
-            mode = ?snapshot.mode,
-            "queued codex run"
+        log_queued_run(session_id, &snapshot);
+        Ok(snapshot)
+    }
+
+    /// Like [`Self::prepare_durable_run`], but for a run with no owning
+    /// session: skips [`Self::register_orchestration_agent`] and its
+    /// rollback entirely (there is no session agent roster to join or
+    /// unwind), so `session_agent_id` on the resulting snapshot is always
+    /// `None`. The escalation executor's own lifecycle (claim, timeout
+    /// sweep) is this run's only supervision -- there is deliberately no
+    /// orchestration-side tracking to keep in sync.
+    fn prepare_standalone_run(
+        &self,
+        project_dir: &str,
+        request: &CodexRunRequest,
+        run_id: String,
+    ) -> Result<CodexRunSnapshot, CliError> {
+        let prompt = validate_run_request(request)?;
+        self.preflight_websocket_probe(&run_id)?;
+        let display_name = request.name.clone().unwrap_or_else(|| "Codex".to_string());
+        let session_id = run_id.clone();
+        let snapshot = queued_run_snapshot(
+            &session_id,
+            request,
+            run_id,
+            project_dir.to_string(),
+            prompt,
+            None,
+            display_name,
         );
-        state::append_event_best_effort(
-            "info",
-            &format!(
-                "queued codex run {} for session {}",
-                snapshot.run_id, snapshot.session_id
-            ),
-        );
+        self.save_and_broadcast(&snapshot)?;
+        log_queued_run(&session_id, &snapshot);
         Ok(snapshot)
     }
 
@@ -291,13 +353,29 @@ fn ensure_run_belongs_to_session(
     .into())
 }
 
+fn log_queued_run(session_id: &str, snapshot: &CodexRunSnapshot) {
+    tracing::info!(
+        session_id,
+        run_id = %snapshot.run_id,
+        mode = ?snapshot.mode,
+        "queued codex run"
+    );
+    state::append_event_best_effort(
+        "info",
+        &format!(
+            "queued codex run {} for session {}",
+            snapshot.run_id, snapshot.session_id
+        ),
+    );
+}
+
 fn queued_run_snapshot(
     session_id: &str,
     request: &CodexRunRequest,
     run_id: String,
     project_dir: String,
     prompt: &str,
-    session_agent_id: String,
+    session_agent_id: Option<String>,
     display_name: String,
 ) -> CodexRunSnapshot {
     let now = utc_now();
@@ -307,7 +385,7 @@ fn queued_run_snapshot(
         task_id: request.task_id.clone(),
         board_item_id: request.board_item_id.clone(),
         workflow_execution_id: request.workflow_execution_id.clone(),
-        session_agent_id: Some(session_agent_id),
+        session_agent_id,
         display_name: Some(display_name),
         project_dir,
         thread_id: request.resume_thread_id.clone(),
@@ -412,46 +490,5 @@ pub(super) fn lock_db(db: &Arc<Mutex<DaemonDb>>) -> Result<MutexGuard<'_, Daemon
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::daemon::protocol::CodexRunMode;
-    use crate::session::types::SessionRole;
-
-    #[test]
-    fn queued_run_snapshot_copies_binding_and_normalizes_optional_values() {
-        let request = CodexRunRequest {
-            actor: None,
-            prompt: "investigate".to_string(),
-            mode: CodexRunMode::Report,
-            role: SessionRole::Worker,
-            fallback_role: None,
-            capabilities: Vec::new(),
-            name: None,
-            persona: None,
-            resume_thread_id: None,
-            task_id: Some("task-1".to_string()),
-            board_item_id: Some("board-item-1".to_string()),
-            workflow_execution_id: Some("workflow-1".to_string()),
-            model: Some("  ".to_string()),
-            effort: Some(" high ".to_string()),
-            allow_custom_model: false,
-        };
-
-        let snapshot = queued_run_snapshot(
-            "session-1",
-            &request,
-            "run-1".to_string(),
-            "/tmp/project".to_string(),
-            "investigate",
-            "agent-1".to_string(),
-            "Codex".to_string(),
-        );
-
-        assert_eq!(snapshot.model, None);
-        assert_eq!(snapshot.effort.as_deref(), Some("high"));
-        let value = serde_json::to_value(snapshot).expect("serialize queued snapshot");
-        assert_eq!(value["task_id"], "task-1");
-        assert_eq!(value["board_item_id"], "board-item-1");
-        assert_eq!(value["workflow_execution_id"], "workflow-1");
-    }
-}
+#[path = "handle_tests.rs"]
+mod tests;

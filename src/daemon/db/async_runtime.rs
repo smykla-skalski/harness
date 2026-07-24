@@ -1,4 +1,4 @@
-use sqlx::{query, query_as};
+use sqlx::{query, query_as, query_scalar};
 
 use super::{
     AgentTuiLiveRefreshState, AgentTuiSize, AgentTuiSnapshot, AgentTuiStatus, AsyncDaemonDb,
@@ -111,9 +111,30 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("async codex run save")
             .await?;
+        // A standalone run (see `CodexControllerHandle::prepare_standalone_run`)
+        // stamps a free-form label into `snapshot.session_id`, not a real
+        // session id -- persisting that string as-is would violate
+        // `codex_runs.session_id`'s foreign key. Only bind it when a matching
+        // `sessions` row actually exists; otherwise store an honest NULL.
+        // This existence check is also the invariant the removed `NOT NULL`
+        // foreign key used to enforce for every session-bound caller: the
+        // session row must already be committed before its first run is
+        // saved, and must still exist at every later save. Either a
+        // session-bound run saved before its session commits, or one
+        // re-saved (via this UPSERT) after its session was hard-deleted,
+        // now silently stores NULL and stays an unbound orphan instead of
+        // failing loudly.
+        let session_id: Option<&str> = query_scalar::<_, i64>(
+            "SELECT 1 FROM sessions WHERE session_id = ?1",
+        )
+        .bind(&snapshot.session_id)
+        .fetch_optional(transaction.as_mut())
+        .await
+        .map_err(|error| db_error(format!("check async codex run session: {error}")))?
+        .map(|_| snapshot.session_id.as_str());
         query(UPSERT_CODEX_RUN_SQL)
             .bind(&snapshot.run_id)
-            .bind(&snapshot.session_id)
+            .bind(session_id)
             .bind(&snapshot.task_id)
             .bind(&snapshot.board_item_id)
             .bind(&snapshot.workflow_execution_id)
@@ -278,7 +299,7 @@ impl AsyncDaemonDb {
 #[derive(sqlx::FromRow)]
 struct AsyncCodexRunRow {
     run_id: String,
-    session_id: String,
+    session_id: Option<String>,
     task_id: Option<String>,
     board_item_id: Option<String>,
     workflow_execution_id: Option<String>,
@@ -305,8 +326,11 @@ struct AsyncCodexRunRow {
 impl AsyncCodexRunRow {
     fn into_snapshot(self) -> Result<CodexRunSnapshot, CliError> {
         Ok(CodexRunSnapshot {
+            // A session-less standalone run persists NULL for `session_id`
+            // (see `save_codex_run`); the wire type stays non-optional, so a
+            // NULL falls back to the run's own id rather than surfacing here.
+            session_id: self.session_id.unwrap_or_else(|| self.run_id.clone()),
             run_id: self.run_id,
-            session_id: self.session_id,
             task_id: self.task_id,
             board_item_id: self.board_item_id,
             workflow_execution_id: self.workflow_execution_id,

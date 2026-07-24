@@ -29,6 +29,19 @@ extension TriageReasonCode {
       "Rule matched"
     case .ruleSetDefault:
       "Rule set default"
+    case .agentVerdict:
+      "Agent verdict"
+    }
+  }
+}
+
+extension TaskBoardTriageEscalationStatus {
+  var title: String {
+    switch self {
+    case .pending:
+      "Agent judgment pending"
+    case .running:
+      "Agent judgment in progress"
     }
   }
 }

@@ -116,6 +116,8 @@ mod schema_v45;
 mod schema_v46;
 mod schema_v47;
 mod schema_v48;
+mod schema_v49;
+mod schema_v50;
 #[allow(dead_code)]
 mod task_board;
 #[cfg(test)]
@@ -170,6 +172,7 @@ pub(crate) use task_board::{
     TaskBoardRemoteSourceOfferReassignment, TaskBoardRemoteTerminalArtifact,
     TaskBoardRunAcquireRequest, TaskBoardTriageCurrentRead, TaskBoardTriageOverrideClearInput,
     TaskBoardTriageOverrideMutationResult, TaskBoardTriageOverrideSetInput,
+    ClaimedTaskBoardTriageEscalation,
     executor_start_authority, executor_start_io_permit, remote_executor_identity,
     remote_executor_identity_from_parts, stop_pending_snapshot_matches,
 };
@@ -374,7 +377,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-pub(crate) const SCHEMA_VERSION: &str = "48";
+pub(crate) const SCHEMA_VERSION: &str = "50";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]

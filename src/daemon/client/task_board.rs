@@ -1,5 +1,4 @@
 use serde::de::DeserializeOwned;
-use serde_json::Value;
 
 use crate::daemon::protocol::{
     PolicyApprovalGrantResolveRequest, PolicyApprovalGrantResolveResponse,
@@ -8,26 +7,22 @@ use crate::daemon::protocol::{
     PolicyCanvasSetSpawnRequiresLivePolicyRequest, PolicyCanvasWorkspaceResponse,
     PolicyTransferBundle, PolicyTransferDumpRequest, PolicyTransferImportRequest,
     TASK_BOARD_STORAGE_DATABASE, TaskBoardAuditRequest, TaskBoardAuditResponse,
-    TaskBoardAutomationHistoryRequest, TaskBoardAutomationMetricsResponse,
-    TaskBoardAutomationRunDetailResponse, TaskBoardAutomationRunsResponse,
     TaskBoardCapabilitiesResponse, TaskBoardCatalogRequest, TaskBoardClearTriageOverrideRequest,
     TaskBoardCreateItemRequest, TaskBoardDispatchDeliverRequest, TaskBoardDispatchDeliverResponse,
     TaskBoardDispatchPickRequest, TaskBoardDispatchPickResponse, TaskBoardDispatchRequest,
     TaskBoardDispatchResponse, TaskBoardEvaluateRequest, TaskBoardEvaluationResponse,
-    TaskBoardGitHubTokensSyncRequest, TaskBoardGitHubTokensSyncResponse, TaskBoardGitRuntimeConfig,
-    TaskBoardGitRuntimeConfigResponse, TaskBoardHostListResponse, TaskBoardHostLocalResponse,
+    TaskBoardHostListResponse, TaskBoardHostLocalResponse,
     TaskBoardHostSetProjectTypesRequest, TaskBoardHostSetProjectTypesResponse,
     TaskBoardItemPositionMutationResponse, TaskBoardItemPositionSnapshot,
     TaskBoardListItemsRequest, TaskBoardListItemsResponse, TaskBoardMachinesResponse,
-    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorRunOnceResponse,
-    TaskBoardOrchestratorSettingsResponse, TaskBoardOrchestratorSettingsUpdateRequest,
-    TaskBoardOrchestratorStatusResponse, TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest,
+    TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest,
     TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse,
     TaskBoardProjectsResponse, TaskBoardResetItemPositionRequest, TaskBoardSetItemPositionRequest,
     TaskBoardActivateTriageRulesRequest, TaskBoardPreviewTriageRulesRequest,
     TaskBoardSaveTriageRulesDraftRequest, TaskBoardSetTriageOverrideRequest, TaskBoardSyncRequest,
-    TaskBoardSyncResponse, TaskBoardTodoistTokenSyncRequest, TaskBoardTodoistTokenSyncResponse,
-    TaskBoardTriageCurrentResponse, TaskBoardTriageHistoryResponse,
+    TaskBoardSyncResponse,
+    TaskBoardTriageCurrentResponse, TaskBoardTriageEscalationVerdictRequest,
+    TaskBoardTriageEscalationVerdictResponse, TaskBoardTriageHistoryResponse,
     TaskBoardTriageOverrideMutationResponse, TaskBoardTriageRulesAuditResponse,
     TaskBoardTriageRulesDraftResponse, TaskBoardTriageRulesRevisionsResponse,
     TaskBoardUpdateItemRequest, http_paths,
@@ -165,6 +160,18 @@ impl DaemonClient {
         request: &TaskBoardPreviewTriageRulesRequest,
     ) -> Result<TriageRuleSetPreviewResult, CliError> {
         self.post(http_paths::TASK_BOARD_TRIAGE_RULES_PREVIEW, request)
+    }
+
+    /// Report a triage escalation verdict. No control-plane session
+    /// authentication is involved -- the request body's `verdict_token` is
+    /// the entire credential, matching the endpoint's own auth contract
+    /// (see `TaskBoardTriageEscalationVerdictRequest`).
+    pub fn report_task_board_triage_escalation_verdict(
+        &self,
+        escalation_id: &str,
+        request: &TaskBoardTriageEscalationVerdictRequest,
+    ) -> Result<TaskBoardTriageEscalationVerdictResponse, CliError> {
+        self.post(&triage_escalation_verdict_path(escalation_id), request)
     }
 
     pub fn activate_task_board_triage_rules(
@@ -360,97 +367,6 @@ impl DaemonClient {
         self.post(http_paths::POLICY_APPROVAL_GRANT_REVOKE, request)
     }
 
-    pub fn task_board_orchestrator_status(
-        &self,
-    ) -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
-        self.get(http_paths::TASK_BOARD_ORCHESTRATOR_STATUS)
-    }
-
-    pub fn start_task_board_orchestrator(
-        &self,
-    ) -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
-        self.post(http_paths::TASK_BOARD_ORCHESTRATOR_START, &Value::Null)
-    }
-
-    pub fn stop_task_board_orchestrator(
-        &self,
-    ) -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
-        self.post(http_paths::TASK_BOARD_ORCHESTRATOR_STOP, &Value::Null)
-    }
-
-    pub fn run_task_board_orchestrator_once(
-        &self,
-        request: &TaskBoardOrchestratorRunOnceRequest,
-    ) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
-        self.post(http_paths::TASK_BOARD_ORCHESTRATOR_RUN_ONCE, request)
-    }
-
-    pub fn task_board_automation_runs(
-        &self,
-        request: &TaskBoardAutomationHistoryRequest,
-    ) -> Result<TaskBoardAutomationRunsResponse, CliError> {
-        let limit = request.limit.map(|value| value.to_string());
-        let mut query = Vec::with_capacity(2);
-        if let Some(value) = limit.as_deref() {
-            query.push(("limit", value));
-        }
-        if let Some(value) = request.before.as_deref() {
-            query.push(("before", value));
-        }
-        self.get_with_query(http_paths::TASK_BOARD_ORCHESTRATOR_RUNS, &query)
-    }
-
-    pub fn task_board_automation_run_detail(
-        &self,
-        run_id: &str,
-    ) -> Result<TaskBoardAutomationRunDetailResponse, CliError> {
-        self.get(&automation_run_detail_path(run_id))
-    }
-
-    pub fn task_board_automation_metrics(
-        &self,
-    ) -> Result<TaskBoardAutomationMetricsResponse, CliError> {
-        self.get(http_paths::TASK_BOARD_ORCHESTRATOR_METRICS)
-    }
-
-    pub fn task_board_orchestrator_settings(
-        &self,
-    ) -> Result<TaskBoardOrchestratorSettingsResponse, CliError> {
-        self.get(http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS)
-    }
-
-    pub fn update_task_board_orchestrator_settings(
-        &self,
-        request: &TaskBoardOrchestratorSettingsUpdateRequest,
-    ) -> Result<TaskBoardOrchestratorSettingsResponse, CliError> {
-        self.put(http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS, request)
-    }
-
-    pub fn task_board_runtime_config(&self) -> Result<TaskBoardGitRuntimeConfigResponse, CliError> {
-        self.get(http_paths::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG)
-    }
-
-    pub fn update_task_board_runtime_config(
-        &self,
-        request: &TaskBoardGitRuntimeConfig,
-    ) -> Result<TaskBoardGitRuntimeConfigResponse, CliError> {
-        self.put(http_paths::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG, request)
-    }
-
-    pub fn sync_task_board_github_tokens(
-        &self,
-        request: &TaskBoardGitHubTokensSyncRequest,
-    ) -> Result<TaskBoardGitHubTokensSyncResponse, CliError> {
-        self.put(http_paths::TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS, request)
-    }
-
-    pub fn sync_task_board_todoist_token(
-        &self,
-        request: &TaskBoardTodoistTokenSyncRequest,
-    ) -> Result<TaskBoardTodoistTokenSyncResponse, CliError> {
-        self.put(http_paths::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN, request)
-    }
-
     fn get_task_board_with_status<Res: DeserializeOwned>(
         &self,
         path: &str,
@@ -468,14 +384,15 @@ fn item_path(item_id: &str) -> String {
     http_paths::TASK_BOARD_ITEM.replace("{item_id}", item_id)
 }
 
-fn automation_run_detail_path(run_id: &str) -> String {
+fn triage_escalation_verdict_path(escalation_id: &str) -> String {
     let mut base = reqwest::Url::parse("http://localhost/").expect("static URL should parse");
     base.path_segments_mut()
         .expect("static URL should accept path segments")
         .pop_if_empty()
-        .push(run_id);
-    let encoded_run_id = base.path().trim_start_matches('/');
-    http_paths::TASK_BOARD_ORCHESTRATOR_RUN_DETAIL.replace("{run_id}", encoded_run_id)
+        .push(escalation_id);
+    let encoded_escalation_id = base.path().trim_start_matches('/');
+    http_paths::TASK_BOARD_TRIAGE_ESCALATION_VERDICT
+        .replace("{escalation_id}", encoded_escalation_id)
 }
 
 fn item_action_path(item_id: &str, action: &str) -> String {

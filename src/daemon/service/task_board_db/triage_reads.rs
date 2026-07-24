@@ -21,6 +21,7 @@ pub(crate) async fn get_task_board_item_triage_current_db(
         current: read.current,
         triage_override: read.triage_override,
         effective: read.effective,
+        pending_escalation_status: read.pending_escalation_status,
     })
 }
 

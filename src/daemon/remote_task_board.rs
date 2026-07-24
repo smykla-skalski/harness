@@ -140,6 +140,7 @@ pub(crate) fn project_task_board_triage_current(
             current: response.current.map(redact_triage_record),
             triage_override: response.triage_override.map(redact_triage_override),
             effective: response.effective,
+            pending_escalation_status: response.pending_escalation_status,
         }
     } else {
         response
@@ -275,6 +276,7 @@ mod tests {
             current: Some(sample_record()),
             triage_override: None,
             effective: None,
+            pending_escalation_status: None,
         };
         let projected = project_task_board_triage_current(response, true);
         let wire = serde_json::to_value(&projected).expect("serialize viewer projection");
@@ -295,6 +297,7 @@ mod tests {
             current: Some(sample_record()),
             triage_override: None,
             effective: None,
+            pending_escalation_status: None,
         };
         let projected = project_task_board_triage_current(response, false);
         let current = projected.current.expect("current decision");
@@ -311,6 +314,7 @@ mod tests {
             current: None,
             triage_override: Some(sample_override()),
             effective: None,
+            pending_escalation_status: None,
         };
         let projected = project_task_board_triage_current(response, true);
         let wire = serde_json::to_value(&projected).expect("serialize viewer projection");
@@ -333,6 +337,7 @@ mod tests {
             current: None,
             triage_override: Some(sample_override()),
             effective: None,
+            pending_escalation_status: None,
         };
         let projected = project_task_board_triage_current(response, false);
         let triage_override = projected.triage_override.expect("override");
