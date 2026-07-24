@@ -22,6 +22,7 @@ struct TaskBoardManagementTriageSection: View {
       Text("Triage")
         .font(captionSemibold)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .accessibilityAddTraits(.isHeader)
       automaticConclusionRow
       effectiveOutcomeRow
       pendingEscalationRow
@@ -219,6 +220,7 @@ struct TaskBoardManagementTriageSection: View {
         Text("Decision History")
           .font(captionSemibold)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .accessibilityAddTraits(.isHeader)
         if inspector.didHistoryFail, inspector.historyDecisions.isEmpty {
           Button("Retry History") {
             loadHistory(reset: true)
