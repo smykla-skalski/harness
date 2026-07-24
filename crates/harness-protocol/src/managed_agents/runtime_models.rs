@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum RuntimeModelTier {
     Fast,
     Balanced,
@@ -11,7 +11,7 @@ pub enum RuntimeModelTier {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum EffortKind {
     None,
     ThinkingBudget,
@@ -19,7 +19,7 @@ pub enum EffortKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct RuntimeModel {
     pub id: String,
     pub display_name: String,
@@ -38,7 +38,7 @@ impl RuntimeModel {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct RuntimeModelCatalog {
     pub runtime: String,
     pub models: Vec<RuntimeModel>,

@@ -13,14 +13,12 @@ use axum::http::HeaderMap;
 use axum::response::Response;
 use serde::Deserialize;
 
-#[cfg(feature = "openapi")]
 use crate::daemon::agent_acp::AcpSessionListPage;
 use crate::daemon::protocol::http_paths;
 use crate::errors::CliError;
 
 use super::super::DaemonHttpState;
 use super::super::auth::require_auth;
-#[cfg(feature = "openapi")]
 use super::super::openapi::{DaemonErrorBody, OkResponse};
 use super::super::response::{extract_request_id, timed_json};
 use super::{ensure_acp_agent, ensure_acp_enabled, run_acp_agent_blocking};
@@ -32,7 +30,7 @@ pub(super) struct ListAcpSessionsQuery {
     pub(super) cursor: Option<String>,
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     get,
     path = "/v1/managed-agents/{managed_agent_id}/sessions",
     tag = "managed-agents",
@@ -45,7 +43,7 @@ pub(super) struct ListAcpSessionsQuery {
         (status = 200, description = "One page of agent-reported sessions", body = AcpSessionListPage),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn get_acp_sessions(
     Path(agent_id): Path<String>,
     Query(query): Query<ListAcpSessionsQuery>,
@@ -78,7 +76,7 @@ pub(super) async fn get_acp_sessions(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     delete,
     path = "/v1/managed-agents/{managed_agent_id}/sessions/{agent_session_id}",
     tag = "managed-agents",
@@ -90,7 +88,7 @@ pub(super) async fn get_acp_sessions(
         (status = 200, description = "Agent session deleted", body = OkResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn delete_acp_session(
     Path((agent_id, agent_session_id)): Path<(String, String)>,
     headers: HeaderMap,
@@ -121,7 +119,7 @@ pub(super) async fn delete_acp_session(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/managed-agents/{managed_agent_id}/sessions/{agent_session_id}/close",
     tag = "managed-agents",
@@ -133,7 +131,7 @@ pub(super) async fn delete_acp_session(
         (status = 200, description = "Agent session closed", body = OkResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_acp_session_close(
     Path((agent_id, agent_session_id)): Path<(String, String)>,
     headers: HeaderMap,

@@ -39,7 +39,7 @@ const REVIEWER_PERSONA: &str = "code-reviewer";
 const REVIEWER_CONSENSUS: u8 = 2;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct DispatchPlan {
     pub board_item_id: String,
     #[serde(default)]
@@ -67,7 +67,7 @@ pub struct DispatchPlan {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct DispatchExecutionSummary {
     pub plans: Vec<DispatchPlan>,
     pub applied: Vec<DispatchAppliedTask>,
@@ -76,7 +76,7 @@ pub struct DispatchExecutionSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct DispatchAppliedTask {
     pub board_item_id: String,
     pub session_id: String,
@@ -90,7 +90,7 @@ pub struct DispatchAppliedTask {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardReadOnlyWorkflowLaunch {
     pub workflow_kind: TaskBoardWorkflowKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -110,7 +110,7 @@ pub struct TaskBoardReadOnlyWorkflowLaunch {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardWriteWorkflowLaunch {
     pub workflow_kind: TaskBoardWorkflowKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -134,7 +134,7 @@ pub struct TaskBoardWriteWorkflowLaunch {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct DispatchFailure {
     pub board_item_id: String,
     pub kind: DispatchFailureKind,
@@ -143,7 +143,7 @@ pub struct DispatchFailure {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum DispatchFailureKind {
     CreateSession,
     CreateTask,
@@ -153,7 +153,7 @@ pub enum DispatchFailureKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "state", rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum DispatchReadiness {
     Ready,
     Blocked { reason: DispatchBlockReason },
@@ -161,7 +161,7 @@ pub enum DispatchReadiness {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum DispatchBlockReason {
     AlreadyLinked {
         work_item_id: String,
@@ -187,7 +187,7 @@ pub enum DispatchBlockReason {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum SessionIntent {
     Existing {
         session_id: String,
@@ -200,7 +200,7 @@ pub enum SessionIntent {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskCreationIntent {
     pub title: String,
     pub context: Option<String>,
@@ -212,13 +212,13 @@ pub struct TaskCreationIntent {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct WorkerIntent {
     pub mode: AgentMode,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewerIntent {
     pub phase: FollowUpPhase,
     pub suggested_persona: String,
@@ -226,7 +226,7 @@ pub struct ReviewerIntent {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct EvaluatorIntent {
     pub phase: FollowUpPhase,
     pub mode: AgentMode,
@@ -234,7 +234,7 @@ pub struct EvaluatorIntent {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum FollowUpPhase {
     AfterWorkerReview,
 }

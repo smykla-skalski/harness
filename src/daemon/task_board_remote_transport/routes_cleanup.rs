@@ -13,12 +13,11 @@ use super::wire::RemoteAssignmentWireState;
 use super::wire_cleanup::{RemoteCleanupObservationRequest, RemoteCleanupObservationResponse};
 use crate::daemon::db::TaskBoardRemoteAssignmentRecord;
 use crate::daemon::http::DaemonHttpState;
-#[cfg(feature = "openapi")]
 use crate::daemon::http::openapi::DaemonErrorBody;
 
 pub(crate) const CLEANUP_OBSERVATION_PATH: &str = "/v1/task-board-execution/cleanup/observe";
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/task-board-execution/cleanup/observe",
     tag = "task-board-execution",
@@ -28,7 +27,7 @@ pub(crate) const CLEANUP_OBSERVATION_PATH: &str = "/v1/task-board-execution/clea
         (status = 200, description = "Cleanup completion observation", body = RemoteCleanupObservationResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn observe_cleanup(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,

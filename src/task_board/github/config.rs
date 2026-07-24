@@ -3,14 +3,14 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct GitHubProjectConfig {
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub owner: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub repo: String,
     #[serde(default, skip_serializing_if = "empty_path")]
-    #[cfg_attr(feature = "openapi", schema(value_type = String))]
+    #[schema(value_type = String)]
     pub checkout_path: PathBuf,
     #[serde(default = "default_branch")]
     pub default_branch: String,
@@ -41,7 +41,7 @@ fn empty_path(path: &Path) -> bool {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum GitHubMergeMethod {
     #[default]
@@ -51,7 +51,7 @@ pub enum GitHubMergeMethod {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct GitHubAutomationLabels {
     pub managed: String,
     pub auto_merge: String,
@@ -60,14 +60,14 @@ pub struct GitHubAutomationLabels {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct GitHubAutomationToggles {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub enabled: Vec<GitHubAutomation>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct GitHubRequestedReviewers {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub reviewers: Vec<String>,
@@ -77,7 +77,7 @@ pub struct GitHubRequestedReviewers {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum GitHubAutomation {
     SyncTaskBoard,
     CreateBranch,
@@ -88,7 +88,7 @@ pub enum GitHubAutomation {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ProtectedPathRule {
     pub pattern: String,
 }

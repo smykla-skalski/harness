@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 /// on purpose: tokenizers only exist for these; anything else falls through to
 /// the diff-only renderer (no syntax highlighting).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HarnessCodeLanguage {
     Codeowners,

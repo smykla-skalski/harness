@@ -43,7 +43,6 @@ mod auth_audit;
 mod core;
 mod improver;
 mod managed_agents;
-#[cfg(feature = "openapi")]
 pub mod openapi;
 mod openrouter_models;
 mod recovery_snapshot_cache;

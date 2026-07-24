@@ -16,7 +16,7 @@ use std::str;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardGitIdentityDefaults {
     pub git_config: TaskBoardGitConfigDefaults,
     pub gh_cli: TaskBoardGhCliDefaults,
@@ -25,7 +25,7 @@ pub struct TaskBoardGitIdentityDefaults {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardGitConfigDefaults {
     pub user_name: Option<String>,
     pub user_email: Option<String>,
@@ -36,14 +36,14 @@ pub struct TaskBoardGitConfigDefaults {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardGhCliDefaults {
     pub github_token_present: bool,
     pub username: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardSshKeyDiscovery {
     pub path: String,
     pub mode: String,
@@ -52,7 +52,7 @@ pub struct TaskBoardSshKeyDiscovery {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardEnvDefaults {
     pub harness_github_token_present: bool,
     pub harness_todoist_token_present: bool,

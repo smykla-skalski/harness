@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct Actor {
     pub login: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -13,7 +13,7 @@ pub struct Actor {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ReviewTimelineEntry {
     IssueComment(IssueCommentEntry),
@@ -41,13 +41,13 @@ impl ReviewTimelineEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct IssueCommentEntry {
     pub id: String,
-    #[cfg_attr(feature = "openapi", schema(value_type = String, format = DateTime))]
+    #[schema(value_type = String, format = DateTime)]
     pub created_at: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "openapi", schema(value_type = Option<String>, format = DateTime))]
+    #[schema(value_type = Option<String>, format = DateTime)]
     pub updated_at: Option<DateTime<Utc>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actor: Option<Actor>,
@@ -69,10 +69,10 @@ pub struct IssueCommentEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewEntry {
     pub id: String,
-    #[cfg_attr(feature = "openapi", schema(value_type = String, format = DateTime))]
+    #[schema(value_type = String, format = DateTime)]
     pub created_at: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actor: Option<Actor>,
@@ -88,7 +88,7 @@ pub struct ReviewEntry {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ReviewState {
     Pending,
@@ -99,7 +99,7 @@ pub enum ReviewState {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewInlineCommentEntry {
     pub id: String,
     pub path: String,
@@ -112,7 +112,7 @@ pub struct ReviewInlineCommentEntry {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub diff_hunk: Option<String>,
     pub body: String,
-    #[cfg_attr(feature = "openapi", schema(value_type = String, format = DateTime))]
+    #[schema(value_type = String, format = DateTime)]
     pub created_at: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actor: Option<Actor>,
@@ -129,10 +129,10 @@ pub struct ReviewInlineCommentEntry {
     clippy::struct_excessive_bools,
     reason = "wire DTO: is_resolved/is_collapsed/outdated/comments_truncated are independent GitHub thread flags mirrored field-for-field by the Swift Monitor and the GraphQL fixtures; they are not mutually exclusive so an enum does not model them, and grouping into a sub-struct would break the serde wire shape"
 )]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewThreadEntry {
     pub id: String,
-    #[cfg_attr(feature = "openapi", schema(value_type = String, format = DateTime))]
+    #[schema(value_type = String, format = DateTime)]
     pub created_at: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actor: Option<Actor>,
@@ -158,11 +158,11 @@ pub struct ReviewThreadEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewThreadCommentEntry {
     pub id: String,
     pub body: String,
-    #[cfg_attr(feature = "openapi", schema(value_type = String, format = DateTime))]
+    #[schema(value_type = String, format = DateTime)]
     pub created_at: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actor: Option<Actor>,
@@ -171,10 +171,10 @@ pub struct ReviewThreadCommentEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct CommitEntry {
     pub id: String,
-    #[cfg_attr(feature = "openapi", schema(value_type = String, format = DateTime))]
+    #[schema(value_type = String, format = DateTime)]
     pub created_at: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actor: Option<Actor>,
@@ -182,7 +182,7 @@ pub struct CommitEntry {
     pub abbreviated_oid: String,
     pub message_headline: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "openapi", schema(value_type = Option<String>, format = DateTime))]
+    #[schema(value_type = Option<String>, format = DateTime)]
     pub committed_date: Option<DateTime<Utc>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub author_name: Option<String>,
@@ -193,10 +193,10 @@ pub struct CommitEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct HeadRefForcePushedEntry {
     pub id: String,
-    #[cfg_attr(feature = "openapi", schema(value_type = String, format = DateTime))]
+    #[schema(value_type = String, format = DateTime)]
     pub created_at: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actor: Option<Actor>,
@@ -209,10 +209,10 @@ pub struct HeadRefForcePushedEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct SimpleActorEventEntry {
     pub id: String,
-    #[cfg_attr(feature = "openapi", schema(value_type = String, format = DateTime))]
+    #[schema(value_type = String, format = DateTime)]
     pub created_at: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actor: Option<Actor>,
@@ -257,7 +257,7 @@ pub struct SimpleActorEventEntry {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SimpleActorEventKind {
     HeadRefDeleted,
@@ -302,15 +302,15 @@ pub enum SimpleActorEventKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct UnknownEntry {
     pub id: String,
-    #[cfg_attr(feature = "openapi", schema(value_type = String, format = DateTime))]
+    #[schema(value_type = String, format = DateTime)]
     pub created_at: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actor: Option<Actor>,
     pub typename: String,
     #[serde(default, skip_serializing_if = "JsonValue::is_null")]
-    #[cfg_attr(feature = "openapi", schema(value_type = Object))]
+    #[schema(value_type = Object)]
     pub raw_payload: JsonValue,
 }

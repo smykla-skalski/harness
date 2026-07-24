@@ -6,7 +6,7 @@ use super::wire::{RemoteWireError, require_canonical_time, require_text, require
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub(crate) struct RemoteHostAdvertisement {
     pub(crate) schema_version: u32,
     pub(crate) host_id: String,

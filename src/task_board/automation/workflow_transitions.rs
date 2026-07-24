@@ -29,7 +29,7 @@ const REVIEW_PHASES: [TaskBoardExecutionPhase; 4] = [
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardPullRequestIdentity {
     pub repository: String,
     pub number: u64,
@@ -38,7 +38,7 @@ pub struct TaskBoardPullRequestIdentity {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardPullRequestHeadIdentity {
     pub repository: String,
     pub branch: String,

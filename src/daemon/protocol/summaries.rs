@@ -9,7 +9,6 @@ use crate::github_api::{GitHubApiStatus, GitHubRateResource};
 use crate::hooks::protocol::payloads::AskUserQuestionPrompt;
 use crate::observe::types::{FixSafety, IssueCategory, IssueCode, IssueSeverity};
 use crate::session::service::ResolvedRuntimeSessionAgent;
-#[cfg(feature = "openapi")]
 use crate::session::types::AgentRegistrationWire;
 use crate::session::types::{
     AgentRegistration, PendingLeaderTransfer, SessionMetrics, SessionSignalRecord, SessionStatus,
@@ -23,7 +22,7 @@ use harness_protocol::managed_agents::acp::AcpRuntimeProbeResponse;
 pub const DAEMON_WIRE_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct HealthResponse {
     pub status: String,
     pub version: String,
@@ -43,7 +42,7 @@ fn default_wire_version() -> u32 {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct DaemonControlResponse {
     pub status: String,
 }
@@ -55,7 +54,7 @@ pub struct DaemonControlResponse {
 /// intentionally avoids any database query so short-lived CLI invocations can
 /// verify readiness cheaply.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReadinessResponse {
     pub ready: bool,
     pub daemon_epoch: String,
@@ -68,26 +67,26 @@ pub struct ReadinessResponse {
 /// daemon surfaces ambiguity as a `session_ambiguous` error instead of
 /// populating this response with multiple entries.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct RuntimeSessionResolutionResponse {
     pub resolved: Option<ResolvedRuntimeSessionAgent>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct LogLevelResponse {
     pub level: String,
     pub filter: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct SetLogLevelRequest {
     pub level: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct HostBridgeReconfigureRequest {
     #[serde(default)]
     pub enable: Vec<String>,
@@ -99,7 +98,7 @@ pub struct HostBridgeReconfigureRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum DaemonTelemetryKind {
     DecodeFailure,
 }
@@ -114,7 +113,7 @@ impl DaemonTelemetryKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct DaemonTelemetryRequest {
     pub kind: DaemonTelemetryKind,
     pub source: String,
@@ -124,13 +123,13 @@ pub struct DaemonTelemetryRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct DaemonTelemetryResponse {
     pub recorded_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct DaemonDiagnosticsReport {
     pub health: Option<HealthResponse>,
     pub manifest: Option<DaemonManifest>,
@@ -143,7 +142,7 @@ pub struct DaemonDiagnosticsReport {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct GitHubApiDiagnostics {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub data_revision: Option<u64>,
@@ -159,7 +158,7 @@ pub struct GitHubApiDiagnostics {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct GitHubRateBucketDiagnostics {
     pub resource: String,
     pub remaining: u32,
@@ -169,7 +168,7 @@ pub struct GitHubRateBucketDiagnostics {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct GitHubCooldownDiagnostics {
     pub resource: String,
     pub reason: String,
@@ -177,7 +176,7 @@ pub struct GitHubCooldownDiagnostics {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct GitHubOperationSpendDiagnostics {
     pub operation: String,
     pub network_requests: u64,
@@ -235,7 +234,7 @@ fn github_resource_name(resource: GitHubRateResource) -> String {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct WorktreeSummary {
     pub checkout_id: String,
     pub name: String,
@@ -246,7 +245,7 @@ pub struct WorktreeSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ProjectSummary {
     pub project_id: String,
     pub name: String,
@@ -258,7 +257,7 @@ pub struct ProjectSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct SessionSummary {
     pub project_id: String,
     pub project_name: String,
@@ -286,7 +285,7 @@ pub struct SessionSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ObserverSummary {
     pub observe_id: String,
     pub last_scan_time: String,
@@ -301,7 +300,7 @@ pub struct ObserverSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ObserverOpenIssue {
     pub issue_id: String,
     pub code: IssueCode,
@@ -317,7 +316,7 @@ pub struct ObserverOpenIssue {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ObserverActiveWorker {
     pub issue_id: String,
     pub target_file: String,
@@ -327,7 +326,7 @@ pub struct ObserverActiveWorker {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ObserverAgentSessionSummary {
     pub agent_id: String,
     pub runtime: String,
@@ -337,7 +336,7 @@ pub struct ObserverAgentSessionSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AgentPendingUserPrompt {
     pub tool_name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -351,7 +350,7 @@ pub struct AgentPendingUserPrompt {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AgentToolActivitySummary {
     pub agent_id: String,
     pub runtime: String,
@@ -366,10 +365,10 @@ pub struct AgentToolActivitySummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct SessionDetail {
     pub session: SessionSummary,
-    #[cfg_attr(feature = "openapi", schema(value_type = Vec<AgentRegistrationWire>))]
+    #[schema(value_type = Vec<AgentRegistrationWire>)]
     pub agents: Vec<AgentRegistration>,
     pub tasks: Vec<WorkItem>,
     pub signals: Vec<SessionSignalRecord>,
@@ -378,7 +377,7 @@ pub struct SessionDetail {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TimelineEntry {
     pub entry_id: String,
     pub recorded_at: String,
@@ -391,7 +390,7 @@ pub struct TimelineEntry {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TimelineCursor {
     pub recorded_at: String,
     pub entry_id: String,
@@ -412,7 +411,7 @@ pub struct TimelineWindowRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TimelineWindowResponse {
     pub revision: i64,
     pub total_count: usize,
@@ -430,7 +429,7 @@ pub struct TimelineWindowResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AcpTranscriptResponse {
     pub entries: Vec<TimelineEntry>,
 }

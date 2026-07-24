@@ -12,9 +12,7 @@ use crate::daemon::protocol::{
     PolicyScenarioDeleteRequest, PolicyScenarioUpdateRequest, http_paths,
 };
 
-#[cfg(feature = "openapi")]
 use super::super::openapi::DaemonErrorBody;
-#[cfg(feature = "openapi")]
 use crate::daemon::protocol::PolicyCanvasWorkspaceResponse;
 use super::super::response::timed_json;
 use super::super::{DaemonHttpState, require_async_db, task_board_route_executor};
@@ -68,7 +66,7 @@ pub(super) fn merge_policy_routes(router: Router<DaemonHttpState>) -> Router<Dae
         )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     get,
     path = "/v1/policy-canvases",
     tag = "policy",
@@ -76,7 +74,7 @@ pub(super) fn merge_policy_routes(router: Router<DaemonHttpState>) -> Router<Dae
         (status = 200, description = "The full policy-canvas workspace", body = PolicyCanvasWorkspaceResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn get_policy_canvas_workspace(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -98,7 +96,7 @@ pub(super) async fn get_policy_canvas_workspace(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/policy-canvases/create",
     tag = "policy",
@@ -107,7 +105,7 @@ pub(super) async fn get_policy_canvas_workspace(
         (status = 200, description = "Workspace after creating the canvas", body = PolicyCanvasWorkspaceResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_policy_canvas_create(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -130,7 +128,7 @@ pub(super) async fn post_policy_canvas_create(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/policy-canvases/duplicate",
     tag = "policy",
@@ -139,7 +137,7 @@ pub(super) async fn post_policy_canvas_create(
         (status = 200, description = "Workspace after duplicating the canvas", body = PolicyCanvasWorkspaceResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_policy_canvas_duplicate(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -162,7 +160,7 @@ pub(super) async fn post_policy_canvas_duplicate(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/policy-canvases/rename",
     tag = "policy",
@@ -171,7 +169,7 @@ pub(super) async fn post_policy_canvas_duplicate(
         (status = 200, description = "Workspace after renaming the canvas", body = PolicyCanvasWorkspaceResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_policy_canvas_rename(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -194,7 +192,7 @@ pub(super) async fn post_policy_canvas_rename(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/policy-canvases/active",
     tag = "policy",
@@ -203,7 +201,7 @@ pub(super) async fn post_policy_canvas_rename(
         (status = 200, description = "Workspace after selecting the active canvas", body = PolicyCanvasWorkspaceResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_policy_canvas_set_active(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -226,7 +224,7 @@ pub(super) async fn post_policy_canvas_set_active(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/policy-canvases/delete",
     tag = "policy",
@@ -235,7 +233,7 @@ pub(super) async fn post_policy_canvas_set_active(
         (status = 200, description = "Workspace after deleting the canvas", body = PolicyCanvasWorkspaceResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_policy_canvas_delete(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -258,7 +256,7 @@ pub(super) async fn post_policy_canvas_delete(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/policy-canvases/global-enforcement",
     tag = "policy",
@@ -267,7 +265,7 @@ pub(super) async fn post_policy_canvas_delete(
         (status = 200, description = "Workspace after toggling global enforcement", body = PolicyCanvasWorkspaceResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_policy_canvas_set_global_enforcement(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -292,7 +290,7 @@ pub(super) async fn post_policy_canvas_set_global_enforcement(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/policy-scenarios/create",
     tag = "policy",
@@ -301,7 +299,7 @@ pub(super) async fn post_policy_canvas_set_global_enforcement(
         (status = 200, description = "Workspace after creating the scenario", body = PolicyCanvasWorkspaceResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_policy_scenario_create(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -324,7 +322,7 @@ pub(super) async fn post_policy_scenario_create(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/policy-scenarios/update",
     tag = "policy",
@@ -333,7 +331,7 @@ pub(super) async fn post_policy_scenario_create(
         (status = 200, description = "Workspace after updating the scenario", body = PolicyCanvasWorkspaceResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_policy_scenario_update(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -356,7 +354,7 @@ pub(super) async fn post_policy_scenario_update(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/policy-scenarios/delete",
     tag = "policy",
@@ -365,7 +363,7 @@ pub(super) async fn post_policy_scenario_update(
         (status = 200, description = "Workspace after deleting the scenario", body = PolicyCanvasWorkspaceResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_policy_scenario_delete(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -388,7 +386,7 @@ pub(super) async fn post_policy_scenario_delete(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/policy-scenarios/reset",
     tag = "policy",
@@ -396,7 +394,7 @@ pub(super) async fn post_policy_scenario_delete(
         (status = 200, description = "Workspace after resetting scenarios to the built-in set", body = PolicyCanvasWorkspaceResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_policy_scenario_reset(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,

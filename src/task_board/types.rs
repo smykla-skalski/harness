@@ -1,14 +1,10 @@
-#[cfg(feature = "openapi")]
 use std::borrow::Cow;
 
 use clap::ValueEnum;
 use clap::builder::PossibleValue;
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "openapi")]
 use utoipa::openapi::schema::{Schema, Type};
-#[cfg(feature = "openapi")]
 use utoipa::openapi::{ObjectBuilder, RefOr};
-#[cfg(feature = "openapi")]
 use utoipa::{PartialSchema, ToSchema};
 
 use super::automation::TaskBoardWorkflowKind;
@@ -21,7 +17,7 @@ pub const CURRENT_TASK_BOARD_ITEM_VERSION: u32 = 1;
 pub const MAX_TASK_BOARD_ESTIMATE: u64 = i64::MAX as u64;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardItem {
     pub schema_version: u32,
     pub id: String,
@@ -88,7 +84,7 @@ pub struct TaskBoardItem {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum TaskBoardTombstoneCause {
     Manual,
     ProviderExclusion,
@@ -139,7 +135,7 @@ impl TaskBoardItem {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardWorkflowState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_id: Option<String>,
@@ -188,7 +184,7 @@ impl TaskBoardWorkflowState {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
 #[value(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum TaskBoardWorkflowStatus {
     #[default]
     Idle,
@@ -204,7 +200,7 @@ pub enum TaskBoardWorkflowStatus {
 )]
 #[value(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum TaskBoardStatus {
     Backlog,
     #[default]
@@ -295,7 +291,6 @@ impl<'de> Deserialize<'de> for TaskBoardItemKind {
 // bare string, not a tagged enum), and a `value_type` override is rejected on
 // an enum-variant field such as `DispatchBlockReason::Kind`, so the type owns a
 // manual `{type: string}` component that references cleanly from every use.
-#[cfg(feature = "openapi")]
 impl PartialSchema for TaskBoardItemKind {
     fn schema() -> RefOr<Schema> {
         ObjectBuilder::new()
@@ -307,7 +302,6 @@ impl PartialSchema for TaskBoardItemKind {
     }
 }
 
-#[cfg(feature = "openapi")]
 impl ToSchema for TaskBoardItemKind {
     fn name() -> Cow<'static, str> {
         Cow::Borrowed("TaskBoardItemKind")
@@ -346,7 +340,7 @@ impl TaskBoardStatus {
 )]
 #[value(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum TaskBoardPriority {
     Low,
     #[default]
@@ -358,7 +352,7 @@ pub enum TaskBoardPriority {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
 #[value(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum AgentMode {
     #[default]
     Headless,

@@ -9,7 +9,7 @@ const MAX_OVERRIDE_REASON_BYTES: usize = 256;
 /// later evaluator sharing [`effective_triage_outcome`] -- for one item,
 /// persisted independently of `lane_origin` provenance.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardTriageOverride {
     pub verdict: TriageVerdict,
     pub actor: String,
@@ -38,7 +38,7 @@ pub fn is_canonical_override_reason(value: &str) -> bool {
 /// item's placement.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum TaskBoardTriageEffectiveSource {
     Override,
     Automatic,
@@ -47,7 +47,7 @@ pub enum TaskBoardTriageEffectiveSource {
 /// The verdict that actually governs an item's placement right now, and
 /// which side decided it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardTriageEffectiveOutcome {
     pub verdict: TriageVerdict,
     pub source: TaskBoardTriageEffectiveSource,

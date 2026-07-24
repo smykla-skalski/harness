@@ -18,9 +18,7 @@ use super::DaemonHttpState;
 use super::auth::authorize_control_request;
 use super::response::{extract_request_id, timed_json};
 
-#[cfg(feature = "openapi")]
 use super::openapi::DaemonErrorBody;
-#[cfg(feature = "openapi")]
 use crate::daemon::protocol::{VoiceSessionMutationResponse, VoiceSessionStartResponse};
 
 pub(super) fn voice_routes() -> Router<DaemonHttpState> {
@@ -34,7 +32,7 @@ pub(super) fn voice_routes() -> Router<DaemonHttpState> {
         .route(http_paths::VOICE_FINISH, post(post_voice_finish))
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/sessions/{session_id}/voice-sessions",
     tag = "voice",
@@ -44,7 +42,7 @@ pub(super) fn voice_routes() -> Router<DaemonHttpState> {
         (status = 200, description = "Voice session started", body = VoiceSessionStartResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn post_voice_session(
     Path(session_id): Path<String>,
     headers: HeaderMap,
@@ -65,7 +63,7 @@ async fn post_voice_session(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/voice-sessions/{voice_session_id}/audio",
     tag = "voice",
@@ -75,7 +73,7 @@ async fn post_voice_session(
         (status = 200, description = "Audio chunk accepted", body = VoiceSessionMutationResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn post_voice_audio_chunk(
     Path(voice_session_id): Path<String>,
     headers: HeaderMap,
@@ -96,7 +94,7 @@ async fn post_voice_audio_chunk(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/voice-sessions/{voice_session_id}/transcript",
     tag = "voice",
@@ -106,7 +104,7 @@ async fn post_voice_audio_chunk(
         (status = 200, description = "Transcript segment recorded", body = VoiceSessionMutationResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn post_voice_transcript(
     Path(voice_session_id): Path<String>,
     headers: HeaderMap,
@@ -127,7 +125,7 @@ async fn post_voice_transcript(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/voice-sessions/{voice_session_id}/finish",
     tag = "voice",
@@ -137,7 +135,7 @@ async fn post_voice_transcript(
         (status = 200, description = "Voice session finished", body = VoiceSessionMutationResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn post_voice_finish(
     Path(voice_session_id): Path<String>,
     headers: HeaderMap,

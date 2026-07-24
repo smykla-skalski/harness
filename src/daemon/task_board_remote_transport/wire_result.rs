@@ -12,7 +12,7 @@ pub(crate) const MAX_REMOTE_TYPED_RESULT_BYTES: usize = 2 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub(crate) struct RemoteTypedResult {
     pub(crate) offer_request_sha256: String,
     pub(crate) result: TaskBoardLocalAttemptResult,

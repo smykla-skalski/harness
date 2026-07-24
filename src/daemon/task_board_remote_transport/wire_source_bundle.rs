@@ -16,7 +16,7 @@ const SOURCE_BUNDLE_RESPONSE_DOMAIN: &str = "harness.task-board.remote-source-bu
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub(crate) struct RemoteSourceBundleUploadRequest {
     pub(crate) schema_version: u32,
     pub(crate) offer: RemoteOfferRequest,
@@ -26,7 +26,7 @@ pub(crate) struct RemoteSourceBundleUploadRequest {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub(crate) struct RemoteSourceBundleUploadResponse {
     pub(crate) schema_version: u32,
     pub(crate) binding: RemoteAttemptBinding,

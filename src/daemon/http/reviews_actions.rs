@@ -18,7 +18,6 @@ use crate::daemon::service;
 
 use super::DaemonHttpState;
 use super::auth::require_auth;
-#[cfg(feature = "openapi")]
 use super::openapi::DaemonErrorBody;
 use super::response::{extract_request_id, timed_json};
 
@@ -39,7 +38,7 @@ pub(super) fn merge_action_routes(router: Router<DaemonHttpState>) -> Router<Dae
         .route(http_paths::REVIEWS_COMMENT, post(post_comment_reviews))
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/approve",
     tag = "reviews",
@@ -48,7 +47,7 @@ pub(super) fn merge_action_routes(router: Router<DaemonHttpState>) -> Router<Dae
         (status = 200, description = "Outcome of applying the approvals", body = crate::daemon::protocol::ReviewsActionResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_approve_reviews(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -69,7 +68,7 @@ pub(super) async fn post_approve_reviews(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/merge",
     tag = "reviews",
@@ -78,7 +77,7 @@ pub(super) async fn post_approve_reviews(
         (status = 200, description = "Outcome of merging the targets", body = crate::daemon::protocol::ReviewsActionResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_merge_reviews(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -93,7 +92,7 @@ pub(super) async fn post_merge_reviews(
     timed_json("POST", http_paths::REVIEWS_MERGE, &request_id, start, result)
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/rerun-checks",
     tag = "reviews",
@@ -102,7 +101,7 @@ pub(super) async fn post_merge_reviews(
         (status = 200, description = "Outcome of re-running the failed checks", body = crate::daemon::protocol::ReviewsActionResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_rerun_reviews_checks(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -123,7 +122,7 @@ pub(super) async fn post_rerun_reviews_checks(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/labels",
     tag = "reviews",
@@ -132,7 +131,7 @@ pub(super) async fn post_rerun_reviews_checks(
         (status = 200, description = "Outcome of adding the label", body = crate::daemon::protocol::ReviewsActionResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_label_reviews(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -153,7 +152,7 @@ pub(super) async fn post_label_reviews(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/auto",
     tag = "reviews",
@@ -162,7 +161,7 @@ pub(super) async fn post_label_reviews(
         (status = 200, description = "Outcome of the automatic approve-and-merge pass", body = crate::daemon::protocol::ReviewsActionResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_auto_reviews(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -177,7 +176,7 @@ pub(super) async fn post_auto_reviews(
     timed_json("POST", http_paths::REVIEWS_AUTO, &request_id, start, result)
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/request-review",
     tag = "reviews",
@@ -186,7 +185,7 @@ pub(super) async fn post_auto_reviews(
         (status = 200, description = "Outcome of re-requesting review", body = crate::daemon::protocol::ReviewsActionResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_request_review(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -207,7 +206,7 @@ pub(super) async fn post_request_review(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/comment",
     tag = "reviews",
@@ -216,7 +215,7 @@ pub(super) async fn post_request_review(
         (status = 200, description = "Outcome of posting the comment", body = crate::daemon::protocol::ReviewsActionResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_comment_reviews(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,

@@ -16,7 +16,7 @@ use super::store_canvas::simulation_inputs;
 /// A named simulation case. `seeded` marks the built-in baseline scenarios so the
 /// UI can distinguish them and `reset` can restore them.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct PolicyScenario {
     pub id: String,
     pub name: String,

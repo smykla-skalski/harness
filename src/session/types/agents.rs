@@ -25,7 +25,6 @@ use super::identity::{AgentDescriptorId, ManagedAgentId, RuntimeSessionId, Sessi
 use crate::agents::runtime::RuntimeCapabilities;
 mod wire;
 pub use wire::AgentRegistrationWire;
-#[cfg(feature = "openapi")]
 pub use wire::AgentStatusSchema;
 
 /// Stable reference to a daemon-managed agent instance that owns this session registration.
@@ -69,7 +68,7 @@ impl ManagedAgentRef {
 /// Transport family for a daemon-managed agent reference.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum ManagedAgentKind {
     Tui,
     Acp,
@@ -179,7 +178,7 @@ impl AgentRegistration {
 
 /// A pending leadership transfer initiated by a non-leader actor.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct PendingLeaderTransfer {
     pub requested_by: String,
     pub current_leader_id: String,
@@ -192,7 +191,7 @@ pub struct PendingLeaderTransfer {
 /// Role an agent holds within a session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum SessionRole {
     Leader,
     Observer,
@@ -385,7 +384,7 @@ impl AgentStatus {
 /// Icon source for a persona, supporting system SF Symbols or bundled assets.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum PersonaSymbol {
     /// A system SF Symbol identified by name (e.g. `magnifyingglass.circle.fill`).
     SfSymbol { name: String },
@@ -395,7 +394,7 @@ pub enum PersonaSymbol {
 
 /// A predefined agent definition that shapes an agent's role and focus.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AgentPersona {
     /// Unique slug (e.g. `code-reviewer`, `test-writer`).
     pub identifier: String,

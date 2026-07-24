@@ -6,20 +6,17 @@ use axum::http::HeaderMap;
 use axum::response::Response;
 
 use crate::daemon::agent_acp::AcpAgentStartRequest;
-#[cfg(feature = "openapi")]
 use crate::daemon::agent_acp::AcpAgentStartRequestSchema;
 use crate::daemon::protocol::{ManagedAgentSnapshot, http_paths};
-#[cfg(feature = "openapi")]
 use crate::daemon::protocol::ManagedAgentSnapshotSchema;
 
 use super::super::DaemonHttpState;
 use super::super::auth::require_auth;
-#[cfg(feature = "openapi")]
 use super::super::openapi::DaemonErrorBody;
 use super::super::response::{extract_request_id, timed_json};
 use super::{ensure_acp_enabled, run_acp_agent_blocking};
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/sessions/{session_id}/managed-agents/acp",
     tag = "managed-agents",
@@ -31,7 +28,7 @@ use super::{ensure_acp_enabled, run_acp_agent_blocking};
         (status = 200, description = "Started ACP managed agent", body = ManagedAgentSnapshotSchema),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_acp_agent_start(
     Path(session_id): Path<String>,
     headers: HeaderMap,

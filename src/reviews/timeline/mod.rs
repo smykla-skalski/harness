@@ -51,7 +51,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsTimelineRequest {
     pub pull_request_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -61,12 +61,12 @@ pub struct ReviewsTimelineRequest {
     #[serde(default)]
     pub force_refresh: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "openapi", schema(value_type = Option<String>, format = DateTime))]
+    #[schema(value_type = Option<String>, format = DateTime)]
     pub pull_request_updated_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum TimelinePageDirection {
     Older,
@@ -74,18 +74,18 @@ pub enum TimelinePageDirection {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsTimelineResponse {
     pub pull_request_id: String,
     pub entries: Vec<ReviewTimelineEntry>,
     pub page_info: TimelinePageInfo,
     pub viewer_can_comment: bool,
-    #[cfg_attr(feature = "openapi", schema(value_type = String, format = DateTime))]
+    #[schema(value_type = String, format = DateTime)]
     pub fetched_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TimelinePageInfo {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start_cursor: Option<String>,

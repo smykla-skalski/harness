@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 
 use crate::daemon::agent_acp::AcpAgentSnapshot;
-#[cfg(feature = "openapi")]
 use crate::daemon::agent_acp::AcpAgentSnapshotSchema;
 use crate::daemon::agent_tui::AgentTuiSnapshot;
 use crate::session::types::{HarnessSessionId, ManagedAgentId, SessionAgentId};
@@ -20,7 +19,6 @@ pub enum ManagedAgentSnapshot {
 /// enum variant's inner type, and the `Acp` variant hand-serializes its identity
 /// fields, so this mirror points that variant at [`AcpAgentSnapshotSchema`]. It
 /// is referenced from the handlers via `body = ManagedAgentSnapshotSchema`.
-#[cfg(feature = "openapi")]
 #[derive(serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", content = "snapshot")]
 pub enum ManagedAgentSnapshotSchema {
@@ -87,9 +85,9 @@ impl ManagedAgentSnapshot {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ManagedAgentListResponse {
-    #[cfg_attr(feature = "openapi", schema(value_type = Vec<ManagedAgentSnapshotSchema>))]
+    #[schema(value_type = Vec<ManagedAgentSnapshotSchema>)]
     pub agents: Vec<ManagedAgentSnapshot>,
 }
 

@@ -10,16 +10,13 @@ use crate::daemon::protocol::{
     TaskBoardGitSigningVerifyRequest, TaskBoardOpenRouterTokenSyncRequest,
     TaskBoardTodoistTokenSyncRequest, http_paths,
 };
-#[cfg(feature = "openapi")]
 use crate::task_board::{
     TaskBoardGitHubTokensSyncResponse, TaskBoardGitIdentityDefaults,
     TaskBoardOpenRouterTokenSyncResponse, TaskBoardTodoistTokenSyncResponse,
 };
 
 use super::DaemonHttpState;
-#[cfg(feature = "openapi")]
 use super::openapi::DaemonErrorBody;
-#[cfg(feature = "openapi")]
 use crate::daemon::protocol::{
     TaskBoardGitRuntimeKeyMaterialSyncResponse, TaskBoardGitRuntimeSecretHandoffAckResponse,
     TaskBoardGitRuntimeSecretHandoffPrepareResponse, TaskBoardGitSigningVerifyResponse,
@@ -73,7 +70,7 @@ pub(super) fn merge_git_routes(router: Router<DaemonHttpState>) -> Router<Daemon
         )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     get,
     path = "/v1/task-board/orchestrator/runtime-config",
     tag = "task-board",
@@ -81,7 +78,7 @@ pub(super) fn merge_git_routes(router: Router<DaemonHttpState>) -> Router<Daemon
         (status = 200, description = "Current git runtime configuration", body = TaskBoardGitRuntimeConfig),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn get_task_board_orchestrator_runtime_config(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -99,7 +96,7 @@ async fn get_task_board_orchestrator_runtime_config(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     put,
     path = "/v1/task-board/orchestrator/runtime-config",
     tag = "task-board",
@@ -108,7 +105,7 @@ async fn get_task_board_orchestrator_runtime_config(
         (status = 200, description = "Git runtime configuration after the update", body = TaskBoardGitRuntimeConfig),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn put_task_board_orchestrator_runtime_config(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -127,7 +124,7 @@ async fn put_task_board_orchestrator_runtime_config(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     put,
     path = "/v1/task-board/orchestrator/github-tokens",
     tag = "task-board",
@@ -136,7 +133,7 @@ async fn put_task_board_orchestrator_runtime_config(
         (status = 200, description = "Outcome of syncing GitHub repository tokens", body = TaskBoardGitHubTokensSyncResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn put_task_board_orchestrator_github_tokens(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -155,7 +152,7 @@ async fn put_task_board_orchestrator_github_tokens(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     put,
     path = "/v1/task-board/orchestrator/todoist-token",
     tag = "task-board",
@@ -164,7 +161,7 @@ async fn put_task_board_orchestrator_github_tokens(
         (status = 200, description = "Outcome of syncing the Todoist token", body = TaskBoardTodoistTokenSyncResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn put_task_board_orchestrator_todoist_token(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -183,7 +180,7 @@ async fn put_task_board_orchestrator_todoist_token(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     put,
     path = "/v1/task-board/orchestrator/openrouter-token",
     tag = "task-board",
@@ -192,7 +189,7 @@ async fn put_task_board_orchestrator_todoist_token(
         (status = 200, description = "Outcome of syncing the OpenRouter token", body = TaskBoardOpenRouterTokenSyncResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn put_task_board_orchestrator_openrouter_token(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -211,7 +208,7 @@ async fn put_task_board_orchestrator_openrouter_token(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     get,
     path = "/v1/task-board/git/identity-defaults",
     tag = "task-board",
@@ -219,7 +216,7 @@ async fn put_task_board_orchestrator_openrouter_token(
         (status = 200, description = "Discovered git identity and signing defaults", body = TaskBoardGitIdentityDefaults),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn get_task_board_git_identity_defaults(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -237,7 +234,7 @@ async fn get_task_board_git_identity_defaults(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/task-board/git/signing/verify",
     tag = "task-board",
@@ -246,7 +243,7 @@ async fn get_task_board_git_identity_defaults(
         (status = 200, description = "Result of verifying git commit signing", body = TaskBoardGitSigningVerifyResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn post_task_board_git_signing_verify(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -265,7 +262,7 @@ async fn post_task_board_git_signing_verify(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     put,
     path = "/v1/task-board/git/runtime/key-material",
     tag = "task-board",
@@ -274,7 +271,7 @@ async fn post_task_board_git_signing_verify(
         (status = 200, description = "Outcome of syncing git runtime key material", body = TaskBoardGitRuntimeKeyMaterialSyncResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn put_task_board_git_runtime_key_material(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -293,7 +290,7 @@ async fn put_task_board_git_runtime_key_material(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/task-board/git/runtime/secret-handoff/prepare",
     tag = "task-board",
@@ -301,7 +298,7 @@ async fn put_task_board_git_runtime_key_material(
         (status = 200, description = "Prepared secret-handoff envelope", body = TaskBoardGitRuntimeSecretHandoffPrepareResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn post_task_board_git_runtime_secret_handoff_prepare(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -319,7 +316,7 @@ async fn post_task_board_git_runtime_secret_handoff_prepare(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/task-board/git/runtime/secret-handoff/ack",
     tag = "task-board",
@@ -328,7 +325,7 @@ async fn post_task_board_git_runtime_secret_handoff_prepare(
         (status = 200, description = "Result of acknowledging the secret handoff", body = TaskBoardGitRuntimeSecretHandoffAckResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn post_task_board_git_runtime_secret_handoff_ack(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,

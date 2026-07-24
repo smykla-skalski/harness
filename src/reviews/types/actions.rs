@@ -15,14 +15,14 @@ use super::super::timeline;
 use super::ReviewItem;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsApproveRequest {
     pub targets: Vec<ReviewTarget>,
     pub source: ReviewsApproveRequestSource,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ReviewsApproveRequestSource {
     Direct,
@@ -30,7 +30,7 @@ pub enum ReviewsApproveRequestSource {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsMergeRequest {
     pub targets: Vec<ReviewTarget>,
     #[serde(default)]
@@ -38,20 +38,20 @@ pub struct ReviewsMergeRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsRerunChecksRequest {
     pub targets: Vec<ReviewTarget>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsLabelRequest {
     pub targets: Vec<ReviewTarget>,
     pub label: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsAutoRequest {
     pub targets: Vec<ReviewTarget>,
     #[serde(default)]
@@ -59,7 +59,7 @@ pub struct ReviewsAutoRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsCommentRequest {
     pub targets: Vec<ReviewTarget>,
     pub body: String,
@@ -71,7 +71,7 @@ pub struct ReviewsCommentRequest {
 /// requested changes), this drops them back into the requested-reviewers
 /// list so they get notified to look again.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsRequestReviewRequest {
     pub targets: Vec<ReviewTarget>,
     pub reviewer_login: String,
@@ -79,7 +79,7 @@ pub struct ReviewsRequestReviewRequest {
 
 /// Action-related feature flags for [`ReviewsCapabilitiesResponse`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsActionCapabilities {
     #[serde(default)]
     pub supports_action_preview: bool,
@@ -90,7 +90,7 @@ pub struct ReviewsActionCapabilities {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsCapabilitiesResponse {
     pub schema_version: u32,
     #[serde(flatten)]
@@ -100,7 +100,7 @@ pub struct ReviewsCapabilitiesResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsActionPreviewRequest {
     pub action: ReviewActionPreviewKind,
     pub targets: Vec<ReviewTarget>,
@@ -109,7 +109,7 @@ pub struct ReviewsActionPreviewRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsActionPreviewResponse {
     pub action: ReviewActionPreviewKind,
     pub capabilities: ReviewsCapabilitiesResponse,
@@ -123,7 +123,7 @@ pub struct ReviewsActionPreviewResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewActionPreviewTarget {
     pub pull_request_id: String,
     pub repository: String,
@@ -136,7 +136,7 @@ pub struct ReviewActionPreviewTarget {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsActionResponse {
     pub summary: String,
     #[serde(default)]
@@ -144,13 +144,13 @@ pub struct ReviewsActionResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsCacheClearResponse {
     pub cleared_entries: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsRefreshRequest {
     #[serde(default)]
     pub targets: Vec<ReviewTarget>,
@@ -164,7 +164,7 @@ pub struct ReviewsRefreshRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsRefreshResponse {
     pub fetched_at: String,
     #[serde(default)]
@@ -174,7 +174,7 @@ pub struct ReviewsRefreshResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsBodyRequest {
     pub pull_request_id: String,
     #[serde(default)]
@@ -184,11 +184,11 @@ pub struct ReviewsBodyRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsBodyResponse {
     pub pull_request_id: String,
     pub body: String,
-    #[cfg_attr(feature = "openapi", schema(value_type = String, format = DateTime))]
+    #[schema(value_type = String, format = DateTime)]
     pub pr_updated_at: DateTime<Utc>,
     pub fetched_at: String,
     pub from_cache: bool,
@@ -196,7 +196,7 @@ pub struct ReviewsBodyResponse {
 
 /// State flags embedded in [`ReviewTarget`] (at most 3 booleans).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewTargetFlags {
     #[serde(default)]
     pub is_draft: bool,
@@ -207,7 +207,7 @@ pub struct ReviewTargetFlags {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewTarget {
     pub pull_request_id: String,
     pub repository_id: String,
@@ -239,7 +239,7 @@ pub struct ReviewTarget {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewActionResult {
     pub repository: String,
     pub number: u64,

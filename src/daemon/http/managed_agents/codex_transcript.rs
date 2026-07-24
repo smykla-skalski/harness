@@ -6,13 +6,11 @@ use axum::response::Response;
 use serde::Deserialize;
 
 use crate::daemon::protocol::http_paths;
-#[cfg(feature = "openapi")]
 use crate::daemon::protocol::CodexTranscriptResponse;
 use crate::errors::{CliError, CliErrorKind};
 
 use super::super::DaemonHttpState;
 use super::super::auth::require_auth;
-#[cfg(feature = "openapi")]
 use super::super::openapi::DaemonErrorBody;
 use super::super::response::{extract_request_id, timed_json};
 
@@ -22,7 +20,7 @@ pub(super) struct CodexTranscriptQuery {
     session_id: Option<String>,
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     get,
     path = "/v1/managed-agents/codex/transcript",
     tag = "managed-agents",
@@ -33,7 +31,7 @@ pub(super) struct CodexTranscriptQuery {
         (status = 200, description = "Codex agent transcript entries", body = CodexTranscriptResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn get_codex_transcript(
     Query(query): Query<CodexTranscriptQuery>,
     headers: HeaderMap,

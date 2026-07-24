@@ -12,7 +12,7 @@ use super::policy::PolicyApprovalGrant;
 use super::types::{AgentMode, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardAuditSummary {
     pub total: usize,
     pub ready: usize,
@@ -22,14 +22,14 @@ pub struct TaskBoardAuditSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardStatusCount {
     pub status: TaskBoardStatus,
     pub count: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardSyncSummary {
     pub total: usize,
     pub providers: Vec<TaskBoardProviderSyncSummary>,
@@ -38,7 +38,7 @@ pub struct TaskBoardSyncSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardProviderSyncSummary {
     pub provider: ExternalProvider,
     pub configured: bool,
@@ -49,7 +49,7 @@ pub struct TaskBoardProviderSyncSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardProjectSummary {
     pub project_id: String,
     pub item_count: usize,
@@ -57,7 +57,7 @@ pub struct TaskBoardProjectSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardMachineSummary {
     pub mode: AgentMode,
     pub item_count: usize,

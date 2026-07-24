@@ -8,7 +8,7 @@ use crate::session::types::{
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct RoleChangeRequest {
     pub actor: String,
     pub role: SessionRole,
@@ -16,13 +16,13 @@ pub struct RoleChangeRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AgentRemoveRequest {
     pub actor: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct LeaderTransferRequest {
     pub actor: String,
     pub new_leader_id: String,
@@ -30,7 +30,7 @@ pub struct LeaderTransferRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskCreateRequest {
     pub actor: String,
     pub title: String,
@@ -40,20 +40,20 @@ pub struct TaskCreateRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskDeleteRequest {
     pub actor: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskAssignRequest {
     pub actor: String,
     pub agent_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskDropRequest {
     pub actor: String,
     pub target: TaskDropTarget,
@@ -64,21 +64,21 @@ pub struct TaskDropRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 #[serde(tag = "target_type", rename_all = "snake_case")]
 pub enum TaskDropTarget {
     Agent { agent_id: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskQueuePolicyRequest {
     pub actor: String,
     pub queue_policy: TaskQueuePolicy,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskUpdateRequest {
     pub actor: String,
     pub status: TaskStatus,
@@ -86,42 +86,42 @@ pub struct TaskUpdateRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskCheckpointRequest {
     pub actor: String,
     pub summary: String,
     // The daemon rejects progress above 100 (`ensure_valid_progress`); bound
     // the schema so a generated client sees the ceiling it must not exceed.
-    #[cfg_attr(feature = "openapi", schema(maximum = 100))]
+    #[schema(maximum = 100)]
     pub progress: u8,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct SessionEndRequest {
     pub actor: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct SessionArchiveRequest {
     pub actor: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct SessionLeaveRequest {
     pub agent_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct SessionTitleRequest {
     pub title: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct SignalSendRequest {
     pub actor: String,
     pub agent_id: String,
@@ -131,13 +131,13 @@ pub struct SignalSendRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ObserveSessionRequest {
     pub actor: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct SessionStartRequest {
     #[serde(default)]
     pub title: String,
@@ -152,7 +152,7 @@ pub struct SessionStartRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct SessionJoinRequest {
     pub runtime: String,
     pub role: SessionRole,
@@ -169,7 +169,7 @@ pub struct SessionJoinRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct SignalAckRequest {
     pub agent_id: String,
     pub signal_id: String,
@@ -178,7 +178,7 @@ pub struct SignalAckRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct SignalCancelRequest {
     pub actor: String,
     pub agent_id: String,
@@ -186,7 +186,7 @@ pub struct SignalCancelRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskSubmitForReviewRequest {
     pub actor: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -196,13 +196,13 @@ pub struct TaskSubmitForReviewRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskClaimReviewRequest {
     pub actor: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskSubmitReviewRequest {
     pub actor: String,
     pub verdict: ReviewVerdict,
@@ -212,7 +212,7 @@ pub struct TaskSubmitReviewRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskRespondReviewRequest {
     pub actor: String,
     #[serde(default)]
@@ -224,7 +224,7 @@ pub struct TaskRespondReviewRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskArbitrateRequest {
     pub actor: String,
     pub verdict: ReviewVerdict,
@@ -232,7 +232,7 @@ pub struct TaskArbitrateRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ImproverApplyRequest {
     pub actor: String,
     pub issue_id: String,
@@ -245,20 +245,20 @@ pub struct ImproverApplyRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct SessionMutationResponse {
     pub state: SessionState,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct SessionArchiveResponse {
     pub session_id: String,
     pub archived_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AdoptSessionRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bookmark_id: Option<String>,
@@ -266,7 +266,7 @@ pub struct AdoptSessionRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AgentRuntimeSessionRegistrationRequest {
     pub managed_agent_id: String,
     pub runtime: String,
@@ -295,7 +295,7 @@ mod tests {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AgentRuntimeSessionRegistrationResponse {
     pub registered: bool,
 }

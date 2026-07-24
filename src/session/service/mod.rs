@@ -52,7 +52,7 @@ pub struct TaskSpec<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ResolvedRuntimeSessionAgent {
     pub orchestration_session_id: String,
     pub session_agent_id: String,

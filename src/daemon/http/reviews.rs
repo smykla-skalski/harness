@@ -16,7 +16,6 @@ use crate::daemon::service;
 
 use super::DaemonHttpState;
 use super::auth::require_auth;
-#[cfg(feature = "openapi")]
 use super::openapi::DaemonErrorBody;
 use super::response::{extract_request_id, timed_json};
 
@@ -66,7 +65,7 @@ pub(super) fn reviews_routes() -> Router<DaemonHttpState> {
         )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     get,
     path = "/v1/reviews/capabilities",
     tag = "reviews",
@@ -74,7 +73,7 @@ pub(super) fn reviews_routes() -> Router<DaemonHttpState> {
         (status = 200, description = "Feature flags for the review tooling", body = crate::daemon::protocol::ReviewsCapabilitiesResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn get_review_capabilities(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -93,7 +92,7 @@ pub(super) async fn get_review_capabilities(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/repositories",
     tag = "reviews",
@@ -102,7 +101,7 @@ pub(super) async fn get_review_capabilities(
         (status = 200, description = "Repositories the organization exposes for review", body = crate::daemon::protocol::ReviewsRepositoryCatalogResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_review_repositories(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -123,7 +122,7 @@ pub(super) async fn post_review_repositories(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/query",
     tag = "reviews",
@@ -132,7 +131,7 @@ pub(super) async fn post_review_repositories(
         (status = 200, description = "Matching reviews with their summary", body = crate::daemon::protocol::ReviewsQueryResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_query_reviews(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -153,7 +152,7 @@ pub(super) async fn post_query_reviews(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/pull-requests/resolve",
     tag = "reviews",
@@ -162,7 +161,7 @@ pub(super) async fn post_query_reviews(
         (status = 200, description = "Resolved pull requests plus any that were not found", body = crate::daemon::protocol::ReviewsPullRequestResolveResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_resolve_review_pull_requests(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -183,7 +182,7 @@ pub(super) async fn post_resolve_review_pull_requests(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/action-preview",
     tag = "reviews",
@@ -192,7 +191,7 @@ pub(super) async fn post_resolve_review_pull_requests(
         (status = 200, description = "Per-target eligibility preview for an action", body = crate::daemon::protocol::ReviewsActionPreviewResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_review_action_preview(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -212,7 +211,7 @@ pub(super) async fn post_review_action_preview(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     delete,
     path = "/v1/reviews/cache",
     tag = "reviews",
@@ -220,7 +219,7 @@ pub(super) async fn post_review_action_preview(
         (status = 200, description = "Number of cache entries cleared", body = crate::daemon::protocol::ReviewsCacheClearResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn delete_reviews_cache(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -239,7 +238,7 @@ pub(super) async fn delete_reviews_cache(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/refresh",
     tag = "reviews",
@@ -248,7 +247,7 @@ pub(super) async fn delete_reviews_cache(
         (status = 200, description = "Refreshed review items", body = crate::daemon::protocol::ReviewsRefreshResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_refresh_reviews(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -269,7 +268,7 @@ pub(super) async fn post_refresh_reviews(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/body",
     tag = "reviews",
@@ -278,7 +277,7 @@ pub(super) async fn post_refresh_reviews(
         (status = 200, description = "Pull request body text", body = crate::daemon::protocol::ReviewsBodyResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_review_body(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -293,7 +292,7 @@ pub(super) async fn post_review_body(
     timed_json("POST", http_paths::REVIEWS_BODY, &request_id, start, result)
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/body/update",
     tag = "reviews",
@@ -302,7 +301,7 @@ pub(super) async fn post_review_body(
         (status = 200, description = "Result of the body update, including drift detection", body = crate::daemon::protocol::ReviewsBodyUpdateResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_review_body_update(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -323,7 +322,7 @@ pub(super) async fn post_review_body_update(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/timeline",
     tag = "reviews",
@@ -332,7 +331,7 @@ pub(super) async fn post_review_body_update(
         (status = 200, description = "Paged pull request timeline", body = crate::daemon::protocol::ReviewsTimelineResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_review_timeline(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -353,7 +352,7 @@ pub(super) async fn post_review_timeline(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/avatar",
     tag = "reviews",
@@ -362,7 +361,7 @@ pub(super) async fn post_review_timeline(
         (status = 200, description = "Base64-encoded avatar image proxied from GitHub", body = crate::daemon::protocol::ReviewsAvatarResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_review_avatar(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -383,7 +382,7 @@ pub(super) async fn post_review_avatar(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/review-threads/resolve",
     tag = "reviews",
@@ -392,7 +391,7 @@ pub(super) async fn post_review_avatar(
         (status = 200, description = "Confirmed resolved state of the review thread", body = crate::daemon::protocol::ReviewsReviewThreadResolveResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_review_review_threads_resolve(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,

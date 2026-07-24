@@ -118,7 +118,7 @@ pub struct TaskBoardExecutionOwnership {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum TaskBoardAttemptResultArtifact {
     Planning(TaskBoardPlanningResult),
     Implementation(TaskBoardImplementationResult),
@@ -129,7 +129,7 @@ pub enum TaskBoardAttemptResultArtifact {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardLocalAttemptResult {
     pub schema_version: u32,
     pub execution_id: String,

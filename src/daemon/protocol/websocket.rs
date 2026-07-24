@@ -36,7 +36,7 @@ pub struct WsChunkFrame {
 /// traffic so personas and per-runtime model catalogs are available before the
 /// user can start an agent.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct WsConfigPayload {
     pub personas: Vec<AgentPersona>,
     pub runtime_models: Vec<RuntimeModelCatalog>,

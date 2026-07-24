@@ -6,12 +6,10 @@ use axum::response::Response;
 use serde::Deserialize;
 
 use crate::daemon::protocol::http_paths;
-#[cfg(feature = "openapi")]
 use crate::daemon::protocol::CodexAgentInspectResponse;
 
 use super::super::DaemonHttpState;
 use super::super::auth::require_auth;
-#[cfg(feature = "openapi")]
 use super::super::openapi::DaemonErrorBody;
 use super::super::response::{extract_request_id, timed_json};
 
@@ -21,7 +19,7 @@ pub(super) struct CodexInspectQuery {
     session_id: Option<String>,
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     get,
     path = "/v1/managed-agents/codex/inspect",
     tag = "managed-agents",
@@ -32,7 +30,7 @@ pub(super) struct CodexInspectQuery {
         (status = 200, description = "Codex managed-agent inspection", body = CodexAgentInspectResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn get_codex_inspect(
     Query(query): Query<CodexInspectQuery>,
     headers: HeaderMap,

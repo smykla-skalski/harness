@@ -8,7 +8,7 @@ use serde_json::Value;
 
 /// An option in an `AskUserQuestion` prompt.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AskUserQuestionOption {
     pub label: String,
     #[serde(default)]
@@ -17,7 +17,7 @@ pub struct AskUserQuestionOption {
 
 /// An `AskUserQuestion` prompt with header, options, multi-select.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AskUserQuestionPrompt {
     pub question: String,
     #[serde(default)]

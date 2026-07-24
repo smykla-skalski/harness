@@ -21,7 +21,6 @@ use crate::workspace::utc_now;
 use super::super::response::{extract_request_id, timed_json, timed_response};
 use super::super::{DaemonConnectInfo, DaemonHttpState};
 
-#[cfg(feature = "openapi")]
 use super::super::openapi::DaemonErrorBody;
 
 const ROUTE_REMOTE_PAIR_STATUS: &str = "remote.pair.status";
@@ -37,18 +36,18 @@ pub(super) fn remote_pairing_status_routes() -> Router<DaemonHttpState> {
 }
 
 #[derive(Debug, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 struct RemotePairStatusHttpRequest {
     pairing_id: String,
 }
 
 #[derive(Debug, Serialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 struct RemotePairStatusHttpResponse {
     status: &'static str,
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/remote/pair/status",
     tag = "pairing",
@@ -58,7 +57,7 @@ struct RemotePairStatusHttpResponse {
         (status = 200, description = "Current pairing status", body = RemotePairStatusHttpResponse),
         (status = 400, description = "Malformed status request", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn post_remote_pair_status(
     ConnectInfo(connect_info): ConnectInfo<DaemonConnectInfo>,
     headers: HeaderMap,

@@ -13,7 +13,7 @@ use validation::validate_limit;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum TaskBoardPolicyScope {
     Global,
     Workflow(TaskBoardWorkflowKind),
@@ -23,7 +23,7 @@ pub enum TaskBoardPolicyScope {
 /// Quantitative policy limits compile into durable admission requirements.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum TaskBoardPolicyLimit {
     Concurrency {
         scope: TaskBoardPolicyScope,
@@ -50,7 +50,7 @@ pub enum TaskBoardPolicyLimit {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum TaskBoardPolicyWeekday {
     Monday,
     Tuesday,
@@ -63,7 +63,7 @@ pub enum TaskBoardPolicyWeekday {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum TaskBoardOutsideWindowAction {
     Defer,
     Deny,
@@ -71,7 +71,7 @@ pub enum TaskBoardOutsideWindowAction {
 
 /// Recurring local-time window using 24-hour `HH:MM` and an IANA timezone.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardPolicyWindow {
     pub scope: TaskBoardPolicyScope,
     pub timezone: String,
@@ -82,7 +82,7 @@ pub struct TaskBoardPolicyWindow {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardAutomationPolicy {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub limits: Vec<TaskBoardPolicyLimit>,

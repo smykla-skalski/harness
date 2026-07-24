@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum VoiceProcessingSink {
     LocalDaemon,
@@ -10,7 +10,7 @@ pub enum VoiceProcessingSink {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum VoiceRouteTargetKind {
     CodexPrompt,
@@ -20,7 +20,7 @@ pub enum VoiceRouteTargetKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct VoiceRouteTarget {
     pub kind: VoiceRouteTargetKind,
     pub run_id: Option<String>,
@@ -30,7 +30,7 @@ pub struct VoiceRouteTarget {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct VoiceAudioFormatDescriptor {
     pub sample_rate: f64,
     pub channel_count: usize,
@@ -39,7 +39,7 @@ pub struct VoiceAudioFormatDescriptor {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct VoiceTranscriptSegment {
     pub sequence: u64,
     pub text: String,
@@ -50,7 +50,7 @@ pub struct VoiceTranscriptSegment {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct VoiceSessionStartRequest {
     pub actor: String,
     pub locale_identifier: String,
@@ -61,7 +61,7 @@ pub struct VoiceSessionStartRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct VoiceSessionStartResponse {
     pub voice_session_id: String,
     pub accepted_sinks: Vec<VoiceProcessingSink>,
@@ -69,7 +69,7 @@ pub struct VoiceSessionStartResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct VoiceAudioChunkRequest {
     pub actor: String,
     pub sequence: u64,
@@ -78,19 +78,19 @@ pub struct VoiceAudioChunkRequest {
     pub started_at_seconds: f64,
     pub duration_seconds: f64,
     /// Base64-encoded PCM audio frames for this chunk.
-    #[cfg_attr(feature = "openapi", schema(format = Byte))]
+    #[schema(format = Byte)]
     pub audio_base64: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct VoiceTranscriptUpdateRequest {
     pub actor: String,
     pub segment: VoiceTranscriptSegment,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum VoiceSessionFinishReason {
     Completed,
@@ -98,7 +98,7 @@ pub enum VoiceSessionFinishReason {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct VoiceSessionFinishRequest {
     pub actor: String,
     pub reason: VoiceSessionFinishReason,
@@ -106,7 +106,7 @@ pub struct VoiceSessionFinishRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct VoiceSessionMutationResponse {
     pub voice_session_id: String,
     pub status: String,

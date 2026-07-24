@@ -13,7 +13,7 @@ pub const POLICY_TRANSFER_VERSION: u32 = 1;
     reason = "transfer metadata mirrors independent persisted workspace flags"
 )]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct PolicyTransferWorkspaceMetadata {
     pub schema_version: u32,
     pub active_canvas_id: String,
@@ -29,7 +29,7 @@ pub struct PolicyTransferWorkspaceMetadata {
 
 /// Versioned envelope carrying one or many exact policy canvas records.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct PolicyTransferBundle {
     pub format: String,
     pub version: u32,
@@ -41,7 +41,7 @@ pub struct PolicyTransferBundle {
 /// Select policies for a dump. Empty `policy_ids` dumps every policy and full
 /// workspace metadata.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct PolicyTransferDumpRequest {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub policy_ids: Vec<String>,
@@ -50,7 +50,7 @@ pub struct PolicyTransferDumpRequest {
 /// Import one or many exact policy records, either by merge/upsert or by full
 /// workspace replacement.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct PolicyTransferImportRequest {
     pub bundle: PolicyTransferBundle,
     #[serde(default)]

@@ -17,7 +17,7 @@ pub const LAUNCH_AGENT_LABEL: &str = "io.harness.daemon";
 const LEGACY_LAUNCH_AGENT_LABEL: &str = "io.harness.monitor.daemon";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct LaunchAgentStatus {
     pub installed: bool,
     pub loaded: bool,

@@ -63,7 +63,7 @@ pub const GITHUB_REPOSITORY_ENV: &str = "GITHUB_REPOSITORY";
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
 #[value(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum ExternalProvider {
     #[value(name = "github", alias = "git_hub")]
     #[serde(rename = "github", alias = "git_hub")]

@@ -24,7 +24,7 @@ fn ownership_override() -> Option<DaemonOwnership> {
 /// distinct launchd labels and bridge ports.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum DaemonOwnership {
     #[default]
     Managed,
