@@ -211,7 +211,15 @@ pub(crate) async fn update_task_board_project_db(
     request: &TaskBoardProjectUpdateRequest,
 ) -> Result<TaskBoardProjectUpdateResponse, CliError> {
     let display_name = match (request.clear_display_name, request.display_name.as_deref()) {
-        (true, _) => DisplayNameEdit::Clear,
+        // Letting the clear quietly win would report success for a rename the
+        // caller never got, and the name it sent would be the thing erased.
+        (true, Some(_)) => {
+            return Err(CliErrorKind::usage_error(
+                "task-board project update cannot both set and clear display_name",
+            )
+            .into());
+        }
+        (true, None) => DisplayNameEdit::Clear,
         (false, Some(value)) => DisplayNameEdit::Set(value),
         (false, None) => DisplayNameEdit::Keep,
     };
@@ -408,3 +416,7 @@ fn non_empty(value: &str) -> Option<String> {
     let value = value.trim();
     (!value.is_empty()).then(|| value.to_owned())
 }
+
+#[cfg(test)]
+#[path = "task_board_db_tests.rs"]
+mod tests;
