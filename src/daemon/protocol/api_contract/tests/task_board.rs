@@ -402,6 +402,24 @@ fn task_board_routes_have_complete_ws_parity() {
                 true,
             ),
             (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_WORKING_COPIES,
+                ws_methods::TASK_BOARD_WORKING_COPIES_LIST,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_WORKING_COPIES_OBTAIN,
+                ws_methods::TASK_BOARD_WORKING_COPIES_OBTAIN,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_WORKING_COPIES_DELETE,
+                ws_methods::TASK_BOARD_WORKING_COPIES_DELETE,
+                true,
+            ),
+            (
                 HttpRouteMethod::Get,
                 http_paths::TASK_BOARD_ITEM_POSITION,
                 ws_methods::TASK_BOARD_POSITION_GET,
