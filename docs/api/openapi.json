@@ -7401,6 +7401,7 @@
           }
         ],
         "requestBody": {
+          "description": "Optional actor override; the body may be omitted",
           "content": {
             "application/json": {
               "schema": {
@@ -7408,7 +7409,7 @@
               }
             }
           },
-          "required": true
+          "required": false
         },
         "responses": {
           "200": {

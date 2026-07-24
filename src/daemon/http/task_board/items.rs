@@ -334,7 +334,7 @@ pub(super) async fn post_task_board_plan_approve(
     path = "/v1/task-board/items/{item_id}/planning/revoke",
     tag = "task-board",
     params(("item_id" = String, Path, description = "Task-board item identifier")),
-    request_body = TaskBoardPlanRevokeBody,
+    request_body(content = TaskBoardPlanRevokeBody, description = "Optional actor override; the body may be omitted"),
     responses(
         (status = 200, description = "Planning transition after revoking plan approval", body = TaskBoardPlanningResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),

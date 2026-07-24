@@ -5,8 +5,8 @@ use axum::response::Response;
 
 use crate::daemon::protocol::{
     TaskBoardAuditRequest, TaskBoardCatalogRequest, TaskBoardDispatchDeliverRequest,
-    TaskBoardDispatchDeliverResponse, TaskBoardDispatchPickRequest, TaskBoardDispatchPickResponse,
-    TaskBoardDispatchRequest, TaskBoardEvaluateRequest, TaskBoardHostSetProjectTypesRequest,
+    TaskBoardDispatchDeliverResponse, TaskBoardDispatchPickResponse, TaskBoardDispatchRequest,
+    TaskBoardEvaluateRequest, TaskBoardHostSetProjectTypesRequest,
     TaskBoardSyncRequest, http_paths,
 };
 use crate::task_board::{
@@ -121,7 +121,6 @@ pub(super) async fn post_task_board_dispatch_deliver(
 pub(super) async fn post_task_board_dispatch_pick(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    _body: Option<Json<TaskBoardDispatchPickRequest>>,
 ) -> Response {
     let (start, request_id) = match authenticated_request(&headers, &state) {
         Ok(parts) => parts,
