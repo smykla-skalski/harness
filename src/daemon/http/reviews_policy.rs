@@ -3,7 +3,8 @@ use std::time::Instant;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::{Json, Router};
+use axum::Json;
+use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{
     ReviewsPolicyHistoryRequest, ReviewsPolicyPreviewRequest, ReviewsPolicyRunStartRequest,
@@ -29,25 +30,14 @@ fn authenticated_policy_request(
     Ok((start, request_id))
 }
 
-pub(super) fn merge_policy_routes(router: Router<DaemonHttpState>) -> Router<DaemonHttpState> {
-    use axum::routing::post;
+pub(super) fn merge_policy_routes(
+    router: OpenApiRouter<DaemonHttpState>,
+) -> OpenApiRouter<DaemonHttpState> {
     router
-        .route(
-            http_paths::REVIEWS_POLICY_PREVIEW,
-            post(post_reviews_policy_preview),
-        )
-        .route(
-            http_paths::REVIEWS_POLICY_START,
-            post(post_reviews_policy_start),
-        )
-        .route(
-            http_paths::REVIEWS_POLICY_STATUS,
-            post(post_reviews_policy_status),
-        )
-        .route(
-            http_paths::REVIEWS_POLICY_HISTORY,
-            post(post_reviews_policy_history),
-        )
+        .routes(routes!(post_reviews_policy_preview))
+        .routes(routes!(post_reviews_policy_start))
+        .routes(routes!(post_reviews_policy_status))
+        .routes(routes!(post_reviews_policy_history))
 }
 
 #[utoipa::path(

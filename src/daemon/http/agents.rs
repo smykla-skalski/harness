@@ -3,8 +3,8 @@ use std::time::Instant;
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::routing::post;
-use axum::{Json, Router};
+use axum::Json;
+use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{
     AgentRemoveRequest, LeaderTransferRequest, RoleChangeRequest, SessionDetail, http_paths,
@@ -18,14 +18,11 @@ use super::response::{extract_request_id, timed_json};
 
 use super::openapi::DaemonErrorBody;
 
-pub(super) fn agent_routes() -> Router<DaemonHttpState> {
-    Router::new()
-        .route(http_paths::SESSION_AGENT_ROLE, post(post_role_change))
-        .route(http_paths::SESSION_AGENT_REMOVE, post(post_remove_agent))
-        .route(
-            http_paths::SESSION_LEADER_TRANSFER,
-            post(post_transfer_leader),
-        )
+pub(super) fn agent_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
+        .routes(routes!(post_role_change))
+        .routes(routes!(post_remove_agent))
+        .routes(routes!(post_transfer_leader))
 }
 
 #[utoipa::path(

@@ -3,8 +3,8 @@ use std::time::Instant;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::routing::post;
-use axum::{Json, Router};
+use axum::Json;
+use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{
     ReviewsFileCommentRequest, ReviewsFilesBlobRequest, ReviewsFilesListRequest,
@@ -20,34 +20,18 @@ use super::response::{extract_request_id, timed_json};
 
 /// Wire the review-files endpoints onto the reviews router. These handlers live
 /// in their own module so `reviews.rs` stays within the file-length cap.
-pub(super) fn merge_files_routes(router: Router<DaemonHttpState>) -> Router<DaemonHttpState> {
+pub(super) fn merge_files_routes(
+    router: OpenApiRouter<DaemonHttpState>,
+) -> OpenApiRouter<DaemonHttpState> {
     router
-        .route(http_paths::REVIEWS_FILES_LIST, post(post_review_files_list))
-        .route(
-            http_paths::REVIEWS_FILES_PATCH,
-            post(post_review_files_patch),
-        )
-        .route(
-            http_paths::REVIEWS_FILES_PREVIEW,
-            post(post_review_files_preview),
-        )
-        .route(
-            http_paths::REVIEWS_FILES_VIEWED,
-            post(post_review_files_viewed),
-        )
-        .route(http_paths::REVIEWS_FILES_BLOB, post(post_review_files_blob))
-        .route(
-            http_paths::REVIEWS_FILES_COMMENT,
-            post(post_review_files_comment),
-        )
-        .route(
-            http_paths::REVIEWS_FILES_LOCAL_CLONES,
-            post(post_review_files_local_clones),
-        )
-        .route(
-            http_paths::REVIEWS_FILES_LOCAL_CLONES_DELETE,
-            post(post_review_files_local_clones_delete),
-        )
+        .routes(routes!(post_review_files_list))
+        .routes(routes!(post_review_files_patch))
+        .routes(routes!(post_review_files_preview))
+        .routes(routes!(post_review_files_viewed))
+        .routes(routes!(post_review_files_blob))
+        .routes(routes!(post_review_files_comment))
+        .routes(routes!(post_review_files_local_clones))
+        .routes(routes!(post_review_files_local_clones_delete))
 }
 
 #[utoipa::path(

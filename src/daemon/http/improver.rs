@@ -3,8 +3,8 @@ use std::time::Instant;
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::routing::post;
-use axum::{Json, Router};
+use axum::Json;
+use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{ImproverApplyRequest, http_paths};
 use crate::daemon::service;
@@ -17,11 +17,8 @@ use super::response::{extract_request_id, timed_json};
 
 use super::openapi::DaemonErrorBody;
 
-pub(super) fn improver_routes() -> Router<DaemonHttpState> {
-    Router::new().route(
-        http_paths::SESSION_IMPROVER_APPLY,
-        post(post_improver_apply),
-    )
+pub(super) fn improver_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new().routes(routes!(post_improver_apply))
 }
 
 #[utoipa::path(

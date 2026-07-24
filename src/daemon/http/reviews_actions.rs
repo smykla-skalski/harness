@@ -7,8 +7,8 @@ use std::time::Instant;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::routing::post;
-use axum::{Json, Router};
+use axum::Json;
+use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{
     ReviewsApproveRequest, ReviewsAutoRequest, ReviewsCommentRequest, ReviewsLabelRequest,
@@ -24,18 +24,17 @@ use super::response::{extract_request_id, timed_json};
 /// Wire the review write-action endpoints onto the reviews router. These
 /// handlers live in their own module so `reviews.rs` stays within the
 /// file-length cap.
-pub(super) fn merge_action_routes(router: Router<DaemonHttpState>) -> Router<DaemonHttpState> {
+pub(super) fn merge_action_routes(
+    router: OpenApiRouter<DaemonHttpState>,
+) -> OpenApiRouter<DaemonHttpState> {
     router
-        .route(http_paths::REVIEWS_APPROVE, post(post_approve_reviews))
-        .route(http_paths::REVIEWS_MERGE, post(post_merge_reviews))
-        .route(
-            http_paths::REVIEWS_RERUN_CHECKS,
-            post(post_rerun_reviews_checks),
-        )
-        .route(http_paths::REVIEWS_LABELS, post(post_label_reviews))
-        .route(http_paths::REVIEWS_AUTO, post(post_auto_reviews))
-        .route(http_paths::REVIEWS_REQUEST_REVIEW, post(post_request_review))
-        .route(http_paths::REVIEWS_COMMENT, post(post_comment_reviews))
+        .routes(routes!(post_approve_reviews))
+        .routes(routes!(post_merge_reviews))
+        .routes(routes!(post_rerun_reviews_checks))
+        .routes(routes!(post_label_reviews))
+        .routes(routes!(post_auto_reviews))
+        .routes(routes!(post_request_review))
+        .routes(routes!(post_comment_reviews))
 }
 
 #[utoipa::path(

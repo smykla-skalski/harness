@@ -3,8 +3,8 @@ use std::time::Instant;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::routing::{delete, get, post};
-use axum::{Json, Router};
+use axum::Json;
+use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{
     ReviewsActionPreviewRequest, ReviewsAvatarRequest, ReviewsBodyRequest, ReviewsBodyUpdateRequest,
@@ -19,25 +19,13 @@ use super::auth::require_auth;
 use super::openapi::DaemonErrorBody;
 use super::response::{extract_request_id, timed_json};
 
-pub(super) fn reviews_routes() -> Router<DaemonHttpState> {
-    let router = Router::new()
-        .route(
-            http_paths::REVIEWS_REPOSITORIES,
-            post(post_review_repositories),
-        )
-        .route(
-            http_paths::REVIEWS_CAPABILITIES,
-            get(get_review_capabilities),
-        )
-        .route(http_paths::REVIEWS_QUERY, post(post_query_reviews))
-        .route(
-            http_paths::REVIEWS_PULL_REQUEST_RESOLVE,
-            post(post_resolve_review_pull_requests),
-        )
-        .route(
-            http_paths::REVIEWS_ACTION_PREVIEW,
-            post(post_review_action_preview),
-        );
+pub(super) fn reviews_routes() -> OpenApiRouter<DaemonHttpState> {
+    let router = OpenApiRouter::new()
+        .routes(routes!(post_review_repositories))
+        .routes(routes!(get_review_capabilities))
+        .routes(routes!(post_query_reviews))
+        .routes(routes!(post_resolve_review_pull_requests))
+        .routes(routes!(post_review_action_preview));
     // Policy preview/start/status/history handlers live in the sibling
     // `reviews_policy` module to keep this file within the line-length cap.
     let router = super::reviews_policy::merge_policy_routes(router);
@@ -46,23 +34,17 @@ pub(super) fn reviews_routes() -> Router<DaemonHttpState> {
     // the same reason.
     let router = super::reviews_actions::merge_action_routes(router);
     let router = router
-        .route(http_paths::REVIEWS_CACHE, delete(delete_reviews_cache))
-        .route(http_paths::REVIEWS_REFRESH, post(post_refresh_reviews))
-        .route(http_paths::REVIEWS_BODY, post(post_review_body))
-        .route(
-            http_paths::REVIEWS_BODY_UPDATE,
-            post(post_review_body_update),
-        );
+        .routes(routes!(delete_reviews_cache))
+        .routes(routes!(post_refresh_reviews))
+        .routes(routes!(post_review_body))
+        .routes(routes!(post_review_body_update));
     // Review-files preview/patch/blob/local-clone handlers live in the sibling
     // `reviews_files` module to keep this file within the line-length cap.
     let router = super::reviews_files::merge_files_routes(router);
     router
-        .route(http_paths::REVIEWS_AVATAR, post(post_review_avatar))
-        .route(http_paths::REVIEWS_TIMELINE, post(post_review_timeline))
-        .route(
-            http_paths::REVIEWS_REVIEW_THREADS_RESOLVE,
-            post(post_review_review_threads_resolve),
-        )
+        .routes(routes!(post_review_avatar))
+        .routes(routes!(post_review_timeline))
+        .routes(routes!(post_review_review_threads_resolve))
 }
 
 #[utoipa::path(
