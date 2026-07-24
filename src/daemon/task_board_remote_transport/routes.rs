@@ -119,7 +119,7 @@ pub(crate) fn execution_http_body_limit(method: &Method, path: &str) -> Option<u
 
 /// Every remote-execution transport operation as `(method, path,
 /// operation_id)`. The auth recognizer ([`execution_operation`]) and the
-/// OpenAPI contract test both read this table, so a documented transport route
+/// `OpenAPI` contract test both read this table, so a documented transport route
 /// cannot drift from the recognized set. Re-exported under `http::openapi`;
 /// the transport module itself stays crate-internal.
 pub const EXECUTION_OPERATIONS: &[(Method, &str, &str)] = &[
