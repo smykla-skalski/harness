@@ -115,7 +115,7 @@ pub enum ItemProjectAttribution {
     Unattributed,
 }
 
-/// Read an item's origin. This is the runtime half of the v49 backfill and
+/// Read an item's origin. This is the runtime half of the v51 backfill and
 /// reads the same two columns in the same order, so an item created now and
 /// one migrated then land on the same project.
 #[must_use]
