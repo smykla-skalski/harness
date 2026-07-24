@@ -9,6 +9,7 @@ pub const CURRENT_TASK_BOARD_ITEM_VERSION: u32 = 1;
 pub const MAX_TASK_BOARD_ESTIMATE: u64 = i64::MAX as u64;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardItem {
     pub schema_version: u32,
     pub id: String,
@@ -75,6 +76,7 @@ pub struct TaskBoardItem {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TaskBoardTombstoneCause {
     Manual,
     ProviderExclusion,
@@ -125,6 +127,7 @@ impl TaskBoardItem {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardWorkflowState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_id: Option<String>,
@@ -173,6 +176,7 @@ impl TaskBoardWorkflowState {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
 #[value(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TaskBoardWorkflowStatus {
     #[default]
     Idle,
@@ -188,6 +192,7 @@ pub enum TaskBoardWorkflowStatus {
 )]
 #[value(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TaskBoardStatus {
     Backlog,
     #[default]
@@ -274,6 +279,29 @@ impl<'de> Deserialize<'de> for TaskBoardItemKind {
     }
 }
 
+// utoipa cannot derive a schema for the hand-written serde above (it emits a
+// bare string, not a tagged enum), and a `value_type` override is rejected on
+// an enum-variant field such as `DispatchBlockReason::Kind`, so the type owns a
+// manual `{type: string}` component that references cleanly from every use.
+#[cfg(feature = "openapi")]
+impl utoipa::PartialSchema for TaskBoardItemKind {
+    fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+        utoipa::openapi::ObjectBuilder::new()
+            .schema_type(utoipa::openapi::schema::Type::String)
+            .description(Some(
+                "Open string enum: `task`, `umbrella`, or a forward-compatible unknown value.",
+            ))
+            .into()
+    }
+}
+
+#[cfg(feature = "openapi")]
+impl utoipa::ToSchema for TaskBoardItemKind {
+    fn name() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed("TaskBoardItemKind")
+    }
+}
+
 impl ValueEnum for TaskBoardItemKind {
     fn value_variants<'a>() -> &'a [Self] {
         &[Self::Task, Self::Umbrella]
@@ -306,6 +334,7 @@ impl TaskBoardStatus {
 )]
 #[value(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TaskBoardPriority {
     Low,
     #[default]
@@ -317,6 +346,7 @@ pub enum TaskBoardPriority {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
 #[value(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum AgentMode {
     #[default]
     Headless,
@@ -326,6 +356,7 @@ pub enum AgentMode {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ExternalRef {
     pub provider: ExternalRefProvider,
     pub external_id: String,
@@ -338,6 +369,7 @@ pub struct ExternalRef {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ValueEnum)]
 #[value(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum ExternalRefProvider {
     #[value(name = "github", alias = "git_hub")]
     #[serde(rename = "github", alias = "git_hub")]
@@ -346,6 +378,7 @@ pub enum ExternalRefProvider {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ExternalRefSyncState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
@@ -366,6 +399,7 @@ pub struct ExternalRefSyncState {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PlanningState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
@@ -376,6 +410,7 @@ pub struct PlanningState {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskUsage {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input_tokens: Option<u64>,

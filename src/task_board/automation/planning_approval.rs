@@ -9,6 +9,7 @@ use crate::task_board::{
 const PLAN_HASH_DOMAIN: &[u8] = b"harness-task-board-plan-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardPlanApprovalBinding {
     pub execution_id: String,
     pub workflow_kind: TaskBoardWorkflowKind,

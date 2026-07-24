@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardGitRuntimeConfig {
     #[serde(default)]
     pub global: TaskBoardGitRuntimeProfile,
@@ -76,6 +77,7 @@ impl TaskBoardGitRuntimeConfig {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardGitRuntimeProfile {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub author_name: Option<String>,
@@ -190,6 +192,7 @@ impl TaskBoardGitRuntimeProfile {
     clippy::struct_excessive_bools,
     reason = "wire model exposes per-secret configured flags for multiple signing backends"
 )]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardGitSigningConfig {
     #[serde(default)]
     pub mode: TaskBoardGitSigningMode,
@@ -310,6 +313,7 @@ fn is_false_ref(value: &bool) -> bool {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TaskBoardGitSigningMode {
     #[default]
     None,
@@ -318,6 +322,7 @@ pub enum TaskBoardGitSigningMode {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardGitRepositoryOverride {
     pub repository: String,
     #[serde(default)]
@@ -354,6 +359,7 @@ impl TaskBoardGitRepositoryOverride {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardGitHubTokensSyncRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub global_token: Option<String>,
@@ -362,6 +368,7 @@ pub struct TaskBoardGitHubTokensSyncRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardGitHubRepositoryToken {
     pub repository: String,
     pub token: String,
@@ -377,29 +384,34 @@ impl TaskBoardGitHubRepositoryToken {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardGitHubTokensSyncResponse {
     pub global_token_configured: bool,
     pub repository_token_count: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardTodoistTokenSyncRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub token: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardTodoistTokenSyncResponse {
     pub token_configured: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardOpenRouterTokenSyncRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub token: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardOpenRouterTokenSyncResponse {
     pub token_configured: bool,
 }

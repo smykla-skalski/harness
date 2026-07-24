@@ -16,6 +16,7 @@ pub struct TaskBoardAutomationRunDetailRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardAutomationForceCancelRequest {
     pub target: TaskBoardAutomationCancelTarget,
     pub reason: String,
@@ -25,6 +26,7 @@ pub struct TaskBoardAutomationForceCancelRequest {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TaskBoardAutomationForceCancelDisposition {
     AcceptedPending,
     Cancelled,
@@ -33,6 +35,7 @@ pub enum TaskBoardAutomationForceCancelDisposition {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardAutomationForceCancelResponse {
     pub disposition: TaskBoardAutomationForceCancelDisposition,
 }

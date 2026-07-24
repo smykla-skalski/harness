@@ -6,6 +6,7 @@ pub const TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TaskBoardWorkflowKind {
     Unknown,
     #[default]
@@ -91,6 +92,7 @@ pub enum TaskBoardPhaseVerdict {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TaskBoardPhaseCapabilityProfile {
     PlanningReadOnly,
     ImplementationWrite,
@@ -99,6 +101,7 @@ pub enum TaskBoardPhaseCapabilityProfile {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardPlanningResult {
     pub plan_markdown: String,
     pub acceptance_criteria: Vec<String>,
@@ -142,6 +145,7 @@ pub struct TaskBoardEvaluationResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardResolvedReviewer {
     pub reviewer_count: u32,
     pub required_approvals: u32,
@@ -151,6 +155,7 @@ pub struct TaskBoardResolvedReviewer {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardReadOnlyRunContext {
     pub schema_version: u32,
     pub session_id: String,
