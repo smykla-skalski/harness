@@ -8,6 +8,7 @@ pub const TASK_BOARD_TRIAGE_RULES_LIST_DEFAULT_LIMIT: u32 = 50;
 
 /// Response for `GET /v1/task-board/triage/rules/draft`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardTriageRulesDraftResponse {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub draft: Option<TriageRuleSetDraft>,
@@ -16,6 +17,7 @@ pub struct TaskBoardTriageRulesDraftResponse {
 /// Request for `PUT /v1/task-board/triage/rules/draft`. `expected_revision`
 /// is `None` when saving over an empty slot (no draft yet).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardSaveTriageRulesDraftRequest {
     pub rules: TriageRuleSetV1,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -28,6 +30,7 @@ pub struct TaskBoardSaveTriageRulesDraftRequest {
 /// Request for `POST /v1/task-board/triage/rules/preview`. Never persists
 /// anything, whether or not `rules` is valid.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardPreviewTriageRulesRequest {
     pub rules: TriageRuleSetV1,
 }
@@ -36,6 +39,7 @@ pub struct TaskBoardPreviewTriageRulesRequest {
 /// deactivates back to the `BuiltInV1` default; `expected_active_revision`
 /// is `None` when no custom rule set currently governs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardActivateTriageRulesRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rules: Option<TriageRuleSetV1>,
@@ -48,6 +52,7 @@ pub struct TaskBoardActivateTriageRulesRequest {
 
 /// Response for `GET /v1/task-board/triage/rules/revisions`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardTriageRulesRevisionsResponse {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub revisions: Vec<TriageRuleSetRevisionSummary>,
@@ -55,6 +60,7 @@ pub struct TaskBoardTriageRulesRevisionsResponse {
 
 /// Response for `GET /v1/task-board/triage/rules/audit`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardTriageRulesAuditResponse {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub audit: Vec<TriageRuleSetAuditEntry>,

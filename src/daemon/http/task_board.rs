@@ -14,7 +14,7 @@ mod policy_io;
 mod policy_spawn_gate;
 pub(super) mod positions;
 pub(super) mod triage;
-mod triage_rules;
+pub(super) mod triage_rules;
 
 pub(super) use self::items::{authenticated_request, authorized_control_request_parts};
 pub(super) use self::policy_io::{

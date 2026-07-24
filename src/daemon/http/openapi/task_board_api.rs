@@ -1,6 +1,5 @@
-//! Task-board domain [`utoipa::OpenApi`] aggregator. Kept in its own module
-//! because the 48-operation path list would push `openapi/mod.rs` past the
-//! file-length cap.
+//! Task-board domain [`utoipa::OpenApi`] aggregator. Kept in its own module so
+//! the path list does not push `openapi/mod.rs` past the file-length cap.
 
 #[derive(utoipa::OpenApi)]
 #[openapi(paths(
@@ -32,6 +31,12 @@
     super::super::task_board::triage::get_task_board_item_triage_history,
     super::super::task_board::triage::put_task_board_item_triage_override,
     super::super::task_board::triage::post_task_board_item_triage_override_clear,
+    super::super::task_board::triage_rules::get_task_board_triage_rules_draft,
+    super::super::task_board::triage_rules::put_task_board_triage_rules_draft,
+    super::super::task_board::triage_rules::post_task_board_triage_rules_preview,
+    super::super::task_board::triage_rules::post_task_board_triage_rules_activate,
+    super::super::task_board::triage_rules::get_task_board_triage_rules_revisions,
+    super::super::task_board::triage_rules::get_task_board_triage_rules_audit,
     super::super::task_board_orchestrator_handlers::get_task_board_orchestrator_status,
     super::super::task_board_orchestrator_handlers::post_task_board_orchestrator_start,
     super::super::task_board_orchestrator_handlers::post_task_board_orchestrator_stop,
