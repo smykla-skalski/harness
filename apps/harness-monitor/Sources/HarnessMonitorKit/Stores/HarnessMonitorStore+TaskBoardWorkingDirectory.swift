@@ -17,10 +17,16 @@ extension HarnessMonitorStore {
     if hasExistingSession {
       return .dispatch(projectDir: nil)
     }
-    let associatedProjectDir = await associatedProjectDir(
+    // A user-picked folder (a bookmark) wins; otherwise fall back to a
+    // daemon-obtained working copy. Resolving the copy also bumps its
+    // last_used_at so an actively-delivered checkout is never garbage-collected.
+    var associatedProjectDir = await associatedProjectDir(
       for: executionRepository,
       daemonSandboxed: daemonSandboxed
     )
+    if associatedProjectDir == nil {
+      associatedProjectDir = await managedWorkingCopyProjectDir(for: executionRepository)
+    }
     return TaskBoardWorkingDirectoryResolver.decide(
       hasExistingSession: false,
       executionRepository: executionRepository,
@@ -40,15 +46,37 @@ extension HarnessMonitorStore {
     // record whose bookmark no longer resolves (folder moved or deleted) must
     // re-prompt, not get filtered out as already associated - otherwise Deliver
     // would silently do nothing.
+    let managedPresent = await managedWorkingCopySlugs()
     var resolved: Set<String> = []
     for repository in distinctCreateRepositories(items) {
-      if await associatedProjectDir(for: repository, daemonSandboxed: daemonSandboxed) != nil {
+      let hasBookmark =
+        await associatedProjectDir(for: repository, daemonSandboxed: daemonSandboxed) != nil
+      if hasBookmark || managedPresent.contains(repository) {
         resolved.insert(repository)
       }
     }
     return TaskBoardWorkingDirectoryResolver.unresolvedRepositories(items: items) {
       resolved.contains($0)
     }
+  }
+
+  /// Resolve a daemon-obtained working copy for `executionRepository` without
+  /// cloning: returns the checkout path when a copy already exists (bumping its
+  /// last_used_at), or `nil` so delivery falls through to prompting the user.
+  private func managedWorkingCopyProjectDir(for executionRepository: String?) async -> String? {
+    guard let executionRepository, let client else { return nil }
+    let normalized = RepositoryDirectoryStore.normalizedRepository(executionRepository)
+    guard !normalized.isEmpty else { return nil }
+    return try? await client
+      .obtainTaskBoardWorkingCopy(repository: normalized, allowClone: false)?
+      .path
+  }
+
+  /// Normalized slugs of repositories that already have a daemon-owned working
+  /// copy, used as the batch "resolved" signal for the consolidated sheet.
+  private func managedWorkingCopySlugs() async -> Set<String> {
+    let entries = await listRepositoryWorkingCopies()
+    return Set(entries.map { RepositoryDirectoryStore.normalizedRepository($0.repoFullName) })
   }
 
   private func distinctCreateRepositories(
