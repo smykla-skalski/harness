@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use fs_err as fs;
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::session::storage;
 use crate::workspace::layout::sessions_root as workspace_sessions_root;
 use crate::workspace::{
     canonical_checkout_root, harness_data_root, project_context_dir, resolve_git_checkout_identity,
@@ -188,6 +189,14 @@ pub fn discovered_project_for_checkout(project_dir: &Path) -> DiscoveredProject 
         };
     }
 
+    // A sandboxed daemon reaches the checkout only while a folder grant is
+    // held, so a released grant fails the read above. Falling straight through
+    // would register the checkout as its own repository root; the recorded
+    // origin still holds the identity it was registered under.
+    if let Some(project) = recorded_git_project(&context_root) {
+        return project;
+    }
+
     let name = checkout_root.file_name().map_or_else(
         || checkout_id.clone(),
         |name| name.to_string_lossy().to_string(),
@@ -203,6 +212,17 @@ pub fn discovered_project_for_checkout(project_dir: &Path) -> DiscoveredProject 
         is_worktree: false,
         worktree_name: None,
     }
+}
+
+/// Rebuild a checkout's identity from its recorded origin, but only when that
+/// origin recorded a git repository root. A plain directory has no identity to
+/// restore and must keep registering as a directory.
+fn recorded_git_project(context_root: &Path) -> Option<DiscoveredProject> {
+    let origin = storage::load_project_origin(context_root)?;
+    if origin.repository_root.is_none() {
+        return None;
+    }
+    build_discovered_project(context_root)
 }
 
 fn fallback_project(context_root: &Path) -> DiscoveredProject {

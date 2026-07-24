@@ -13,6 +13,7 @@ use crate::workspace::layout::sessions_root as workspace_sessions_root;
 use crate::workspace::{canonical_checkout_root, harness_data_root, project_context_dir, utc_now};
 
 mod adopted_external;
+mod checkout_identity;
 mod ledger_fallback;
 mod repair_context_root;
 mod runtime_sessions;
