@@ -10,6 +10,7 @@ ALTER TABLE task_board_items ADD COLUMN source_project_id TEXT
         OR (
             substr(source_project_id, 1, 8) = 'project-'
             AND length(source_project_id) = 40
+            AND substr(source_project_id, 9) NOT GLOB '*[^0-9a-f]*'
         )
     );
 

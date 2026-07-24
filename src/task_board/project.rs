@@ -89,12 +89,19 @@ impl TaskBoardProject {
 
 /// Whether a value is an assigned project identifier. Display paths lean on
 /// this to avoid ever showing a raw identifier when a project row is missing.
+///
+/// Lowercase only, matching both producers (`generate_id` and the v51 backfill)
+/// and the column's CHECK constraint. Accepting a spelling the database rejects
+/// would let a write path call a value assigned that can never be stored, and
+/// accepting one the database allows but this rejects is worse still: the row
+/// persists and every later read silently treats the item as unattributed.
 #[must_use]
 pub fn is_project_id(value: &str) -> bool {
     let Some(body) = value.strip_prefix(PROJECT_ID_PREFIX) else {
         return false;
     };
-    body.len() == PROJECT_ID_BODY_LEN && body.bytes().all(|byte| byte.is_ascii_hexdigit())
+    body.len() == PROJECT_ID_BODY_LEN
+        && body.bytes().all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
 }
 
 /// What a write path must do about an item's project attribution.

@@ -69,6 +69,17 @@ fn provider_project_values_are_not_mistaken_for_identifiers() {
     }
 }
 
+/// Both producers emit lowercase and the column's CHECK enforces it, so an
+/// uppercase body is not a spelling variant - it is a value the database
+/// would refuse, and calling it assigned here would split the two rules.
+#[test]
+fn an_uppercase_body_is_not_an_identifier() {
+    let generated = TaskBoardProject::generate_id();
+
+    assert!(is_project_id(&generated));
+    assert!(!is_project_id(&generated.to_uppercase()));
+}
+
 #[test]
 fn display_name_wins_over_slug_and_falls_back_to_it() {
     let mut project = project("acme/widgets");

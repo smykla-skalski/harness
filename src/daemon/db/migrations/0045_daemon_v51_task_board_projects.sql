@@ -3,10 +3,14 @@
 -- `slug` that leaves every attached item alone. `source` scopes `slug`
 -- because two providers may hand out the same slug for unrelated projects.
 CREATE TABLE IF NOT EXISTS task_board_projects (
+    -- The hex clause matters as much as the length one: `is_project_id`
+    -- treats a non-hex value as unassigned, so a row the column accepted but
+    -- that predicate rejects would persist and read as having no project.
     project_id    TEXT PRIMARY KEY
                       CHECK (
                           substr(project_id, 1, 8) = 'project-'
                           AND length(project_id) = 40
+                          AND substr(project_id, 9) NOT GLOB '*[^0-9a-f]*'
                       ),
     source        TEXT NOT NULL CHECK (source IN ('github', 'todoist', 'manual')),
     slug          TEXT NOT NULL

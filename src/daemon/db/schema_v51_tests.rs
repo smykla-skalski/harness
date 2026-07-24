@@ -59,12 +59,12 @@ fn slug_of(connection: &Connection, project_id: &str) -> (String, String) {
         .expect("read project row")
 }
 
-fn migrated_from_v48(path: &std::path::Path, seed: &str) -> DaemonDb {
+fn migrated_from_v50(path: &std::path::Path, seed: &str) -> DaemonDb {
     let db = DaemonDb::open(path).expect("open current database");
     db.connection()
         .execute_batch(DROP_V51_SQL)
-        .expect("restore v48 schema");
-    db.connection().execute_batch(seed).expect("seed v48 rows");
+        .expect("restore v50 schema");
+    db.connection().execute_batch(seed).expect("seed v50 rows");
     drop(db);
     DaemonDb::open(path).expect("migrate v50 database")
 }
@@ -88,11 +88,36 @@ fn fresh_schema_includes_the_projects_table() {
     assert_eq!(count, 1);
 }
 
+/// The column and `is_project_id` have to agree on what an identifier looks
+/// like. If the column is the looser of the two, a stored row comes back from
+/// every read as an item with no project at all.
+#[test]
+fn the_projects_table_rejects_an_identifier_is_project_id_would_reject() {
+    let db = DaemonDb::open_in_memory().expect("open current database");
+
+    for body in [
+        "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ",
+        "B43C8448B6FF43A7BC2AD32DB5C558B0",
+    ] {
+        let candidate = format!("project-{body}");
+        assert!(
+            !is_project_id(&candidate),
+            "{candidate} should not read as an assigned id"
+        );
+        let stored = db.connection().execute(
+            "INSERT INTO task_board_projects (project_id, source, slug, created_at, updated_at)
+             VALUES (?1, 'manual', 'rejected', '2026-07-25T00:00:00Z', '2026-07-25T00:00:00Z')",
+            [candidate.as_str()],
+        );
+        assert!(stored.is_err(), "{candidate} was accepted by the column");
+    }
+}
+
 #[test]
 fn backfill_gives_every_attributed_item_a_project_identifier() {
     let directory = tempdir().expect("tempdir");
     let path = directory.path().join("harness.db");
-    let migrated = migrated_from_v48(&path, SEED_LEGACY_ITEMS_SQL);
+    let migrated = migrated_from_v50(&path, SEED_LEGACY_ITEMS_SQL);
     let connection = migrated.connection();
 
     let imported =
@@ -133,7 +158,7 @@ fn backfill_gives_every_attributed_item_a_project_identifier() {
 fn migration_is_idempotent_across_restarts() {
     let directory = tempdir().expect("tempdir");
     let path = directory.path().join("harness.db");
-    let migrated = migrated_from_v48(&path, SEED_LEGACY_ITEMS_SQL);
+    let migrated = migrated_from_v50(&path, SEED_LEGACY_ITEMS_SQL);
     let before = source_project_of(migrated.connection(), "imported-github").expect("attributed");
     drop(migrated);
 
@@ -160,7 +185,7 @@ fn migration_is_idempotent_across_restarts() {
 fn renaming_a_project_keeps_its_items_attached() {
     let directory = tempdir().expect("tempdir");
     let path = directory.path().join("harness.db");
-    let migrated = migrated_from_v48(&path, SEED_LEGACY_ITEMS_SQL);
+    let migrated = migrated_from_v50(&path, SEED_LEGACY_ITEMS_SQL);
     let connection = migrated.connection();
     let project = source_project_of(connection, "imported-github").expect("attributed");
 
@@ -189,7 +214,7 @@ async fn async_upgrade_records_the_v51_migration() {
     let db = DaemonDb::open(&path).expect("open current v50 database");
     db.connection()
         .execute_batch(DROP_V51_SQL)
-        .expect("restore v48 schema");
+        .expect("restore v50 schema");
     drop(db);
 
     let async_db = AsyncDaemonDb::connect(&path)
