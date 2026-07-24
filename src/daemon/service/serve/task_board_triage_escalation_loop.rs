@@ -164,11 +164,10 @@ async fn spawn_escalation_worker(
         effort: None,
         allow_custom_model: false,
     };
-    let label = escalation.escalation_id.clone();
     let run_id = escalation.managed_run_id.clone();
     run_codex_agent_blocking(state, "triage escalation start", move |controller| {
         controller
-            .start_standalone_run_with_id(&label, &project_dir, &request, run_id)
+            .start_standalone_run_with_id(&project_dir, &request, run_id)
             .map(|_| ())
     })
     .await

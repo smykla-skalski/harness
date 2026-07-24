@@ -102,28 +102,28 @@ impl CodexControllerHandle {
         })
     }
 
-    /// Start a run with no owning Harness session at all -- `label` is a
-    /// free-form identity used only for the reservation/idempotency check
-    /// and the snapshot's `session_id` display field, never resolved against
-    /// the `sessions` table. `project_dir` is supplied directly by the
-    /// caller instead of being derived from a session's worktree. Used by
-    /// standalone one-shot report runs (triage escalation) that have no
+    /// Start a run with no owning Harness session at all. The run's own id
+    /// is its identity everywhere a session id would appear -- the
+    /// reservation/idempotency check, the snapshot's `session_id` display
+    /// field, and (via the NULL-`session_id` persistence fallback) the row
+    /// resurrected from the database -- so a repeated same-id call stays
+    /// idempotent across persistence. `project_dir` is supplied directly by
+    /// the caller instead of being derived from a session's worktree. Used
+    /// by standalone one-shot report runs (triage escalation) that have no
     /// interactive session to join and no repository to work in.
     ///
     /// # Errors
     /// Returns [`CliError`] when the snapshot cannot be persisted.
     pub(crate) fn start_standalone_run_with_id(
         &self,
-        label: &str,
         project_dir: &str,
         request: &CodexRunRequest,
         run_id: String,
     ) -> Result<CodexRunSnapshot, CliError> {
-        let label = label.to_string();
         let project_dir = project_dir.to_string();
-        let reservation_label = label.clone();
+        let reservation_label = run_id.clone();
         self.finish_starting_run(run_id, &reservation_label, move |controller, run_id| {
-            controller.prepare_standalone_run(&label, &project_dir, request, run_id)
+            controller.prepare_standalone_run(&project_dir, request, run_id)
         })
     }
 
@@ -131,9 +131,11 @@ impl CodexControllerHandle {
     /// [`Self::start_run_with_id`] and [`Self::start_standalone_run_with_id`].
     /// `label` is the value `ensure_run_belongs_to_session` compares a
     /// reused run's stored `session_id` against -- for a standalone run this
-    /// is the caller's free-form label, not a real session id, which is
-    /// exactly what [`Self::prepare_standalone_run`] stamps into the
-    /// snapshot's `session_id` field.
+    /// is the run id itself, which is both what
+    /// [`Self::prepare_standalone_run`] stamps into the snapshot's
+    /// `session_id` field and what the database load fallback yields for a
+    /// persisted NULL `session_id` row, so the comparison holds before and
+    /// after a reload.
     fn finish_starting_run(
         &self,
         run_id: String,
@@ -214,16 +216,16 @@ impl CodexControllerHandle {
     /// orchestration-side tracking to keep in sync.
     fn prepare_standalone_run(
         &self,
-        label: &str,
         project_dir: &str,
         request: &CodexRunRequest,
         run_id: String,
     ) -> Result<CodexRunSnapshot, CliError> {
         let prompt = validate_run_request(request)?;
-        self.preflight_websocket_probe(label)?;
+        self.preflight_websocket_probe(&run_id)?;
         let display_name = request.name.clone().unwrap_or_else(|| "Codex".to_string());
+        let session_id = run_id.clone();
         let snapshot = queued_run_snapshot(
-            label,
+            &session_id,
             request,
             run_id,
             project_dir.to_string(),
@@ -232,7 +234,7 @@ impl CodexControllerHandle {
             display_name,
         );
         self.save_and_broadcast(&snapshot)?;
-        log_queued_run(label, &snapshot);
+        log_queued_run(&session_id, &snapshot);
         Ok(snapshot)
     }
 
