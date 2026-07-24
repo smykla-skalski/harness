@@ -7,6 +7,7 @@ mod task_board_ws_parity_expected;
 fn task_board_routes_have_complete_ws_parity() {
     let actual: Vec<_> = super::routes_task_board::ROUTES
         .iter()
+        .chain(super::routes_task_board_working_copies::ROUTES)
         .chain(super::routes_task_board_positions::ROUTES)
         .chain(super::routes_task_board_triage::ROUTES)
         .chain(super::routes_task_board_orchestrator::ROUTES)

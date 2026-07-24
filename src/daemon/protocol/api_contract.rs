@@ -89,6 +89,7 @@ mod routes_task_board;
 mod routes_task_board_orchestrator;
 mod routes_task_board_positions;
 mod routes_task_board_triage;
+mod routes_task_board_working_copies;
 mod routes_tasks_agents_voice;
 #[cfg(test)]
 mod tests;

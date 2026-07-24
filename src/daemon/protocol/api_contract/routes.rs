@@ -3,7 +3,8 @@ use std::sync::LazyLock;
 use super::{
     HttpApiRouteContract, routes_policy_transfer, routes_remote, routes_reviews,
     routes_sessions_infra, routes_task_board, routes_task_board_orchestrator,
-    routes_task_board_positions, routes_task_board_triage, routes_tasks_agents_voice,
+    routes_task_board_positions, routes_task_board_triage, routes_task_board_working_copies,
+    routes_tasks_agents_voice,
 };
 
 pub static HTTP_API_CONTRACT: LazyLock<Vec<HttpApiRouteContract>> = LazyLock::new(|| {
@@ -12,6 +13,7 @@ pub static HTTP_API_CONTRACT: LazyLock<Vec<HttpApiRouteContract>> = LazyLock::ne
     v.extend_from_slice(routes_tasks_agents_voice::ROUTES);
     v.extend_from_slice(routes_reviews::ROUTES);
     v.extend_from_slice(routes_task_board::ROUTES);
+    v.extend_from_slice(routes_task_board_working_copies::ROUTES);
     v.extend_from_slice(routes_task_board_positions::ROUTES);
     v.extend_from_slice(routes_task_board_triage::ROUTES);
     v.extend_from_slice(routes_task_board_orchestrator::ROUTES);
