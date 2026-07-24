@@ -3,35 +3,44 @@
 //! Working copies are a convenience the user can always re-obtain, so the
 //! daemon caps their disk use: at startup it drops copies unused past
 //! `WORKING_COPY_MAX_AGE_DAYS`, then LRU-evicts until under
-//! `WORKING_COPY_DISK_BUDGET_MB`. Delivery bumps `last_used_at`, so an
-//! actively-delivered copy is never aged out.
+//! `WORKING_COPY_DISK_BUDGET_MB`. GC runs under the same registry lock as
+//! obtain, and delivery bumps `last_used_at`, so a copy resolved before the
+//! pass keeps its fresh timestamp and is not aged out.
 
 use std::fs;
 
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::working_copy::{
     WORKING_COPY_DISK_BUDGET_MB, WORKING_COPY_MAX_AGE_DAYS, WorkingCopyKey, WorkingCopyRegistry,
     WorkingCopyRegistryEntry, WorkingCopyRoot,
 };
 
-use super::store::{load_registry, save_registry, working_copies_root};
+use super::store::{load_registry, save_registry};
 
 /// One-shot GC pass over the working-copy registry, using the plan defaults.
 ///
 /// # Errors
 /// Returns `CliError` when the registry can't be loaded or saved.
 pub async fn run_task_board_working_copy_gc() -> Result<WorkingCopyGcReport, CliError> {
-    run_task_board_working_copy_gc_with(
-        &working_copies_root(),
-        chrono::Utc::now(),
-        chrono::Duration::days(WORKING_COPY_MAX_AGE_DAYS),
-        WORKING_COPY_DISK_BUDGET_MB.saturating_mul(1024 * 1024),
-    )
+    let now = chrono::Utc::now();
+    let max_age = chrono::Duration::days(WORKING_COPY_MAX_AGE_DAYS);
+    let max_disk = WORKING_COPY_DISK_BUDGET_MB.saturating_mul(1024 * 1024);
+    // Route through the runtime so GC shares obtain's registry lock and atomic
+    // write instead of racing it through a second, unlocked writer.
+    super::working_copy_runtime()
+        .with_registry_mut(move |registry| gc_registry_in_place(registry, now, max_age, max_disk))
+        .await
+        .map_err(|error| -> CliError {
+            CliErrorKind::workflow_io(format!(
+                "task-board working-copy gc registry write failed: {error}"
+            ))
+            .into()
+        })
 }
 
 /// Same as [`run_task_board_working_copy_gc`] but with the root, `now`,
-/// max-age, and disk-budget injected so tests can drive the full flow against
-/// a tempdir without touching `daemon_root()`.
+/// max-age, and disk-budget injected so tests can drive the full flow against a
+/// tempdir without touching `daemon_root()` or the process-wide runtime.
 ///
 /// # Errors
 /// Returns `CliError` when the registry can't be loaded or saved.
@@ -42,13 +51,25 @@ pub fn run_task_board_working_copy_gc_with(
     max_disk_bytes: u64,
 ) -> Result<WorkingCopyGcReport, CliError> {
     let mut registry = load_registry(root)?;
-    let targets = registry.pick_gc_targets(now, max_age, max_disk_bytes);
-    if targets.is_empty() {
-        return Ok(WorkingCopyGcReport::default());
-    }
-    let report = apply_targets(&mut registry, &targets);
+    let report = gc_registry_in_place(&mut registry, now, max_age, max_disk_bytes);
     save_registry(root, &registry)?;
     Ok(report)
+}
+
+/// Pick and apply GC targets against an in-memory registry, removing each
+/// checkout directory and its row. Shared by the production lock-held path and
+/// the tempdir-injected test path.
+fn gc_registry_in_place(
+    registry: &mut WorkingCopyRegistry,
+    now: chrono::DateTime<chrono::Utc>,
+    max_age: chrono::Duration,
+    max_disk_bytes: u64,
+) -> WorkingCopyGcReport {
+    let targets = registry.pick_gc_targets(now, max_age, max_disk_bytes);
+    if targets.is_empty() {
+        return WorkingCopyGcReport::default();
+    }
+    apply_targets(registry, &targets)
 }
 
 fn apply_targets(registry: &mut WorkingCopyRegistry, targets: &[WorkingCopyKey]) -> WorkingCopyGcReport {

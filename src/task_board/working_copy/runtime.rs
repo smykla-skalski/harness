@@ -207,6 +207,33 @@ impl WorkingCopyRuntime {
         .map_err(|join| WorkingCopyRuntimeError::Join(join.to_string()))?
         .map_err(WorkingCopyRuntimeError::Io)
     }
+
+    /// Run `mutate` against the registry under the same lock and atomic-write
+    /// path `record_entry` uses, so delete and GC never race obtain into a lost
+    /// update or a torn file. The closure may also remove checkout directories;
+    /// doing that inside the lock keeps a concurrent obtain from reusing a
+    /// directory mid-delete.
+    ///
+    /// # Errors
+    /// Returns [`WorkingCopyRuntimeError`] on IO, serialization, or join failures.
+    pub async fn with_registry_mut<F, R>(&self, mutate: F) -> Result<R, WorkingCopyRuntimeError>
+    where
+        F: FnOnce(&mut WorkingCopyRegistry) -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        let _guard = self.registry_lock.lock().await;
+        let registry_path = self.root.registry_path();
+        spawn_blocking(move || {
+            let mut registry = load_registry_lenient(&registry_path);
+            let out = mutate(&mut registry);
+            let body = serde_json::to_vec_pretty(&registry).map_err(|e| e.to_string())?;
+            write_registry_atomically(&registry_path, &body)?;
+            Ok::<R, String>(out)
+        })
+        .await
+        .map_err(|join| WorkingCopyRuntimeError::Join(join.to_string()))?
+        .map_err(WorkingCopyRuntimeError::Io)
+    }
 }
 
 async fn ensure_root_dir(path: &Path) -> Result<(), WorkingCopyRuntimeError> {
@@ -218,16 +245,30 @@ async fn ensure_root_dir(path: &Path) -> Result<(), WorkingCopyRuntimeError> {
         .map_err(|error| WorkingCopyRuntimeError::Io(error.to_string()))
 }
 
-/// A directory is reusable only if gix can open it as a repo with a working
-/// tree. A partial checkout from a failed clone fails this and gets recloned.
-async fn is_reusable_checkout(path: &Path) -> bool {
+/// Name of the completion marker written under `.git` once `main_worktree`
+/// finishes. `gix::open` succeeds and `workdir()` is `Some` for a repo whose
+/// fetch landed but whose checkout never ran - a clone the daemon died in the
+/// middle of - so reuse keys off this marker, not off the repo's mere shape.
+const COMPLETION_MARKER_NAME: &str = "harness-obtain-complete";
+
+pub(crate) fn completion_marker(checkout_path: &Path) -> PathBuf {
+    checkout_path.join(".git").join(COMPLETION_MARKER_NAME)
+}
+
+/// A directory is reusable only when the completion marker is present and gix
+/// can open it as a repo with a working tree. A clone interrupted before the
+/// checkout finished has no marker, so it reads as absent and gets recloned.
+pub(crate) async fn is_reusable_checkout(path: &Path) -> bool {
     if !path.exists() {
         return false;
     }
     let path = path.to_path_buf();
-    spawn_blocking(move || gix::open(&path).is_ok_and(|repo| repo.workdir().is_some()))
-        .await
-        .unwrap_or(false)
+    spawn_blocking(move || {
+        completion_marker(&path).exists()
+            && gix::open(&path).is_ok_and(|repo| repo.workdir().is_some())
+    })
+    .await
+    .unwrap_or(false)
 }
 
 fn load_registry_lenient(registry_path: &Path) -> WorkingCopyRegistry {
@@ -282,14 +323,39 @@ fn run_clone_checkout(clone_url: &str, checkout_path: &Path) -> Result<(), Worki
     }
     let interrupted = AtomicBool::new(false);
     let mut prepare = gix::prepare_clone(clone_url, checkout_path)
-        .map_err(|e| WorkingCopyRuntimeError::Clone(e.to_string()))?;
+        .map_err(|e| WorkingCopyRuntimeError::Clone(redact_clone_url_secret(&e.to_string())))?;
     let (mut checkout, _fetch) = prepare
         .fetch_then_checkout(Discard, &interrupted)
-        .map_err(|e| WorkingCopyRuntimeError::Clone(e.to_string()))?;
+        .map_err(|e| WorkingCopyRuntimeError::Clone(redact_clone_url_secret(&e.to_string())))?;
     let (_repo, _outcome) = checkout
         .main_worktree(Discard, &interrupted)
-        .map_err(|e| WorkingCopyRuntimeError::Checkout(e.to_string()))?;
+        .map_err(|e| WorkingCopyRuntimeError::Checkout(redact_clone_url_secret(&e.to_string())))?;
+    // Mark completion only after the worktree is fully materialized; reuse keys
+    // off this marker, never off the bare presence of a `.git` directory.
+    fs::write(completion_marker(checkout_path), b"")
+        .map_err(|e| WorkingCopyRuntimeError::Io(e.to_string()))?;
     Ok(())
+}
+
+/// gix error strings can echo the clone URL, which carries the
+/// `x-access-token:<token>@` credential. Strip it before the message reaches a
+/// log line or the WS progress stream.
+fn redact_clone_url_secret(message: &str) -> String {
+    const MARKER: &str = "x-access-token:";
+    let mut out = String::with_capacity(message.len());
+    let mut rest = message;
+    while let Some(idx) = rest.find(MARKER) {
+        let after = idx + MARKER.len();
+        out.push_str(&rest[..after]);
+        if let Some(at) = rest[after..].find('@') {
+            out.push_str("***");
+            rest = &rest[after + at..];
+        } else {
+            rest = &rest[after..];
+        }
+    }
+    out.push_str(rest);
+    out
 }
 
 #[cfg(test)]
@@ -396,6 +462,51 @@ mod tests {
         assert!(!second.cloned);
         assert_eq!(second.checkout_path, first.checkout_path);
         assert!(reuse_sink.snapshot().is_empty());
+    }
+
+    #[tokio::test]
+    async fn partial_checkout_without_marker_is_not_reused() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let source = dir.path().join("source.git");
+        make_source_repo(&source);
+        let root = WorkingCopyRoot::new(dir.path().join("working-copies"));
+        let runtime = Arc::new(WorkingCopyRuntime::new(root));
+        let url = format!("file://{}", source.display());
+        let sink: Arc<dyn WorkingCopyProgressSink> =
+            Arc::new(super::super::progress::DiscardProgressSink);
+
+        let first = runtime
+            .obtain_with_url("fixture/source", url.clone(), true, sink.clone())
+            .await
+            .expect("obtain")
+            .expect("present");
+        // Simulate a clone the daemon died in the middle of: the `.git` tree is
+        // present but the completion marker was never written.
+        std::fs::remove_file(completion_marker(&first.checkout_path)).expect("remove marker");
+
+        // Reuse must reject it - allow_clone:false now reports "not present".
+        let absent = runtime
+            .obtain_with_url("fixture/source", url.clone(), false, sink.clone())
+            .await
+            .expect("obtain");
+        assert!(absent.is_none());
+
+        // With cloning allowed the stale directory is cleared and recloned.
+        let recloned = runtime
+            .obtain_with_url("fixture/source", url, true, sink)
+            .await
+            .expect("obtain")
+            .expect("present");
+        assert!(recloned.cloned);
+        assert!(completion_marker(&recloned.checkout_path).exists());
+    }
+
+    #[test]
+    fn redact_clone_url_secret_strips_the_token() {
+        let raw = "failed to fetch https://x-access-token:ghp_secret123@github.com/owner/repo.git: 404";
+        let redacted = redact_clone_url_secret(raw);
+        assert!(!redacted.contains("ghp_secret123"));
+        assert!(redacted.contains("x-access-token:***@github.com/owner/repo.git"));
     }
 
     #[tokio::test]
