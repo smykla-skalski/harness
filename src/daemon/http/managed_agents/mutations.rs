@@ -6,22 +6,40 @@ use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
 
-use crate::daemon::agent_acp::AcpPermissionDecision;
 use crate::daemon::agent_tui::{AgentTuiInputRequest, AgentTuiResizeRequest, AgentTuiStartRequest};
+#[cfg(feature = "openapi")]
+use crate::daemon::agent_tui::AgentTuiInputRequestSchema;
 use crate::daemon::protocol::{
     CodexApprovalDecisionRequest, CodexRunRequest, CodexSteerRequest, ManagedAgentSnapshot,
     http_paths,
 };
+#[cfg(feature = "openapi")]
+use crate::daemon::protocol::ManagedAgentSnapshotSchema;
 use crate::errors::CliError;
 
 use super::super::DaemonHttpState;
 use super::super::auth::{authorize_control_request, require_auth};
+#[cfg(feature = "openapi")]
+use super::super::openapi::DaemonErrorBody;
 use super::super::response::{extract_request_id, timed_json};
 use super::{
-    ensure_acp_agent, ensure_acp_enabled, ensure_codex_agent, ensure_terminal_agent_async,
-    run_acp_agent_blocking, run_codex_agent_blocking, run_terminal_agent_blocking,
+    ensure_codex_agent, ensure_terminal_agent_async, run_acp_agent_blocking,
+    run_codex_agent_blocking, run_terminal_agent_blocking,
 };
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/managed-agents/terminal",
+    tag = "managed-agents",
+    params(
+        ("session_id" = String, Path, description = "Session identifier"),
+    ),
+    request_body = AgentTuiStartRequest,
+    responses(
+        (status = 200, description = "Started terminal managed agent", body = ManagedAgentSnapshotSchema),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_terminal_agent_start(
     Path(session_id): Path<String>,
     headers: HeaderMap,
@@ -47,6 +65,19 @@ pub(super) async fn post_terminal_agent_start(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/managed-agents/codex",
+    tag = "managed-agents",
+    params(
+        ("session_id" = String, Path, description = "Session identifier"),
+    ),
+    request_body = CodexRunRequest,
+    responses(
+        (status = 200, description = "Started Codex managed agent", body = ManagedAgentSnapshotSchema),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_codex_agent_start(
     Path(session_id): Path<String>,
     headers: HeaderMap,
@@ -76,6 +107,19 @@ pub(super) async fn post_codex_agent_start(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/managed-agents/{managed_agent_id}/input",
+    tag = "managed-agents",
+    params(
+        ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
+    ),
+    request_body = AgentTuiInputRequestSchema,
+    responses(
+        (status = 200, description = "Terminal agent snapshot after input", body = ManagedAgentSnapshotSchema),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_terminal_agent_input(
     Path(managed_agent_id): Path<String>,
     headers: HeaderMap,
@@ -107,6 +151,19 @@ pub(super) async fn post_terminal_agent_input(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/managed-agents/{managed_agent_id}/resize",
+    tag = "managed-agents",
+    params(
+        ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
+    ),
+    request_body = AgentTuiResizeRequest,
+    responses(
+        (status = 200, description = "Terminal agent snapshot after resize", body = ManagedAgentSnapshotSchema),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_terminal_agent_resize(
     Path(managed_agent_id): Path<String>,
     headers: HeaderMap,
@@ -138,6 +195,18 @@ pub(super) async fn post_terminal_agent_resize(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/managed-agents/{managed_agent_id}/stop",
+    tag = "managed-agents",
+    params(
+        ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
+    ),
+    responses(
+        (status = 200, description = "Managed agent snapshot after stop", body = ManagedAgentSnapshotSchema),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 #[expect(
     clippy::cognitive_complexity,
     reason = "managed-agent stop probes codex, ACP, then terminal managers explicitly"
@@ -197,6 +266,18 @@ pub(super) async fn post_terminal_agent_stop(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/managed-agents/{managed_agent_id}/ready",
+    tag = "managed-agents",
+    params(
+        ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
+    ),
+    responses(
+        (status = 200, description = "Terminal agent snapshot after readiness signal", body = ManagedAgentSnapshotSchema),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_terminal_agent_ready(
     Path(managed_agent_id): Path<String>,
     headers: HeaderMap,
@@ -227,6 +308,19 @@ pub(super) async fn post_terminal_agent_ready(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/managed-agents/{managed_agent_id}/steer",
+    tag = "managed-agents",
+    params(
+        ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
+    ),
+    request_body = CodexSteerRequest,
+    responses(
+        (status = 200, description = "Codex agent snapshot after steering prompt", body = ManagedAgentSnapshotSchema),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_codex_agent_steer(
     Path(managed_agent_id): Path<String>,
     headers: HeaderMap,
@@ -261,6 +355,18 @@ pub(super) async fn post_codex_agent_steer(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/managed-agents/{managed_agent_id}/interrupt",
+    tag = "managed-agents",
+    params(
+        ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
+    ),
+    responses(
+        (status = 200, description = "Codex agent snapshot after interrupt", body = ManagedAgentSnapshotSchema),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_codex_agent_interrupt(
     Path(agent_id): Path<String>,
     headers: HeaderMap,
@@ -294,6 +400,20 @@ pub(super) async fn post_codex_agent_interrupt(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/managed-agents/{managed_agent_id}/approvals/{approval_id}",
+    tag = "managed-agents",
+    params(
+        ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
+        ("approval_id" = String, Path, description = "Pending approval identifier"),
+    ),
+    request_body = CodexApprovalDecisionRequest,
+    responses(
+        (status = 200, description = "Codex agent snapshot after resolving the approval", body = ManagedAgentSnapshotSchema),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_codex_agent_approval(
     Path((agent_id, approval_id)): Path<(String, String)>,
     headers: HeaderMap,
@@ -329,7 +449,7 @@ pub(super) async fn post_codex_agent_approval(
     )
 }
 
-async fn with_managed_agent_lock<T, Fut>(
+pub(super) async fn with_managed_agent_lock<T, Fut>(
     state: &DaemonHttpState,
     session_id: &str,
     agent_id: &str,
@@ -348,118 +468,4 @@ where
 fn codex_session_id(state: &DaemonHttpState, agent_id: &str) -> Result<String, CliError> {
     ensure_codex_agent(state, agent_id)?;
     Ok(state.codex_controller.run(agent_id)?.session_id)
-}
-
-fn acp_session_id(state: &DaemonHttpState, agent_id: &str) -> Result<String, CliError> {
-    ensure_acp_enabled()?;
-    ensure_acp_agent(state, agent_id)?;
-    state.acp_agent_manager.get(agent_id).map(|s| s.session_id)
-}
-
-#[derive(serde::Deserialize)]
-pub(super) struct AcpPromptRequestBody {
-    pub prompt: String,
-}
-
-pub(super) async fn post_acp_agent_prompt(
-    Path(agent_id): Path<String>,
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<AcpPromptRequestBody>,
-) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
-    let result = match acp_session_id(&state, &agent_id) {
-        Ok(session_id) => {
-            let prompt = request.prompt;
-            let prompt_agent_id = agent_id.clone();
-            with_managed_agent_lock(&state, &session_id, &agent_id, || {
-                run_acp_agent_blocking(&state, "prompt", move |manager| {
-                    manager
-                        .send_prompt(&prompt_agent_id, &prompt)
-                        .map(ManagedAgentSnapshot::Acp)
-                })
-            })
-            .await
-        }
-        Err(error) => Err(error),
-    };
-    timed_json(
-        "POST",
-        http_paths::MANAGED_AGENT_ACP_PROMPT,
-        &request_id,
-        start,
-        result,
-    )
-}
-
-pub(super) async fn post_acp_agent_logout(
-    Path(agent_id): Path<String>,
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
-    let result = match acp_session_id(&state, &agent_id) {
-        Ok(session_id) => {
-            let logout_agent_id = agent_id.clone();
-            with_managed_agent_lock(&state, &session_id, &agent_id, || {
-                run_acp_agent_blocking(&state, "logout", move |manager| {
-                    manager
-                        .logout(&logout_agent_id)
-                        .map(|()| serde_json::json!({ "ok": true }))
-                })
-            })
-            .await
-        }
-        Err(error) => Err(error),
-    };
-    timed_json(
-        "POST",
-        http_paths::MANAGED_AGENT_ACP_LOGOUT,
-        &request_id,
-        start,
-        result,
-    )
-}
-
-pub(super) async fn post_acp_permission(
-    Path((agent_id, batch_id)): Path<(String, String)>,
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<AcpPermissionDecision>,
-) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
-    let result = match acp_session_id(&state, &agent_id) {
-        Ok(session_id) => {
-            let decision_agent_id = agent_id.clone();
-            let decision_batch_id = batch_id.clone();
-            with_managed_agent_lock(&state, &session_id, &agent_id, || {
-                run_acp_agent_blocking(&state, "permission", move |manager| {
-                    manager
-                        .resolve_permission_batch(&decision_agent_id, &decision_batch_id, &request)
-                        .map(ManagedAgentSnapshot::Acp)
-                })
-            })
-            .await
-        }
-        Err(error) => Err(error),
-    };
-    timed_json(
-        "POST",
-        http_paths::MANAGED_AGENT_ACP_PERMISSION,
-        &request_id,
-        start,
-        result,
-    )
 }

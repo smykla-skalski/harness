@@ -5,12 +5,28 @@ use axum::http::HeaderMap;
 use axum::response::Response;
 
 use crate::daemon::protocol::http_paths;
+#[cfg(feature = "openapi")]
+use crate::daemon::protocol::{ManagedAgentListResponse, ManagedAgentSnapshotSchema};
 
 use super::super::DaemonHttpState;
 use super::super::auth::require_auth;
+#[cfg(feature = "openapi")]
+use super::super::openapi::DaemonErrorBody;
 use super::super::response::{extract_request_id, timed_json};
 use super::{managed_agent_list_response_async, managed_agent_snapshot_async};
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/v1/sessions/{session_id}/managed-agents",
+    tag = "managed-agents",
+    params(
+        ("session_id" = String, Path, description = "Session identifier"),
+    ),
+    responses(
+        (status = 200, description = "Managed agents running in the session", body = ManagedAgentListResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(crate) async fn get_managed_agents(
     Path(session_id): Path<String>,
     headers: HeaderMap,
@@ -31,6 +47,18 @@ pub(crate) async fn get_managed_agents(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/v1/managed-agents/{managed_agent_id}",
+    tag = "managed-agents",
+    params(
+        ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
+    ),
+    responses(
+        (status = 200, description = "Managed agent snapshot", body = ManagedAgentSnapshotSchema),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(crate) async fn get_managed_agent(
     Path(managed_agent_id): Path<String>,
     headers: HeaderMap,

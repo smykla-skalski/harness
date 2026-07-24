@@ -8,8 +8,13 @@ use serde::Deserialize;
 use crate::daemon::protocol::{ManagedAgentSnapshot, http_paths};
 use crate::errors::{CliError, CliErrorKind};
 
+#[cfg(feature = "openapi")]
+use crate::daemon::protocol::ManagedAgentSnapshotSchema;
+
 use super::super::DaemonHttpState;
 use super::super::auth::require_auth;
+#[cfg(feature = "openapi")]
+use super::super::openapi::DaemonErrorBody;
 use super::super::response::{extract_request_id, timed_json};
 use super::{ensure_acp_agent, ensure_acp_enabled, run_acp_agent_blocking};
 
@@ -19,6 +24,19 @@ pub(super) struct DeleteAcpAgentQuery {
     pub(super) session_id: Option<String>,
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    delete,
+    path = "/v1/managed-agents/{managed_agent_id}",
+    tag = "managed-agents",
+    params(
+        ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
+        ("session_id" = Option<String>, Query, description = "Reject the delete unless the agent belongs to this session"),
+    ),
+    responses(
+        (status = 200, description = "Final ACP agent snapshot after stop", body = ManagedAgentSnapshotSchema),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn delete_acp_agent(
     Path(agent_id): Path<String>,
     Query(query): Query<DeleteAcpAgentQuery>,

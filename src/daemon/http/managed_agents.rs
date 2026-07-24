@@ -12,16 +12,17 @@ use crate::feature_flags::acp_enabled_from_env;
 
 use super::{DaemonHttpState, require_async_db};
 
-mod acp_delete;
-mod acp_inspect;
-mod acp_sessions;
-mod acp_start;
-mod acp_transcript;
+pub(super) mod acp_delete;
+pub(super) mod acp_inspect;
+pub(super) mod acp_sessions;
+pub(super) mod acp_start;
+pub(super) mod acp_transcript;
 mod attach;
-mod codex_inspect;
-mod codex_transcript;
+pub(super) mod codex_inspect;
+pub(super) mod codex_transcript;
 mod lookup;
-mod mutations;
+pub(super) mod mutations;
+pub(super) mod mutations_acp;
 pub(crate) mod reads;
 mod snapshots;
 
@@ -90,15 +91,15 @@ pub(super) fn managed_agent_routes() -> Router<DaemonHttpState> {
         )
         .route(
             http_paths::MANAGED_AGENT_ACP_PERMISSION,
-            post(mutations::post_acp_permission),
+            post(mutations_acp::post_acp_permission),
         )
         .route(
             http_paths::MANAGED_AGENT_ACP_PROMPT,
-            post(mutations::post_acp_agent_prompt),
+            post(mutations_acp::post_acp_agent_prompt),
         )
         .route(
             http_paths::MANAGED_AGENT_ACP_LOGOUT,
-            post(mutations::post_acp_agent_logout),
+            post(mutations_acp::post_acp_agent_logout),
         )
         .route(
             http_paths::MANAGED_AGENT_ACP_SESSIONS,
