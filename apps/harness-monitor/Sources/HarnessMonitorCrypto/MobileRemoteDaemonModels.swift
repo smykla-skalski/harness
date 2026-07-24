@@ -118,7 +118,7 @@ public struct MobileRemoteDaemonPairingInvitation: Codable, Equatable, Sendable 
   public let expiresAt: Date
 
   public static func decode(_ url: URL, now: Date = .now) throws -> Self {
-    guard MobilePairingLink.supports(url), url.host?.lowercased() == "remote-pair" else {
+    guard MobilePairingLink.supports(url) else {
       throw MobileRemoteDaemonProfileError.invalidInvitation
     }
     let payloads =
@@ -174,23 +174,102 @@ public enum MobilePairingLink: Equatable, Sendable {
   case relay(MobilePairingInvitation)
   case remote(MobileRemoteDaemonPairingInvitation)
 
+  /// Canonical deep-link host every pairing flow shares.
+  static let canonicalHost = MobilePairingInvitationCodec.urlHost
+  /// Host the remote-daemon flow emitted before unification. Still accepted so
+  /// links already handed out under it keep resolving.
+  static let legacyRemoteHost = "remote-pair"
+
   public static func supports(_ url: URL) -> Bool {
     guard url.scheme?.lowercased() == MobilePairingInvitationCodec.urlScheme,
       let host = url.host?.lowercased()
     else {
       return false
     }
-    return [MobilePairingInvitationCodec.urlHost, "remote-pair"].contains(host)
+    return host == canonicalHost || host == legacyRemoteHost
+  }
+
+  /// True when `url` is an unambiguous remote-daemon pairing link — a supported
+  /// pairing host whose single payload carries the remote marker and not the
+  /// relay marker. A caller that only pairs with a remote daemon (the watch)
+  /// uses this to forward remote links while leaving relay or ambiguous links,
+  /// which share the `pair` host, alone.
+  public static func isRemotePairingLink(_ url: URL) -> Bool {
+    guard supports(url), let flow = classifyFlow(url) else {
+      return false
+    }
+    switch flow {
+    case .remote:
+      return true
+    case .relay:
+      return false
+    }
+  }
+
+  /// True when a remote-daemon-only surface (the watch) should handle `url` as a
+  /// pairing attempt rather than ignore it. The legacy `remote-pair` host only
+  /// ever carried remote-daemon invitations, so any link on it qualifies — a
+  /// corrupt legacy link still surfaces a pairing error instead of being
+  /// silently dropped. On the shared `pair` host the payload decides via
+  /// `isRemotePairingLink`, so relay and ambiguous links are left alone.
+  public static func isRemotePairingDeepLink(_ url: URL) -> Bool {
+    guard url.scheme?.lowercased() == MobilePairingInvitationCodec.urlScheme else {
+      return false
+    }
+    if url.host?.lowercased() == legacyRemoteHost {
+      return true
+    }
+    return isRemotePairingLink(url)
   }
 
   public static func decode(_ url: URL, now: Date = .now) throws -> Self {
-    switch url.host?.lowercased() {
-    case MobilePairingInvitationCodec.urlHost:
-      return .relay(try MobilePairingInvitationCodec.decode(url, now: now))
-    case "remote-pair":
-      return .remote(try MobileRemoteDaemonPairingInvitation.decode(url, now: now))
-    default:
+    guard supports(url) else {
       throw MobilePairingError.unsupportedURL(url.absoluteString)
+    }
+    // The host no longer selects the flow; the payload does. A remote-daemon
+    // invitation carries `server_spki_sha256`, a relay invitation carries
+    // `publicKeyFingerprint`. A payload that matches neither or both is
+    // rejected rather than guessed at.
+    guard let flow = classifyFlow(url) else {
+      throw MobilePairingError.unsupportedURL(url.absoluteString)
+    }
+    switch flow {
+    case .remote:
+      return .remote(try MobileRemoteDaemonPairingInvitation.decode(url, now: now))
+    case .relay:
+      return .relay(try MobilePairingInvitationCodec.decode(url, now: now))
+    }
+  }
+
+  private enum Flow {
+    case relay
+    case remote
+  }
+
+  private static func classifyFlow(_ url: URL) -> Flow? {
+    let payloads =
+      URLComponents(url: url, resolvingAgainstBaseURL: false)?
+      .queryItems?
+      .filter { $0.name == "payload" } ?? []
+    // More than one `payload` is itself ambiguous, so require exactly one
+    // before reading its markers rather than classifying off the first.
+    guard
+      payloads.count == 1,
+      let payload = payloads.first?.value,
+      let data = Data(base64URLEncoded: payload),
+      let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    else {
+      return nil
+    }
+    let looksRemote = object["server_spki_sha256"] != nil
+    let looksRelay = object["publicKeyFingerprint"] != nil
+    switch (looksRemote, looksRelay) {
+    case (true, false):
+      return .remote
+    case (false, true):
+      return .relay
+    default:
+      return nil
     }
   }
 
@@ -208,7 +287,7 @@ public enum MobilePairingLink: Equatable, Sendable {
     if payload["server_spki_sha256"] != nil {
       var components = URLComponents()
       components.scheme = MobilePairingInvitationCodec.urlScheme
-      components.host = "remote-pair"
+      components.host = canonicalHost
       components.queryItems = [URLQueryItem(name: "payload", value: trimmed)]
       guard let url = components.url else {
         throw MobileRemoteDaemonProfileError.invalidInvitation

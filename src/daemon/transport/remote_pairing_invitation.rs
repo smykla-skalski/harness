@@ -55,10 +55,9 @@ pub(super) fn build_remote_pairing_invitation(
     let payload = serde_json::to_vec(&payload).map_err(|error| {
         CliErrorKind::workflow_parse(format!("encode remote pairing invitation: {error}"))
     })?;
-    let pairing_url = format!(
-        "harness://remote-pair?payload={}",
-        URL_SAFE_NO_PAD.encode(payload)
-    );
+    // Every pairing flow now shares the `harness://pair` host; the app decides
+    // which flow a link drives from its payload, not the host.
+    let pairing_url = format!("harness://pair?payload={}", URL_SAFE_NO_PAD.encode(payload));
     Ok(RemotePairingInvitation {
         endpoint,
         server_spki_sha256,

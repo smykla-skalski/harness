@@ -57,7 +57,7 @@ public struct RemoteDaemonPairingInvitation: Codable, Equatable, Sendable {
   public static func decode(_ url: URL, now: Date = .now) throws -> Self {
     guard
       url.scheme?.lowercased() == "harness",
-      url.host?.lowercased() == "remote-pair",
+      isPairingHost(url.host),
       let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
     else {
       throw RemoteDaemonPairingInvitationError.invalidURL
@@ -107,6 +107,77 @@ public struct RemoteDaemonPairingInvitation: Codable, Equatable, Sendable {
     guard expiresAt > now else {
       throw RemoteDaemonPairingInvitationError.expired
     }
+  }
+
+  /// Accepts the canonical `pair` host and the legacy `remote-pair` host so
+  /// links handed out before the hosts were unified still resolve.
+  private static func isPairingHost(_ host: String?) -> Bool {
+    guard let host = host?.lowercased() else {
+      return false
+    }
+    return host == "pair" || host == "remote-pair"
+  }
+
+  /// True when `url` is an unambiguous remote-daemon pairing link: a `harness://`
+  /// pairing host whose single payload parses and carries the remote marker
+  /// `server_spki_sha256` without the relay marker `publicKeyFingerprint`. The
+  /// flow is chosen from the payload, not the host — the `pair` host is shared
+  /// with relay invitations. Anything else — an unparseable payload, more than
+  /// one payload item, a missing remote marker, or a payload carrying both
+  /// markers — returns false and is left for the deep-link router rather than
+  /// decoded as remote, since `Codable` decoding would otherwise ignore the
+  /// relay marker and accept it. Field validity such as expiry and endpoint is
+  /// enforced later by `decode(_:)`, which surfaces a clear pairing error.
+  public static func isRemotePairingLink(_ url: URL) -> Bool {
+    guard
+      url.scheme?.lowercased() == "harness",
+      isPairingHost(url.host),
+      let object = payloadObject(from: url)
+    else {
+      return false
+    }
+    return object["server_spki_sha256"] != nil && object["publicKeyFingerprint"] == nil
+  }
+
+  /// True when the macOS deep-link handler should treat `url` as a remote-daemon
+  /// pairing attempt — showing the confirmation sheet or a clear pairing error —
+  /// rather than routing it for navigation. The legacy `remote-pair` host only
+  /// ever carried remote-daemon invitations, so any link on it qualifies and a
+  /// corrupt legacy link still surfaces a clear error instead of being silently
+  /// ignored. On the shared `pair` host the payload decides via
+  /// `isRemotePairingLink`, so a relay invitation is left for the router.
+  public static func isRemotePairingDeepLink(_ url: URL) -> Bool {
+    guard url.scheme?.lowercased() == "harness" else {
+      return false
+    }
+    if url.host?.lowercased() == "remote-pair" {
+      return true
+    }
+    return isRemotePairingLink(url)
+  }
+
+  private static func payloadObject(from url: URL) -> [String: Any]? {
+    let payloads =
+      URLComponents(url: url, resolvingAgainstBaseURL: false)?
+      .queryItems?
+      .filter { $0.name == "payload" } ?? []
+    // More than one `payload` is ambiguous, so require exactly one, matching
+    // `decode(_:)` rather than reading markers off the first item.
+    guard payloads.count == 1, let encoded = payloads.first?.value else {
+      return nil
+    }
+    let padding = String(repeating: "=", count: (4 - encoded.count % 4) % 4)
+    let base64 =
+      encoded
+      .replacingOccurrences(of: "-", with: "+")
+      .replacingOccurrences(of: "_", with: "/") + padding
+    guard
+      let data = Data(base64Encoded: base64),
+      let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    else {
+      return nil
+    }
+    return object
   }
 
   enum CodingKeys: String, CodingKey {

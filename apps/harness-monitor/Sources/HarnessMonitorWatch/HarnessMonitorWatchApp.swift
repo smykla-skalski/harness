@@ -67,9 +67,11 @@ struct HarnessMonitorWatchApp: App {
           }
         }
         .onOpenURL { url in
-          guard MobilePairingLink.supports(url),
-            url.host?.lowercased() == "remote-pair"
-          else {
+          // The watch only pairs with a remote daemon. Any link on the legacy
+          // `remote-pair` host is a pairing attempt — a corrupt one still shows
+          // an error rather than being dropped; on the shared `pair` host the
+          // payload must mark it remote, so relay links are left alone.
+          guard MobilePairingLink.isRemotePairingDeepLink(url) else {
             return
           }
           Task {

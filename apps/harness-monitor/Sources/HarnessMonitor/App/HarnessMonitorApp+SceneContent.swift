@@ -106,13 +106,15 @@ extension HarnessMonitorApp {
     }
   }
 
-  /// Handles incoming `harness://` URLs. Remote-pairing links show a
-  /// confirmation sheet before pairing. Other routes go through the deep-link
-  /// router for review / task-board navigation.
+  /// Handles incoming `harness://` URLs. Remote-daemon pairing links show a
+  /// confirmation sheet (or a clear error) before pairing. Other routes go
+  /// through the deep-link router for review / task-board navigation. On the
+  /// shared `harness://pair` host the payload marker selects the flow, so a
+  /// relay invitation is left for the router; the legacy `remote-pair` host is
+  /// always handled as a pairing attempt so a corrupt legacy link still errors
+  /// clearly instead of being silently ignored.
   func handleHarnessDeepLink(_ url: URL) {
-    if url.scheme?.lowercased() == "harness",
-      url.host?.lowercased() == "remote-pair"
-    {
+    if RemoteDaemonPairingInvitation.isRemotePairingDeepLink(url) {
       do {
         let invitation = try RemoteDaemonPairingInvitation.decode(url)
         pendingPairingInvitationValue = invitation

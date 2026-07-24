@@ -399,7 +399,7 @@ fn daemon_remote_pair_create_builds_persisted_record_and_response() {
 
     let encoded_payload = response
         .pairing_url
-        .strip_prefix("harness://remote-pair?payload=")
+        .strip_prefix("harness://pair?payload=")
         .expect("remote pairing deep link");
     let payload = URL_SAFE_NO_PAD
         .decode(encoded_payload)

@@ -99,7 +99,7 @@ struct HarnessMonitorStoreRemoteConnectionTests {
     store.remoteDaemonActionState = .forgetting
 
     store.pairRemoteDaemon(
-      using: .deepLink("harness://remote-pair"),
+      using: .deepLink("harness://pair"),
       displayName: "Work Mac"
     )
 
