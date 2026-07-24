@@ -6,11 +6,12 @@ use axum::response::Response;
 use crate::daemon::protocol::{
     TaskBoardAuditRequest, TaskBoardCatalogRequest, TaskBoardDispatchDeliverRequest,
     TaskBoardDispatchRequest, TaskBoardEvaluateRequest, TaskBoardHostSetProjectTypesRequest,
-    TaskBoardSyncRequest, http_paths,
+    TaskBoardProjectUpdateRequest, TaskBoardSyncRequest, http_paths,
 };
 use crate::task_board::{
     DispatchExecutionSummary, Machine, TaskBoardAuditSummary, TaskBoardEvaluationSummary,
     TaskBoardMachineSummary, TaskBoardProjectSummary, TaskBoardSyncSummary,
+    project::TaskBoardProject,
 };
 
 use super::super::DaemonHttpState;
@@ -223,6 +224,35 @@ pub(super) async fn get_task_board_projects(
         &request_id,
         start,
         task_board_route_executor::projects(&state, &request).await,
+    )
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/task-board/projects/update",
+    tag = "task-board",
+    request_body = TaskBoardProjectUpdateRequest,
+    responses(
+        (status = 200, description = "The project after the edit", body = TaskBoardProject),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+)]
+pub(super) async fn post_task_board_projects_update(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(mut request): Json<TaskBoardProjectUpdateRequest>,
+) -> Response {
+    let (start, request_id) = match authorized_control_request_parts(&headers, &state, &mut request)
+    {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_PROJECTS_UPDATE,
+        &request_id,
+        start,
+        task_board_route_executor::update_project(&state, &request).await,
     )
 }
 

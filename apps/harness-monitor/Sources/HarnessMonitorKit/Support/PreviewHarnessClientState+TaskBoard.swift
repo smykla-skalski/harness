@@ -251,8 +251,8 @@ extension PreviewHarnessClientState {
 
   func taskBoardProjects(status: TaskBoardStatus?) -> [TaskBoardProjectSummary] {
     let grouped = Dictionary(
-      grouping: currentTaskBoardItems(status: status).filter { $0.projectId != nil },
-      by: \.projectId
+      grouping: currentTaskBoardItems(status: status).filter { $0.sourceProjectId != nil },
+      by: \.sourceProjectId
     )
     return grouped.compactMap { key, items in
       guard let projectId = key else {
@@ -260,6 +260,9 @@ extension PreviewHarnessClientState {
       }
       return TaskBoardProjectSummary(
         projectId: projectId,
+        source: .gitHub,
+        slug: items.first?.executionRepository ?? items.first?.projectId ?? "unnamed project",
+        displayName: nil,
         itemCount: items.count,
         readyCount: items.count { $0.status == .todo }
       )

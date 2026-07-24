@@ -32,6 +32,9 @@ fn task_board_routes_have_complete_ws_parity() {
         actual,
         task_board_ws_parity_expected::expected_task_board_ws_parity()
     );
+    // Derived from the same route tables rather than from the expected fixture,
+    // so the MCP surface cannot drift on its own. Orchestrator routes are
+    // deliberately absent: they are not exposed as MCP methods.
     let expected_mcp_methods: Vec<_> = super::routes_task_board::ROUTES
         .iter()
         .chain(super::routes_task_board_positions::ROUTES)

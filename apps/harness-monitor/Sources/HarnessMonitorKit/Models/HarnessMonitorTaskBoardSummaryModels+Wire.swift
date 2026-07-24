@@ -28,6 +28,9 @@ extension TaskBoardProjectSummary {
   public init(wire: TaskBoardProjectSummaryWire) {
     self.init(
       projectId: wire.projectId,
+      source: wire.source,
+      slug: wire.slug,
+      displayName: wire.displayName,
       itemCount: Int(wire.itemCount),
       readyCount: Int(wire.readyCount)
     )

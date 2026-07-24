@@ -74,7 +74,8 @@ struct TaskBoardRepositoryIdentityTests {
         snapshot: TaskBoardInboxSnapshot(),
         taskBoardItems: [review],
         decisionItems: [],
-        scopeSessionID: nil
+        scopeSessionID: nil,
+        taskBoardProjects: []
       )
     )
 

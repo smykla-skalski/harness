@@ -156,7 +156,8 @@ struct TaskBoardCardPresentationWorkerTests {
         snapshot: TaskBoardInboxSnapshot(),
         taskBoardItems: [ambiguous, duplicateOwner, unique],
         decisionItems: [],
-        scopeSessionID: nil
+        scopeSessionID: nil,
+        taskBoardProjects: []
       )
     )
 
@@ -184,7 +185,8 @@ struct TaskBoardCardPresentationWorkerTests {
         snapshot: TaskBoardInboxSnapshot(items: [inbox]),
         taskBoardItems: [],
         decisionItems: [],
-        scopeSessionID: nil
+        scopeSessionID: nil,
+        taskBoardProjects: []
       )
     )
 

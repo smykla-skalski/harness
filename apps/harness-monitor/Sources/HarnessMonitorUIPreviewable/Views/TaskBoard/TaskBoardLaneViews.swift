@@ -96,9 +96,6 @@ struct TaskBoardItemRow: View {
   private var statusTint: Color { taskBoardStatusColor(for: item.status) }
 
   private var repositoryLabel: String {
-    guard let repositoryID = item.taskBoardRepositoryIdentity else {
-      return item.agentMode.title
-    }
     if let cardPresentation {
       let precomputed =
         alwaysShowsFullRepositoryNames
@@ -108,10 +105,12 @@ struct TaskBoardItemRow: View {
         return precomputed
       }
     }
+    // An item belonging to no project names the agent mode instead, which is
+    // the only other thing the footer slot can honestly say about it.
     return projectLabelResolver.label(
-      for: repositoryID,
+      for: item,
       alwaysShowFullName: alwaysShowsFullRepositoryNames
-    )
+    ) ?? item.agentMode.title
   }
 
   private var cardGlyph: TaskBoardCardGlyph {

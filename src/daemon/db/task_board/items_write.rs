@@ -17,10 +17,10 @@ pub(crate) async fn insert_item_in_tx(
         estimated_tokens, estimated_cost_microusd, imported_from_provider, planning_json,
         workflow_json, session_id, work_item_id, usage_json, parent_item_id, child_order,
         created_at, updated_at, deleted_at, revision, kind, lane_position, lane_origin,
-        lane_actor, lane_producer, lane_set_at, tombstone_cause
+        lane_actor, lane_producer, lane_set_at, tombstone_cause, source_project_id
     ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
         ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28,
-        ?29, ?30, ?31, ?32, ?33)",
+        ?29, ?30, ?31, ?32, ?33, ?34)",
     )
     .bind(&item.id)
     .bind(i64::from(item.schema_version))
@@ -68,6 +68,7 @@ pub(crate) async fn insert_item_in_tx(
     .bind(lane_producer(item.lane_origin.as_ref()))
     .bind(&item.lane_set_at)
     .bind(tombstone_cause_label(item.tombstone_cause.as_ref()))
+    .bind(&item.source_project_id)
     .execute(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("insert task board item '{}': {error}", item.id)))?;
@@ -90,7 +91,8 @@ pub(crate) async fn replace_item_in_tx(
         session_id = ?18, work_item_id = ?19, usage_json = ?20, parent_item_id = ?21,
         child_order = ?22, created_at = ?23, updated_at = ?24, deleted_at = ?25,
         revision = ?26, kind = ?27, lane_position = ?28, lane_origin = ?29,
-        lane_actor = ?30, lane_producer = ?31, lane_set_at = ?32, tombstone_cause = ?33
+        lane_actor = ?30, lane_producer = ?31, lane_set_at = ?32, tombstone_cause = ?33,
+        source_project_id = ?34
         WHERE item_id = ?1",
     )
     .bind(&item.id)
@@ -139,6 +141,7 @@ pub(crate) async fn replace_item_in_tx(
     .bind(lane_producer(item.lane_origin.as_ref()))
     .bind(&item.lane_set_at)
     .bind(tombstone_cause_label(item.tombstone_cause.as_ref()))
+    .bind(&item.source_project_id)
     .execute(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("replace task board item '{}': {error}", item.id)))?;

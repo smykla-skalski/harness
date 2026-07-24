@@ -15,6 +15,7 @@ pub mod orchestrator;
 pub mod planning;
 pub mod policy;
 pub mod policy_graph;
+pub mod project;
 #[cfg(feature = "daemon-runtime")]
 pub mod policy_runtime;
 pub mod progress_rollup;

@@ -82,6 +82,7 @@ pub(super) fn task_board_routes() -> OpenApiRouter<DaemonHttpState> {
         .routes(routes!(operations::post_task_board_evaluate))
         .routes(routes!(operations::get_task_board_audit))
         .routes(routes!(operations::get_task_board_projects))
+        .routes(routes!(operations::post_task_board_projects_update))
         .routes(routes!(operations::get_task_board_machines))
         .merge(task_board_host_routes());
     merge_policy_pipeline_routes(merge_policy_spawn_gate_routes(merge_policy_io_routes(

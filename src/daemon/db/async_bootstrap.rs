@@ -39,6 +39,17 @@ pub(super) async fn ensure_async_schema(pool: &SqlitePool) -> Result<(), CliErro
     run_daemon_migrator(pool).await
 }
 
+/// Every migration the binary carries. Tests that assert a fully migrated
+/// database read this instead of a literal range, so adding a migration does
+/// not mean rewriting a number in unrelated tests.
+#[cfg(test)]
+pub(crate) fn all_migration_versions() -> Vec<i64> {
+    DAEMON_DB_MIGRATOR
+        .iter()
+        .map(|migration| i64::try_from(migration.version).unwrap_or(i64::MAX))
+        .collect()
+}
+
 async fn ensure_schema_meta_migrations_recorded(
     pool: &SqlitePool,
     version: &str,
@@ -98,6 +109,7 @@ const fn migration_effect_column(migration_version: i64) -> Option<(&'static str
         35 => Some(("task_board_execution_hosts", "observed_host_instance_id")),
         40 => Some(("task_board_items", "tombstone_cause")),
         41 => Some(("task_board_items", "triage_override_verdict")),
+        46 => Some(("task_board_items", "source_project_id")),
         _ => None,
     }
 }
@@ -150,6 +162,9 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         42 => 48,
         43 => 49,
         44 => 50,
+        // Schema v51 ships as two files: the projects table and the item
+        // attribution that references it.
+        45 | 46 => 51,
         _ => u64::MAX,
     }
 }

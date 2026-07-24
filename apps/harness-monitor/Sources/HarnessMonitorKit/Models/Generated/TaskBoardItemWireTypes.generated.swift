@@ -13,6 +13,7 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
   public var priority: TaskBoardPriority
   public var tags: [String]
   public var projectId: String?
+  public var sourceProjectId: String?
   public var targetProjectTypes: [String]
   public var agentMode: TaskBoardAgentMode
   public var workflowKind: TaskBoardWorkflowKind
@@ -37,7 +38,7 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
   public var deletedAt: String?
   public var tombstoneCause: TaskBoardTombstoneCause?
 
-  public init(schemaVersion: UInt32, id: String, title: String, body: String = "", status: TaskBoardStatus = .todo, priority: TaskBoardPriority = .medium, tags: [String] = [], projectId: String? = nil, targetProjectTypes: [String] = [], agentMode: TaskBoardAgentMode = .headless, workflowKind: TaskBoardWorkflowKind = .defaultTask, kind: TaskBoardItemKind = .task, executionRepository: String? = nil, estimatedTokens: UInt64? = nil, estimatedCostMicrousd: UInt64? = nil, externalRefs: [ExternalRefWire] = [], importedFromProvider: ExternalRefProviderWire? = nil, planning: PlanningStateWire = PlanningStateWire(), workflow: TaskBoardWorkflowStateWire? = nil, sessionId: String? = nil, workItemId: String? = nil, usage: TaskUsageWire = TaskUsageWire(), parentItemId: String? = nil, childOrder: UInt32 = 0, lanePosition: UInt32? = nil, laneOrigin: TaskBoardLaneOriginWire? = nil, laneSetAt: String? = nil, createdAt: String, updatedAt: String, deletedAt: String? = nil, tombstoneCause: TaskBoardTombstoneCause? = nil) {
+  public init(schemaVersion: UInt32, id: String, title: String, body: String = "", status: TaskBoardStatus = .todo, priority: TaskBoardPriority = .medium, tags: [String] = [], projectId: String? = nil, sourceProjectId: String? = nil, targetProjectTypes: [String] = [], agentMode: TaskBoardAgentMode = .headless, workflowKind: TaskBoardWorkflowKind = .defaultTask, kind: TaskBoardItemKind = .task, executionRepository: String? = nil, estimatedTokens: UInt64? = nil, estimatedCostMicrousd: UInt64? = nil, externalRefs: [ExternalRefWire] = [], importedFromProvider: ExternalRefProviderWire? = nil, planning: PlanningStateWire = PlanningStateWire(), workflow: TaskBoardWorkflowStateWire? = nil, sessionId: String? = nil, workItemId: String? = nil, usage: TaskUsageWire = TaskUsageWire(), parentItemId: String? = nil, childOrder: UInt32 = 0, lanePosition: UInt32? = nil, laneOrigin: TaskBoardLaneOriginWire? = nil, laneSetAt: String? = nil, createdAt: String, updatedAt: String, deletedAt: String? = nil, tombstoneCause: TaskBoardTombstoneCause? = nil) {
     self.schemaVersion = schemaVersion
     self.id = id
     self.title = title
@@ -46,6 +47,7 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
     self.priority = priority
     self.tags = tags
     self.projectId = projectId
+    self.sourceProjectId = sourceProjectId
     self.targetProjectTypes = targetProjectTypes
     self.agentMode = agentMode
     self.workflowKind = workflowKind
@@ -81,6 +83,7 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
     priority = try container.decodeIfPresent(TaskBoardPriority.self, forKey: .priority) ?? .medium
     tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
     projectId = try container.decodeIfPresent(String.self, forKey: .projectId)
+    sourceProjectId = try container.decodeIfPresent(String.self, forKey: .sourceProjectId)
     targetProjectTypes = try container.decodeIfPresent([String].self, forKey: .targetProjectTypes) ?? []
     agentMode = try container.decodeIfPresent(TaskBoardAgentMode.self, forKey: .agentMode) ?? .headless
     workflowKind = try container.decodeIfPresent(TaskBoardWorkflowKind.self, forKey: .workflowKind) ?? .defaultTask
@@ -115,6 +118,7 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
     case priority
     case tags
     case projectId = "project_id"
+    case sourceProjectId = "source_project_id"
     case targetProjectTypes = "target_project_types"
     case agentMode = "agent_mode"
     case workflowKind = "workflow_kind"

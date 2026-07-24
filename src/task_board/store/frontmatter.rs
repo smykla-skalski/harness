@@ -18,6 +18,8 @@ pub(super) struct TaskBoardFrontmatter {
     tags: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     project_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    source_project_id: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     target_project_types: Vec<String>,
     agent_mode: AgentMode,
@@ -71,6 +73,7 @@ impl From<&TaskBoardItem> for TaskBoardFrontmatter {
             priority: item.priority,
             tags: item.tags.clone(),
             project_id: item.project_id.clone(),
+            source_project_id: item.source_project_id.clone(),
             target_project_types: item.target_project_types.clone(),
             agent_mode: item.agent_mode,
             workflow_kind: item.workflow_kind,
@@ -108,6 +111,7 @@ impl TaskBoardFrontmatter {
             priority: self.priority,
             tags: self.tags,
             project_id: self.project_id,
+            source_project_id: self.source_project_id,
             target_project_types: self.target_project_types,
             agent_mode: self.agent_mode,
             workflow_kind: self.workflow_kind,

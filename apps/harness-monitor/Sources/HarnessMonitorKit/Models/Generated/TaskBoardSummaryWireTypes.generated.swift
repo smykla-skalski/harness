@@ -45,17 +45,26 @@ public struct TaskBoardStatusCountWire: Codable, Equatable, Sendable {
 
 public struct TaskBoardProjectSummaryWire: Codable, Equatable, Sendable {
   public var projectId: String
+  public var source: TaskBoardProjectSource
+  public var slug: String
+  public var displayName: String?
   public var itemCount: UInt
   public var readyCount: UInt
 
-  public init(projectId: String, itemCount: UInt, readyCount: UInt) {
+  public init(projectId: String, source: TaskBoardProjectSource, slug: String, displayName: String? = nil, itemCount: UInt, readyCount: UInt) {
     self.projectId = projectId
+    self.source = source
+    self.slug = slug
+    self.displayName = displayName
     self.itemCount = itemCount
     self.readyCount = readyCount
   }
 
   enum CodingKeys: String, CodingKey {
     case projectId = "project_id"
+    case source
+    case slug
+    case displayName = "display_name"
     case itemCount = "item_count"
     case readyCount = "ready_count"
   }
@@ -77,4 +86,12 @@ public struct TaskBoardMachineSummaryWire: Codable, Equatable, Sendable {
     case itemCount = "item_count"
     case readyCount = "ready_count"
   }
+}
+
+public enum TaskBoardProjectSource: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case gitHub = "github"
+  case todoist = "todoist"
+  case manual = "manual"
+
+  public var id: String { rawValue }
 }

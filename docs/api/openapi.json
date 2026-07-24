@@ -12283,6 +12283,68 @@
         "x-websocket-method": "task_board.projects"
       }
     },
+    "/v1/task-board/projects/update": {
+      "post": {
+        "tags": [
+          "task-board"
+        ],
+        "operationId": "post_task_board_projects_update",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskBoardProjectUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The project after the edit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskBoardProject"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "task_board.projects_update"
+      }
+    },
     "/v1/task-board/sync": {
       "post": {
         "tags": [
@@ -29444,6 +29506,13 @@
               "null"
             ]
           },
+          "source_project_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The registered project this item's work came from. Assigned by the\nwrite path from whichever origin the item carries, and stable across a\nrename of that project."
+          },
           "status": {
             "$ref": "#/components/schemas/TaskBoardStatus"
           },
@@ -30687,14 +30756,65 @@
           }
         }
       },
+      "TaskBoardProject": {
+        "type": "object",
+        "description": "A named source of board work. `project_id` is assigned once and never\nchanges, so renaming a project leaves every item still attached to it.",
+        "required": [
+          "project_id",
+          "source",
+          "slug",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/TaskBoardProjectSource"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        }
+      },
+      "TaskBoardProjectSource": {
+        "type": "string",
+        "description": "Where a project's identity comes from. The source scopes the slug, because\ntwo providers may hand out the same slug for unrelated projects.",
+        "enum": [
+          "github",
+          "todoist",
+          "manual"
+        ]
+      },
       "TaskBoardProjectSummary": {
         "type": "object",
         "required": [
           "project_id",
+          "source",
+          "slug",
           "item_count",
           "ready_count"
         ],
         "properties": {
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "item_count": {
             "type": "integer",
             "minimum": 0
@@ -30705,6 +30825,40 @@
           "ready_count": {
             "type": "integer",
             "minimum": 0
+          },
+          "slug": {
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/TaskBoardProjectSource"
+          }
+        }
+      },
+      "TaskBoardProjectUpdateRequest": {
+        "type": "object",
+        "description": "Rename a project or retitle it. `project_id` never changes, so every item\nattached to the project stays attached across the edit.",
+        "required": [
+          "project_id"
+        ],
+        "properties": {
+          "clear_display_name": {
+            "type": "boolean",
+            "description": "Drop the display name so the project reads by its slug again."
+          },
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "slug": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },

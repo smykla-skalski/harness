@@ -7,6 +7,8 @@ struct TaskBoardOverviewPresentationInput: Equatable, Sendable {
   let taskBoardItems: [TaskBoardItem]
   let decisionItems: [DecisionPresentationItem]
   let scopeSessionID: String?
+  /// The registered project catalog every card resolves its name through.
+  let taskBoardProjects: [TaskBoardProjectSummary]
 }
 
 struct TaskBoardOverviewPresentation: Equatable, Sendable {
@@ -175,6 +177,7 @@ actor TaskBoardOverviewPresentationWorker {
     // exclude it here or it would double-count as both open and done.
     let taskBoardOpenCount = taskBoardItems.count { $0.status != .done }
     let projectLabelResolver = TaskBoardProjectLabelResolver(
+      projects: input.taskBoardProjects,
       projectIDs: taskBoardItems.compactMap(\.taskBoardRepositoryIdentity)
     )
     // One parser (and its 3 formatters) for the whole snapshot, not one per card.

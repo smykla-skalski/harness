@@ -10,6 +10,7 @@ pub(super) struct ItemRow {
     pub(super) priority: String,
     pub(super) tags_json: String,
     pub(super) project_id: Option<String>,
+    pub(super) source_project_id: Option<String>,
     pub(super) target_project_types_json: String,
     pub(super) agent_mode: String,
     pub(super) workflow_kind: String,

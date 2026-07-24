@@ -109,6 +109,12 @@ pub(super) fn expected_task_board_ws_parity() -> Vec<(HttpRouteMethod, &'static 
             true,
         ),
         (
+            HttpRouteMethod::Post,
+            http_paths::TASK_BOARD_PROJECTS_UPDATE,
+            ws_methods::TASK_BOARD_PROJECTS_UPDATE,
+            false,
+        ),
+        (
             HttpRouteMethod::Get,
             http_paths::TASK_BOARD_MACHINES,
             ws_methods::TASK_BOARD_MACHINES,

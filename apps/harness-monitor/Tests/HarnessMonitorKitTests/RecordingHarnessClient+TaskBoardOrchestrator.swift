@@ -349,8 +349,8 @@ extension RecordingHarnessClient {
       }
       let grouped = Dictionary(
         grouping: filteredTaskBoardItems(status: status, itemId: nil)
-          .filter { $0.projectId != nil },
-        by: \.projectId
+          .filter { $0.sourceProjectId != nil },
+        by: \.sourceProjectId
       )
       return grouped.compactMap { key, items in
         guard let projectId = key else {
@@ -358,6 +358,9 @@ extension RecordingHarnessClient {
         }
         return TaskBoardProjectSummary(
           projectId: projectId,
+          source: .gitHub,
+          slug: items.first?.executionRepository ?? items.first?.projectId ?? "unnamed project",
+          displayName: nil,
           itemCount: items.count,
           readyCount: items.count { $0.status == .todo }
         )

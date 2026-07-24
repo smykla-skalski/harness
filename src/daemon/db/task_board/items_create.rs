@@ -7,6 +7,7 @@ use super::super::lane_order::{
 };
 use super::super::triage_apply::TriageOutcome;
 use super::super::triage_apply_rules::apply_active_triage_in_tx;
+use super::super::projects::resolve_item_project_in_tx;
 use super::{
     TaskBoardMutation, TaskBoardMutationKind, TaskBoardTriageIngress, bump_change_in_tx,
     load_item_in_tx, record_triage_or_lane_audit_in_tx, validate_item,
@@ -64,6 +65,7 @@ impl AsyncDaemonDb {
             .begin_immediate_transaction("task board item create")
             .await?;
         reject_if_item_exists_in_tx(&mut transaction, &item.id).await?;
+        resolve_item_project_in_tx(&mut transaction, &mut item).await?;
         let inserted = insert_with_lane_transition_in_tx(&mut transaction, item).await?;
         let before_triage = inserted.item.clone();
         let (write, outcome) = match ingress {

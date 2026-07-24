@@ -7,7 +7,8 @@ use crate::daemon::protocol::{
     TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardEvaluateRequest,
     TaskBoardGitSigningVerifyRequest, TaskBoardHostSetProjectTypesRequest,
     TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest,
-    TaskBoardPlanSubmitRequest, TaskBoardResetItemPositionRequest, TaskBoardSetItemPositionRequest,
+    TaskBoardPlanSubmitRequest, TaskBoardProjectUpdateRequest,
+    TaskBoardResetItemPositionRequest, TaskBoardSetItemPositionRequest,
     TaskBoardSyncRequest, TaskBoardUpdateItemRequest, WsRequest, WsResponse, ws_methods,
 };
 use crate::errors::CliError;
@@ -96,7 +97,7 @@ pub(crate) async fn dispatch_task_board_method(
             Some(Box::pin(dispatch::dispatch_task_board_dispatch(request, state)).await)
         }
         ws_methods::TASK_BOARD_DISPATCH_DELIVER => {
-            Some(dispatch::dispatch_task_board_dispatch_deliver(request, state).await)
+            Some(Box::pin(dispatch::dispatch_task_board_dispatch_deliver(request, state)).await)
         }
         ws_methods::TASK_BOARD_DISPATCH_PICK => {
             Some(dispatch::dispatch_task_board_dispatch_pick(request, state).await)
@@ -104,6 +105,9 @@ pub(crate) async fn dispatch_task_board_method(
         ws_methods::TASK_BOARD_EVALUATE => Some(dispatch_task_board_evaluate(request, state).await),
         ws_methods::TASK_BOARD_AUDIT => Some(dispatch_task_board_audit(request, state).await),
         ws_methods::TASK_BOARD_PROJECTS => Some(dispatch_task_board_projects(request, state).await),
+        ws_methods::TASK_BOARD_PROJECTS_UPDATE => {
+            Some(dispatch_task_board_projects_update(request, state).await)
+        }
         ws_methods::TASK_BOARD_MACHINES => Some(dispatch_task_board_machines(request, state).await),
         ws_methods::TASK_BOARD_HOST_LOCAL => {
             Some(dispatch_task_board_host_local(request, state).await)
@@ -344,6 +348,19 @@ async fn dispatch_task_board_projects(request: &WsRequest, state: &DaemonHttpSta
     dispatch_query_result(
         &request.id,
         task_board_route_executor::projects(state, &body).await,
+    )
+}
+
+async fn dispatch_task_board_projects_update(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Ok(body) = parse_control_plane_params::<TaskBoardProjectUpdateRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::update_project(state, &body).await,
     )
 }
 

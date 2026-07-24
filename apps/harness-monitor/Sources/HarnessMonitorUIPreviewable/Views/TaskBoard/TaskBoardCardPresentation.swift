@@ -20,21 +20,8 @@ struct TaskBoardCardPresentation: Equatable, Sendable {
   ) -> Self {
     let titlePresentation = TaskBoardCardTitlePresentation(item: item)
     let fragments = TaskBoardInlineCodeFormatter.fragments(in: titlePresentation.title)
-    let repositoryLabelDefault: String?
-    let repositoryLabelFullName: String?
-    if let repositoryID = item.taskBoardRepositoryIdentity {
-      repositoryLabelDefault = projectLabelResolver.label(
-        for: repositoryID,
-        alwaysShowFullName: false
-      )
-      repositoryLabelFullName = projectLabelResolver.label(
-        for: repositoryID,
-        alwaysShowFullName: true
-      )
-    } else {
-      repositoryLabelDefault = nil
-      repositoryLabelFullName = nil
-    }
+    let repositoryLabelDefault = projectLabelResolver.label(for: item, alwaysShowFullName: false)
+    let repositoryLabelFullName = projectLabelResolver.label(for: item, alwaysShowFullName: true)
     return Self(
       titleFragments: fragments,
       titleLeadingText: titlePresentation.leadingText,

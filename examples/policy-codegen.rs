@@ -2592,6 +2592,7 @@ const TASK_BOARD_ENUMS_EMIT_ONLY: &[&str] = &[
     "TaskBoardWorkflowKind",
 ];
 const TASK_BOARD_SUMMARY_SOURCE: &str = include_str!("../src/task_board/summary.rs");
+const TASK_BOARD_PROJECT_SOURCE: &str = include_str!("../src/task_board/project.rs");
 const TASK_BOARD_SUMMARY_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardSummaryWireTypes.generated.swift";
 // The audit, project and machine summary structs - all over primitives plus the
 // adopted TaskBoardStatus/TaskBoardAgentMode enums. The sync summary cluster is
@@ -2600,6 +2601,7 @@ const TASK_BOARD_SUMMARY_EMIT_ONLY: &[&str] = &[
     "TaskBoardAuditSummary",
     "TaskBoardStatusCount",
     "TaskBoardProjectSummary",
+    "TaskBoardProjectSource",
     "TaskBoardMachineSummary",
 ];
 const TASK_BOARD_ITEM_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardItemWireTypes.generated.swift";
@@ -3240,7 +3242,7 @@ fn modules() -> Vec<GeneratedModule> {
             output: TASK_BOARD_SUMMARY_OUTPUT,
             description: "the Rust task-board audit, project and machine summaries",
             defaults: &[],
-            sources: &[TASK_BOARD_SUMMARY_SOURCE],
+            sources: &[TASK_BOARD_SUMMARY_SOURCE, TASK_BOARD_PROJECT_SOURCE],
         },
         GeneratedModule {
             output: TASK_BOARD_ITEM_OUTPUT,

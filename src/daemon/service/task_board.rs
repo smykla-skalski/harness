@@ -12,8 +12,8 @@ use crate::daemon::protocol::{
     TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardGetItemRequest,
     TaskBoardListItemsRequest, TaskBoardListItemsResponse, TaskBoardMachinesResponse,
     TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest,
-    TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse, TaskBoardProjectsResponse,
-    TaskBoardSyncRequest, TaskBoardSyncResponse, TaskBoardUpdateItemRequest,
+    TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse, TaskBoardSyncRequest,
+    TaskBoardSyncResponse, TaskBoardUpdateItemRequest,
 };
 use crate::daemon::protocol::{
     TaskBoardDispatchPickResponse, TaskBoardDispatchRequest, TaskBoardDispatchResponse,
@@ -27,7 +27,7 @@ use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::{
     ExternalSyncConfig, ExternalSyncOperation, TaskBoardItem, TaskBoardOrchestrator,
     TaskBoardStore, build_audit_summary, build_machine_summaries, build_progress_rollups,
-    build_project_summaries, configured_sync_clients, default_board_root, sync_external_tasks,
+    configured_sync_clients, default_board_root, sync_external_tasks,
 };
 #[cfg(test)]
 use crate::task_board::{
@@ -268,18 +268,6 @@ pub(crate) async fn sync_task_board_async_with_config(
     let summary = build_sync_response_async(&board, request, config.clone(), operations).await?;
     log_sync_completion(&summary);
     Ok(summary)
-}
-
-/// List project summaries for task-board items.
-///
-/// # Errors
-/// Returns `CliError` when board items cannot be loaded.
-#[cfg(test)]
-pub fn list_task_board_projects(
-    request: &TaskBoardCatalogRequest,
-) -> Result<TaskBoardProjectsResponse, CliError> {
-    let items = store().list(request.status)?;
-    Ok(build_project_summaries(&items))
 }
 
 /// List machine summaries for task-board items.

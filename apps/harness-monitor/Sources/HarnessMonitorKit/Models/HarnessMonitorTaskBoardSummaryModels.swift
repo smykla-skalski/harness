@@ -116,10 +116,39 @@ public struct TaskBoardAuditSummary: Codable, Equatable, Sendable {
 
 public struct TaskBoardProjectSummary: Codable, Equatable, Identifiable, Sendable {
   public let projectId: String
+  public let source: TaskBoardProjectSource
+  public let slug: String
+  public let displayName: String?
   public let itemCount: Int
   public let readyCount: Int
 
+  public init(
+    projectId: String,
+    source: TaskBoardProjectSource,
+    slug: String,
+    displayName: String? = nil,
+    itemCount: Int,
+    readyCount: Int
+  ) {
+    self.projectId = projectId
+    self.source = source
+    self.slug = slug
+    self.displayName = displayName
+    self.itemCount = itemCount
+    self.readyCount = readyCount
+  }
+
   public var id: String { projectId }
+
+  /// What a person should see. Never the opaque identifier.
+  public var label: String {
+    guard let displayName,
+      !displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    else {
+      return slug
+    }
+    return displayName
+  }
 }
 
 public struct TaskBoardMachineSummary: Codable, Equatable, Identifiable, Sendable {

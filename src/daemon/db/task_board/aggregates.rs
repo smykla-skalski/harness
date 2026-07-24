@@ -7,6 +7,7 @@ use serde::de::DeserializeOwned;
 use sqlx::{Sqlite, Transaction, query, query_as};
 
 use super::mapper::{machine_from_row, parse_json, to_json};
+use super::projects::register_configured_repositories_in_tx;
 use super::remote_assignment_start_authority::refuse_settings_replacement_during_executor_start_io;
 use super::remote_hosts::sync_remote_hosts_in_tx;
 use super::rows::MachineRow;
@@ -295,6 +296,7 @@ pub(super) async fn replace_orchestrator_settings_in_tx(
     .await
     .map(|row| row.0)
     .map_err(|error| db_error(format!("read orchestrator settings revision: {error}")))?;
+    register_configured_repositories_in_tx(transaction, settings).await?;
     sync_remote_hosts_in_tx(transaction, settings, row_revision).await?;
     let change_revision = bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
     Ok(TaskBoardOrchestratorSettingsMutation {

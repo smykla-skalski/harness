@@ -11,6 +11,7 @@ use super::super::triage_apply::{
 };
 use super::super::triage_apply_rules::apply_active_triage_in_tx;
 use super::lifecycle::ensure_estimates_are_editable_in_tx;
+use super::super::projects::resolve_item_project_in_tx;
 use super::{
     TaskBoardMutation, TaskBoardMutationKind, TaskBoardTriageIngress,
     apply_task_board_item_status_transition_in_tx, bump_change_in_tx, clear_children_parent_in_tx,
@@ -112,6 +113,7 @@ impl AsyncDaemonDb {
         }
         item.status = item.status.canonical_persisted_status();
         resolve_parent_update_in_tx(&mut transaction, &mut item, &before, ingress).await?;
+        resolve_item_project_in_tx(&mut transaction, &mut item).await?;
         validate_item(&item)?;
         if item == before {
             transaction
