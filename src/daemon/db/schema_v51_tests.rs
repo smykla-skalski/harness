@@ -80,7 +80,8 @@ fn fresh_schema_includes_the_projects_table() {
     let count: i64 = db
         .connection()
         .query_row(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'task_board_projects'",
+            "SELECT COUNT(*) FROM sqlite_master \
+             WHERE type = 'table' AND name = 'task_board_projects'",
             [],
             |row| row.get(0),
         )

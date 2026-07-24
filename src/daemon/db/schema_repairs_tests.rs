@@ -17,7 +17,8 @@ fn repair_restores_the_newest_schema_objects_before_stamping() {
     let restored: i64 = db
         .conn
         .query_row(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'task_board_projects'",
+            "SELECT COUNT(*) FROM sqlite_master \
+             WHERE type = 'table' AND name = 'task_board_projects'",
             [],
             |row| row.get(0),
         )
