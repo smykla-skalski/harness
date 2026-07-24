@@ -75,6 +75,7 @@ mod task_board_route_parity_support;
 mod task_board_support;
 mod task_board_triage_override_parity;
 mod task_board_triage_parity;
+mod task_board_triage_rules_parity;
 mod task_review;
 mod telemetry;
 

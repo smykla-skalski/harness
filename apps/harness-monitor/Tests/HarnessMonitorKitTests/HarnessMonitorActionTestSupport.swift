@@ -310,6 +310,14 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var taskBoardTriageOverrideItemsAfterError: [TaskBoardItem]?
   var taskBoardTriageOverrideSetRequests: [TaskBoardSetTriageOverrideRequest] = []
   var taskBoardTriageOverrideClearRequests: [TaskBoardClearTriageOverrideRequest] = []
+  var taskBoardTriageRuleSetDraftStorage: TriageRuleSetDraft?
+  var taskBoardActiveTriageRuleSetRevisionStorage: Int64?
+  var taskBoardTriageRuleSetRevisionsStorage: [TriageRuleSetRevisionSummary] = []
+  var taskBoardTriageRuleSetAuditStorage: [TriageRuleSetAuditEntry] = []
+  var taskBoardTriageRulesSaveDraftRequests: [TaskBoardSaveTriageRulesDraftRequest] = []
+  var taskBoardTriageRulesActivateRequests: [TaskBoardActivateTriageRulesRequest] = []
+  var taskBoardTriageRulesError: (any Error)?
+  var taskBoardTriageRulesErrorRemainingUses = 0
   var taskBoardPositionError: (any Error)?
   var taskBoardPositionErrorRemainingUses = 0
   var taskBoardPositionItemsAfterError: [TaskBoardItem]?
