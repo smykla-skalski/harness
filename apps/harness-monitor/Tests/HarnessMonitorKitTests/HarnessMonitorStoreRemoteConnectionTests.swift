@@ -191,22 +191,33 @@ struct HarnessMonitorStoreRemoteConnectionTests {
     #expect(await daemon.recordedWarmUpCallCount() == 1)
   }
 
-  @Test("Revocation failure keeps the remote profile and does not reconnect locally")
-  func revocationFailureKeepsRemoteConnection() async throws {
+  @Test("Revocation failure still forgets locally and warns about the live token")
+  func revocationFailureStillForgetsLocallyWithWarning() async throws {
     let fixture = try RemoteStoreFixture(revoker: FailingRemoteDaemonRevoker())
-    let daemon = RecordingDaemonController()
+    let daemon = RecordingDaemonController(
+      warmUpError: DaemonControlError.daemonDidNotStart,
+      usesWarmUpErrorForBootstrap: false
+    )
     let store = HarnessMonitorStore(
       daemonController: daemon,
+      daemonOwnership: .external,
       remoteDaemonServices: fixture.services
     )
 
     store.forgetRemoteDaemon()
-    try await waitUntil { store.remoteDaemonActionState.errorMessage != nil }
+    try await waitUntil {
+      !store.usesRemoteDaemon && store.remoteDaemonActionState == .idle
+    }
 
-    #expect(store.usesRemoteDaemon)
-    #expect(store.remoteDaemonProfile == fixture.profile)
-    #expect(try fixture.tokenStore.loadToken(profileID: fixture.profile.id) != nil)
-    #expect(await daemon.recordedWarmUpCallCount() == 0)
+    #expect(store.remoteDaemonProfile == nil)
+    #expect(try fixture.tokenStore.loadToken(profileID: fixture.profile.id) == nil)
+    #expect(store.manifestURL == HarnessMonitorPaths.manifestURLWithoutLiveDiscovery())
+
+    let warning = try #require(
+      store.toast.activeFeedback.first { $0.title == "Remote daemon forgotten" }
+    )
+    #expect(warning.severity == .warning)
+    #expect(warning.message.contains("couldn't confirm this client was revoked"))
   }
 
   private func waitUntil(

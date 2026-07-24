@@ -1,5 +1,15 @@
 import Foundation
 
+public struct RemoteDaemonForgetOutcome: Equatable, Sendable {
+  public let profile: RemoteDaemonProfile
+  public let serverRevoked: Bool
+
+  public init(profile: RemoteDaemonProfile, serverRevoked: Bool) {
+    self.profile = profile
+    self.serverRevoked = serverRevoked
+  }
+}
+
 public actor RemoteDaemonProfileCoordinator {
   private let repository: any RemoteDaemonProfilePersisting
   private let tokenStore: any RemoteDaemonTokenPersisting
@@ -62,7 +72,7 @@ public actor RemoteDaemonProfileCoordinator {
   }
 
   @discardableResult
-  public func forgetActiveProfile() async throws -> RemoteDaemonProfile? {
+  public func forgetActiveProfile() async throws -> RemoteDaemonForgetOutcome? {
     let originalState = try repository.load()
     guard let activeProfileID = originalState.activeProfileID else {
       return nil
@@ -70,39 +80,53 @@ public actor RemoteDaemonProfileCoordinator {
     guard let profile = originalState.profiles.first(where: { $0.id == activeProfileID }) else {
       throw RemoteDaemonProfileError.profileNotFound
     }
-    let token = try tokenForForget(profile)
-    if profile.status == .active {
-      guard let token else {
-        throw RemoteDaemonProfileError.missingToken
-      }
-      try await revoker.revoke(profile: profile, token: token)
-    }
+    let token = tokenForForget(profile)
+    let serverRevoked = await revokeIfReachable(profile: profile, token: token)
     var forgottenState = originalState
     forgottenState.profiles.removeAll { $0.id == activeProfileID }
     forgottenState.activeProfileID = nil
-    do {
-      try tokenStore.deleteToken(profileID: activeProfileID)
-    } catch {
-      restoreToken(token, profileID: activeProfileID)
-      throw error
-    }
+    // Persist the profile removal before deleting the Keychain token. Deleting last means a
+    // failure never has to restore a token we might not have read back; the defensive re-save
+    // undoes a non-atomic partial write.
     do {
       try repository.save(forgottenState)
     } catch {
-      rollbackForget(state: originalState, token: token, profileID: activeProfileID)
+      try? repository.save(originalState)
       throw error
     }
-    return profile
+    do {
+      try tokenStore.deleteToken(profileID: activeProfileID)
+    } catch {
+      try? repository.save(originalState)
+      throw error
+    }
+    return RemoteDaemonForgetOutcome(profile: profile, serverRevoked: serverRevoked)
   }
 
-  private func tokenForForget(_ profile: RemoteDaemonProfile) throws -> String? {
+  // Best-effort: server-side revocation must never block the local disconnect, so this
+  // returns false instead of throwing whenever the credential cannot be confirmed
+  // revoked - server unreachable or rejecting, or no usable token to revoke with. A
+  // false result drives the caller's "token may still be live" warning.
+  private func revokeIfReachable(profile: RemoteDaemonProfile, token: String?) async -> Bool {
     if profile.status == .revoked {
-      return try? tokenStore.loadToken(profileID: profile.id)
+      return true
     }
-    guard let token = try tokenStore.loadToken(profileID: profile.id),
+    guard let token else {
+      return false
+    }
+    do {
+      try await revoker.revoke(profile: profile, token: token)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  private func tokenForForget(_ profile: RemoteDaemonProfile) -> String? {
+    guard let token = try? tokenStore.loadToken(profileID: profile.id),
       !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     else {
-      throw RemoteDaemonProfileError.missingToken
+      return nil
     }
     return token
   }
@@ -145,21 +169,6 @@ public actor RemoteDaemonProfileCoordinator {
       } else {
         try? tokenStore.deleteToken(profileID: replacedToken.profileID)
       }
-    }
-  }
-
-  private func rollbackForget(
-    state: RemoteDaemonProfileState,
-    token: String?,
-    profileID: UUID
-  ) {
-    try? repository.save(state)
-    restoreToken(token, profileID: profileID)
-  }
-
-  private func restoreToken(_ token: String?, profileID: UUID) {
-    if let token {
-      try? tokenStore.saveToken(token, profileID: profileID)
     }
   }
 }

@@ -11,7 +11,8 @@ struct RemoteDaemonProfileCoordinatorRevocationTests {
 
     let forgotten = try await fixture.coordinator.forgetActiveProfile()
 
-    #expect(forgotten == fixture.profile)
+    #expect(forgotten?.profile == fixture.profile)
+    #expect(forgotten?.serverRevoked == true)
     #expect(
       await fixture.revoker.recordedCalls()
         == [.init(clientID: fixture.profile.clientID, token: "server-issued-token")]
@@ -20,24 +21,20 @@ struct RemoteDaemonProfileCoordinatorRevocationTests {
     #expect(try fixture.tokenStore.loadToken(profileID: fixture.profile.id) == nil)
   }
 
-  @Test("Revocation failure preserves the retryable profile and token")
-  func revocationFailurePreservesLocalState() async throws {
+  @Test("Revocation failure still forgets locally and reports it unrevoked")
+  func revocationFailureStillForgetsLocally() async throws {
     let fixture = try RevocationCoordinatorFixture(revocationFails: true)
 
-    await #expect(throws: RemoteDaemonRevocationTestError.rejected) {
-      _ = try await fixture.coordinator.forgetActiveProfile()
-    }
+    let forgotten = try await fixture.coordinator.forgetActiveProfile()
 
+    #expect(forgotten?.profile == fixture.profile)
+    #expect(forgotten?.serverRevoked == false)
     #expect(
-      try fixture.repository.load()
-        == RemoteDaemonProfileState(
-          profiles: [fixture.profile],
-          activeProfileID: fixture.profile.id
-        )
+      await fixture.revoker.recordedCalls()
+        == [.init(clientID: fixture.profile.clientID, token: "server-issued-token")]
     )
-    #expect(
-      try fixture.tokenStore.loadToken(profileID: fixture.profile.id) == "server-issued-token"
-    )
+    #expect(try fixture.repository.load() == RemoteDaemonProfileState())
+    #expect(try fixture.tokenStore.loadToken(profileID: fixture.profile.id) == nil)
   }
 
   @Test("Already revoked profiles are removed without another server call")
@@ -46,23 +43,23 @@ struct RemoteDaemonProfileCoordinatorRevocationTests {
     let revokedProfile = activeProfile.markingRevoked(at: .now)
     let fixture = try RevocationCoordinatorFixture(profile: revokedProfile)
 
-    _ = try await fixture.coordinator.forgetActiveProfile()
+    let forgotten = try await fixture.coordinator.forgetActiveProfile()
 
+    #expect(forgotten?.serverRevoked == true)
     #expect(await fixture.revoker.recordedCalls().isEmpty)
     #expect(try fixture.repository.load() == RemoteDaemonProfileState())
     #expect(try fixture.tokenStore.loadToken(profileID: revokedProfile.id) == nil)
   }
 
-  @Test("Missing active token fails closed without contacting the server")
-  func missingTokenPreservesProfile() async throws {
+  @Test("Missing active token still forgets locally without contacting the server")
+  func missingTokenStillForgetsLocally() async throws {
     let fixture = try RevocationCoordinatorFixture(storesToken: false)
 
-    await #expect(throws: RemoteDaemonProfileError.missingToken) {
-      _ = try await fixture.coordinator.forgetActiveProfile()
-    }
+    let forgotten = try await fixture.coordinator.forgetActiveProfile()
 
+    #expect(forgotten?.serverRevoked == false)
     #expect(await fixture.revoker.recordedCalls().isEmpty)
-    #expect(try fixture.repository.load().activeProfileID == fixture.profile.id)
+    #expect(try fixture.repository.load() == RemoteDaemonProfileState())
   }
 }
 
