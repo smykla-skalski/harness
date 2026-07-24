@@ -143,7 +143,13 @@ struct SettingsRepositoryWorkingDirectoriesSection: View {
     return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
   }
 
+  nonisolated(unsafe) private static let byteCountFormatter: ByteCountFormatter = {
+    let formatter = ByteCountFormatter()
+    formatter.countStyle = .file
+    return formatter
+  }()
+
   private func formattedSize(_ bytes: UInt64) -> String {
-    ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+    Self.byteCountFormatter.string(fromByteCount: Int64(bytes))
   }
 }

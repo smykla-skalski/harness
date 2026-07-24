@@ -76,6 +76,7 @@ struct ResolveRepositoryDirectoriesSheet: View {
         Image(systemName: "exclamationmark.triangle.fill")
           .foregroundStyle(.orange)
           .help("Could not obtain a copy - check the repository token, then retry")
+          .accessibilityLabel(Text("Could not obtain a copy of \(repository)"))
       }
       if obtaining.contains(repository) {
         ProgressView()
