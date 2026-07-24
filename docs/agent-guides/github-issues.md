@@ -37,8 +37,8 @@ A child does not name its umbrella in its body, because the sub-issue link alrea
 Create the umbrella and children first, read the child numbers back from the create output, then attach each child in the order it needs to land, since GitHub preserves that order. The attach endpoint keys on the child's database id rather than its issue number:
 
 ```bash
-gh api --method POST repos/<owner>/<repo>/issues/<umbrella>/sub_issues \
-  -F sub_issue_id=$(gh api repos/<owner>/<repo>/issues/<child> --jq .id)
+gh api --method POST repos/<owner>/<repo>/issues/<umbrella-number>/sub_issues \
+  -F sub_issue_id="$(gh api repos/<owner>/<repo>/issues/<child-number> --jq '.id')"
 ```
 
 ## What never goes in an issue
@@ -65,4 +65,4 @@ Confirm scope forks with the user before filing when the answer would change whi
 
 Apply `kind/enhancement` or `kind/bug` to every issue. Add `area/api` when the change alters a contract between the daemon and its clients, including the wire protocol, the command line, and the tool interfaces.
 
-Read created issue numbers back from the command output rather than assuming them, and verify the umbrella checklist after wiring it up.
+Read created issue numbers back from the command output rather than assuming them, and verify the umbrella's sub-issues list after attaching the children.
