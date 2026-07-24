@@ -29,7 +29,7 @@ use super::{DaemonConnectInfo, DaemonHttpState};
 #[cfg(feature = "openapi")]
 use super::openapi::DaemonErrorBody;
 
-mod status;
+pub(super) mod status;
 
 pub(super) fn remote_pairing_routes() -> Router<DaemonHttpState> {
     Router::new()

@@ -16,6 +16,8 @@ use utoipa::OpenApi;
 use crate::daemon::protocol::{HTTP_API_CONTRACT, HttpRouteMethod};
 
 mod policy_api;
+mod remote_pairing_api;
+mod signals_voice_api;
 mod task_board_api;
 mod task_board_execution_api;
 
@@ -88,6 +90,12 @@ struct HarnessDaemonApi;
     super::core::get_github_status,
     super::core::get_projects,
     super::core::get_runtime_session_resolution,
+    super::core::get_diagnostics,
+    super::core::get_config,
+    super::core::get_runtimes_probe,
+    super::core::post_bridge_reconfigure,
+    super::audit::get_audit_events,
+    super::openrouter_models::get_openrouter_models,
 ))]
 struct CoreApi;
 
@@ -210,6 +218,8 @@ pub fn openapi_document() -> utoipa::openapi::OpenApi {
     doc.merge(task_board_api::TaskBoardApi::openapi());
     doc.merge(task_board_execution_api::TaskBoardExecutionApi::openapi());
     doc.merge(policy_api::PolicyApi::openapi());
+    doc.merge(remote_pairing_api::RemotePairingApi::openapi());
+    doc.merge(signals_voice_api::SignalsVoiceApi::openapi());
     env!("CARGO_PKG_VERSION").clone_into(&mut doc.info.version);
     doc
 }
