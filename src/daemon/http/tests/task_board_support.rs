@@ -182,10 +182,12 @@ pub(super) async fn seed_catalog_board_item(
         .expect("create item");
 }
 
-/// Finds the summary by slug, because `project_id` is an assigned identifier
-/// the caller cannot know and deliberately does not carry the project's name.
+/// Finds the summary by source and slug, the pair the catalog is unique on.
+/// `project_id` is assigned, so the caller cannot know it, and a slug alone
+/// names a different project under each source.
 pub(super) fn assert_project_summary(
     value: &Value,
+    source: &str,
     slug: &str,
     item_count: u64,
     ready_count: u64,
@@ -195,16 +197,17 @@ pub(super) fn assert_project_summary(
         .map(|projects| {
             projects
                 .iter()
-                .filter(|summary| summary["slug"].as_str() == Some(slug))
+                .filter(|summary| {
+                    summary["source"].as_str() == Some(source)
+                        && summary["slug"].as_str() == Some(slug)
+                })
                 .collect()
         })
         .unwrap_or_default();
-    // A slug is unique only within a source, so two of them here means the
-    // lookup is ambiguous and whichever one matched proves nothing.
     assert_eq!(
         matches.len(),
         1,
-        "expected exactly one project summary for {slug}: {value}"
+        "expected exactly one project summary for {source}/{slug}: {value}"
     );
     let summary = matches[0];
     assert_eq!(summary["item_count"].as_u64(), Some(item_count));
