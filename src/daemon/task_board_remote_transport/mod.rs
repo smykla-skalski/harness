@@ -37,10 +37,6 @@ mod wire_source_bundle;
 mod wire_source_bundle_recovery;
 mod wire_validation;
 
-// Re-exported so the OpenAPI contract test can recognise transport routes,
-// which sit outside `HTTP_API_CONTRACT` by design.
-pub use routes::execution_operation;
-
 #[cfg(test)]
 mod client_tests;
 #[cfg(test)]

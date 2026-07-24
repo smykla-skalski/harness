@@ -19,6 +19,11 @@ mod policy_api;
 mod task_board_api;
 mod task_board_execution_api;
 
+/// Route recogniser for the remote-execution transport, surfaced here (only
+/// under the `openapi` feature) so the contract test can accept documented
+/// transport routes while the transport module stays `pub(crate)`.
+pub use crate::daemon::task_board_remote_transport::routes::execution_operation;
+
 /// Error envelope returned by daemon handlers on failure.
 ///
 /// Mirrors the dominant shape produced by `error_status_and_body`

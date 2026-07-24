@@ -139,9 +139,10 @@ pub(crate) fn execution_http_body_limit(method: &Method, path: &str) -> Option<u
     }
 }
 
-/// Recognise a remote-execution transport route. Exposed (via the transport
-/// module re-export) so the OpenAPI contract test can accept documented
-/// transport routes, which sit outside `HTTP_API_CONTRACT` by design.
+/// Recognise a remote-execution transport route. Re-exported under
+/// `http::openapi` (openapi feature only) so the contract test can accept
+/// documented transport routes, which sit outside `HTTP_API_CONTRACT` by
+/// design; the transport module itself stays crate-internal.
 pub fn execution_operation(method: &Method, path: &str) -> Option<&'static str> {
     match (method, path) {
         (&Method::GET, ADVERTISE_PATH) => Some("advertise"),

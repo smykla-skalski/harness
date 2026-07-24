@@ -12,9 +12,8 @@
 use std::collections::BTreeSet;
 
 use axum::http::Method;
-use harness::daemon::http::openapi::openapi_json_value;
+use harness::daemon::http::openapi::{execution_operation, openapi_json_value};
 use harness::daemon::protocol::HTTP_API_CONTRACT;
-use harness::daemon::task_board_remote_transport::execution_operation;
 
 const HTTP_METHODS: [&str; 4] = ["get", "post", "put", "delete"];
 
