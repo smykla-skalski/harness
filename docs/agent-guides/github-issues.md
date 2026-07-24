@@ -12,7 +12,7 @@ Umbrella issues prefix the title with `☂️ `, for example `☂️ feat(monito
 
 ## Body
 
-Three sections at most for an ordinary issue. Bug reports swap the second section for three of their own, and umbrellas add a closing checklist; both variants are set out below.
+Three sections at most for an ordinary issue. Bug reports swap the second section for three of their own, set out below. An umbrella keeps the ordinary body and adds no section of its own; it links its children as native sub-issues instead.
 
 `## Problem` comes first: two to four sentences of prose, active voice, present tense. State the user-visible impact and why it matters. No solution belongs in this section. If the reader cannot tell what goes wrong today, the issue is not ready.
 
@@ -30,11 +30,16 @@ Bugs replace `## Expected outcome` with three sections: `## Steps to reproduce` 
 
 Use an umbrella when a goal needs several issues that each stand alone. Three or more children justifies one; two is a dependency, not a group, and an umbrella over it is ceremony.
 
-The umbrella body follows the same three sections, then ends with a `## Child issues` checklist in the order the children need to land, introduced by a line saying so. Each child must be independently valuable and reviewable on its own.
+The umbrella body follows the same three sections and adds no child-issue section. Attach each child as a native GitHub sub-issue instead: GitHub then renders the child list, its progress, and a two-way link on both issues, so a hand-written checklist only duplicates state that goes stale. Each child must be independently valuable and reviewable on its own.
 
-Every child ends its body with `Part of #<umbrella>`. Issues that depend on each other without an umbrella use `Depends on #<issue>` instead.
+A child does not name its umbrella in its body, because the sub-issue link already shows that relationship on both sides. Issues that depend on each other without an umbrella still use `Depends on #<issue>`, which GitHub does not model natively.
 
-Numbers cannot be predicted. GitHub shares one sequence between issues and pull requests, so a PR merging in the middle of a filing run shifts the next number. Create the children first, read the numbers back from the create output, then edit the umbrella to add the checklist.
+Create the umbrella and children first, read the child numbers back from the create output, then attach each child in the order it needs to land, since GitHub preserves that order. The attach endpoint keys on the child's database id rather than its issue number:
+
+```bash
+gh api --method POST repos/<owner>/<repo>/issues/<umbrella-number>/sub_issues \
+  -F sub_issue_id="$(gh api repos/<owner>/<repo>/issues/<child-number> --jq '.id')"
+```
 
 ## What never goes in an issue
 
@@ -60,4 +65,4 @@ Confirm scope forks with the user before filing when the answer would change whi
 
 Apply `kind/enhancement` or `kind/bug` to every issue. Add `area/api` when the change alters a contract between the daemon and its clients, including the wire protocol, the command line, and the tool interfaces.
 
-Read created issue numbers back from the command output rather than assuming them, and verify the umbrella checklist after wiring it up.
+Read created issue numbers back from the command output rather than assuming them, and verify the umbrella's sub-issues list after attaching the children.
