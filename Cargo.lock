@@ -3717,6 +3717,7 @@ dependencies = [
  "tokio-util",
  "tracing",
  "user_dirs",
+ "utoipa",
  "uuid",
  "uzers",
  "vt100",

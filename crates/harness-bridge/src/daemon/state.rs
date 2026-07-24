@@ -35,6 +35,7 @@ pub(crate) const DAEMON_OWNERSHIP_ENV: &str = "HARNESS_DAEMON_OWNERSHIP";
 static DAEMON_ROOT_OVERRIDE: Mutex<Option<PathBuf>> = Mutex::new(None);
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(utoipa::ToSchema)]
 pub struct HostBridgeCapabilityManifest {
     #[serde(default = "default_host_bridge_enabled")]
     pub enabled: bool,
