@@ -1591,6 +1591,1693 @@
         "x-websocket-method": "managed_agent.stop"
       }
     },
+    "/v1/policies/dump": {
+      "post": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "post_policy_dump",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyTransferDumpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Exact transfer bundle for the selected policies",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyTransferBundle"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
+    "/v1/policies/import": {
+      "post": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "post_policy_import_batch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyTransferImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Workspace after importing the transfer bundle",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyCanvasWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
+    "/v1/policy-approval-grants": {
+      "get": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "get_policy_approval_grants",
+        "responses": {
+          "200": {
+            "description": "All durable spawn-gate approval grants",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyApprovalGrantsListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_canvas.approval_grants_list"
+      }
+    },
+    "/v1/policy-approval-grants/resolve": {
+      "post": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "post_policy_approval_grant_resolve",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyApprovalGrantResolveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The approval grant after approve or deny",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyApprovalGrantResolveResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_canvas.approval_grant_resolve"
+      }
+    },
+    "/v1/policy-approval-grants/revoke": {
+      "post": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "post_policy_approval_grant_revoke",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyApprovalGrantRevokeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The approval grant after revocation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyApprovalGrantRevokeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_canvas.approval_grant_revoke"
+      }
+    },
+    "/v1/policy-canvases": {
+      "get": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "get_policy_canvas_workspace",
+        "responses": {
+          "200": {
+            "description": "The full policy-canvas workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyCanvasWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_canvas.workspace_get"
+      }
+    },
+    "/v1/policy-canvases/active": {
+      "post": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "post_policy_canvas_set_active",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyCanvasSetActiveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Workspace after selecting the active canvas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyCanvasWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_canvas.set_active"
+      }
+    },
+    "/v1/policy-canvases/create": {
+      "post": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "post_policy_canvas_create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyCanvasCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Workspace after creating the canvas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyCanvasWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_canvas.create"
+      }
+    },
+    "/v1/policy-canvases/delete": {
+      "post": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "post_policy_canvas_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyCanvasDeleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Workspace after deleting the canvas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyCanvasWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_canvas.delete"
+      }
+    },
+    "/v1/policy-canvases/duplicate": {
+      "post": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "post_policy_canvas_duplicate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyCanvasDuplicateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Workspace after duplicating the canvas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyCanvasWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_canvas.duplicate"
+      }
+    },
+    "/v1/policy-canvases/export": {
+      "post": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "post_policy_export",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyCanvasExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The exported canvas document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyCanvasExportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_canvas.export"
+      }
+    },
+    "/v1/policy-canvases/global-enforcement": {
+      "post": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "post_policy_canvas_set_global_enforcement",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyCanvasSetGlobalEnforcementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Workspace after toggling global enforcement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyCanvasWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_canvas.set_global_enforcement"
+      }
+    },
+    "/v1/policy-canvases/import": {
+      "post": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "post_policy_import",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyCanvasImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Workspace after importing the canvas document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyCanvasWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_canvas.import"
+      }
+    },
+    "/v1/policy-canvases/rename": {
+      "post": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "post_policy_canvas_rename",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyCanvasRenameRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Workspace after renaming the canvas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyCanvasWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_canvas.rename"
+      }
+    },
+    "/v1/policy-canvases/spawn-kill-switch": {
+      "post": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "post_policy_canvas_set_spawn_kill_switch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyCanvasSetSpawnKillSwitchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Workspace after toggling the spawn kill switch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyCanvasWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_canvas.set_spawn_kill_switch"
+      }
+    },
+    "/v1/policy-canvases/spawn-requires-live-policy": {
+      "post": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "post_policy_canvas_set_spawn_requires_live_policy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyCanvasSetSpawnRequiresLivePolicyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Workspace after toggling the spawn-requires-live-policy switch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyCanvasWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_canvas.set_spawn_requires_live_policy"
+      }
+    },
+    "/v1/policy-pipeline": {
+      "get": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "get_policy_pipeline",
+        "parameters": [
+          {
+            "name": "canvas_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The draft policy graph for the selected canvas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyGraph"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_pipeline.get"
+      },
+      "put": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "put_policy_pipeline_draft",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyPipelineSaveDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Validation outcome and, when valid, the persisted draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyPipelineSaveResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_pipeline.save_draft"
+      }
+    },
+    "/v1/policy-pipeline/audit": {
+      "get": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "get_policy_audit",
+        "parameters": [
+          {
+            "name": "canvas_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Active-revision and latest-simulation audit summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyPipelineAuditSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_pipeline.audit"
+      }
+    },
+    "/v1/policy-pipeline/go-live-diff": {
+      "post": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "post_policy_go_live_diff",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyPipelineGoLiveDiffRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Per-scenario decision diff between the live policy and the draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyPipelineGoLiveDiff"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_pipeline.go_live_diff"
+      }
+    },
+    "/v1/policy-pipeline/make-live": {
+      "post": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "post_policy_make_live",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyPipelineMakeLiveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The now-live document and refreshed workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyPipelineMakeLiveResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_pipeline.make_live"
+      }
+    },
+    "/v1/policy-pipeline/promote": {
+      "post": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "post_policy_promote",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyPipelinePromoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The promoted draft revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyPipelinePromoteResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_pipeline.promote"
+      }
+    },
+    "/v1/policy-pipeline/replay": {
+      "post": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "post_policy_replay",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyPipelineReplayRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The draft replayed against a window of recorded decisions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyPipelineReplayResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_pipeline.replay"
+      }
+    },
+    "/v1/policy-pipeline/simulate": {
+      "post": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "post_policy_simulate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyPipelineSimulateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Non-persisting simulation of the draft against the scenario set",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyPipelineSimulationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_pipeline.simulate"
+      }
+    },
+    "/v1/policy-scenarios/create": {
+      "post": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "post_policy_scenario_create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyScenarioCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Workspace after creating the scenario",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyCanvasWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_scenario.create"
+      }
+    },
+    "/v1/policy-scenarios/delete": {
+      "post": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "post_policy_scenario_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyScenarioDeleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Workspace after deleting the scenario",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyCanvasWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_scenario.delete"
+      }
+    },
+    "/v1/policy-scenarios/reset": {
+      "post": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "post_policy_scenario_reset",
+        "responses": {
+          "200": {
+            "description": "Workspace after resetting scenarios to the built-in set",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyCanvasWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_scenario.reset"
+      }
+    },
+    "/v1/policy-scenarios/update": {
+      "post": {
+        "tags": [
+          "policy"
+        ],
+        "operationId": "post_policy_scenario_update",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyScenarioUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Workspace after updating the scenario",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyCanvasWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "policy_scenario.update"
+      }
+    },
     "/v1/projects": {
       "get": {
         "tags": [
@@ -13803,6 +15490,601 @@
           }
         }
       },
+      "PolicyAction": {
+        "type": "string",
+        "enum": [
+          "sync",
+          "triage",
+          "plan",
+          "spawn_agent",
+          "mutate_repo",
+          "push_branch",
+          "open_pr",
+          "submit_review",
+          "merge_pr",
+          "delete_worktree",
+          "stop_agent",
+          "access_secret",
+          "destructive_fs"
+        ]
+      },
+      "PolicyActionStep": {
+        "type": "object",
+        "required": [
+          "action_id"
+        ],
+        "properties": {
+          "action_id": {
+            "type": "string"
+          }
+        }
+      },
+      "PolicyApprovalGate": {
+        "type": "object",
+        "description": "Configuration for an approval-gate node. A durable one-shot grant governs\nthe gate: an approved grant traverses the `approved` output, a denied grant\nterminates the route as `Deny`, and no or pending grant blocks the route as\n`RequireHuman`. `reason_code` is the human/pending block reason.",
+        "required": [
+          "reason_code"
+        ],
+        "properties": {
+          "expiry_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "reason_code": {
+            "$ref": "#/components/schemas/PolicyReasonCode"
+          }
+        }
+      },
+      "PolicyApprovalGrant": {
+        "type": "object",
+        "description": "A durable approval grant persisted by the daemon, keyed by board item,\naction, and the canvas revision that authored the gate. Moves pending ->\napproved | denied | revoked, then an approved grant is consumed once at\ndispatch reservation.",
+        "required": [
+          "id",
+          "board_item_id",
+          "action",
+          "canvas_revision",
+          "node_id",
+          "reason_code",
+          "state",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/PolicyAction"
+          },
+          "board_item_id": {
+            "type": "string"
+          },
+          "canvas_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "canvas_revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "consumed_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "expiry_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "id": {
+            "type": "string"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "reason_code": {
+            "$ref": "#/components/schemas/PolicyReasonCode"
+          },
+          "resolved_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resolved_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "$ref": "#/components/schemas/PolicyApprovalState"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        }
+      },
+      "PolicyApprovalGrantResolveRequest": {
+        "type": "object",
+        "required": [
+          "grant_id",
+          "approve"
+        ],
+        "properties": {
+          "actor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "approve": {
+            "type": "boolean"
+          },
+          "grant_id": {
+            "type": "string"
+          }
+        }
+      },
+      "PolicyApprovalGrantResolveResponse": {
+        "type": "object",
+        "required": [
+          "grant"
+        ],
+        "properties": {
+          "grant": {
+            "$ref": "#/components/schemas/PolicyApprovalGrant"
+          }
+        }
+      },
+      "PolicyApprovalGrantRevokeRequest": {
+        "type": "object",
+        "required": [
+          "grant_id"
+        ],
+        "properties": {
+          "actor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "grant_id": {
+            "type": "string"
+          }
+        }
+      },
+      "PolicyApprovalGrantRevokeResponse": {
+        "type": "object",
+        "required": [
+          "grant"
+        ],
+        "properties": {
+          "grant": {
+            "$ref": "#/components/schemas/PolicyApprovalGrant"
+          }
+        }
+      },
+      "PolicyApprovalGrantState": {
+        "type": "object",
+        "description": "Caller-supplied approval-grant state for one approval-gate node. Dispatch\nresolves durable grants for the (board item, action, revision) key and injects\ntheir state here; simulation and replay supply fixture state so those paths\nstay deterministic.",
+        "required": [
+          "node_id",
+          "state"
+        ],
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/PolicyApprovalState"
+          }
+        }
+      },
+      "PolicyApprovalGrantsListResponse": {
+        "type": "object",
+        "properties": {
+          "grants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicyApprovalGrant"
+            }
+          }
+        }
+      },
+      "PolicyApprovalState": {
+        "type": "string",
+        "description": "Resolution state of a durable [`ApprovalGate`](crate::task_board::policy_graph)\ngrant, injected into evaluation by the caller. `None` on the input means no\ngrant exists yet for the gate.",
+        "enum": [
+          "pending",
+          "approved",
+          "denied",
+          "revoked"
+        ]
+      },
+      "PolicyCanvasCreateRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "PolicyCanvasDeleteRequest": {
+        "type": "object",
+        "required": [
+          "canvas_id"
+        ],
+        "properties": {
+          "canvas_id": {
+            "type": "string"
+          }
+        }
+      },
+      "PolicyCanvasDuplicateRequest": {
+        "type": "object",
+        "required": [
+          "canvas_id"
+        ],
+        "properties": {
+          "canvas_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "PolicyCanvasExportRequest": {
+        "type": "object",
+        "properties": {
+          "canvas_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "PolicyCanvasExportResponse": {
+        "type": "object",
+        "required": [
+          "canvas_id",
+          "title",
+          "document"
+        ],
+        "properties": {
+          "canvas_id": {
+            "type": "string"
+          },
+          "document": {
+            "$ref": "#/components/schemas/PolicyGraph"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "PolicyCanvasImportRequest": {
+        "type": "object",
+        "required": [
+          "document"
+        ],
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/PolicyGraph"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "PolicyCanvasPoint": {
+        "type": "object",
+        "required": [
+          "x",
+          "y"
+        ],
+        "properties": {
+          "x": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "y": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PolicyCanvasRecord": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "created_at",
+          "updated_at",
+          "document"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "document": {
+            "$ref": "#/components/schemas/PolicyGraph"
+          },
+          "id": {
+            "type": "string"
+          },
+          "is_manual_ocr_paste_canvas": {
+            "type": "boolean"
+          },
+          "is_review_screenshot_extraction_canvas": {
+            "type": "boolean"
+          },
+          "is_review_text_paste_dry_run_canvas": {
+            "type": "boolean"
+          },
+          "latest_simulation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PolicyPipelineSimulationResult"
+              }
+            ]
+          },
+          "live_document": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PolicyGraph"
+              }
+            ]
+          },
+          "live_updated_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        }
+      },
+      "PolicyCanvasRect": {
+        "type": "object",
+        "required": [
+          "x",
+          "y",
+          "width",
+          "height"
+        ],
+        "properties": {
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "width": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "x": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "y": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PolicyCanvasRenameRequest": {
+        "type": "object",
+        "required": [
+          "canvas_id",
+          "title"
+        ],
+        "properties": {
+          "canvas_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "PolicyCanvasSetActiveRequest": {
+        "type": "object",
+        "required": [
+          "canvas_id"
+        ],
+        "properties": {
+          "canvas_id": {
+            "type": "string"
+          }
+        }
+      },
+      "PolicyCanvasSetGlobalEnforcementRequest": {
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PolicyCanvasSetSpawnKillSwitchRequest": {
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PolicyCanvasSetSpawnRequiresLivePolicyRequest": {
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PolicyCanvasSummary": {
+        "type": "object",
+        "required": [
+          "canvas_id",
+          "title",
+          "revision",
+          "mode",
+          "document",
+          "node_count",
+          "edge_count",
+          "group_count",
+          "updated_at"
+        ],
+        "properties": {
+          "canvas_id": {
+            "type": "string"
+          },
+          "document": {
+            "$ref": "#/components/schemas/PolicyGraph"
+          },
+          "edge_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "group_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "latest_simulation_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "latest_simulation_succeeded": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "latest_simulation_trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "live_document": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PolicyGraph"
+              }
+            ]
+          },
+          "live_updated_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mode": {
+            "$ref": "#/components/schemas/PolicyGraphMode"
+          },
+          "node_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        }
+      },
+      "PolicyCanvasWorkspaceResponse": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "active_canvas_id"
+        ],
+        "properties": {
+          "active_canvas_id": {
+            "type": "string"
+          },
+          "canvases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicyCanvasSummary"
+            }
+          },
+          "global_policy_enforcement_enabled": {
+            "type": "boolean"
+          },
+          "scenarios": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicyScenario"
+            }
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "spawn_kill_switch": {
+            "type": "boolean"
+          },
+          "spawn_requires_live_policy": {
+            "type": "boolean"
+          }
+        }
+      },
       "PolicyDecision": {
         "oneOf": [
           {
@@ -13917,6 +16199,1982 @@
           }
         ]
       },
+      "PolicyEventWait": {
+        "type": "object",
+        "required": [
+          "event_key"
+        ],
+        "properties": {
+          "event_key": {
+            "type": "string"
+          }
+        }
+      },
+      "PolicyEvidence": {
+        "type": "object",
+        "properties": {
+          "branch_protection_allows_merge": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "checks_green": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "protected_path_touched": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "review_auto_merge_enabled": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "review_has_conflict_markers": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "review_has_merge_conflicts": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "review_has_no_decision": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "review_is_draft": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "review_is_open": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "review_policy_blocked": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "review_required_approvals_satisfied_after_viewer_approval": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "review_review_required": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "review_viewer_can_update": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "review_viewer_has_active_approval": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "reviewer_verdict_approved": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "risk_score": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "unresolved_requested_changes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "PolicyEvidenceCheck": {
+        "type": "object",
+        "required": [
+          "field",
+          "pass",
+          "fail_reason_code",
+          "missing_reason_code"
+        ],
+        "properties": {
+          "fail_reason_code": {
+            "$ref": "#/components/schemas/PolicyReasonCode"
+          },
+          "field": {
+            "$ref": "#/components/schemas/PolicyEvidenceField"
+          },
+          "missing_reason_code": {
+            "$ref": "#/components/schemas/PolicyReasonCode"
+          },
+          "pass": {
+            "$ref": "#/components/schemas/PolicyEvidencePredicate"
+          }
+        }
+      },
+      "PolicyEvidenceField": {
+        "type": "string",
+        "enum": [
+          "checks_green",
+          "branch_protection_allows_merge",
+          "reviewer_verdict_approved",
+          "unresolved_requested_changes",
+          "protected_path_touched",
+          "risk_score",
+          "review_is_open",
+          "review_is_draft",
+          "review_review_required",
+          "review_has_no_decision",
+          "review_has_merge_conflicts",
+          "review_policy_blocked",
+          "review_viewer_can_update",
+          "review_has_conflict_markers",
+          "review_viewer_has_active_approval",
+          "review_auto_merge_enabled",
+          "review_required_approvals_satisfied_after_viewer_approval"
+        ]
+      },
+      "PolicyEvidencePredicate": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "predicate"
+            ],
+            "properties": {
+              "predicate": {
+                "type": "string",
+                "enum": [
+                  "is_true"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "predicate"
+            ],
+            "properties": {
+              "predicate": {
+                "type": "string",
+                "enum": [
+                  "is_false"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "predicate"
+            ],
+            "properties": {
+              "predicate": {
+                "type": "string",
+                "enum": [
+                  "is_zero"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "predicate"
+            ],
+            "properties": {
+              "predicate": {
+                "type": "string",
+                "enum": [
+                  "is_positive"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "predicate"
+            ],
+            "properties": {
+              "predicate": {
+                "type": "string",
+                "enum": [
+                  "is_present"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "predicate"
+            ],
+            "properties": {
+              "predicate": {
+                "type": "string",
+                "enum": [
+                  "is_missing"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "PolicyFinishNode": {
+        "type": "object",
+        "required": [
+          "decision",
+          "reason_code"
+        ],
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/PolicyGraphDecision"
+          },
+          "reason_code": {
+            "$ref": "#/components/schemas/PolicyReasonCode"
+          }
+        }
+      },
+      "PolicyGraph": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "revision",
+          "mode",
+          "nodes",
+          "edges",
+          "groups",
+          "layout"
+        ],
+        "properties": {
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicyGraphEdge"
+            }
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicyGraphGroup"
+            }
+          },
+          "layout": {
+            "$ref": "#/components/schemas/PolicyGraphLayout"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/PolicyGraphMode"
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicyGraphNode"
+            }
+          },
+          "policy_trace_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "PolicyGraphAutomationBinding": {
+        "type": "object",
+        "required": [
+          "event_source"
+        ],
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "allowed_bundle_identifiers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "content_kinds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "denied_bundle_identifiers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "event_source": {
+            "type": "string"
+          },
+          "is_enabled": {
+            "type": "boolean"
+          },
+          "ocr_configuration": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PolicyGraphOCRConfiguration"
+              }
+            ]
+          },
+          "postprocessors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "preprocessors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "priority": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "review_pull_request_extraction": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PolicyGraphReviewPullRequestExtraction"
+              }
+            ]
+          },
+          "source_app_mode": {
+            "type": "string"
+          }
+        }
+      },
+      "PolicyGraphDecision": {
+        "type": "string",
+        "enum": [
+          "allow",
+          "deny"
+        ]
+      },
+      "PolicyGraphEdge": {
+        "type": "object",
+        "required": [
+          "id",
+          "from_node",
+          "from_port",
+          "to_node",
+          "to_port"
+        ],
+        "properties": {
+          "condition": {
+            "$ref": "#/components/schemas/PolicyGraphEdgeCondition"
+          },
+          "from_node": {
+            "$ref": "#/components/schemas/PolicyGraphNodeId"
+          },
+          "from_port": {
+            "$ref": "#/components/schemas/PolicyGraphPortId"
+          },
+          "id": {
+            "$ref": "#/components/schemas/PolicyGraphEdgeId"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to_node": {
+            "$ref": "#/components/schemas/PolicyGraphNodeId"
+          },
+          "to_port": {
+            "$ref": "#/components/schemas/PolicyGraphPortId"
+          }
+        }
+      },
+      "PolicyGraphEdgeCondition": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "condition"
+            ],
+            "properties": {
+              "condition": {
+                "type": "string",
+                "enum": [
+                  "always"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "actions",
+              "condition"
+            ],
+            "properties": {
+              "actions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PolicyAction"
+                }
+              },
+              "condition": {
+                "type": "string",
+                "enum": [
+                  "action_in"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "condition"
+            ],
+            "properties": {
+              "condition": {
+                "type": "string",
+                "enum": [
+                  "evidence_pass"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "reason_code",
+              "condition"
+            ],
+            "properties": {
+              "condition": {
+                "type": "string",
+                "enum": [
+                  "evidence_failure"
+                ]
+              },
+              "reason_code": {
+                "$ref": "#/components/schemas/PolicyReasonCode"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "reason_code",
+              "condition"
+            ],
+            "properties": {
+              "condition": {
+                "type": "string",
+                "enum": [
+                  "evidence_consensus"
+                ]
+              },
+              "reason_code": {
+                "$ref": "#/components/schemas/PolicyReasonCode"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "condition"
+            ],
+            "properties": {
+              "condition": {
+                "type": "string",
+                "enum": [
+                  "evidence_missing"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "condition"
+            ],
+            "properties": {
+              "condition": {
+                "type": "string",
+                "enum": [
+                  "condition_true"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "condition"
+            ],
+            "properties": {
+              "condition": {
+                "type": "string",
+                "enum": [
+                  "condition_false"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "condition"
+            ],
+            "properties": {
+              "condition": {
+                "type": "string",
+                "enum": [
+                  "risk_high"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "condition"
+            ],
+            "properties": {
+              "condition": {
+                "type": "string",
+                "enum": [
+                  "risk_low_or_equal"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "condition"
+            ],
+            "properties": {
+              "condition": {
+                "type": "string",
+                "enum": [
+                  "risk_missing"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "PolicyGraphEdgeId": {
+        "type": "string",
+        "description": "Identifies an edge within a policy graph (`PolicyGraphEdge::id`)."
+      },
+      "PolicyGraphGroup": {
+        "type": "object",
+        "required": [
+          "id",
+          "label"
+        ],
+        "properties": {
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "frame": {
+            "$ref": "#/components/schemas/PolicyCanvasRect"
+          },
+          "id": {
+            "$ref": "#/components/schemas/PolicyGraphGroupId"
+          },
+          "label": {
+            "type": "string"
+          },
+          "node_ids": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicyGraphNodeId"
+            }
+          }
+        }
+      },
+      "PolicyGraphGroupId": {
+        "type": "string",
+        "description": "Identifies a node group (`PolicyGraphGroup::id`, a node's `group_id`)."
+      },
+      "PolicyGraphLayout": {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicyGraphNodeLayout"
+            }
+          },
+          "offset": {
+            "$ref": "#/components/schemas/PolicyCanvasPoint"
+          },
+          "zoom": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "PolicyGraphMode": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "dry_run",
+          "enforced"
+        ]
+      },
+      "PolicyGraphNode": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "kind"
+        ],
+        "properties": {
+          "automation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PolicyGraphAutomationBinding"
+              }
+            ]
+          },
+          "group_id": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PolicyGraphGroupId"
+              }
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/PolicyGraphNodeId"
+          },
+          "input_ports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicyGraphPortId"
+            }
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PolicyGraphNodeKind"
+          },
+          "label": {
+            "type": "string"
+          },
+          "output_ports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicyGraphPortId"
+            }
+          }
+        }
+      },
+      "PolicyGraphNodeId": {
+        "type": "string",
+        "description": "Identifies a node within a policy graph (`PolicyGraphNode::id`, an edge's\n`from_node`/`to_node`, a group's members, a layout entry's `node_id`)."
+      },
+      "PolicyGraphNodeKind": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "workflow",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "trigger"
+                ]
+              },
+              "workflow": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PolicyWorkflowEntry"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "workflow_entry"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "required": [
+              "actions",
+              "kind"
+            ],
+            "properties": {
+              "actions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PolicyAction"
+                }
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "action_gate"
+                ]
+              }
+            }
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PolicyActionStep"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "action_step"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "required": [
+              "checks",
+              "kind"
+            ],
+            "properties": {
+              "checks": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PolicyEvidenceCheck"
+                }
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "evidence_check"
+                ]
+              }
+            }
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PolicyIfThenElseCondition"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "if_then_else"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PolicySwitchNode"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "switch"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "required": [
+              "field",
+              "threshold",
+              "high_risk_reason_code",
+              "missing_reason_code",
+              "kind"
+            ],
+            "properties": {
+              "field": {
+                "$ref": "#/components/schemas/PolicyEvidenceField"
+              },
+              "high_risk_reason_code": {
+                "$ref": "#/components/schemas/PolicyReasonCode"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "risk_classifier"
+                ]
+              },
+              "missing_reason_code": {
+                "$ref": "#/components/schemas/PolicyReasonCode"
+              },
+              "threshold": {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 0
+              }
+            }
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PolicyWaitStep"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "wait_step"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PolicyEventWait"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "event_wait"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PolicyHandoffStep"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "handoff"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "hub"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "reason_code",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "human_gate"
+                ]
+              },
+              "reason_code": {
+                "$ref": "#/components/schemas/PolicyReasonCode"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "reason_code",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "consensus_gate"
+                ]
+              },
+              "reason_code": {
+                "$ref": "#/components/schemas/PolicyReasonCode"
+              }
+            }
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PolicyApprovalGate"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "approval_gate"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "required": [
+              "reason_code",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "dry_run_gate"
+                ]
+              },
+              "reason_code": {
+                "$ref": "#/components/schemas/PolicyReasonCode"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "decision",
+              "reason_codes",
+              "kind"
+            ],
+            "properties": {
+              "decision": {
+                "$ref": "#/components/schemas/PolicyGraphDecision"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "supervisor_rule"
+                ]
+              },
+              "reason_codes": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PolicyReasonCode"
+                }
+              }
+            }
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PolicyFinishNode"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "finish"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "review_screenshot_paste"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "ocr_image"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "resolve_review_pull_requests"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "copy_review_pull_request_list"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "PolicyGraphNodeLayout": {
+        "type": "object",
+        "required": [
+          "node_id",
+          "x",
+          "y"
+        ],
+        "properties": {
+          "node_id": {
+            "$ref": "#/components/schemas/PolicyGraphNodeId"
+          },
+          "source": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PolicyGraphNodeLayoutSource"
+              }
+            ]
+          },
+          "x": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "y": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PolicyGraphNodeLayoutSource": {
+        "type": "string",
+        "enum": [
+          "auto",
+          "manual"
+        ]
+      },
+      "PolicyGraphOCRConfiguration": {
+        "type": "object",
+        "properties": {
+          "automatically_detects_language": {
+            "type": "boolean"
+          },
+          "recognition_level": {
+            "type": "string"
+          },
+          "uses_language_correction": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PolicyGraphPortDirection": {
+        "type": "string",
+        "enum": [
+          "input",
+          "output"
+        ]
+      },
+      "PolicyGraphPortId": {
+        "type": "string",
+        "description": "Identifies a port on a node (`input_ports`/`output_ports`, an edge's\n`from_port`/`to_port`, a switch arm's `port`)."
+      },
+      "PolicyGraphReviewPullRequestExtraction": {
+        "type": "object",
+        "properties": {
+          "auto_copy": {
+            "type": "boolean"
+          },
+          "failure_signal_mode": {
+            "type": "string"
+          },
+          "number_memory_enabled": {
+            "type": "boolean"
+          },
+          "output_format": {
+            "type": "string"
+          },
+          "policy_repositories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "repository_mode": {
+            "type": "string"
+          },
+          "result_scope": {
+            "type": "string"
+          },
+          "show_sheet": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PolicyGraphValidationIssue": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "expected",
+              "actual",
+              "issue"
+            ],
+            "properties": {
+              "actual": {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 0
+              },
+              "expected": {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 0
+              },
+              "issue": {
+                "type": "string",
+                "enum": [
+                  "unsupported_schema_version"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "location",
+              "issue"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "issue": {
+                "type": "string",
+                "enum": [
+                  "duplicate_id"
+                ]
+              },
+              "location": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "edge_id",
+              "node_id",
+              "issue"
+            ],
+            "properties": {
+              "edge_id": {
+                "type": "string"
+              },
+              "issue": {
+                "type": "string",
+                "enum": [
+                  "dangling_edge"
+                ]
+              },
+              "node_id": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "edge_id",
+              "node_id",
+              "port",
+              "direction",
+              "issue"
+            ],
+            "properties": {
+              "direction": {
+                "$ref": "#/components/schemas/PolicyGraphPortDirection"
+              },
+              "edge_id": {
+                "type": "string"
+              },
+              "issue": {
+                "type": "string",
+                "enum": [
+                  "invalid_port"
+                ]
+              },
+              "node_id": {
+                "type": "string"
+              },
+              "port": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "node_ids",
+              "issue"
+            ],
+            "properties": {
+              "issue": {
+                "type": "string",
+                "enum": [
+                  "cycle"
+                ]
+              },
+              "node_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "action",
+              "issue"
+            ],
+            "properties": {
+              "action": {
+                "$ref": "#/components/schemas/PolicyAction"
+              },
+              "issue": {
+                "type": "string",
+                "enum": [
+                  "unsafe_high_risk_action"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "edge_id",
+              "provided",
+              "required",
+              "issue"
+            ],
+            "properties": {
+              "edge_id": {
+                "type": "string"
+              },
+              "issue": {
+                "type": "string",
+                "enum": [
+                  "incompatible_payload_edge"
+                ]
+              },
+              "provided": {
+                "type": "string"
+              },
+              "required": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A route reachable by a `spawn_agent` input reaches `node_id`, a\nnon-terminal node with no continuation, so the evaluator would fall\nthrough to an implicit default-allow instead of an explicit terminal.",
+            "required": [
+              "node_id",
+              "issue"
+            ],
+            "properties": {
+              "issue": {
+                "type": "string",
+                "enum": [
+                  "spawn_route_missing_terminal"
+                ]
+              },
+              "node_id": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "PolicyGraphValidationReport": {
+        "type": "object",
+        "properties": {
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicyGraphValidationIssue"
+            }
+          }
+        }
+      },
+      "PolicyHandoffStep": {
+        "type": "object",
+        "required": [
+          "handoff_key"
+        ],
+        "properties": {
+          "handoff_key": {
+            "type": "string"
+          }
+        }
+      },
+      "PolicyIfThenElseCondition": {
+        "type": "object",
+        "required": [
+          "field",
+          "predicate"
+        ],
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/PolicyEvidenceField"
+          },
+          "predicate": {
+            "$ref": "#/components/schemas/PolicyEvidencePredicate"
+          }
+        }
+      },
+      "PolicyInput": {
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/PolicyAction"
+          },
+          "approvals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicyApprovalGrantState"
+            }
+          },
+          "evaluated_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/PolicyEvidence"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/PolicySubject"
+          },
+          "workflow": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "PolicyPipelineAuditSummary": {
+        "type": "object",
+        "required": [
+          "active_revision",
+          "mode",
+          "validation"
+        ],
+        "properties": {
+          "active_revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "global_policy_enforcement_enabled": {
+            "type": "boolean"
+          },
+          "latest_simulation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PolicyPipelineSimulationResult"
+              }
+            ]
+          },
+          "latest_trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mode": {
+            "$ref": "#/components/schemas/PolicyGraphMode"
+          },
+          "pending_approval_grant_count": {
+            "type": "integer",
+            "description": "Populated by the daemon service layer; pure audit callers receive zero.",
+            "minimum": 0
+          },
+          "spawn_kill_switch": {
+            "type": "boolean"
+          },
+          "spawn_requires_live_policy": {
+            "type": "boolean"
+          },
+          "validation": {
+            "$ref": "#/components/schemas/PolicyGraphValidationReport"
+          }
+        }
+      },
+      "PolicyPipelineGoLiveDiff": {
+        "type": "object",
+        "required": [
+          "has_live_policy",
+          "changed_count"
+        ],
+        "properties": {
+          "changed_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "diffs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicyPipelineGoLiveDiffEntry"
+            }
+          },
+          "has_live_policy": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PolicyPipelineGoLiveDiffEntry": {
+        "type": "object",
+        "required": [
+          "scenario_id",
+          "scenario_name",
+          "action",
+          "draft_decision",
+          "changed"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/PolicyAction"
+          },
+          "changed": {
+            "type": "boolean"
+          },
+          "draft_decision": {
+            "$ref": "#/components/schemas/PolicyDecision"
+          },
+          "live_decision": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PolicyDecision"
+              }
+            ]
+          },
+          "scenario_id": {
+            "type": "string"
+          },
+          "scenario_name": {
+            "type": "string"
+          }
+        }
+      },
+      "PolicyPipelineGoLiveDiffRequest": {
+        "type": "object",
+        "properties": {
+          "canvas_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "document": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PolicyGraph"
+              }
+            ]
+          }
+        }
+      },
+      "PolicyPipelineMakeLiveRequest": {
+        "type": "object",
+        "required": [
+          "revision"
+        ],
+        "properties": {
+          "actor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "canvas_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "PolicyPipelineMakeLiveResponse": {
+        "type": "object",
+        "required": [
+          "document",
+          "trace_id",
+          "global_policy_enforcement_enabled",
+          "workspace"
+        ],
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/PolicyGraph"
+          },
+          "global_policy_enforcement_enabled": {
+            "type": "boolean"
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "workspace": {
+            "$ref": "#/components/schemas/PolicyCanvasWorkspaceResponse"
+          }
+        }
+      },
+      "PolicyPipelinePromoteRequest": {
+        "type": "object",
+        "required": [
+          "revision"
+        ],
+        "properties": {
+          "actor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "canvas_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "PolicyPipelinePromoteResponse": {
+        "type": "object",
+        "required": [
+          "document",
+          "trace_id"
+        ],
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/PolicyGraph"
+          },
+          "trace_id": {
+            "type": "string"
+          }
+        }
+      },
+      "PolicyPipelineReplayDecision": {
+        "type": "object",
+        "description": "One replayed decision: what history recorded versus what the draft decides\nnow for the same input.",
+        "required": [
+          "id",
+          "recorded_at",
+          "action",
+          "historical_decision",
+          "draft_decision",
+          "changed",
+          "insufficient_evidence"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/PolicyAction"
+          },
+          "changed": {
+            "type": "boolean"
+          },
+          "draft_decision": {
+            "$ref": "#/components/schemas/PolicyDecision"
+          },
+          "historical_decision": {
+            "$ref": "#/components/schemas/PolicyDecision"
+          },
+          "id": {
+            "type": "string"
+          },
+          "insufficient_evidence": {
+            "type": "boolean"
+          },
+          "recorded_at": {
+            "type": "string"
+          },
+          "visited_node_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "PolicyPipelineReplayRequest": {
+        "type": "object",
+        "properties": {
+          "canvas_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "PolicyPipelineReplayResult": {
+        "type": "object",
+        "description": "The result of replaying the draft against a window of recorded decisions.",
+        "required": [
+          "sample_size",
+          "changed_count"
+        ],
+        "properties": {
+          "changed_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicyPipelineReplayDecision"
+            }
+          },
+          "sample_size": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "PolicyPipelineSaveDraftRequest": {
+        "type": "object",
+        "required": [
+          "document"
+        ],
+        "properties": {
+          "canvas_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "document": {
+            "$ref": "#/components/schemas/PolicyGraph"
+          },
+          "if_revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "PolicyPipelineSaveResponse": {
+        "type": "object",
+        "required": [
+          "document",
+          "validation"
+        ],
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/PolicyGraph"
+          },
+          "persisted": {
+            "type": "boolean"
+          },
+          "validation": {
+            "$ref": "#/components/schemas/PolicyGraphValidationReport"
+          }
+        }
+      },
+      "PolicyPipelineSimulateRequest": {
+        "type": "object",
+        "properties": {
+          "canvas_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "document": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PolicyGraph"
+              }
+            ]
+          }
+        }
+      },
+      "PolicyPipelineSimulatedDecision": {
+        "type": "object",
+        "required": [
+          "action",
+          "decision"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/PolicyAction"
+          },
+          "boundaries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicyRuntimeBoundary"
+            }
+          },
+          "decision": {
+            "$ref": "#/components/schemas/PolicyDecision"
+          },
+          "policy_trace_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "scenario_id": {
+            "type": "string"
+          },
+          "scenario_name": {
+            "type": "string"
+          },
+          "visited_node_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "PolicyPipelineSimulationResult": {
+        "type": "object",
+        "required": [
+          "revision",
+          "trace_id",
+          "simulated_at",
+          "succeeded",
+          "validation"
+        ],
+        "properties": {
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicyPipelineSimulatedDecision"
+            }
+          },
+          "has_runtime_boundaries": {
+            "type": "boolean"
+          },
+          "policy_trace_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "simulated_at": {
+            "type": "string"
+          },
+          "succeeded": {
+            "type": "boolean"
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "validation": {
+            "$ref": "#/components/schemas/PolicyGraphValidationReport"
+          }
+        }
+      },
       "PolicyReasonCode": {
         "type": "string",
         "enum": [
@@ -13936,6 +18194,388 @@
           "spawn_policy_required",
           "spawn_kill_switch_engaged"
         ]
+      },
+      "PolicyRuntimeBoundary": {
+        "type": "object",
+        "required": [
+          "node_id",
+          "resume_key",
+          "wait"
+        ],
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "resume_key": {
+            "type": "string"
+          },
+          "wait": {
+            "$ref": "#/components/schemas/PolicyWaitCondition"
+          }
+        }
+      },
+      "PolicyScenario": {
+        "type": "object",
+        "description": "A named simulation case. `seeded` marks the built-in baseline scenarios so the\nUI can distinguish them and `reset` can restore them.",
+        "required": [
+          "id",
+          "name",
+          "input"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "input": {
+            "$ref": "#/components/schemas/PolicyInput"
+          },
+          "name": {
+            "type": "string"
+          },
+          "seeded": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PolicyScenarioCreateRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "input"
+        ],
+        "properties": {
+          "input": {
+            "$ref": "#/components/schemas/PolicyInput"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "PolicyScenarioDeleteRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "PolicyScenarioUpdateRequest": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "input"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "input": {
+            "$ref": "#/components/schemas/PolicyInput"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "PolicySubject": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "agent_mode": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AgentMode"
+              }
+            ]
+          },
+          "branch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "priority": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TaskBoardPriority"
+              }
+            ]
+          },
+          "pull_request": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "repository": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "session_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "target_project_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "task_board_item_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "PolicySwitchArm": {
+        "type": "object",
+        "required": [
+          "port",
+          "field",
+          "predicate"
+        ],
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/PolicyEvidenceField"
+          },
+          "port": {
+            "$ref": "#/components/schemas/PolicyGraphPortId"
+          },
+          "predicate": {
+            "$ref": "#/components/schemas/PolicyEvidencePredicate"
+          }
+        }
+      },
+      "PolicySwitchNode": {
+        "type": "object",
+        "required": [
+          "arms"
+        ],
+        "properties": {
+          "arms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicySwitchArm"
+            }
+          }
+        }
+      },
+      "PolicyTransferBundle": {
+        "type": "object",
+        "description": "Versioned envelope carrying one or many exact policy canvas records.",
+        "required": [
+          "format",
+          "version",
+          "policies"
+        ],
+        "properties": {
+          "format": {
+            "type": "string"
+          },
+          "policies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicyCanvasRecord"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "workspace": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PolicyTransferWorkspaceMetadata"
+              }
+            ]
+          }
+        }
+      },
+      "PolicyTransferDumpRequest": {
+        "type": "object",
+        "description": "Select policies for a dump. Empty `policy_ids` dumps every policy and full\nworkspace metadata.",
+        "properties": {
+          "policy_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "PolicyTransferImportRequest": {
+        "type": "object",
+        "description": "Import one or many exact policy records, either by merge/upsert or by full\nworkspace replacement.",
+        "required": [
+          "bundle"
+        ],
+        "properties": {
+          "bundle": {
+            "$ref": "#/components/schemas/PolicyTransferBundle"
+          },
+          "replace_all": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PolicyTransferWorkspaceMetadata": {
+        "type": "object",
+        "description": "Complete non-canvas state needed to replace a policy workspace exactly.",
+        "required": [
+          "schema_version",
+          "active_canvas_id",
+          "global_policy_enforcement_enabled",
+          "manual_ocr_paste_canvas_deleted",
+          "review_text_paste_dry_run_canvas_deleted",
+          "review_screenshot_extraction_canvas_deleted",
+          "scenarios",
+          "scenarios_seeded",
+          "spawn_requires_live_policy",
+          "spawn_kill_switch"
+        ],
+        "properties": {
+          "active_canvas_id": {
+            "type": "string"
+          },
+          "global_policy_enforcement_enabled": {
+            "type": "boolean"
+          },
+          "manual_ocr_paste_canvas_deleted": {
+            "type": "boolean"
+          },
+          "review_screenshot_extraction_canvas_deleted": {
+            "type": "boolean"
+          },
+          "review_text_paste_dry_run_canvas_deleted": {
+            "type": "boolean"
+          },
+          "scenarios": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicyScenario"
+            }
+          },
+          "scenarios_seeded": {
+            "type": "boolean"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "spawn_kill_switch": {
+            "type": "boolean"
+          },
+          "spawn_requires_live_policy": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PolicyWaitCondition": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "duration_seconds",
+              "kind"
+            ],
+            "properties": {
+              "duration_seconds": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "timer"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_key",
+              "kind"
+            ],
+            "properties": {
+              "event_key": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "event"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "PolicyWaitStep": {
+        "type": "object",
+        "required": [
+          "wait",
+          "resume_key"
+        ],
+        "properties": {
+          "resume_key": {
+            "type": "string"
+          },
+          "wait": {
+            "$ref": "#/components/schemas/PolicyWaitCondition"
+          }
+        }
+      },
+      "PolicyWorkflowEntry": {
+        "type": "object",
+        "required": [
+          "workflow_id"
+        ],
+        "properties": {
+          "workflow_id": {
+            "type": "string"
+          }
+        }
       },
       "ProjectSummary": {
         "type": "object",
