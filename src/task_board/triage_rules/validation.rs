@@ -282,7 +282,7 @@ fn canonical_when(when: &[TriageRuleCondition]) -> Vec<TriageRuleCondition> {
 }
 
 fn condition_sort_key(condition: &TriageRuleCondition) -> String {
-    serde_json::to_string(condition).unwrap_or_default()
+    serde_json::to_string(condition).expect("TriageRuleCondition is always serializable")
 }
 
 /// Whether every condition in `earlier` also appears in `later` -- i.e.
