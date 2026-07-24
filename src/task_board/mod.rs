@@ -5,6 +5,7 @@ pub mod external;
 mod external_create_intents;
 pub mod git_identity_defaults;
 pub mod github;
+pub mod item_fields;
 pub mod lane;
 #[allow(dead_code)]
 #[cfg(feature = "daemon-runtime")]
@@ -156,6 +157,9 @@ pub use triage_override::{
     effective_triage_outcome, is_canonical_override_actor, is_canonical_override_reason,
     suppress_placement_for_override,
 };
+pub use item_fields::{
+    ExternalRef, ExternalRefProvider, ExternalRefSyncState, PlanningState, TaskUsage,
+};
 pub use triage_rules::{
     MAX_CONDITIONS_PER_RULE, MAX_LABEL_CONDITION_ITEMS, MAX_RULE_ID_BYTES,
     MAX_STRING_CONDITION_BYTES, MAX_TRIAGE_RULES, RUNTIME_RULES_EVALUATOR_IDENTITY,
@@ -168,9 +172,8 @@ pub use triage_rules::{
     is_canonical_rule_id, validate_triage_rule_set,
 };
 pub use types::{
-    AgentMode, ExternalRef, ExternalRefProvider, ExternalRefSyncState, PlanningState,
-    TaskBoardItem, TaskBoardPriority, TaskBoardStatus, TaskBoardTombstoneCause,
-    TaskBoardWorkflowState, TaskBoardWorkflowStatus, TaskUsage,
+    AgentMode, TaskBoardItem, TaskBoardPriority, TaskBoardStatus, TaskBoardTombstoneCause,
+    TaskBoardWorkflowState, TaskBoardWorkflowStatus,
 };
 pub(crate) use worker_prompt::plan_worker_prompt;
 #[cfg(any(test, feature = "daemon-runtime"))]
