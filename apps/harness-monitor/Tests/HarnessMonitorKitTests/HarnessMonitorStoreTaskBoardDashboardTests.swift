@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
@@ -230,6 +231,16 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
     #expect(
       !client.recordedCalls().contains(.deliverTaskBoardDispatch(itemID: "board-2", dryRun: false))
     )
+  }
+
+  @Test("Dispatch summary decodes when the daemon omits an empty failures list")
+  func dispatchSummaryDecodesWithoutFailuresKey() throws {
+    // The daemon skips serializing an empty failures list and older payloads
+    // predate the field, so a missing key must decode as no failures.
+    let json = Data(#"{"plans": [], "applied": []}"#.utf8)
+    let summary = try JSONDecoder().decode(TaskBoardDispatchSummary.self, from: json)
+    #expect(summary.failures.isEmpty)
+    #expect(summary.applied.isEmpty)
   }
 
   @Test("Audit, projects, and machines summaries update dashboard state")

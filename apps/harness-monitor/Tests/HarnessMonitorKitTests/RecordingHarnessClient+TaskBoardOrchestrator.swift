@@ -173,8 +173,16 @@ extension RecordingHarnessClient {
     return lock.withLock {
       let matching = filteredTaskBoardItems(status: request.status, itemId: request.itemId)
       var applied: [TaskBoardDispatchAppliedTask] = []
-      let plans = matching.map { item in
+      var failures: [TaskBoardDispatchFailure] = []
+      let plans = matching.map { item -> TaskBoardDispatchPlan in
         if request.dryRun {
+          return sampleDispatchPlan(for: item)
+        }
+
+        // A reserve failure lands the item in failures instead of applied - the
+        // daemon reports one or the other, never both - so skip mutating it.
+        if let message = taskBoardDispatchFailureMessages[item.id] {
+          failures.append(TaskBoardDispatchFailure(boardItemId: item.id, message: message))
           return sampleDispatchPlan(for: item)
         }
 
@@ -205,8 +213,12 @@ extension RecordingHarnessClient {
         )
         return sampleDispatchPlan(for: updated)
       }
-      var failures: [TaskBoardDispatchFailure] = []
-      if let itemID = request.itemId, let message = taskBoardDispatchFailureMessages[itemID] {
+      // A targeted item that never matched (so is not on the board) still
+      // reports its configured reserve failure.
+      if !request.dryRun, let itemID = request.itemId,
+        let message = taskBoardDispatchFailureMessages[itemID],
+        !failures.contains(where: { $0.boardItemId == itemID })
+      {
         failures.append(TaskBoardDispatchFailure(boardItemId: itemID, message: message))
       }
       return TaskBoardDispatchSummary(plans: plans, applied: applied, failures: failures)

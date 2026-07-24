@@ -220,6 +220,23 @@ public struct TaskBoardDispatchSummary: Codable, Equatable, Sendable {
     self.applied = applied
     self.failures = failures
   }
+
+  // Decoded directly from JSON where the daemon omits an empty failures list
+  // (skip_serializing_if) and older persisted payloads predate the field, so a
+  // synthesized decoder would throw on the missing key.
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    plans = try container.decode([TaskBoardDispatchPlan].self, forKey: .plans)
+    applied = try container.decode([TaskBoardDispatchAppliedTask].self, forKey: .applied)
+    failures =
+      try container.decodeIfPresent([TaskBoardDispatchFailure].self, forKey: .failures) ?? []
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case plans
+    case applied
+    case failures
+  }
 }
 
 public struct TaskBoardDispatchFailure: Codable, Equatable, Sendable {
