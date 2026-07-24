@@ -63,6 +63,19 @@ final class MobileRemoteDaemonPairingTests: XCTestCase {
     XCTAssertThrowsError(try MobilePairingLink.decode(payload))
   }
 
+  func testPairingLinkRejectsMultiplePayloadItems() throws {
+    let now = Date(timeIntervalSince1970: 1_752_124_400)
+    let encoded = try pairingPayload(from: remoteInvitationURL(now: now))
+    var components = try XCTUnwrap(URLComponents(string: "harness://pair"))
+    components.queryItems = [
+      URLQueryItem(name: "payload", value: encoded),
+      URLQueryItem(name: "payload", value: encoded),
+    ]
+    let url = try XCTUnwrap(components.url)
+
+    XCTAssertThrowsError(try MobilePairingLink.decode(url, now: now))
+  }
+
   func testManualPayloadNormalizesRemoteAndRelayInvitations() throws {
     let now = Date(timeIntervalSince1970: 1_752_124_400)
     let remoteURL = try remoteInvitationURL(now: now)

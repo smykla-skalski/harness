@@ -214,11 +214,15 @@ public enum MobilePairingLink: Equatable, Sendable {
   }
 
   private static func classifyFlow(_ url: URL) -> Flow? {
+    let payloads =
+      URLComponents(url: url, resolvingAgainstBaseURL: false)?
+      .queryItems?
+      .filter { $0.name == "payload" } ?? []
+    // More than one `payload` is itself ambiguous, so require exactly one
+    // before reading its markers rather than classifying off the first.
     guard
-      let payload = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-        .queryItems?
-        .first(where: { $0.name == "payload" })?
-        .value,
+      payloads.count == 1,
+      let payload = payloads.first?.value,
       let data = Data(base64URLEncoded: payload),
       let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
     else {
