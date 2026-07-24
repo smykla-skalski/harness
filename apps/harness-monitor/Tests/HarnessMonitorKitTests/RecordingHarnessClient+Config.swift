@@ -91,6 +91,14 @@ extension RecordingHarnessClient {
     }
   }
 
+  /// Reserve failures the daemon returns for an item: dispatch reports the item
+  /// in `failures` (with this message) instead of `applied`, and holds nothing.
+  func configureTaskBoardDispatchFailure(itemID: String, message: String) {
+    lock.withLock {
+      taskBoardDispatchFailureMessages[itemID] = message
+    }
+  }
+
   func configureMutationDelay(_ delay: Duration?) {
     lock.withLock {
       mutationDelay = delay

@@ -1217,10 +1217,12 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // task_board dispatch.rs + policy.rs graph. The hands are TaskBoard*-prefixed and
     // flatten the internally-tagged enums (DispatchReadiness/BlockReason/SessionIntent
     // /PolicyDecision) into discriminator structs; these *Wire types own the faithful
-    // tagged-enum decode and the lifecycle/failures fields are dropped via OMITTED_WIRE_FIELDS.
+    // tagged-enum decode. The lifecycle fields and DispatchFailure's kind enum drop via
+    // OMITTED_WIRE_FIELDS, so DispatchFailure crosses as board_item_id + message only.
     "DispatchExecutionSummary",
     "DispatchPlan",
     "DispatchAppliedTask",
+    "DispatchFailure",
     "DispatchReadiness",
     "DispatchBlockReason",
     "SessionIntent",
@@ -1948,7 +1950,9 @@ fn is_hand_model_default_optional(struct_name: &str, field_name: &str) -> bool {
 /// minimal instead of pulling a whole sub-graph the app never reads (e.g. the
 /// dispatch lifecycle and its step/phase/status enums).
 const OMITTED_WIRE_FIELDS: &[(&str, &str)] = &[
-    ("DispatchExecutionSummary", "failures"),
+    // DispatchFailure crosses to the client so the deliver flow can surface the reserve
+    // failure message; its kind enum stays daemon-side, keeping the wire board_item_id + message.
+    ("DispatchFailure", "kind"),
     ("DispatchPlan", "lifecycle"),
     ("DispatchAppliedTask", "lifecycle"),
     ("DispatchAppliedTask", "read_only_workflow"),
@@ -2725,6 +2729,7 @@ const TASK_BOARD_DISPATCH_EMIT_ONLY: &[&str] = &[
     "DispatchExecutionSummary",
     "DispatchPlan",
     "DispatchAppliedTask",
+    "DispatchFailure",
     "DispatchReadiness",
     "DispatchBlockReason",
     "SessionIntent",
