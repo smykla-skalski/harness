@@ -9,6 +9,248 @@
     "version": "50.0.0"
   },
   "paths": {
+    "/v1/audit/events": {
+      "get": {
+        "tags": [
+          "daemon"
+        ],
+        "operationId": "get_audit_events",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date_range_start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date_range_end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sources",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "categories",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "severities",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "outcomes",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "action_keys",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search_text",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Filtered Harness Monitor audit events page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HarnessMonitorAuditEventsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "audit.events"
+      }
+    },
+    "/v1/bridge/reconfigure": {
+      "post": {
+        "tags": [
+          "daemon"
+        ],
+        "operationId": "post_bridge_reconfigure",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HostBridgeReconfigureRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Host bridge status after reconfiguration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BridgeStatusReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "bridge.reconfigure"
+      }
+    },
+    "/v1/config": {
+      "get": {
+        "tags": [
+          "daemon"
+        ],
+        "operationId": "get_config",
+        "responses": {
+          "200": {
+            "description": "Initial configuration payload: personas, per-runtime model catalogs, ACP agents, and the ACP runtime probe",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WsConfigPayload"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "config.get"
+      }
+    },
     "/v1/daemon/log-level": {
       "get": {
         "tags": [
@@ -226,6 +468,55 @@
             "$ref": "#/components/responses/RemoteRequestTimedOut"
           }
         }
+      }
+    },
+    "/v1/diagnostics": {
+      "get": {
+        "tags": [
+          "daemon"
+        ],
+        "operationId": "get_diagnostics",
+        "responses": {
+          "200": {
+            "description": "Daemon diagnostics report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonDiagnosticsReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "diagnostics"
       }
     },
     "/v1/github/status": {
@@ -1589,6 +1880,55 @@
           }
         },
         "x-websocket-method": "managed_agent.stop"
+      }
+    },
+    "/v1/openrouter/models": {
+      "get": {
+        "tags": [
+          "daemon"
+        ],
+        "operationId": "get_openrouter_models",
+        "responses": {
+          "200": {
+            "description": "OpenRouter model catalog",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenRouterModelCatalogResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "openrouter.list_models"
       }
     },
     "/v1/policies/dump": {
@@ -3362,6 +3702,209 @@
           },
           "414": {
             "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
+    "/v1/remote/client/revoke": {
+      "post": {
+        "tags": [
+          "pairing"
+        ],
+        "description": "Revoke the remote client credential bound to the authenticated caller. Error bodies use an ad-hoc error object carrying code and message but no details field.",
+        "operationId": "post_remote_client_self_revoke",
+        "responses": {
+          "200": {
+            "description": "Client credential revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteClientSelfRevokeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Revocation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
+    "/v1/remote/pair/claim": {
+      "post": {
+        "tags": [
+          "pairing"
+        ],
+        "description": "Claim a one-time pairing code to mint a remote client credential. Public: no daemon credentials, guarded by domain, TTL, and rate limits. Error bodies use an ad-hoc error object carrying code and message but no details field.",
+        "operationId": "post_remote_pair_claim",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemotePairClaimHttpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Pairing claimed; issued client credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemotePairClaimHttpResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed claim request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Pairing domain rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Pairing code already claimed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Pairing code expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
+    "/v1/remote/pair/status": {
+      "post": {
+        "tags": [
+          "pairing"
+        ],
+        "description": "Check the lifecycle status of a pairing request by its opaque id. Public: no daemon credentials, rate limited, output redacted. Error bodies use an ad-hoc error object carrying code and message but no details field.",
+        "operationId": "post_remote_pair_status",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemotePairStatusHttpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Current pairing status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemotePairStatusHttpResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed status request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
           },
           "431": {
             "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
@@ -5331,6 +5874,45 @@
         "x-websocket-method": "runtime_session.resolve"
       }
     },
+    "/v1/runtimes/probe": {
+      "get": {
+        "tags": [
+          "daemon"
+        ],
+        "operationId": "get_runtimes_probe",
+        "responses": {
+          "200": {
+            "description": "ACP runtime availability probe",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcpRuntimeProbeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "runtimes.probe"
+      }
+    },
     "/v1/sessions": {
       "get": {
         "tags": [
@@ -6673,6 +7255,225 @@
         "x-websocket-method": "session.runtime_session"
       }
     },
+    "/v1/sessions/{session_id}/signal": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "operationId": "post_send_signal",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignalSendRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Signal delivered; updated session detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "signal.send"
+      }
+    },
+    "/v1/sessions/{session_id}/signal-ack": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "operationId": "post_signal_ack",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignalAckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Signal acknowledgment recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "signal.ack"
+      }
+    },
+    "/v1/sessions/{session_id}/signal-cancel": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "operationId": "post_cancel_signal",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignalCancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Signal cancelled; updated session detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "signal.cancel"
+      }
+    },
     "/v1/sessions/{session_id}/task": {
       "post": {
         "tags": [
@@ -7837,6 +8638,79 @@
           }
         },
         "x-websocket-method": "session.title"
+      }
+    },
+    "/v1/sessions/{session_id}/voice-sessions": {
+      "post": {
+        "tags": [
+          "voice"
+        ],
+        "operationId": "post_voice_session",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceSessionStartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Voice session started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceSessionStartResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "voice.start_session"
       }
     },
     "/v1/task-board-execution/advertise": {
@@ -11821,6 +12695,225 @@
         },
         "x-websocket-method": "task_board.triage_rules_revisions"
       }
+    },
+    "/v1/voice-sessions/{voice_session_id}/audio": {
+      "post": {
+        "tags": [
+          "voice"
+        ],
+        "operationId": "post_voice_audio_chunk",
+        "parameters": [
+          {
+            "name": "voice_session_id",
+            "in": "path",
+            "description": "Voice session identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceAudioChunkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Audio chunk accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceSessionMutationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "voice.append_audio"
+      }
+    },
+    "/v1/voice-sessions/{voice_session_id}/finish": {
+      "post": {
+        "tags": [
+          "voice"
+        ],
+        "operationId": "post_voice_finish",
+        "parameters": [
+          {
+            "name": "voice_session_id",
+            "in": "path",
+            "description": "Voice session identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceSessionFinishRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Voice session finished",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceSessionMutationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "voice.finish_session"
+      }
+    },
+    "/v1/voice-sessions/{voice_session_id}/transcript": {
+      "post": {
+        "tags": [
+          "voice"
+        ],
+        "operationId": "post_voice_transcript",
+        "parameters": [
+          {
+            "name": "voice_session_id",
+            "in": "path",
+            "description": "Voice session identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceTranscriptUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Transcript segment recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceSessionMutationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "voice.append_transcript"
+      }
     }
   },
   "components": {
@@ -11833,6 +12926,86 @@
           "deferred",
           "expired"
         ]
+      },
+      "AcpAgentDescriptor": {
+        "type": "object",
+        "required": [
+          "id",
+          "display_name",
+          "capabilities",
+          "launch_command",
+          "launch_args",
+          "env_passthrough",
+          "doctor_probe"
+        ],
+        "properties": {
+          "bundled_with_harness": {
+            "type": "boolean"
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/String"
+            }
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "doctor_probe": {
+            "$ref": "#/components/schemas/DoctorProbe"
+          },
+          "env_passthrough": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "excluded_from_initial_default": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "install_hint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "launch_args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "launch_command": {
+            "type": "string"
+          },
+          "model_catalog": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RuntimeModelCatalog"
+              }
+            ]
+          },
+          "prompt_timeout_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "session_configuration": {
+            "$ref": "#/components/schemas/AcpSessionConfiguration"
+          },
+          "spawn_configuration": {
+            "$ref": "#/components/schemas/AcpSpawnConfiguration"
+          }
+        }
       },
       "AcpAgentHandshake": {
         "type": "object",
@@ -12295,6 +13468,14 @@
           }
         }
       },
+      "AcpAuthState": {
+        "type": "string",
+        "enum": [
+          "ready",
+          "unknown",
+          "unavailable"
+        ]
+      },
       "AcpEndpoint": {
         "type": "object",
         "description": "A remote ACP endpoint the daemon connects to instead of spawning a child.\n\nThe URL scheme selects the transport: `ws`/`wss` uses WebSocket, `http`/\n`https` uses SSE with POST. Only header names and the environment variables\nholding their values cross the wire; the daemon resolves the values at\nconnect time so a token never rides the request. `headers_env` applies only\nto `http`/`https` endpoints - the WebSocket transport drops request headers,\nso the daemon rejects headers set on a `ws`/`wss` endpoint.",
@@ -12603,6 +13784,76 @@
           }
         }
       },
+      "AcpRuntimeProbe": {
+        "type": "object",
+        "required": [
+          "agent_id",
+          "display_name",
+          "binary_present",
+          "auth_state"
+        ],
+        "properties": {
+          "agent_id": {
+            "type": "string"
+          },
+          "auth_state": {
+            "$ref": "#/components/schemas/AcpAuthState"
+          },
+          "binary_present": {
+            "type": "boolean"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "install_hint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AcpRuntimeProbeResponse": {
+        "type": "object",
+        "required": [
+          "probes",
+          "checked_at"
+        ],
+        "properties": {
+          "checked_at": {
+            "type": "string"
+          },
+          "probes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AcpRuntimeProbe"
+            }
+          }
+        }
+      },
+      "AcpSessionConfigOptionBinding": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "option_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "AcpSessionConfigOptionState": {
         "type": "object",
         "description": "Compact view of one advertised session config option and its value.",
@@ -12629,6 +13880,70 @@
           }
         }
       },
+      "AcpSessionConfiguration": {
+        "type": "object",
+        "properties": {
+          "additional_directories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Roots beyond the project directory the agent may work in, sent on\n`session/new` only when the agent advertises `additionalDirectories`."
+          },
+          "effort": {
+            "$ref": "#/components/schemas/AcpSessionEffortTransport"
+          },
+          "mcp_servers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AcpMcpServer"
+            },
+            "description": "MCP servers offered to the agent on `session/new`.\n\nHttp and Sse entries are dropped for agents that do not advertise the\nmatching MCP capability, so a descriptor can list them unconditionally.\n\nSerializes with credentials blanked; see [`AcpMcpServer::redacted`]."
+          },
+          "model": {
+            "$ref": "#/components/schemas/AcpSessionModelTransport"
+          }
+        }
+      },
+      "AcpSessionEffortTransport": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "disabled"
+                ]
+              }
+            }
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AcpSessionConfigOptionBinding"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "config_option"
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
       "AcpSessionListPage": {
         "type": "object",
         "description": "One page of `session/list` results, carrying the agent's opaque cursor.",
@@ -12646,6 +13961,59 @@
             }
           }
         }
+      },
+      "AcpSessionModelTransport": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "disabled"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "session_model"
+                ]
+              }
+            }
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AcpSessionConfigOptionBinding"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "config_option"
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        ]
       },
       "AcpSessionSummary": {
         "type": "object",
@@ -12680,6 +14048,56 @@
             ]
           }
         }
+      },
+      "AcpSpawnConfiguration": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "descriptor_runtime"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "name",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "runtime"
+                ]
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "none"
+                ]
+              }
+            }
+          }
+        ]
       },
       "AcpTranscriptResponse": {
         "type": "object",
@@ -13556,6 +14974,54 @@
           }
         }
       },
+      "BridgeStatusReport": {
+        "type": "object",
+        "required": [
+          "running"
+        ],
+        "properties": {
+          "capabilities": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HostBridgeCapabilityManifest"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "pid": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "socket_path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "started_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "uptime_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
       "CodexAgentInspectResponse": {
         "type": "object",
         "required": [
@@ -14166,6 +15632,59 @@
           }
         }
       },
+      "DaemonAuditEvent": {
+        "type": "object",
+        "required": [
+          "recorded_at",
+          "level",
+          "message"
+        ],
+        "properties": {
+          "level": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "recorded_at": {
+            "type": "string"
+          }
+        }
+      },
+      "DaemonBinaryStamp": {
+        "type": "object",
+        "required": [
+          "helper_path",
+          "device_identifier",
+          "inode",
+          "file_size",
+          "modification_time_interval_since_1970"
+        ],
+        "properties": {
+          "device_identifier": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "file_size": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "helper_path": {
+            "type": "string"
+          },
+          "inode": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "modification_time_interval_since_1970": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
       "DaemonControlResponse": {
         "type": "object",
         "required": [
@@ -14174,6 +15693,109 @@
         "properties": {
           "status": {
             "type": "string"
+          }
+        }
+      },
+      "DaemonDiagnostics": {
+        "type": "object",
+        "required": [
+          "daemon_root",
+          "manifest_path",
+          "auth_token_path",
+          "auth_token_present",
+          "events_path",
+          "database_path",
+          "database_size_bytes"
+        ],
+        "properties": {
+          "auth_token_path": {
+            "type": "string"
+          },
+          "auth_token_present": {
+            "type": "boolean"
+          },
+          "daemon_root": {
+            "type": "string"
+          },
+          "database_path": {
+            "type": "string"
+          },
+          "database_size_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "events_path": {
+            "type": "string"
+          },
+          "last_event": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DaemonAuditEvent"
+              }
+            ]
+          },
+          "manifest_path": {
+            "type": "string"
+          }
+        }
+      },
+      "DaemonDiagnosticsReport": {
+        "type": "object",
+        "required": [
+          "launch_agent",
+          "acp_runtime_probe",
+          "workspace",
+          "recent_events"
+        ],
+        "properties": {
+          "acp_runtime_probe": {
+            "$ref": "#/components/schemas/AcpRuntimeProbeResponse"
+          },
+          "github_api": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/GitHubApiDiagnostics"
+              }
+            ]
+          },
+          "health": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/HealthResponse"
+              }
+            ]
+          },
+          "launch_agent": {
+            "$ref": "#/components/schemas/LaunchAgentStatus"
+          },
+          "manifest": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DaemonManifest"
+              }
+            ]
+          },
+          "recent_events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DaemonAuditEvent"
+            }
+          },
+          "workspace": {
+            "$ref": "#/components/schemas/DaemonDiagnostics"
           }
         }
       },
@@ -14213,6 +15835,71 @@
             "description": "Human-readable error message."
           }
         }
+      },
+      "DaemonManifest": {
+        "type": "object",
+        "required": [
+          "version",
+          "pid",
+          "endpoint",
+          "started_at",
+          "token_path"
+        ],
+        "properties": {
+          "binary_stamp": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DaemonBinaryStamp"
+              }
+            ]
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "host_bridge": {
+            "$ref": "#/components/schemas/HostBridgeManifest"
+          },
+          "ownership": {
+            "$ref": "#/components/schemas/DaemonOwnership",
+            "description": "Which entry point launched this daemon. Defaults to `Managed` for\npre-coexistence manifests so legacy installs deserialize cleanly."
+          },
+          "pid": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "sandboxed": {
+            "type": "boolean"
+          },
+          "started_at": {
+            "type": "string"
+          },
+          "token_path": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "DaemonOwnership": {
+        "type": "string",
+        "description": "Which entry point owns this daemon process.\n\nManaged daemons are launched by `SMAppService` from the bundled Harness\nMonitor app. External daemons are launched by `harness-daemon dev` from a\nCLI shell. The two kinds run side-by-side without colliding because they\nkeep their state in separate `<root>/daemon/<ownership>/` subtrees and use\ndistinct launchd labels and bridge ports.",
+        "enum": [
+          "managed",
+          "external"
+        ]
       },
       "DaemonTelemetryKind": {
         "type": "string",
@@ -14766,6 +16453,32 @@
           }
         ]
       },
+      "DoctorProbe": {
+        "type": "object",
+        "required": [
+          "command",
+          "args"
+        ],
+        "properties": {
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "command": {
+            "type": "string"
+          }
+        }
+      },
+      "EffortKind": {
+        "type": "string",
+        "enum": [
+          "none",
+          "thinking_budget",
+          "reasoning_effort"
+        ]
+      },
       "EvaluationSignalFailure": {
         "type": "object",
         "required": [
@@ -15300,6 +17013,110 @@
           "yaml"
         ]
       },
+      "HarnessMonitorAuditEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "recorded_at",
+          "source",
+          "category",
+          "kind",
+          "severity",
+          "outcome",
+          "title",
+          "summary"
+        ],
+        "properties": {
+          "action_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "actor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "category": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "legacy_message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "payload_json": {},
+          "recorded_at": {
+            "type": "string"
+          },
+          "related_urls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "severity": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "summary": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "HarnessMonitorAuditEventsResponse": {
+        "type": "object",
+        "required": [
+          "events",
+          "has_older"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HarnessMonitorAuditEvent"
+            }
+          },
+          "has_older": {
+            "type": "boolean"
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "HeadRefForcePushedEntry": {
         "type": "object",
         "required": [
@@ -15420,6 +17237,81 @@
             "type": "integer",
             "format": "int64",
             "minimum": 0
+          }
+        }
+      },
+      "HostBridgeCapabilityManifest": {
+        "type": "object",
+        "required": [
+          "transport"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "endpoint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "healthy": {
+            "type": "boolean"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "transport": {
+            "type": "string"
+          }
+        }
+      },
+      "HostBridgeManifest": {
+        "type": "object",
+        "properties": {
+          "capabilities": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HostBridgeCapabilityManifest"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "socket_path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "HostBridgeReconfigureRequest": {
+        "type": "object",
+        "properties": {
+          "disable": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "enable": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "force": {
+            "type": "boolean"
           }
         }
       },
@@ -15663,6 +17555,63 @@
           "medium",
           "critical"
         ]
+      },
+      "LaunchAgentStatus": {
+        "type": "object",
+        "required": [
+          "installed",
+          "loaded",
+          "label",
+          "path",
+          "domain_target",
+          "service_target"
+        ],
+        "properties": {
+          "domain_target": {
+            "type": "string"
+          },
+          "installed": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string"
+          },
+          "last_exit_status": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "loaded": {
+            "type": "boolean"
+          },
+          "path": {
+            "type": "string"
+          },
+          "pid": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "service_target": {
+            "type": "string"
+          },
+          "state": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
       },
       "LeaderJoinPolicy": {
         "type": "object",
@@ -16080,6 +18029,67 @@
         "properties": {
           "ok": {
             "type": "boolean"
+          }
+        }
+      },
+      "OpenRouterModelCatalogResponse": {
+        "type": "object",
+        "required": [
+          "models",
+          "fetched_at",
+          "source"
+        ],
+        "properties": {
+          "fetched_at": {
+            "type": "string"
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenRouterModelEntry"
+            }
+          },
+          "source": {
+            "$ref": "#/components/schemas/OpenRouterModelCatalogSource"
+          }
+        }
+      },
+      "OpenRouterModelCatalogSource": {
+        "type": "string",
+        "enum": [
+          "live",
+          "cache",
+          "fallback"
+        ]
+      },
+      "OpenRouterModelEntry": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "context_length": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "supported_parameters": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -19797,6 +21807,21 @@
         },
         "additionalProperties": false
       },
+      "RemoteClientSelfRevokeResponse": {
+        "type": "object",
+        "required": [
+          "client_id",
+          "revoked_at"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string"
+          },
+          "revoked_at": {
+            "type": "string"
+          }
+        }
+      },
       "RemoteCodexLaunchEnvelope": {
         "type": "object",
         "description": "Private, path-free Codex launch contract sealed into one remote offer.",
@@ -20121,6 +22146,107 @@
           }
         },
         "additionalProperties": false
+      },
+      "RemotePairClaimHttpRequest": {
+        "type": "object",
+        "required": [
+          "code",
+          "domain",
+          "client_id",
+          "display_name",
+          "platform"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "domain": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          }
+        }
+      },
+      "RemotePairClaimHttpResponse": {
+        "type": "object",
+        "required": [
+          "client_id",
+          "display_name",
+          "platform",
+          "role",
+          "scopes",
+          "token",
+          "token_hint",
+          "paired_at"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "paired_at": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "reviews_query": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReviewsQueryRequest"
+              }
+            ]
+          },
+          "role": {
+            "type": "string"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "token": {
+            "type": "string"
+          },
+          "token_hint": {
+            "type": "string"
+          }
+        }
+      },
+      "RemotePairStatusHttpRequest": {
+        "type": "object",
+        "required": [
+          "pairing_id"
+        ],
+        "properties": {
+          "pairing_id": {
+            "type": "string"
+          }
+        }
+      },
+      "RemotePairStatusHttpResponse": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        }
       },
       "RemoteRepositorySelector": {
         "oneOf": [
@@ -23853,6 +25979,68 @@
           }
         }
       },
+      "RuntimeModel": {
+        "type": "object",
+        "required": [
+          "id",
+          "display_name",
+          "tier"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "effort_kind": {
+            "$ref": "#/components/schemas/EffortKind"
+          },
+          "effort_values": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "id": {
+            "type": "string"
+          },
+          "tier": {
+            "$ref": "#/components/schemas/RuntimeModelTier"
+          }
+        }
+      },
+      "RuntimeModelCatalog": {
+        "type": "object",
+        "required": [
+          "runtime",
+          "models",
+          "default",
+          "cheapest_fastest"
+        ],
+        "properties": {
+          "cheapest_fastest": {
+            "type": "string"
+          },
+          "default": {
+            "type": "string"
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuntimeModel"
+            }
+          },
+          "runtime": {
+            "type": "string"
+          }
+        }
+      },
+      "RuntimeModelTier": {
+        "type": "string",
+        "enum": [
+          "fast",
+          "balanced",
+          "max"
+        ]
+      },
       "RuntimeSessionResolutionResponse": {
         "type": "object",
         "description": "Wire-level outcome of a runtime-session lookup.\n\nReturned by `GET /v1/runtime-sessions/resolve`. `resolved` is `None` when\nno live agent matches; `Some` carries the single unambiguous match. The\ndaemon surfaces ambiguity as a `session_ambiguous` error instead of\npopulating this response with multiple entries.",
@@ -24632,6 +26820,48 @@
           }
         }
       },
+      "SignalAckRequest": {
+        "type": "object",
+        "required": [
+          "agent_id",
+          "signal_id",
+          "result",
+          "project_dir"
+        ],
+        "properties": {
+          "agent_id": {
+            "type": "string"
+          },
+          "project_dir": {
+            "type": "string"
+          },
+          "result": {
+            "$ref": "#/components/schemas/AckResult"
+          },
+          "signal_id": {
+            "type": "string"
+          }
+        }
+      },
+      "SignalCancelRequest": {
+        "type": "object",
+        "required": [
+          "actor",
+          "agent_id",
+          "signal_id"
+        ],
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "agent_id": {
+            "type": "string"
+          },
+          "signal_id": {
+            "type": "string"
+          }
+        }
+      },
       "SignalPayload": {
         "type": "object",
         "required": [
@@ -24664,6 +26894,35 @@
           "high",
           "urgent"
         ]
+      },
+      "SignalSendRequest": {
+        "type": "object",
+        "required": [
+          "actor",
+          "agent_id",
+          "command",
+          "message"
+        ],
+        "properties": {
+          "action_hint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "actor": {
+            "type": "string"
+          },
+          "agent_id": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
       },
       "SimpleActorEventEntry": {
         "type": "object",
@@ -24847,6 +27106,9 @@
           "disconnected",
           "revision_marker"
         ]
+      },
+      "String": {
+        "type": "string"
       },
       "TaskArbitrateRequest": {
         "type": "object",
@@ -30910,6 +33172,279 @@
           }
         }
       },
+      "VoiceAudioChunkRequest": {
+        "type": "object",
+        "required": [
+          "actor",
+          "sequence",
+          "format",
+          "frame_count",
+          "started_at_seconds",
+          "duration_seconds",
+          "audio_base64"
+        ],
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "audio_base64": {
+            "type": "string",
+            "format": "byte",
+            "description": "Base64-encoded PCM audio frames for this chunk."
+          },
+          "duration_seconds": {
+            "type": "number",
+            "format": "double"
+          },
+          "format": {
+            "$ref": "#/components/schemas/VoiceAudioFormatDescriptor"
+          },
+          "frame_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sequence": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "started_at_seconds": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "VoiceAudioFormatDescriptor": {
+        "type": "object",
+        "required": [
+          "sample_rate",
+          "channel_count",
+          "common_format",
+          "interleaved"
+        ],
+        "properties": {
+          "channel_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "common_format": {
+            "type": "string"
+          },
+          "interleaved": {
+            "type": "boolean"
+          },
+          "sample_rate": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "VoiceProcessingSink": {
+        "type": "string",
+        "enum": [
+          "localDaemon",
+          "remoteProcessor",
+          "agentBridge"
+        ]
+      },
+      "VoiceRouteTarget": {
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "action_hint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "agent_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "command": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "$ref": "#/components/schemas/VoiceRouteTargetKind"
+          },
+          "run_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "VoiceRouteTargetKind": {
+        "type": "string",
+        "enum": [
+          "codexPrompt",
+          "codexContext",
+          "signal",
+          "systemFocusedField"
+        ]
+      },
+      "VoiceSessionFinishReason": {
+        "type": "string",
+        "enum": [
+          "completed",
+          "cancelled"
+        ]
+      },
+      "VoiceSessionFinishRequest": {
+        "type": "object",
+        "required": [
+          "actor",
+          "reason"
+        ],
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "confirmed_text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "$ref": "#/components/schemas/VoiceSessionFinishReason"
+          }
+        }
+      },
+      "VoiceSessionMutationResponse": {
+        "type": "object",
+        "required": [
+          "voice_session_id",
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "voice_session_id": {
+            "type": "string"
+          }
+        }
+      },
+      "VoiceSessionStartRequest": {
+        "type": "object",
+        "required": [
+          "actor",
+          "locale_identifier",
+          "requested_sinks",
+          "route_target",
+          "requires_confirmation"
+        ],
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "locale_identifier": {
+            "type": "string"
+          },
+          "remote_processor_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requested_sinks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VoiceProcessingSink"
+            }
+          },
+          "requires_confirmation": {
+            "type": "boolean"
+          },
+          "route_target": {
+            "$ref": "#/components/schemas/VoiceRouteTarget"
+          }
+        }
+      },
+      "VoiceSessionStartResponse": {
+        "type": "object",
+        "required": [
+          "voice_session_id",
+          "accepted_sinks",
+          "status"
+        ],
+        "properties": {
+          "accepted_sinks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VoiceProcessingSink"
+            }
+          },
+          "status": {
+            "type": "string"
+          },
+          "voice_session_id": {
+            "type": "string"
+          }
+        }
+      },
+      "VoiceTranscriptSegment": {
+        "type": "object",
+        "required": [
+          "sequence",
+          "text",
+          "is_final",
+          "started_at_seconds",
+          "duration_seconds"
+        ],
+        "properties": {
+          "confidence": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "duration_seconds": {
+            "type": "number",
+            "format": "double"
+          },
+          "is_final": {
+            "type": "boolean"
+          },
+          "sequence": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "started_at_seconds": {
+            "type": "number",
+            "format": "double"
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "VoiceTranscriptUpdateRequest": {
+        "type": "object",
+        "required": [
+          "actor",
+          "segment"
+        ],
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "segment": {
+            "$ref": "#/components/schemas/VoiceTranscriptSegment"
+          }
+        }
+      },
       "WorkItem": {
         "type": "object",
         "description": "A work item tracked within a session.",
@@ -31124,6 +33659,44 @@
           "total_session_count": {
             "type": "integer",
             "minimum": 0
+          }
+        }
+      },
+      "WsConfigPayload": {
+        "type": "object",
+        "description": "Initial configuration payload pushed as the first WebSocket frame after\nupgrade. The Swift client must receive and process this before any other\ntraffic so personas and per-runtime model catalogs are available before the\nuser can start an agent.",
+        "required": [
+          "personas",
+          "runtime_models"
+        ],
+        "properties": {
+          "acp_agents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AcpAgentDescriptor"
+            }
+          },
+          "personas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentPersona"
+            }
+          },
+          "runtime_models": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuntimeModelCatalog"
+            }
+          },
+          "runtime_probe": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AcpRuntimeProbeResponse"
+              }
+            ]
           }
         }
       }
