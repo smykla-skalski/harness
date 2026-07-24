@@ -139,8 +139,8 @@ extension HarnessMonitorStore {
     resetLocalManifestURL()
     if let outcome, !outcome.serverRevoked {
       toast.presentWarning(
-        "Removed the remote daemon on this Mac, but couldn't revoke this client on the server "
-          + "- the access token stays valid until it expires, so revoke it from the server "
+        "Removed the remote daemon on this Mac, but couldn't confirm this client was revoked "
+          + "on the server - the access token may still be valid, so revoke it from the server "
           + "if this Mac may be compromised",
         title: "Remote daemon forgotten"
       )
