@@ -47,7 +47,7 @@ impl Execute for TaskBoardTriageEscalationReportArgs {
         }
         if let Some(quote) = self.rationale.chars().find(|c| matches!(c, '\'' | '"' | '`')) {
             return Err(CliErrorKind::workflow_io(format!(
-                "--rationale must be plain text with no quote characters (found {quote})"
+                "--rationale must be plain text with no quote characters (found {quote:?})"
             ))
             .into());
         }
