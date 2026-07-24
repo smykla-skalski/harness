@@ -130,7 +130,7 @@ core-foundation = "0.10"
 assert_cmd = "=2.2.0"
 predicates = "=3.1.4"
 tempfile = "=3.27.0"
-insta = "=1.46.3"
+insta = "=1.48.0"
 harness-testkit = { path = "testkit" }
 temp-env = { version = "=0.3.6", features = ["async_closure"] }
 axum = { version = "=0.8.9", features = ["json", "ws"] }
