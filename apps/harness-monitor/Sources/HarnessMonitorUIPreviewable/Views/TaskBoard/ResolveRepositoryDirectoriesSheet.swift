@@ -18,7 +18,9 @@ struct ResolveRepositoryDirectoriesSheet: View {
       Divider()
       ScrollView {
         VStack(spacing: 8) {
-          ForEach(repositories, id: \.self, content: row(for:))
+          ForEach(Array(repositories.enumerated()), id: \.offset) { _, repository in
+            row(for: repository)
+          }
         }
       }
       Divider()
@@ -35,7 +37,7 @@ struct ResolveRepositoryDirectoriesSheet: View {
       guard let repository = importingRepository else { return }
       importingRepository = nil
       let folders = result.map { [$0] }
-      Task {
+      Task { @MainActor in
         if await store.resolveRepositoryWorkingDirectory(repository: repository, from: folders) {
           resolved.insert(repository)
         }
@@ -58,10 +60,14 @@ struct ResolveRepositoryDirectoriesSheet: View {
     return HStack(spacing: 12) {
       Image(systemName: isResolved ? "checkmark.circle.fill" : "folder.badge.questionmark")
         .foregroundStyle(isResolved ? Color.green : Color.secondary)
+        .accessibilityHidden(true)
       Text(repository)
         .font(.body.monospaced())
         .lineLimit(1)
         .truncationMode(.middle)
+        .accessibilityLabel(
+          Text("\(repository), \(isResolved ? "folder selected" : "no folder selected")")
+        )
       Spacer(minLength: 12)
       Button("Clone") {}
         .disabled(true)

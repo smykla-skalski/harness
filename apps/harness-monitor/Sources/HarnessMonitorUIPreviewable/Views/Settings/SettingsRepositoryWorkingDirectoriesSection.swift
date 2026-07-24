@@ -18,7 +18,9 @@ struct SettingsRepositoryWorkingDirectoriesSection: View {
         Text("Add a repository above to choose its working directory")
           .foregroundStyle(.secondary)
       } else {
-        ForEach(repositories, id: \.self, content: row(for:))
+        ForEach(Array(repositories.enumerated()), id: \.offset) { _, repository in
+          row(for: repository)
+        }
       }
     } header: {
       Text("Working Directories")
@@ -73,6 +75,7 @@ struct SettingsRepositoryWorkingDirectoriesSection: View {
     }
   }
 
+  @MainActor
   private func reload() async {
     paths = await store.repositoryWorkingDirectoryPaths()
   }
