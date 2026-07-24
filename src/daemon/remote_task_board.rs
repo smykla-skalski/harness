@@ -6,9 +6,10 @@ use crate::daemon::protocol::{
 };
 use crate::task_board::{
     AgentMode, TaskBoardItem, TaskBoardPriority, TaskBoardStatus, TaskBoardTriageDecisionRecord,
+    TaskBoardTriageOverride,
 };
 
-use super::remote_redaction::redact_known_secrets;
+use super::remote_redaction::{REDACTION_PLACEHOLDER, redact_known_secrets};
 
 const BODY_PREVIEW_CHAR_LIMIT: usize = 180;
 const BODY_PREVIEW_PREFIX_LIMIT: usize = BODY_PREVIEW_CHAR_LIMIT - 3;
@@ -137,6 +138,8 @@ pub(crate) fn project_task_board_triage_current(
     if viewer {
         TaskBoardTriageCurrentResponse {
             current: response.current.map(redact_triage_record),
+            triage_override: response.triage_override.map(redact_triage_override),
+            effective: response.effective,
         }
     } else {
         response
@@ -167,6 +170,17 @@ fn redact_triage_record(record: TaskBoardTriageDecisionRecord) -> TaskBoardTriag
         reason_detail: None,
         evidence_fingerprint: None,
         ..record
+    }
+}
+
+/// A remote viewer may see that a triage override is active plus its verdict
+/// and `set_at` timestamp, but the setting actor and any free-text reason are
+/// sensitive and must be redacted.
+fn redact_triage_override(override_: TaskBoardTriageOverride) -> TaskBoardTriageOverride {
+    TaskBoardTriageOverride {
+        actor: REDACTION_PLACEHOLDER.to_string(),
+        reason: None,
+        ..override_
     }
 }
 
@@ -222,8 +236,18 @@ mod tests {
         project_task_board_triage_current, project_task_board_triage_history,
     };
     use crate::task_board::{
-        TaskBoardTriageDecisionRecord, TriageCause, TriageReasonCode, TriageVerdict,
+        TaskBoardTriageDecisionRecord, TaskBoardTriageOverride, TriageCause, TriageReasonCode,
+        TriageVerdict, is_canonical_override_actor,
     };
+
+    fn sample_override() -> TaskBoardTriageOverride {
+        TaskBoardTriageOverride {
+            verdict: TriageVerdict::Undecided,
+            actor: "operator-1".to_string(),
+            reason: Some("looks fine as backlog".to_string()),
+            set_at: "2026-07-23T00:00:00Z".to_string(),
+        }
+    }
 
     fn sample_record() -> TaskBoardTriageDecisionRecord {
         TaskBoardTriageDecisionRecord {
@@ -249,6 +273,8 @@ mod tests {
     fn viewer_current_nulls_reason_detail_and_evidence_fingerprint() {
         let response = TaskBoardTriageCurrentResponse {
             current: Some(sample_record()),
+            triage_override: None,
+            effective: None,
         };
         let projected = project_task_board_triage_current(response, true);
         let wire = serde_json::to_value(&projected).expect("serialize viewer projection");
@@ -267,6 +293,8 @@ mod tests {
     fn full_current_keeps_reason_detail_and_evidence_fingerprint() {
         let response = TaskBoardTriageCurrentResponse {
             current: Some(sample_record()),
+            triage_override: None,
+            effective: None,
         };
         let projected = project_task_board_triage_current(response, false);
         let current = projected.current.expect("current decision");
@@ -274,6 +302,44 @@ mod tests {
         assert_eq!(
             current.evidence_fingerprint.as_deref(),
             Some("sha256:0000000000000000000000000000000000000000000000000000000000000000")
+        );
+    }
+
+    #[test]
+    fn viewer_current_redacts_override_actor_and_reason_but_keeps_verdict_and_timestamp() {
+        let response = TaskBoardTriageCurrentResponse {
+            current: None,
+            triage_override: Some(sample_override()),
+            effective: None,
+        };
+        let projected = project_task_board_triage_current(response, true);
+        let wire = serde_json::to_value(&projected).expect("serialize viewer projection");
+        assert_eq!(wire["triage_override"]["actor"], "[redacted]");
+        assert!(wire["triage_override"]["reason"].is_null());
+        assert_eq!(wire["triage_override"]["verdict"], "undecided");
+        assert_eq!(wire["triage_override"]["set_at"], "2026-07-23T00:00:00Z");
+        let triage_override = projected.triage_override.expect("override");
+        assert!(
+            is_canonical_override_actor(&triage_override.actor),
+            "a redacted actor must still be a canonical, valid domain value"
+        );
+        assert_eq!(triage_override.actor, "[redacted]");
+        assert!(triage_override.reason.is_none());
+    }
+
+    #[test]
+    fn full_current_keeps_override_actor_and_reason() {
+        let response = TaskBoardTriageCurrentResponse {
+            current: None,
+            triage_override: Some(sample_override()),
+            effective: None,
+        };
+        let projected = project_task_board_triage_current(response, false);
+        let triage_override = projected.triage_override.expect("override");
+        assert_eq!(triage_override.actor, "operator-1");
+        assert_eq!(
+            triage_override.reason.as_deref(),
+            Some("looks fine as backlog")
         );
     }
 

@@ -14,4 +14,18 @@ extension HarnessMonitorTaskBoardClientProtocol {
   ) async throws -> TaskBoardTriageHistoryResponse {
     throw HarnessMonitorAPIError.server(code: 501, message: "Task board triage unavailable")
   }
+
+  public func setTaskBoardItemTriageOverride(
+    id _: String,
+    request _: TaskBoardSetTriageOverrideRequest
+  ) async throws -> TaskBoardTriageOverrideMutationResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board triage unavailable")
+  }
+
+  public func clearTaskBoardItemTriageOverride(
+    id _: String,
+    request _: TaskBoardClearTriageOverrideRequest
+  ) async throws -> TaskBoardTriageOverrideMutationResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board triage unavailable")
+  }
 }

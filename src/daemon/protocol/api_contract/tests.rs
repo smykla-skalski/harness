@@ -295,6 +295,45 @@ fn task_board_triage_remote_scopes_are_read_only() {
 }
 
 #[test]
+fn task_board_triage_override_mutations_require_remote_write_scope() {
+    let route_scope = |method, path| {
+        let route = HTTP_API_CONTRACT
+            .iter()
+            .find(|route| route.method == method && route.path == path)
+            .unwrap_or_else(|| {
+                panic!("missing task-board triage override route {method:?} {path}")
+            });
+        remote_http_scopes(route)
+    };
+
+    assert_eq!(
+        route_scope(
+            HttpRouteMethod::Put,
+            http_paths::TASK_BOARD_ITEM_TRIAGE_OVERRIDE
+        ),
+        Some(&[RemoteAccessScope::Write][..])
+    );
+    assert_eq!(
+        route_scope(
+            HttpRouteMethod::Post,
+            http_paths::TASK_BOARD_ITEM_TRIAGE_OVERRIDE_CLEAR
+        ),
+        Some(&[RemoteAccessScope::Write][..])
+    );
+    assert_eq!(
+        remote_ws_scopes(ws_methods::TASK_BOARD_TRIAGE_OVERRIDE_SET),
+        Some(&[RemoteAccessScope::Write][..])
+    );
+    assert_eq!(
+        remote_ws_scopes(ws_methods::TASK_BOARD_TRIAGE_OVERRIDE_CLEAR),
+        Some(&[RemoteAccessScope::Write][..])
+    );
+    let viewer_scopes =
+        crate::daemon::remote::scopes_for_role(crate::daemon::remote::RemoteRole::Viewer);
+    assert!(!viewer_scopes.contains(&RemoteAccessScope::Write));
+}
+
+#[test]
 fn reviews_pull_request_resolve_remote_scope_is_read_only() {
     let route = HTTP_API_CONTRACT
         .iter()

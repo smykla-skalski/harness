@@ -22,6 +22,7 @@ mod orchestrator;
 mod policy;
 mod read;
 mod secret_handoff;
+mod triage;
 
 #[expect(
     clippy::cognitive_complexity,
@@ -62,6 +63,12 @@ pub(crate) async fn dispatch_task_board_method(
         }
         ws_methods::TASK_BOARD_TRIAGE_HISTORY => {
             Some(read::dispatch_task_board_triage_history(request, state, connection).await)
+        }
+        ws_methods::TASK_BOARD_TRIAGE_OVERRIDE_SET => {
+            Some(triage::dispatch_triage_override_set(request, state).await)
+        }
+        ws_methods::TASK_BOARD_TRIAGE_OVERRIDE_CLEAR => {
+            Some(triage::dispatch_triage_override_clear(request, state).await)
         }
         ws_methods::TASK_BOARD_UPDATE => Some(dispatch_task_board_update(request, state).await),
         ws_methods::TASK_BOARD_DELETE => Some(dispatch_task_board_delete(request, state).await),
@@ -404,7 +411,7 @@ pub(super) fn parse_params<T: DeserializeOwned>(request: &WsRequest) -> serde_js
     serde_json::from_value(request.params.clone())
 }
 
-fn parse_control_plane_params<T>(request: &WsRequest) -> serde_json::Result<T>
+pub(super) fn parse_control_plane_params<T>(request: &WsRequest) -> serde_json::Result<T>
 where
     T: DeserializeOwned + ControlPlaneActorRequest,
 {

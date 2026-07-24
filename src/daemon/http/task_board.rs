@@ -34,7 +34,10 @@ use self::positions::{
     get_task_board_item_position_snapshot, post_task_board_item_position_reset,
     put_task_board_item_position,
 };
-use self::triage::{get_task_board_item_triage, get_task_board_item_triage_history};
+use self::triage::{
+    get_task_board_item_triage, get_task_board_item_triage_history,
+    post_task_board_item_triage_override_clear, put_task_board_item_triage_override,
+};
 
 fn task_board_host_routes() -> Router<DaemonHttpState> {
     Router::new()
@@ -83,6 +86,14 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::TASK_BOARD_ITEM_TRIAGE_HISTORY,
             get(get_task_board_item_triage_history),
+        )
+        .route(
+            http_paths::TASK_BOARD_ITEM_TRIAGE_OVERRIDE,
+            put(put_task_board_item_triage_override),
+        )
+        .route(
+            http_paths::TASK_BOARD_ITEM_TRIAGE_OVERRIDE_CLEAR,
+            post(post_task_board_item_triage_override_clear),
         )
         .route(
             http_paths::TASK_BOARD_PLAN_BEGIN,

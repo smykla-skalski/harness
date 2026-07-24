@@ -35,6 +35,10 @@ pub(super) struct ItemRow {
     pub(super) lane_producer: Option<String>,
     pub(super) lane_set_at: Option<String>,
     pub(super) tombstone_cause: Option<String>,
+    pub(super) triage_override_verdict: Option<String>,
+    pub(super) triage_override_actor: Option<String>,
+    pub(super) triage_override_reason: Option<String>,
+    pub(super) triage_override_set_at: Option<String>,
 }
 
 #[derive(Debug, FromRow)]

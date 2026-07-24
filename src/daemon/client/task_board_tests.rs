@@ -6,9 +6,10 @@ use super::DaemonClient;
 use super::test_support::{read_http_request, write_http_response};
 use crate::daemon::protocol::{
     PolicyTransferBundle, PolicyTransferDumpRequest, PolicyTransferImportRequest,
-    TaskBoardAutomationHistoryRequest, TaskBoardListItemsRequest, TaskBoardUpdateItemRequest,
+    TaskBoardAutomationHistoryRequest, TaskBoardClearTriageOverrideRequest,
+    TaskBoardListItemsRequest, TaskBoardSetTriageOverrideRequest, TaskBoardUpdateItemRequest,
 };
-use crate::task_board::{TaskBoardItem, TaskBoardStatus};
+use crate::task_board::{TaskBoardItem, TaskBoardStatus, TriageVerdict};
 
 fn client_with(endpoint: String) -> DaemonClient {
     DaemonClient {
@@ -228,6 +229,94 @@ fn triage_reads_reject_unsafe_item_ids_before_transport() {
 
     assert_eq!(current.code(), "KSRCLI059");
     assert_eq!(history.code(), "KSRCLI059");
+}
+
+fn triage_override_mutation_response_body() -> String {
+    format!(
+        r#"{{"snapshot":{{"item":{},"item_revision":2,"items_change_seq":3}},"shifted":[]}}"#,
+        serde_json::to_string(&item()).expect("serialize item")
+    )
+}
+
+#[test]
+fn set_triage_override_uses_item_triage_override_put_route() {
+    let (endpoint, request_line, handle) =
+        spawn_mock("200 OK", triage_override_mutation_response_body());
+
+    let response = client_with(endpoint)
+        .set_task_board_item_triage_override(
+            "task-1",
+            &TaskBoardSetTriageOverrideRequest {
+                verdict: TriageVerdict::Todo,
+                reason: Some("looks ready".into()),
+                expected_item_revision: 1,
+                expected_items_change_seq: 2,
+                actor: "operator-1".into(),
+            },
+        )
+        .expect("set triage override");
+    handle.join().expect("server");
+
+    assert_eq!(response.snapshot.item_revision, 2);
+    assert_eq!(
+        *request_line.lock().expect("request line"),
+        "PUT /v1/task-board/items/task-1/triage/override HTTP/1.1"
+    );
+}
+
+#[test]
+fn clear_triage_override_uses_item_triage_override_clear_post_route() {
+    let (endpoint, request_line, handle) =
+        spawn_mock("200 OK", triage_override_mutation_response_body());
+
+    let response = client_with(endpoint)
+        .clear_task_board_item_triage_override(
+            "task-1",
+            &TaskBoardClearTriageOverrideRequest {
+                expected_item_revision: 1,
+                expected_items_change_seq: 2,
+                actor: "operator-1".into(),
+            },
+        )
+        .expect("clear triage override");
+    handle.join().expect("server");
+
+    assert_eq!(response.snapshot.items_change_seq, 3);
+    assert_eq!(
+        *request_line.lock().expect("request line"),
+        "POST /v1/task-board/items/task-1/triage/override/clear HTTP/1.1"
+    );
+}
+
+#[test]
+fn triage_override_mutations_reject_unsafe_item_ids_before_transport() {
+    let client = client_with("http://127.0.0.1:1".to_string());
+
+    let set = client
+        .set_task_board_item_triage_override(
+            "../unsafe",
+            &TaskBoardSetTriageOverrideRequest {
+                verdict: TriageVerdict::Todo,
+                reason: None,
+                expected_item_revision: 1,
+                expected_items_change_seq: 2,
+                actor: "operator-1".into(),
+            },
+        )
+        .expect_err("unsafe set id");
+    let clear = client
+        .clear_task_board_item_triage_override(
+            "../unsafe",
+            &TaskBoardClearTriageOverrideRequest {
+                expected_item_revision: 1,
+                expected_items_change_seq: 2,
+                actor: "operator-1".into(),
+            },
+        )
+        .expect_err("unsafe clear id");
+
+    assert_eq!(set.code(), "KSRCLI059");
+    assert_eq!(clear.code(), "KSRCLI059");
 }
 
 #[test]

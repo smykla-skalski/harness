@@ -189,7 +189,7 @@ extension RecordingHarnessClient {
 }
 
 extension TaskBoardItem {
-  fileprivate func withPosition(
+  func withPosition(
     status: TaskBoardStatus,
     lanePosition: UInt32?,
     laneOrigin: TaskBoardLaneOrigin?,

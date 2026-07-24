@@ -50,6 +50,8 @@ pub const TASK_BOARD_POSITION_SET: &str = "task_board.position_set";
 pub const TASK_BOARD_POSITION_RESET: &str = "task_board.position_reset";
 pub const TASK_BOARD_TRIAGE_GET: &str = "task_board.triage_get";
 pub const TASK_BOARD_TRIAGE_HISTORY: &str = "task_board.triage_history";
+pub const TASK_BOARD_TRIAGE_OVERRIDE_SET: &str = "task_board.triage_override_set";
+pub const TASK_BOARD_TRIAGE_OVERRIDE_CLEAR: &str = "task_board.triage_override_clear";
 pub const TASK_BOARD_UPDATE: &str = "task_board.update";
 pub const TASK_BOARD_DELETE: &str = "task_board.delete";
 pub const TASK_BOARD_PLAN_BEGIN: &str = "task_board.plan_begin";
@@ -239,6 +241,8 @@ pub const ALL: &[&str] = &[
     TASK_BOARD_POSITION_RESET,
     TASK_BOARD_TRIAGE_GET,
     TASK_BOARD_TRIAGE_HISTORY,
+    TASK_BOARD_TRIAGE_OVERRIDE_SET,
+    TASK_BOARD_TRIAGE_OVERRIDE_CLEAR,
     TASK_BOARD_UPDATE,
     TASK_BOARD_DELETE,
     TASK_BOARD_PLAN_BEGIN,

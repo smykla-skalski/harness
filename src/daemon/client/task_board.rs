@@ -10,8 +10,8 @@ use crate::daemon::protocol::{
     TASK_BOARD_STORAGE_DATABASE, TaskBoardAuditRequest, TaskBoardAuditResponse,
     TaskBoardAutomationHistoryRequest, TaskBoardAutomationMetricsResponse,
     TaskBoardAutomationRunDetailResponse, TaskBoardAutomationRunsResponse,
-    TaskBoardCapabilitiesResponse, TaskBoardCatalogRequest, TaskBoardCreateItemRequest,
-    TaskBoardDispatchDeliverRequest, TaskBoardDispatchDeliverResponse,
+    TaskBoardCapabilitiesResponse, TaskBoardCatalogRequest, TaskBoardClearTriageOverrideRequest,
+    TaskBoardCreateItemRequest, TaskBoardDispatchDeliverRequest, TaskBoardDispatchDeliverResponse,
     TaskBoardDispatchPickRequest, TaskBoardDispatchPickResponse, TaskBoardDispatchRequest,
     TaskBoardDispatchResponse, TaskBoardEvaluateRequest, TaskBoardEvaluationResponse,
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitHubTokensSyncResponse, TaskBoardGitRuntimeConfig,
@@ -24,9 +24,10 @@ use crate::daemon::protocol::{
     TaskBoardOrchestratorStatusResponse, TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest,
     TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse,
     TaskBoardProjectsResponse, TaskBoardResetItemPositionRequest, TaskBoardSetItemPositionRequest,
-    TaskBoardSyncRequest, TaskBoardSyncResponse, TaskBoardTodoistTokenSyncRequest,
-    TaskBoardTodoistTokenSyncResponse, TaskBoardTriageCurrentResponse,
-    TaskBoardTriageHistoryResponse, TaskBoardUpdateItemRequest, http_paths,
+    TaskBoardSetTriageOverrideRequest, TaskBoardSyncRequest, TaskBoardSyncResponse,
+    TaskBoardTodoistTokenSyncRequest, TaskBoardTodoistTokenSyncResponse,
+    TaskBoardTriageCurrentResponse, TaskBoardTriageHistoryResponse,
+    TaskBoardTriageOverrideMutationResponse, TaskBoardUpdateItemRequest, http_paths,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io;
@@ -120,6 +121,24 @@ impl DaemonClient {
             query.push(("limit", value));
         }
         self.get_with_query(&item_action_path(item_id, "triage/history"), &query)
+    }
+
+    pub fn set_task_board_item_triage_override(
+        &self,
+        item_id: &str,
+        request: &TaskBoardSetTriageOverrideRequest,
+    ) -> Result<TaskBoardTriageOverrideMutationResponse, CliError> {
+        io::validate_safe_segment(item_id)?;
+        self.put(&item_action_path(item_id, "triage/override"), request)
+    }
+
+    pub fn clear_task_board_item_triage_override(
+        &self,
+        item_id: &str,
+        request: &TaskBoardClearTriageOverrideRequest,
+    ) -> Result<TaskBoardTriageOverrideMutationResponse, CliError> {
+        io::validate_safe_segment(item_id)?;
+        self.post(&item_action_path(item_id, "triage/override/clear"), request)
     }
 
     pub fn update_task_board_item(

@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
-const REDACTED: &str = "[redacted]";
+pub(crate) const REDACTION_PLACEHOLDER: &str = "[redacted]";
 
 static KNOWN_SECRET_RULES: LazyLock<Vec<(Regex, &'static str)>> = LazyLock::new(|| {
     vec![
@@ -26,34 +26,34 @@ static KNOWN_SECRET_RULES: LazyLock<Vec<(Regex, &'static str)>> = LazyLock::new(
         ),
         (
             Regex::new(r"\bgithub_pat_[A-Za-z0-9_]{20,}\b").expect("GitHub PAT regex"),
-            REDACTED,
+            REDACTION_PLACEHOLDER,
         ),
         (
             Regex::new(r"\bgh[pousr]_[A-Za-z0-9_]{20,}\b").expect("GitHub token regex"),
-            REDACTED,
+            REDACTION_PLACEHOLDER,
         ),
         (
             Regex::new(r"\bglpat-[A-Za-z0-9_-]{20,}\b").expect("GitLab token regex"),
-            REDACTED,
+            REDACTION_PLACEHOLDER,
         ),
         (
             Regex::new(r"\bsk-[A-Za-z0-9]{20,}\b").expect("API token regex"),
-            REDACTED,
+            REDACTION_PLACEHOLDER,
         ),
         (
             Regex::new(r"\bxox[baprs]-[A-Za-z0-9-]{20,}\b").expect("Slack token regex"),
-            REDACTED,
+            REDACTION_PLACEHOLDER,
         ),
         (
             Regex::new(r"\bAKIA[0-9A-Z]{16}\b").expect("AWS access key regex"),
-            REDACTED,
+            REDACTION_PLACEHOLDER,
         ),
         (
             Regex::new(
                 r"(?is)-----BEGIN [^-]*(?:PRIVATE KEY|SECRET|TOKEN).*?-----END [^-]*-----",
             )
             .expect("PEM secret regex"),
-            REDACTED,
+            REDACTION_PLACEHOLDER,
         ),
     ]
 });

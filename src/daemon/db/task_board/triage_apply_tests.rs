@@ -50,10 +50,16 @@ pub(super) async fn seed_decided_todo_item(db: &AsyncDaemonDb) -> &'static str {
         .expect("load item")
         .expect("item exists");
     item.work_item_id = None;
-    apply_builtin_v1_triage_in_tx(&mut transaction, &mut item, "2026-07-22T01:00:00Z", false)
-        .await
-        .expect("apply triage")
-        .expect("decision recorded");
+    apply_builtin_v1_triage_in_tx(
+        &mut transaction,
+        &mut item,
+        "2026-07-22T01:00:00Z",
+        false,
+        None,
+    )
+    .await
+    .expect("apply triage")
+    .expect("decision recorded");
     replace_item_in_tx(&mut transaction, &item, revision + 1)
         .await
         .expect("persist triaged placement");
@@ -77,11 +83,16 @@ async fn eligible_backlog_item_with_a_label_promotes_to_todo_with_automatic_plac
         .expect("load item")
         .expect("item exists");
     item.work_item_id = None;
-    let outcome =
-        apply_builtin_v1_triage_in_tx(&mut transaction, &mut item, "2026-07-22T01:00:00Z", false)
-            .await
-            .expect("apply triage")
-            .expect("decision recorded");
+    let outcome = apply_builtin_v1_triage_in_tx(
+        &mut transaction,
+        &mut item,
+        "2026-07-22T01:00:00Z",
+        false,
+        None,
+    )
+    .await
+    .expect("apply triage")
+    .expect("decision recorded");
     transaction.commit().await.expect("commit");
 
     let decision = outcome.decision();
@@ -115,11 +126,16 @@ async fn eligible_backlog_item_with_no_labels_stays_in_backlog_as_undecided() {
         .expect("load item")
         .expect("item exists");
     item.work_item_id = None;
-    let outcome =
-        apply_builtin_v1_triage_in_tx(&mut transaction, &mut item, "2026-07-22T01:00:00Z", false)
-            .await
-            .expect("apply triage")
-            .expect("decision recorded");
+    let outcome = apply_builtin_v1_triage_in_tx(
+        &mut transaction,
+        &mut item,
+        "2026-07-22T01:00:00Z",
+        false,
+        None,
+    )
+    .await
+    .expect("apply triage")
+    .expect("decision recorded");
     transaction.commit().await.expect("commit");
 
     let decision = outcome.decision();
@@ -177,6 +193,7 @@ async fn active_dispatch_reservations_suppress_triage_decisions_and_placement() 
             &mut item,
             "2026-07-22T01:00:00Z",
             false,
+            None,
         )
         .await
         .expect("check triage eligibility");
@@ -215,11 +232,16 @@ async fn needs_info_label_stays_undecided_even_with_other_labels() {
         .expect("load item")
         .expect("item exists");
     item.work_item_id = None;
-    let outcome =
-        apply_builtin_v1_triage_in_tx(&mut transaction, &mut item, "2026-07-22T01:00:00Z", false)
-            .await
-            .expect("apply triage")
-            .expect("decision recorded");
+    let outcome = apply_builtin_v1_triage_in_tx(
+        &mut transaction,
+        &mut item,
+        "2026-07-22T01:00:00Z",
+        false,
+        None,
+    )
+    .await
+    .expect("apply triage")
+    .expect("decision recorded");
     transaction.commit().await.expect("commit");
 
     let decision = outcome.decision();
@@ -249,6 +271,7 @@ async fn unchanged_fingerprint_is_idempotent_and_records_no_new_decision() {
         &mut reloaded,
         "2026-07-22T02:00:00Z",
         false,
+        None,
     )
     .await
     .expect("apply triage");
@@ -295,11 +318,16 @@ async fn manual_placement_suppresses_status_and_placement_but_not_decision_histo
     item.work_item_id = None;
     // No labels at all -> BuiltInV1 would normally demote to Backlog/Undecided,
     // but a manual anchor must suppress the status/placement effect.
-    let outcome =
-        apply_builtin_v1_triage_in_tx(&mut transaction, &mut item, "2026-07-22T01:00:00Z", false)
-            .await
-            .expect("apply triage")
-            .expect("decision recorded even though placement is suppressed");
+    let outcome = apply_builtin_v1_triage_in_tx(
+        &mut transaction,
+        &mut item,
+        "2026-07-22T01:00:00Z",
+        false,
+        None,
+    )
+    .await
+    .expect("apply triage")
+    .expect("decision recorded even though placement is suppressed");
     transaction.commit().await.expect("commit");
 
     assert_eq!(outcome.decision().verdict, TriageVerdict::Undecided);
@@ -366,10 +394,15 @@ async fn ineligible_umbrella_item_is_never_evaluated() {
         .expect("load item")
         .expect("item exists");
     item.work_item_id = None;
-    let decision =
-        apply_builtin_v1_triage_in_tx(&mut transaction, &mut item, "2026-07-22T01:00:00Z", false)
-            .await
-            .expect("apply triage");
+    let decision = apply_builtin_v1_triage_in_tx(
+        &mut transaction,
+        &mut item,
+        "2026-07-22T01:00:00Z",
+        false,
+        None,
+    )
+    .await
+    .expect("apply triage");
     transaction.commit().await.expect("commit");
 
     assert!(decision.is_none());

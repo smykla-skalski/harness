@@ -27,6 +27,8 @@ actor PreviewHarnessClientState {
   /// Empty by default -- preview fixtures carry no triage history until a
   /// preview or test explicitly seeds one via `seedTaskBoardTriageDecisions`.
   var taskBoardTriageDecisionsByItemID: [String: [TaskBoardTriageDecisionRecord]]
+  /// The active triage override per item id, if any. Empty by default.
+  var taskBoardTriageOverrideByItemID: [String: TaskBoardTriageOverride]
   var reviewItems: [ReviewItem]
   var taskBoardHostRegistry: [TaskBoardHostMachine]
   var nextAgentTuiSequence: Int
@@ -74,6 +76,7 @@ actor PreviewHarnessClientState {
       uniqueKeysWithValues: fixtures.taskBoardItems.map { ($0.id, 1) }
     )
     self.taskBoardTriageDecisionsByItemID = [:]
+    self.taskBoardTriageOverrideByItemID = [:]
     self.reviewItems = fixtures.reviewsResponse.items
     self.taskBoardHostRegistry = [
       TaskBoardHostMachine(

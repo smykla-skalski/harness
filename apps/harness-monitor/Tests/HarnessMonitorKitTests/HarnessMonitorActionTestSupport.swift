@@ -304,6 +304,12 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var taskBoardItemsChangeSeqStorage: Int64 = 0
   /// Ordered newest-first per item id; the first entry is the current decision.
   var taskBoardTriageDecisionsStorage: [String: [TaskBoardTriageDecisionRecord]] = [:]
+  var taskBoardTriageOverridesStorage: [String: TaskBoardTriageOverride] = [:]
+  var taskBoardTriageOverrideError: (any Error)?
+  var taskBoardTriageOverrideErrorRemainingUses = 0
+  var taskBoardTriageOverrideItemsAfterError: [TaskBoardItem]?
+  var taskBoardTriageOverrideSetRequests: [TaskBoardSetTriageOverrideRequest] = []
+  var taskBoardTriageOverrideClearRequests: [TaskBoardClearTriageOverrideRequest] = []
   var taskBoardPositionError: (any Error)?
   var taskBoardPositionErrorRemainingUses = 0
   var taskBoardPositionItemsAfterError: [TaskBoardItem]?

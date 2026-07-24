@@ -84,6 +84,7 @@ extension PreviewHarnessClientState {
     taskBoardItems.remove(at: targetIndex)
     taskBoardItemRevisions.removeValue(forKey: id)
     taskBoardTriageDecisionsByItemID.removeValue(forKey: id)
+    taskBoardTriageOverrideByItemID.removeValue(forKey: id)
     taskBoardItemsChangeSeq += 1
     return deleted
   }

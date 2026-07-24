@@ -53,6 +53,9 @@ pub const TASK_BOARD_ITEM_POSITION: &str = "/v1/task-board/items/{item_id}/posit
 pub const TASK_BOARD_ITEM_POSITION_RESET: &str = "/v1/task-board/items/{item_id}/position/reset";
 pub const TASK_BOARD_ITEM_TRIAGE: &str = "/v1/task-board/items/{item_id}/triage";
 pub const TASK_BOARD_ITEM_TRIAGE_HISTORY: &str = "/v1/task-board/items/{item_id}/triage/history";
+pub const TASK_BOARD_ITEM_TRIAGE_OVERRIDE: &str = "/v1/task-board/items/{item_id}/triage/override";
+pub const TASK_BOARD_ITEM_TRIAGE_OVERRIDE_CLEAR: &str =
+    "/v1/task-board/items/{item_id}/triage/override/clear";
 pub const TASK_BOARD_PLAN_BEGIN: &str = "/v1/task-board/items/{item_id}/planning/begin";
 pub const TASK_BOARD_PLAN_SUBMIT: &str = "/v1/task-board/items/{item_id}/planning/submit";
 pub const TASK_BOARD_PLAN_APPROVE: &str = "/v1/task-board/items/{item_id}/planning/approve";

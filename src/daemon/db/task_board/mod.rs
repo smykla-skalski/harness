@@ -97,6 +97,10 @@ mod remote_assignment_terminal_handoff;
 mod triage_apply;
 mod triage_audit;
 mod triage_decisions;
+mod triage_override;
+mod triage_override_audit;
+#[cfg(test)]
+mod triage_override_position_conflict_tests;
 mod triage_queries;
 pub(crate) use remote_assignment_terminal_handoff::{
     exact_active_remote_target, parent_points_to_assignment,
@@ -316,6 +320,11 @@ pub(crate) use scheduler::{
     TaskBoardAutomationControlRecord, TaskBoardAutomationRunAdmission, TaskBoardAutomationRunFence,
     TaskBoardAutomationRunLease, TaskBoardAutomationRunStage, TaskBoardRunAcquireRequest,
 };
+pub(crate) use triage_override::{
+    TaskBoardTriageOverrideClearInput, TaskBoardTriageOverrideMutationResult,
+    TaskBoardTriageOverrideSetInput,
+};
+pub(crate) use triage_queries::TaskBoardTriageCurrentRead;
 
 pub(crate) const ITEMS_CHANGE_SCOPE: &str = "task_board:items";
 pub(crate) const MACHINES_CHANGE_SCOPE: &str = "task_board:machines";

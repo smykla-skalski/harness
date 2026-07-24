@@ -1,15 +1,16 @@
 use crate::daemon::protocol::{
     TASK_BOARD_STORAGE_DATABASE, TaskBoardAuditRequest, TaskBoardAuditResponse,
-    TaskBoardCapabilitiesResponse, TaskBoardCatalogRequest, TaskBoardCreateItemRequest,
-    TaskBoardDeleteItemRequest, TaskBoardGetItemRequest, TaskBoardHostListResponse,
-    TaskBoardHostLocalResponse, TaskBoardHostSetProjectTypesRequest,
+    TaskBoardCapabilitiesResponse, TaskBoardCatalogRequest, TaskBoardClearTriageOverrideRequest,
+    TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardGetItemRequest,
+    TaskBoardHostListResponse, TaskBoardHostLocalResponse, TaskBoardHostSetProjectTypesRequest,
     TaskBoardHostSetProjectTypesResponse, TaskBoardItemPositionMutationResponse,
     TaskBoardItemPositionSnapshot, TaskBoardListItemsRequest, TaskBoardListItemsResponse,
     TaskBoardMachinesResponse, TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest,
     TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse,
     TaskBoardProjectsResponse, TaskBoardResetItemPositionRequest, TaskBoardSetItemPositionRequest,
-    TaskBoardSyncRequest, TaskBoardSyncResponse, TaskBoardTriageCurrentResponse,
-    TaskBoardTriageHistoryResponse, TaskBoardUpdateItemRequest,
+    TaskBoardSetTriageOverrideRequest, TaskBoardSyncRequest, TaskBoardSyncResponse,
+    TaskBoardTriageCurrentResponse, TaskBoardTriageHistoryResponse,
+    TaskBoardTriageOverrideMutationResponse, TaskBoardUpdateItemRequest,
 };
 use crate::daemon::service;
 use crate::errors::CliError;
@@ -110,6 +111,32 @@ pub(crate) async fn get_item_triage_history(
         item_id,
         before_generation,
         limit,
+    )
+    .await
+}
+
+pub(crate) async fn set_item_triage_override(
+    state: &DaemonHttpState,
+    item_id: &str,
+    request: &TaskBoardSetTriageOverrideRequest,
+) -> Result<TaskBoardTriageOverrideMutationResponse, CliError> {
+    service::set_task_board_triage_override_db(
+        require_async_db(state, "task board triage override set")?,
+        item_id,
+        request,
+    )
+    .await
+}
+
+pub(crate) async fn clear_item_triage_override(
+    state: &DaemonHttpState,
+    item_id: &str,
+    request: &TaskBoardClearTriageOverrideRequest,
+) -> Result<TaskBoardTriageOverrideMutationResponse, CliError> {
+    service::clear_task_board_triage_override_db(
+        require_async_db(state, "task board triage override clear")?,
+        item_id,
+        request,
     )
     .await
 }

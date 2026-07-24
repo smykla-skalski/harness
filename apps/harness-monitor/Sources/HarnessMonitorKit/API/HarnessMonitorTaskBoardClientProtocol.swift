@@ -16,6 +16,14 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
     beforeGeneration: UInt64?,
     limit: UInt32?
   ) async throws -> TaskBoardTriageHistoryResponse
+  func setTaskBoardItemTriageOverride(
+    id: String,
+    request: TaskBoardSetTriageOverrideRequest
+  ) async throws -> TaskBoardTriageOverrideMutationResponse
+  func clearTaskBoardItemTriageOverride(
+    id: String,
+    request: TaskBoardClearTriageOverrideRequest
+  ) async throws -> TaskBoardTriageOverrideMutationResponse
   func createTaskBoardItem(request: TaskBoardCreateItemRequest) async throws -> TaskBoardItem
   func updateTaskBoardItem(
     id: String,

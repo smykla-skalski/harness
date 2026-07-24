@@ -58,12 +58,13 @@ async fn current_requires_an_existing_item_and_returns_optional_record() {
     let (_directory, db) = connect().await;
     seed_item(&db, "item-1").await;
 
-    assert!(
-        db.task_board_triage_current("item-1")
-            .await
-            .expect("read empty current")
-            .is_none()
-    );
+    let empty = db
+        .task_board_triage_current("item-1")
+        .await
+        .expect("read empty current");
+    assert!(empty.current.is_none());
+    assert!(empty.triage_override.is_none());
+    assert!(empty.effective.is_none());
     record_decision(
         &db,
         "item-1",
@@ -73,11 +74,11 @@ async fn current_requires_an_existing_item_and_returns_optional_record() {
     )
     .await;
 
-    let current = db
+    let read = db
         .task_board_triage_current("item-1")
         .await
-        .expect("read current")
-        .expect("current decision");
+        .expect("read current");
+    let current = read.current.expect("current decision");
     assert_eq!(current.item_id, "item-1");
     assert_eq!(current.generation, 1);
     assert_eq!(current.verdict, TriageVerdict::Todo);
@@ -86,6 +87,15 @@ async fn current_requires_an_existing_item_and_returns_optional_record() {
         Some("sha256:1111111111111111111111111111111111111111111111111111111111111111")
     );
     assert!(current.superseded_at.is_none());
+    assert!(read.triage_override.is_none());
+    let effective = read
+        .effective
+        .expect("effective outcome falls back to the decision");
+    assert_eq!(effective.verdict, TriageVerdict::Todo);
+    assert_eq!(
+        effective.source,
+        crate::task_board::TaskBoardTriageEffectiveSource::Automatic
+    );
 
     assert!(db.task_board_triage_current("missing").await.is_err());
     assert!(db.task_board_triage_current("../unsafe").await.is_err());

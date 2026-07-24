@@ -4,11 +4,19 @@ use sha2::{Digest, Sha256};
 
 use super::types::{ExternalRefProvider, TaskBoardItem, TaskBoardPriority};
 
-/// Stable identity for the deterministic built-in evaluator. `#334` rule sets
-/// and `#335` agent escalation are later evaluators with their own identity.
+/// Stable identity for the deterministic built-in evaluator. Later
+/// runtime-authored rule sets and agent escalation are separate evaluators
+/// with their own identity.
 pub const BUILTIN_V1_EVALUATOR_IDENTITY: &str = "task_board.triage.builtin_v1";
 /// Bumped only when this check table itself changes, never by configuration.
 pub const BUILTIN_V1_EVALUATOR_VERSION: u32 = 1;
+
+/// `lane_origin.producer` for a Todo slot an explicit triage override
+/// created or moved, as distinct from [`BUILTIN_V1_EVALUATOR_IDENTITY`] for
+/// a slot the evaluator computed on its own. A later automatic
+/// re-evaluation (on clear, or any fresh decision) may replace this with the
+/// real evaluator identity once that decision reconciles the slot itself.
+pub const OVERRIDE_PLACEMENT_PRODUCER: &str = "task_board.triage.override";
 
 const NEEDS_INFO_LABELS: [&str; 2] = ["needs-info", "triage/needs-info"];
 const EXCLUSION_LABELS: [&str; 6] = [

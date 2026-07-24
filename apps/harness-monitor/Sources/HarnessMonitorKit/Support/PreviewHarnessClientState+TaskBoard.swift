@@ -31,7 +31,8 @@ extension PreviewHarnessClientState {
       }
   }
 
-  private func materializedLaneItems(_ items: [TaskBoardItem]) -> [TaskBoardItem]? {
+  /// `nil` when the anchors can't be laid out over `items.count` slots.
+  func materializedLaneItems(_ items: [TaskBoardItem]) -> [TaskBoardItem]? {
     var anchors: [UInt32: TaskBoardItem] = [:]
     var defaults: [TaskBoardItem] = []
     for item in items {
@@ -73,7 +74,7 @@ extension PreviewHarnessClientState {
     return legacyWithinLaneOrder(left, right)
   }
 
-  private func legacyWithinLaneOrder(_ left: TaskBoardItem, _ right: TaskBoardItem) -> Bool {
+  func legacyWithinLaneOrder(_ left: TaskBoardItem, _ right: TaskBoardItem) -> Bool {
     let leftPriority = taskBoardLanePriority(left.priority)
     let rightPriority = taskBoardLanePriority(right.priority)
     if leftPriority != rightPriority {
