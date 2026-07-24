@@ -95,10 +95,13 @@ mod remote_assignment_stop_fence;
 mod remote_assignment_terminal;
 mod remote_assignment_terminal_handoff;
 mod triage_apply;
+mod triage_apply_agent;
 mod triage_apply_rules;
 mod triage_audit;
 mod triage_cause;
 mod triage_decisions;
+mod triage_escalation_enqueue;
+mod triage_escalation_store;
 mod triage_override;
 mod triage_override_audit;
 #[cfg(test)]
@@ -250,6 +253,7 @@ pub(crate) use dispatch_preparations::{
 pub(crate) use imports::{TaskBoardImportMarker, TaskBoardImportResult};
 #[allow(unused_imports)]
 pub(crate) use items::{TaskBoardItemSnapshot, TaskBoardMutation};
+pub(crate) use triage_escalation_store::ClaimedTaskBoardTriageEscalation;
 pub(crate) use lane_order::{TaskBoardItemsSnapshot, TaskBoardLaneShift};
 pub(crate) use lane_order_api::{
     TaskBoardLaneMutationResult, TaskBoardLanePositionInput, TaskBoardLaneResetInput,

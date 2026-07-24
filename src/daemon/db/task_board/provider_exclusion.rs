@@ -14,6 +14,7 @@ use super::triage_audit::{
     ProviderExclusionConflictAudit, record_provider_exclusion_hidden_audit_in_tx,
     record_provider_exclusion_restored_audit_in_tx,
 };
+use super::triage_escalation_enqueue::maybe_enqueue_triage_escalation_in_tx;
 use super::{ITEMS_CHANGE_SCOPE, ORCHESTRATOR_CHANGE_SCOPE};
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error, utc_now};
 use crate::infra::io;
@@ -226,6 +227,17 @@ impl AsyncDaemonDb {
         )
         .await?;
         let change_revision = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
+        if let Some(TriageOutcome::Decided(decision)) = outcome.as_ref() {
+            maybe_enqueue_triage_escalation_in_tx(
+                &mut transaction,
+                &write.item.id,
+                decision,
+                existing_override.is_some(),
+                &self.triage_escalation_config(),
+                &decided_at,
+            )
+            .await?;
+        }
         record_provider_exclusion_restored_audit_in_tx(
             &mut transaction,
             context,

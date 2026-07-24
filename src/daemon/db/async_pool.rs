@@ -1,3 +1,4 @@
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use sqlx::pool::PoolOptions;
@@ -12,6 +13,7 @@ use super::{
 };
 use crate::session::service::canonicalize_persisted_session_state;
 use crate::session::storage;
+use crate::task_board::TaskBoardTriageEscalationConfig;
 use crate::telemetry::{record_daemon_db_health_counts, record_daemon_db_pool_state};
 use crate::workspace::utc_now;
 
@@ -108,6 +110,14 @@ const RESOLVE_SESSION_SQL: &str = "SELECT
 pub(crate) struct AsyncDaemonDb {
     pool: SqlitePool,
     pub(super) path: PathBuf,
+    /// `Arc<OnceLock<_>>`, not a plain field: daemon startup resolves this
+    /// from env vars and sets it once, but by then `connect()` has already
+    /// returned and this handle has typically already been cloned into
+    /// `Arc<AsyncDaemonDb>` and stored for the whole process to share --
+    /// setting a plain field would only affect the one clone doing the
+    /// setting. Every clone shares the same `OnceLock` through this `Arc`,
+    /// so a single `set_triage_escalation_config` call reaches all of them.
+    triage_escalation_config: Arc<OnceLock<TaskBoardTriageEscalationConfig>>,
 }
 
 impl AsyncDaemonDb {
@@ -138,6 +148,7 @@ impl AsyncDaemonDb {
             let db = Self {
                 pool,
                 path: path.to_path_buf(),
+                triage_escalation_config: Arc::new(OnceLock::new()),
             };
             async_bootstrap::ensure_async_schema(db.pool()).await?;
             let version = db.schema_version().await?;
@@ -165,6 +176,23 @@ impl AsyncDaemonDb {
     #[must_use]
     pub(crate) fn storage_path(&self) -> &Path {
         &self.path
+    }
+
+    /// Set once at daemon startup from the resolved feature flag and env
+    /// vars (see `src/feature_flags.rs`). Idempotent by construction
+    /// (`OnceLock::set`): a second call is a silent no-op rather than a
+    /// panic, since the daemon has exactly one startup path in practice but
+    /// nothing here depends on that staying true.
+    pub(crate) fn set_triage_escalation_config(&self, config: TaskBoardTriageEscalationConfig) {
+        let _ = self.triage_escalation_config.set(config);
+    }
+
+    #[must_use]
+    pub(super) fn triage_escalation_config(&self) -> TaskBoardTriageEscalationConfig {
+        self.triage_escalation_config
+            .get()
+            .copied()
+            .unwrap_or_else(TaskBoardTriageEscalationConfig::disabled)
     }
 
     /// Read the canonical schema version through `SQLx`.

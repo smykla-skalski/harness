@@ -13,6 +13,7 @@ use super::rows::ItemRow;
 use super::triage_apply::{EnsuredTriageDecision, apply_override_placement_effect_in_tx, triage_eligible};
 use super::triage_apply_rules::ensure_current_active_triage_decision_in_tx;
 use super::triage_decisions::current_triage_decision_in_tx;
+use super::triage_escalation_enqueue::maybe_enqueue_triage_escalation_in_tx;
 use super::triage_override_audit::{
     record_triage_override_cleared_audit_in_tx, record_triage_override_set_audit_in_tx,
 };
@@ -372,6 +373,19 @@ impl AsyncDaemonDb {
         .await?;
         clear_triage_override_row_in_tx(&mut transaction, &write.item.id).await?;
         let items_change_seq = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
+        if let Some(EnsuredTriageDecision::Decided(decision)) = reconciliation.decision.as_ref() {
+            // The override this call just cleared is gone by construction --
+            // override_active is always false here.
+            maybe_enqueue_triage_escalation_in_tx(
+                &mut transaction,
+                &write.item.id,
+                decision,
+                false,
+                &self.triage_escalation_config(),
+                &now,
+            )
+            .await?;
+        }
         record_triage_override_cleared_audit_in_tx(
             &mut transaction,
             &before,
