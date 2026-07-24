@@ -54,8 +54,12 @@ struct SettingsRepositoryWorkingDirectoriesSection: View {
   }
 
   private func row(for repository: String) -> some View {
-    let bookmarkPath = paths[repository]
-    let managedCopy = workingCopies[repository.lowercased()]
+    // paths/associated/workingCopies are keyed by the normalized slug (the
+    // association store trims + lowercases on write); a mixed-case display
+    // string must be normalized before lookup or the row shows "Not set".
+    let key = RepositoryDirectoryStore.normalizedRepository(repository)
+    let bookmarkPath = paths[key]
+    let managedCopy = workingCopies[key]
     return HStack(spacing: 12) {
       VStack(alignment: .leading, spacing: 2) {
         Text(repository)
@@ -68,13 +72,19 @@ struct SettingsRepositoryWorkingDirectoriesSection: View {
           .truncationMode(.middle)
       }
       Spacer(minLength: 12)
-      actions(for: repository, bookmarkPath: bookmarkPath, managedCopy: managedCopy)
+      actions(
+        for: repository,
+        isAssociated: associated.contains(key),
+        bookmarkPath: bookmarkPath,
+        managedCopy: managedCopy
+      )
     }
   }
 
   @ViewBuilder
   private func actions(
     for repository: String,
+    isAssociated: Bool,
     bookmarkPath: String?,
     managedCopy: WorkingCopyListEntry?
   ) -> some View {
@@ -83,7 +93,7 @@ struct SettingsRepositoryWorkingDirectoriesSection: View {
         .controlSize(.small)
         .accessibilityLabel(Text("Obtaining a copy of \(repository)"))
     } else {
-      if associated.contains(repository) {
+      if isAssociated {
         Button("Remove", role: .destructive) {
           Task {
             await store.removeRepositoryWorkingDirectory(repository: repository)
@@ -133,7 +143,7 @@ struct SettingsRepositoryWorkingDirectoriesSection: View {
     associated = await store.repositoryDirectoryAssociations()
     let copies = await store.listRepositoryWorkingCopies()
     workingCopies = Dictionary(
-      copies.map { ($0.repoFullName.lowercased(), $0) },
+      copies.map { (RepositoryDirectoryStore.normalizedRepository($0.repoFullName), $0) },
       uniquingKeysWith: { first, _ in first }
     )
   }
@@ -143,12 +153,13 @@ struct SettingsRepositoryWorkingDirectoriesSection: View {
     return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
   }
 
-  nonisolated(unsafe) private static let byteCountFormatter: ByteCountFormatter = {
+  @MainActor private static let byteCountFormatter: ByteCountFormatter = {
     let formatter = ByteCountFormatter()
     formatter.countStyle = .file
     return formatter
   }()
 
+  @MainActor
   private func formattedSize(_ bytes: UInt64) -> String {
     Self.byteCountFormatter.string(fromByteCount: Int64(bytes))
   }
