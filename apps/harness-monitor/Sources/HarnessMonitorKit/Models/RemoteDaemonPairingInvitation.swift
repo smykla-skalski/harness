@@ -57,7 +57,7 @@ public struct RemoteDaemonPairingInvitation: Codable, Equatable, Sendable {
   public static func decode(_ url: URL, now: Date = .now) throws -> Self {
     guard
       url.scheme?.lowercased() == "harness",
-      url.host?.lowercased() == "remote-pair",
+      isPairingHost(url.host),
       let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
     else {
       throw RemoteDaemonPairingInvitationError.invalidURL
@@ -107,6 +107,15 @@ public struct RemoteDaemonPairingInvitation: Codable, Equatable, Sendable {
     guard expiresAt > now else {
       throw RemoteDaemonPairingInvitationError.expired
     }
+  }
+
+  /// Accepts the canonical `pair` host and the legacy `remote-pair` host so
+  /// links handed out before the hosts were unified still resolve.
+  private static func isPairingHost(_ host: String?) -> Bool {
+    guard let host = host?.lowercased() else {
+      return false
+    }
+    return host == "pair" || host == "remote-pair"
   }
 
   enum CodingKeys: String, CodingKey {

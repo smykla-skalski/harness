@@ -326,5 +326,5 @@ private func watchRemoteInvitationURL(now: Date) throws -> URL {
     .replacingOccurrences(of: "+", with: "-")
     .replacingOccurrences(of: "/", with: "_")
     .replacingOccurrences(of: "=", with: "")
-  return try XCTUnwrap(URL(string: "harness://remote-pair?payload=\(encoded)"))
+  return try XCTUnwrap(URL(string: "harness://pair?payload=\(encoded)"))
 }

@@ -19,6 +19,50 @@ final class MobileRemoteDaemonPairingTests: XCTestCase {
     XCTAssertEqual(link.stationName, "daemon.example.com")
   }
 
+  func testPairingLinkDecodesRemoteInvitationUnderLegacyHost() throws {
+    let now = Date(timeIntervalSince1970: 1_752_124_400)
+
+    let link = try MobilePairingLink.decode(
+      remoteInvitationURL(now: now, host: "remote-pair"),
+      now: now
+    )
+    guard case .remote = link else {
+      return XCTFail("expected legacy remote-pair link to resolve as a remote invitation")
+    }
+  }
+
+  func testPairingLinkDecodesRelayInvitationUnderSharedHost() throws {
+    let now = Date(timeIntervalSince1970: 1_752_124_400)
+    let relayInvitation = makePairingInvitation(now: now)
+    let relayURL = try MobilePairingInvitationCodec.encode(relayInvitation)
+
+    XCTAssertEqual(relayURL.host, "pair")
+    let link = try MobilePairingLink.decode(relayURL, now: now)
+    guard case .relay(let decoded) = link else {
+      return XCTFail("expected relay invitation")
+    }
+    XCTAssertEqual(decoded, relayInvitation)
+  }
+
+  func testPairingLinkRejectsUnrecognizedPayload() throws {
+    let payload = try payloadURL(
+      object: ["endpoint": "https://daemon.example.com", "unrelated": true]
+    )
+
+    XCTAssertThrowsError(try MobilePairingLink.decode(payload))
+  }
+
+  func testPairingLinkRejectsAmbiguousPayload() throws {
+    let payload = try payloadURL(
+      object: [
+        "server_spki_sha256": testSPKIPin,
+        "publicKeyFingerprint": "00:11:22:33:44:55:66:77",
+      ]
+    )
+
+    XCTAssertThrowsError(try MobilePairingLink.decode(payload))
+  }
+
   func testManualPayloadNormalizesRemoteAndRelayInvitations() throws {
     let now = Date(timeIntervalSince1970: 1_752_124_400)
     let remoteURL = try remoteInvitationURL(now: now)
@@ -314,10 +358,21 @@ actor RecordingRemotePairingTransport: MobileRemoteDaemonPairingTransport {
 
 let testSPKIPin = "sha256/CQ8Rnn313xPUG+5zny4xTooD6AxAsZr/anC/ea4bTIY="
 
+func payloadURL(object: [String: Any], host: String = "pair") throws -> URL {
+  let data = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+  let encoded =
+    data.base64EncodedString()
+    .replacingOccurrences(of: "+", with: "-")
+    .replacingOccurrences(of: "/", with: "_")
+    .replacingOccurrences(of: "=", with: "")
+  return try XCTUnwrap(URL(string: "harness://\(host)?payload=\(encoded)"))
+}
+
 func remoteInvitationURL(
   now: Date,
   endpoint: String = "https://daemon.example.com",
-  ttl: TimeInterval = 600
+  ttl: TimeInterval = 600,
+  host: String = "pair"
 ) throws -> URL {
   let payload: [String: Any] = [
     "version": 1,
@@ -334,7 +389,7 @@ func remoteInvitationURL(
     .replacingOccurrences(of: "+", with: "-")
     .replacingOccurrences(of: "/", with: "_")
     .replacingOccurrences(of: "=", with: "")
-  return try XCTUnwrap(URL(string: "harness://remote-pair?payload=\(encoded)"))
+  return try XCTUnwrap(URL(string: "harness://\(host)?payload=\(encoded)"))
 }
 
 func remoteAccess(deviceIdentityID: String? = nil) throws -> MobileRemoteDaemonAccess {

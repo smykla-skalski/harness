@@ -5,7 +5,7 @@ import Testing
 
 @Suite("Remote daemon pairing invitation")
 struct RemoteDaemonPairingInvitationTests {
-  @Test("Decodes the versioned daemon deep link")
+  @Test("Decodes the versioned daemon deep link under the shared pair host")
   func decodesVersionedDeepLink() throws {
     let now = try #require(ISO8601DateFormatter().date(from: "2026-07-10T04:00:00Z"))
     let invitation = try RemoteDaemonPairingInvitation.decode(
@@ -23,6 +23,38 @@ struct RemoteDaemonPairingInvitationTests {
     #expect(invitation.role == .operator)
     #expect(invitation.scopes == ["read", "write"])
     #expect(invitation.expiresAt > now)
+  }
+
+  @Test("Still decodes links handed out under the legacy remote-pair host")
+  func decodesLegacyRemotePairHost() throws {
+    let now = try #require(ISO8601DateFormatter().date(from: "2026-07-10T04:00:00Z"))
+    let invitation = try RemoteDaemonPairingInvitation.decode(
+      invitationURL(
+        endpoint: "https://daemon.example.com:8443",
+        expiresAt: "2026-07-10T04:10:00Z",
+        host: "remote-pair"
+      ),
+      now: now
+    )
+
+    #expect(invitation.endpoint.absoluteString == "https://daemon.example.com:8443")
+    #expect(invitation.code == "manual-code-value")
+  }
+
+  @Test("Rejects hosts that are not pairing hosts")
+  func rejectsNonPairingHost() throws {
+    let now = try #require(ISO8601DateFormatter().date(from: "2026-07-10T04:00:00Z"))
+
+    #expect(throws: RemoteDaemonPairingInvitationError.invalidURL) {
+      try RemoteDaemonPairingInvitation.decode(
+        invitationURL(
+          endpoint: "https://daemon.example.com",
+          expiresAt: "2026-07-10T04:10:00Z",
+          host: "reviews"
+        ),
+        now: now
+      )
+    }
   }
 
   @Test("Rejects non-HTTPS endpoints")
@@ -100,7 +132,8 @@ struct RemoteDaemonPairingInvitationTests {
   private func invitationURL(
     endpoint: String,
     pin: String = Self.validPin,
-    expiresAt: String
+    expiresAt: String,
+    host: String = "pair"
   ) throws -> URL {
     let payload: [String: Any] = [
       "version": 1,
@@ -116,7 +149,7 @@ struct RemoteDaemonPairingInvitationTests {
       .replacingOccurrences(of: "+", with: "-")
       .replacingOccurrences(of: "/", with: "_")
       .replacingOccurrences(of: "=", with: "")
-    return try #require(URL(string: "harness://remote-pair?payload=\(encoded)"))
+    return try #require(URL(string: "harness://\(host)?payload=\(encoded)"))
   }
 
   private static let validPin = "sha256/CQ8Rnn313xPUG+5zny4xTooD6AxAsZr/anC/ea4bTIY="

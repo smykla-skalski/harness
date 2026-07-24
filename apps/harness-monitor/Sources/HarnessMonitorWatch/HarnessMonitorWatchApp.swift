@@ -67,9 +67,9 @@ struct HarnessMonitorWatchApp: App {
           }
         }
         .onOpenURL { url in
-          guard MobilePairingLink.supports(url),
-            url.host?.lowercased() == "remote-pair"
-          else {
+          // Remote-daemon links now arrive under the shared `harness://pair`
+          // host; `supports` still accepts the legacy `remote-pair` host too.
+          guard MobilePairingLink.supports(url) else {
             return
           }
           Task {

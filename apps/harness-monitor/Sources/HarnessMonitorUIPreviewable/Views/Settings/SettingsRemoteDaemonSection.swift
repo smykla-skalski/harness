@@ -64,7 +64,7 @@ struct SettingsRemoteDaemonSection: View {
         .harnessNativeFormControl()
       switch pairingMode {
       case .link:
-        SecureField("harness://remote-pair link", text: $pairingLink)
+        SecureField("harness://pair link", text: $pairingLink)
           .harnessNativeFormControl()
       case .manual:
         TextField("HTTPS endpoint", text: $endpoint)
