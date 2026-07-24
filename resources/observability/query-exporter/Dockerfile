@@ -1,4 +1,4 @@
-FROM adonato/query-exporter:5.0.2@sha256:b1cca5a315160fd9023eebe32391bf7d551d3e6af02eb7ed7ec4e11359835c43
+FROM adonato/query-exporter:5.2.0@sha256:75a854f9803539f04224f9eda825f4956bc3212fefb9883b3fae488b5decc5ec
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
