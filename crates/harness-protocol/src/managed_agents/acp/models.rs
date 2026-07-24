@@ -88,6 +88,7 @@ impl Default for AcpAgentStartRequest {
 pub type CapabilityTag = String;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct DoctorProbe {
     pub command: String,
     pub args: Vec<String>,
@@ -95,6 +96,7 @@ pub struct DoctorProbe {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(tag = "kind", rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum AcpSpawnConfiguration {
     #[default]
     DescriptorRuntime,
@@ -120,6 +122,7 @@ impl AcpSpawnConfiguration {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AcpSessionConfigOptionBinding {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub option_id: Option<String>,
@@ -129,6 +132,7 @@ pub struct AcpSessionConfigOptionBinding {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(tag = "kind", rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum AcpSessionModelTransport {
     #[default]
     Disabled,
@@ -141,6 +145,7 @@ pub enum AcpSessionModelTransport {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(tag = "kind", rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum AcpSessionEffortTransport {
     #[default]
     Disabled,
@@ -151,6 +156,7 @@ pub enum AcpSessionEffortTransport {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AcpSessionConfiguration {
     #[serde(default)]
     pub model: AcpSessionModelTransport,
@@ -184,6 +190,7 @@ impl AcpSessionConfiguration {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AcpAgentDescriptor {
     pub id: String,
     pub display_name: String,
@@ -212,12 +219,14 @@ pub struct AcpAgentDescriptor {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AcpRuntimeProbeResponse {
     pub probes: Vec<AcpRuntimeProbe>,
     pub checked_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AcpRuntimeProbe {
     pub agent_id: String,
     pub display_name: String,
@@ -229,6 +238,7 @@ pub struct AcpRuntimeProbe {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum AcpAuthState {
     Ready,
     Unknown,

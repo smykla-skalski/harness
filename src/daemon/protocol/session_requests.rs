@@ -121,6 +121,7 @@ pub struct SessionTitleRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SignalSendRequest {
     pub actor: String,
     pub agent_id: String,
@@ -168,6 +169,7 @@ pub struct SessionJoinRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SignalAckRequest {
     pub agent_id: String,
     pub signal_id: String,
@@ -176,6 +178,7 @@ pub struct SignalAckRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SignalCancelRequest {
     pub actor: String,
     pub agent_id: String,

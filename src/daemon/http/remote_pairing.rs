@@ -35,6 +35,7 @@ pub(super) fn remote_pairing_routes() -> Router<DaemonHttpState> {
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemotePairClaimHttpRequest {
     code: String,
     domain: String,
@@ -44,6 +45,7 @@ pub(crate) struct RemotePairClaimHttpRequest {
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemotePairClaimHttpResponse {
     client_id: String,
     display_name: String,

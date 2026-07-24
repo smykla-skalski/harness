@@ -14,6 +14,8 @@ use super::response::{extract_request_id, timed_json};
 use super::{DaemonHttpState, require_async_db};
 
 #[derive(Debug, Default, serde::Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
+#[cfg_attr(feature = "openapi", into_params(parameter_in = Query))]
 pub(crate) struct AuditEventsQuery {
     limit: Option<u32>,
     before: Option<String>,

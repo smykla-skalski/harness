@@ -27,6 +27,7 @@ pub(super) fn remote_client_routes() -> Router<DaemonHttpState> {
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 struct RemoteClientSelfRevokeResponse {
     client_id: String,
     revoked_at: String,

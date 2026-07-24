@@ -83,6 +83,7 @@ type ManifestWriteHook = dyn Fn() + Send + Sync + 'static;
 static MANIFEST_WRITE_HOOK: Mutex<Option<Arc<ManifestWriteHook>>> = Mutex::new(None);
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct HostBridgeCapabilityManifest {
     #[serde(default = "default_host_bridge_enabled")]
     pub enabled: bool,
@@ -100,6 +101,7 @@ fn default_host_bridge_enabled() -> bool {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct HostBridgeManifest {
     #[serde(default)]
     pub running: bool,
@@ -110,6 +112,7 @@ pub struct HostBridgeManifest {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct DaemonBinaryStamp {
     pub helper_path: String,
     pub device_identifier: u64,
@@ -119,6 +122,7 @@ pub struct DaemonBinaryStamp {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct DaemonManifest {
     pub version: String,
     pub pid: u32,
@@ -142,6 +146,7 @@ pub struct DaemonManifest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct DaemonAuditEvent {
     pub recorded_at: String,
     pub level: String,
@@ -149,6 +154,7 @@ pub struct DaemonAuditEvent {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct DaemonDiagnostics {
     pub daemon_root: String,
     pub manifest_path: String,

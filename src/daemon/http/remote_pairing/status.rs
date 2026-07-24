@@ -34,11 +34,13 @@ pub(super) fn remote_pairing_status_routes() -> Router<DaemonHttpState> {
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 struct RemotePairStatusHttpRequest {
     pairing_id: String,
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 struct RemotePairStatusHttpResponse {
     status: &'static str,
 }
