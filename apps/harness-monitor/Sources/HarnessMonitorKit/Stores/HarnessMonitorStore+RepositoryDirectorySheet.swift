@@ -26,6 +26,14 @@ extension HarnessMonitorStore {
     )
   }
 
+  /// Normalized repositories that carry an association record, whether or not
+  /// their bookmark still resolves. Callers use this to offer Remove for a stale
+  /// binding whose path `repositoryWorkingDirectoryPaths` omits.
+  public func repositoryDirectoryAssociations() async -> Set<String> {
+    guard let repositoryDirectoryStore else { return [] }
+    return Set(await repositoryDirectoryStore.allAssociations().map(\.repository))
+  }
+
   /// Forgets the working directory associated with `repository`.
   public func removeRepositoryWorkingDirectory(repository: String) async {
     guard let repositoryDirectoryStore else { return }

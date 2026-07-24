@@ -121,6 +121,21 @@ struct HarnessMonitorStoreTaskBoardWorkingDirectoryTests {
     #expect(bookmarkID != nil)
   }
 
+  @Test("Associations list repositories whose bookmark no longer resolves")
+  func associationsIncludeUnresolvable() async throws {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    try await store.repositoryDirectoryStore?.associate(
+      repository: "assoc-stale/repo",
+      bookmarkID: "B-missing"
+    )
+    // The association record is present so Settings can still offer Remove, even
+    // though the path omits it because the bookmark does not resolve.
+    let associations = await store.repositoryDirectoryAssociations()
+    #expect(associations.contains("assoc-stale/repo"))
+    let paths = await store.repositoryWorkingDirectoryPaths()
+    #expect(paths["assoc-stale/repo"] == nil)
+  }
+
   @Test("Working directory paths resolve and clear per repository")
   func workingDirectoryPathsResolveAndClear() async throws {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())

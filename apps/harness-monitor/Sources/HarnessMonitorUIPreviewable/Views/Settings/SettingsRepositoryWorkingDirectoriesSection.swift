@@ -10,6 +10,7 @@ struct SettingsRepositoryWorkingDirectoriesSection: View {
   let repositories: [String]
 
   @State private var paths: [String: String] = [:]
+  @State private var associated: Set<String> = []
   @State private var importingRepository: String?
 
   var body: some View {
@@ -61,7 +62,7 @@ struct SettingsRepositoryWorkingDirectoriesSection: View {
           .truncationMode(.middle)
       }
       Spacer(minLength: 12)
-      if paths[repository] != nil {
+      if associated.contains(repository) {
         Button("Remove", role: .destructive) {
           Task {
             await store.removeRepositoryWorkingDirectory(repository: repository)
@@ -78,6 +79,7 @@ struct SettingsRepositoryWorkingDirectoriesSection: View {
   @MainActor
   private func reload() async {
     paths = await store.repositoryWorkingDirectoryPaths()
+    associated = await store.repositoryDirectoryAssociations()
   }
 
   private func abbreviatedPath(_ path: String) -> String {
