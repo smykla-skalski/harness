@@ -135,7 +135,7 @@ services:
       - tempo
 
   pyroscope:
-    image: grafana/pyroscope:2.0.2@sha256:644515bfa06cb3779b8666514b1bab2295bd11f1e1a53834bd9584a43f77c4f5
+    image: grafana/pyroscope:2.2.0@sha256:7f019d866e474609c7f112d2632d75bdf8ad418c08461fcb5193444bb6dc476d
     command:
       - -config.file=/etc/pyroscope/config.yaml
     restart: unless-stopped
