@@ -7839,6 +7839,727 @@
         "x-websocket-method": "session.title"
       }
     },
+    "/v1/task-board-execution/advertise": {
+      "get": {
+        "tags": [
+          "task-board-execution"
+        ],
+        "operationId": "advertise",
+        "responses": {
+          "200": {
+            "description": "Execution host identity and its active assignment bindings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteHostAdvertisement"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
+    "/v1/task-board-execution/artifacts/fetch": {
+      "post": {
+        "tags": [
+          "task-board-execution"
+        ],
+        "description": "Fetch a stored result artifact for an assignment. Responds 503 with the REMOTE_ARTIFACT_UNAVAILABLE code when the executor's artifact storage is unavailable.",
+        "operationId": "fetch_artifact",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoteArtifactFetchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Requested result artifact",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteArtifactFetchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
+    "/v1/task-board-execution/cancel": {
+      "post": {
+        "tags": [
+          "task-board-execution"
+        ],
+        "operationId": "cancel",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoteCancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Terminal cancellation record for the assignment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteCancelResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
+    "/v1/task-board-execution/claims": {
+      "post": {
+        "tags": [
+          "task-board-execution"
+        ],
+        "operationId": "claim",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoteClaimRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Immutable claim receipt for the assignment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteClaimResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
+    "/v1/task-board-execution/cleanup/observe": {
+      "post": {
+        "tags": [
+          "task-board-execution"
+        ],
+        "description": "Read exact executor cleanup completion evidence for a settled assignment. Responds 503 with the REMOTE_CLEANUP_PENDING code when cleanup has not yet completed.",
+        "operationId": "observe_cleanup",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoteCleanupObservationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Cleanup completion observation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteCleanupObservationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
+    "/v1/task-board-execution/leases/renew": {
+      "post": {
+        "tags": [
+          "task-board-execution"
+        ],
+        "operationId": "renew_lease",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoteLeaseRenewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Renewed lease for the claimed assignment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteLeaseRenewResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
+    "/v1/task-board-execution/offers": {
+      "post": {
+        "tags": [
+          "task-board-execution"
+        ],
+        "operationId": "offer",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoteOfferRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Offer disposition and, when accepted, the assignment lease",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteOfferResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
+    "/v1/task-board-execution/settled": {
+      "post": {
+        "tags": [
+          "task-board-execution"
+        ],
+        "operationId": "settled",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoteSettledRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Settlement record for the completed assignment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteSettledResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
+    "/v1/task-board-execution/source-bundles/abandon": {
+      "post": {
+        "tags": [
+          "task-board-execution"
+        ],
+        "operationId": "abandon_source_bundle",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoteSourceBundleAbandonRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Abandonment record for the source bundle",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteSourceBundleAbandonResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
+    "/v1/task-board-execution/source-bundles/receipt": {
+      "post": {
+        "tags": [
+          "task-board-execution"
+        ],
+        "operationId": "verify_source_bundle_receipt",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoteSourceBundleUploadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Verification of the stored source-bundle receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteSourceBundleReceiptVerificationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
+    "/v1/task-board-execution/source-bundles/upload": {
+      "post": {
+        "tags": [
+          "task-board-execution"
+        ],
+        "operationId": "upload_source_bundle",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoteSourceBundleUploadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Stored source-bundle receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteSourceBundleUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
+    "/v1/task-board-execution/status": {
+      "post": {
+        "tags": [
+          "task-board-execution"
+        ],
+        "operationId": "status",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoteStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Authoritative status of the claimed assignment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteStatusResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
     "/v1/task-board/audit": {
       "get": {
         "tags": [
@@ -18667,6 +19388,1289 @@
           }
         }
       },
+      "RemoteArtifactEntry": {
+        "type": "object",
+        "required": [
+          "relative_path",
+          "sha256",
+          "size_bytes",
+          "media_type"
+        ],
+        "properties": {
+          "media_type": {
+            "type": "string"
+          },
+          "relative_path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteArtifactFetchRequest": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "binding",
+          "lease_id",
+          "offer_request_sha256",
+          "relative_path",
+          "expected_sha256",
+          "request_sha256"
+        ],
+        "properties": {
+          "binding": {
+            "$ref": "#/components/schemas/RemoteAttemptBinding"
+          },
+          "expected_sha256": {
+            "type": "string"
+          },
+          "lease_id": {
+            "type": "string"
+          },
+          "offer_request_sha256": {
+            "type": "string"
+          },
+          "relative_path": {
+            "type": "string"
+          },
+          "request_sha256": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteArtifactFetchResponse": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "binding",
+          "offer_request_sha256",
+          "artifact",
+          "content_base64"
+        ],
+        "properties": {
+          "artifact": {
+            "$ref": "#/components/schemas/RemoteArtifactEntry"
+          },
+          "binding": {
+            "$ref": "#/components/schemas/RemoteAttemptBinding"
+          },
+          "content_base64": {
+            "type": "string"
+          },
+          "offer_request_sha256": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteArtifactManifest": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RemoteArtifactEntry"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteAssignmentWireState": {
+        "type": "string",
+        "enum": [
+          "offered",
+          "claimed",
+          "running",
+          "completed",
+          "failed",
+          "cancelled",
+          "superseded",
+          "unknown"
+        ]
+      },
+      "RemoteAttemptBinding": {
+        "type": "object",
+        "required": [
+          "assignment_id",
+          "execution_id",
+          "phase",
+          "workflow_kind",
+          "action_key",
+          "attempt",
+          "idempotency_key",
+          "host_id",
+          "host_instance_id",
+          "fencing_epoch",
+          "configuration_revision",
+          "execution_record_sha256",
+          "repository",
+          "base_revision"
+        ],
+        "properties": {
+          "action_key": {
+            "type": "string"
+          },
+          "assignment_id": {
+            "type": "string"
+          },
+          "attempt": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "base_revision": {
+            "type": "string"
+          },
+          "configuration_revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "execution_id": {
+            "type": "string"
+          },
+          "execution_record_sha256": {
+            "type": "string"
+          },
+          "expected_head_revision": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fencing_epoch": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "host_id": {
+            "type": "string"
+          },
+          "host_instance_id": {
+            "type": "string"
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "phase": {
+            "$ref": "#/components/schemas/TaskBoardExecutionPhase"
+          },
+          "repository": {
+            "type": "string"
+          },
+          "workflow_kind": {
+            "$ref": "#/components/schemas/TaskBoardWorkflowKind"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteCancelRequest": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "binding",
+          "lease_id",
+          "offer_request_sha256",
+          "reason",
+          "request_sha256"
+        ],
+        "properties": {
+          "binding": {
+            "$ref": "#/components/schemas/RemoteAttemptBinding"
+          },
+          "lease_id": {
+            "type": "string"
+          },
+          "offer_request_sha256": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "request_sha256": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteCancelResponse": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "binding",
+          "offer_request_sha256",
+          "cancel_response_sha256",
+          "state",
+          "observed_at"
+        ],
+        "properties": {
+          "binding": {
+            "$ref": "#/components/schemas/RemoteAttemptBinding"
+          },
+          "cancel_response_sha256": {
+            "type": "string"
+          },
+          "claimed_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "observed_at": {
+            "type": "string"
+          },
+          "offer_request_sha256": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "started_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "$ref": "#/components/schemas/RemoteAssignmentWireState"
+          },
+          "workspace_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteClaimRequest": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "binding",
+          "lease_id",
+          "offer_request_sha256",
+          "request_sha256"
+        ],
+        "properties": {
+          "binding": {
+            "$ref": "#/components/schemas/RemoteAttemptBinding"
+          },
+          "lease_id": {
+            "type": "string"
+          },
+          "offer_request_sha256": {
+            "type": "string"
+          },
+          "request_sha256": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteClaimResponse": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "binding",
+          "offer_request_sha256",
+          "lease",
+          "claimed_at"
+        ],
+        "properties": {
+          "binding": {
+            "$ref": "#/components/schemas/RemoteAttemptBinding"
+          },
+          "claimed_at": {
+            "type": "string"
+          },
+          "lease": {
+            "$ref": "#/components/schemas/RemoteLease"
+          },
+          "offer_request_sha256": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteCleanupObservationRequest": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "binding",
+          "lease_id",
+          "offer_request_sha256",
+          "settlement_request_sha256",
+          "request_sha256"
+        ],
+        "properties": {
+          "binding": {
+            "$ref": "#/components/schemas/RemoteAttemptBinding"
+          },
+          "lease_id": {
+            "type": "string"
+          },
+          "offer_request_sha256": {
+            "type": "string"
+          },
+          "request_sha256": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "settlement_request_sha256": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteCleanupObservationResponse": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "binding",
+          "offer_request_sha256",
+          "settlement_request_sha256",
+          "cleanup_completed_at",
+          "response_sha256"
+        ],
+        "properties": {
+          "binding": {
+            "$ref": "#/components/schemas/RemoteAttemptBinding"
+          },
+          "cleanup_completed_at": {
+            "type": "string"
+          },
+          "offer_request_sha256": {
+            "type": "string"
+          },
+          "response_sha256": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "settlement_request_sha256": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteCodexLaunchEnvelope": {
+        "type": "object",
+        "description": "Private, path-free Codex launch contract sealed into one remote offer.",
+        "required": [
+          "schema_version",
+          "runtime",
+          "actor",
+          "prompt",
+          "mode",
+          "role",
+          "fallback_role",
+          "capabilities",
+          "display_name",
+          "board_item_id",
+          "workflow_execution_id",
+          "allow_custom_model"
+        ],
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "allow_custom_model": {
+            "type": "boolean"
+          },
+          "board_item_id": {
+            "type": "string"
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "effort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fallback_role": {
+            "$ref": "#/components/schemas/SessionRole"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/CodexRunMode"
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "persona": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/SessionRole"
+          },
+          "runtime": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "task_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workflow_execution_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteHostAdvertisement": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "host_id",
+          "host_instance_id",
+          "protocol_version",
+          "capabilities",
+          "runtimes",
+          "repositories",
+          "capacity",
+          "active_assignments",
+          "sent_at"
+        ],
+        "properties": {
+          "active_assignments": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "capacity": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "host_id": {
+            "type": "string"
+          },
+          "host_instance_id": {
+            "type": "string"
+          },
+          "protocol_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "repositories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "runtimes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "sent_at": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteLease": {
+        "type": "object",
+        "required": [
+          "lease_id",
+          "expires_at"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string"
+          },
+          "lease_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteLeaseRenewRequest": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "binding",
+          "lease_id",
+          "offer_request_sha256",
+          "extend_seconds",
+          "request_sha256"
+        ],
+        "properties": {
+          "binding": {
+            "$ref": "#/components/schemas/RemoteAttemptBinding"
+          },
+          "extend_seconds": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "lease_id": {
+            "type": "string"
+          },
+          "offer_request_sha256": {
+            "type": "string"
+          },
+          "request_sha256": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteLeaseRenewResponse": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "binding",
+          "offer_request_sha256",
+          "lease"
+        ],
+        "properties": {
+          "binding": {
+            "$ref": "#/components/schemas/RemoteAttemptBinding"
+          },
+          "lease": {
+            "$ref": "#/components/schemas/RemoteLease"
+          },
+          "offer_request_sha256": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteOfferDisposition": {
+        "type": "string",
+        "enum": [
+          "accepted",
+          "rejected"
+        ]
+      },
+      "RemoteOfferRequest": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "binding",
+          "lease_seconds",
+          "deadline_at",
+          "launch",
+          "source",
+          "artifacts",
+          "request_sha256"
+        ],
+        "properties": {
+          "artifacts": {
+            "$ref": "#/components/schemas/RemoteArtifactManifest"
+          },
+          "binding": {
+            "$ref": "#/components/schemas/RemoteAttemptBinding"
+          },
+          "deadline_at": {
+            "type": "string"
+          },
+          "launch": {
+            "$ref": "#/components/schemas/RemoteCodexLaunchEnvelope"
+          },
+          "lease_seconds": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "request_sha256": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "source": {
+            "$ref": "#/components/schemas/RemoteSourceMaterial"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteOfferResponse": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "binding",
+          "offer_request_sha256",
+          "disposition"
+        ],
+        "properties": {
+          "binding": {
+            "$ref": "#/components/schemas/RemoteAttemptBinding"
+          },
+          "disposition": {
+            "$ref": "#/components/schemas/RemoteOfferDisposition"
+          },
+          "lease": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RemoteLease"
+              }
+            ]
+          },
+          "offer_request_sha256": {
+            "type": "string"
+          },
+          "rejection_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteRepositorySelector": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "exact_revision"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "branch",
+              "reference",
+              "kind"
+            ],
+            "properties": {
+              "branch": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "branch"
+                ]
+              },
+              "reference": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "RemoteSettledRequest": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "binding",
+          "lease_id",
+          "offer_request_sha256",
+          "terminal_state",
+          "request_sha256"
+        ],
+        "properties": {
+          "binding": {
+            "$ref": "#/components/schemas/RemoteAttemptBinding"
+          },
+          "lease_id": {
+            "type": "string"
+          },
+          "offer_request_sha256": {
+            "type": "string"
+          },
+          "request_sha256": {
+            "type": "string"
+          },
+          "result_sha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "terminal_state": {
+            "$ref": "#/components/schemas/RemoteAssignmentWireState"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteSettledResponse": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "binding",
+          "offer_request_sha256",
+          "settlement_request_sha256",
+          "settled_at"
+        ],
+        "properties": {
+          "binding": {
+            "$ref": "#/components/schemas/RemoteAttemptBinding"
+          },
+          "offer_request_sha256": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "settled_at": {
+            "type": "string"
+          },
+          "settlement_request_sha256": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteSourceBundleAbandonRequest": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "offer",
+          "upload_request_sha256",
+          "verified_absence",
+          "reason",
+          "request_sha256"
+        ],
+        "properties": {
+          "offer": {
+            "$ref": "#/components/schemas/RemoteOfferRequest"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "request_sha256": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "upload_request_sha256": {
+            "type": "string"
+          },
+          "verified_absence": {
+            "$ref": "#/components/schemas/RemoteSourceBundleReceiptVerificationResponse"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteSourceBundleAbandonResponse": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "binding",
+          "upload_request_sha256",
+          "abandon_request_sha256",
+          "abandoned_by_host_instance_id",
+          "abandoned_at",
+          "response_sha256"
+        ],
+        "properties": {
+          "abandon_request_sha256": {
+            "type": "string"
+          },
+          "abandoned_at": {
+            "type": "string"
+          },
+          "abandoned_by_host_instance_id": {
+            "type": "string"
+          },
+          "binding": {
+            "$ref": "#/components/schemas/RemoteAttemptBinding"
+          },
+          "response_sha256": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "upload_request_sha256": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteSourceBundleReceiptVerificationResponse": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "binding",
+          "offer_request_sha256",
+          "upload_request_sha256",
+          "observed_host_instance_id",
+          "checked_at",
+          "response_sha256"
+        ],
+        "properties": {
+          "binding": {
+            "$ref": "#/components/schemas/RemoteAttemptBinding"
+          },
+          "checked_at": {
+            "type": "string"
+          },
+          "observed_host_instance_id": {
+            "type": "string"
+          },
+          "offer_request_sha256": {
+            "type": "string"
+          },
+          "receipt": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RemoteSourceBundleUploadResponse"
+              }
+            ]
+          },
+          "response_sha256": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "upload_request_sha256": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteSourceBundleUploadRequest": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "offer",
+          "content_base64",
+          "request_sha256"
+        ],
+        "properties": {
+          "content_base64": {
+            "type": "string"
+          },
+          "offer": {
+            "$ref": "#/components/schemas/RemoteOfferRequest"
+          },
+          "request_sha256": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteSourceBundleUploadResponse": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "binding",
+          "offer_request_sha256",
+          "upload_request_sha256",
+          "artifact",
+          "stored_at",
+          "response_sha256"
+        ],
+        "properties": {
+          "artifact": {
+            "$ref": "#/components/schemas/RemoteArtifactEntry"
+          },
+          "binding": {
+            "$ref": "#/components/schemas/RemoteAttemptBinding"
+          },
+          "offer_request_sha256": {
+            "type": "string"
+          },
+          "response_sha256": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "stored_at": {
+            "type": "string"
+          },
+          "upload_request_sha256": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteSourceMaterial": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "schema_version",
+              "repository",
+              "selector",
+              "revision",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "repository"
+                ]
+              },
+              "repository": {
+                "type": "string"
+              },
+              "revision": {
+                "type": "string"
+              },
+              "schema_version": {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 0
+              },
+              "selector": {
+                "$ref": "#/components/schemas/RemoteRepositorySelector"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "schema_version",
+              "repository",
+              "base_revision",
+              "revision",
+              "advertised_ref",
+              "bundle",
+              "kind"
+            ],
+            "properties": {
+              "advertised_ref": {
+                "type": "string"
+              },
+              "base_revision": {
+                "type": "string"
+              },
+              "bundle": {
+                "$ref": "#/components/schemas/RemoteArtifactEntry"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "prior_phase_bundle"
+                ]
+              },
+              "repository": {
+                "type": "string"
+              },
+              "revision": {
+                "type": "string"
+              },
+              "schema_version": {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 0
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "schema_version",
+              "repository",
+              "revision",
+              "advertised_ref",
+              "bundle",
+              "kind"
+            ],
+            "properties": {
+              "advertised_ref": {
+                "type": "string"
+              },
+              "bundle": {
+                "$ref": "#/components/schemas/RemoteArtifactEntry"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "repository_snapshot_bundle"
+                ]
+              },
+              "repository": {
+                "type": "string"
+              },
+              "revision": {
+                "type": "string"
+              },
+              "schema_version": {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 0
+              }
+            }
+          }
+        ],
+        "description": "Immutable, host-independent source identity for one remote attempt.\n\nRepository sources never contain controller-local paths. Prior-phase source is represented by\na bounded, digest-addressed Git bundle entry carried by the sealed offer manifest."
+      },
+      "RemoteStatusRequest": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "binding",
+          "lease_id",
+          "offer_request_sha256",
+          "request_sha256"
+        ],
+        "properties": {
+          "binding": {
+            "$ref": "#/components/schemas/RemoteAttemptBinding"
+          },
+          "lease_id": {
+            "type": "string"
+          },
+          "offer_request_sha256": {
+            "type": "string"
+          },
+          "request_sha256": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteStatusResponse": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "binding",
+          "state",
+          "offer_request_sha256",
+          "status_sha256",
+          "output_artifacts",
+          "observed_at"
+        ],
+        "properties": {
+          "binding": {
+            "$ref": "#/components/schemas/RemoteAttemptBinding"
+          },
+          "claimed_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "failure_class": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TaskBoardFailureClass"
+              }
+            ]
+          },
+          "lease": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RemoteLease"
+              }
+            ]
+          },
+          "observed_at": {
+            "type": "string"
+          },
+          "offer_request_sha256": {
+            "type": "string"
+          },
+          "output_artifacts": {
+            "$ref": "#/components/schemas/RemoteArtifactManifest"
+          },
+          "result": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RemoteTypedResult"
+              }
+            ]
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "started_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "$ref": "#/components/schemas/RemoteAssignmentWireState"
+          },
+          "status_sha256": {
+            "type": "string"
+          },
+          "workspace_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteTypedResult": {
+        "type": "object",
+        "required": [
+          "offer_request_sha256",
+          "result",
+          "result_sha256"
+        ],
+        "properties": {
+          "offer_request_sha256": {
+            "type": "string"
+          },
+          "result": {
+            "$ref": "#/components/schemas/TaskBoardLocalAttemptResult"
+          },
+          "result_sha256": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "ResolvedRuntimeSessionAgent": {
         "type": "object",
         "required": [
@@ -22905,6 +24909,100 @@
           }
         }
       },
+      "TaskBoardAttemptResultArtifact": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "value",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "planning"
+                ]
+              },
+              "value": {
+                "$ref": "#/components/schemas/TaskBoardPlanningResult"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "value",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "implementation"
+                ]
+              },
+              "value": {
+                "$ref": "#/components/schemas/TaskBoardImplementationResult"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "value",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "review"
+                ]
+              },
+              "value": {
+                "$ref": "#/components/schemas/TaskBoardReviewerOutcome"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "value",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "evaluation"
+                ]
+              },
+              "value": {
+                "$ref": "#/components/schemas/TaskBoardEvaluationResult"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "value",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "lifecycle"
+                ]
+              },
+              "value": {
+                "$ref": "#/components/schemas/TaskBoardLifecycleOutcome"
+              }
+            }
+          }
+        ]
+      },
       "TaskBoardAuditSummary": {
         "type": "object",
         "required": [
@@ -23963,6 +26061,41 @@
           }
         }
       },
+      "TaskBoardEvaluationResult": {
+        "type": "object",
+        "required": [
+          "verdict",
+          "summary"
+        ],
+        "properties": {
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "head_revision": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "revision_cycle": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "summary": {
+            "type": "string"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/TaskBoardPhaseVerdict"
+          }
+        }
+      },
       "TaskBoardEvaluationSummary": {
         "type": "object",
         "required": [
@@ -24055,6 +26188,31 @@
           }
         },
         "additionalProperties": false
+      },
+      "TaskBoardExecutionPhase": {
+        "type": "string",
+        "enum": [
+          "planning",
+          "awaiting_approval",
+          "implementation",
+          "review",
+          "evaluate",
+          "publish",
+          "cleanup",
+          "terminal"
+        ]
+      },
+      "TaskBoardFailureClass": {
+        "type": "string",
+        "enum": [
+          "transient",
+          "permanent",
+          "authentication",
+          "configuration",
+          "policy",
+          "conflict",
+          "unknown_outcome"
+        ]
       },
       "TaskBoardGhCliDefaults": {
         "type": "object",
@@ -24548,6 +26706,38 @@
           }
         }
       },
+      "TaskBoardImplementationResult": {
+        "type": "object",
+        "required": [
+          "revision_cycle",
+          "base_head_revision",
+          "head_revision",
+          "summary"
+        ],
+        "properties": {
+          "base_head_revision": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "head_revision": {
+            "type": "string"
+          },
+          "revision_cycle": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "TaskBoardItem": {
         "type": "object",
         "required": [
@@ -24810,6 +27000,33 @@
         ],
         "description": "Provenance for an explicit lane position. Defaults intentionally have no\nprovenance because their visual slot is derived at read time."
       },
+      "TaskBoardLifecycleOutcome": {
+        "type": "object",
+        "required": [
+          "mutated",
+          "terminal"
+        ],
+        "properties": {
+          "external_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mutated": {
+            "type": "boolean"
+          },
+          "provider_revision": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "terminal": {
+            "type": "boolean"
+          }
+        }
+      },
       "TaskBoardListItemsResponse": {
         "type": "object",
         "required": [
@@ -24849,6 +27066,46 @@
             }
           }
         }
+      },
+      "TaskBoardLocalAttemptResult": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "execution_id",
+          "action_key",
+          "attempt",
+          "idempotency_key",
+          "exact_head_revision",
+          "artifact"
+        ],
+        "properties": {
+          "action_key": {
+            "type": "string"
+          },
+          "artifact": {
+            "$ref": "#/components/schemas/TaskBoardAttemptResultArtifact"
+          },
+          "attempt": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "exact_head_revision": {
+            "type": "string"
+          },
+          "execution_id": {
+            "type": "string"
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
       },
       "TaskBoardLocalExecutionHostConfig": {
         "type": "object",
@@ -25405,6 +27662,14 @@
           "implementation_write",
           "review_read_only",
           "evaluate_read_only"
+        ]
+      },
+      "TaskBoardPhaseVerdict": {
+        "type": "string",
+        "enum": [
+          "pass",
+          "changes_required",
+          "human_required"
         ]
       },
       "TaskBoardPlanApprovalBinding": {
@@ -26131,6 +28396,46 @@
             "type": "integer",
             "format": "int32",
             "minimum": 0
+          }
+        }
+      },
+      "TaskBoardReviewResult": {
+        "type": "object",
+        "required": [
+          "verdict",
+          "head_revision",
+          "summary"
+        ],
+        "properties": {
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "head_revision": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/TaskBoardPhaseVerdict"
+          }
+        }
+      },
+      "TaskBoardReviewerOutcome": {
+        "type": "object",
+        "required": [
+          "profile_id",
+          "result"
+        ],
+        "properties": {
+          "profile_id": {
+            "type": "string"
+          },
+          "result": {
+            "$ref": "#/components/schemas/TaskBoardReviewResult"
           }
         }
       },
