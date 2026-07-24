@@ -28,7 +28,7 @@ crossterm = "0.29.0"
 fs2 = "0.4.3"
 fs-err = "3.3.0"
 futures-util = "0.3.31"
-gix = { version = "0.83.0", features = ["status", "worktree-mutation", "index", "blocking-http-transport-reqwest-rust-tls"] }
+gix = { version = "0.86.0", features = ["status", "worktree-mutation", "index", "blocking-http-transport-reqwest-rust-tls"] }
 gray_matter = { version = "0.3.2", default-features = false, features = ["yaml"] }
 harness-command = { path = "../harness-command", version = "50.0.0" }
 harness-hook = { path = "../harness-hook", version = "50.0.0" }

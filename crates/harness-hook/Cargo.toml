@@ -20,7 +20,7 @@ harness-telemetry = { path = "../harness-telemetry", version = "50.0.0" }
 chrono = { version = "0.4.44", features = ["serde"] }
 fs-err = "3.3.0"
 fs2 = "0.4.3"
-gix = { version = "0.83.0", features = ["status"] }
+gix = { version = "0.86.0", features = ["status"] }
 gray_matter = { version = "0.3.2", default-features = false, features = ["yaml"] }
 hex = "0.4.3"
 rayon = "1.11.0"
