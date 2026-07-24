@@ -106,8 +106,8 @@ struct RemoteDaemonProfileCoordinatorForgetTests {
     #expect(try tokenStore.loadToken(profileID: profile.id) == "server-issued-token")
   }
 
-  @Test("Unreadable active token preserves the profile for server revocation")
-  func unreadableActiveTokenPreservesProfile() async throws {
+  @Test("Unreadable active token still forgets locally without revoking")
+  func unreadableActiveTokenStillForgetsLocally() async throws {
     let profile = try remoteProfileFixture()
     let repository = InMemoryRemoteDaemonProfileStore(
       state: RemoteDaemonProfileState(profiles: [profile], activeProfileID: profile.id)
@@ -122,16 +122,12 @@ struct RemoteDaemonProfileCoordinatorForgetTests {
       revoker: SuccessfulRemoteDaemonRevoker()
     )
 
-    await #expect(throws: RemoteDaemonForgetTestError.tokenRead) {
-      _ = try await coordinator.forgetActiveProfile()
-    }
+    let forgotten = try await coordinator.forgetActiveProfile()
 
-    #expect(
-      try repository.load()
-        == RemoteDaemonProfileState(profiles: [profile], activeProfileID: profile.id)
-    )
-    #expect(tokenStore.deleteCallCount == 0)
-    #expect(tokenStore.hasToken(profileID: profile.id))
+    #expect(forgotten?.serverRevoked == false)
+    #expect(try repository.load() == RemoteDaemonProfileState())
+    #expect(tokenStore.deleteCallCount == 1)
+    #expect(!tokenStore.hasToken(profileID: profile.id))
   }
 }
 

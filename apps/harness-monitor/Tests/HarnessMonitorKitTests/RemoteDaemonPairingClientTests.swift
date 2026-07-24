@@ -108,7 +108,8 @@ struct RemoteDaemonPairingClientTests {
 
     let forgotten = try await coordinator.forgetActiveProfile()
 
-    #expect(forgotten == profile)
+    #expect(forgotten?.profile == profile)
+    #expect(forgotten?.serverRevoked == true)
     #expect(try repository.load() == RemoteDaemonProfileState())
     #expect(try tokenStore.loadToken(profileID: profile.id) == nil)
   }

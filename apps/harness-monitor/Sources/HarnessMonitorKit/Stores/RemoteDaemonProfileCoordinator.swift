@@ -1,5 +1,15 @@
 import Foundation
 
+public struct RemoteDaemonForgetOutcome: Equatable, Sendable {
+  public let profile: RemoteDaemonProfile
+  public let serverRevoked: Bool
+
+  public init(profile: RemoteDaemonProfile, serverRevoked: Bool) {
+    self.profile = profile
+    self.serverRevoked = serverRevoked
+  }
+}
+
 public actor RemoteDaemonProfileCoordinator {
   private let repository: any RemoteDaemonProfilePersisting
   private let tokenStore: any RemoteDaemonTokenPersisting
@@ -62,7 +72,7 @@ public actor RemoteDaemonProfileCoordinator {
   }
 
   @discardableResult
-  public func forgetActiveProfile() async throws -> RemoteDaemonProfile? {
+  public func forgetActiveProfile() async throws -> RemoteDaemonForgetOutcome? {
     let originalState = try repository.load()
     guard let activeProfileID = originalState.activeProfileID else {
       return nil
@@ -70,13 +80,8 @@ public actor RemoteDaemonProfileCoordinator {
     guard let profile = originalState.profiles.first(where: { $0.id == activeProfileID }) else {
       throw RemoteDaemonProfileError.profileNotFound
     }
-    let token = try tokenForForget(profile)
-    if profile.status == .active {
-      guard let token else {
-        throw RemoteDaemonProfileError.missingToken
-      }
-      try await revoker.revoke(profile: profile, token: token)
-    }
+    let token = tokenForForget(profile)
+    let serverRevoked = await revokeIfReachable(profile: profile, token: token)
     var forgottenState = originalState
     forgottenState.profiles.removeAll { $0.id == activeProfileID }
     forgottenState.activeProfileID = nil
@@ -92,17 +97,32 @@ public actor RemoteDaemonProfileCoordinator {
       rollbackForget(state: originalState, token: token, profileID: activeProfileID)
       throw error
     }
-    return profile
+    return RemoteDaemonForgetOutcome(profile: profile, serverRevoked: serverRevoked)
   }
 
-  private func tokenForForget(_ profile: RemoteDaemonProfile) throws -> String? {
+  // Best-effort. Forgetting a remote daemon is a local disconnect that must always
+  // complete, so an unreachable or rejecting server returns false here instead of
+  // throwing; the caller warns the user that the token stays live until it expires.
+  private func revokeIfReachable(profile: RemoteDaemonProfile, token: String?) async -> Bool {
     if profile.status == .revoked {
-      return try? tokenStore.loadToken(profileID: profile.id)
+      return true
     }
-    guard let token = try tokenStore.loadToken(profileID: profile.id),
+    guard let token else {
+      return false
+    }
+    do {
+      try await revoker.revoke(profile: profile, token: token)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  private func tokenForForget(_ profile: RemoteDaemonProfile) -> String? {
+    guard let token = try? tokenStore.loadToken(profileID: profile.id),
       !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     else {
-      throw RemoteDaemonProfileError.missingToken
+      return nil
     }
     return token
   }

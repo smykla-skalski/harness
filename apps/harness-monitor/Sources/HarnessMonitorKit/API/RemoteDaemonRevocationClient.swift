@@ -45,8 +45,10 @@ public struct HTTPRemoteDaemonRevocationClient: RemoteDaemonClientRevoking, Send
 
   private static func defaultSession(serverTrust: HarnessMonitorServerTrust) -> URLSession {
     let configuration = URLSessionConfiguration.ephemeral
-    configuration.timeoutIntervalForRequest = 15
-    configuration.timeoutIntervalForResource = 30
+    // Revocation is best-effort and blocks the "Forget Remote Daemon" spinner, so keep the
+    // wait short: an unreachable server should fall through to the local forget in seconds.
+    configuration.timeoutIntervalForRequest = 8
+    configuration.timeoutIntervalForResource = 15
     return HarnessMonitorURLSessionFactory.make(
       configuration: configuration,
       serverTrust: serverTrust

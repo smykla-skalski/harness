@@ -78,8 +78,8 @@ extension HarnessMonitorStore {
     HarnessMonitorAsyncWorkQueue.shared.submit(
       .init(title: "Forget remote daemon") { [weak self] in
         do {
-          _ = try await remoteDaemonServices.profileCoordinator.forgetActiveProfile()
-          await self?.completeRemoteDaemonForget()
+          let outcome = try await remoteDaemonServices.profileCoordinator.forgetActiveProfile()
+          await self?.completeRemoteDaemonForget(outcome)
         } catch {
           await self?.failRemoteDaemonAction(error)
         }
@@ -132,11 +132,19 @@ extension HarnessMonitorStore {
     await reconnect()
   }
 
-  private func completeRemoteDaemonForget() async {
+  private func completeRemoteDaemonForget(_ outcome: RemoteDaemonForgetOutcome?) async {
     stopRemoteDaemonReconnect()
     remoteDaemonProfile = nil
     remoteDaemonActionState = .idle
     resetLocalManifestURL()
+    if let outcome, !outcome.serverRevoked {
+      toast.presentWarning(
+        "Removed the remote daemon on this Mac, but couldn't reach the server to revoke this "
+          + "client - the access token stays valid until it expires, so revoke it from the server "
+          + "if this Mac may be compromised",
+        title: "Remote daemon forgotten"
+      )
+    }
     await reconnect()
   }
 
