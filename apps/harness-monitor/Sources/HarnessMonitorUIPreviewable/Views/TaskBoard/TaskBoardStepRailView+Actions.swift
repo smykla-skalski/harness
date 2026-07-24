@@ -86,10 +86,15 @@ extension TaskBoardStepRailView {
           )
           // Guarantee the item just delivered is prompted for even if the
           // consolidated gather returns nothing, so Deliver never silently no-ops.
+          // Keep the sorted order so the sheet's row identity stays stable across
+          // presentations.
           if !unresolved.contains(repository) {
-            unresolved.append(repository)
+            unresolved = (unresolved + [repository]).sorted()
           }
           await MainActor.run {
+            // This item was not delivered; drop any prior delivery so the stage
+            // resolver does not treat it as running against a stale session.
+            state.delivery = nil
             store.presentResolveRepositoryDirectories(repositories: unresolved)
             state.finish()
           }
