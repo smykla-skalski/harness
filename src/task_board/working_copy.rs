@@ -22,7 +22,7 @@
 pub mod progress;
 pub mod runtime;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
@@ -167,32 +167,31 @@ impl WorkingCopyRegistry {
         max_age: Duration,
         max_disk_bytes: u64,
     ) -> Vec<WorkingCopyKey> {
-        let mut age_targets: Vec<WorkingCopyKey> = self
+        let age_targets: BTreeSet<WorkingCopyKey> = self
             .entries
             .iter()
             .filter(|(_, entry)| now.signed_duration_since(entry.last_used_at) > max_age)
             .map(|(key, _)| key.clone())
             .collect();
 
-        let mut remaining: Vec<(WorkingCopyKey, WorkingCopyRegistryEntry)> = self
+        let mut remaining: Vec<(&WorkingCopyKey, &WorkingCopyRegistryEntry)> = self
             .entries
             .iter()
-            .filter(|(key, _)| !age_targets.contains(key))
-            .map(|(k, v)| (k.clone(), v.clone()))
+            .filter(|(key, _)| !age_targets.contains(*key))
             .collect();
-        // Oldest last_used_at first.
-        remaining.sort_by_key(|entry| entry.1.last_used_at);
+        // Oldest last_used_at first, so LRU eviction drops the stalest.
+        remaining.sort_by_key(|(_, entry)| entry.last_used_at);
 
-        let mut remaining_size: u64 = remaining.iter().map(|(_, e)| e.size_bytes).sum();
-        let mut lru_targets: Vec<WorkingCopyKey> = Vec::new();
-        while remaining_size > max_disk_bytes && !remaining.is_empty() {
-            let (key, entry) = remaining.remove(0);
+        let mut targets: Vec<WorkingCopyKey> = age_targets.into_iter().collect();
+        let mut remaining_size: u64 = remaining.iter().map(|(_, entry)| entry.size_bytes).sum();
+        for (key, entry) in remaining {
+            if remaining_size <= max_disk_bytes {
+                break;
+            }
             remaining_size = remaining_size.saturating_sub(entry.size_bytes);
-            lru_targets.push(key);
+            targets.push(key.clone());
         }
-
-        age_targets.extend(lru_targets);
-        age_targets
+        targets
     }
 }
 
