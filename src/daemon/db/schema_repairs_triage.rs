@@ -10,6 +10,12 @@ const MIGRATION_SQL: &str = include_str!("migrations/0040_daemon_v46_task_board_
 /// complete -- only a shape matching neither is treated as corrupt.
 const MIGRATION_SQL_V48: &str =
     include_str!("migrations/0042_daemon_v48_task_board_triage_rules.sql");
+/// Migration 0043/v49 recreated `task_board_triage_decisions` again (widened
+/// `reason_code` to include `agent_verdict`), so a database already migrated
+/// past v48 legitimately carries this third shape instead of either prior
+/// one -- same acceptance pattern as `MIGRATION_SQL_V48` above.
+const MIGRATION_SQL_V49: &str =
+    include_str!("migrations/0043_daemon_v49_task_board_triage_escalation.sql");
 const OBJECTS_MARKER: &str = "CREATE TABLE IF NOT EXISTS task_board_triage_decisions";
 const TOMBSTONE_CAUSE_DEFINITION: &str = "
 tombstone_cause TEXT
@@ -63,7 +69,8 @@ pub(super) fn shape_needs_repair(conn: &Connection) -> Result<bool, CliError> {
 fn matches_a_known_good_shape(shape: &ObjectShape, actual: &str) -> Result<bool, CliError> {
     let actual = normalize_sql(actual);
     Ok(actual == expected_object_sql(shape, MIGRATION_SQL)?
-        || actual == expected_object_sql(shape, MIGRATION_SQL_V48)?)
+        || actual == expected_object_sql(shape, MIGRATION_SQL_V48)?
+        || actual == expected_object_sql(shape, MIGRATION_SQL_V49)?)
 }
 
 pub(super) fn repair_and_stamp(conn: &Connection) -> Result<(), CliError> {

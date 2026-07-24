@@ -160,6 +160,54 @@ async fn async_codex_runs_round_trip_and_list_newest_first() {
     assert_eq!(loaded.events[0].kind, "turn/completed");
 }
 
+/// A standalone triage-escalation run (see
+/// `CodexControllerHandle::prepare_standalone_run`) has no owning session at
+/// all -- `session_id` on the snapshot is a free-form label, not a real
+/// session id. Persisting it must store an honest NULL rather than a value
+/// that would violate the `codex_runs.session_id` foreign key, and loading
+/// it back must fall back to the run's own id rather than surface a NULL
+/// on a wire type that stays non-optional.
+#[tokio::test]
+async fn async_standalone_codex_run_persists_a_null_session_and_falls_back_on_load() {
+    let tmp = tempdir().expect("tempdir");
+    let db_path = tmp.path().join("harness.db");
+    let async_db = AsyncDaemonDb::connect(&db_path)
+        .await
+        .expect("open async db");
+
+    let mut standalone = sample_codex_run(
+        "codex-run-standalone-1",
+        "2026-04-09T10:00:00Z",
+    );
+    standalone.session_id = "triage-escalation-no-such-session".into();
+    standalone.session_agent_id = None;
+    async_db
+        .save_codex_run(&standalone)
+        .await
+        .expect("save standalone run despite no matching session");
+
+    let stored_session_id: Option<String> = sqlx::query_scalar(
+        "SELECT session_id FROM codex_runs WHERE run_id = 'codex-run-standalone-1'",
+    )
+    .fetch_one(async_db.pool())
+    .await
+    .expect("load raw session_id column");
+    assert_eq!(
+        stored_session_id, None,
+        "a session-less run must persist NULL, not the free-form label"
+    );
+
+    let loaded = async_db
+        .codex_run("codex-run-standalone-1")
+        .await
+        .expect("load standalone run")
+        .expect("present");
+    assert_eq!(
+        loaded.session_id, "codex-run-standalone-1",
+        "the wire snapshot falls back to the run's own id, never surfacing NULL"
+    );
+}
+
 #[tokio::test]
 async fn async_agent_tuis_round_trip_and_list_newest_first() {
     let tmp = tempdir().expect("tempdir");

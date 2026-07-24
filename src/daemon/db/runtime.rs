@@ -1,7 +1,7 @@
 use super::{
     AgentTuiLiveRefreshState, AgentTuiSize, AgentTuiSnapshot, AgentTuiStatus, Arc, CliError,
     CodexRunMode, CodexRunSnapshot, CodexRunStatus, DaemonDb, ErrorKind, IoError, Mutex, OnceLock,
-    TerminalScreenSnapshot, Type, db_error, state,
+    OptionalExtension, TerminalScreenSnapshot, Type, db_error, state,
 };
 
 pub(crate) fn ensure_shared_db(
@@ -29,6 +29,29 @@ impl DaemonDb {
             .map_err(|error| db_error(format!("serialize codex resolved approvals: {error}")))?;
         let events_json = serde_json::to_string(&snapshot.events)
             .map_err(|error| db_error(format!("serialize codex events: {error}")))?;
+        // A standalone run (see `CodexControllerHandle::prepare_standalone_run`)
+        // stamps a free-form label into `snapshot.session_id`, not a real
+        // session id -- persisting that string as-is would violate
+        // `codex_runs.session_id`'s foreign key. Only bind it when a matching
+        // `sessions` row actually exists; otherwise store an honest NULL.
+        // This existence check is also the invariant the removed `NOT NULL`
+        // foreign key used to enforce for every session-bound caller: the
+        // session row must already be committed before its first run is
+        // saved, and must still exist at every later save. Either a
+        // session-bound run saved before its session commits, or one
+        // re-saved (via this UPSERT) after its session was hard-deleted,
+        // now silently stores NULL and stays an unbound orphan instead of
+        // failing loudly.
+        let session_id: Option<&str> = self
+            .conn
+            .query_row(
+                "SELECT 1 FROM sessions WHERE session_id = ?1",
+                [&snapshot.session_id],
+                |_| Ok(()),
+            )
+            .optional()
+            .map_err(|error| db_error(format!("check codex run session: {error}")))?
+            .map(|()| snapshot.session_id.as_str());
         self.conn
             .execute(
                 "INSERT INTO codex_runs (
@@ -63,7 +86,7 @@ impl DaemonDb {
                     effort = excluded.effort",
                 rusqlite::params![
                     snapshot.run_id,
-                    snapshot.session_id,
+                    session_id,
                     snapshot.task_id,
                     snapshot.board_item_id,
                     snapshot.workflow_execution_id,
@@ -282,14 +305,20 @@ impl DaemonDb {
 }
 
 fn codex_run_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<CodexRunSnapshot> {
+    let run_id: String = row.get(0)?;
+    // A session-less standalone run persists NULL for `session_id` (see
+    // `save_codex_run`); the wire type stays non-optional, so a NULL falls
+    // back to the run's own id rather than surfacing here.
+    let session_id: Option<String> = row.get(1)?;
+    let session_id = session_id.unwrap_or_else(|| run_id.clone());
     let mode_raw: String = row.get(10)?;
     let status_raw: String = row.get(11)?;
     let pending_approvals_json: String = row.get(16)?;
     let resolved_approvals_json: String = row.get(17)?;
     let events_json: String = row.get(18)?;
     Ok(CodexRunSnapshot {
-        run_id: row.get(0)?,
-        session_id: row.get(1)?,
+        run_id,
+        session_id,
         task_id: row.get(2)?,
         board_item_id: row.get(3)?,
         workflow_execution_id: row.get(4)?,
