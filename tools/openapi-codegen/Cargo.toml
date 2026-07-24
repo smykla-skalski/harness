@@ -10,7 +10,7 @@ name = "openapi-codegen"
 path = "src/main.rs"
 
 [dependencies]
-harness-daemon = { path = "../../crates/harness-daemon", features = ["openapi"] }
+harness-daemon = { path = "../../crates/harness-daemon" }
 
 [lints.clippy]
 pedantic = { level = "deny", priority = 1 }

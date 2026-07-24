@@ -71,7 +71,6 @@ pub use harness_protocol::managed_agents::acp::{
     AcpMcpServer, AcpPermissionBatch, AcpPermissionDecision, AcpPermissionItem,
     AcpPermissionOption, AcpSessionConfigOptionState, AcpSessionListPage, AcpSessionSummary,
 };
-#[cfg(feature = "openapi")]
 pub use harness_protocol::managed_agents::acp::{
     AcpAgentInspectSnapshotSchema, AcpAgentSnapshotSchema, AcpAgentStartRequestSchema,
     AcpPermissionBatchSchema,

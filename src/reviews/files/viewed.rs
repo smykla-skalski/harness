@@ -16,7 +16,7 @@ use super::ReviewFileViewedState;
 
 /// Request to flip viewed-state on one or more paths within a PR.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsFilesViewedRequest {
     pub pull_request_id: String,
     pub paths: Vec<ReviewFilesViewedTarget>,
@@ -24,7 +24,7 @@ pub struct ReviewsFilesViewedRequest {
 
 /// One target within a viewed-state request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewFilesViewedTarget {
     pub path: String,
     pub expected_prior_state: ReviewFileViewedState,
@@ -61,7 +61,7 @@ impl ReviewsFilesViewedRequest {
 /// `Updated` confirms the flip, `Drifted` accepts the daemon's current state,
 /// `Failed` rolls back.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ReviewFileViewedOutcome {
     Updated,
@@ -71,7 +71,7 @@ pub enum ReviewFileViewedOutcome {
 
 /// One result row inside the response.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewFilesViewedResult {
     pub path: String,
     pub outcome: ReviewFileViewedOutcome,
@@ -80,7 +80,7 @@ pub struct ReviewFilesViewedResult {
 
 /// Response shape.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsFilesViewedResponse {
     pub pull_request_id: String,
     pub results: Vec<ReviewFilesViewedResult>,

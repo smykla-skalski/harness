@@ -62,7 +62,7 @@ pub(crate) use store::{
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
 #[value(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum ExternalSyncDirection {
     Pull,
     Push,
@@ -72,7 +72,7 @@ pub enum ExternalSyncDirection {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum ExternalSyncAction {
     Pull,
     Push,
@@ -81,7 +81,7 @@ pub enum ExternalSyncAction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ExternalSyncOperation {
     pub provider: ExternalProvider,
     pub action: ExternalSyncAction,

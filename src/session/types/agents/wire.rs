@@ -6,11 +6,11 @@ use crate::agents::kind::RuntimeKind;
 use crate::agents::runtime::RuntimeCapabilities;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AgentRegistrationWire {
     session_agent_id: String,
     name: String,
-    #[cfg_attr(feature = "openapi", schema(value_type = RuntimeKindSchema))]
+    #[schema(value_type = RuntimeKindSchema)]
     runtime: RuntimeKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     descriptor_id: Option<String>,
@@ -19,7 +19,7 @@ pub struct AgentRegistrationWire {
     capabilities: Vec<String>,
     joined_at: String,
     updated_at: String,
-    #[cfg_attr(feature = "openapi", schema(value_type = AgentStatusSchema))]
+    #[schema(value_type = AgentStatusSchema)]
     status: super::AgentStatus,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     runtime_session_id: Option<String>,
@@ -117,7 +117,6 @@ fn managed_agent_ref(
 // structs reproduce the actual serialized JSON and are referenced via
 // `#[schema(value_type = ...)]`. They live here (shared source) because this
 // module is compiled by every crate that mirrors the session types.
-#[cfg(feature = "openapi")]
 #[derive(Serialize, Deserialize, utoipa::ToSchema)]
 pub struct RuntimeKindSchema {
     /// Runtime family, `tui` or `acp`.
@@ -127,7 +126,6 @@ pub struct RuntimeKindSchema {
 }
 
 /// Serialized disconnect reason: `{ "kind", "code"?, "signal"? }`.
-#[cfg(feature = "openapi")]
 #[derive(Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DisconnectReasonSchema {
     /// Snake-case reason discriminant (for example `process_exited`).
@@ -139,7 +137,6 @@ pub struct DisconnectReasonSchema {
 }
 
 /// Bare live-agent status strings.
-#[cfg(feature = "openapi")]
 #[derive(Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum AgentStatusStateSchema {
@@ -150,7 +147,6 @@ pub enum AgentStatusStateSchema {
 }
 
 /// Serialized disconnected-agent status object.
-#[cfg(feature = "openapi")]
 #[derive(Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AgentDisconnectedSchema {
     /// Always `disconnected`.
@@ -161,7 +157,6 @@ pub struct AgentDisconnectedSchema {
 }
 
 /// Serialized agent status: a bare status string or a disconnected object.
-#[cfg(feature = "openapi")]
 #[derive(Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(untagged)]
 pub enum AgentStatusSchema {

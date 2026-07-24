@@ -3,9 +3,10 @@ use std::time::Instant;
 use axum::extract::{ConnectInfo, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum::routing::post;
-use axum::{Json, Router};
+use axum::Json;
 use serde::{Deserialize, Serialize};
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
 use uuid::Uuid;
 
 use crate::daemon::db::DaemonDb;
@@ -21,7 +22,6 @@ use crate::workspace::utc_now;
 use super::super::response::{extract_request_id, timed_json, timed_response};
 use super::super::{DaemonConnectInfo, DaemonHttpState};
 
-#[cfg(feature = "openapi")]
 use super::super::openapi::DaemonErrorBody;
 
 const ROUTE_REMOTE_PAIR_STATUS: &str = "remote.pair.status";
@@ -29,26 +29,23 @@ const ROUTE_REMOTE_PAIR_STATUS_RATE_LIMIT: &str = "remote.pair.status.rate_limit
 const UNAVAILABLE_DETAIL: &str = "remote pairing status unavailable";
 const RATE_LIMIT_DETAIL: &str = "remote pairing status attempts are rate limited";
 
-pub(super) fn remote_pairing_status_routes() -> Router<DaemonHttpState> {
-    Router::new().route(
-        http_paths::REMOTE_PAIR_STATUS,
-        post(post_remote_pair_status),
-    )
+pub(super) fn remote_pairing_status_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new().routes(routes!(post_remote_pair_status))
 }
 
 #[derive(Debug, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 struct RemotePairStatusHttpRequest {
     pairing_id: String,
 }
 
 #[derive(Debug, Serialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 struct RemotePairStatusHttpResponse {
     status: &'static str,
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/remote/pair/status",
     tag = "pairing",
@@ -58,7 +55,7 @@ struct RemotePairStatusHttpResponse {
         (status = 200, description = "Current pairing status", body = RemotePairStatusHttpResponse),
         (status = 400, description = "Malformed status request", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn post_remote_pair_status(
     ConnectInfo(connect_info): ConnectInfo<DaemonConnectInfo>,
     headers: HeaderMap,

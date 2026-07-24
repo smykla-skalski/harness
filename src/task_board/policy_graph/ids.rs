@@ -22,26 +22,26 @@ use serde::{Deserialize, Serialize};
 /// `from_node`/`to_node`, a group's members, a layout entry's `node_id`).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct PolicyGraphNodeId(String);
 
 /// Identifies an edge within a policy graph (`PolicyGraphEdge::id`).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct PolicyGraphEdgeId(String);
 
 /// Identifies a node group (`PolicyGraphGroup::id`, a node's `group_id`).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct PolicyGraphGroupId(String);
 
 /// Identifies a port on a node (`input_ports`/`output_ports`, an edge's
 /// `from_port`/`to_port`, a switch arm's `port`).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct PolicyGraphPortId(String);
 
 impl PolicyGraphNodeId {

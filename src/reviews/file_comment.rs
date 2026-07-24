@@ -4,7 +4,7 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ReviewsFileCommentKind {
     NewThread,
@@ -12,7 +12,7 @@ pub enum ReviewsFileCommentKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsFileCommentRequest {
     pub pull_request_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -30,7 +30,7 @@ pub struct ReviewsFileCommentRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsFileCommentResponse {
     pub pull_request_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]

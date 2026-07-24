@@ -11,13 +11,11 @@ use axum::response::Response;
 
 use crate::daemon::agent_acp::AcpPermissionDecision;
 use crate::daemon::protocol::{ManagedAgentSnapshot, http_paths};
-#[cfg(feature = "openapi")]
 use crate::daemon::protocol::ManagedAgentSnapshotSchema;
 use crate::errors::CliError;
 
 use super::super::DaemonHttpState;
 use super::super::auth::require_auth;
-#[cfg(feature = "openapi")]
 use super::super::openapi::{DaemonErrorBody, OkResponse};
 use super::super::response::{extract_request_id, timed_json};
 use super::mutations::with_managed_agent_lock;
@@ -30,12 +28,12 @@ fn acp_session_id(state: &DaemonHttpState, agent_id: &str) -> Result<String, Cli
 }
 
 #[derive(serde::Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub(super) struct AcpPromptRequestBody {
     pub prompt: String,
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/managed-agents/{managed_agent_id}/prompt",
     tag = "managed-agents",
@@ -47,7 +45,7 @@ pub(super) struct AcpPromptRequestBody {
         (status = 200, description = "ACP agent snapshot after sending the prompt", body = ManagedAgentSnapshotSchema),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_acp_agent_prompt(
     Path(agent_id): Path<String>,
     headers: HeaderMap,
@@ -83,7 +81,7 @@ pub(super) async fn post_acp_agent_prompt(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/managed-agents/{managed_agent_id}/logout",
     tag = "managed-agents",
@@ -94,7 +92,7 @@ pub(super) async fn post_acp_agent_prompt(
         (status = 200, description = "ACP agent logged out", body = OkResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_acp_agent_logout(
     Path(agent_id): Path<String>,
     headers: HeaderMap,
@@ -128,7 +126,7 @@ pub(super) async fn post_acp_agent_logout(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/managed-agents/{managed_agent_id}/permission-batches/{batch_id}",
     tag = "managed-agents",
@@ -141,7 +139,7 @@ pub(super) async fn post_acp_agent_logout(
         (status = 200, description = "ACP agent snapshot after resolving the permission batch", body = ManagedAgentSnapshotSchema),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_acp_permission(
     Path((agent_id, batch_id)): Path<(String, String)>,
     headers: HeaderMap,

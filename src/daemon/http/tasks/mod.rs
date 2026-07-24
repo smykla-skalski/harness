@@ -1,7 +1,5 @@
-use axum::Router;
-use axum::routing::post;
+use utoipa_axum::{router::OpenApiRouter, routes};
 
-use crate::daemon::protocol::http_paths;
 use crate::daemon::service;
 
 use super::DaemonHttpState;
@@ -9,50 +7,28 @@ use super::DaemonHttpState;
 pub(super) mod mutations;
 pub(super) mod review;
 
+#[cfg(test)]
 pub(super) use mutations::{
-    post_task_assign, post_task_checkpoint, post_task_create, post_task_delete, post_task_drop,
+    post_task_assign, post_task_checkpoint, post_task_create, post_task_drop,
     post_task_queue_policy, post_task_update,
 };
-pub(super) use review::{
-    post_task_arbitrate, post_task_claim_review, post_task_respond_review,
-    post_task_submit_for_review, post_task_submit_review,
-};
+#[cfg(test)]
+pub(super) use review::post_task_submit_for_review;
 
-pub(super) fn task_routes() -> Router<DaemonHttpState> {
-    Router::new()
-        .route(http_paths::SESSION_TASK_CREATE, post(post_task_create))
-        .route(http_paths::SESSION_TASK_DELETE, post(post_task_delete))
-        .route(http_paths::SESSION_TASK_ASSIGN, post(post_task_assign))
-        .route(http_paths::SESSION_TASK_DROP, post(post_task_drop))
-        .route(
-            http_paths::SESSION_TASK_QUEUE_POLICY,
-            post(post_task_queue_policy),
-        )
-        .route(http_paths::SESSION_TASK_UPDATE, post(post_task_update))
-        .route(
-            http_paths::SESSION_TASK_CHECKPOINT,
-            post(post_task_checkpoint),
-        )
-        .route(
-            http_paths::SESSION_TASK_SUBMIT_FOR_REVIEW,
-            post(post_task_submit_for_review),
-        )
-        .route(
-            http_paths::SESSION_TASK_CLAIM_REVIEW,
-            post(post_task_claim_review),
-        )
-        .route(
-            http_paths::SESSION_TASK_SUBMIT_REVIEW,
-            post(post_task_submit_review),
-        )
-        .route(
-            http_paths::SESSION_TASK_RESPOND_REVIEW,
-            post(post_task_respond_review),
-        )
-        .route(
-            http_paths::SESSION_TASK_ARBITRATE,
-            post(post_task_arbitrate),
-        )
+pub(super) fn task_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
+        .routes(routes!(mutations::post_task_create))
+        .routes(routes!(mutations::post_task_delete))
+        .routes(routes!(mutations::post_task_assign))
+        .routes(routes!(mutations::post_task_drop))
+        .routes(routes!(mutations::post_task_queue_policy))
+        .routes(routes!(mutations::post_task_update))
+        .routes(routes!(mutations::post_task_checkpoint))
+        .routes(routes!(review::post_task_submit_for_review))
+        .routes(routes!(review::post_task_claim_review))
+        .routes(routes!(review::post_task_submit_review))
+        .routes(routes!(review::post_task_respond_review))
+        .routes(routes!(review::post_task_arbitrate))
 }
 
 async fn broadcast_task_snapshot(state: &DaemonHttpState, session_id: &str) {

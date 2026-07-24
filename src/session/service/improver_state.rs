@@ -20,7 +20,7 @@ use crate::session::roles::SessionAction;
 
 /// Canonical writeable targets for improver patches.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 #[value(rename_all = "snake_case")]
 pub enum ImproverTarget {
@@ -41,14 +41,14 @@ impl ImproverTarget {
 
 /// Result of [`apply_improver_apply`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ImproverApplyOutcome {
-    #[cfg_attr(feature = "openapi", schema(value_type = String))]
+    #[schema(value_type = String)]
     pub canonical_path: PathBuf,
     pub before_sha256: String,
     pub after_sha256: String,
     pub applied: bool,
-    #[cfg_attr(feature = "openapi", schema(value_type = Option<String>))]
+    #[schema(value_type = Option<String>)]
     pub backup_path: Option<PathBuf>,
     pub unified_diff: String,
 }

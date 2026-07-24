@@ -7,7 +7,7 @@ use crate::task_board::{
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardCreateItemRequest {
     pub title: String,
     #[serde(default)]
@@ -59,7 +59,7 @@ pub struct TaskBoardGetItemRequest {
 
 /// Request an explicit manual position in a canonical task-board lane.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardSetItemPositionRequest {
     pub status: TaskBoardStatus,
     pub lane_position: u32,
@@ -72,7 +72,7 @@ pub struct TaskBoardSetItemPositionRequest {
 
 /// Reset an item from an explicit position to its derived default placement.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardResetItemPositionRequest {
     pub expected_item_revision: i64,
     pub expected_items_change_seq: i64,
@@ -82,7 +82,7 @@ pub struct TaskBoardResetItemPositionRequest {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardUpdateItemRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
@@ -135,7 +135,7 @@ pub struct TaskBoardUpdateItemRequest {
     reason = "wire contract exposes independent identity-clear switches"
 )]
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardUpdateIdentityClears {
     #[serde(default)]
     pub clear_project_id: bool,
@@ -150,7 +150,7 @@ pub struct TaskBoardUpdateIdentityClears {
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardUpdateEstimateClears {
     #[serde(default)]
     pub clear_estimated_tokens: bool,
@@ -159,7 +159,7 @@ pub struct TaskBoardUpdateEstimateClears {
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardUpdateStateClears {
     #[serde(default)]
     pub clear_planning: bool,

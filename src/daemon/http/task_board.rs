@@ -1,7 +1,5 @@
-use axum::Router;
-use axum::routing::{get, post, put};
-
-use crate::daemon::protocol::http_paths;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
 
 use super::DaemonHttpState;
 use super::task_board_git::merge_git_routes;
@@ -22,158 +20,64 @@ pub(super) use self::policy_io::{
     POLICY_TRANSFER_HTTP_BODY_LIMIT_BYTES, policy_transfer_http_body_limit,
 };
 
-use self::items::{
-    delete_task_board_item, get_task_board_capabilities, get_task_board_item, get_task_board_items,
-    post_task_board_item, post_task_board_plan_approve, post_task_board_plan_begin,
-    post_task_board_plan_revoke, post_task_board_plan_submit, put_task_board_item,
-};
-use self::operations::{
-    get_task_board_audit, get_task_board_host_list, get_task_board_host_local,
-    get_task_board_machines, get_task_board_projects, post_task_board_dispatch,
-    post_task_board_dispatch_deliver, post_task_board_dispatch_pick, post_task_board_evaluate,
-    post_task_board_sync, put_task_board_host_set_project_types,
-};
 use self::policy::merge_policy_routes;
 use self::policy_io::merge_policy_io_routes;
 use self::policy_pipeline::merge_policy_pipeline_routes;
 use self::policy_spawn_gate::merge_policy_spawn_gate_routes;
-use self::positions::{
-    get_task_board_item_position_snapshot, post_task_board_item_position_reset,
-    put_task_board_item_position,
-};
-use self::triage::{
-    get_task_board_item_triage, get_task_board_item_triage_history,
-    post_task_board_item_triage_override_clear, put_task_board_item_triage_override,
-};
-use self::triage_rules::{
-    get_task_board_triage_rules_audit, get_task_board_triage_rules_draft,
-    get_task_board_triage_rules_revisions, post_task_board_triage_rules_activate,
-    post_task_board_triage_rules_preview, put_task_board_triage_rules_draft,
-};
 
-fn task_board_triage_rules_routes() -> Router<DaemonHttpState> {
-    Router::new()
-        .route(
-            http_paths::TASK_BOARD_TRIAGE_RULES_DRAFT,
-            get(get_task_board_triage_rules_draft).put(put_task_board_triage_rules_draft),
-        )
-        .route(
-            http_paths::TASK_BOARD_TRIAGE_RULES_PREVIEW,
-            post(post_task_board_triage_rules_preview),
-        )
-        .route(
-            http_paths::TASK_BOARD_TRIAGE_RULES_ACTIVATE,
-            post(post_task_board_triage_rules_activate),
-        )
-        .route(
-            http_paths::TASK_BOARD_TRIAGE_RULES_REVISIONS,
-            get(get_task_board_triage_rules_revisions),
-        )
-        .route(
-            http_paths::TASK_BOARD_TRIAGE_RULES_AUDIT,
-            get(get_task_board_triage_rules_audit),
-        )
+fn task_board_triage_rules_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
+        .routes(routes!(
+            triage_rules::get_task_board_triage_rules_draft,
+            triage_rules::put_task_board_triage_rules_draft
+        ))
+        .routes(routes!(triage_rules::post_task_board_triage_rules_preview))
+        .routes(routes!(triage_rules::post_task_board_triage_rules_activate))
+        .routes(routes!(triage_rules::get_task_board_triage_rules_revisions))
+        .routes(routes!(triage_rules::get_task_board_triage_rules_audit))
 }
 
-fn task_board_host_routes() -> Router<DaemonHttpState> {
-    Router::new()
-        .route(
-            http_paths::TASK_BOARD_HOST_LOCAL,
-            get(get_task_board_host_local),
-        )
-        .route(
-            http_paths::TASK_BOARD_HOST_LIST,
-            get(get_task_board_host_list),
-        )
-        .route(
-            http_paths::TASK_BOARD_HOST_SET_PROJECT_TYPES,
-            put(put_task_board_host_set_project_types),
-        )
+fn task_board_host_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
+        .routes(routes!(operations::get_task_board_host_local))
+        .routes(routes!(operations::get_task_board_host_list))
+        .routes(routes!(operations::put_task_board_host_set_project_types))
 }
 
-pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
-    let router = Router::new()
-        .route(
-            http_paths::TASK_BOARD_CAPABILITIES,
-            get(get_task_board_capabilities),
-        )
-        .route(
-            http_paths::TASK_BOARD_ITEMS,
-            post(post_task_board_item).get(get_task_board_items),
-        )
-        .route(
-            http_paths::TASK_BOARD_ITEM,
-            get(get_task_board_item)
-                .put(put_task_board_item)
-                .delete(delete_task_board_item),
-        )
-        .route(
-            http_paths::TASK_BOARD_ITEM_POSITION,
-            get(get_task_board_item_position_snapshot).put(put_task_board_item_position),
-        )
-        .route(
-            http_paths::TASK_BOARD_ITEM_POSITION_RESET,
-            post(post_task_board_item_position_reset),
-        )
-        .route(
-            http_paths::TASK_BOARD_ITEM_TRIAGE,
-            get(get_task_board_item_triage),
-        )
-        .route(
-            http_paths::TASK_BOARD_ITEM_TRIAGE_HISTORY,
-            get(get_task_board_item_triage_history),
-        )
-        .route(
-            http_paths::TASK_BOARD_ITEM_TRIAGE_OVERRIDE,
-            put(put_task_board_item_triage_override),
-        )
-        .route(
-            http_paths::TASK_BOARD_ITEM_TRIAGE_OVERRIDE_CLEAR,
-            post(post_task_board_item_triage_override_clear),
-        )
+pub(super) fn task_board_routes() -> OpenApiRouter<DaemonHttpState> {
+    let router = OpenApiRouter::new()
+        .routes(routes!(items::get_task_board_capabilities))
+        .routes(routes!(
+            items::post_task_board_item,
+            items::get_task_board_items
+        ))
+        .routes(routes!(
+            items::get_task_board_item,
+            items::put_task_board_item,
+            items::delete_task_board_item
+        ))
+        .routes(routes!(
+            positions::get_task_board_item_position_snapshot,
+            positions::put_task_board_item_position
+        ))
+        .routes(routes!(positions::post_task_board_item_position_reset))
+        .routes(routes!(triage::get_task_board_item_triage))
+        .routes(routes!(triage::get_task_board_item_triage_history))
+        .routes(routes!(triage::put_task_board_item_triage_override))
+        .routes(routes!(triage::post_task_board_item_triage_override_clear))
         .merge(task_board_triage_rules_routes())
-        .route(
-            http_paths::TASK_BOARD_PLAN_BEGIN,
-            post(post_task_board_plan_begin),
-        )
-        .route(
-            http_paths::TASK_BOARD_PLAN_SUBMIT,
-            post(post_task_board_plan_submit),
-        )
-        .route(
-            http_paths::TASK_BOARD_PLAN_APPROVE,
-            post(post_task_board_plan_approve),
-        )
-        .route(
-            http_paths::TASK_BOARD_PLAN_REVOKE,
-            post(post_task_board_plan_revoke),
-        )
-        .route(http_paths::TASK_BOARD_SYNC, post(post_task_board_sync))
-        .route(
-            http_paths::TASK_BOARD_DISPATCH,
-            post(post_task_board_dispatch),
-        )
-        .route(
-            http_paths::TASK_BOARD_DISPATCH_DELIVER,
-            post(post_task_board_dispatch_deliver),
-        )
-        .route(
-            http_paths::TASK_BOARD_DISPATCH_PICK,
-            post(post_task_board_dispatch_pick),
-        )
-        .route(
-            http_paths::TASK_BOARD_EVALUATE,
-            post(post_task_board_evaluate),
-        )
-        .route(http_paths::TASK_BOARD_AUDIT, get(get_task_board_audit))
-        .route(
-            http_paths::TASK_BOARD_PROJECTS,
-            get(get_task_board_projects),
-        )
-        .route(
-            http_paths::TASK_BOARD_MACHINES,
-            get(get_task_board_machines),
-        )
+        .routes(routes!(items::post_task_board_plan_begin))
+        .routes(routes!(items::post_task_board_plan_submit))
+        .routes(routes!(items::post_task_board_plan_approve))
+        .routes(routes!(items::post_task_board_plan_revoke))
+        .routes(routes!(operations::post_task_board_sync))
+        .routes(routes!(operations::post_task_board_dispatch))
+        .routes(routes!(operations::post_task_board_dispatch_deliver))
+        .routes(routes!(operations::post_task_board_dispatch_pick))
+        .routes(routes!(operations::post_task_board_evaluate))
+        .routes(routes!(operations::get_task_board_audit))
+        .routes(routes!(operations::get_task_board_projects))
+        .routes(routes!(operations::get_task_board_machines))
         .merge(task_board_host_routes());
     merge_policy_pipeline_routes(merge_policy_spawn_gate_routes(merge_policy_io_routes(
         merge_policy_routes(merge_git_routes(merge_orchestrator_routes(router))),

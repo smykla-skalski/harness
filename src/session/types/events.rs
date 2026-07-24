@@ -7,7 +7,7 @@ use super::{SessionRole, TaskSeverity, TaskStatus};
 /// Session-visible signal status for CLI and daemon rendering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum SessionSignalStatus {
     Pending,
     #[serde(alias = "acknowledged")]
@@ -31,7 +31,7 @@ impl SessionSignalStatus {
 
 /// A signal visible within a multi-agent session.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct SessionSignalRecord {
     pub runtime: String,
     pub agent_id: String,

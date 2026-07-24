@@ -160,7 +160,7 @@ description = "Run fast integration tests in parallel with process isolation"
 run = [
   "./scripts/cargo-local.sh build -p harness-daemon -p harness-bridge -p harness-mcp",
   "./scripts/run-linux-only.sh ./scripts/cargo-local.sh build -p harness-systemd",
-  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test integration --features full-runtime,openapi",
+  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test integration --features full-runtime",
 ]
 
 [tasks."test:workers"]
@@ -311,7 +311,6 @@ hide = true
 run = [
   "./scripts/cargo-local.sh clippy -p harness --lib --bins",
   "./scripts/cargo-local.sh clippy --all-targets -p harness-command -p harness-daemon-client -p harness-protocol -p harness-systemd-protocol -p harness-telemetry -p harness-daemon -p harness-bridge -p harness-mcp -p harness-hook -p policy-codegen -p openapi-codegen",
-  "./scripts/cargo-local.sh clippy --all-targets -p harness-daemon --features openapi",
   "./scripts/run-linux-only.sh ./scripts/cargo-local.sh clippy --all-targets -p harness-systemd",
 ]
 

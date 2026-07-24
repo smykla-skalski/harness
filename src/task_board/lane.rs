@@ -12,7 +12,7 @@ const MAX_LANE_SET_AT_BYTES: usize = 128;
 /// provenance because their visual slot is derived at read time.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum TaskBoardLaneOrigin {
     Manual { actor: String },
     Automatic { producer: String },

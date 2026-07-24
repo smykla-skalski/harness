@@ -3,9 +3,10 @@ use std::time::Instant;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum::routing::post;
-use axum::{Json, Router};
+use axum::Json;
 use serde::Serialize;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
 use uuid::Uuid;
 
 use crate::daemon::protocol::http_paths;
@@ -19,24 +20,20 @@ use crate::workspace::utc_now;
 use super::response::{extract_request_id, timed_response};
 use super::{DaemonHttpState, authenticated_remote_client, require_async_db};
 
-#[cfg(feature = "openapi")]
 use super::openapi::DaemonErrorBody;
 
-pub(super) fn remote_client_routes() -> Router<DaemonHttpState> {
-    Router::new().route(
-        http_paths::REMOTE_CLIENT_SELF_REVOKE,
-        post(post_remote_client_self_revoke),
-    )
+pub(super) fn remote_client_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new().routes(routes!(post_remote_client_self_revoke))
 }
 
 #[derive(Debug, Serialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 struct RemoteClientSelfRevokeResponse {
     client_id: String,
     revoked_at: String,
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/remote/client/revoke",
     tag = "pairing",
@@ -45,7 +42,7 @@ struct RemoteClientSelfRevokeResponse {
         (status = 200, description = "Client credential revoked", body = RemoteClientSelfRevokeResponse),
         (status = 400, description = "Revocation failed", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn post_remote_client_self_revoke(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,

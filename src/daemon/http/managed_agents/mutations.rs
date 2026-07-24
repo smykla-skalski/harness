@@ -7,19 +7,16 @@ use axum::http::HeaderMap;
 use axum::response::Response;
 
 use crate::daemon::agent_tui::{AgentTuiInputRequest, AgentTuiResizeRequest, AgentTuiStartRequest};
-#[cfg(feature = "openapi")]
 use crate::daemon::agent_tui::AgentTuiInputRequestSchema;
 use crate::daemon::protocol::{
     CodexApprovalDecisionRequest, CodexRunRequest, CodexSteerRequest, ManagedAgentSnapshot,
     http_paths,
 };
-#[cfg(feature = "openapi")]
 use crate::daemon::protocol::ManagedAgentSnapshotSchema;
 use crate::errors::CliError;
 
 use super::super::DaemonHttpState;
 use super::super::auth::{authorize_control_request, require_auth};
-#[cfg(feature = "openapi")]
 use super::super::openapi::DaemonErrorBody;
 use super::super::response::{extract_request_id, timed_json};
 use super::{
@@ -27,7 +24,7 @@ use super::{
     run_codex_agent_blocking, run_terminal_agent_blocking,
 };
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/sessions/{session_id}/managed-agents/terminal",
     tag = "managed-agents",
@@ -39,7 +36,7 @@ use super::{
         (status = 200, description = "Started terminal managed agent", body = ManagedAgentSnapshotSchema),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_terminal_agent_start(
     Path(session_id): Path<String>,
     headers: HeaderMap,
@@ -65,7 +62,7 @@ pub(super) async fn post_terminal_agent_start(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/sessions/{session_id}/managed-agents/codex",
     tag = "managed-agents",
@@ -77,7 +74,7 @@ pub(super) async fn post_terminal_agent_start(
         (status = 200, description = "Started Codex managed agent", body = ManagedAgentSnapshotSchema),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_codex_agent_start(
     Path(session_id): Path<String>,
     headers: HeaderMap,
@@ -107,7 +104,7 @@ pub(super) async fn post_codex_agent_start(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/managed-agents/{managed_agent_id}/input",
     tag = "managed-agents",
@@ -119,7 +116,7 @@ pub(super) async fn post_codex_agent_start(
         (status = 200, description = "Terminal agent snapshot after input", body = ManagedAgentSnapshotSchema),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_terminal_agent_input(
     Path(managed_agent_id): Path<String>,
     headers: HeaderMap,
@@ -151,7 +148,7 @@ pub(super) async fn post_terminal_agent_input(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/managed-agents/{managed_agent_id}/resize",
     tag = "managed-agents",
@@ -163,7 +160,7 @@ pub(super) async fn post_terminal_agent_input(
         (status = 200, description = "Terminal agent snapshot after resize", body = ManagedAgentSnapshotSchema),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_terminal_agent_resize(
     Path(managed_agent_id): Path<String>,
     headers: HeaderMap,
@@ -195,7 +192,7 @@ pub(super) async fn post_terminal_agent_resize(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/managed-agents/{managed_agent_id}/stop",
     tag = "managed-agents",
@@ -206,7 +203,7 @@ pub(super) async fn post_terminal_agent_resize(
         (status = 200, description = "Managed agent snapshot after stop", body = ManagedAgentSnapshotSchema),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 #[expect(
     clippy::cognitive_complexity,
     reason = "managed-agent stop probes codex, ACP, then terminal managers explicitly"
@@ -266,7 +263,7 @@ pub(super) async fn post_terminal_agent_stop(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/managed-agents/{managed_agent_id}/ready",
     tag = "managed-agents",
@@ -277,7 +274,7 @@ pub(super) async fn post_terminal_agent_stop(
         (status = 200, description = "Terminal agent snapshot after readiness signal", body = ManagedAgentSnapshotSchema),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_terminal_agent_ready(
     Path(managed_agent_id): Path<String>,
     headers: HeaderMap,
@@ -308,7 +305,7 @@ pub(super) async fn post_terminal_agent_ready(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/managed-agents/{managed_agent_id}/steer",
     tag = "managed-agents",
@@ -320,7 +317,7 @@ pub(super) async fn post_terminal_agent_ready(
         (status = 200, description = "Codex agent snapshot after steering prompt", body = ManagedAgentSnapshotSchema),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_codex_agent_steer(
     Path(managed_agent_id): Path<String>,
     headers: HeaderMap,
@@ -355,7 +352,7 @@ pub(super) async fn post_codex_agent_steer(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/managed-agents/{managed_agent_id}/interrupt",
     tag = "managed-agents",
@@ -366,7 +363,7 @@ pub(super) async fn post_codex_agent_steer(
         (status = 200, description = "Codex agent snapshot after interrupt", body = ManagedAgentSnapshotSchema),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_codex_agent_interrupt(
     Path(agent_id): Path<String>,
     headers: HeaderMap,
@@ -400,7 +397,7 @@ pub(super) async fn post_codex_agent_interrupt(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/managed-agents/{managed_agent_id}/approvals/{approval_id}",
     tag = "managed-agents",
@@ -413,7 +410,7 @@ pub(super) async fn post_codex_agent_interrupt(
         (status = 200, description = "Codex agent snapshot after resolving the approval", body = ManagedAgentSnapshotSchema),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_codex_agent_approval(
     Path((agent_id, approval_id)): Path<(String, String)>,
     headers: HeaderMap,

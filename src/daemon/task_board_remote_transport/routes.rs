@@ -1,8 +1,9 @@
 use axum::extract::{DefaultBodyLimit, State};
 use axum::http::{HeaderMap, Method, StatusCode};
 use axum::response::Response;
-use axum::routing::{get, post};
-use axum::{Json, Router};
+use axum::Json;
+use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
+use utoipa_axum::routes;
 
 use super::routes_status::{mutation_record, status_response, verify_operation_record};
 use super::routes_support::{
@@ -21,9 +22,7 @@ use super::wire_limits::{
 };
 use crate::daemon::db::utc_now;
 use crate::daemon::http::{DaemonHttpState, require_async_db, require_execution_remote_client};
-#[cfg(feature = "openapi")]
 use crate::daemon::http::openapi::DaemonErrorBody;
-#[cfg(feature = "openapi")]
 use super::wire::{
     RemoteArtifactFetchResponse, RemoteClaimResponse, RemoteHostAdvertisement, RemoteOfferResponse,
     RemoteSettledResponse, RemoteSourceBundleUploadResponse, RemoteStatusResponse,
@@ -62,56 +61,35 @@ const fn max_body_limit(left: usize, right: usize) -> usize {
     if left > right { left } else { right }
 }
 
-pub(crate) fn execution_routes() -> Router<DaemonHttpState> {
-    Router::new()
-        .route(ADVERTISE_PATH, get(advertise))
-        .route(
-            OFFER_PATH,
-            post(offer).layer(DefaultBodyLimit::max(OFFER_HTTP_BODY_LIMIT_BYTES)),
-        )
-        .route(
-            SOURCE_BUNDLE_PATH,
-            post(upload_source_bundle)
+pub(crate) fn execution_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
+        .routes(routes!(advertise))
+        .routes(routes!(offer).layer(DefaultBodyLimit::max(OFFER_HTTP_BODY_LIMIT_BYTES)))
+        .routes(
+            routes!(upload_source_bundle)
                 .layer(DefaultBodyLimit::max(SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES)),
         )
-        .route(
-            SOURCE_BUNDLE_RECEIPT_PATH,
-            post(super::routes_source_bundle::verify_source_bundle_receipt)
+        .routes(
+            routes!(super::routes_source_bundle::verify_source_bundle_receipt)
                 .layer(DefaultBodyLimit::max(SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES)),
         )
-        .route(
-            SOURCE_BUNDLE_ABANDON_PATH,
-            post(super::routes_source_bundle::abandon_source_bundle).layer(DefaultBodyLimit::max(
-                SOURCE_BUNDLE_ABANDON_HTTP_BODY_LIMIT_BYTES,
-            )),
+        .routes(
+            routes!(super::routes_source_bundle::abandon_source_bundle).layer(
+                DefaultBodyLimit::max(SOURCE_BUNDLE_ABANDON_HTTP_BODY_LIMIT_BYTES),
+            ),
         )
-        .route(
-            CLAIM_PATH,
-            post(claim).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)),
+        .routes(routes!(claim).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)))
+        .routes(
+            routes!(renew_lease).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)),
         )
-        .route(
-            LEASE_RENEW_PATH,
-            post(renew_lease).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)),
+        .routes(routes!(status).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)))
+        .routes(routes!(cancel).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)))
+        .routes(routes!(settled).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)))
+        .routes(
+            routes!(fetch_artifact).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)),
         )
-        .route(
-            STATUS_PATH,
-            post(status).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)),
-        )
-        .route(
-            CANCEL_PATH,
-            post(cancel).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)),
-        )
-        .route(
-            SETTLED_PATH,
-            post(settled).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)),
-        )
-        .route(
-            ARTIFACT_PATH,
-            post(fetch_artifact).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)),
-        )
-        .route(
-            super::routes_cleanup::CLEANUP_OBSERVATION_PATH,
-            post(super::routes_cleanup::observe_cleanup)
+        .routes(
+            routes!(super::routes_cleanup::observe_cleanup)
                 .layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)),
         )
 }
@@ -142,8 +120,8 @@ pub(crate) fn execution_http_body_limit(method: &Method, path: &str) -> Option<u
 /// Every remote-execution transport operation as `(method, path,
 /// operation_id)`. The auth recognizer ([`execution_operation`]) and the
 /// OpenAPI contract test both read this table, so a documented transport route
-/// cannot drift from the recognized set. Re-exported under `http::openapi`
-/// (openapi feature only); the transport module itself stays crate-internal.
+/// cannot drift from the recognized set. Re-exported under `http::openapi`;
+/// the transport module itself stays crate-internal.
 pub const EXECUTION_OPERATIONS: &[(Method, &str, &str)] = &[
     (Method::GET, ADVERTISE_PATH, "advertise"),
     (Method::POST, OFFER_PATH, "offer"),
@@ -171,7 +149,7 @@ pub fn execution_operation(method: &Method, path: &str) -> Option<&'static str> 
         .map(|entry| entry.2)
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/task-board-execution/source-bundles/upload",
     tag = "task-board-execution",
@@ -180,7 +158,7 @@ pub fn execution_operation(method: &Method, path: &str) -> Option<&'static str> 
         (status = 200, description = "Stored source-bundle receipt", body = RemoteSourceBundleUploadResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn upload_source_bundle(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -210,7 +188,7 @@ async fn upload_source_bundle(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     get,
     path = "/v1/task-board-execution/advertise",
     tag = "task-board-execution",
@@ -218,7 +196,7 @@ async fn upload_source_bundle(
         (status = 200, description = "Execution host identity and its active assignment bindings", body = RemoteHostAdvertisement),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn advertise(headers: HeaderMap, State(state): State<DaemonHttpState>) -> Response {
     map_route_result(
         async {
@@ -239,7 +217,7 @@ async fn advertise(headers: HeaderMap, State(state): State<DaemonHttpState>) -> 
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/task-board-execution/offers",
     tag = "task-board-execution",
@@ -248,7 +226,7 @@ async fn advertise(headers: HeaderMap, State(state): State<DaemonHttpState>) -> 
         (status = 200, description = "Offer disposition and, when accepted, the assignment lease", body = RemoteOfferResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn offer(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -273,7 +251,7 @@ async fn offer(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/task-board-execution/claims",
     tag = "task-board-execution",
@@ -282,7 +260,7 @@ async fn offer(
         (status = 200, description = "Immutable claim receipt for the assignment", body = RemoteClaimResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn claim(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -306,7 +284,7 @@ async fn claim(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/task-board-execution/leases/renew",
     tag = "task-board-execution",
@@ -315,7 +293,7 @@ async fn claim(
         (status = 200, description = "Renewed lease for the claimed assignment", body = RemoteLeaseRenewResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn renew_lease(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -341,7 +319,7 @@ async fn renew_lease(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/task-board-execution/status",
     tag = "task-board-execution",
@@ -350,7 +328,7 @@ async fn renew_lease(
         (status = 200, description = "Authoritative status of the claimed assignment", body = RemoteStatusResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn status(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -375,7 +353,7 @@ async fn status(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/task-board-execution/cancel",
     tag = "task-board-execution",
@@ -384,7 +362,7 @@ async fn status(
         (status = 200, description = "Terminal cancellation record for the assignment", body = RemoteCancelResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn cancel(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -417,7 +395,7 @@ async fn cancel(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/task-board-execution/settled",
     tag = "task-board-execution",
@@ -426,7 +404,7 @@ async fn cancel(
         (status = 200, description = "Settlement record for the completed assignment", body = RemoteSettledResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn settled(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -446,7 +424,7 @@ async fn settled(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/task-board-execution/artifacts/fetch",
     tag = "task-board-execution",
@@ -456,7 +434,7 @@ async fn settled(
         (status = 200, description = "Requested result artifact", body = RemoteArtifactFetchResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn fetch_artifact(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,

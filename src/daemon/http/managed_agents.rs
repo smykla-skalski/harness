@@ -1,6 +1,7 @@
-use axum::Router;
-use axum::routing::{delete, get, post};
+use axum::routing::get;
 use tokio::task::spawn_blocking;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
 
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
@@ -31,104 +32,37 @@ pub(crate) use snapshots::{
     acp_inspect_response, managed_agent_list_response_async, managed_agent_snapshot_async,
 };
 
-pub(super) fn managed_agent_routes() -> Router<DaemonHttpState> {
-    Router::new()
-        .route(
-            http_paths::SESSION_MANAGED_AGENTS,
-            get(reads::get_managed_agents),
-        )
-        .route(
-            http_paths::SESSION_MANAGED_AGENTS_TERMINAL,
-            post(mutations::post_terminal_agent_start),
-        )
-        .route(
-            http_paths::SESSION_MANAGED_AGENTS_CODEX,
-            post(mutations::post_codex_agent_start),
-        )
-        .route(
-            http_paths::SESSION_MANAGED_AGENTS_ACP,
-            post(acp_start::post_acp_agent_start),
-        )
-        .route(
-            http_paths::MANAGED_AGENT_DETAIL,
-            get(reads::get_managed_agent),
-        )
-        .route(
-            http_paths::MANAGED_AGENT_DETAIL,
-            delete(acp_delete::delete_acp_agent),
-        )
-        .route(
-            http_paths::MANAGED_AGENT_INPUT,
-            post(mutations::post_terminal_agent_input),
-        )
-        .route(
-            http_paths::MANAGED_AGENT_RESIZE,
-            post(mutations::post_terminal_agent_resize),
-        )
-        .route(
-            http_paths::MANAGED_AGENT_STOP,
-            post(mutations::post_terminal_agent_stop),
-        )
-        .route(
-            http_paths::MANAGED_AGENT_READY,
-            post(mutations::post_terminal_agent_ready),
-        )
+pub(super) fn managed_agent_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
+        .routes(routes!(reads::get_managed_agents))
+        .routes(routes!(mutations::post_terminal_agent_start))
+        .routes(routes!(mutations::post_codex_agent_start))
+        .routes(routes!(acp_start::post_acp_agent_start))
+        .routes(routes!(
+            reads::get_managed_agent,
+            acp_delete::delete_acp_agent
+        ))
+        .routes(routes!(mutations::post_terminal_agent_input))
+        .routes(routes!(mutations::post_terminal_agent_resize))
+        .routes(routes!(mutations::post_terminal_agent_stop))
+        .routes(routes!(mutations::post_terminal_agent_ready))
         .route(
             http_paths::MANAGED_AGENT_ATTACH,
             get(attach::get_terminal_agent_attach),
         )
-        .route(
-            http_paths::MANAGED_AGENT_STEER,
-            post(mutations::post_codex_agent_steer),
-        )
-        .route(
-            http_paths::MANAGED_AGENT_INTERRUPT,
-            post(mutations::post_codex_agent_interrupt),
-        )
-        .route(
-            http_paths::MANAGED_AGENT_APPROVAL,
-            post(mutations::post_codex_agent_approval),
-        )
-        .route(
-            http_paths::MANAGED_AGENT_ACP_PERMISSION,
-            post(mutations_acp::post_acp_permission),
-        )
-        .route(
-            http_paths::MANAGED_AGENT_ACP_PROMPT,
-            post(mutations_acp::post_acp_agent_prompt),
-        )
-        .route(
-            http_paths::MANAGED_AGENT_ACP_LOGOUT,
-            post(mutations_acp::post_acp_agent_logout),
-        )
-        .route(
-            http_paths::MANAGED_AGENT_ACP_SESSIONS,
-            get(acp_sessions::get_acp_sessions),
-        )
-        .route(
-            http_paths::MANAGED_AGENT_ACP_SESSION_DELETE,
-            delete(acp_sessions::delete_acp_session),
-        )
-        .route(
-            http_paths::MANAGED_AGENT_ACP_SESSION_CLOSE,
-            post(acp_sessions::post_acp_session_close),
-        )
-        .route(
-            http_paths::MANAGED_AGENTS_CODEX_INSPECT,
-            get(codex_inspect::get_codex_inspect),
-        )
-        .route(
-            http_paths::MANAGED_AGENTS_CODEX_TRANSCRIPT,
-            get(codex_transcript::get_codex_transcript),
-        )
-        .route(
-            http_paths::MANAGED_AGENTS_ACP_INSPECT,
-            get(acp_inspect::get_acp_inspect),
-        )
-        .route(
-            http_paths::MANAGED_AGENTS_ACP_TRANSCRIPT,
-            get(acp_transcript::get_acp_transcript),
-        )
+        .routes(routes!(mutations::post_codex_agent_steer))
+        .routes(routes!(mutations::post_codex_agent_interrupt))
+        .routes(routes!(mutations::post_codex_agent_approval))
+        .routes(routes!(mutations_acp::post_acp_permission))
+        .routes(routes!(mutations_acp::post_acp_agent_prompt))
+        .routes(routes!(mutations_acp::post_acp_agent_logout))
+        .routes(routes!(acp_sessions::get_acp_sessions))
+        .routes(routes!(acp_sessions::delete_acp_session))
+        .routes(routes!(acp_sessions::post_acp_session_close))
+        .routes(routes!(codex_inspect::get_codex_inspect))
+        .routes(routes!(codex_transcript::get_codex_transcript))
+        .routes(routes!(acp_inspect::get_acp_inspect))
+        .routes(routes!(acp_transcript::get_acp_transcript))
 }
 
 // Cross-transport ACP policy lives here. HTTP and websocket wrappers still own

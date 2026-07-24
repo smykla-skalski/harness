@@ -51,7 +51,7 @@ pub struct AcpAgentStartRequest {
 /// to `http`/`https` endpoints - the WebSocket transport drops request headers,
 /// so the daemon rejects headers set on a `ws`/`wss` endpoint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AcpEndpoint {
     pub url: String,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -88,7 +88,7 @@ impl Default for AcpAgentStartRequest {
 pub type CapabilityTag = String;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct DoctorProbe {
     pub command: String,
     pub args: Vec<String>,
@@ -96,7 +96,7 @@ pub struct DoctorProbe {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum AcpSpawnConfiguration {
     #[default]
     DescriptorRuntime,
@@ -122,7 +122,7 @@ impl AcpSpawnConfiguration {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AcpSessionConfigOptionBinding {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub option_id: Option<String>,
@@ -132,7 +132,7 @@ pub struct AcpSessionConfigOptionBinding {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum AcpSessionModelTransport {
     #[default]
     Disabled,
@@ -145,7 +145,7 @@ pub enum AcpSessionModelTransport {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum AcpSessionEffortTransport {
     #[default]
     Disabled,
@@ -156,7 +156,7 @@ pub enum AcpSessionEffortTransport {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AcpSessionConfiguration {
     #[serde(default)]
     pub model: AcpSessionModelTransport,
@@ -190,7 +190,7 @@ impl AcpSessionConfiguration {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AcpAgentDescriptor {
     pub id: String,
     pub display_name: String,
@@ -219,14 +219,14 @@ pub struct AcpAgentDescriptor {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AcpRuntimeProbeResponse {
     pub probes: Vec<AcpRuntimeProbe>,
     pub checked_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AcpRuntimeProbe {
     pub agent_id: String,
     pub display_name: String,
@@ -238,7 +238,7 @@ pub struct AcpRuntimeProbe {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum AcpAuthState {
     Ready,
     Unknown,
@@ -246,30 +246,30 @@ pub enum AcpAuthState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AcpPermissionItem {
     pub request_id: String,
     pub session_id: String,
-    #[cfg_attr(feature = "openapi", schema(value_type = Object))]
+    #[schema(value_type = Object)]
     pub tool_call: Value,
     pub options: Vec<AcpPermissionOption>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AcpPermissionOption {
     pub option_id: String,
     pub name: String,
     pub kind: AcpPermissionOptionKind,
     #[serde(default, rename = "_meta", skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "openapi", schema(value_type = Option<Object>))]
+    #[schema(value_type = Option<Object>)]
     pub meta: Option<Map<String, Value>>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum AcpPermissionOptionKind {
     AllowOnce,
     AllowAlways,
@@ -289,7 +289,7 @@ pub struct AcpPermissionBatch {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "decision", rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum AcpPermissionDecision {
     ApproveAll,
     ApproveSome { request_ids: BTreeSet<String> },
@@ -334,7 +334,7 @@ pub struct AcpAgentSnapshot {
     reason = "mirrors independent ACP capability flags; each bool is a distinct protocol capability"
 )]
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AcpAgentHandshake {
     pub protocol_version: u16,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -367,7 +367,7 @@ pub struct AcpAgentHandshake {
 
 /// Live per-session agent state assembled from ACP session notifications.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AcpAgentSessionState {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub config_options: Vec<AcpSessionConfigOptionState>,
@@ -390,7 +390,7 @@ pub struct AcpAgentSessionState {
 /// sessions harness never started, so callers treat the list as display data
 /// rather than a source of harness session state.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AcpSessionSummary {
     pub session_id: String,
     pub cwd: String,
@@ -404,7 +404,7 @@ pub struct AcpSessionSummary {
 
 /// One page of `session/list` results, carrying the agent's opaque cursor.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AcpSessionListPage {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sessions: Vec<AcpSessionSummary>,
@@ -414,7 +414,7 @@ pub struct AcpSessionListPage {
 
 /// Compact view of one advertised session config option and its value.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AcpSessionConfigOptionState {
     pub id: String,
     pub name: String,
@@ -447,9 +447,9 @@ pub struct AcpAgentInspectSnapshot {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AcpAgentInspectResponse {
-    #[cfg_attr(feature = "openapi", schema(value_type = Vec<super::schema::AcpAgentInspectSnapshotSchema>))]
+    #[schema(value_type = Vec<super::schema::AcpAgentInspectSnapshotSchema>)]
     pub agents: Vec<AcpAgentInspectSnapshot>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub daemon_perceived_now: Option<String>,

@@ -13,14 +13,12 @@ use super::auth::authenticated_remote_client;
 use super::response::{extract_request_id, timed_json};
 use super::{DaemonHttpState, require_async_db};
 
-#[cfg(feature = "openapi")]
 use super::openapi::DaemonErrorBody;
-#[cfg(feature = "openapi")]
 use crate::daemon::protocol::HarnessMonitorAuditEventsResponse;
 
 #[derive(Debug, Default, serde::Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
-#[cfg_attr(feature = "openapi", into_params(parameter_in = Query))]
+#[derive(utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub(crate) struct AuditEventsQuery {
     limit: Option<u32>,
     before: Option<String>,
@@ -52,7 +50,7 @@ impl AuditEventsQuery {
     }
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     get,
     path = "/v1/audit/events",
     tag = "daemon",
@@ -61,7 +59,7 @@ impl AuditEventsQuery {
         (status = 200, description = "Filtered Harness Monitor audit events page", body = HarnessMonitorAuditEventsResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn get_audit_events(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,

@@ -27,7 +27,7 @@ const REGISTRY_DIR: &str = "machines";
 const LOCAL_ID_FILE: &str = "local.json";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct Machine {
     pub id: String,
     pub label: String,

@@ -15,7 +15,7 @@ const GIT_BUNDLE_MEDIA_TYPE: &str = "application/x-git-bundle";
 /// a bounded, digest-addressed Git bundle entry carried by the sealed offer manifest.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub(crate) enum RemoteSourceMaterial {
     Repository {
         schema_version: u32,
@@ -42,7 +42,7 @@ pub(crate) enum RemoteSourceMaterial {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub(crate) enum RemoteRepositorySelector {
     ExactRevision,
     Branch { branch: String, reference: String },

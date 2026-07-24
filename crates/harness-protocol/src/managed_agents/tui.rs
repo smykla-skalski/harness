@@ -6,7 +6,7 @@ pub const DEFAULT_AGENT_TUI_ROWS: u16 = 30;
 pub const DEFAULT_AGENT_TUI_COLS: u16 = 120;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AgentTuiSize {
     pub rows: u16,
     pub cols: u16,
@@ -23,7 +23,7 @@ impl Default for AgentTuiSize {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum AgentTuiStatus {
     Starting,
     Running,
@@ -61,7 +61,7 @@ impl AgentTuiStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TerminalScreenSnapshot {
     pub rows: u16,
     pub cols: u16,
@@ -81,7 +81,7 @@ impl TerminalScreenSnapshot {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AgentTuiStartRequest {
     pub runtime: String,
     #[serde(default = "default_agent_tui_role")]
@@ -119,7 +119,7 @@ pub struct AgentTuiStartRequest {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AgentTuiResizeRequest {
     pub rows: u16,
     pub cols: u16,
@@ -131,7 +131,7 @@ pub struct AgentTuiListResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct AgentTuiSnapshot {
     pub tui_id: String,
     pub session_id: String,

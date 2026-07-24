@@ -50,7 +50,6 @@ pub use harness_protocol::managed_agents::tui::{
 };
 pub use input::{AgentTuiInput, AgentTuiKey};
 pub use input_request::{AgentTuiInputRequest, AgentTuiInputSequence, AgentTuiInputSequenceStep};
-#[cfg(feature = "openapi")]
 pub use input_request::AgentTuiInputRequestSchema;
 #[cfg(feature = "daemon-runtime")]
 pub use manager::AgentTuiManagerHandle;

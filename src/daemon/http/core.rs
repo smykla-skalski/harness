@@ -3,8 +3,10 @@ use std::time::Instant;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::routing::{get, post};
-use axum::{Json, Router};
+use axum::Json;
+use axum::routing::get;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
 
 use axum::extract::Query;
 
@@ -21,62 +23,48 @@ use crate::daemon::service;
 use crate::daemon::websocket::{build_config_payload, ws_upgrade_handler};
 use crate::errors::{CliError, CliErrorKind};
 
-#[cfg(feature = "openapi")]
 use super::openapi::DaemonErrorBody;
-#[cfg(feature = "openapi")]
 use crate::agents::acp::probe::AcpRuntimeProbeResponse;
-#[cfg(feature = "openapi")]
 use crate::daemon::bridge::BridgeStatusReport;
-#[cfg(feature = "openapi")]
 use crate::daemon::protocol::{
     DaemonControlResponse, DaemonDiagnosticsReport, DaemonTelemetryResponse, GitHubApiDiagnostics,
     HealthResponse, LogLevelResponse, ProjectSummary, WsConfigPayload,
 };
 
-use super::audit::get_audit_events;
 use super::auth::{authenticated_remote_client, require_auth};
 use super::response::{extract_request_id, timed_json};
 use super::stream::stream_global;
 use super::{DaemonHttpState, require_async_db};
 
-pub(super) fn core_routes() -> Router<DaemonHttpState> {
-    Router::new()
-        .route(http_paths::HEALTH, get(get_health))
-        .route(http_paths::READY, get(get_ready))
-        .route(http_paths::DIAGNOSTICS, get(get_diagnostics))
-        .route(http_paths::GITHUB_STATUS, get(get_github_status))
-        .route(http_paths::AUDIT_EVENTS, get(get_audit_events))
-        .route(http_paths::DAEMON_TELEMETRY, post(post_daemon_telemetry))
-        .route(http_paths::CONFIG, get(get_config))
-        .route(http_paths::DAEMON_STOP, post(post_stop_daemon))
-        .route(
-            http_paths::BRIDGE_RECONFIGURE,
-            post(post_bridge_reconfigure),
-        )
-        .route(
-            http_paths::DAEMON_LOG_LEVEL,
-            get(get_log_level).put(put_log_level),
-        )
-        .route(http_paths::PROJECTS, get(get_projects))
-        .route(
-            http_paths::RUNTIME_SESSION_RESOLVE,
-            get(get_runtime_session_resolution),
-        )
-        .route(http_paths::RUNTIMES_PROBE, get(get_runtimes_probe))
+pub(super) fn core_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
+        .routes(routes!(get_health))
+        .routes(routes!(get_ready))
+        .routes(routes!(get_diagnostics))
+        .routes(routes!(get_github_status))
+        .routes(routes!(super::audit::get_audit_events))
+        .routes(routes!(post_daemon_telemetry))
+        .routes(routes!(get_config))
+        .routes(routes!(post_stop_daemon))
+        .routes(routes!(post_bridge_reconfigure))
+        .routes(routes!(get_log_level, put_log_level))
+        .routes(routes!(get_projects))
+        .routes(routes!(get_runtime_session_resolution))
+        .routes(routes!(get_runtimes_probe))
         .route(http_paths::WS, get(ws_upgrade_handler))
         .route(http_paths::STREAM, get(stream_global))
 }
 
 /// Query parameters for `GET /v1/runtime-sessions/resolve`.
-#[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
-#[cfg_attr(feature = "openapi", into_params(parameter_in = Query))]
+#[derive(utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 #[derive(Debug, serde::Deserialize)]
 pub(crate) struct RuntimeSessionResolutionQuery {
     pub runtime_name: String,
     pub runtime_session_id: String,
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     get,
     path = "/v1/health",
     tag = "daemon",
@@ -84,7 +72,7 @@ pub(crate) struct RuntimeSessionResolutionQuery {
         (status = 200, description = "Daemon health snapshot", body = HealthResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn get_health(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -101,7 +89,7 @@ pub(super) async fn get_health(
     timed_json("GET", http_paths::HEALTH, &request_id, start, result)
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     get,
     path = "/v1/ready",
     tag = "daemon",
@@ -109,7 +97,7 @@ pub(super) async fn get_health(
         (status = 200, description = "Readiness probe", body = ReadinessResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn get_ready(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -126,7 +114,7 @@ pub(super) async fn get_ready(
     timed_json("GET", http_paths::READY, &request_id, start, result)
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     get,
     path = "/v1/runtime-sessions/resolve",
     tag = "daemon",
@@ -135,7 +123,7 @@ pub(super) async fn get_ready(
         (status = 200, description = "Runtime-session resolution outcome", body = RuntimeSessionResolutionResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn get_runtime_session_resolution(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -165,7 +153,7 @@ pub(super) async fn get_runtime_session_resolution(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     get,
     path = "/v1/diagnostics",
     tag = "daemon",
@@ -173,7 +161,7 @@ pub(super) async fn get_runtime_session_resolution(
         (status = 200, description = "Daemon diagnostics report", body = DaemonDiagnosticsReport),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn get_diagnostics(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -194,14 +182,14 @@ pub(super) async fn get_diagnostics(
     timed_json("GET", http_paths::DIAGNOSTICS, &request_id, start, result)
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     get,
     path = "/v1/github/status",
     tag = "daemon",
     responses(
         (status = 200, description = "GitHub API usage diagnostics", body = GitHubApiDiagnostics),
     ),
-))]
+)]
 pub(super) async fn get_github_status(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -215,14 +203,14 @@ pub(super) async fn get_github_status(
     timed_json("GET", http_paths::GITHUB_STATUS, &request_id, start, result)
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     get,
     path = "/v1/config",
     tag = "daemon",
     responses(
         (status = 200, description = "Initial configuration payload: personas, per-runtime model catalogs, ACP agents, and the ACP runtime probe", body = WsConfigPayload),
     ),
-))]
+)]
 pub(super) async fn get_config(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -241,14 +229,14 @@ pub(super) async fn get_config(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     get,
     path = "/v1/runtimes/probe",
     tag = "daemon",
     responses(
         (status = 200, description = "ACP runtime availability probe", body = AcpRuntimeProbeResponse),
     ),
-))]
+)]
 pub(super) async fn get_runtimes_probe(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -267,7 +255,7 @@ pub(super) async fn get_runtimes_probe(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/daemon/stop",
     tag = "daemon",
@@ -275,7 +263,7 @@ pub(super) async fn get_runtimes_probe(
         (status = 200, description = "Daemon shutdown acknowledged", body = DaemonControlResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_stop_daemon(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -292,7 +280,7 @@ pub(super) async fn post_stop_daemon(
     timed_json("POST", http_paths::DAEMON_STOP, &request_id, start, result)
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/daemon/telemetry",
     tag = "daemon",
@@ -301,7 +289,7 @@ pub(super) async fn post_stop_daemon(
         (status = 200, description = "Telemetry recorded", body = DaemonTelemetryResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_daemon_telemetry(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -332,7 +320,7 @@ pub(super) async fn post_daemon_telemetry(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/bridge/reconfigure",
     tag = "daemon",
@@ -341,7 +329,7 @@ pub(super) async fn post_daemon_telemetry(
         (status = 200, description = "Host bridge status after reconfiguration", body = BridgeStatusReport),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 async fn post_bridge_reconfigure(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -382,7 +370,7 @@ async fn post_bridge_reconfigure(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     get,
     path = "/v1/daemon/log-level",
     tag = "daemon",
@@ -390,7 +378,7 @@ async fn post_bridge_reconfigure(
         (status = 200, description = "Current daemon log level", body = LogLevelResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn get_log_level(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -409,7 +397,7 @@ pub(super) async fn get_log_level(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     put,
     path = "/v1/daemon/log-level",
     tag = "daemon",
@@ -418,7 +406,7 @@ pub(super) async fn get_log_level(
         (status = 200, description = "Updated daemon log level", body = LogLevelResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn put_log_level(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -455,7 +443,7 @@ pub(super) async fn put_log_level(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     get,
     path = "/v1/projects",
     tag = "daemon",
@@ -463,7 +451,7 @@ pub(super) async fn put_log_level(
         (status = 200, description = "Projects and their worktrees", body = Vec<ProjectSummary>),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn get_projects(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,

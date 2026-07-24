@@ -96,7 +96,7 @@ pub struct BridgeState {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct BridgeStatusReport {
     pub running: bool,
     pub socket_path: Option<String>,

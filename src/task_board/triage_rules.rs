@@ -34,7 +34,7 @@ pub const MAX_STRING_CONDITION_BYTES: usize = 256;
 /// candidate's canonical, persisted identity -- reordering two rules is a
 /// real change, not a no-op.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TriageRuleSetV1 {
     pub schema_version: u16,
     pub rules: Vec<TriageRule>,
@@ -42,7 +42,7 @@ pub struct TriageRuleSetV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TriageRule {
     pub id: String,
     /// Conjunction (AND) of closed, typed predicates. Empty matches every
@@ -53,7 +53,7 @@ pub struct TriageRule {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct TriageRuleOutcome {
     pub verdict: TriageVerdict,
     #[serde(default)]
@@ -62,7 +62,7 @@ pub struct TriageRuleOutcome {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum TriagePriorityAction {
     #[default]
     Keep,
@@ -79,7 +79,7 @@ pub enum TriagePriorityAction {
 /// never a regex or arbitrary expression over prose.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "fact", rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum TriageRuleCondition {
     LabelsHasAny { labels: Vec<String> },
     LabelsHasAll { labels: Vec<String> },

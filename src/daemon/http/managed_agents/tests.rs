@@ -74,7 +74,10 @@ async fn spawn_managed_agent_server(
         .expect("bind listener");
     let addr = listener.local_addr().expect("listener addr");
     let server = tokio::spawn(async move {
-        axum::serve(listener, managed_agent_routes().with_state(state))
+        axum::serve(
+            listener,
+            managed_agent_routes().split_for_parts().0.with_state(state),
+        )
             .await
             .expect("serve managed agent routes");
     });

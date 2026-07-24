@@ -90,10 +90,13 @@ Validation should match risk:
 
 The daemon HTTP API is described by an OpenAPI 3.1 document at
 `docs/api/openapi.json`, generated from `#[utoipa::path]` annotations on the
-handlers plus `#[derive(utoipa::ToSchema)]` on their wire types (behind the
-`openapi` feature). Regenerate it with `mise run openapi:generate` after
-changing an annotated handler or wire type; `mise run openapi:check` fails on
-drift and runs inside `mise run test`. Never edit the generated file by hand.
+handlers plus `#[derive(utoipa::ToSchema)]` on their wire types. Registering a
+route in the `utoipa-axum` router (`.routes(routes!(handler))`) also produces
+its OpenAPI path, so `utoipa` is a permanent dependency with no `openapi`
+feature to gate. Regenerate the document with `mise run openapi:generate`
+after changing an annotated handler or wire type; `mise run openapi:check`
+fails on drift and runs inside `mise run test`. Never edit the generated file
+by hand. What stays manual and why is audited in `docs/api/openapi-upkeep.md`.
 
 Coverage is complete: every non-exempt daemon HTTP route is annotated, and the
 `documented_operations_match_contract` integration test fails if a new handler

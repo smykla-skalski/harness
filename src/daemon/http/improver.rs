@@ -3,8 +3,8 @@ use std::time::Instant;
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::routing::post;
-use axum::{Json, Router};
+use axum::Json;
+use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{ImproverApplyRequest, http_paths};
 use crate::daemon::service;
@@ -15,17 +15,13 @@ use super::DaemonHttpState;
 use super::auth::authorize_control_request;
 use super::response::{extract_request_id, timed_json};
 
-#[cfg(feature = "openapi")]
 use super::openapi::DaemonErrorBody;
 
-pub(super) fn improver_routes() -> Router<DaemonHttpState> {
-    Router::new().route(
-        http_paths::SESSION_IMPROVER_APPLY,
-        post(post_improver_apply),
-    )
+pub(super) fn improver_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new().routes(routes!(post_improver_apply))
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/sessions/{session_id}/improver/apply",
     tag = "agents",
@@ -35,7 +31,7 @@ pub(super) fn improver_routes() -> Router<DaemonHttpState> {
         (status = 200, description = "Improver patch applied or previewed", body = ImproverApplyOutcome),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_improver_apply(
     Path(session_id): Path<String>,
     headers: HeaderMap,

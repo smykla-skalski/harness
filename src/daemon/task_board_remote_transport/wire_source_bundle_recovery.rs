@@ -30,7 +30,7 @@ struct RemoteSourceBundleAbandonAuthority<'a> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub(crate) struct RemoteSourceBundleReceiptVerificationResponse {
     pub(crate) schema_version: u32,
     pub(crate) binding: RemoteAttemptBinding,
@@ -45,7 +45,7 @@ pub(crate) struct RemoteSourceBundleReceiptVerificationResponse {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub(crate) struct RemoteSourceBundleAbandonRequest {
     pub(crate) schema_version: u32,
     pub(crate) offer: RemoteOfferRequest,
@@ -57,7 +57,7 @@ pub(crate) struct RemoteSourceBundleAbandonRequest {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub(crate) struct RemoteSourceBundleAbandonResponse {
     pub(crate) schema_version: u32,
     pub(crate) binding: RemoteAttemptBinding,

@@ -3,8 +3,8 @@ use std::time::Instant;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::routing::post;
-use axum::{Json, Router};
+use axum::Json;
+use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{
     ReviewsFileCommentRequest, ReviewsFilesBlobRequest, ReviewsFilesListRequest,
@@ -15,43 +15,26 @@ use crate::reviews::LocalCloneListEntry;
 
 use super::DaemonHttpState;
 use super::auth::require_auth;
-#[cfg(feature = "openapi")]
 use super::openapi::DaemonErrorBody;
 use super::response::{extract_request_id, timed_json};
 
 /// Wire the review-files endpoints onto the reviews router. These handlers live
 /// in their own module so `reviews.rs` stays within the file-length cap.
-pub(super) fn merge_files_routes(router: Router<DaemonHttpState>) -> Router<DaemonHttpState> {
+pub(super) fn merge_files_routes(
+    router: OpenApiRouter<DaemonHttpState>,
+) -> OpenApiRouter<DaemonHttpState> {
     router
-        .route(http_paths::REVIEWS_FILES_LIST, post(post_review_files_list))
-        .route(
-            http_paths::REVIEWS_FILES_PATCH,
-            post(post_review_files_patch),
-        )
-        .route(
-            http_paths::REVIEWS_FILES_PREVIEW,
-            post(post_review_files_preview),
-        )
-        .route(
-            http_paths::REVIEWS_FILES_VIEWED,
-            post(post_review_files_viewed),
-        )
-        .route(http_paths::REVIEWS_FILES_BLOB, post(post_review_files_blob))
-        .route(
-            http_paths::REVIEWS_FILES_COMMENT,
-            post(post_review_files_comment),
-        )
-        .route(
-            http_paths::REVIEWS_FILES_LOCAL_CLONES,
-            post(post_review_files_local_clones),
-        )
-        .route(
-            http_paths::REVIEWS_FILES_LOCAL_CLONES_DELETE,
-            post(post_review_files_local_clones_delete),
-        )
+        .routes(routes!(post_review_files_list))
+        .routes(routes!(post_review_files_patch))
+        .routes(routes!(post_review_files_preview))
+        .routes(routes!(post_review_files_viewed))
+        .routes(routes!(post_review_files_blob))
+        .routes(routes!(post_review_files_comment))
+        .routes(routes!(post_review_files_local_clones))
+        .routes(routes!(post_review_files_local_clones_delete))
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/files/list",
     tag = "reviews",
@@ -60,7 +43,7 @@ pub(super) fn merge_files_routes(router: Router<DaemonHttpState>) -> Router<Daem
         (status = 200, description = "Changed files for a pull request", body = crate::daemon::protocol::ReviewsFilesListResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_review_files_list(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -81,7 +64,7 @@ pub(super) async fn post_review_files_list(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/files/patch",
     tag = "reviews",
@@ -90,7 +73,7 @@ pub(super) async fn post_review_files_list(
         (status = 200, description = "Per-path patches with drift detection", body = crate::daemon::protocol::ReviewsFilesPatchResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_review_files_patch(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -111,7 +94,7 @@ pub(super) async fn post_review_files_patch(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/files/preview",
     tag = "reviews",
@@ -120,7 +103,7 @@ pub(super) async fn post_review_files_patch(
         (status = 200, description = "Line-limited patch previews with drift detection", body = crate::daemon::protocol::ReviewsFilesPreviewResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_review_files_preview(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -141,7 +124,7 @@ pub(super) async fn post_review_files_preview(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/files/viewed",
     tag = "reviews",
@@ -150,7 +133,7 @@ pub(super) async fn post_review_files_preview(
         (status = 200, description = "Per-path viewed-state outcomes", body = crate::daemon::protocol::ReviewsFilesViewedResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_review_files_viewed(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -171,7 +154,7 @@ pub(super) async fn post_review_files_viewed(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/files/blob",
     tag = "reviews",
@@ -180,7 +163,7 @@ pub(super) async fn post_review_files_viewed(
         (status = 200, description = "Base64-encoded image blob with metadata", body = crate::daemon::protocol::ReviewsFilesBlobResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_review_files_blob(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -201,7 +184,7 @@ pub(super) async fn post_review_files_blob(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/files/comment",
     tag = "reviews",
@@ -210,7 +193,7 @@ pub(super) async fn post_review_files_blob(
         (status = 200, description = "Result of posting the file comment or thread reply", body = crate::daemon::protocol::ReviewsFileCommentResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_review_files_comment(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -231,7 +214,7 @@ pub(super) async fn post_review_files_comment(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/files/local-clones",
     tag = "reviews",
@@ -239,7 +222,7 @@ pub(super) async fn post_review_files_comment(
         (status = 200, description = "Local bare-clone registry entries", body = Vec<crate::reviews::LocalCloneListEntry>),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_review_files_local_clones(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -260,18 +243,18 @@ pub(super) async fn post_review_files_local_clones(
 }
 
 #[derive(serde::Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub(super) struct DeleteLocalClonePayload {
     repo_key_segment: String,
 }
 
 #[derive(serde::Serialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub(super) struct DeleteLocalCloneResponseBody {
     clones: Vec<LocalCloneListEntry>,
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/files/local-clones/delete",
     tag = "reviews",
@@ -280,7 +263,7 @@ pub(super) struct DeleteLocalCloneResponseBody {
         (status = 200, description = "Local bare-clone registry after the deletion", body = DeleteLocalCloneResponseBody),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_review_files_local_clones_delete(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,

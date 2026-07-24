@@ -3,7 +3,8 @@ use std::time::Instant;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::{Json, Router};
+use axum::Json;
+use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{
     ReviewsPolicyHistoryRequest, ReviewsPolicyPreviewRequest, ReviewsPolicyRunStartRequest,
@@ -13,7 +14,6 @@ use crate::daemon::service;
 
 use super::DaemonHttpState;
 use super::auth::require_auth;
-#[cfg(feature = "openapi")]
 use super::openapi::DaemonErrorBody;
 use super::response::{extract_request_id, timed_json};
 
@@ -30,28 +30,17 @@ fn authenticated_policy_request(
     Ok((start, request_id))
 }
 
-pub(super) fn merge_policy_routes(router: Router<DaemonHttpState>) -> Router<DaemonHttpState> {
-    use axum::routing::post;
+pub(super) fn merge_policy_routes(
+    router: OpenApiRouter<DaemonHttpState>,
+) -> OpenApiRouter<DaemonHttpState> {
     router
-        .route(
-            http_paths::REVIEWS_POLICY_PREVIEW,
-            post(post_reviews_policy_preview),
-        )
-        .route(
-            http_paths::REVIEWS_POLICY_START,
-            post(post_reviews_policy_start),
-        )
-        .route(
-            http_paths::REVIEWS_POLICY_STATUS,
-            post(post_reviews_policy_status),
-        )
-        .route(
-            http_paths::REVIEWS_POLICY_HISTORY,
-            post(post_reviews_policy_history),
-        )
+        .routes(routes!(post_reviews_policy_preview))
+        .routes(routes!(post_reviews_policy_start))
+        .routes(routes!(post_reviews_policy_status))
+        .routes(routes!(post_reviews_policy_history))
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/policy/preview",
     tag = "reviews",
@@ -60,7 +49,7 @@ pub(super) fn merge_policy_routes(router: Router<DaemonHttpState>) -> Router<Dae
         (status = 200, description = "Preview of the policy workflow steps for a target", body = crate::daemon::protocol::ReviewsPolicyPreviewResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_reviews_policy_preview(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -80,7 +69,7 @@ pub(super) async fn post_reviews_policy_preview(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/policy/start",
     tag = "reviews",
@@ -89,7 +78,7 @@ pub(super) async fn post_reviews_policy_preview(
         (status = 200, description = "The started (or resumed) policy run", body = crate::daemon::protocol::ReviewsPolicyRunResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_reviews_policy_start(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -111,7 +100,7 @@ pub(super) async fn post_reviews_policy_start(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/policy/status",
     tag = "reviews",
@@ -120,7 +109,7 @@ pub(super) async fn post_reviews_policy_start(
         (status = 200, description = "Active and recent policy runs for a subject", body = crate::daemon::protocol::ReviewsPolicyStatusResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_reviews_policy_status(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -139,7 +128,7 @@ pub(super) async fn post_reviews_policy_status(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/reviews/policy/history",
     tag = "reviews",
@@ -148,7 +137,7 @@ pub(super) async fn post_reviews_policy_status(
         (status = 200, description = "Historical policy runs with aggregate metrics", body = crate::daemon::protocol::ReviewsPolicyHistoryResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_reviews_policy_history(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,

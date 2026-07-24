@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use super::types::{PlanningState, TaskBoardItem, TaskBoardStatus};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct PlanningTransition {
     pub board_item_id: String,
     pub from_status: TaskBoardStatus,
@@ -25,7 +25,7 @@ pub enum PlanApprovalGate {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum PlanApprovalBlockReason {
     Deleted,
     MissingSummary,

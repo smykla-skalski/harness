@@ -20,43 +20,40 @@ use super::super::DaemonHttpState;
 use super::super::auth::{authenticated_remote_client, authorize_control_request, require_auth};
 use super::super::response::{extract_request_id, timed_json};
 use super::super::task_board_route_executor;
-#[cfg(feature = "openapi")]
 use super::super::openapi::DaemonErrorBody;
-#[cfg(feature = "openapi")]
 use crate::daemon::protocol::{
     TaskBoardCapabilitiesResponse, TaskBoardListItemsResponse, TaskBoardPlanningResponse,
 };
-#[cfg(feature = "openapi")]
 use crate::task_board::TaskBoardItem;
 
 #[derive(Debug, Clone, Default, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
-#[cfg_attr(feature = "openapi", into_params(parameter_in = Query))]
+#[derive(utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub(super) struct TaskBoardListQuery {
     pub status: Option<TaskBoardStatus>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub(super) struct TaskBoardPlanSubmitBody {
     pub summary: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub(super) struct TaskBoardPlanApproveBody {
     pub approved_by: String,
     pub approved_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub(super) struct TaskBoardPlanRevokeBody {
     #[serde(default)]
     pub actor: Option<String>,
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/task-board/items",
     tag = "task-board",
@@ -65,7 +62,7 @@ pub(super) struct TaskBoardPlanRevokeBody {
         (status = 200, description = "The created task-board item", body = TaskBoardItem),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_task_board_item(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -84,7 +81,7 @@ pub(super) async fn post_task_board_item(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     get,
     path = "/v1/task-board/capabilities",
     tag = "task-board",
@@ -92,7 +89,7 @@ pub(super) async fn post_task_board_item(
         (status = 200, description = "Task-board capability descriptor", body = TaskBoardCapabilitiesResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn get_task_board_capabilities(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -110,7 +107,7 @@ pub(super) async fn get_task_board_capabilities(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     get,
     path = "/v1/task-board/items",
     tag = "task-board",
@@ -119,7 +116,7 @@ pub(super) async fn get_task_board_capabilities(
         (status = 200, description = "Task-board items with per-status counts and progress rollups", body = TaskBoardListItemsResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn get_task_board_items(
     Query(query): Query<TaskBoardListQuery>,
     headers: HeaderMap,
@@ -144,7 +141,7 @@ pub(super) async fn get_task_board_items(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     get,
     path = "/v1/task-board/items/{item_id}",
     tag = "task-board",
@@ -153,7 +150,7 @@ pub(super) async fn get_task_board_items(
         (status = 200, description = "The requested task-board item", body = TaskBoardItem),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn get_task_board_item(
     Path(item_id): Path<String>,
     headers: HeaderMap,
@@ -176,7 +173,7 @@ pub(super) async fn get_task_board_item(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     put,
     path = "/v1/task-board/items/{item_id}",
     tag = "task-board",
@@ -186,7 +183,7 @@ pub(super) async fn get_task_board_item(
         (status = 200, description = "The updated task-board item", body = TaskBoardItem),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn put_task_board_item(
     Path(item_id): Path<String>,
     headers: HeaderMap,
@@ -206,7 +203,7 @@ pub(super) async fn put_task_board_item(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     delete,
     path = "/v1/task-board/items/{item_id}",
     tag = "task-board",
@@ -215,7 +212,7 @@ pub(super) async fn put_task_board_item(
         (status = 200, description = "The deleted (tombstoned) task-board item", body = TaskBoardItem),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn delete_task_board_item(
     Path(item_id): Path<String>,
     headers: HeaderMap,
@@ -235,7 +232,7 @@ pub(super) async fn delete_task_board_item(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/task-board/items/{item_id}/planning/begin",
     tag = "task-board",
@@ -244,7 +241,7 @@ pub(super) async fn delete_task_board_item(
         (status = 200, description = "Planning transition after entering planning", body = TaskBoardPlanningResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_task_board_plan_begin(
     Path(item_id): Path<String>,
     headers: HeaderMap,
@@ -264,7 +261,7 @@ pub(super) async fn post_task_board_plan_begin(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/task-board/items/{item_id}/planning/submit",
     tag = "task-board",
@@ -274,7 +271,7 @@ pub(super) async fn post_task_board_plan_begin(
         (status = 200, description = "Planning transition after submitting a plan", body = TaskBoardPlanningResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_task_board_plan_submit(
     Path(item_id): Path<String>,
     headers: HeaderMap,
@@ -298,7 +295,7 @@ pub(super) async fn post_task_board_plan_submit(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/task-board/items/{item_id}/planning/approve",
     tag = "task-board",
@@ -308,7 +305,7 @@ pub(super) async fn post_task_board_plan_submit(
         (status = 200, description = "Planning transition after approving the plan", body = TaskBoardPlanningResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_task_board_plan_approve(
     Path(item_id): Path<String>,
     headers: HeaderMap,
@@ -334,7 +331,7 @@ pub(super) async fn post_task_board_plan_approve(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/task-board/items/{item_id}/planning/revoke",
     tag = "task-board",
@@ -344,7 +341,7 @@ pub(super) async fn post_task_board_plan_approve(
         (status = 200, description = "Planning transition after revoking plan approval", body = TaskBoardPlanningResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_task_board_plan_revoke(
     Path(item_id): Path<String>,
     headers: HeaderMap,

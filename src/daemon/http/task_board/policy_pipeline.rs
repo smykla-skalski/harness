@@ -1,9 +1,8 @@
 use axum::Json;
-use axum::Router;
 use axum::extract::{Query, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::routing::{get, post};
+use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{
     PolicyPipelineAuditRequest, PolicyPipelineGetRequest, PolicyPipelineGoLiveDiffRequest,
@@ -11,9 +10,7 @@ use crate::daemon::protocol::{
     PolicyPipelineSaveDraftRequest, PolicyPipelineSimulateRequest, http_paths,
 };
 
-#[cfg(feature = "openapi")]
 use super::super::openapi::DaemonErrorBody;
-#[cfg(feature = "openapi")]
 use crate::daemon::protocol::{
     PolicyPipelineAuditResponse, PolicyPipelineGoLiveDiffResponse, PolicyPipelineMakeLiveResponse,
     PolicyPipelinePromoteResponse, PolicyPipelineReplayResponse, PolicyPipelineResponse,
@@ -24,25 +21,19 @@ use super::super::{DaemonHttpState, require_async_db, task_board_route_executor}
 use super::authenticated_request;
 
 pub(super) fn merge_policy_pipeline_routes(
-    router: Router<DaemonHttpState>,
-) -> Router<DaemonHttpState> {
+    router: OpenApiRouter<DaemonHttpState>,
+) -> OpenApiRouter<DaemonHttpState> {
     router
-        .route(
-            http_paths::POLICY_PIPELINE,
-            get(get_policy_pipeline).put(put_policy_pipeline_draft),
-        )
-        .route(http_paths::POLICY_SIMULATE, post(post_policy_simulate))
-        .route(http_paths::POLICY_PROMOTE, post(post_policy_promote))
-        .route(http_paths::POLICY_MAKE_LIVE, post(post_policy_make_live))
-        .route(
-            http_paths::POLICY_GO_LIVE_DIFF,
-            post(post_policy_go_live_diff),
-        )
-        .route(http_paths::POLICY_REPLAY, post(post_policy_replay))
-        .route(http_paths::POLICY_AUDIT, get(get_policy_audit))
+        .routes(routes!(get_policy_pipeline, put_policy_pipeline_draft))
+        .routes(routes!(post_policy_simulate))
+        .routes(routes!(post_policy_promote))
+        .routes(routes!(post_policy_make_live))
+        .routes(routes!(post_policy_go_live_diff))
+        .routes(routes!(post_policy_replay))
+        .routes(routes!(get_policy_audit))
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     get,
     path = "/v1/policy-pipeline",
     tag = "policy",
@@ -51,7 +42,7 @@ pub(super) fn merge_policy_pipeline_routes(
         (status = 200, description = "The draft policy graph for the selected canvas", body = PolicyPipelineResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn get_policy_pipeline(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -74,7 +65,7 @@ pub(super) async fn get_policy_pipeline(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     put,
     path = "/v1/policy-pipeline",
     tag = "policy",
@@ -83,7 +74,7 @@ pub(super) async fn get_policy_pipeline(
         (status = 200, description = "Validation outcome and, when valid, the persisted draft", body = PolicyPipelineSaveDraftResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn put_policy_pipeline_draft(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -106,7 +97,7 @@ pub(super) async fn put_policy_pipeline_draft(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/policy-pipeline/simulate",
     tag = "policy",
@@ -115,7 +106,7 @@ pub(super) async fn put_policy_pipeline_draft(
         (status = 200, description = "Non-persisting simulation of the draft against the scenario set", body = PolicyPipelineSimulationResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_policy_simulate(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -138,7 +129,7 @@ pub(super) async fn post_policy_simulate(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/policy-pipeline/promote",
     tag = "policy",
@@ -147,7 +138,7 @@ pub(super) async fn post_policy_simulate(
         (status = 200, description = "The promoted draft revision", body = PolicyPipelinePromoteResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_policy_promote(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -170,7 +161,7 @@ pub(super) async fn post_policy_promote(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/policy-pipeline/make-live",
     tag = "policy",
@@ -179,7 +170,7 @@ pub(super) async fn post_policy_promote(
         (status = 200, description = "The now-live document and refreshed workspace", body = PolicyPipelineMakeLiveResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_policy_make_live(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -202,7 +193,7 @@ pub(super) async fn post_policy_make_live(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/policy-pipeline/go-live-diff",
     tag = "policy",
@@ -211,7 +202,7 @@ pub(super) async fn post_policy_make_live(
         (status = 200, description = "Per-scenario decision diff between the live policy and the draft", body = PolicyPipelineGoLiveDiffResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_policy_go_live_diff(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -234,7 +225,7 @@ pub(super) async fn post_policy_go_live_diff(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     post,
     path = "/v1/policy-pipeline/replay",
     tag = "policy",
@@ -243,7 +234,7 @@ pub(super) async fn post_policy_go_live_diff(
         (status = 200, description = "The draft replayed against a window of recorded decisions", body = PolicyPipelineReplayResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn post_policy_replay(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -266,7 +257,7 @@ pub(super) async fn post_policy_replay(
     )
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     get,
     path = "/v1/policy-pipeline/audit",
     tag = "policy",
@@ -275,7 +266,7 @@ pub(super) async fn post_policy_replay(
         (status = 200, description = "Active-revision and latest-simulation audit summary", body = PolicyPipelineAuditResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn get_policy_audit(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,

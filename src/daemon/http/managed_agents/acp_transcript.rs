@@ -10,7 +10,6 @@ use crate::errors::{CliError, CliErrorKind};
 
 use super::super::DaemonHttpState;
 use super::super::auth::require_auth;
-#[cfg(feature = "openapi")]
 use super::super::openapi::DaemonErrorBody;
 use super::super::response::{extract_request_id, timed_json};
 use super::ensure_acp_enabled;
@@ -21,7 +20,7 @@ pub(super) struct AcpTranscriptQuery {
     session_id: Option<String>,
 }
 
-#[cfg_attr(feature = "openapi", utoipa::path(
+#[utoipa::path(
     get,
     path = "/v1/managed-agents/acp/transcript",
     tag = "managed-agents",
@@ -32,7 +31,7 @@ pub(super) struct AcpTranscriptQuery {
         (status = 200, description = "ACP agent transcript entries", body = AcpTranscriptResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
-))]
+)]
 pub(super) async fn get_acp_transcript(
     Query(query): Query<AcpTranscriptQuery>,
     headers: HeaderMap,

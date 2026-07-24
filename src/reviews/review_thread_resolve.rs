@@ -15,7 +15,7 @@ use crate::github_api::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsReviewThreadResolveRequest {
     pub thread_id: String,
     pub resolved: bool,
@@ -26,7 +26,7 @@ pub struct ReviewsReviewThreadResolveRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct ReviewsReviewThreadResolveResponse {
     pub thread_id: String,
     pub resolved: bool,

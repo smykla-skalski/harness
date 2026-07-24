@@ -3,7 +3,6 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "openapi")]
 use super::AgentRegistrationWire;
 use super::{
     ARBITRATION_BLOCKED_REASON, AgentRegistration, AgentStatus, HarnessSessionId, ManagedAgentRef,
@@ -62,7 +61,7 @@ pub fn is_control_plane_actor_id(actor_id: &str) -> bool {
 
 /// Main versioned state document for a multi-agent orchestration session.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct SessionState {
     pub schema_version: u32,
     /// Monotonically increasing counter for optimistic concurrency.
@@ -74,15 +73,15 @@ pub struct SessionState {
     pub project_name: String,
     /// Per-session worktree directory (`<sessions_root>/<project>/<sid>/workspace`).
     #[serde(default)]
-    #[cfg_attr(feature = "openapi", schema(value_type = String))]
+    #[schema(value_type = String)]
     pub worktree_path: PathBuf,
     /// Per-session shared directory for cross-agent artefacts.
     #[serde(default)]
-    #[cfg_attr(feature = "openapi", schema(value_type = String))]
+    #[schema(value_type = String)]
     pub shared_path: PathBuf,
     /// User's original repository root (pre-worktree).
     #[serde(default)]
-    #[cfg_attr(feature = "openapi", schema(value_type = String))]
+    #[schema(value_type = String)]
     pub origin_path: PathBuf,
     /// Git branch owned by this session (`harness/<sid>`).
     #[serde(default)]
@@ -99,7 +98,7 @@ pub struct SessionState {
     pub updated_at: String,
     /// Registered agents keyed by agent ID.
     #[serde(default)]
-    #[cfg_attr(feature = "openapi", schema(value_type = BTreeMap<String, AgentRegistrationWire>))]
+    #[schema(value_type = BTreeMap<String, AgentRegistrationWire>)]
     pub agents: BTreeMap<String, AgentRegistration>,
     /// Work items keyed by task ID.
     #[serde(default)]
@@ -121,7 +120,7 @@ pub struct SessionState {
     pub pending_leader_transfer: Option<PendingLeaderTransfer>,
     /// Path of the external session directory this session was adopted from.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "openapi", schema(value_type = Option<String>))]
+    #[schema(value_type = Option<String>)]
     pub external_origin: Option<PathBuf>,
     /// Timestamp when this session was adopted from an external origin.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -182,7 +181,7 @@ impl SessionState {
 /// Session lifecycle status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum SessionStatus {
     AwaitingLeader,
     Active,
@@ -234,7 +233,7 @@ impl SessionStatus {
 
 /// Lightweight rollup metrics for session summaries.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub struct SessionMetrics {
     #[serde(default)]
     pub agent_count: u32,
