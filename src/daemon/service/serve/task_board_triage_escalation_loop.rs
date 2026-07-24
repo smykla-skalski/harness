@@ -56,7 +56,7 @@ async fn run_task_board_triage_escalation_loop(
                     break;
                 }
             }
-            _ = ticker.tick() => Box::pin(drain_tick(&state, &db, &config)).await,
+            _ = ticker.tick() => drain_tick(&state, &db, &config).await,
         }
     }
 }
