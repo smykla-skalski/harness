@@ -47,8 +47,10 @@ public actor RepositoryDirectoryStore {
     )
   }
 
-  /// Match the daemon's `normalize_repository_slug`: trim and lowercase so the
-  /// same repository never splits into two associations.
+  /// Mirror the daemon's `normalize_repository_slug` transformation - trim the
+  /// ends and lowercase - so the same repository never splits into two
+  /// associations. Slug shape (`owner/repo`) is guaranteed by the caller: keys
+  /// come from `execution_repository`, which the daemon already normalized.
   public static func normalizedRepository(_ repository: String) -> String {
     repository.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
   }

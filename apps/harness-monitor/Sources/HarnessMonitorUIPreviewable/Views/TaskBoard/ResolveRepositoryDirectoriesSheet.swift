@@ -49,6 +49,7 @@ struct ResolveRepositoryDirectoriesSheet: View {
     VStack(alignment: .leading, spacing: 4) {
       Text("Set working directories")
         .font(.headline)
+        .accessibilityAddTraits(.isHeader)
       Text("These imported repositories need a local folder before their items can run.")
         .font(.subheadline)
         .foregroundStyle(.secondary)
