@@ -4,6 +4,7 @@ use super::wire::{RemoteArtifactEntry, RemoteAssignmentWireState, RemoteAttemptB
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemoteCancelRequest {
     pub(crate) schema_version: u32,
     pub(crate) binding: RemoteAttemptBinding,
@@ -15,6 +16,7 @@ pub(crate) struct RemoteCancelRequest {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemoteCancelResponse {
     pub(crate) schema_version: u32,
     pub(crate) binding: RemoteAttemptBinding,
@@ -32,6 +34,7 @@ pub(crate) struct RemoteCancelResponse {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemoteSettledRequest {
     pub(crate) schema_version: u32,
     pub(crate) binding: RemoteAttemptBinding,
@@ -44,6 +47,7 @@ pub(crate) struct RemoteSettledRequest {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemoteSettledResponse {
     pub(crate) schema_version: u32,
     pub(crate) binding: RemoteAttemptBinding,
@@ -54,6 +58,7 @@ pub(crate) struct RemoteSettledResponse {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemoteArtifactFetchRequest {
     pub(crate) schema_version: u32,
     pub(crate) binding: RemoteAttemptBinding,
@@ -66,6 +71,7 @@ pub(crate) struct RemoteArtifactFetchRequest {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemoteArtifactFetchResponse {
     pub(crate) schema_version: u32,
     pub(crate) binding: RemoteAttemptBinding,

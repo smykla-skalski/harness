@@ -12,6 +12,7 @@ const CLEANUP_RESPONSE_DOMAIN: &str = "harness.task-board.remote-cleanup-observa
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemoteCleanupObservationRequest {
     pub(crate) schema_version: u32,
     pub(crate) binding: RemoteAttemptBinding,
@@ -62,6 +63,7 @@ impl RemoteCleanupObservationRequest {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemoteCleanupObservationResponse {
     pub(crate) schema_version: u32,
     pub(crate) binding: RemoteAttemptBinding,
