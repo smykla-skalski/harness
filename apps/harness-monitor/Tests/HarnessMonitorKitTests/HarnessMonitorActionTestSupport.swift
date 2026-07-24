@@ -300,6 +300,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var taskBoardAuditSummaryStorage: TaskBoardAuditSummary?
   var taskBoardProjectSummariesStorage: [TaskBoardProjectSummary]?
   var taskBoardMachineSummariesStorage: [TaskBoardMachineSummary]?
+  var taskBoardWorkingCopiesStorage: [WorkingCopyListEntry] = []
   var taskBoardUpdateError: (any Error)?
   var taskBoardItemRevisionsStorage: [String: Int64] = [:]
   var taskBoardItemsChangeSeqStorage: Int64 = 0
