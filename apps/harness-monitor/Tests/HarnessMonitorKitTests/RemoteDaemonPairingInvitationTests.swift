@@ -97,6 +97,28 @@ struct RemoteDaemonPairingInvitationTests {
     #expect(!RemoteDaemonPairingInvitation.isRemotePairingLink(ambiguous))
   }
 
+  @Test("Leaves a link carrying multiple payload items for the router")
+  func ignoresMultiplePayloadItems() throws {
+    let single = try invitationURL(
+      endpoint: "https://daemon.example.com",
+      expiresAt: "2026-07-10T04:10:00Z"
+    )
+    let encoded = try #require(
+      URLComponents(url: single, resolvingAgainstBaseURL: false)?
+        .queryItems?
+        .first(where: { $0.name == "payload" })?
+        .value
+    )
+    var components = try #require(URLComponents(string: "harness://pair"))
+    components.queryItems = [
+      URLQueryItem(name: "payload", value: encoded),
+      URLQueryItem(name: "payload", value: encoded),
+    ]
+    let url = try #require(components.url)
+
+    #expect(!RemoteDaemonPairingInvitation.isRemotePairingLink(url))
+  }
+
   @Test("Rejects remote-daemon classification for non-pairing hosts and junk payloads")
   func rejectsRemoteClassificationForNonPairingHostsAndJunk() throws {
     let remotePayloadOnRoute = try invitationURL(

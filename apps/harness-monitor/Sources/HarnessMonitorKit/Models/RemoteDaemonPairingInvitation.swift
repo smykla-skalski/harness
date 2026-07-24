@@ -119,14 +119,15 @@ public struct RemoteDaemonPairingInvitation: Codable, Equatable, Sendable {
   }
 
   /// True when `url` is an unambiguous remote-daemon pairing link: a `harness://`
-  /// pairing host whose payload carries the remote marker `server_spki_sha256`
-  /// and not the relay marker `publicKeyFingerprint`. The flow is chosen from
-  /// the payload, not the host — the `pair` host is shared with relay
-  /// invitations. A payload carrying both markers is ambiguous and left for the
-  /// router rather than decoded as remote, since `Codable` decoding would
-  /// otherwise ignore the relay marker and accept it. A remote payload that is
-  /// otherwise malformed still returns true so the caller surfaces a clear
-  /// pairing error; a payload without the remote marker is left for the router.
+  /// pairing host whose single payload parses and carries the remote marker
+  /// `server_spki_sha256` without the relay marker `publicKeyFingerprint`. The
+  /// flow is chosen from the payload, not the host — the `pair` host is shared
+  /// with relay invitations. Anything else — an unparseable payload, more than
+  /// one payload item, a missing remote marker, or a payload carrying both
+  /// markers — returns false and is left for the deep-link router rather than
+  /// decoded as remote, since `Codable` decoding would otherwise ignore the
+  /// relay marker and accept it. Field validity such as expiry and endpoint is
+  /// enforced later by `decode(_:)`, which surfaces a clear pairing error.
   public static func isRemotePairingLink(_ url: URL) -> Bool {
     guard
       url.scheme?.lowercased() == "harness",
@@ -139,12 +140,13 @@ public struct RemoteDaemonPairingInvitation: Codable, Equatable, Sendable {
   }
 
   private static func payloadObject(from url: URL) -> [String: Any]? {
-    guard
-      let encoded = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-        .queryItems?
-        .first(where: { $0.name == "payload" })?
-        .value
-    else {
+    let payloads =
+      URLComponents(url: url, resolvingAgainstBaseURL: false)?
+      .queryItems?
+      .filter { $0.name == "payload" } ?? []
+    // More than one `payload` is ambiguous, so require exactly one, matching
+    // `decode(_:)` rather than reading markers off the first item.
+    guard payloads.count == 1, let encoded = payloads.first?.value else {
       return nil
     }
     let padding = String(repeating: "=", count: (4 - encoded.count % 4) % 4)
