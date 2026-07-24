@@ -272,12 +272,42 @@ pub(crate) async fn is_reusable_checkout(path: &Path) -> bool {
 }
 
 fn load_registry_lenient(registry_path: &Path) -> WorkingCopyRegistry {
-    if registry_path.exists() {
-        let raw = fs::read(registry_path).unwrap_or_default();
-        serde_json::from_slice::<WorkingCopyRegistry>(&raw).unwrap_or_default()
-    } else {
-        WorkingCopyRegistry::default()
+    if !registry_path.exists() {
+        return WorkingCopyRegistry::default();
     }
+    let raw = match fs::read(registry_path) {
+        Ok(raw) => raw,
+        Err(error) => {
+            warn_working_copy(&format!(
+                "working-copy registry read failed, treating as empty: path={} error={error}",
+                registry_path.display()
+            ));
+            return WorkingCopyRegistry::default();
+        }
+    };
+    match serde_json::from_slice::<WorkingCopyRegistry>(&raw) {
+        Ok(registry) => registry,
+        Err(error) => {
+            // A corrupt registry would otherwise be silently overwritten with an
+            // empty one on the next write, orphaning every tracked checkout.
+            // Preserve the bytes aside so the reset is diagnosable and reversible.
+            let backup = registry_path.with_extension(format!("json.corrupt.{}", process::id()));
+            let _ = fs::rename(registry_path, &backup);
+            warn_working_copy(&format!(
+                "working-copy registry parse failed, reset to empty (corrupt file kept at {}): error={error}",
+                backup.display()
+            ));
+            WorkingCopyRegistry::default()
+        }
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn warn_working_copy(msg: &str) {
+    tracing::warn!(target = "harness::task_board::working_copy", "{msg}");
 }
 
 /// Walk `path` recursively summing file sizes. Best-effort - any unreadable
@@ -330,16 +360,35 @@ fn run_clone_checkout(clone_url: &str, checkout_path: &Path) -> Result<(), Worki
     let (_repo, _outcome) = checkout
         .main_worktree(Discard, &interrupted)
         .map_err(|e| WorkingCopyRuntimeError::Checkout(redact_clone_url_secret(&e.to_string())))?;
-    // Mark completion only after the worktree is fully materialized; reuse keys
-    // off this marker, never off the bare presence of a `.git` directory.
+    // gix records the fetch URL (token embedded) as remote.origin.url; scrub the
+    // credential so it is not left at rest in the checkout's config.
+    scrub_checkout_credential(checkout_path)?;
+    // Mark completion only after the worktree is materialized and scrubbed; reuse
+    // keys off this marker, never off the bare presence of a `.git` directory.
     fs::write(completion_marker(checkout_path), b"")
         .map_err(|e| WorkingCopyRuntimeError::Io(e.to_string()))?;
     Ok(())
 }
 
+/// Remove the `x-access-token:<token>@` credential gix persisted into the
+/// checkout's `.git/config` (as `remote.origin.url`), leaving a valid tokenless
+/// URL so the secret is not left at rest on disk. A no-op when the config has no
+/// embedded credential.
+fn scrub_checkout_credential(checkout_path: &Path) -> Result<(), WorkingCopyRuntimeError> {
+    let config_path = checkout_path.join(".git").join("config");
+    let Ok(contents) = fs::read_to_string(&config_path) else {
+        return Ok(());
+    };
+    let scrubbed = strip_clone_url_credential(&contents);
+    if scrubbed != contents {
+        fs::write(&config_path, scrubbed).map_err(|e| WorkingCopyRuntimeError::Io(e.to_string()))?;
+    }
+    Ok(())
+}
+
 /// gix error strings can echo the clone URL, which carries the
-/// `x-access-token:<token>@` credential. Strip it before the message reaches a
-/// log line or the WS progress stream.
+/// `x-access-token:<token>@` credential. Replace it with `***` before the
+/// message reaches a log line or the WS progress stream.
 fn redact_clone_url_secret(message: &str) -> String {
     const MARKER: &str = "x-access-token:";
     let mut out = String::with_capacity(message.len());
@@ -351,6 +400,27 @@ fn redact_clone_url_secret(message: &str) -> String {
             out.push_str("***");
             rest = &rest[after + at..];
         } else {
+            rest = &rest[after..];
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+/// Remove `x-access-token:<token>@` entirely, yielding a valid tokenless URL
+/// (unlike [`redact_clone_url_secret`], which keeps a `***` placeholder for log
+/// readability). Used to rewrite the checkout's persisted remote URL.
+fn strip_clone_url_credential(text: &str) -> String {
+    const MARKER: &str = "x-access-token:";
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(idx) = rest.find(MARKER) {
+        if let Some(at) = rest[idx + MARKER.len()..].find('@') {
+            out.push_str(&rest[..idx]);
+            rest = &rest[idx + MARKER.len() + at + 1..];
+        } else {
+            let after = idx + MARKER.len();
+            out.push_str(&rest[..after]);
             rest = &rest[after..];
         }
     }
@@ -507,6 +577,15 @@ mod tests {
         let redacted = redact_clone_url_secret(raw);
         assert!(!redacted.contains("ghp_secret123"));
         assert!(redacted.contains("x-access-token:***@github.com/owner/repo.git"));
+    }
+
+    #[test]
+    fn strip_clone_url_credential_yields_a_tokenless_url() {
+        let raw = "[remote \"origin\"]\n\turl = https://x-access-token:ghp_secret@github.com/o/r.git\n";
+        let stripped = strip_clone_url_credential(raw);
+        assert!(!stripped.contains("ghp_secret"));
+        assert!(!stripped.contains("x-access-token"));
+        assert!(stripped.contains("url = https://github.com/o/r.git"));
     }
 
     #[tokio::test]
