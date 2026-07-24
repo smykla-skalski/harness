@@ -116,14 +116,16 @@ pub async fn run_stdio(api_key_file: Option<PathBuf>) -> Result<(), agent_client
         )
         .on_receive_dispatch(
             async move |message: Dispatch,
-                        connection: ConnectionTo<agent_client_protocol::Client>| {
+                        _connection: ConnectionTo<agent_client_protocol::Client>| {
                 let method = message.method().to_owned();
-                message.respond_with_error(
-                    internal_error(format!(
-                        "harness-openrouter-agent: method '{method}' not handled"
-                    )),
-                    connection,
-                )
+                match message {
+                    Dispatch::Request(_, responder) => responder.respond_with_error(
+                        internal_error(format!(
+                            "harness-openrouter-agent: method '{method}' not handled"
+                        )),
+                    ),
+                    Dispatch::Notification(_) | Dispatch::Response(_, _) => Ok(()),
+                }
             },
             agent_client_protocol::on_receive_dispatch!(),
         )

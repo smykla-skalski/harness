@@ -19,15 +19,15 @@ use std::sync::Mutex;
 
 use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::schema::v1::{
-    ContentBlock, CreateTerminalRequest, CreateTerminalResponse, EnvVariable, InitializeRequest,
-    KillTerminalRequest, KillTerminalResponse, McpServer, McpServerStdio, NewSessionRequest,
+    ContentBlock, CreateTerminalRequest, CreateTerminalResponse, InitializeRequest,
+    KillTerminalRequest, KillTerminalResponse, NewSessionRequest,
     PromptRequest, ReadTextFileRequest, ReadTextFileResponse, ReleaseTerminalRequest,
     ReleaseTerminalResponse, RequestPermissionRequest, RequestPermissionResponse,
     SessionConfigKind, SessionNotification, SessionUpdate, StopReason, TerminalId,
     TerminalOutputRequest, TerminalOutputResponse, TextContent, WaitForTerminalExitRequest,
     WaitForTerminalExitResponse, WriteTextFileRequest, WriteTextFileResponse,
 };
-use agent_client_protocol::{AcpAgent, Agent, Client, ConnectionTo};
+use agent_client_protocol::{AcpAgent, AcpAgentConfig, Agent, Client, ConnectionTo};
 use tokio::process::Command;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, Request, ResponseTemplate};
@@ -53,17 +53,15 @@ pub(super) fn build_agent(server_url: &str) -> (AcpAgent, tempfile::TempDir) {
     let key_dir = tempfile::tempdir().expect("api-key-file tempdir");
     let key_path = key_dir.path().join("openrouter-key");
     std::fs::write(&key_path, "sk-test").expect("write api-key-file");
-    let stdio = McpServerStdio::new("openrouter-shim", PathBuf::from(BIN_PATH))
+    let config = AcpAgentConfig::new(PathBuf::from(BIN_PATH))
         .args(vec![
             "--stdio".to_string(),
             "--api-key-file".to_string(),
             key_path.display().to_string(),
         ])
-        .env(vec![
-            EnvVariable::new("OPENROUTER_API_URL", server_url.to_owned()),
-            EnvVariable::new("HARNESS_OPENROUTER_LOG", "off"),
-        ]);
-    (AcpAgent::new(McpServer::Stdio(stdio)), key_dir)
+        .env("OPENROUTER_API_URL", server_url.to_owned())
+        .env("HARNESS_OPENROUTER_LOG", "off");
+    (AcpAgent::new(config), key_dir)
 }
 
 pub(super) fn sse(body: &[&str]) -> String {
