@@ -56,6 +56,7 @@ struct TaskBoardOperationsInspector: View {
       ScrollView(.vertical) {
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
           TaskBoardAutomationInspector(store: store, isActive: isVisible)
+          TaskBoardTriageRulesEditor(store: store, isActive: isVisible)
           TaskBoardOperationsPanel(
             store: store,
             taskBoardItems: isVisible ? taskBoardItems : [],
