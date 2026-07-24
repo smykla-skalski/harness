@@ -2745,6 +2745,11 @@ const TASK_BOARD_DISPATCH_EMIT_ONLY: &[&str] = &[
     "TaskBoardDispatchPickResponse",
     "TaskBoardDispatchPickSelection",
 ];
+const TASK_BOARD_WORKING_COPY_SOURCE: &str = include_str!("../src/task_board/working_copy.rs");
+const TASK_BOARD_WORKING_COPY_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardWorkingCopyWireTypes.generated.swift";
+// The task-board working-copy registry row surfaced to the resolve sheet and
+// Settings. Carries the checkout path the app forwards verbatim as project_dir.
+const TASK_BOARD_WORKING_COPY_EMIT_ONLY: &[&str] = &["WorkingCopyListEntry"];
 const POLICY_CANVAS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/PolicyCanvasWireTypes.generated.swift";
 // The policy-canvas read types in the task_board.rs facade. The rest of that file
 // (flatten, alias and struct-variant-tagged types) is excluded by the allow-list,
@@ -3302,6 +3307,12 @@ fn modules() -> Vec<GeneratedModule> {
             ],
         },
         GeneratedModule {
+            output: TASK_BOARD_WORKING_COPY_OUTPUT,
+            description: "the Rust task-board working-copy registry entry",
+            defaults: &[],
+            sources: &[TASK_BOARD_WORKING_COPY_SOURCE],
+        },
+        GeneratedModule {
             output: ACP_PROBE_OUTPUT,
             description: "the Rust acp runtime-probe response",
             defaults: &[],
@@ -3491,6 +3502,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         TASK_BOARD_PLANNING_OUTPUT => TASK_BOARD_PLANNING_EMIT_ONLY,
         TASK_BOARD_EVALUATION_OUTPUT => TASK_BOARD_EVALUATION_EMIT_ONLY,
         TASK_BOARD_DISPATCH_OUTPUT => TASK_BOARD_DISPATCH_EMIT_ONLY,
+        TASK_BOARD_WORKING_COPY_OUTPUT => TASK_BOARD_WORKING_COPY_EMIT_ONLY,
         ACP_PROBE_OUTPUT => ACP_PROBE_EMIT_ONLY,
         AGENT_PERSONA_OUTPUT => AGENT_PERSONA_EMIT_ONLY,
         RUNTIME_MODELS_OUTPUT => RUNTIME_MODELS_EMIT_ONLY,
