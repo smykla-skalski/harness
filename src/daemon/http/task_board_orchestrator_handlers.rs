@@ -5,10 +5,10 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 
 use crate::daemon::protocol::{
-    TaskBoardAutomationForceCancelRequest, TaskBoardAutomationForceCancelResponse,
-    TaskBoardAutomationHistoryRequest, TaskBoardOrchestratorRunOnceRequest,
-    TaskBoardOrchestratorSettingsUpdateRequest, http_paths,
+    TaskBoardAutomationForceCancelRequest, TaskBoardAutomationHistoryRequest,
+    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest, http_paths,
 };
+#[cfg(feature = "openapi")]
 use crate::task_board::{
     TaskBoardAutomationHistoryResponse, TaskBoardAutomationMetrics, TaskBoardAutomationRunDetail,
     TaskBoardOrchestratorSettings, TaskBoardOrchestratorStatus,
@@ -17,6 +17,8 @@ use crate::task_board::{
 use super::DaemonHttpState;
 #[cfg(feature = "openapi")]
 use super::openapi::DaemonErrorBody;
+#[cfg(feature = "openapi")]
+use crate::daemon::protocol::TaskBoardAutomationForceCancelResponse;
 use super::response::timed_json;
 use super::task_board::{authenticated_request, authorized_control_request_parts};
 use super::task_board_route_executor;

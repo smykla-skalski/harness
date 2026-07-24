@@ -4,7 +4,6 @@ use axum::http::HeaderMap;
 use axum::response::Response;
 
 use crate::daemon::protocol::{
-    TaskBoardItemPositionMutationResponse, TaskBoardItemPositionSnapshot,
     TaskBoardResetItemPositionRequest, TaskBoardSetItemPositionRequest, http_paths,
 };
 use crate::daemon::remote_task_board::project_task_board_position_snapshot;
@@ -12,6 +11,10 @@ use crate::daemon::remote_task_board::project_task_board_position_snapshot;
 use super::super::DaemonHttpState;
 #[cfg(feature = "openapi")]
 use super::super::openapi::DaemonErrorBody;
+#[cfg(feature = "openapi")]
+use crate::daemon::protocol::{
+    TaskBoardItemPositionMutationResponse, TaskBoardItemPositionSnapshot,
+};
 use super::super::response::timed_json;
 use super::super::task_board_route_executor;
 use super::items::{authenticated_task_board_read, authorized_control_request_parts};

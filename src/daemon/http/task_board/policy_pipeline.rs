@@ -6,16 +6,19 @@ use axum::response::Response;
 use axum::routing::{get, post};
 
 use crate::daemon::protocol::{
-    PolicyPipelineAuditRequest, PolicyPipelineAuditResponse, PolicyPipelineGetRequest,
-    PolicyPipelineGoLiveDiffRequest, PolicyPipelineGoLiveDiffResponse, PolicyPipelineMakeLiveRequest,
-    PolicyPipelineMakeLiveResponse, PolicyPipelinePromoteRequest, PolicyPipelinePromoteResponse,
-    PolicyPipelineReplayRequest, PolicyPipelineReplayResponse, PolicyPipelineResponse,
-    PolicyPipelineSaveDraftRequest, PolicyPipelineSaveDraftResponse, PolicyPipelineSimulateRequest,
-    PolicyPipelineSimulationResponse, http_paths,
+    PolicyPipelineAuditRequest, PolicyPipelineGetRequest, PolicyPipelineGoLiveDiffRequest,
+    PolicyPipelineMakeLiveRequest, PolicyPipelinePromoteRequest, PolicyPipelineReplayRequest,
+    PolicyPipelineSaveDraftRequest, PolicyPipelineSimulateRequest, http_paths,
 };
 
 #[cfg(feature = "openapi")]
 use super::super::openapi::DaemonErrorBody;
+#[cfg(feature = "openapi")]
+use crate::daemon::protocol::{
+    PolicyPipelineAuditResponse, PolicyPipelineGoLiveDiffResponse, PolicyPipelineMakeLiveResponse,
+    PolicyPipelinePromoteResponse, PolicyPipelineReplayResponse, PolicyPipelineResponse,
+    PolicyPipelineSaveDraftResponse, PolicyPipelineSimulationResponse,
+};
 use super::super::response::timed_json;
 use super::super::{DaemonHttpState, require_async_db, task_board_route_executor};
 use super::authenticated_request;
