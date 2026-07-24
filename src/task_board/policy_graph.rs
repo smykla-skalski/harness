@@ -418,7 +418,6 @@ pub enum PolicyGraphPortDirection {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyGraphSimulation {
     pub mode: PolicyGraphMode,
     pub decision: PolicyDecision,
@@ -435,7 +434,6 @@ pub struct PolicyGraphSimulation {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicySimulationTrace {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entry_node_id: Option<String>,
@@ -455,7 +453,6 @@ pub type PolicyPipelineValidationIssue = PolicyGraphValidationIssue;
 pub type PolicyPipelineValidationCode = PolicyGraphValidationIssue;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyPipelinePort {
     pub id: PolicyGraphPortId,
     pub label: String,

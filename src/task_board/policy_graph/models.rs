@@ -133,7 +133,6 @@ pub struct PolicyApprovalGate {
 /// reached with no existing grant. The caller creates the durable grant
 /// fire-and-forget so evaluation itself stays non-blocking.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PolicyApprovalRequest {
     pub node_id: String,
     pub reason_code: PolicyReasonCode,
