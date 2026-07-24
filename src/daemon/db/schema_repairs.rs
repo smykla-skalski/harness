@@ -197,6 +197,7 @@ fn current_schema_objects_missing(conn: &super::Connection) -> Result<bool, CliE
         "task_board_remote_host_quarantines",
         "task_board_orchestrator_wake_events",
         "task_board_reconciliation_cursors",
+        "task_board_projects",
     ] {
         if !table_exists(conn, table)? {
             return Ok(true);
@@ -276,6 +277,8 @@ pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError>
     super::schema_v47::run(&db.conn)?;
     super::schema_v48::run(&db.conn)?;
     super::schema_v49::run(&db.conn)?;
+    super::schema_v50::run(&db.conn)?;
+    super::schema_v51::run(&db.conn)?;
     super::schema_repairs_external_creates::require_complete_shape(&db.conn)?;
     super::schema_repairs_wake_events::require_complete_shape(&db.conn)?;
     super::schema_repairs_admission::require_complete_shape(&db.conn)?;
@@ -457,3 +460,7 @@ fn column_exists(
     .map(|count| count > 0)
     .map_err(|error| db_error(format!("check {table_name}.{column_name}: {error}")))
 }
+
+#[cfg(test)]
+#[path = "schema_repairs_tests.rs"]
+mod tests;
