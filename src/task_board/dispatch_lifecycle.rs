@@ -6,6 +6,7 @@ use crate::task_board::types::AgentMode;
 use super::{EvaluatorIntent, ReviewerIntent, WorkerIntent};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct DispatchLifecycle {
     pub worker: DispatchLifecycleStep,
     pub reviewer: DispatchLifecycleStep,
@@ -13,6 +14,7 @@ pub struct DispatchLifecycle {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct DispatchLifecycleStep {
     pub phase: DispatchLifecyclePhase,
     pub status: DispatchLifecycleStatus,
@@ -28,6 +30,7 @@ pub struct DispatchLifecycleStep {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum DispatchLifecyclePhase {
     Worker,
     Reviewer,
@@ -36,6 +39,7 @@ pub enum DispatchLifecyclePhase {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum DispatchLifecycleStatus {
     Planned,
     SessionTaskLinked,
@@ -44,6 +48,7 @@ pub enum DispatchLifecycleStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct DispatchNativeSignal {
     pub command: String,
     pub trigger_step: String,

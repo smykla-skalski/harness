@@ -7,6 +7,7 @@ use super::types::{
 };
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardEvaluationSummary {
     pub total: usize,
     pub evaluated: usize,
@@ -23,12 +24,14 @@ pub struct TaskBoardEvaluationSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct EvaluationSignalFailure {
     pub board_item_id: String,
     pub message: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardEvaluationRecord {
     pub board_item_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -52,6 +55,7 @@ pub struct TaskBoardEvaluationRecord {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TaskBoardEvaluationOutcome {
     SkippedUnlinked,
     MissingSession,

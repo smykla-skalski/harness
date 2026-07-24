@@ -62,6 +62,7 @@ mod sessions_mutations;
 mod signals;
 mod stream;
 mod task_board;
+mod task_board_git;
 mod task_board_orchestrator_handlers;
 mod task_board_orchestrator_run_once;
 pub(crate) mod task_board_route_executor;

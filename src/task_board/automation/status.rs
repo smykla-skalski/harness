@@ -7,6 +7,7 @@ pub const TASK_BOARD_AUTOMATION_SNAPSHOT_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TaskBoardAutomationDesiredMode {
     #[default]
     Off,
@@ -16,6 +17,7 @@ pub enum TaskBoardAutomationDesiredMode {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TaskBoardAutomationAdmissionState {
     Accepting,
     Draining,
@@ -25,6 +27,7 @@ pub enum TaskBoardAutomationAdmissionState {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TaskBoardAutomationEffectiveState {
     Offline,
     #[default]
@@ -38,6 +41,7 @@ pub enum TaskBoardAutomationEffectiveState {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TaskBoardAutomationRunTrigger {
     Scheduled,
     Event,
@@ -47,6 +51,7 @@ pub enum TaskBoardAutomationRunTrigger {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TaskBoardAutomationRunState {
     Running,
     Cancelling,
@@ -55,6 +60,7 @@ pub enum TaskBoardAutomationRunState {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TaskBoardAutomationRunOutcome {
     Completed,
     Noop,
@@ -64,6 +70,7 @@ pub enum TaskBoardAutomationRunOutcome {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardAutomationScope {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub item_id: Option<String>,
@@ -78,6 +85,7 @@ pub struct TaskBoardAutomationScope {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardAutomationQueueSummary {
     pub ready: usize,
     pub awaiting_approval: usize,
@@ -91,6 +99,7 @@ pub struct TaskBoardAutomationQueueSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardAutomationRunInfo {
     pub run_id: String,
     pub trigger: TaskBoardAutomationRunTrigger,
@@ -106,6 +115,8 @@ pub struct TaskBoardAutomationRunInfo {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
+#[cfg_attr(feature = "openapi", into_params(parameter_in = Query))]
 pub struct TaskBoardAutomationHistoryRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub limit: Option<u32>,
@@ -121,6 +132,7 @@ impl TaskBoardAutomationHistoryRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardAutomationHistoryResponse {
     pub runs: Vec<TaskBoardAutomationRunInfo>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -129,6 +141,7 @@ pub struct TaskBoardAutomationHistoryResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardAutomationRunStage {
     pub sequence: u64,
     pub stage: String,
@@ -137,10 +150,12 @@ pub struct TaskBoardAutomationRunStage {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "openapi", schema(value_type = Option<Object>))]
     pub payload: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardAutomationRunDetail {
     pub run: TaskBoardAutomationRunInfo,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -152,6 +167,7 @@ pub struct TaskBoardAutomationRunDetail {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardAutomationMetrics {
     pub runs_total: u64,
     pub runs_running: u64,
@@ -165,6 +181,7 @@ pub struct TaskBoardAutomationMetrics {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardAutomationCancelTarget {
     pub execution_id: String,
     pub item_id: String,
@@ -196,6 +213,7 @@ impl TaskBoardAutomationCancelTarget {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardAutomationSnapshot {
     #[serde(default = "default_snapshot_schema_version")]
     pub schema_version: u32,

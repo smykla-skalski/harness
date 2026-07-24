@@ -33,6 +33,7 @@ const MAX_EVALUATOR_IDENTITY_BYTES: usize = 256;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TriageVerdict {
     Todo,
     Undecided,
@@ -45,6 +46,7 @@ pub enum TriageVerdict {
 /// nothing, for the default) travels in the decision's `reason_detail`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TriageReasonCode {
     NeedsInfoLabel,
     NoMeaningfulLabels,
@@ -55,6 +57,7 @@ pub enum TriageReasonCode {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TriageCause {
     Initial,
     FingerprintChanged,
@@ -77,6 +80,7 @@ pub struct TaskBoardTriageDecision {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardTriageDecisionRecord {
     pub decision_id: String,
     pub item_id: String,

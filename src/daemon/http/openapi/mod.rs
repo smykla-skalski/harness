@@ -15,6 +15,8 @@ use utoipa::OpenApi;
 
 use crate::daemon::protocol::{HTTP_API_CONTRACT, HttpRouteMethod};
 
+mod task_board_api;
+
 /// Error envelope returned by daemon handlers on failure.
 ///
 /// Mirrors the dominant shape produced by `error_status_and_body`
@@ -198,6 +200,7 @@ pub fn openapi_document() -> utoipa::openapi::OpenApi {
     doc.merge(TasksAgentsApi::openapi());
     doc.merge(ManagedAgentsApi::openapi());
     doc.merge(ReviewsApi::openapi());
+    doc.merge(task_board_api::TaskBoardApi::openapi());
     env!("CARGO_PKG_VERSION").clone_into(&mut doc.info.version);
     doc
 }
@@ -283,7 +286,10 @@ fn inject_provenance(doc: &mut serde_json::Value) {
 /// Operations whose handler accepts an optional request body
 /// (`Option<Json<..>>`). `utoipa` marks every declared `request_body` as
 /// required, so the optional ones are relaxed here at the JSON layer.
-const OPTIONAL_REQUEST_BODIES: &[(&str, &str)] = &[("post", "/v1/sessions/{session_id}/observe")];
+const OPTIONAL_REQUEST_BODIES: &[(&str, &str)] = &[
+    ("post", "/v1/sessions/{session_id}/observe"),
+    ("post", "/v1/task-board/items/{item_id}/planning/revoke"),
+];
 
 /// Mark the request body optional for operations whose handler tolerates a
 /// missing body, since `utoipa` cannot express `required = false` on

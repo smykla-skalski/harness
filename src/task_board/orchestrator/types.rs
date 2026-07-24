@@ -17,6 +17,7 @@ pub use crate::task_board::github::GitHubProjectConfig as TaskBoardGitHubProject
 pub const CURRENT_ORCHESTRATOR_STATE_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardGitHubInboxConfig {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub repositories: Vec<String>,
@@ -25,12 +26,14 @@ pub struct TaskBoardGitHubInboxConfig {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardTodoistInboxConfig {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub project_filter: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardOrchestratorSettings {
     #[serde(default)]
     pub step_mode: bool,
@@ -67,6 +70,7 @@ pub struct TaskBoardOrchestratorSettings {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardOrchestratorSettingsUpdateRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub step_mode: Option<bool>,
@@ -108,6 +112,7 @@ pub struct TaskBoardOrchestratorSettingsUpdateRequest {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TaskBoardOrchestratorWorkflow {
     DefaultTask,
     PrFix,
@@ -116,6 +121,7 @@ pub enum TaskBoardOrchestratorWorkflow {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardOrchestratorRunOnceRequest {
     #[serde(default, alias = "id", skip_serializing_if = "Option::is_none")]
     pub item_id: Option<String>,
@@ -151,6 +157,7 @@ pub struct TaskBoardOrchestratorPreparedRun {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardOrchestratorStatus {
     pub enabled: bool,
     pub running: bool,
@@ -169,6 +176,7 @@ pub struct TaskBoardOrchestratorStatus {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardHeldDispatchSummary {
     pub count: usize,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -176,6 +184,7 @@ pub struct TaskBoardHeldDispatchSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardHeldDispatchItem {
     pub intent_id: String,
     pub board_item_id: String,
@@ -198,6 +207,7 @@ pub struct TaskBoardOrchestratorState {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardOrchestratorTickInfo {
     pub run_id: String,
     pub phase: TaskBoardOrchestratorTickPhase,
@@ -209,6 +219,7 @@ pub struct TaskBoardOrchestratorTickInfo {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TaskBoardOrchestratorTickPhase {
     Starting,
     Dispatch,
@@ -218,6 +229,7 @@ pub enum TaskBoardOrchestratorTickPhase {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardOrchestratorRunSummary {
     pub run_id: String,
     pub started_at: String,
@@ -238,12 +250,14 @@ pub struct TaskBoardOrchestratorRunSummary {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TaskBoardOrchestratorRunStatus {
     Completed,
     Failed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardWorkflowExecutionCount {
     pub status: TaskBoardWorkflowStatus,
     pub count: usize,

@@ -1,14 +1,27 @@
+#[cfg(feature = "openapi")]
+use std::borrow::Cow;
+
 use clap::ValueEnum;
 use clap::builder::PossibleValue;
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "openapi")]
+use utoipa::openapi::schema::{Schema, Type};
+#[cfg(feature = "openapi")]
+use utoipa::openapi::{ObjectBuilder, RefOr};
+#[cfg(feature = "openapi")]
+use utoipa::{PartialSchema, ToSchema};
 
 use super::automation::TaskBoardWorkflowKind;
+pub use super::item_fields::{
+    ExternalRef, ExternalRefProvider, ExternalRefSyncState, PlanningState, TaskUsage,
+};
 use super::lane::TaskBoardLaneOrigin;
 
 pub const CURRENT_TASK_BOARD_ITEM_VERSION: u32 = 1;
 pub const MAX_TASK_BOARD_ESTIMATE: u64 = i64::MAX as u64;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardItem {
     pub schema_version: u32,
     pub id: String,
@@ -75,6 +88,7 @@ pub struct TaskBoardItem {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TaskBoardTombstoneCause {
     Manual,
     ProviderExclusion,
@@ -125,6 +139,7 @@ impl TaskBoardItem {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardWorkflowState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_id: Option<String>,
@@ -173,6 +188,7 @@ impl TaskBoardWorkflowState {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
 #[value(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TaskBoardWorkflowStatus {
     #[default]
     Idle,
@@ -188,6 +204,7 @@ pub enum TaskBoardWorkflowStatus {
 )]
 #[value(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TaskBoardStatus {
     Backlog,
     #[default]
@@ -274,6 +291,29 @@ impl<'de> Deserialize<'de> for TaskBoardItemKind {
     }
 }
 
+// utoipa cannot derive a schema for the hand-written serde above (it emits a
+// bare string, not a tagged enum), and a `value_type` override is rejected on
+// an enum-variant field such as `DispatchBlockReason::Kind`, so the type owns a
+// manual `{type: string}` component that references cleanly from every use.
+#[cfg(feature = "openapi")]
+impl PartialSchema for TaskBoardItemKind {
+    fn schema() -> RefOr<Schema> {
+        ObjectBuilder::new()
+            .schema_type(Type::String)
+            .description(Some(
+                "Open string enum: `task`, `umbrella`, or a forward-compatible unknown value.",
+            ))
+            .into()
+    }
+}
+
+#[cfg(feature = "openapi")]
+impl ToSchema for TaskBoardItemKind {
+    fn name() -> Cow<'static, str> {
+        Cow::Borrowed("TaskBoardItemKind")
+    }
+}
+
 impl ValueEnum for TaskBoardItemKind {
     fn value_variants<'a>() -> &'a [Self] {
         &[Self::Task, Self::Umbrella]
@@ -306,6 +346,7 @@ impl TaskBoardStatus {
 )]
 #[value(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum TaskBoardPriority {
     Low,
     #[default]
@@ -317,72 +358,13 @@ pub enum TaskBoardPriority {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
 #[value(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum AgentMode {
     #[default]
     Headless,
     Interactive,
     Planning,
     Evaluate,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ExternalRef {
-    pub provider: ExternalRefProvider,
-    pub external_id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub url: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub sync_state: Option<ExternalRefSyncState>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ValueEnum)]
-#[value(rename_all = "snake_case")]
-#[serde(rename_all = "snake_case")]
-pub enum ExternalRefProvider {
-    #[value(name = "github", alias = "git_hub")]
-    #[serde(rename = "github", alias = "git_hub")]
-    GitHub,
-    Todoist,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ExternalRefSyncState {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub body: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub status: Option<TaskBoardStatus>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub project_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub updated_at: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub synced_at: Option<String>,
-    /// The provider's label set as of the last successful sync, so a later
-    /// sync can tell a provider-side removal apart from a locally added tag.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub labels: Vec<String>,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PlanningState {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub summary: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub approved_by: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub approved_at: Option<String>,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-pub struct TaskUsage {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub input_tokens: Option<u64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub output_tokens: Option<u64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cost_usd: Option<f64>,
 }
 
 #[expect(

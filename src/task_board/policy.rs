@@ -27,6 +27,7 @@ pub enum PolicyAction {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "decision", rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum PolicyDecision {
     Allow {
         reason_code: PolicyReasonCode,
@@ -52,6 +53,7 @@ pub enum PolicyDecision {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum PolicyReasonCode {
     DefaultAllow,
     AutoMergeAllowed,
