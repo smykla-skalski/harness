@@ -18,7 +18,7 @@ mod controller_trust;
 pub(crate) mod credentials;
 pub(crate) mod routes;
 pub(crate) mod routes_cleanup;
-mod routes_source_bundle;
+pub(crate) mod routes_source_bundle;
 mod routes_status;
 mod routes_support;
 pub(crate) mod tls_pin;
@@ -36,6 +36,10 @@ mod wire_source;
 mod wire_source_bundle;
 mod wire_source_bundle_recovery;
 mod wire_validation;
+
+// Re-exported so the OpenAPI contract test can recognise transport routes,
+// which sit outside `HTTP_API_CONTRACT` by design.
+pub use routes::execution_operation;
 
 #[cfg(test)]
 mod client_tests;

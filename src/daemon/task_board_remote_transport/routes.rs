@@ -21,6 +21,13 @@ use super::wire_limits::{
 };
 use crate::daemon::db::utc_now;
 use crate::daemon::http::{DaemonHttpState, require_async_db, require_execution_remote_client};
+#[cfg(feature = "openapi")]
+use crate::daemon::http::openapi::DaemonErrorBody;
+#[cfg(feature = "openapi")]
+use super::wire::{
+    RemoteArtifactFetchResponse, RemoteClaimResponse, RemoteHostAdvertisement, RemoteOfferResponse,
+    RemoteSettledResponse, RemoteSourceBundleUploadResponse, RemoteStatusResponse,
+};
 
 pub(crate) const ADVERTISE_PATH: &str = "/v1/task-board-execution/advertise";
 pub(crate) const OFFER_PATH: &str = "/v1/task-board-execution/offers";
@@ -132,7 +139,10 @@ pub(crate) fn execution_http_body_limit(method: &Method, path: &str) -> Option<u
     }
 }
 
-pub(crate) fn execution_operation(method: &Method, path: &str) -> Option<&'static str> {
+/// Recognise a remote-execution transport route. Exposed (via the transport
+/// module re-export) so the OpenAPI contract test can accept documented
+/// transport routes, which sit outside `HTTP_API_CONTRACT` by design.
+pub fn execution_operation(method: &Method, path: &str) -> Option<&'static str> {
     match (method, path) {
         (&Method::GET, ADVERTISE_PATH) => Some("advertise"),
         (&Method::POST, OFFER_PATH) => Some("offer"),
@@ -150,6 +160,16 @@ pub(crate) fn execution_operation(method: &Method, path: &str) -> Option<&'stati
     }
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/task-board-execution/source-bundles/upload",
+    tag = "task-board-execution",
+    request_body = RemoteSourceBundleUploadRequest,
+    responses(
+        (status = 200, description = "Stored source-bundle receipt", body = RemoteSourceBundleUploadResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 async fn upload_source_bundle(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -179,6 +199,15 @@ async fn upload_source_bundle(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/v1/task-board-execution/advertise",
+    tag = "task-board-execution",
+    responses(
+        (status = 200, description = "Execution host identity and its active assignment bindings", body = RemoteHostAdvertisement),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 async fn advertise(headers: HeaderMap, State(state): State<DaemonHttpState>) -> Response {
     map_route_result(
         async {
@@ -199,6 +228,16 @@ async fn advertise(headers: HeaderMap, State(state): State<DaemonHttpState>) -> 
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/task-board-execution/offers",
+    tag = "task-board-execution",
+    request_body = RemoteOfferRequest,
+    responses(
+        (status = 200, description = "Offer disposition and, when accepted, the assignment lease", body = RemoteOfferResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 async fn offer(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -223,6 +262,16 @@ async fn offer(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/task-board-execution/claims",
+    tag = "task-board-execution",
+    request_body = RemoteClaimRequest,
+    responses(
+        (status = 200, description = "Immutable claim receipt for the assignment", body = RemoteClaimResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 async fn claim(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -246,6 +295,16 @@ async fn claim(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/task-board-execution/leases/renew",
+    tag = "task-board-execution",
+    request_body = RemoteLeaseRenewRequest,
+    responses(
+        (status = 200, description = "Renewed lease for the claimed assignment", body = RemoteLeaseRenewResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 async fn renew_lease(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -271,6 +330,16 @@ async fn renew_lease(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/task-board-execution/status",
+    tag = "task-board-execution",
+    request_body = RemoteStatusRequest,
+    responses(
+        (status = 200, description = "Authoritative status of the claimed assignment", body = RemoteStatusResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 async fn status(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -295,6 +364,16 @@ async fn status(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/task-board-execution/cancel",
+    tag = "task-board-execution",
+    request_body = RemoteCancelRequest,
+    responses(
+        (status = 200, description = "Terminal cancellation record for the assignment", body = RemoteCancelResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 async fn cancel(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -327,6 +406,16 @@ async fn cancel(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/task-board-execution/settled",
+    tag = "task-board-execution",
+    request_body = RemoteSettledRequest,
+    responses(
+        (status = 200, description = "Settlement record for the completed assignment", body = RemoteSettledResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 async fn settled(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -346,6 +435,17 @@ async fn settled(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/task-board-execution/artifacts/fetch",
+    tag = "task-board-execution",
+    description = "Fetch a stored result artifact for an assignment. Responds 503 with the REMOTE_ARTIFACT_UNAVAILABLE code when the executor's artifact storage is unavailable.",
+    request_body = RemoteArtifactFetchRequest,
+    responses(
+        (status = 200, description = "Requested result artifact", body = RemoteArtifactFetchResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 async fn fetch_artifact(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,

@@ -11,8 +11,10 @@
 
 use std::collections::BTreeSet;
 
+use axum::http::Method;
 use harness::daemon::http::openapi::openapi_json_value;
 use harness::daemon::protocol::HTTP_API_CONTRACT;
+use harness::daemon::task_board_remote_transport::execution_operation;
 
 const HTTP_METHODS: [&str; 4] = ["get", "post", "put", "delete"];
 
@@ -195,6 +197,20 @@ const DOCUMENTED_ROUTES: &[(&str, &str)] = &[
     ("POST", "/v1/policy-scenarios/reset"),
     ("POST", "/v1/policies/dump"),
     ("POST", "/v1/policies/import"),
+    // Remote-execution transport: documented but outside HTTP_API_CONTRACT;
+    // recognised by task_board_remote_transport::execution_operation.
+    ("GET", "/v1/task-board-execution/advertise"),
+    ("POST", "/v1/task-board-execution/offers"),
+    ("POST", "/v1/task-board-execution/source-bundles/upload"),
+    ("POST", "/v1/task-board-execution/source-bundles/receipt"),
+    ("POST", "/v1/task-board-execution/source-bundles/abandon"),
+    ("POST", "/v1/task-board-execution/claims"),
+    ("POST", "/v1/task-board-execution/leases/renew"),
+    ("POST", "/v1/task-board-execution/status"),
+    ("POST", "/v1/task-board-execution/cancel"),
+    ("POST", "/v1/task-board-execution/settled"),
+    ("POST", "/v1/task-board-execution/artifacts/fetch"),
+    ("POST", "/v1/task-board-execution/cleanup/observe"),
 ];
 
 fn documented_operations() -> BTreeSet<(String, String)> {
@@ -239,13 +255,17 @@ fn documented_operations_match_annotation_allowlist() {
 #[test]
 fn documented_routes_exist_in_contract() {
     for (method, path) in DOCUMENTED_ROUTES {
-        let found = HTTP_API_CONTRACT
+        let in_contract = HTTP_API_CONTRACT
             .iter()
             .any(|route| route.method.as_str() == *method && route.path == *path);
+        let in_transport = Method::from_bytes(method.as_bytes())
+            .ok()
+            .is_some_and(|method| execution_operation(&method, path).is_some());
         assert!(
-            found,
-            "documented route {method} {path} is absent from HTTP_API_CONTRACT \
-             (did a #[utoipa::path] literal drift from http_paths?)"
+            in_contract || in_transport,
+            "documented route {method} {path} is absent from both HTTP_API_CONTRACT and the \
+             remote-execution transport (did a #[utoipa::path] literal drift from http_paths \
+             or execution_operation?)"
         );
     }
 }
