@@ -33,11 +33,16 @@ use super::frames::{error_response, error_response_with_payload};
 use super::mutations::{cli_error_response, dispatch_query_result};
 use super::params::{extract_managed_agent_id, extract_session_id, extract_string_param};
 
+mod acp_sessions;
 mod managed_agents;
 #[cfg(test)]
 mod tests;
 mod voice;
 
+pub(crate) use self::acp_sessions::{
+    dispatch_managed_agent_close_acp_session, dispatch_managed_agent_delete_acp_session,
+    dispatch_managed_agent_logout_acp,
+};
 pub(crate) use self::managed_agents::{
     dispatch_managed_agent_input, dispatch_managed_agent_interrupt_codex,
     dispatch_managed_agent_prompt_acp, dispatch_managed_agent_ready, dispatch_managed_agent_resize,

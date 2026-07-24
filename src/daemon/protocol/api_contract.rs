@@ -18,10 +18,31 @@ impl HttpRouteMethod {
     }
 }
 
+/// Why a route carries no WebSocket RPC mirror. Every exemption must name one
+/// of these; there is deliberately no "not built yet" variant, so a route that
+/// merely lacks a client path is a parity gap to close, not an exemption to
+/// record. See `docs/api/websocket-parity-exemptions.md` for the audit that
+/// classified each current exemption.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WsExemptionKind {
+    /// The route can never be a single request-and-response RPC call: a
+    /// connection upgrade, a long-lived server-sent stream, or a liveness probe
+    /// that exists to stay transport-plain.
+    Structural,
+    /// The route is request/response and could be expressed as an RPC method,
+    /// but is deliberately kept HTTP-only for a durable reason (a pre-auth
+    /// bootstrap that cannot ride the authenticated RPC channel, a one-way
+    /// ingestion path, or a bulk CLI transfer outside the interactive surface).
+    StandingDecision,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HttpRouteParity {
     Rpc { ws_method: &'static str },
-    Exempt { reason: &'static str },
+    Exempt {
+        kind: WsExemptionKind,
+        reason: &'static str,
+    },
 }
 
 impl HttpRouteParity {
@@ -37,7 +58,15 @@ impl HttpRouteParity {
     pub const fn exemption_reason(self) -> Option<&'static str> {
         match self {
             Self::Rpc { .. } => None,
-            Self::Exempt { reason } => Some(reason),
+            Self::Exempt { reason, .. } => Some(reason),
+        }
+    }
+
+    #[must_use]
+    pub const fn exemption_kind(self) -> Option<WsExemptionKind> {
+        match self {
+            Self::Rpc { .. } => None,
+            Self::Exempt { kind, .. } => Some(kind),
         }
     }
 }

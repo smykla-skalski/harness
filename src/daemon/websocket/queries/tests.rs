@@ -230,6 +230,43 @@ async fn dispatch_read_query_managed_agent_acp_inspect_returns_acp_disabled_when
 }
 
 #[tokio::test]
+async fn dispatch_read_query_managed_agent_acp_sessions_requires_managed_agent_id() {
+    let state = test_http_state_with_db();
+    let request = WsRequest {
+        id: "req-acp-sessions-missing".into(),
+        method: "managed_agent.acp_sessions".into(),
+        params: serde_json::json!({}),
+        trace_context: None,
+    };
+
+    let response = dispatch_read_query(&request, &state).await;
+
+    let error = response.error.expect("missing param error");
+    assert_eq!(error.code, "MISSING_PARAM");
+    assert_eq!(error.message, "missing managed_agent_id");
+}
+
+#[tokio::test]
+async fn dispatch_read_query_managed_agent_acp_sessions_returns_acp_disabled_when_feature_flag_off()
+{
+    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("0"))], async {
+        let state = test_http_state_with_db();
+        let request = WsRequest {
+            id: "req-acp-sessions-disabled".into(),
+            method: "managed_agent.acp_sessions".into(),
+            params: serde_json::json!({ "managed_agent_id": "acp-worker" }),
+            trace_context: None,
+        };
+
+        let response = dispatch_read_query(&request, &state).await;
+
+        let error = response.error.expect("ACP disabled error");
+        assert_eq!(error.code, "ACP_DISABLED");
+    })
+    .await;
+}
+
+#[tokio::test]
 async fn dispatch_read_query_managed_agent_acp_inspect_uses_session_id_scope() {
     temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
         let state = test_http_state_with_db();

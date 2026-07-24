@@ -411,7 +411,7 @@ pub(crate) async fn dispatch_managed_agent_resolve_acp_permission(
     dispatch_managed_agent_response(request, state, result).await
 }
 
-async fn with_managed_agent_lock<T, Fut>(
+pub(super) async fn with_managed_agent_lock<T, Fut>(
     state: &DaemonHttpState,
     session_id: &str,
     agent_id: &str,
@@ -514,7 +514,7 @@ fn codex_session_id(state: &DaemonHttpState, agent_id: &str) -> Result<String, C
     state.codex_controller.run(agent_id).map(|s| s.session_id)
 }
 
-fn acp_session_id(state: &DaemonHttpState, agent_id: &str) -> Result<String, CliError> {
+pub(super) fn acp_session_id(state: &DaemonHttpState, agent_id: &str) -> Result<String, CliError> {
     ensure_acp_agent(state, agent_id)?;
     state.acp_agent_manager.get(agent_id).map(|s| s.session_id)
 }

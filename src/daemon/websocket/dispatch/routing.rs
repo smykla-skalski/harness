@@ -7,9 +7,10 @@ use super::super::connection::ConnectionState;
 use super::super::frames::ok_response;
 use super::super::mutations::{dispatch_session_start, dispatch_set_log_level};
 use super::super::parity::{
-    dispatch_bridge_reconfigure, dispatch_managed_agent_input,
-    dispatch_managed_agent_interrupt_codex, dispatch_managed_agent_prompt_acp,
-    dispatch_managed_agent_ready, dispatch_managed_agent_resize,
+    dispatch_bridge_reconfigure, dispatch_managed_agent_close_acp_session,
+    dispatch_managed_agent_delete_acp_session, dispatch_managed_agent_input,
+    dispatch_managed_agent_interrupt_codex, dispatch_managed_agent_logout_acp,
+    dispatch_managed_agent_prompt_acp, dispatch_managed_agent_ready, dispatch_managed_agent_resize,
     dispatch_managed_agent_resolve_acp_permission, dispatch_managed_agent_resolve_codex_approval,
     dispatch_managed_agent_start_acp, dispatch_managed_agent_start_codex,
     dispatch_managed_agent_start_terminal, dispatch_managed_agent_steer_codex,
@@ -143,6 +144,7 @@ async fn dispatch_read_method(
             | ws_methods::MANAGED_AGENTS_CODEX_TRANSCRIPT
             | ws_methods::MANAGED_AGENTS_ACP_INSPECT
             | ws_methods::MANAGED_AGENTS_ACP_TRANSCRIPT
+            | ws_methods::MANAGED_AGENTS_ACP_SESSIONS
             | ws_methods::OPENROUTER_LIST_MODELS
     ) {
         Some(
@@ -394,6 +396,15 @@ async fn dispatch_acp_managed_agent_mutation(
         }
         ws_methods::MANAGED_AGENT_RESOLVE_ACP_PERMISSION => {
             Some(dispatch_managed_agent_resolve_acp_permission(request, state).await)
+        }
+        ws_methods::MANAGED_AGENT_LOGOUT_ACP => {
+            Some(dispatch_managed_agent_logout_acp(request, state).await)
+        }
+        ws_methods::MANAGED_AGENT_DELETE_ACP_SESSION => {
+            Some(dispatch_managed_agent_delete_acp_session(request, state).await)
+        }
+        ws_methods::MANAGED_AGENT_CLOSE_ACP_SESSION => {
+            Some(dispatch_managed_agent_close_acp_session(request, state).await)
         }
         _ => None,
     }

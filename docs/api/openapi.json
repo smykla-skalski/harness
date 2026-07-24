@@ -1245,7 +1245,8 @@
           "504": {
             "$ref": "#/components/responses/RemoteRequestTimedOut"
           }
-        }
+        },
+        "x-websocket-method": "managed_agent.logout_acp"
       }
     },
     "/v1/managed-agents/{managed_agent_id}/permission-batches/{batch_id}": {
@@ -1610,7 +1611,8 @@
           "504": {
             "$ref": "#/components/responses/RemoteRequestTimedOut"
           }
-        }
+        },
+        "x-websocket-method": "managed_agent.acp_sessions"
       }
     },
     "/v1/managed-agents/{managed_agent_id}/sessions/{agent_session_id}": {
@@ -1678,7 +1680,8 @@
           "504": {
             "$ref": "#/components/responses/RemoteRequestTimedOut"
           }
-        }
+        },
+        "x-websocket-method": "managed_agent.delete_acp_session"
       }
     },
     "/v1/managed-agents/{managed_agent_id}/sessions/{agent_session_id}/close": {
@@ -1746,7 +1749,8 @@
           "504": {
             "$ref": "#/components/responses/RemoteRequestTimedOut"
           }
-        }
+        },
+        "x-websocket-method": "managed_agent.close_acp_session"
       }
     },
     "/v1/managed-agents/{managed_agent_id}/steer": {

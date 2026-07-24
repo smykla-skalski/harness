@@ -305,3 +305,82 @@ fn session_adopt_reports_poisoned_db_lock_as_ws_error() {
         );
     });
 }
+
+#[tokio::test]
+async fn dispatch_managed_agent_logout_acp_returns_acp_disabled_when_feature_flag_off() {
+    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("0"))], async {
+        let state = super::super::test_support::test_ws_state();
+        let request = WsRequest {
+            id: "req-logout-acp-disabled".into(),
+            method: "managed_agent.logout_acp".into(),
+            params: json!({ "managed_agent_id": "acp-worker" }),
+            trace_context: None,
+        };
+
+        let response = dispatch_managed_agent_logout_acp(&request, &state).await;
+
+        let error = response.error.expect("ACP disabled error");
+        assert_eq!(error.code, "ACP_DISABLED");
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn dispatch_managed_agent_delete_acp_session_requires_agent_session_id() {
+    // ACP must be enabled to reach param validation: the handler fails fast on
+    // the feature flag first, matching the rest of the ACP mutation surface.
+    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
+        let state = super::super::test_support::test_ws_state();
+        let request = WsRequest {
+            id: "req-delete-acp-session-missing".into(),
+            method: "managed_agent.delete_acp_session".into(),
+            params: json!({ "managed_agent_id": "acp-worker" }),
+            trace_context: None,
+        };
+
+        let response = dispatch_managed_agent_delete_acp_session(&request, &state).await;
+
+        let error = response.error.expect("missing param error");
+        assert_eq!(error.code, "MISSING_PARAM");
+        assert_eq!(error.message, "missing agent_session_id");
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn dispatch_managed_agent_delete_acp_session_returns_acp_disabled_when_feature_flag_off() {
+    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("0"))], async {
+        let state = super::super::test_support::test_ws_state();
+        let request = WsRequest {
+            id: "req-delete-acp-session-disabled".into(),
+            method: "managed_agent.delete_acp_session".into(),
+            params: json!({ "managed_agent_id": "acp-worker", "agent_session_id": "sess-1" }),
+            trace_context: None,
+        };
+
+        let response = dispatch_managed_agent_delete_acp_session(&request, &state).await;
+
+        let error = response.error.expect("ACP disabled error");
+        assert_eq!(error.code, "ACP_DISABLED");
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn dispatch_managed_agent_close_acp_session_returns_acp_disabled_when_feature_flag_off() {
+    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("0"))], async {
+        let state = super::super::test_support::test_ws_state();
+        let request = WsRequest {
+            id: "req-close-acp-session-disabled".into(),
+            method: "managed_agent.close_acp_session".into(),
+            params: json!({ "managed_agent_id": "acp-worker", "agent_session_id": "sess-1" }),
+            trace_context: None,
+        };
+
+        let response = dispatch_managed_agent_close_acp_session(&request, &state).await;
+
+        let error = response.error.expect("ACP disabled error");
+        assert_eq!(error.code, "ACP_DISABLED");
+    })
+    .await;
+}

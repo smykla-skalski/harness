@@ -20,7 +20,7 @@ fn every_non_exempt_http_route_has_a_ws_mapping() {
 #[test]
 fn explicit_non_rpc_exemptions_are_documented_and_stable() {
     let exemptions = explicit_exemptions();
-    assert_eq!(exemptions.len(), 15, "unexpected exemption count");
+    assert_eq!(exemptions.len(), 11, "unexpected exemption count");
     let exempt_paths: BTreeSet<_> = exemptions.iter().map(|route| route.path).collect();
     assert_eq!(
         exempt_paths,
@@ -36,18 +36,68 @@ fn explicit_non_rpc_exemptions_are_documented_and_stable() {
             http_paths::SESSION_STREAM,
             http_paths::READY,
             http_paths::MANAGED_AGENT_ATTACH,
-            http_paths::MANAGED_AGENT_ACP_LOGOUT,
-            http_paths::MANAGED_AGENT_ACP_SESSIONS,
-            http_paths::MANAGED_AGENT_ACP_SESSION_DELETE,
-            http_paths::MANAGED_AGENT_ACP_SESSION_CLOSE,
         ])
     );
-    assert!(exemptions.iter().all(|route| {
-        route
+}
+
+/// Placeholder-reason guard. Every exemption must be classified structural or a
+/// standing decision and must not lean on "no client consumes it yet" wording. A
+/// route that merely lacks a client path is a parity gap to close, not an
+/// exemption to record, so this stops a future placeholder from passing as a
+/// warranted exemption. See `docs/api/websocket-parity-exemptions.md`.
+#[test]
+fn every_exemption_is_classified_with_a_durable_reason() {
+    // Substrings that betray an unbuilt-client placeholder rather than a decision.
+    const PROVISIONAL_MARKERS: &[&str] = &[
+        "yet",
+        "no client",
+        "no monitor",
+        "not built",
+        "unbuilt",
+        "for now",
+        "provisional",
+        "todo",
+        "will be",
+        "planned",
+        "not implemented",
+        "consumes it",
+        "not consumed",
+    ];
+    for route in explicit_exemptions() {
+        let kind = route
+            .parity
+            .exemption_kind()
+            .expect("exempt route must declare a kind");
+        assert!(
+            matches!(
+                kind,
+                WsExemptionKind::Structural | WsExemptionKind::StandingDecision
+            ),
+            "{} {} must be structural or a standing decision",
+            route.method.as_str(),
+            route.path
+        );
+        let reason = route
             .parity
             .exemption_reason()
-            .is_some_and(|reason| !reason.is_empty())
-    }));
+            .expect("exempt route must carry a reason");
+        assert!(
+            !reason.trim().is_empty(),
+            "{} {} has an empty exemption reason",
+            route.method.as_str(),
+            route.path
+        );
+        let lowered = reason.to_ascii_lowercase();
+        for marker in PROVISIONAL_MARKERS {
+            assert!(
+                !lowered.contains(marker),
+                "{} {}: exemption reason reads as an unbuilt placeholder (\"{marker}\"); close the \
+                 parity gap or record a durable structural / standing-decision reason",
+                route.method.as_str(),
+                route.path
+            );
+        }
+    }
 }
 
 #[test]

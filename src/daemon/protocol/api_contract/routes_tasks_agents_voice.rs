@@ -1,4 +1,6 @@
-use super::{HttpApiRouteContract, HttpRouteMethod, HttpRouteParity, http_paths, ws_methods};
+use super::{
+    HttpApiRouteContract, HttpRouteMethod, HttpRouteParity, WsExemptionKind, http_paths, ws_methods,
+};
 
 pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     HttpApiRouteContract {
@@ -205,7 +207,8 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         method: HttpRouteMethod::Get,
         path: http_paths::MANAGED_AGENT_ATTACH,
         parity: HttpRouteParity::Exempt {
-            reason: "managed agent attach upgrades into a raw terminal stream",
+            kind: WsExemptionKind::Structural,
+            reason: "managed agent attach upgrades the connection into a raw terminal stream",
         },
         swift_client_exposed: false,
     },
@@ -260,32 +263,32 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
         path: http_paths::MANAGED_AGENT_ACP_LOGOUT,
-        parity: HttpRouteParity::Exempt {
-            reason: "CLI-only ACP auth action; no Monitor surface consumes it yet",
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::MANAGED_AGENT_LOGOUT_ACP,
         },
         swift_client_exposed: false,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Get,
         path: http_paths::MANAGED_AGENT_ACP_SESSIONS,
-        parity: HttpRouteParity::Exempt {
-            reason: "CLI-only view of agent-owned sessions; no Monitor surface consumes it yet",
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::MANAGED_AGENTS_ACP_SESSIONS,
         },
         swift_client_exposed: false,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Delete,
         path: http_paths::MANAGED_AGENT_ACP_SESSION_DELETE,
-        parity: HttpRouteParity::Exempt {
-            reason: "CLI-only ACP session lifecycle action; no Monitor surface consumes it yet",
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::MANAGED_AGENT_DELETE_ACP_SESSION,
         },
         swift_client_exposed: false,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
         path: http_paths::MANAGED_AGENT_ACP_SESSION_CLOSE,
-        parity: HttpRouteParity::Exempt {
-            reason: "CLI-only ACP session lifecycle action; no Monitor surface consumes it yet",
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::MANAGED_AGENT_CLOSE_ACP_SESSION,
         },
         swift_client_exposed: false,
     },
