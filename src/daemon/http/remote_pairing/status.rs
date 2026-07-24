@@ -21,6 +21,9 @@ use crate::workspace::utc_now;
 use super::super::response::{extract_request_id, timed_json, timed_response};
 use super::super::{DaemonConnectInfo, DaemonHttpState};
 
+#[cfg(feature = "openapi")]
+use super::super::openapi::DaemonErrorBody;
+
 const ROUTE_REMOTE_PAIR_STATUS: &str = "remote.pair.status";
 const ROUTE_REMOTE_PAIR_STATUS_RATE_LIMIT: &str = "remote.pair.status.rate_limit";
 const UNAVAILABLE_DETAIL: &str = "remote pairing status unavailable";
@@ -45,6 +48,17 @@ struct RemotePairStatusHttpResponse {
     status: &'static str,
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/remote/pair/status",
+    tag = "pairing",
+    request_body = RemotePairStatusHttpRequest,
+    description = "Check the lifecycle status of a pairing request by its opaque id. Public: no daemon credentials, rate limited, output redacted. Error bodies use an ad-hoc error object carrying code and message but no details field.",
+    responses(
+        (status = 200, description = "Current pairing status", body = RemotePairStatusHttpResponse),
+        (status = 400, description = "Malformed status request", body = DaemonErrorBody),
+    ),
+))]
 async fn post_remote_pair_status(
     ConnectInfo(connect_info): ConnectInfo<DaemonConnectInfo>,
     headers: HeaderMap,

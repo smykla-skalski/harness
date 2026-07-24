@@ -19,6 +19,9 @@ use crate::workspace::utc_now;
 use super::response::{extract_request_id, timed_response};
 use super::{DaemonHttpState, authenticated_remote_client, require_async_db};
 
+#[cfg(feature = "openapi")]
+use super::openapi::DaemonErrorBody;
+
 pub(super) fn remote_client_routes() -> Router<DaemonHttpState> {
     Router::new().route(
         http_paths::REMOTE_CLIENT_SELF_REVOKE,
@@ -33,6 +36,16 @@ struct RemoteClientSelfRevokeResponse {
     revoked_at: String,
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/remote/client/revoke",
+    tag = "pairing",
+    description = "Revoke the remote client credential bound to the authenticated caller. Error bodies use an ad-hoc error object carrying code and message but no details field.",
+    responses(
+        (status = 200, description = "Client credential revoked", body = RemoteClientSelfRevokeResponse),
+        (status = 400, description = "Revocation failed", body = DaemonErrorBody),
+    ),
+))]
 async fn post_remote_client_self_revoke(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
