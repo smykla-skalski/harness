@@ -24,11 +24,13 @@ mod automation_run;
 mod item_ops;
 mod orchestrator_ops;
 mod policy_ops;
+mod triage_rules_ops;
 mod worker_start;
 
 pub(crate) use item_ops::*;
 pub(crate) use orchestrator_ops::*;
 pub(crate) use policy_ops::*;
+pub(crate) use triage_rules_ops::*;
 
 pub(super) async fn run_blocking<T, F>(operation: &'static str, work: F) -> Result<T, CliError>
 where

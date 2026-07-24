@@ -8,9 +8,10 @@ use super::{
     AgentRemoveRequest, CodexRunRequest, ImproverApplyRequest, LeaderTransferRequest,
     ObserveSessionRequest, RoleChangeRequest, SessionArchiveRequest, SessionEndRequest,
     SignalCancelRequest, SignalSendRequest, TaskArbitrateRequest, TaskAssignRequest,
-    TaskBoardAutomationForceCancelRequest, TaskBoardClearTriageOverrideRequest,
-    TaskBoardDispatchRequest, TaskBoardEvaluateRequest, TaskBoardOrchestratorRunOnceRequest,
-    TaskBoardPlanApproveRequest, TaskBoardPlanRevokeRequest, TaskBoardResetItemPositionRequest,
+    TaskBoardActivateTriageRulesRequest, TaskBoardAutomationForceCancelRequest,
+    TaskBoardClearTriageOverrideRequest, TaskBoardDispatchRequest, TaskBoardEvaluateRequest,
+    TaskBoardOrchestratorRunOnceRequest, TaskBoardPlanApproveRequest, TaskBoardPlanRevokeRequest,
+    TaskBoardResetItemPositionRequest, TaskBoardSaveTriageRulesDraftRequest,
     TaskBoardSetItemPositionRequest, TaskBoardSetTriageOverrideRequest, TaskCheckpointRequest,
     TaskClaimReviewRequest, TaskCreateRequest, TaskDeleteRequest, TaskDropRequest,
     TaskQueuePolicyRequest, TaskRespondReviewRequest, TaskSubmitForReviewRequest,
@@ -268,6 +269,18 @@ impl ControlPlaneActorRequest for TaskBoardSetTriageOverrideRequest {
 }
 
 impl ControlPlaneActorRequest for TaskBoardClearTriageOverrideRequest {
+    fn bind_control_plane_actor(&mut self) {
+        bind_required_control_plane_actor(&mut self.actor);
+    }
+}
+
+impl ControlPlaneActorRequest for TaskBoardSaveTriageRulesDraftRequest {
+    fn bind_control_plane_actor(&mut self) {
+        bind_required_control_plane_actor(&mut self.actor);
+    }
+}
+
+impl ControlPlaneActorRequest for TaskBoardActivateTriageRulesRequest {
     fn bind_control_plane_actor(&mut self) {
         bind_required_control_plane_actor(&mut self.actor);
     }

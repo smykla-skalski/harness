@@ -56,6 +56,11 @@ pub const TASK_BOARD_ITEM_TRIAGE_HISTORY: &str = "/v1/task-board/items/{item_id}
 pub const TASK_BOARD_ITEM_TRIAGE_OVERRIDE: &str = "/v1/task-board/items/{item_id}/triage/override";
 pub const TASK_BOARD_ITEM_TRIAGE_OVERRIDE_CLEAR: &str =
     "/v1/task-board/items/{item_id}/triage/override/clear";
+pub const TASK_BOARD_TRIAGE_RULES_DRAFT: &str = "/v1/task-board/triage/rules/draft";
+pub const TASK_BOARD_TRIAGE_RULES_PREVIEW: &str = "/v1/task-board/triage/rules/preview";
+pub const TASK_BOARD_TRIAGE_RULES_ACTIVATE: &str = "/v1/task-board/triage/rules/activate";
+pub const TASK_BOARD_TRIAGE_RULES_REVISIONS: &str = "/v1/task-board/triage/rules/revisions";
+pub const TASK_BOARD_TRIAGE_RULES_AUDIT: &str = "/v1/task-board/triage/rules/audit";
 pub const TASK_BOARD_PLAN_BEGIN: &str = "/v1/task-board/items/{item_id}/planning/begin";
 pub const TASK_BOARD_PLAN_SUBMIT: &str = "/v1/task-board/items/{item_id}/planning/submit";
 pub const TASK_BOARD_PLAN_APPROVE: &str = "/v1/task-board/items/{item_id}/planning/approve";

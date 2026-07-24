@@ -23,6 +23,7 @@ mod policy;
 mod read;
 mod secret_handoff;
 mod triage;
+mod triage_rules;
 
 #[expect(
     clippy::cognitive_complexity,
@@ -34,6 +35,9 @@ pub(crate) async fn dispatch_task_board_method(
     connection: &Arc<Mutex<ConnectionState>>,
 ) -> Option<WsResponse> {
     if let Some(response) = Box::pin(orchestrator::dispatch_method(request, state)).await {
+        return Some(response);
+    }
+    if let Some(response) = triage_rules::dispatch_method(request, state).await {
         return Some(response);
     }
     match request.method.as_str() {
