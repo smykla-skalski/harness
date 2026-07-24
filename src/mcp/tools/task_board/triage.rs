@@ -84,6 +84,11 @@ fn id_only_schema() -> Value {
     })
 }
 
+// `before_generation` is a u64 the wire format also accepts as a decimal
+// string, which is how a cursor past the JSON-safe integer range survives a
+// client that cannot hold it as a number. Advertising integer only would make
+// this validator reject that form before the request ever leaves.
+//
 // The upper bound on `limit` lives with the page validation in the daemon's
 // protocol crate, which this shared MCP source cannot reach. Advertising only
 // the lower bound keeps one owner for the ceiling instead of a copy that rots.
@@ -92,7 +97,12 @@ fn triage_history_schema() -> Value {
         "type": "object",
         "properties": {
             "id": { "type": "string" },
-            "before_generation": { "type": "integer", "minimum": 1 },
+            "before_generation": {
+                "anyOf": [
+                    { "type": "integer", "minimum": 1 },
+                    { "type": "string", "pattern": "^[1-9][0-9]*$" }
+                ]
+            },
             "limit": { "type": "integer", "minimum": 1 }
         },
         "required": ["id"],
@@ -178,4 +188,22 @@ fn limit_only_schema() -> Value {
         },
         "additionalProperties": false
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::triage_history_schema;
+
+    #[test]
+    fn history_cursor_advertises_both_wire_forms() {
+        let cursor = &triage_history_schema()["properties"]["before_generation"];
+
+        let variants = cursor["anyOf"]
+            .as_array()
+            .expect("cursor advertises variants");
+        assert!(variants.contains(&json!({ "type": "integer", "minimum": 1 })));
+        assert!(variants.iter().any(|variant| variant["type"] == "string"));
+    }
 }
