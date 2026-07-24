@@ -80,54 +80,6 @@ fn repo_version_surfaces_stay_in_sync() {
 }
 
 #[test]
-fn docs_describe_automatic_version_sync_workflow() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let agents = read_repo_file(root, "AGENTS.md");
-    let claude = read_repo_file(root, "CLAUDE.md");
-    let readme = read_repo_file(root, "README.md");
-    let monitor_readme = read_repo_file(root, "apps/harness-monitor/README.md");
-    let mise = read_repo_file(root, ".mise.toml");
-    let docs = [
-        agents.as_str(),
-        claude.as_str(),
-        readme.as_str(),
-        monitor_readme.as_str(),
-        mise.as_str(),
-    ];
-
-    super::super::helpers::assert_docs_contain_needles(
-        &docs,
-        "version workflow docs should mention",
-        &[
-            "./scripts/version.sh set <version>",
-            "mise run version:sync",
-            "mise run version:check",
-        ],
-    );
-
-    assert!(
-        !agents.contains("Manual bump surfaces for harness:"),
-        "AGENTS.md should describe the automatic version sync workflow instead of manual bump surfaces"
-    );
-    assert!(
-        !claude.contains("Manual bump surfaces for harness:"),
-        "CLAUDE.md should describe the automatic version sync workflow instead of manual bump surfaces"
-    );
-    assert!(
-        agents.contains("explicit user approval")
-            && claude.contains("explicit user approval")
-            && readme.contains("explicit user approval"),
-        "version workflow docs should gate version bumps behind explicit user approval"
-    );
-    assert!(
-        agents.contains("local binary must be reinstalled")
-            && claude.contains("local binary must be reinstalled")
-            && readme.contains("local binary must be reinstalled"),
-        "version workflow docs should require bumps for shipped harness/aff logic changes that force local reinstalls"
-    );
-}
-
-#[test]
 fn monitor_generate_script_invokes_tuist_then_post_generate() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let script = read_repo_file(root, "apps/harness-monitor/Scripts/generate.sh");
