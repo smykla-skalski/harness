@@ -44,6 +44,16 @@ final class MobileRemoteDaemonPairingTests: XCTestCase {
     XCTAssertEqual(decoded, relayInvitation)
   }
 
+  func testRelayInvitationDecodesWithMixedCaseSchemeAndHost() throws {
+    let now = Date(timeIntervalSince1970: 1_752_124_400)
+    let relayInvitation = makePairingInvitation(now: now)
+    let encoded = try pairingPayload(from: MobilePairingInvitationCodec.encode(relayInvitation))
+    let mixedCase = try XCTUnwrap(URL(string: "HARNESS://PAIR?payload=\(encoded)"))
+
+    XCTAssertEqual(try MobilePairingLink.decode(mixedCase, now: now), .relay(relayInvitation))
+    XCTAssertEqual(try MobilePairingInvitationCodec.decode(mixedCase, now: now), relayInvitation)
+  }
+
   func testPairingLinkRejectsUnrecognizedPayload() throws {
     let payload = try payloadURL(
       object: ["endpoint": "https://daemon.example.com", "unrelated": true]

@@ -78,7 +78,12 @@ public enum MobilePairingInvitationCodec {
   }
 
   public static func decode(_ url: URL, now: Date = .now) throws -> MobilePairingInvitation {
-    guard url.scheme == urlScheme, url.host == urlHost else {
+    // Match the scheme and host case-insensitively, like `MobilePairingLink`
+    // and the remote decoder, so a link whose casing changed in transit (hand
+    // entry, QR round-trip) still decodes. Every relay entry point — the link
+    // classifier, the pairing coordinator, and the service — routes through
+    // here, so the tolerance has to live at this check.
+    guard url.scheme?.lowercased() == urlScheme, url.host?.lowercased() == urlHost else {
       throw MobilePairingError.unsupportedURL(url.absoluteString)
     }
     guard
