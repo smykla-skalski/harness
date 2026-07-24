@@ -217,7 +217,7 @@ struct HarnessMonitorStoreRemoteConnectionTests {
       store.toast.activeFeedback.first { $0.title == "Remote daemon forgotten" }
     )
     #expect(warning.severity == .warning)
-    #expect(warning.message.contains("couldn't reach the server"))
+    #expect(warning.message.contains("couldn't revoke this client on the server"))
   }
 
   private func waitUntil(

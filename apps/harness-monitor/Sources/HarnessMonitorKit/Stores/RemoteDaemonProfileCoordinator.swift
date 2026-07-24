@@ -101,8 +101,9 @@ public actor RemoteDaemonProfileCoordinator {
   }
 
   // Best-effort. Forgetting a remote daemon is a local disconnect that must always
-  // complete, so an unreachable or rejecting server returns false here instead of
-  // throwing; the caller warns the user that the token stays live until it expires.
+  // complete, so this returns false instead of throwing whenever the credential
+  // cannot be confirmed revoked - server unreachable or rejecting, or no usable
+  // token to revoke with; the caller then warns that the token stays live.
   private func revokeIfReachable(profile: RemoteDaemonProfile, token: String?) async -> Bool {
     if profile.status == .revoked {
       return true
