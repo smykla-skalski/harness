@@ -209,6 +209,27 @@ public struct TaskBoardDispatchPlan: Codable, Equatable, Identifiable, Sendable 
 public struct TaskBoardDispatchSummary: Codable, Equatable, Sendable {
   public let plans: [TaskBoardDispatchPlan]
   public let applied: [TaskBoardDispatchAppliedTask]
+  public let failures: [TaskBoardDispatchFailure]
+
+  public init(
+    plans: [TaskBoardDispatchPlan],
+    applied: [TaskBoardDispatchAppliedTask],
+    failures: [TaskBoardDispatchFailure] = []
+  ) {
+    self.plans = plans
+    self.applied = applied
+    self.failures = failures
+  }
+}
+
+public struct TaskBoardDispatchFailure: Codable, Equatable, Sendable {
+  public let boardItemId: String
+  public let message: String
+
+  public init(boardItemId: String, message: String) {
+    self.boardItemId = boardItemId
+    self.message = message
+  }
 }
 
 public struct TaskBoardDispatchAppliedTask: Codable, Equatable, Identifiable, Sendable {

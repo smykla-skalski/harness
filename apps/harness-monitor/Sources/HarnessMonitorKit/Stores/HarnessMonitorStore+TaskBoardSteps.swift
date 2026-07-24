@@ -112,13 +112,16 @@ extension HarnessMonitorStore {
     using client: any HarnessMonitorClientProtocol
   ) async -> TaskBoardDispatchDelivery? {
     var didReserveItem = false
+    var reserveFailure: String?
     if !isAlreadyHeld {
       do {
         let measuredSummary = try await Self.measureOperation {
           try await client.dispatchTaskBoard(request: request)
         }
         recordRequestSuccess()
-        didReserveItem = measuredSummary.value.applied.contains { $0.boardItemId == itemID }
+        let summary = measuredSummary.value
+        didReserveItem = summary.applied.contains { $0.boardItemId == itemID }
+        reserveFailure = summary.failures.first { $0.boardItemId == itemID }?.message
       } catch {
         presentFailureFeedback(error.localizedDescription)
         return nil
@@ -130,7 +133,11 @@ extension HarnessMonitorStore {
     // only trustworthy answer. Claiming without checking is what surfaced as
     // the "is not held" conflict.
     guard await taskBoardDeliveryIsHeld(itemID: itemID, using: client) else {
-      presentUnheldTaskBoardDeliveryFeedback(itemID: itemID, didReserveItem: didReserveItem)
+      presentUnheldTaskBoardDeliveryFeedback(
+        itemID: itemID,
+        didReserveItem: didReserveItem,
+        reserveFailure: reserveFailure
+      )
       return nil
     }
     return await claimHeldTaskBoardDelivery(
@@ -157,10 +164,20 @@ extension HarnessMonitorStore {
     }
   }
 
-  /// Nothing is held, so there is no delivery to claim. A reserve that applied
-  /// the item started its worker outright, which is what happens when the
-  /// daemon's step mode is off; anything else never reserved it at all.
-  private func presentUnheldTaskBoardDeliveryFeedback(itemID: String, didReserveItem: Bool) {
+  /// Nothing is held, so there is no delivery to claim. When the reserve reported
+  /// a failure for this item, that reason is the honest thing to show instead of a
+  /// generic message - a missing project dir or an admission block reads as "never
+  /// reserved" otherwise. A reserve that applied the item started its worker
+  /// outright (the daemon's step mode was off); anything else never reserved it.
+  private func presentUnheldTaskBoardDeliveryFeedback(
+    itemID: String,
+    didReserveItem: Bool,
+    reserveFailure: String?
+  ) {
+    if let reserveFailure {
+      presentFailureFeedback(reserveFailure)
+      return
+    }
     guard didReserveItem else {
       presentFailureFeedback(
         """

@@ -157,7 +157,14 @@ extension TaskBoardDispatchSummary {
   public init(wire: DispatchExecutionSummaryWire) {
     self.init(
       plans: wire.plans.map(TaskBoardDispatchPlan.init(wire:)),
-      applied: wire.applied.map(TaskBoardDispatchAppliedTask.init(wire:))
+      applied: wire.applied.map(TaskBoardDispatchAppliedTask.init(wire:)),
+      failures: wire.failures.map(TaskBoardDispatchFailure.init(wire:))
     )
+  }
+}
+
+extension TaskBoardDispatchFailure {
+  init(wire: DispatchFailureWire) {
+    self.init(boardItemId: wire.boardItemId, message: wire.message)
   }
 }

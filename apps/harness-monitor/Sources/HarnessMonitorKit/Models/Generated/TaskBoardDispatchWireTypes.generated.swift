@@ -65,15 +65,25 @@ public struct DispatchPlanWire: Codable, Equatable, Sendable {
 public struct DispatchExecutionSummaryWire: Codable, Equatable, Sendable {
   public var plans: [DispatchPlanWire]
   public var applied: [DispatchAppliedTaskWire]
+  public var failures: [DispatchFailureWire]
 
-  public init(plans: [DispatchPlanWire], applied: [DispatchAppliedTaskWire]) {
+  public init(plans: [DispatchPlanWire], applied: [DispatchAppliedTaskWire], failures: [DispatchFailureWire] = []) {
     self.plans = plans
     self.applied = applied
+    self.failures = failures
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    plans = try container.decode([DispatchPlanWire].self, forKey: .plans)
+    applied = try container.decode([DispatchAppliedTaskWire].self, forKey: .applied)
+    failures = try container.decodeIfPresent([DispatchFailureWire].self, forKey: .failures) ?? []
   }
 
   enum CodingKeys: String, CodingKey {
     case plans
     case applied
+    case failures
   }
 }
 
@@ -95,6 +105,21 @@ public struct DispatchAppliedTaskWire: Codable, Equatable, Sendable {
     case sessionId = "session_id"
     case workItemId = "work_item_id"
     case item
+  }
+}
+
+public struct DispatchFailureWire: Codable, Equatable, Sendable {
+  public var boardItemId: String
+  public var message: String
+
+  public init(boardItemId: String, message: String) {
+    self.boardItemId = boardItemId
+    self.message = message
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case boardItemId = "board_item_id"
+    case message
   }
 }
 

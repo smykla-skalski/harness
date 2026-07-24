@@ -205,7 +205,11 @@ extension RecordingHarnessClient {
         )
         return sampleDispatchPlan(for: updated)
       }
-      return TaskBoardDispatchSummary(plans: plans, applied: applied)
+      var failures: [TaskBoardDispatchFailure] = []
+      if let itemID = request.itemId, let message = taskBoardDispatchFailureMessages[itemID] {
+        failures.append(TaskBoardDispatchFailure(boardItemId: itemID, message: message))
+      }
+      return TaskBoardDispatchSummary(plans: plans, applied: applied, failures: failures)
     }
   }
 

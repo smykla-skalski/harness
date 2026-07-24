@@ -209,6 +209,29 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
     )
   }
 
+  @Test("Step-mode prepare+deliver surfaces the reserve failure reason over the generic message")
+  func stepModePrepareAndDeliverSurfacesReserveFailureReason() async {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardItems([sampleTaskBoardItem()])
+    // The daemon reserves nothing for board-2 and reports the real reason why -
+    // here the missing project dir that a create-session dispatch requires.
+    let reason = "task-board dispatch requires project_dir when a session must be created"
+    client.configureTaskBoardDispatchFailure(itemID: "board-2", message: reason)
+    let store = await makeBootstrappedStore(client: client)
+
+    let delivery = await store.prepareAndDeliverTaskBoardDispatch(
+      request: TaskBoardDispatchRequest(itemId: "board-2", dryRun: false)
+    )
+
+    #expect(delivery == nil)
+    #expect(store.currentSuccessFeedbackMessage == nil)
+    // The real reserve failure reaches the toast instead of "No held delivery to claim".
+    #expect(store.currentFailureFeedbackMessage == reason)
+    #expect(
+      !client.recordedCalls().contains(.deliverTaskBoardDispatch(itemID: "board-2", dryRun: false))
+    )
+  }
+
   @Test("Audit, projects, and machines summaries update dashboard state")
   func auditProjectsAndMachinesUpdateDashboardState() async {
     let client = RecordingHarnessClient()
