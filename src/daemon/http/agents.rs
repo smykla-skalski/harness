@@ -16,6 +16,9 @@ use super::DaemonHttpState;
 use super::auth::authorize_control_request;
 use super::response::{extract_request_id, timed_json};
 
+#[cfg(feature = "openapi")]
+use super::openapi::DaemonErrorBody;
+
 pub(super) fn agent_routes() -> Router<DaemonHttpState> {
     Router::new()
         .route(http_paths::SESSION_AGENT_ROLE, post(post_role_change))
@@ -26,6 +29,20 @@ pub(super) fn agent_routes() -> Router<DaemonHttpState> {
         )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/agents/{session_agent_id}/role",
+    tag = "agents",
+    params(
+        ("session_id" = String, Path, description = "Session identifier"),
+        ("session_agent_id" = String, Path, description = "Session-scoped agent identifier"),
+    ),
+    request_body = RoleChangeRequest,
+    responses(
+        (status = 200, description = "Agent role changed", body = SessionDetail),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_role_change(
     Path((session_id, session_agent_id)): Path<(String, String)>,
     headers: HeaderMap,
@@ -50,6 +67,20 @@ pub(super) async fn post_role_change(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/agents/{session_agent_id}/remove",
+    tag = "agents",
+    params(
+        ("session_id" = String, Path, description = "Session identifier"),
+        ("session_agent_id" = String, Path, description = "Session-scoped agent identifier"),
+    ),
+    request_body = AgentRemoveRequest,
+    responses(
+        (status = 200, description = "Agent removed from the session", body = SessionDetail),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_remove_agent(
     Path((session_id, session_agent_id)): Path<(String, String)>,
     headers: HeaderMap,
@@ -74,6 +105,17 @@ pub(super) async fn post_remove_agent(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/leader",
+    tag = "agents",
+    params(("session_id" = String, Path, description = "Session identifier")),
+    request_body = LeaderTransferRequest,
+    responses(
+        (status = 200, description = "Session leadership transferred", body = SessionDetail),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_transfer_leader(
     Path(session_id): Path<String>,
     headers: HeaderMap,

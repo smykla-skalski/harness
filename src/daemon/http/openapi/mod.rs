@@ -93,6 +93,27 @@ struct CoreApi;
 ))]
 struct SessionsApi;
 
+#[derive(utoipa::OpenApi)]
+#[openapi(paths(
+    super::tasks::mutations::post_task_create,
+    super::tasks::mutations::post_task_delete,
+    super::tasks::mutations::post_task_assign,
+    super::tasks::mutations::post_task_drop,
+    super::tasks::mutations::post_task_queue_policy,
+    super::tasks::mutations::post_task_update,
+    super::tasks::mutations::post_task_checkpoint,
+    super::tasks::review::post_task_submit_for_review,
+    super::tasks::review::post_task_claim_review,
+    super::tasks::review::post_task_submit_review,
+    super::tasks::review::post_task_respond_review,
+    super::tasks::review::post_task_arbitrate,
+    super::agents::post_role_change,
+    super::agents::post_remove_agent,
+    super::agents::post_transfer_leader,
+    super::improver::post_improver_apply,
+))]
+struct TasksAgentsApi;
+
 /// Build the typed `OpenAPI` document from every domain aggregator.
 ///
 /// Aggregators merge in registration order; component schemas deduplicate by
@@ -103,6 +124,7 @@ pub fn openapi_document() -> utoipa::openapi::OpenApi {
     let mut doc = HarnessDaemonApi::openapi();
     doc.merge(CoreApi::openapi());
     doc.merge(SessionsApi::openapi());
+    doc.merge(TasksAgentsApi::openapi());
     env!("CARGO_PKG_VERSION").clone_into(&mut doc.info.version);
     doc
 }

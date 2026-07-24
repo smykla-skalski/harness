@@ -17,6 +17,23 @@ use super::super::auth::authorize_control_request;
 use super::super::response::{extract_request_id, timed_json};
 use super::broadcast_task_snapshot;
 
+#[cfg(feature = "openapi")]
+use super::super::openapi::DaemonErrorBody;
+
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/tasks/{task_id}/submit-for-review",
+    tag = "tasks",
+    params(
+        ("session_id" = String, Path, description = "Session identifier"),
+        ("task_id" = String, Path, description = "Task identifier"),
+    ),
+    request_body = TaskSubmitForReviewRequest,
+    responses(
+        (status = 200, description = "Task submitted for review", body = SessionDetail),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(in crate::daemon::http) async fn post_task_submit_for_review(
     Path((session_id, task_id)): Path<(String, String)>,
     headers: HeaderMap,
@@ -41,6 +58,20 @@ pub(in crate::daemon::http) async fn post_task_submit_for_review(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/tasks/{task_id}/claim-review",
+    tag = "tasks",
+    params(
+        ("session_id" = String, Path, description = "Session identifier"),
+        ("task_id" = String, Path, description = "Task identifier"),
+    ),
+    request_body = TaskClaimReviewRequest,
+    responses(
+        (status = 200, description = "Review claimed by the actor", body = SessionDetail),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(in crate::daemon::http) async fn post_task_claim_review(
     Path((session_id, task_id)): Path<(String, String)>,
     headers: HeaderMap,
@@ -65,6 +96,20 @@ pub(in crate::daemon::http) async fn post_task_claim_review(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/tasks/{task_id}/submit-review",
+    tag = "tasks",
+    params(
+        ("session_id" = String, Path, description = "Session identifier"),
+        ("task_id" = String, Path, description = "Task identifier"),
+    ),
+    request_body = TaskSubmitReviewRequest,
+    responses(
+        (status = 200, description = "Review verdict recorded", body = SessionDetail),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(in crate::daemon::http) async fn post_task_submit_review(
     Path((session_id, task_id)): Path<(String, String)>,
     headers: HeaderMap,
@@ -89,6 +134,20 @@ pub(in crate::daemon::http) async fn post_task_submit_review(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/tasks/{task_id}/respond-review",
+    tag = "tasks",
+    params(
+        ("session_id" = String, Path, description = "Session identifier"),
+        ("task_id" = String, Path, description = "Task identifier"),
+    ),
+    request_body = TaskRespondReviewRequest,
+    responses(
+        (status = 200, description = "Author response to review points recorded", body = SessionDetail),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(in crate::daemon::http) async fn post_task_respond_review(
     Path((session_id, task_id)): Path<(String, String)>,
     headers: HeaderMap,
@@ -113,6 +172,20 @@ pub(in crate::daemon::http) async fn post_task_respond_review(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/tasks/{task_id}/arbitrate",
+    tag = "tasks",
+    params(
+        ("session_id" = String, Path, description = "Session identifier"),
+        ("task_id" = String, Path, description = "Task identifier"),
+    ),
+    request_body = TaskArbitrateRequest,
+    responses(
+        (status = 200, description = "Review arbitrated to a final verdict", body = SessionDetail),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(in crate::daemon::http) async fn post_task_arbitrate(
     Path((session_id, task_id)): Path<(String, String)>,
     headers: HeaderMap,

@@ -15,6 +15,9 @@ use super::DaemonHttpState;
 use super::auth::authorize_control_request;
 use super::response::{extract_request_id, timed_json};
 
+#[cfg(feature = "openapi")]
+use super::openapi::DaemonErrorBody;
+
 pub(super) fn improver_routes() -> Router<DaemonHttpState> {
     Router::new().route(
         http_paths::SESSION_IMPROVER_APPLY,
@@ -22,6 +25,17 @@ pub(super) fn improver_routes() -> Router<DaemonHttpState> {
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/improver/apply",
+    tag = "agents",
+    params(("session_id" = String, Path, description = "Session identifier")),
+    request_body = ImproverApplyRequest,
+    responses(
+        (status = 200, description = "Improver patch applied or previewed", body = ImproverApplyOutcome),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_improver_apply(
     Path(session_id): Path<String>,
     headers: HeaderMap,

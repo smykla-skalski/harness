@@ -17,6 +17,20 @@ use super::super::auth::authorize_control_request;
 use super::super::response::{extract_request_id, timed_json};
 use super::broadcast_task_snapshot;
 
+#[cfg(feature = "openapi")]
+use super::super::openapi::DaemonErrorBody;
+
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/task",
+    tag = "tasks",
+    params(("session_id" = String, Path, description = "Session identifier")),
+    request_body = TaskCreateRequest,
+    responses(
+        (status = 200, description = "Task created", body = SessionDetail),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(in crate::daemon::http) async fn post_task_create(
     Path(session_id): Path<String>,
     headers: HeaderMap,
@@ -41,6 +55,20 @@ pub(in crate::daemon::http) async fn post_task_create(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/tasks/{task_id}/assign",
+    tag = "tasks",
+    params(
+        ("session_id" = String, Path, description = "Session identifier"),
+        ("task_id" = String, Path, description = "Task identifier"),
+    ),
+    request_body = TaskAssignRequest,
+    responses(
+        (status = 200, description = "Task assigned", body = SessionDetail),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(in crate::daemon::http) async fn post_task_assign(
     Path((session_id, task_id)): Path<(String, String)>,
     headers: HeaderMap,
@@ -65,6 +93,20 @@ pub(in crate::daemon::http) async fn post_task_assign(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/tasks/{task_id}",
+    tag = "tasks",
+    params(
+        ("session_id" = String, Path, description = "Session identifier"),
+        ("task_id" = String, Path, description = "Task identifier"),
+    ),
+    request_body = TaskDeleteRequest,
+    responses(
+        (status = 200, description = "Task deleted", body = SessionDetail),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(in crate::daemon::http) async fn post_task_delete(
     Path((session_id, task_id)): Path<(String, String)>,
     headers: HeaderMap,
@@ -89,6 +131,20 @@ pub(in crate::daemon::http) async fn post_task_delete(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/tasks/{task_id}/drop",
+    tag = "tasks",
+    params(
+        ("session_id" = String, Path, description = "Session identifier"),
+        ("task_id" = String, Path, description = "Task identifier"),
+    ),
+    request_body = TaskDropRequest,
+    responses(
+        (status = 200, description = "Task dropped from the target's queue", body = SessionDetail),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(in crate::daemon::http) async fn post_task_drop(
     Path((session_id, task_id)): Path<(String, String)>,
     headers: HeaderMap,
@@ -113,6 +169,20 @@ pub(in crate::daemon::http) async fn post_task_drop(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/tasks/{task_id}/queue-policy",
+    tag = "tasks",
+    params(
+        ("session_id" = String, Path, description = "Session identifier"),
+        ("task_id" = String, Path, description = "Task identifier"),
+    ),
+    request_body = TaskQueuePolicyRequest,
+    responses(
+        (status = 200, description = "Task queue policy updated", body = SessionDetail),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(in crate::daemon::http) async fn post_task_queue_policy(
     Path((session_id, task_id)): Path<(String, String)>,
     headers: HeaderMap,
@@ -137,6 +207,20 @@ pub(in crate::daemon::http) async fn post_task_queue_policy(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/tasks/{task_id}/status",
+    tag = "tasks",
+    params(
+        ("session_id" = String, Path, description = "Session identifier"),
+        ("task_id" = String, Path, description = "Task identifier"),
+    ),
+    request_body = TaskUpdateRequest,
+    responses(
+        (status = 200, description = "Task status updated", body = SessionDetail),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(in crate::daemon::http) async fn post_task_update(
     Path((session_id, task_id)): Path<(String, String)>,
     headers: HeaderMap,
@@ -161,6 +245,20 @@ pub(in crate::daemon::http) async fn post_task_update(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/sessions/{session_id}/tasks/{task_id}/checkpoint",
+    tag = "tasks",
+    params(
+        ("session_id" = String, Path, description = "Session identifier"),
+        ("task_id" = String, Path, description = "Task identifier"),
+    ),
+    request_body = TaskCheckpointRequest,
+    responses(
+        (status = 200, description = "Task checkpoint recorded", body = SessionDetail),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(in crate::daemon::http) async fn post_task_checkpoint(
     Path((session_id, task_id)): Path<(String, String)>,
     headers: HeaderMap,
