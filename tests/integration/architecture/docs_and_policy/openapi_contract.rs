@@ -197,7 +197,7 @@ const DOCUMENTED_ROUTES: &[(&str, &str)] = &[
     ("POST", "/v1/policies/dump"),
     ("POST", "/v1/policies/import"),
     // Remote-execution transport: documented but outside HTTP_API_CONTRACT;
-    // recognised by task_board_remote_transport::execution_operation.
+    // recognised by the imported execution_operation (see documented_routes_exist_in_contract).
     ("GET", "/v1/task-board-execution/advertise"),
     ("POST", "/v1/task-board-execution/offers"),
     ("POST", "/v1/task-board-execution/source-bundles/upload"),
