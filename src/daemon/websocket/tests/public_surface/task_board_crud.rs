@@ -193,24 +193,27 @@ fn websocket_task_board_crud_sync_audit_and_orchestrator_routes_use_real_state()
                 Some(1)
             );
 
-            assert_eq!(
-                call(
-                    &state,
-                    &connection,
-                    "req-orch-status",
-                    ws_methods::TASK_BOARD_ORCHESTRATOR_STATUS,
-                    json!({}),
-                )
-                .await["running"]
-                    .as_bool(),
-                Some(false)
-            );
+            // Status is read after the first start, not before it: the
+            // automation control singleton only exists once automation has been
+            // started, and reading a snapshot must not lazily create it.
             assert_eq!(
                 call(
                     &state,
                     &connection,
                     "req-orch-start",
                     ws_methods::TASK_BOARD_ORCHESTRATOR_START,
+                    json!({}),
+                )
+                .await["running"]
+                    .as_bool(),
+                Some(true)
+            );
+            assert_eq!(
+                call(
+                    &state,
+                    &connection,
+                    "req-orch-status",
+                    ws_methods::TASK_BOARD_ORCHESTRATOR_STATUS,
                     json!({}),
                 )
                 .await["running"]
