@@ -16,7 +16,7 @@ pub const AGENT_V1_EVALUATOR_VERSION: u32 = 1;
 /// history reads the generic `audit_events` trail instead.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(utoipa::ToSchema)]
 pub enum TaskBoardTriageEscalationStatus {
     Pending,
     Running,
