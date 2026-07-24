@@ -21,7 +21,7 @@ struct RemoteDaemonProfileCoordinatorRevocationTests {
     #expect(try fixture.tokenStore.loadToken(profileID: fixture.profile.id) == nil)
   }
 
-  @Test("Revocation failure still forgets locally and reports the live token")
+  @Test("Revocation failure still forgets locally and reports it unrevoked")
   func revocationFailureStillForgetsLocally() async throws {
     let fixture = try RevocationCoordinatorFixture(revocationFails: true)
 
@@ -29,6 +29,10 @@ struct RemoteDaemonProfileCoordinatorRevocationTests {
 
     #expect(forgotten?.profile == fixture.profile)
     #expect(forgotten?.serverRevoked == false)
+    #expect(
+      await fixture.revoker.recordedCalls()
+        == [.init(clientID: fixture.profile.clientID, token: "server-issued-token")]
+    )
     #expect(try fixture.repository.load() == RemoteDaemonProfileState())
     #expect(try fixture.tokenStore.loadToken(profileID: fixture.profile.id) == nil)
   }
