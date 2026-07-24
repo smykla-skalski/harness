@@ -12700,6 +12700,182 @@
         "x-websocket-method": "task_board.triage_rules_revisions"
       }
     },
+    "/v1/task-board/working-copies": {
+      "post": {
+        "tags": [
+          "task-board"
+        ],
+        "operationId": "post_task_board_working_copies",
+        "responses": {
+          "200": {
+            "description": "Working-copy registry entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WorkingCopyListEntry"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "task_board.working_copies_list"
+      }
+    },
+    "/v1/task-board/working-copies/delete": {
+      "post": {
+        "tags": [
+          "task-board"
+        ],
+        "operationId": "post_task_board_working_copies_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteWorkingCopyPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Working-copy registry after the deletion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteWorkingCopyResponseBody"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "task_board.working_copies_delete"
+      }
+    },
+    "/v1/task-board/working-copies/obtain": {
+      "post": {
+        "tags": [
+          "task-board"
+        ],
+        "operationId": "post_task_board_working_copies_obtain",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObtainWorkingCopyPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Obtained (or reused) working copy, if present",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObtainWorkingCopyResponseBody"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "task_board.working_copies_obtain"
+      }
+    },
     "/v1/voice-sessions/{voice_session_id}/audio": {
       "post": {
         "tags": [
@@ -15972,6 +16148,31 @@
           }
         }
       },
+      "DeleteWorkingCopyPayload": {
+        "type": "object",
+        "required": [
+          "repo_key_segment"
+        ],
+        "properties": {
+          "repo_key_segment": {
+            "type": "string"
+          }
+        }
+      },
+      "DeleteWorkingCopyResponseBody": {
+        "type": "object",
+        "required": [
+          "working_copies"
+        ],
+        "properties": {
+          "working_copies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkingCopyListEntry"
+            }
+          }
+        }
+      },
       "DeliveryConfig": {
         "type": "object",
         "required": [
@@ -18021,6 +18222,44 @@
           "resolved_issue_count": {
             "type": "integer",
             "minimum": 0
+          }
+        }
+      },
+      "ObtainWorkingCopyPayload": {
+        "type": "object",
+        "description": "Request body for obtaining a working copy. `allow_clone` gates the\nexpensive path: delivery passes `false` (resolve-or-report-absent), the\nexplicit Settings/sheet action passes `true` (clone when missing).",
+        "required": [
+          "repository",
+          "allow_clone"
+        ],
+        "properties": {
+          "allow_clone": {
+            "type": "boolean"
+          },
+          "repository": {
+            "type": "string"
+          }
+        }
+      },
+      "ObtainWorkingCopyResponseBody": {
+        "type": "object",
+        "description": "Response for obtain: `present` is false only when the copy is missing and\n`allow_clone` was false, in which case `entry` is null.",
+        "required": [
+          "present"
+        ],
+        "properties": {
+          "entry": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/WorkingCopyListEntry"
+              }
+            ]
+          },
+          "present": {
+            "type": "boolean"
           }
         }
       },
@@ -33630,6 +33869,42 @@
         "properties": {
           "mode": {
             "$ref": "#/components/schemas/AgentMode"
+          }
+        }
+      },
+      "WorkingCopyListEntry": {
+        "type": "object",
+        "description": "One row in the Settings/sheet projection of the working-copy registry.\nCarries the checkout `path` because the app forwards it verbatim as the\nsession `project_dir`.",
+        "required": [
+          "repo_full_name",
+          "repo_key_segment",
+          "path",
+          "size_bytes",
+          "created_at",
+          "last_used_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_used_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "path": {
+            "type": "string"
+          },
+          "repo_full_name": {
+            "type": "string"
+          },
+          "repo_key_segment": {
+            "type": "string"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
           }
         }
       },
