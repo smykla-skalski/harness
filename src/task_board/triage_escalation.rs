@@ -69,6 +69,21 @@ pub enum TaskBoardTriageEscalationRejectReason {
     StaleEvidence,
 }
 
+impl TaskBoardTriageEscalationRejectReason {
+    /// Stable `snake_case` string for the wire `rejected_reason` field.
+    /// Renaming one of these is a wire-contract change, not a refactor.
+    #[must_use]
+    pub fn wire_code(self) -> &'static str {
+        match self {
+            Self::UnknownRunningEscalation => "unknown_running_escalation",
+            Self::ItemIneligible => "item_ineligible",
+            Self::OverrideActive => "override_active",
+            Self::ReservationHeld => "reservation_held",
+            Self::StaleEvidence => "stale_evidence",
+        }
+    }
+}
+
 impl TaskBoardTriageEscalationConfig {
     pub const DEFAULT_MAX_CONCURRENT: usize = 2;
     pub const DEFAULT_MAX_PENDING: usize = 20;
@@ -86,3 +101,7 @@ impl TaskBoardTriageEscalationConfig {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "triage_escalation_tests.rs"]
+mod tests;

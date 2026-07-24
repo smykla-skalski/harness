@@ -70,7 +70,7 @@ fn response_for_outcome(
         TaskBoardTriageEscalationVerdictOutcome::Rejected(reason) => {
             TaskBoardTriageEscalationVerdictResponse {
                 accepted: false,
-                rejected_reason: Some(format!("{reason:?}")),
+                rejected_reason: Some(reason.wire_code().to_string()),
             }
         }
     }
