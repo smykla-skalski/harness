@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use tokio::sync::broadcast;
@@ -5,8 +6,8 @@ use tokio::sync::broadcast;
 use crate::agents::acp::probe::probe_acp_agents_cached;
 use crate::daemon::http::{
     AsyncDaemonDbSlot, DaemonHttpState, acp_inspect_response, acp_transcript_response,
-    ensure_acp_enabled, managed_agent_list_response_async, managed_agent_snapshot_async,
-    require_async_db,
+    ensure_acp_agent, ensure_acp_enabled, managed_agent_list_response_async,
+    managed_agent_snapshot_async, require_async_db, run_acp_agent_blocking,
 };
 use crate::daemon::protocol::{
     HarnessMonitorAuditEventsRequest, StreamEvent, TimelineWindowRequest, WsRequest, WsResponse,
@@ -157,6 +158,9 @@ async fn dispatch_session_read_query(
         ws_methods::MANAGED_AGENTS_ACP_INSPECT => Some(dispatch_acp_inspect_query(request, state)),
         ws_methods::MANAGED_AGENTS_ACP_TRANSCRIPT => {
             Some(dispatch_acp_transcript_query(request, state).await)
+        }
+        ws_methods::MANAGED_AGENTS_ACP_SESSIONS => {
+            Some(dispatch_acp_sessions_query(request, state).await)
         }
         ws_methods::OPENROUTER_LIST_MODELS => {
             Some(dispatch_openrouter_list_models_query(request).await)
@@ -345,6 +349,24 @@ async fn dispatch_acp_transcript_query(request: &WsRequest, state: &DaemonHttpSt
     };
     let result = match ensure_acp_enabled() {
         Ok(()) => acp_transcript_response(state, &session_id).await,
+        Err(error) => Err(error),
+    };
+    dispatch_query_result(&request.id, result)
+}
+
+async fn dispatch_acp_sessions_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    let Some(agent_id) = extract_managed_agent_id(&request.params) else {
+        return error_response(&request.id, "MISSING_PARAM", "missing managed_agent_id");
+    };
+    let cwd = extract_string_param(&request.params, "cwd").map(PathBuf::from);
+    let cursor = extract_string_param(&request.params, "cursor");
+    let result = match ensure_acp_enabled().and_then(|()| ensure_acp_agent(state, &agent_id)) {
+        Ok(()) => {
+            run_acp_agent_blocking(state, "ws session-list", move |manager| {
+                manager.list_agent_sessions(&agent_id, cwd, cursor)
+            })
+            .await
+        }
         Err(error) => Err(error),
     };
     dispatch_query_result(&request.id, result)

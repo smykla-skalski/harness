@@ -5,8 +5,8 @@ use super::{
     authorize_remote_execution_operation, authorize_remote_http_route, authorize_remote_ws_method,
 };
 use crate::daemon::protocol::{
-    HTTP_API_CONTRACT, HttpApiRouteContract, HttpRouteMethod, HttpRouteParity, http_paths,
-    ws_methods,
+    HTTP_API_CONTRACT, HttpApiRouteContract, HttpRouteMethod, HttpRouteParity, WsExemptionKind,
+    http_paths, ws_methods,
 };
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 use crate::daemon::remote_identity::{RemoteStoredClient, RemoteTokenHash};
@@ -134,6 +134,7 @@ fn remote_http_authz_accepts_borrowed_route_contracts() {
         method: HttpRouteMethod::Get,
         path: http_paths::STREAM,
         parity: HttpRouteParity::Exempt {
+            kind: WsExemptionKind::Structural,
             reason: "stack-local test route",
         },
         swift_client_exposed: false,

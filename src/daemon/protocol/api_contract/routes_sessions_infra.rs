@@ -1,4 +1,6 @@
-use super::{HttpApiRouteContract, HttpRouteMethod, HttpRouteParity, http_paths, ws_methods};
+use super::{
+    HttpApiRouteContract, HttpRouteMethod, HttpRouteParity, WsExemptionKind, http_paths, ws_methods,
+};
 
 pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     HttpApiRouteContract {
@@ -13,7 +15,9 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         method: HttpRouteMethod::Get,
         path: http_paths::READY,
         parity: HttpRouteParity::Exempt {
-            reason: "daemon readiness probe remains plain HTTP",
+            kind: WsExemptionKind::Structural,
+            reason: "liveness probe for orchestrators and load balancers; stays transport-plain \
+                     HTTP with no RPC form",
         },
         swift_client_exposed: false,
     },
@@ -45,7 +49,9 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         method: HttpRouteMethod::Post,
         path: http_paths::DAEMON_TELEMETRY,
         parity: HttpRouteParity::Exempt {
-            reason: "client decode-failure telemetry is HTTP ingestion only",
+            kind: WsExemptionKind::StandingDecision,
+            reason: "one-way decode-failure telemetry must reach the daemon on a plain HTTP path \
+                     even when a client cannot decode RPC framing",
         },
         swift_client_exposed: true,
     },
@@ -117,7 +123,9 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         method: HttpRouteMethod::Get,
         path: http_paths::WS,
         parity: HttpRouteParity::Exempt {
-            reason: "websocket upgrade transport is not an RPC endpoint",
+            kind: WsExemptionKind::Structural,
+            reason: "the websocket upgrade transport carries the RPC methods; it is not itself an \
+                     RPC call",
         },
         swift_client_exposed: false,
     },
@@ -125,7 +133,9 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         method: HttpRouteMethod::Get,
         path: http_paths::STREAM,
         parity: HttpRouteParity::Exempt {
-            reason: "server-sent global stream remains a transport endpoint",
+            kind: WsExemptionKind::Structural,
+            reason: "long-lived server-sent event stream; the websocket mirror is stream.subscribe, \
+                     not a request/response call",
         },
         swift_client_exposed: false,
     },
@@ -181,7 +191,9 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         method: HttpRouteMethod::Get,
         path: http_paths::SESSION_STREAM,
         parity: HttpRouteParity::Exempt {
-            reason: "server-sent session stream remains a transport endpoint",
+            kind: WsExemptionKind::Structural,
+            reason: "long-lived per-session server-sent event stream; the websocket mirror is \
+                     session.subscribe, not a request/response call",
         },
         swift_client_exposed: false,
     },

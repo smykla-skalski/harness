@@ -179,10 +179,14 @@ pub const MANAGED_AGENT_RESOLVE_CODEX_APPROVAL: &str = "managed_agent.resolve_co
 pub const MANAGED_AGENT_RESOLVE_ACP_PERMISSION: &str = "managed_agent.resolve_acp_permission";
 pub const MANAGED_AGENT_STOP_ACP: &str = "managed_agent.stop_acp";
 pub const MANAGED_AGENT_PROMPT_ACP: &str = "managed_agent.prompt_acp";
+pub const MANAGED_AGENT_LOGOUT_ACP: &str = "managed_agent.logout_acp";
+pub const MANAGED_AGENT_DELETE_ACP_SESSION: &str = "managed_agent.delete_acp_session";
+pub const MANAGED_AGENT_CLOSE_ACP_SESSION: &str = "managed_agent.close_acp_session";
 pub const MANAGED_AGENTS_CODEX_INSPECT: &str = "managed_agent.codex_inspect";
 pub const MANAGED_AGENTS_CODEX_TRANSCRIPT: &str = "managed_agent.codex_transcript";
 pub const MANAGED_AGENTS_ACP_INSPECT: &str = "managed_agent.acp_inspect";
 pub const MANAGED_AGENTS_ACP_TRANSCRIPT: &str = "managed_agent.acp_transcript";
+pub const MANAGED_AGENTS_ACP_SESSIONS: &str = "managed_agent.acp_sessions";
 pub const OPENROUTER_LIST_MODELS: &str = "openrouter.list_models";
 pub const SIGNAL_SEND: &str = "signal.send";
 pub const SIGNAL_CANCEL: &str = "signal.cancel";
@@ -367,10 +371,14 @@ pub const ALL: &[&str] = &[
     MANAGED_AGENT_RESOLVE_ACP_PERMISSION,
     MANAGED_AGENT_STOP_ACP,
     MANAGED_AGENT_PROMPT_ACP,
+    MANAGED_AGENT_LOGOUT_ACP,
+    MANAGED_AGENT_DELETE_ACP_SESSION,
+    MANAGED_AGENT_CLOSE_ACP_SESSION,
     MANAGED_AGENTS_CODEX_INSPECT,
     MANAGED_AGENTS_CODEX_TRANSCRIPT,
     MANAGED_AGENTS_ACP_INSPECT,
     MANAGED_AGENTS_ACP_TRANSCRIPT,
+    MANAGED_AGENTS_ACP_SESSIONS,
     OPENROUTER_LIST_MODELS,
     SIGNAL_SEND,
     SIGNAL_CANCEL,

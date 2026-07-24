@@ -74,14 +74,12 @@ pub fn remote_http_scopes(route: &HttpApiRouteContract) -> Option<&'static [Remo
         http_paths::REMOTE_PAIR_CLAIM
         | http_paths::REMOTE_PAIR_STATUS
         | http_paths::REMOTE_CLIENT_SELF_REVOKE
-        | http_paths::MANAGED_AGENT_ACP_SESSIONS
         | http_paths::POLICIES_DUMP => Some(READ_SCOPES),
         http_paths::DAEMON_TELEMETRY
         | http_paths::MANAGED_AGENT_ATTACH
-        | http_paths::MANAGED_AGENT_ACP_LOGOUT
-        | http_paths::MANAGED_AGENT_ACP_SESSION_DELETE
-        | http_paths::MANAGED_AGENT_ACP_SESSION_CLOSE
         | http_paths::POLICIES_IMPORT => Some(WRITE_SCOPES),
+        // The ACP logout and agent-session routes now carry websocket methods,
+        // so their HTTP scope derives from the mirrored method like any RPC route.
         _ => route.parity.ws_method().and_then(remote_ws_scopes),
     }
 }
@@ -244,6 +242,7 @@ const READ_WS_METHODS: &[&str] = &[
     ws_methods::MANAGED_AGENTS_CODEX_TRANSCRIPT,
     ws_methods::MANAGED_AGENTS_ACP_INSPECT,
     ws_methods::MANAGED_AGENTS_ACP_TRANSCRIPT,
+    ws_methods::MANAGED_AGENTS_ACP_SESSIONS,
     ws_methods::OPENROUTER_LIST_MODELS,
     ws_methods::TASK_BOARD_CAPABILITIES,
     ws_methods::TASK_BOARD_LIST,
@@ -330,6 +329,9 @@ const WRITE_WS_METHODS: &[&str] = &[
     ws_methods::MANAGED_AGENT_RESOLVE_ACP_PERMISSION,
     ws_methods::MANAGED_AGENT_STOP_ACP,
     ws_methods::MANAGED_AGENT_PROMPT_ACP,
+    ws_methods::MANAGED_AGENT_LOGOUT_ACP,
+    ws_methods::MANAGED_AGENT_DELETE_ACP_SESSION,
+    ws_methods::MANAGED_AGENT_CLOSE_ACP_SESSION,
     ws_methods::SIGNAL_SEND,
     ws_methods::SIGNAL_CANCEL,
     ws_methods::SIGNAL_ACK,
