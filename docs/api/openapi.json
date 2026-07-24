@@ -31343,6 +31343,17 @@
               }
             ]
           },
+          "pending_escalation_status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TaskBoardTriageEscalationStatus",
+                "description": "Set only while an escalation for this item is `Pending` or `Running`\n-- a terminal escalation's effect is either `current`/`effective`\nchanging (a landed verdict) or nothing, so there is nothing useful to\nsurface here once it resolves."
+              }
+            ]
+          },
           "triage_override": {
             "oneOf": [
               {
@@ -31442,6 +31453,14 @@
         "enum": [
           "override",
           "automatic"
+        ]
+      },
+      "TaskBoardTriageEscalationStatus": {
+        "type": "string",
+        "description": "The only two escalation states ever exposed to a reader. A terminal\nstate's effect is either a landed decision or nothing at all, so there is\nnothing useful to show once an escalation resolves -- a caller that wants\nhistory reads the generic `audit_events` trail instead.",
+        "enum": [
+          "pending",
+          "running"
         ]
       },
       "TaskBoardTriageHistoryResponse": {
@@ -32602,13 +32621,14 @@
       },
       "TriageReasonCode": {
         "type": "string",
-        "description": "Closed, ordered reason codes. `NeedsInfoLabel` and `NoMeaningfulLabels` are\nevaluated in that order before falling through to `MeaningfulLabel`; those\nthree are `BuiltInV1`-only. `RuleMatched` and `RuleSetDefault` are the\nruntime-authored-rules evaluator's reason codes -- the matched rule id (or\nnothing, for the default) travels in the decision's `reason_detail`.",
+        "description": "Closed, ordered reason codes. `NeedsInfoLabel` and `NoMeaningfulLabels` are\nevaluated in that order before falling through to `MeaningfulLabel`; those\nthree are `BuiltInV1`-only. `RuleMatched` and `RuleSetDefault` are the\nruntime-authored-rules evaluator's reason codes -- the matched rule id (or\nnothing, for the default) travels in the decision's `reason_detail`.\n`AgentVerdict` is the agent-escalation evaluator's only reason code -- the\nagent's bounded rationale travels in `reason_detail`.",
         "enum": [
           "needs_info_label",
           "no_meaningful_labels",
           "meaningful_label",
           "rule_matched",
-          "rule_set_default"
+          "rule_set_default",
+          "agent_verdict"
         ]
       },
       "TriageRule": {
