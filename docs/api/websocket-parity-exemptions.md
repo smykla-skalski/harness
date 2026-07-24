@@ -33,7 +33,7 @@ placeholder.
 
 ## Current exemptions
 
-Eleven routes are exempt. All were reviewed and judged sound.
+Twelve routes are exempt. All were reviewed and judged sound.
 
 ### Structural (5)
 
@@ -50,11 +50,12 @@ subscription primitives `stream.subscribe` / `session.subscribe` are the
 WebSocket equivalents and are intentionally socket-only, listed in
 `WS_ONLY_METHODS`.)
 
-### Standing decision (6)
+### Standing decision (7)
 
 | Method | Path | Durable reason to stay HTTP-only |
 | --- | --- | --- |
 | POST | `/daemon/telemetry` | One-way decode-failure telemetry must reach the daemon on a plain HTTP path even when a client cannot decode RPC framing. |
+| POST | `/v1/task-board/triage/escalations/{escalation_id}/verdict` | Report path for the daemon's own spawned triage-escalation worker, authenticated by a single-use per-escalation token instead of the control-plane session; never exposed to remote or Swift clients, so it must not gain an RPC mirror. |
 | POST | `/v1/remote/pair/claim` | Pre-auth pairing claim that mints the first credential; cannot ride the authenticated RPC channel it bootstraps. |
 | POST | `/v1/remote/pair/status` | Pre-auth pairing lifecycle check; part of the bootstrap that precedes the authenticated RPC channel. |
 | POST | `/v1/remote/clients/self/revoke` | Self-revoke destroys the caller's own credential; kept a one-shot HTTP action rather than a method on the RPC session it would invalidate mid-call. |

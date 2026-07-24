@@ -20,7 +20,7 @@ fn every_non_exempt_http_route_has_a_ws_mapping() {
 #[test]
 fn explicit_non_rpc_exemptions_are_documented_and_stable() {
     let exemptions = explicit_exemptions();
-    assert_eq!(exemptions.len(), 11, "unexpected exemption count");
+    assert_eq!(exemptions.len(), 12, "unexpected exemption count");
     let exempt_paths: BTreeSet<_> = exemptions.iter().map(|route| route.path).collect();
     assert_eq!(
         exempt_paths,
@@ -36,6 +36,7 @@ fn explicit_non_rpc_exemptions_are_documented_and_stable() {
             http_paths::SESSION_STREAM,
             http_paths::READY,
             http_paths::MANAGED_AGENT_ATTACH,
+            http_paths::TASK_BOARD_TRIAGE_ESCALATION_VERDICT,
         ])
     );
 }
@@ -185,6 +186,15 @@ fn config_route_is_swift_exposed_rpc() {
 #[test]
 fn every_http_route_has_remote_scope_contract() {
     for route in HTTP_API_CONTRACT.iter() {
+        // The one deliberate exception: this route must never be
+        // remote-authorizable at all (see
+        // `task_board_triage_escalation_verdict_route_is_never_remote_authorizable`
+        // below) -- declaring any scope here would make
+        // `authorize_remote_http_route` accept it from a remote client,
+        // exactly what it must never do.
+        if route.path == http_paths::TASK_BOARD_TRIAGE_ESCALATION_VERDICT {
+            continue;
+        }
         assert!(
             remote_http_scopes(route).is_some(),
             "{} {} should declare remote auth scopes",
@@ -192,6 +202,24 @@ fn every_http_route_has_remote_scope_contract() {
             route.path
         );
     }
+}
+
+#[test]
+fn task_board_triage_escalation_verdict_route_is_never_remote_authorizable() {
+    let route = HTTP_API_CONTRACT
+        .iter()
+        .find(|route| route.path == http_paths::TASK_BOARD_TRIAGE_ESCALATION_VERDICT)
+        .expect("triage escalation verdict route should be registered");
+
+    assert!(matches!(route.parity, HttpRouteParity::Exempt { .. }));
+    assert!(route.parity.ws_method().is_none());
+    assert!(!route.swift_client_exposed);
+    assert_eq!(
+        remote_http_scopes(route),
+        None,
+        "no remote scope contract means authorize_remote_http_route fails closed \
+         with MissingScopeContract for any remote caller"
+    );
 }
 
 #[test]

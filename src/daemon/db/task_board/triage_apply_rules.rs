@@ -105,8 +105,11 @@ pub(super) async fn apply_active_triage_in_tx(
         active.evaluator_version,
     ) else {
         return match existing {
+            // See `apply_builtin_v1_triage_in_tx`'s identical arm: the
+            // retained decision's own evaluator identity is the correct
+            // placement producer here, not this call's active evaluator.
             Some(existing)
-                if !placement_matches_verdict(item, existing.verdict, RUNTIME_RULES_EVALUATOR_IDENTITY) =>
+                if !placement_matches_verdict(item, existing.verdict, &existing.evaluator_identity) =>
             {
                 let manually_placed = item
                     .lane_origin
@@ -115,12 +118,13 @@ pub(super) async fn apply_active_triage_in_tx(
                 if manually_placed || suppress_placement || override_active {
                     Ok(None)
                 } else {
+                    let producer = existing.evaluator_identity.clone();
                     apply_placement_effect_in_tx(
                         transaction,
                         item,
                         existing.verdict,
                         decided_at,
-                        RUNTIME_RULES_EVALUATOR_IDENTITY,
+                        &producer,
                     )
                     .await?;
                     Ok(Some(TriageOutcome::RetainedEffect(existing)))

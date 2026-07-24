@@ -1,4 +1,6 @@
-use super::{HttpApiRouteContract, HttpRouteMethod, HttpRouteParity, http_paths, ws_methods};
+use super::{
+    HttpApiRouteContract, HttpRouteMethod, HttpRouteParity, WsExemptionKind, http_paths, ws_methods,
+};
 
 pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     HttpApiRouteContract {
@@ -80,5 +82,16 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
             ws_method: ws_methods::TASK_BOARD_TRIAGE_RULES_AUDIT,
         },
         swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::TASK_BOARD_TRIAGE_ESCALATION_VERDICT,
+        parity: HttpRouteParity::Exempt {
+            kind: WsExemptionKind::StandingDecision,
+            reason: "HTTP-only local report from the daemon's own spawned escalation worker, \
+                     authenticated by a single-use per-escalation token minted at claim time, \
+                     not the control-plane session -- never exposed to remote or Swift clients",
+        },
+        swift_client_exposed: false,
     },
 ];

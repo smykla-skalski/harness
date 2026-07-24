@@ -6,7 +6,8 @@ use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::infra::io;
 use crate::task_board::{
     TaskBoardTriageDecision, TaskBoardTriageDecisionRecord, TaskBoardTriageEffectiveOutcome,
-    TaskBoardTriageOverride, effective_triage_outcome, is_canonical_decided_at,
+    TaskBoardTriageEscalationStatus, TaskBoardTriageOverride, effective_triage_outcome,
+    is_canonical_decided_at,
 };
 
 pub(crate) const TASK_BOARD_TRIAGE_HISTORY_MAX_LIMIT: u32 = 100;
@@ -19,6 +20,7 @@ pub(crate) struct TaskBoardTriageCurrentRead {
     pub(crate) current: Option<TaskBoardTriageDecisionRecord>,
     pub(crate) triage_override: Option<TaskBoardTriageOverride>,
     pub(crate) effective: Option<TaskBoardTriageEffectiveOutcome>,
+    pub(crate) pending_escalation_status: Option<TaskBoardTriageEscalationStatus>,
 }
 
 #[derive(Debug)]
@@ -80,10 +82,14 @@ impl AsyncDaemonDb {
         let current = row.map(record_from_row).transpose()?;
         let decision = current.as_ref().and_then(decision_from_record);
         let effective = effective_triage_outcome(triage_override.as_ref(), decision.as_ref());
+        let pending_escalation_status = self
+            .task_board_triage_escalation_status_for_item(item_id)
+            .await?;
         Ok(TaskBoardTriageCurrentRead {
             current,
             triage_override,
             effective,
+            pending_escalation_status,
         })
     }
 

@@ -117,6 +117,10 @@ pub fn task_board_mcp_methods() -> Vec<&'static str> {
         .iter()
         .chain(routes_task_board_positions::ROUTES)
         .chain(routes_task_board_triage::ROUTES)
+        // The triage escalation verdict route is HTTP-only by design (no
+        // websocket mapping exists) and is never an MCP tool -- its only
+        // caller is the daemon's own spawned escalation worker.
+        .filter(|route| !matches!(route.parity, HttpRouteParity::Exempt { .. }))
         .map(|route| {
             route
                 .parity
