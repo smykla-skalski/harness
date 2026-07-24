@@ -4,14 +4,16 @@ use axum::routing::{get, post, put};
 use crate::daemon::protocol::http_paths;
 
 use super::DaemonHttpState;
+use super::task_board_git::merge_git_routes;
 use super::task_board_orchestrator_handlers::merge_orchestrator_routes;
 
-mod items;
+pub(super) mod items;
+pub(super) mod operations;
 mod policy;
 mod policy_io;
 mod policy_spawn_gate;
-mod positions;
-mod triage;
+pub(super) mod positions;
+pub(super) mod triage;
 mod triage_rules;
 
 pub(super) use self::items::{authenticated_request, authorized_control_request_parts};
@@ -20,13 +22,15 @@ pub(super) use self::policy_io::{
 };
 
 use self::items::{
-    delete_task_board_item, get_task_board_audit, get_task_board_capabilities,
-    get_task_board_host_list, get_task_board_host_local, get_task_board_item, get_task_board_items,
+    delete_task_board_item, get_task_board_capabilities, get_task_board_item, get_task_board_items,
+    post_task_board_item, post_task_board_plan_approve, post_task_board_plan_begin,
+    post_task_board_plan_revoke, post_task_board_plan_submit, put_task_board_item,
+};
+use self::operations::{
+    get_task_board_audit, get_task_board_host_list, get_task_board_host_local,
     get_task_board_machines, get_task_board_projects, post_task_board_dispatch,
     post_task_board_dispatch_deliver, post_task_board_dispatch_pick, post_task_board_evaluate,
-    post_task_board_item, post_task_board_plan_approve, post_task_board_plan_begin,
-    post_task_board_plan_revoke, post_task_board_plan_submit, post_task_board_sync,
-    put_task_board_host_set_project_types, put_task_board_item,
+    post_task_board_sync, put_task_board_host_set_project_types,
 };
 use self::policy::merge_policy_routes;
 use self::policy_io::merge_policy_io_routes;
@@ -169,7 +173,7 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
             get(get_task_board_machines),
         )
         .merge(task_board_host_routes());
-    merge_policy_spawn_gate_routes(merge_policy_io_routes(merge_policy_routes(
+    merge_policy_spawn_gate_routes(merge_policy_io_routes(merge_policy_routes(merge_git_routes(
         merge_orchestrator_routes(router),
-    )))
+    ))))
 }

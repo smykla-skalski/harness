@@ -115,6 +115,8 @@ pub struct TaskBoardAutomationRunInfo {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
+#[cfg_attr(feature = "openapi", into_params(parameter_in = Query))]
 pub struct TaskBoardAutomationHistoryRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub limit: Option<u32>,

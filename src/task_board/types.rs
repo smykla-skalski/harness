@@ -1,6 +1,15 @@
+#[cfg(feature = "openapi")]
+use std::borrow::Cow;
+
 use clap::ValueEnum;
 use clap::builder::PossibleValue;
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "openapi")]
+use utoipa::openapi::schema::{Schema, Type};
+#[cfg(feature = "openapi")]
+use utoipa::openapi::{ObjectBuilder, RefOr};
+#[cfg(feature = "openapi")]
+use utoipa::{PartialSchema, ToSchema};
 
 use super::automation::TaskBoardWorkflowKind;
 use super::lane::TaskBoardLaneOrigin;
@@ -284,10 +293,10 @@ impl<'de> Deserialize<'de> for TaskBoardItemKind {
 // an enum-variant field such as `DispatchBlockReason::Kind`, so the type owns a
 // manual `{type: string}` component that references cleanly from every use.
 #[cfg(feature = "openapi")]
-impl utoipa::PartialSchema for TaskBoardItemKind {
-    fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
-        utoipa::openapi::ObjectBuilder::new()
-            .schema_type(utoipa::openapi::schema::Type::String)
+impl PartialSchema for TaskBoardItemKind {
+    fn schema() -> RefOr<Schema> {
+        ObjectBuilder::new()
+            .schema_type(Type::String)
             .description(Some(
                 "Open string enum: `task`, `umbrella`, or a forward-compatible unknown value.",
             ))
@@ -296,9 +305,9 @@ impl utoipa::PartialSchema for TaskBoardItemKind {
 }
 
 #[cfg(feature = "openapi")]
-impl utoipa::ToSchema for TaskBoardItemKind {
-    fn name() -> std::borrow::Cow<'static, str> {
-        std::borrow::Cow::Borrowed("TaskBoardItemKind")
+impl ToSchema for TaskBoardItemKind {
+    fn name() -> Cow<'static, str> {
+        Cow::Borrowed("TaskBoardItemKind")
     }
 }
 

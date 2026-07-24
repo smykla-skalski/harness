@@ -7,7 +7,8 @@ use serde::Deserialize;
 
 use crate::daemon::protocol::{
     TASK_BOARD_TRIAGE_HISTORY_INVALID_PARAMS, TaskBoardClearTriageOverrideRequest,
-    TaskBoardSetTriageOverrideRequest, TaskBoardTriageHistoryRequest, http_paths,
+    TaskBoardSetTriageOverrideRequest, TaskBoardTriageCurrentResponse, TaskBoardTriageHistoryRequest,
+    TaskBoardTriageHistoryResponse, TaskBoardTriageOverrideMutationResponse, http_paths,
 };
 use crate::daemon::remote_task_board::{
     project_task_board_triage_current, project_task_board_triage_history,
@@ -15,16 +16,30 @@ use crate::daemon::remote_task_board::{
 use crate::errors::{CliError, CliErrorKind};
 
 use super::super::DaemonHttpState;
+#[cfg(feature = "openapi")]
+use super::super::openapi::DaemonErrorBody;
 use super::super::response::timed_json;
 use super::super::task_board_route_executor;
 use super::items::{authenticated_task_board_read, authorized_control_request_parts};
 
 #[derive(Debug, Clone, Default, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
+#[cfg_attr(feature = "openapi", into_params(parameter_in = Query))]
 pub(super) struct TaskBoardTriageHistoryQuery {
     pub before_generation: Option<u64>,
     pub limit: Option<u32>,
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/v1/task-board/items/{item_id}/triage",
+    tag = "task-board",
+    params(("item_id" = String, Path, description = "Task-board item identifier")),
+    responses(
+        (status = 200, description = "Current effective triage outcome for the item", body = TaskBoardTriageCurrentResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn get_task_board_item_triage(
     Path(item_id): Path<String>,
     headers: HeaderMap,
@@ -46,6 +61,19 @@ pub(super) async fn get_task_board_item_triage(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/v1/task-board/items/{item_id}/triage/history",
+    tag = "task-board",
+    params(
+        ("item_id" = String, Path, description = "Task-board item identifier"),
+        TaskBoardTriageHistoryQuery,
+    ),
+    responses(
+        (status = 200, description = "Paged triage decision history for the item", body = TaskBoardTriageHistoryResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn get_task_board_item_triage_history(
     Path(item_id): Path<String>,
     query: Result<Query<TaskBoardTriageHistoryQuery>, QueryRejection>,
@@ -88,6 +116,17 @@ pub(super) async fn get_task_board_item_triage_history(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    put,
+    path = "/v1/task-board/items/{item_id}/triage/override",
+    tag = "task-board",
+    params(("item_id" = String, Path, description = "Task-board item identifier")),
+    request_body = TaskBoardSetTriageOverrideRequest,
+    responses(
+        (status = 200, description = "Effective triage outcome after setting the override", body = TaskBoardTriageOverrideMutationResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn put_task_board_item_triage_override(
     Path(item_id): Path<String>,
     headers: HeaderMap,
@@ -108,6 +147,17 @@ pub(super) async fn put_task_board_item_triage_override(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/task-board/items/{item_id}/triage/override/clear",
+    tag = "task-board",
+    params(("item_id" = String, Path, description = "Task-board item identifier")),
+    request_body = TaskBoardClearTriageOverrideRequest,
+    responses(
+        (status = 200, description = "Effective triage outcome after clearing the override", body = TaskBoardTriageOverrideMutationResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_task_board_item_triage_override_clear(
     Path(item_id): Path<String>,
     headers: HeaderMap,

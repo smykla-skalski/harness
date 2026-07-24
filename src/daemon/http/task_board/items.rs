@@ -7,44 +7,60 @@ use axum::response::Response;
 use serde::Deserialize;
 
 use crate::daemon::protocol::{
-    ControlPlaneActorRequest, TaskBoardAuditRequest, TaskBoardCatalogRequest,
-    TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardDispatchDeliverRequest,
-    TaskBoardDispatchPickRequest, TaskBoardDispatchRequest, TaskBoardEvaluateRequest,
-    TaskBoardGetItemRequest, TaskBoardHostSetProjectTypesRequest, TaskBoardListItemsRequest,
-    TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest,
-    TaskBoardPlanSubmitRequest, TaskBoardSyncRequest, TaskBoardUpdateItemRequest, http_paths,
+    ControlPlaneActorRequest, TaskBoardCapabilitiesResponse, TaskBoardCreateItemRequest,
+    TaskBoardDeleteItemRequest, TaskBoardGetItemRequest, TaskBoardListItemsRequest,
+    TaskBoardListItemsResponse, TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest,
+    TaskBoardPlanningResponse, TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest,
+    TaskBoardUpdateItemRequest, http_paths,
 };
 use crate::daemon::remote_task_board::{project_task_board_item, project_task_board_list};
 use crate::daemon::remote_viewer::is_remote_viewer;
-use crate::task_board::TaskBoardStatus;
+use crate::task_board::{TaskBoardItem, TaskBoardStatus};
 
 use super::super::DaemonHttpState;
 use super::super::auth::{authenticated_remote_client, authorize_control_request, require_auth};
 use super::super::response::{extract_request_id, timed_json};
 use super::super::task_board_route_executor;
+#[cfg(feature = "openapi")]
+use super::super::openapi::DaemonErrorBody;
 
 #[derive(Debug, Clone, Default, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
+#[cfg_attr(feature = "openapi", into_params(parameter_in = Query))]
 pub(super) struct TaskBoardListQuery {
     pub status: Option<TaskBoardStatus>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(super) struct TaskBoardPlanSubmitBody {
     pub summary: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(super) struct TaskBoardPlanApproveBody {
     pub approved_by: String,
     pub approved_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(super) struct TaskBoardPlanRevokeBody {
     #[serde(default)]
     pub actor: Option<String>,
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/task-board/items",
+    tag = "task-board",
+    request_body = TaskBoardCreateItemRequest,
+    responses(
+        (status = 200, description = "The created task-board item", body = TaskBoardItem),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_task_board_item(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -63,6 +79,15 @@ pub(super) async fn post_task_board_item(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/v1/task-board/capabilities",
+    tag = "task-board",
+    responses(
+        (status = 200, description = "Task-board capability descriptor", body = TaskBoardCapabilitiesResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn get_task_board_capabilities(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -80,6 +105,16 @@ pub(super) async fn get_task_board_capabilities(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/v1/task-board/items",
+    tag = "task-board",
+    params(TaskBoardListQuery),
+    responses(
+        (status = 200, description = "Task-board items with per-status counts and progress rollups", body = TaskBoardListItemsResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn get_task_board_items(
     Query(query): Query<TaskBoardListQuery>,
     headers: HeaderMap,
@@ -104,6 +139,16 @@ pub(super) async fn get_task_board_items(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/v1/task-board/items/{item_id}",
+    tag = "task-board",
+    params(("item_id" = String, Path, description = "Task-board item identifier")),
+    responses(
+        (status = 200, description = "The requested task-board item", body = TaskBoardItem),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn get_task_board_item(
     Path(item_id): Path<String>,
     headers: HeaderMap,
@@ -126,6 +171,17 @@ pub(super) async fn get_task_board_item(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    put,
+    path = "/v1/task-board/items/{item_id}",
+    tag = "task-board",
+    params(("item_id" = String, Path, description = "Task-board item identifier")),
+    request_body = TaskBoardUpdateItemRequest,
+    responses(
+        (status = 200, description = "The updated task-board item", body = TaskBoardItem),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn put_task_board_item(
     Path(item_id): Path<String>,
     headers: HeaderMap,
@@ -145,6 +201,16 @@ pub(super) async fn put_task_board_item(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    delete,
+    path = "/v1/task-board/items/{item_id}",
+    tag = "task-board",
+    params(("item_id" = String, Path, description = "Task-board item identifier")),
+    responses(
+        (status = 200, description = "The deleted (tombstoned) task-board item", body = TaskBoardItem),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn delete_task_board_item(
     Path(item_id): Path<String>,
     headers: HeaderMap,
@@ -164,6 +230,16 @@ pub(super) async fn delete_task_board_item(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/task-board/items/{item_id}/planning/begin",
+    tag = "task-board",
+    params(("item_id" = String, Path, description = "Task-board item identifier")),
+    responses(
+        (status = 200, description = "Planning transition after entering planning", body = TaskBoardPlanningResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_task_board_plan_begin(
     Path(item_id): Path<String>,
     headers: HeaderMap,
@@ -183,6 +259,17 @@ pub(super) async fn post_task_board_plan_begin(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/task-board/items/{item_id}/planning/submit",
+    tag = "task-board",
+    params(("item_id" = String, Path, description = "Task-board item identifier")),
+    request_body = TaskBoardPlanSubmitBody,
+    responses(
+        (status = 200, description = "Planning transition after submitting a plan", body = TaskBoardPlanningResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_task_board_plan_submit(
     Path(item_id): Path<String>,
     headers: HeaderMap,
@@ -206,6 +293,17 @@ pub(super) async fn post_task_board_plan_submit(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/task-board/items/{item_id}/planning/approve",
+    tag = "task-board",
+    params(("item_id" = String, Path, description = "Task-board item identifier")),
+    request_body = TaskBoardPlanApproveBody,
+    responses(
+        (status = 200, description = "Planning transition after approving the plan", body = TaskBoardPlanningResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_task_board_plan_approve(
     Path(item_id): Path<String>,
     headers: HeaderMap,
@@ -231,6 +329,17 @@ pub(super) async fn post_task_board_plan_approve(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/task-board/items/{item_id}/planning/revoke",
+    tag = "task-board",
+    params(("item_id" = String, Path, description = "Task-board item identifier")),
+    request_body = TaskBoardPlanRevokeBody,
+    responses(
+        (status = 200, description = "Planning transition after revoking plan approval", body = TaskBoardPlanningResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_task_board_plan_revoke(
     Path(item_id): Path<String>,
     headers: HeaderMap,
@@ -252,215 +361,6 @@ pub(super) async fn post_task_board_plan_revoke(
         &request_id,
         start,
         task_board_route_executor::revoke_plan(&state, &request).await,
-    )
-}
-
-pub(super) async fn post_task_board_sync(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardSyncRequest>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    timed_json(
-        "POST",
-        http_paths::TASK_BOARD_SYNC,
-        &request_id,
-        start,
-        task_board_route_executor::sync(&state, &request).await,
-    )
-}
-
-pub(super) async fn post_task_board_dispatch(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(mut request): Json<TaskBoardDispatchRequest>,
-) -> Response {
-    let (start, request_id) = match authorized_control_request_parts(&headers, &state, &mut request)
-    {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    let result = Box::pin(task_board_route_executor::dispatch(&state, request)).await;
-    timed_json(
-        "POST",
-        http_paths::TASK_BOARD_DISPATCH,
-        &request_id,
-        start,
-        result,
-    )
-}
-
-pub(super) async fn post_task_board_dispatch_deliver(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardDispatchDeliverRequest>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    timed_json(
-        "POST",
-        http_paths::TASK_BOARD_DISPATCH_DELIVER,
-        &request_id,
-        start,
-        task_board_route_executor::deliver(&state, &request).await,
-    )
-}
-
-pub(super) async fn post_task_board_dispatch_pick(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    _body: Option<Json<TaskBoardDispatchPickRequest>>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    timed_json(
-        "POST",
-        http_paths::TASK_BOARD_DISPATCH_PICK,
-        &request_id,
-        start,
-        task_board_route_executor::pick(&state).await,
-    )
-}
-
-pub(super) async fn post_task_board_evaluate(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(mut request): Json<TaskBoardEvaluateRequest>,
-) -> Response {
-    let (start, request_id) = match authorized_control_request_parts(&headers, &state, &mut request)
-    {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    let result = task_board_route_executor::evaluate(&state, request).await;
-    timed_json(
-        "POST",
-        http_paths::TASK_BOARD_EVALUATE,
-        &request_id,
-        start,
-        result,
-    )
-}
-
-pub(super) async fn get_task_board_audit(
-    Query(query): Query<TaskBoardListQuery>,
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    let request = TaskBoardAuditRequest {
-        status: query.status,
-    };
-    timed_json(
-        "GET",
-        http_paths::TASK_BOARD_AUDIT,
-        &request_id,
-        start,
-        task_board_route_executor::audit(&state, &request).await,
-    )
-}
-
-pub(super) async fn get_task_board_projects(
-    Query(query): Query<TaskBoardListQuery>,
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    let request = TaskBoardCatalogRequest {
-        status: query.status,
-    };
-    timed_json(
-        "GET",
-        http_paths::TASK_BOARD_PROJECTS,
-        &request_id,
-        start,
-        task_board_route_executor::projects(&state, &request).await,
-    )
-}
-
-pub(super) async fn get_task_board_machines(
-    Query(query): Query<TaskBoardListQuery>,
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    let request = TaskBoardCatalogRequest {
-        status: query.status,
-    };
-    timed_json(
-        "GET",
-        http_paths::TASK_BOARD_MACHINES,
-        &request_id,
-        start,
-        task_board_route_executor::machines(&state, &request).await,
-    )
-}
-
-pub(super) async fn get_task_board_host_local(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    timed_json(
-        "GET",
-        http_paths::TASK_BOARD_HOST_LOCAL,
-        &request_id,
-        start,
-        task_board_route_executor::host_local(&state).await,
-    )
-}
-
-pub(super) async fn get_task_board_host_list(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    timed_json(
-        "GET",
-        http_paths::TASK_BOARD_HOST_LIST,
-        &request_id,
-        start,
-        task_board_route_executor::host_list(&state).await,
-    )
-}
-
-pub(super) async fn put_task_board_host_set_project_types(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardHostSetProjectTypesRequest>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    timed_json(
-        "PUT",
-        http_paths::TASK_BOARD_HOST_SET_PROJECT_TYPES,
-        &request_id,
-        start,
-        task_board_route_executor::host_set_project_types(&state, &request).await,
     )
 }
 

@@ -185,6 +185,59 @@ struct ManagedAgentsApi;
 ))]
 struct ReviewsApi;
 
+#[derive(utoipa::OpenApi)]
+#[openapi(paths(
+    super::task_board::items::get_task_board_capabilities,
+    super::task_board::items::post_task_board_item,
+    super::task_board::items::get_task_board_items,
+    super::task_board::items::get_task_board_item,
+    super::task_board::items::put_task_board_item,
+    super::task_board::items::delete_task_board_item,
+    super::task_board::items::post_task_board_plan_begin,
+    super::task_board::items::post_task_board_plan_submit,
+    super::task_board::items::post_task_board_plan_approve,
+    super::task_board::items::post_task_board_plan_revoke,
+    super::task_board::operations::post_task_board_sync,
+    super::task_board::operations::post_task_board_dispatch,
+    super::task_board::operations::post_task_board_dispatch_deliver,
+    super::task_board::operations::post_task_board_dispatch_pick,
+    super::task_board::operations::post_task_board_evaluate,
+    super::task_board::operations::get_task_board_audit,
+    super::task_board::operations::get_task_board_projects,
+    super::task_board::operations::get_task_board_machines,
+    super::task_board::operations::get_task_board_host_local,
+    super::task_board::operations::get_task_board_host_list,
+    super::task_board::operations::put_task_board_host_set_project_types,
+    super::task_board::positions::get_task_board_item_position_snapshot,
+    super::task_board::positions::put_task_board_item_position,
+    super::task_board::positions::post_task_board_item_position_reset,
+    super::task_board::triage::get_task_board_item_triage,
+    super::task_board::triage::get_task_board_item_triage_history,
+    super::task_board::triage::put_task_board_item_triage_override,
+    super::task_board::triage::post_task_board_item_triage_override_clear,
+    super::task_board_orchestrator_handlers::get_task_board_orchestrator_status,
+    super::task_board_orchestrator_handlers::post_task_board_orchestrator_start,
+    super::task_board_orchestrator_handlers::post_task_board_orchestrator_stop,
+    super::task_board_orchestrator_handlers::post_task_board_orchestrator_run_once,
+    super::task_board_orchestrator_handlers::get_task_board_automation_runs,
+    super::task_board_orchestrator_handlers::get_task_board_automation_run_detail,
+    super::task_board_orchestrator_handlers::get_task_board_automation_metrics,
+    super::task_board_orchestrator_handlers::post_task_board_automation_force_cancel,
+    super::task_board_orchestrator_handlers::get_task_board_orchestrator_settings,
+    super::task_board_orchestrator_handlers::put_task_board_orchestrator_settings,
+    super::task_board_git::get_task_board_orchestrator_runtime_config,
+    super::task_board_git::put_task_board_orchestrator_runtime_config,
+    super::task_board_git::put_task_board_orchestrator_github_tokens,
+    super::task_board_git::put_task_board_orchestrator_todoist_token,
+    super::task_board_git::put_task_board_orchestrator_openrouter_token,
+    super::task_board_git::get_task_board_git_identity_defaults,
+    super::task_board_git::post_task_board_git_signing_verify,
+    super::task_board_git::put_task_board_git_runtime_key_material,
+    super::task_board_git::post_task_board_git_runtime_secret_handoff_prepare,
+    super::task_board_git::post_task_board_git_runtime_secret_handoff_ack,
+))]
+struct TaskBoardApi;
+
 /// Build the typed `OpenAPI` document from every domain aggregator.
 ///
 /// Aggregators merge in registration order; component schemas deduplicate by
@@ -198,6 +251,7 @@ pub fn openapi_document() -> utoipa::openapi::OpenApi {
     doc.merge(TasksAgentsApi::openapi());
     doc.merge(ManagedAgentsApi::openapi());
     doc.merge(ReviewsApi::openapi());
+    doc.merge(TaskBoardApi::openapi());
     env!("CARGO_PKG_VERSION").clone_into(&mut doc.info.version);
     doc
 }
