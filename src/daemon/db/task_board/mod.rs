@@ -95,13 +95,20 @@ mod remote_assignment_stop_fence;
 mod remote_assignment_terminal;
 mod remote_assignment_terminal_handoff;
 mod triage_apply;
+mod triage_apply_rules;
 mod triage_audit;
+mod triage_cause;
 mod triage_decisions;
 mod triage_override;
 mod triage_override_audit;
 #[cfg(test)]
 mod triage_override_position_conflict_tests;
 mod triage_queries;
+mod triage_rules_activation;
+mod triage_rules_bulk_load;
+mod triage_rules_preview;
+mod triage_rules_reevaluation;
+mod triage_rules_store;
 pub(crate) use remote_assignment_terminal_handoff::{
     exact_active_remote_target, parent_points_to_assignment,
 };

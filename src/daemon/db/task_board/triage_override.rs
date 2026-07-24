@@ -10,10 +10,8 @@ use super::lane_order::{
     LaneTransitionKind, TaskBoardLaneShift, replace_with_lane_transition_in_tx,
 };
 use super::rows::ItemRow;
-use super::triage_apply::{
-    EnsuredTriageDecision, apply_override_placement_effect_in_tx,
-    ensure_current_triage_decision_in_tx, triage_eligible,
-};
+use super::triage_apply::{EnsuredTriageDecision, apply_override_placement_effect_in_tx, triage_eligible};
+use super::triage_apply_rules::ensure_current_active_triage_decision_in_tx;
 use super::triage_decisions::current_triage_decision_in_tx;
 use super::triage_override_audit::{
     record_triage_override_cleared_audit_in_tx, record_triage_override_set_audit_in_tx,
@@ -423,7 +421,7 @@ async fn reconcile_cleared_override_in_tx(
 ) -> Result<ClearReconciliation, CliError> {
     let eligible = triage_eligible(item);
     let decision = if eligible {
-        ensure_current_triage_decision_in_tx(transaction, item, now).await?
+        ensure_current_active_triage_decision_in_tx(transaction, item, now).await?
     } else {
         current_triage_decision_in_tx(transaction, &item.id)
             .await?
