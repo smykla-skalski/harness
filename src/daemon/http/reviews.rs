@@ -7,17 +7,17 @@ use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 
 use crate::daemon::protocol::{
-    ReviewsActionPreviewRequest, ReviewsApproveRequest, ReviewsAutoRequest, ReviewsAvatarRequest,
-    ReviewsBodyRequest, ReviewsBodyUpdateRequest, ReviewsCommentRequest, ReviewsLabelRequest,
-    ReviewsMergeRequest, ReviewsPullRequestResolveRequest, ReviewsQueryRequest,
-    ReviewsRefreshRequest, ReviewsRepositoryCatalogRequest, ReviewsRequestReviewRequest,
-    ReviewsRerunChecksRequest, ReviewsReviewThreadResolveRequest, ReviewsTimelineRequest,
+    ReviewsActionPreviewRequest, ReviewsAvatarRequest, ReviewsBodyRequest, ReviewsBodyUpdateRequest,
+    ReviewsPullRequestResolveRequest, ReviewsQueryRequest, ReviewsRefreshRequest,
+    ReviewsRepositoryCatalogRequest, ReviewsReviewThreadResolveRequest, ReviewsTimelineRequest,
     http_paths,
 };
 use crate::daemon::service;
 
 use super::DaemonHttpState;
 use super::auth::require_auth;
+#[cfg(feature = "openapi")]
+use super::openapi::DaemonErrorBody;
 use super::response::{extract_request_id, timed_json};
 
 pub(super) fn reviews_routes() -> Router<DaemonHttpState> {
@@ -42,27 +42,18 @@ pub(super) fn reviews_routes() -> Router<DaemonHttpState> {
     // Policy preview/start/status/history handlers live in the sibling
     // `reviews_policy` module to keep this file within the line-length cap.
     let router = super::reviews_policy::merge_policy_routes(router);
+    // Write-action handlers (approve/merge/rerun-checks/label/auto/
+    // request-review/comment) live in the sibling `reviews_actions` module for
+    // the same reason.
+    let router = super::reviews_actions::merge_action_routes(router);
     let router = router
-        .route(http_paths::REVIEWS_APPROVE, post(post_approve_reviews))
-        .route(http_paths::REVIEWS_MERGE, post(post_merge_reviews))
-        .route(
-            http_paths::REVIEWS_RERUN_CHECKS,
-            post(post_rerun_reviews_checks),
-        )
-        .route(http_paths::REVIEWS_LABELS, post(post_label_reviews))
-        .route(http_paths::REVIEWS_AUTO, post(post_auto_reviews))
-        .route(
-            http_paths::REVIEWS_REQUEST_REVIEW,
-            post(post_request_review),
-        )
         .route(http_paths::REVIEWS_CACHE, delete(delete_reviews_cache))
         .route(http_paths::REVIEWS_REFRESH, post(post_refresh_reviews))
         .route(http_paths::REVIEWS_BODY, post(post_review_body))
         .route(
             http_paths::REVIEWS_BODY_UPDATE,
             post(post_review_body_update),
-        )
-        .route(http_paths::REVIEWS_COMMENT, post(post_comment_reviews));
+        );
     // Review-files preview/patch/blob/local-clone handlers live in the sibling
     // `reviews_files` module to keep this file within the line-length cap.
     let router = super::reviews_files::merge_files_routes(router);
@@ -75,7 +66,16 @@ pub(super) fn reviews_routes() -> Router<DaemonHttpState> {
         )
 }
 
-async fn get_review_capabilities(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/v1/reviews/capabilities",
+    tag = "reviews",
+    responses(
+        (status = 200, description = "Feature flags for the review tooling", body = crate::daemon::protocol::ReviewsCapabilitiesResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn get_review_capabilities(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
@@ -93,7 +93,17 @@ async fn get_review_capabilities(
     )
 }
 
-async fn post_review_repositories(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/repositories",
+    tag = "reviews",
+    request_body = ReviewsRepositoryCatalogRequest,
+    responses(
+        (status = 200, description = "Repositories the organization exposes for review", body = crate::daemon::protocol::ReviewsRepositoryCatalogResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_review_repositories(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsRepositoryCatalogRequest>,
@@ -113,7 +123,17 @@ async fn post_review_repositories(
     )
 }
 
-async fn post_query_reviews(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/query",
+    tag = "reviews",
+    request_body = ReviewsQueryRequest,
+    responses(
+        (status = 200, description = "Matching reviews with their summary", body = crate::daemon::protocol::ReviewsQueryResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_query_reviews(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsQueryRequest>,
@@ -133,7 +153,17 @@ async fn post_query_reviews(
     )
 }
 
-async fn post_resolve_review_pull_requests(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/pull-requests/resolve",
+    tag = "reviews",
+    request_body = ReviewsPullRequestResolveRequest,
+    responses(
+        (status = 200, description = "Resolved pull requests plus any that were not found", body = crate::daemon::protocol::ReviewsPullRequestResolveResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_resolve_review_pull_requests(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsPullRequestResolveRequest>,
@@ -153,7 +183,17 @@ async fn post_resolve_review_pull_requests(
     )
 }
 
-async fn post_review_action_preview(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/action-preview",
+    tag = "reviews",
+    request_body = ReviewsActionPreviewRequest,
+    responses(
+        (status = 200, description = "Per-target eligibility preview for an action", body = crate::daemon::protocol::ReviewsActionPreviewResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_review_action_preview(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsActionPreviewRequest>,
@@ -172,121 +212,16 @@ async fn post_review_action_preview(
     )
 }
 
-async fn post_approve_reviews(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<ReviewsApproveRequest>,
-) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
-    let result = service::approve_reviews(&request).await;
-    timed_json(
-        "POST",
-        http_paths::REVIEWS_APPROVE,
-        &request_id,
-        start,
-        result,
-    )
-}
-
-async fn post_merge_reviews(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<ReviewsMergeRequest>,
-) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
-    let result = service::merge_reviews(&request).await;
-    timed_json(
-        "POST",
-        http_paths::REVIEWS_MERGE,
-        &request_id,
-        start,
-        result,
-    )
-}
-
-async fn post_rerun_reviews_checks(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<ReviewsRerunChecksRequest>,
-) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
-    let result = service::rerun_reviews_checks(&request).await;
-    timed_json(
-        "POST",
-        http_paths::REVIEWS_RERUN_CHECKS,
-        &request_id,
-        start,
-        result,
-    )
-}
-
-async fn post_label_reviews(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<ReviewsLabelRequest>,
-) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
-    let result = service::add_label_to_reviews(&request).await;
-    timed_json(
-        "POST",
-        http_paths::REVIEWS_LABELS,
-        &request_id,
-        start,
-        result,
-    )
-}
-
-async fn post_auto_reviews(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<ReviewsAutoRequest>,
-) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
-    let result = service::auto_reviews(&request).await;
-    timed_json("POST", http_paths::REVIEWS_AUTO, &request_id, start, result)
-}
-
-async fn post_request_review(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<ReviewsRequestReviewRequest>,
-) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
-    let result = service::request_review_for_reviews(&request).await;
-    timed_json(
-        "POST",
-        http_paths::REVIEWS_REQUEST_REVIEW,
-        &request_id,
-        start,
-        result,
-    )
-}
-
-async fn delete_reviews_cache(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    delete,
+    path = "/v1/reviews/cache",
+    tag = "reviews",
+    responses(
+        (status = 200, description = "Number of cache entries cleared", body = crate::daemon::protocol::ReviewsCacheClearResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn delete_reviews_cache(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
@@ -304,7 +239,17 @@ async fn delete_reviews_cache(
     )
 }
 
-async fn post_refresh_reviews(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/refresh",
+    tag = "reviews",
+    request_body = ReviewsRefreshRequest,
+    responses(
+        (status = 200, description = "Refreshed review items", body = crate::daemon::protocol::ReviewsRefreshResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_refresh_reviews(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsRefreshRequest>,
@@ -324,7 +269,17 @@ async fn post_refresh_reviews(
     )
 }
 
-async fn post_review_body(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/body",
+    tag = "reviews",
+    request_body = ReviewsBodyRequest,
+    responses(
+        (status = 200, description = "Pull request body text", body = crate::daemon::protocol::ReviewsBodyResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_review_body(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsBodyRequest>,
@@ -338,7 +293,17 @@ async fn post_review_body(
     timed_json("POST", http_paths::REVIEWS_BODY, &request_id, start, result)
 }
 
-async fn post_review_body_update(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/body/update",
+    tag = "reviews",
+    request_body = ReviewsBodyUpdateRequest,
+    responses(
+        (status = 200, description = "Result of the body update, including drift detection", body = crate::daemon::protocol::ReviewsBodyUpdateResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_review_body_update(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsBodyUpdateRequest>,
@@ -358,27 +323,17 @@ async fn post_review_body_update(
     )
 }
 
-async fn post_comment_reviews(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<ReviewsCommentRequest>,
-) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
-    let result = service::comment_on_reviews(&request).await;
-    timed_json(
-        "POST",
-        http_paths::REVIEWS_COMMENT,
-        &request_id,
-        start,
-        result,
-    )
-}
-
-async fn post_review_timeline(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/timeline",
+    tag = "reviews",
+    request_body = ReviewsTimelineRequest,
+    responses(
+        (status = 200, description = "Paged pull request timeline", body = crate::daemon::protocol::ReviewsTimelineResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_review_timeline(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsTimelineRequest>,
@@ -398,7 +353,17 @@ async fn post_review_timeline(
     )
 }
 
-async fn post_review_avatar(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/avatar",
+    tag = "reviews",
+    request_body = ReviewsAvatarRequest,
+    responses(
+        (status = 200, description = "Base64-encoded avatar image proxied from GitHub", body = crate::daemon::protocol::ReviewsAvatarResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_review_avatar(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsAvatarRequest>,
@@ -418,7 +383,17 @@ async fn post_review_avatar(
     )
 }
 
-async fn post_review_review_threads_resolve(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/review-threads/resolve",
+    tag = "reviews",
+    request_body = ReviewsReviewThreadResolveRequest,
+    responses(
+        (status = 200, description = "Confirmed resolved state of the review thread", body = crate::daemon::protocol::ReviewsReviewThreadResolveResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_review_review_threads_resolve(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsReviewThreadResolveRequest>,

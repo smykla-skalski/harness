@@ -37,6 +37,7 @@ pub(crate) const BLOB_BYTES_CAP: u64 = 5 * 1024 * 1024;
 
 /// Recognized image-content MIME types we'll preview inline.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ReviewImageMime {
     Png,
@@ -60,6 +61,7 @@ impl ReviewImageMime {
 
 /// Request the bytes for one image blob by repository node id + git OID.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsFilesBlobRequest {
     pub repository_id: String,
     pub oid: String,
@@ -76,6 +78,7 @@ impl ReviewsFilesBlobRequest {
 /// Response carrying the blob bytes (base64-encoded for JSON transport) +
 /// metadata + a per-call rate-limit snapshot.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsFilesBlobResponse {
     pub path: String,
     pub oid: String,

@@ -40,6 +40,7 @@ pub use self::policy::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsQueryRequest {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub authors: Vec<String>,
@@ -63,11 +64,13 @@ pub struct ReviewsQueryRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsRepositoryCatalogRequest {
     pub organization: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsRepositoryCatalogResponse {
     pub organization: String,
     #[serde(default)]
@@ -75,12 +78,14 @@ pub struct ReviewsRepositoryCatalogResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsPullRequestReference {
     pub repository: String,
     pub number: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsPullRequestResolveRequest {
     #[serde(default)]
     pub references: Vec<ReviewsPullRequestReference>,
@@ -94,6 +99,7 @@ pub struct ReviewsPullRequestResolveRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsPullRequestResolveResponse {
     pub fetched_at: String,
     #[serde(default)]
@@ -103,6 +109,7 @@ pub struct ReviewsPullRequestResolveResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsQueryResponse {
     pub fetched_at: String,
     pub from_cache: bool,
@@ -117,6 +124,7 @@ pub struct ReviewsQueryResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewRepositoryLabel {
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -126,6 +134,7 @@ pub struct ReviewRepositoryLabel {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsSummary {
     pub total: usize,
     pub review_required: usize,
@@ -141,6 +150,7 @@ pub struct ReviewsSummary {
     reason = "wire flags map directly to distinct UI toggles and daemon state"
 )]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewItemFlags {
     #[serde(default)]
     pub is_draft: bool,
@@ -153,6 +163,7 @@ pub struct ReviewItemFlags {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewItem {
     pub pull_request_id: String,
     pub repository_id: String,
@@ -188,7 +199,9 @@ pub struct ReviewItem {
     pub reviews: Vec<PullRequestReview>,
     pub additions: u64,
     pub deletions: u64,
+    #[cfg_attr(feature = "openapi", schema(value_type = String, format = DateTime))]
     pub created_at: DateTime<Utc>,
+    #[cfg_attr(feature = "openapi", schema(value_type = String, format = DateTime))]
     pub updated_at: DateTime<Utc>,
     #[serde(default)]
     pub required_failed_check_names: Vec<String>,
@@ -205,6 +218,7 @@ pub struct ReviewItem {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewBackportSource {
     pub number: u64,
     pub repository: String,
@@ -212,6 +226,7 @@ pub struct ReviewBackportSource {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewCheck {
     pub name: String,
     pub status: ReviewCheckRunStatus,
@@ -223,6 +238,7 @@ pub struct ReviewCheck {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PullRequestReview {
     pub author: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]

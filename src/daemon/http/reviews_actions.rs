@@ -1,0 +1,238 @@
+//! Review write-action handlers - approve, merge, rerun-checks, label, auto,
+//! request-review, and comment. They all return [`ReviewsActionResponse`] and
+//! live in their own module so `reviews.rs` stays within the file-length cap.
+
+use std::time::Instant;
+
+use axum::extract::State;
+use axum::http::HeaderMap;
+use axum::response::Response;
+use axum::routing::post;
+use axum::{Json, Router};
+
+use crate::daemon::protocol::{
+    ReviewsApproveRequest, ReviewsAutoRequest, ReviewsCommentRequest, ReviewsLabelRequest,
+    ReviewsMergeRequest, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest, http_paths,
+};
+use crate::daemon::service;
+
+use super::DaemonHttpState;
+use super::auth::require_auth;
+#[cfg(feature = "openapi")]
+use super::openapi::DaemonErrorBody;
+use super::response::{extract_request_id, timed_json};
+
+/// Wire the review write-action endpoints onto the reviews router. These
+/// handlers live in their own module so `reviews.rs` stays within the
+/// file-length cap.
+pub(super) fn merge_action_routes(router: Router<DaemonHttpState>) -> Router<DaemonHttpState> {
+    router
+        .route(http_paths::REVIEWS_APPROVE, post(post_approve_reviews))
+        .route(http_paths::REVIEWS_MERGE, post(post_merge_reviews))
+        .route(
+            http_paths::REVIEWS_RERUN_CHECKS,
+            post(post_rerun_reviews_checks),
+        )
+        .route(http_paths::REVIEWS_LABELS, post(post_label_reviews))
+        .route(http_paths::REVIEWS_AUTO, post(post_auto_reviews))
+        .route(http_paths::REVIEWS_REQUEST_REVIEW, post(post_request_review))
+        .route(http_paths::REVIEWS_COMMENT, post(post_comment_reviews))
+}
+
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/approve",
+    tag = "reviews",
+    request_body = ReviewsApproveRequest,
+    responses(
+        (status = 200, description = "Outcome of applying the approvals", body = crate::daemon::protocol::ReviewsActionResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_approve_reviews(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<ReviewsApproveRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let result = service::approve_reviews(&request).await;
+    timed_json(
+        "POST",
+        http_paths::REVIEWS_APPROVE,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/merge",
+    tag = "reviews",
+    request_body = ReviewsMergeRequest,
+    responses(
+        (status = 200, description = "Outcome of merging the targets", body = crate::daemon::protocol::ReviewsActionResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_merge_reviews(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<ReviewsMergeRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let result = service::merge_reviews(&request).await;
+    timed_json("POST", http_paths::REVIEWS_MERGE, &request_id, start, result)
+}
+
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/rerun-checks",
+    tag = "reviews",
+    request_body = ReviewsRerunChecksRequest,
+    responses(
+        (status = 200, description = "Outcome of re-running the failed checks", body = crate::daemon::protocol::ReviewsActionResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_rerun_reviews_checks(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<ReviewsRerunChecksRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let result = service::rerun_reviews_checks(&request).await;
+    timed_json(
+        "POST",
+        http_paths::REVIEWS_RERUN_CHECKS,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/labels",
+    tag = "reviews",
+    request_body = ReviewsLabelRequest,
+    responses(
+        (status = 200, description = "Outcome of adding the label", body = crate::daemon::protocol::ReviewsActionResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_label_reviews(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<ReviewsLabelRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let result = service::add_label_to_reviews(&request).await;
+    timed_json(
+        "POST",
+        http_paths::REVIEWS_LABELS,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/auto",
+    tag = "reviews",
+    request_body = ReviewsAutoRequest,
+    responses(
+        (status = 200, description = "Outcome of the automatic approve-and-merge pass", body = crate::daemon::protocol::ReviewsActionResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_auto_reviews(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<ReviewsAutoRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let result = service::auto_reviews(&request).await;
+    timed_json("POST", http_paths::REVIEWS_AUTO, &request_id, start, result)
+}
+
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/request-review",
+    tag = "reviews",
+    request_body = ReviewsRequestReviewRequest,
+    responses(
+        (status = 200, description = "Outcome of re-requesting review", body = crate::daemon::protocol::ReviewsActionResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_request_review(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<ReviewsRequestReviewRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let result = service::request_review_for_reviews(&request).await;
+    timed_json(
+        "POST",
+        http_paths::REVIEWS_REQUEST_REVIEW,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/comment",
+    tag = "reviews",
+    request_body = ReviewsCommentRequest,
+    responses(
+        (status = 200, description = "Outcome of posting the comment", body = crate::daemon::protocol::ReviewsActionResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_comment_reviews(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<ReviewsCommentRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let result = service::comment_on_reviews(&request).await;
+    timed_json(
+        "POST",
+        http_paths::REVIEWS_COMMENT,
+        &request_id,
+        start,
+        result,
+    )
+}

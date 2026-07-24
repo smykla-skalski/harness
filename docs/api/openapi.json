@@ -1691,6 +1691,1892 @@
         }
       }
     },
+    "/v1/reviews/action-preview": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_review_action_preview",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsActionPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Per-target eligibility preview for an action",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsActionPreviewResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.action_preview"
+      }
+    },
+    "/v1/reviews/approve": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_approve_reviews",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsApproveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Outcome of applying the approvals",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.approve"
+      }
+    },
+    "/v1/reviews/auto": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_auto_reviews",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsAutoRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Outcome of the automatic approve-and-merge pass",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.auto"
+      }
+    },
+    "/v1/reviews/avatar": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_review_avatar",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsAvatarRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Base64-encoded avatar image proxied from GitHub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsAvatarResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.avatar"
+      }
+    },
+    "/v1/reviews/body": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_review_body",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsBodyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Pull request body text",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsBodyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.body"
+      }
+    },
+    "/v1/reviews/body/update": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_review_body_update",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsBodyUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Result of the body update, including drift detection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsBodyUpdateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.body_update"
+      }
+    },
+    "/v1/reviews/cache": {
+      "delete": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "delete_reviews_cache",
+        "responses": {
+          "200": {
+            "description": "Number of cache entries cleared",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsCacheClearResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.clear_cache"
+      }
+    },
+    "/v1/reviews/capabilities": {
+      "get": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "get_review_capabilities",
+        "responses": {
+          "200": {
+            "description": "Feature flags for the review tooling",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsCapabilitiesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.capabilities"
+      }
+    },
+    "/v1/reviews/comment": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_comment_reviews",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsCommentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Outcome of posting the comment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.comment"
+      }
+    },
+    "/v1/reviews/files/blob": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_review_files_blob",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsFilesBlobRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Base64-encoded image blob with metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsFilesBlobResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.files_blob"
+      }
+    },
+    "/v1/reviews/files/comment": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_review_files_comment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsFileCommentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Result of posting the file comment or thread reply",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsFileCommentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.files_comment"
+      }
+    },
+    "/v1/reviews/files/list": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_review_files_list",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsFilesListRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Changed files for a pull request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsFilesListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.files_list"
+      }
+    },
+    "/v1/reviews/files/local-clones": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_review_files_local_clones",
+        "responses": {
+          "200": {
+            "description": "Local bare-clone registry entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LocalCloneListEntry"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.files_local_clones_list"
+      }
+    },
+    "/v1/reviews/files/local-clones/delete": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_review_files_local_clones_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteLocalClonePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Local bare-clone registry after the deletion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteLocalCloneResponseBody"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.files_local_clones_delete"
+      }
+    },
+    "/v1/reviews/files/patch": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_review_files_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsFilesPatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Per-path patches with drift detection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsFilesPatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.files_patch"
+      }
+    },
+    "/v1/reviews/files/preview": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_review_files_preview",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsFilesPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Line-limited patch previews with drift detection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsFilesPreviewResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.files_preview"
+      }
+    },
+    "/v1/reviews/files/viewed": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_review_files_viewed",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsFilesViewedRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Per-path viewed-state outcomes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsFilesViewedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.files_viewed"
+      }
+    },
+    "/v1/reviews/labels": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_label_reviews",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsLabelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Outcome of adding the label",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.add_label"
+      }
+    },
+    "/v1/reviews/merge": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_merge_reviews",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsMergeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Outcome of merging the targets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.merge"
+      }
+    },
+    "/v1/reviews/policy/history": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_reviews_policy_history",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsPolicyHistoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Historical policy runs with aggregate metrics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsPolicyHistoryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.policy_history"
+      }
+    },
+    "/v1/reviews/policy/preview": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_reviews_policy_preview",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsPolicyPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Preview of the policy workflow steps for a target",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsPolicyPreviewResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.policy_preview"
+      }
+    },
+    "/v1/reviews/policy/start": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_reviews_policy_start",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsPolicyRunStartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The started (or resumed) policy run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsPolicyRunResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.policy_start"
+      }
+    },
+    "/v1/reviews/policy/status": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_reviews_policy_status",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsPolicyStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Active and recent policy runs for a subject",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsPolicyStatusResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.policy_status"
+      }
+    },
+    "/v1/reviews/pull-requests/resolve": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_resolve_review_pull_requests",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsPullRequestResolveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Resolved pull requests plus any that were not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsPullRequestResolveResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.pull_requests_resolve"
+      }
+    },
+    "/v1/reviews/query": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_query_reviews",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsQueryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Matching reviews with their summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsQueryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.query"
+      }
+    },
+    "/v1/reviews/refresh": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_refresh_reviews",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsRefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Refreshed review items",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsRefreshResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.refresh"
+      }
+    },
+    "/v1/reviews/repositories": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_review_repositories",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsRepositoryCatalogRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Repositories the organization exposes for review",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsRepositoryCatalogResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.repository_catalog"
+      }
+    },
+    "/v1/reviews/request-review": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_request_review",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsRequestReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Outcome of re-requesting review",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.request_review"
+      }
+    },
+    "/v1/reviews/rerun-checks": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_rerun_reviews_checks",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsRerunChecksRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Outcome of re-running the failed checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.rerun_checks"
+      }
+    },
+    "/v1/reviews/review-threads/resolve": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_review_review_threads_resolve",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsReviewThreadResolveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Confirmed resolved state of the review thread",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsReviewThreadResolveResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.review_threads_resolve"
+      }
+    },
+    "/v1/reviews/timeline": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "post_review_timeline",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsTimelineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Paged pull request timeline",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsTimelineResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "reviews.timeline"
+      }
+    },
     "/v1/runtime-sessions/resolve": {
       "get": {
         "tags": [
@@ -5139,6 +7025,23 @@
           }
         }
       },
+      "Actor": {
+        "type": "object",
+        "required": [
+          "login"
+        ],
+        "properties": {
+          "avatar_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "login": {
+            "type": "string"
+          }
+        }
+      },
       "AdoptSessionRequest": {
         "type": "object",
         "required": [
@@ -6521,6 +8424,69 @@
           }
         }
       },
+      "CommitEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "oid",
+          "abbreviated_oid",
+          "message_headline"
+        ],
+        "properties": {
+          "abbreviated_oid": {
+            "type": "string"
+          },
+          "actor": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Actor"
+              }
+            ]
+          },
+          "author_login": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "author_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "committed_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string"
+          },
+          "message_headline": {
+            "type": "string"
+          },
+          "oid": {
+            "type": "string"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "DaemonControlResponse": {
         "type": "object",
         "required": [
@@ -6611,6 +8577,31 @@
           }
         }
       },
+      "DeleteLocalClonePayload": {
+        "type": "object",
+        "required": [
+          "repo_key_segment"
+        ],
+        "properties": {
+          "repo_key_segment": {
+            "type": "string"
+          }
+        }
+      },
+      "DeleteLocalCloneResponseBody": {
+        "type": "object",
+        "required": [
+          "clones"
+        ],
+        "properties": {
+          "clones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LocalCloneListEntry"
+            }
+          }
+        }
+      },
       "DeliveryConfig": {
         "type": "object",
         "required": [
@@ -6661,6 +8652,14 @@
             "format": "int32"
           }
         }
+      },
+      "FilesLargeDiffStrategy": {
+        "type": "string",
+        "description": "User-facing toggle in Settings. Picked from the `SwiftUI` Picker;\nserialized through to the daemon on each request.",
+        "enum": [
+          "auto_local_clone",
+          "force_github_rest"
+        ]
       },
       "FixSafety": {
         "type": "string",
@@ -6765,6 +8764,14 @@
           }
         }
       },
+      "GitHubMergeMethod": {
+        "type": "string",
+        "enum": [
+          "squash",
+          "merge",
+          "rebase"
+        ]
+      },
       "GitHubOperationSpendDiagnostics": {
         "type": "object",
         "required": [
@@ -6818,6 +8825,92 @@
             "type": "integer",
             "format": "int32",
             "minimum": 0
+          }
+        }
+      },
+      "HarnessCodeLanguage": {
+        "type": "string",
+        "description": "Compact enum of source languages the diff renderer recognizes. Kept narrow\non purpose: tokenizers only exist for these; anything else falls through to\nthe diff-only renderer (no syntax highlighting).",
+        "enum": [
+          "codeowners",
+          "config",
+          "dockerfile",
+          "diff",
+          "feature",
+          "generic",
+          "go",
+          "go_module",
+          "gitignore",
+          "html",
+          "javascript",
+          "json",
+          "lua",
+          "makefile",
+          "markdown",
+          "powershell",
+          "proto",
+          "python",
+          "rego",
+          "rust",
+          "ruby",
+          "shell",
+          "sql",
+          "stylesheet",
+          "swift",
+          "template",
+          "terraform",
+          "toml",
+          "typescript",
+          "vue",
+          "xml",
+          "yaml"
+        ]
+      },
+      "HeadRefForcePushedEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "before_oid",
+          "before_abbreviated_oid",
+          "after_oid",
+          "after_abbreviated_oid"
+        ],
+        "properties": {
+          "actor": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Actor"
+              }
+            ]
+          },
+          "after_abbreviated_oid": {
+            "type": "string"
+          },
+          "after_oid": {
+            "type": "string"
+          },
+          "before_abbreviated_oid": {
+            "type": "string"
+          },
+          "before_oid": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string"
+          },
+          "ref_name": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -7059,6 +9152,75 @@
           "cross_agent_file_conflict"
         ]
       },
+      "IssueCommentEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "body"
+        ],
+        "properties": {
+          "actor": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Actor"
+              }
+            ]
+          },
+          "body": {
+            "type": "string"
+          },
+          "body_text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string"
+          },
+          "is_minimized": {
+            "type": "boolean"
+          },
+          "minimized_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reactions_total": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "viewer_can_edit": {
+            "type": "boolean"
+          },
+          "viewer_did_author": {
+            "type": "boolean"
+          }
+        }
+      },
       "IssueSeverity": {
         "type": "string",
         "description": "Severity level of an observed issue, ordered for filtering.",
@@ -7114,6 +9276,43 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "LocalCloneListEntry": {
+        "type": "object",
+        "description": "One row in the Settings-panel projection of the clones registry.",
+        "required": [
+          "repo_full_name",
+          "repo_key_segment",
+          "size_bytes",
+          "created_at",
+          "last_used_at",
+          "last_fetched_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_fetched_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_used_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "repo_full_name": {
+            "type": "string"
+          },
+          "repo_key_segment": {
+            "type": "string"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
           }
         }
       },
@@ -7534,6 +9733,27 @@
           }
         }
       },
+      "PullRequestReview": {
+        "type": "object",
+        "required": [
+          "author",
+          "state"
+        ],
+        "properties": {
+          "author": {
+            "type": "string"
+          },
+          "author_avatar_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "$ref": "#/components/schemas/ReviewReviewEventState"
+          }
+        }
+      },
       "ReadinessResponse": {
         "type": "object",
         "description": "Lightweight readiness probe response.\n\nReturned by `GET /v1/ready`. Confirms the daemon is serving HTTP, the\ncaller is authenticated, and the backing storage slot is wired up - but\nintentionally avoids any database query so short-lived CLI invocations can\nverify readiness cheaply.",
@@ -7564,6 +9784,216 @@
             "type": "string"
           }
         }
+      },
+      "ReviewActionKind": {
+        "type": "string",
+        "enum": [
+          "approve",
+          "merge",
+          "rerun_checks",
+          "add_label",
+          "auto_approve",
+          "auto_merge",
+          "comment",
+          "request_review"
+        ]
+      },
+      "ReviewActionOutcome": {
+        "type": "string",
+        "enum": [
+          "applied",
+          "skipped",
+          "failed"
+        ]
+      },
+      "ReviewActionPreviewKind": {
+        "type": "string",
+        "enum": [
+          "approve",
+          "merge",
+          "rerun_checks",
+          "add_label",
+          "auto"
+        ]
+      },
+      "ReviewActionPreviewTarget": {
+        "type": "object",
+        "required": [
+          "pull_request_id",
+          "repository",
+          "number",
+          "eligible"
+        ],
+        "properties": {
+          "eligible": {
+            "type": "boolean"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "pull_request_id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "repository": {
+            "type": "string"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ReviewActionResult": {
+        "type": "object",
+        "required": [
+          "repository",
+          "number",
+          "action",
+          "outcome"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/ReviewActionKind"
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "number": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/ReviewActionOutcome"
+          },
+          "repository": {
+            "type": "string"
+          },
+          "timeline_entry": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReviewTimelineEntry"
+              }
+            ]
+          }
+        }
+      },
+      "ReviewAuthorAssociation": {
+        "type": "string",
+        "enum": [
+          "owner",
+          "member",
+          "collaborator",
+          "contributor",
+          "first_timer",
+          "first_time_contributor",
+          "mannequin",
+          "none",
+          "other"
+        ]
+      },
+      "ReviewBackportSource": {
+        "type": "object",
+        "required": [
+          "number",
+          "repository",
+          "url"
+        ],
+        "properties": {
+          "number": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "repository": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewCheck": {
+        "type": "object",
+        "required": [
+          "name",
+          "status",
+          "conclusion"
+        ],
+        "properties": {
+          "check_suite_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "conclusion": {
+            "$ref": "#/components/schemas/ReviewCheckConclusion"
+          },
+          "details_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ReviewCheckRunStatus"
+          }
+        }
+      },
+      "ReviewCheckConclusion": {
+        "type": "string",
+        "enum": [
+          "none",
+          "success",
+          "failure",
+          "neutral",
+          "cancelled",
+          "timed_out",
+          "action_required",
+          "skipped",
+          "stale",
+          "startup_failure"
+        ]
+      },
+      "ReviewCheckRunStatus": {
+        "type": "string",
+        "enum": [
+          "completed",
+          "in_progress",
+          "queued",
+          "requested",
+          "waiting",
+          "unknown"
+        ]
+      },
+      "ReviewCheckStatus": {
+        "type": "string",
+        "enum": [
+          "none",
+          "success",
+          "failure",
+          "pending"
+        ]
       },
       "ReviewClaim": {
         "type": "object",
@@ -7609,6 +10039,591 @@
           }
         }
       },
+      "ReviewEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "state"
+        ],
+        "properties": {
+          "actor": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Actor"
+              }
+            ]
+          },
+          "body": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "comments_truncated": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string"
+          },
+          "inline_comments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewInlineCommentEntry"
+            }
+          },
+          "state": {
+            "$ref": "#/components/schemas/ReviewState"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ReviewFile": {
+        "type": "object",
+        "description": "Metadata for one file inside a PR. No patch body here - patches arrive\nvia the separate `patch` endpoint (REST or local-clone diff).",
+        "required": [
+          "path",
+          "change_type",
+          "additions",
+          "deletions",
+          "viewer_viewed_state",
+          "language_hint"
+        ],
+        "properties": {
+          "additions": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "change_type": {
+            "$ref": "#/components/schemas/ReviewFileChangeType"
+          },
+          "deletions": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "is_binary": {
+            "type": "boolean"
+          },
+          "language_hint": {
+            "$ref": "#/components/schemas/HarnessCodeLanguage"
+          },
+          "mode_change": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "type": "string"
+          },
+          "previous_path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "viewer_viewed_state": {
+            "$ref": "#/components/schemas/ReviewFileViewedState"
+          }
+        }
+      },
+      "ReviewFileChangeType": {
+        "type": "string",
+        "description": "GitHub `PullRequestFileChangeType` enum.",
+        "enum": [
+          "added",
+          "copied",
+          "deleted",
+          "modified",
+          "renamed",
+          "changed",
+          "other"
+        ]
+      },
+      "ReviewFilePatch": {
+        "type": "object",
+        "description": "One file's patch body + metadata produced by either REST or local clone.",
+        "required": [
+          "path",
+          "patch",
+          "status",
+          "additions",
+          "deletions"
+        ],
+        "properties": {
+          "additions": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "deletions": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "etag": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fetched_at": {
+            "type": "string"
+          },
+          "head_ref_oid": {
+            "type": "string"
+          },
+          "patch": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "served_by": {
+            "$ref": "#/components/schemas/ReviewFileServedBy"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ReviewFileChangeType"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ReviewFilePreview": {
+        "type": "object",
+        "required": [
+          "path",
+          "patch",
+          "status",
+          "additions",
+          "deletions",
+          "line_count",
+          "line_limit",
+          "has_more"
+        ],
+        "properties": {
+          "additions": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "deletions": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "etag": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fetched_at": {
+            "type": "string"
+          },
+          "has_more": {
+            "type": "boolean"
+          },
+          "head_ref_oid": {
+            "type": "string"
+          },
+          "line_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "line_limit": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "patch": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "served_by": {
+            "$ref": "#/components/schemas/ReviewFileServedBy"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ReviewFileChangeType"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ReviewFileServedBy": {
+        "type": "string",
+        "description": "Annotates which path produced a patch body so the UI can label provenance.",
+        "enum": [
+          "github_rest",
+          "local_clone",
+          "github_rest_fallback"
+        ]
+      },
+      "ReviewFileViewedOutcome": {
+        "type": "string",
+        "description": "Outcome per path. The Monitor uses this to reconcile its optimistic UI:\n`Updated` confirms the flip, `Drifted` accepts the daemon's current state,\n`Failed` rolls back.",
+        "enum": [
+          "updated",
+          "drifted",
+          "failed"
+        ]
+      },
+      "ReviewFileViewedState": {
+        "type": "string",
+        "description": "GitHub `FileViewedState` enum.",
+        "enum": [
+          "dismissed",
+          "viewed",
+          "unviewed"
+        ]
+      },
+      "ReviewFilesViewedResult": {
+        "type": "object",
+        "description": "One result row inside the response.",
+        "required": [
+          "path",
+          "outcome",
+          "viewer_viewed_state"
+        ],
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/ReviewFileViewedOutcome"
+          },
+          "path": {
+            "type": "string"
+          },
+          "viewer_viewed_state": {
+            "$ref": "#/components/schemas/ReviewFileViewedState"
+          }
+        }
+      },
+      "ReviewFilesViewedTarget": {
+        "type": "object",
+        "description": "One target within a viewed-state request.",
+        "required": [
+          "path",
+          "expected_prior_state",
+          "mark_viewed"
+        ],
+        "properties": {
+          "expected_prior_state": {
+            "$ref": "#/components/schemas/ReviewFileViewedState"
+          },
+          "mark_viewed": {
+            "type": "boolean"
+          },
+          "path": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewImageMime": {
+        "type": "string",
+        "description": "Recognized image-content MIME types we'll preview inline.",
+        "enum": [
+          "png",
+          "jpeg",
+          "gif",
+          "svg"
+        ]
+      },
+      "ReviewInlineCommentEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "path",
+          "body",
+          "created_at"
+        ],
+        "properties": {
+          "actor": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Actor"
+              }
+            ]
+          },
+          "body": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "diff_hunk": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "line": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "original_line": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "outdated": {
+            "type": "boolean"
+          },
+          "path": {
+            "type": "string"
+          },
+          "position": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "reply_to_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ReviewItem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ReviewItemFlags"
+          },
+          {
+            "type": "object",
+            "required": [
+              "pull_request_id",
+              "repository_id",
+              "repository",
+              "number",
+              "title",
+              "url",
+              "author_login",
+              "state",
+              "mergeable",
+              "review_status",
+              "check_status",
+              "head_sha",
+              "additions",
+              "deletions",
+              "created_at",
+              "updated_at"
+            ],
+            "properties": {
+              "additions": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "approval_requirement_satisfied_after_viewer_approval": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "author_association": {
+                "$ref": "#/components/schemas/ReviewAuthorAssociation"
+              },
+              "author_avatar_url": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "author_login": {
+                "type": "string"
+              },
+              "auto_merge_enabled": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "backport_source": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ReviewBackportSource"
+                  }
+                ]
+              },
+              "base_ref_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "check_status": {
+                "$ref": "#/components/schemas/ReviewCheckStatus"
+              },
+              "checks": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ReviewCheck"
+                }
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "default_branch_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "deletions": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "has_conflict_markers": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "head_sha": {
+                "type": "string"
+              },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "mergeable": {
+                "$ref": "#/components/schemas/ReviewMergeableState"
+              },
+              "number": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "pull_request_id": {
+                "type": "string"
+              },
+              "repository": {
+                "type": "string"
+              },
+              "repository_id": {
+                "type": "string"
+              },
+              "required_approving_review_count": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int32",
+                "minimum": 0
+              },
+              "required_failed_check_names": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "review_status": {
+                "$ref": "#/components/schemas/ReviewReviewStatus"
+              },
+              "reviews": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PullRequestReview"
+                }
+              },
+              "state": {
+                "$ref": "#/components/schemas/ReviewPullRequestState"
+              },
+              "title": {
+                "type": "string"
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "url": {
+                "type": "string"
+              },
+              "viewer_can_merge_as_admin": {
+                "type": "boolean"
+              },
+              "viewer_has_active_approval": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "ReviewItemFlags": {
+        "type": "object",
+        "description": "Per-PR state flags bundled into at most 3 booleans.",
+        "properties": {
+          "is_draft": {
+            "type": "boolean"
+          },
+          "policy_blocked": {
+            "type": "boolean"
+          },
+          "viewer_can_update": {
+            "type": "boolean"
+          },
+          "viewer_is_requested_reviewer": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ReviewMergeableState": {
+        "type": "string",
+        "enum": [
+          "mergeable",
+          "conflicting",
+          "unknown"
+        ]
+      },
       "ReviewPoint": {
         "type": "object",
         "description": "A single numbered review point the worker may agree to or dispute.",
@@ -7644,6 +10659,438 @@
           "resolved"
         ]
       },
+      "ReviewPullRequestState": {
+        "type": "string",
+        "enum": [
+          "open",
+          "closed",
+          "merged",
+          "unknown"
+        ]
+      },
+      "ReviewRepositoryLabel": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewReviewEventState": {
+        "type": "string",
+        "enum": [
+          "approved",
+          "changes_requested",
+          "commented",
+          "dismissed",
+          "pending",
+          "unknown"
+        ]
+      },
+      "ReviewReviewStatus": {
+        "type": "string",
+        "enum": [
+          "none",
+          "review_required",
+          "approved",
+          "changes_requested"
+        ]
+      },
+      "ReviewState": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "commented",
+          "approved",
+          "changes_requested",
+          "dismissed"
+        ]
+      },
+      "ReviewTarget": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ReviewTargetFlags"
+          },
+          {
+            "type": "object",
+            "required": [
+              "pull_request_id",
+              "repository_id",
+              "repository",
+              "number",
+              "url",
+              "head_sha",
+              "mergeable",
+              "review_status",
+              "check_status"
+            ],
+            "properties": {
+              "approval_requirement_satisfied_after_viewer_approval": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "auto_merge_enabled": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "check_status": {
+                "$ref": "#/components/schemas/ReviewCheckStatus"
+              },
+              "check_suite_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "has_conflict_markers": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "head_sha": {
+                "type": "string"
+              },
+              "mergeable": {
+                "$ref": "#/components/schemas/ReviewMergeableState"
+              },
+              "number": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "pull_request_id": {
+                "type": "string"
+              },
+              "repository": {
+                "type": "string"
+              },
+              "repository_id": {
+                "type": "string"
+              },
+              "required_failed_check_names": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "review_status": {
+                "$ref": "#/components/schemas/ReviewReviewStatus"
+              },
+              "state": {
+                "$ref": "#/components/schemas/ReviewPullRequestState"
+              },
+              "url": {
+                "type": "string"
+              },
+              "viewer_can_merge_as_admin": {
+                "type": "boolean"
+              },
+              "viewer_has_active_approval": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "ReviewTargetFlags": {
+        "type": "object",
+        "description": "State flags embedded in [`ReviewTarget`] (at most 3 booleans).",
+        "properties": {
+          "is_draft": {
+            "type": "boolean"
+          },
+          "policy_blocked": {
+            "type": "boolean"
+          },
+          "viewer_can_update": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ReviewThreadCommentEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "body",
+          "created_at"
+        ],
+        "properties": {
+          "actor": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Actor"
+              }
+            ]
+          },
+          "body": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ReviewThreadEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "path"
+        ],
+        "properties": {
+          "actor": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Actor"
+              }
+            ]
+          },
+          "comments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewThreadCommentEntry"
+            }
+          },
+          "comments_truncated": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "diff_hunk": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "diff_side": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "is_collapsed": {
+            "type": "boolean"
+          },
+          "is_resolved": {
+            "type": "boolean"
+          },
+          "line": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "original_line": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "outdated": {
+            "type": "boolean"
+          },
+          "path": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewTimelineEntry": {
+        "oneOf": [
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/IssueCommentEntry"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "issue_comment"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReviewEntry"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "review"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReviewThreadEntry"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "review_thread"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommitEntry"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "commit"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HeadRefForcePushedEntry"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "head_ref_force_pushed"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SimpleActorEventEntry"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "simple_actor_event"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UnknownEntry"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "unknown"
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
       "ReviewVerdict": {
         "type": "string",
         "description": "Verdict a reviewer chooses on submission.",
@@ -7676,6 +11123,1734 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "ReviewsActionCapabilities": {
+        "type": "object",
+        "description": "Action-related feature flags for [`ReviewsCapabilitiesResponse`].",
+        "properties": {
+          "supports_action_preview": {
+            "type": "boolean"
+          },
+          "supports_check_run_links": {
+            "type": "boolean"
+          },
+          "supports_repository_sync_health": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ReviewsActionPreviewRequest": {
+        "type": "object",
+        "required": [
+          "action",
+          "targets"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/ReviewActionPreviewKind"
+          },
+          "method": {
+            "$ref": "#/components/schemas/GitHubMergeMethod"
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewTarget"
+            }
+          }
+        }
+      },
+      "ReviewsActionPreviewResponse": {
+        "type": "object",
+        "required": [
+          "action",
+          "capabilities",
+          "total_count",
+          "actionable_count",
+          "skipped_count"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/ReviewActionPreviewKind"
+          },
+          "actionable_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/ReviewsCapabilitiesResponse"
+          },
+          "skipped_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewActionPreviewTarget"
+            }
+          },
+          "total_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ReviewsActionResponse": {
+        "type": "object",
+        "required": [
+          "summary"
+        ],
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewActionResult"
+            }
+          },
+          "summary": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewsApproveRequest": {
+        "type": "object",
+        "required": [
+          "targets",
+          "source"
+        ],
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/ReviewsApproveRequestSource"
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewTarget"
+            }
+          }
+        }
+      },
+      "ReviewsApproveRequestSource": {
+        "type": "string",
+        "enum": [
+          "direct",
+          "review_text_paste"
+        ]
+      },
+      "ReviewsAutoRequest": {
+        "type": "object",
+        "required": [
+          "targets"
+        ],
+        "properties": {
+          "method": {
+            "$ref": "#/components/schemas/GitHubMergeMethod"
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewTarget"
+            }
+          }
+        }
+      },
+      "ReviewsAvatarRequest": {
+        "type": "object",
+        "required": [
+          "avatar_url"
+        ],
+        "properties": {
+          "avatar_url": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewsAvatarResponse": {
+        "type": "object",
+        "required": [
+          "avatar_url",
+          "mime_type",
+          "content_base64",
+          "fetched_at"
+        ],
+        "properties": {
+          "avatar_url": {
+            "type": "string"
+          },
+          "content_base64": {
+            "type": "string"
+          },
+          "fetched_at": {
+            "type": "string"
+          },
+          "mime_type": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewsBodyRequest": {
+        "type": "object",
+        "required": [
+          "pull_request_id"
+        ],
+        "properties": {
+          "cache_max_age_seconds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "force_refresh": {
+            "type": "boolean"
+          },
+          "pull_request_id": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewsBodyResponse": {
+        "type": "object",
+        "required": [
+          "pull_request_id",
+          "body",
+          "pr_updated_at",
+          "fetched_at",
+          "from_cache"
+        ],
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "fetched_at": {
+            "type": "string"
+          },
+          "from_cache": {
+            "type": "boolean"
+          },
+          "pr_updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "pull_request_id": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewsBodyUpdateOutcome": {
+        "type": "string",
+        "enum": [
+          "updated",
+          "body_drifted"
+        ]
+      },
+      "ReviewsBodyUpdateRequest": {
+        "type": "object",
+        "required": [
+          "pull_request_id",
+          "expected_prior_body_sha256",
+          "new_body"
+        ],
+        "properties": {
+          "expected_prior_body_sha256": {
+            "type": "string"
+          },
+          "new_body": {
+            "type": "string"
+          },
+          "pull_request_id": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewsBodyUpdateResponse": {
+        "type": "object",
+        "required": [
+          "pull_request_id",
+          "outcome",
+          "current_body",
+          "current_body_sha256",
+          "pr_updated_at",
+          "fetched_at"
+        ],
+        "properties": {
+          "current_body": {
+            "type": "string"
+          },
+          "current_body_sha256": {
+            "type": "string"
+          },
+          "fetched_at": {
+            "type": "string"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/ReviewsBodyUpdateOutcome"
+          },
+          "pr_updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "pull_request_id": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewsCacheClearResponse": {
+        "type": "object",
+        "required": [
+          "cleared_entries"
+        ],
+        "properties": {
+          "cleared_entries": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "ReviewsCapabilitiesResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ReviewsActionCapabilities"
+          },
+          {
+            "type": "object",
+            "required": [
+              "schema_version"
+            ],
+            "properties": {
+              "schema_version": {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 0
+              },
+              "supports_persistent_action_diagnostics": {
+                "type": "boolean"
+              }
+            }
+          }
+        ]
+      },
+      "ReviewsCommentRequest": {
+        "type": "object",
+        "required": [
+          "targets",
+          "body"
+        ],
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewTarget"
+            }
+          }
+        }
+      },
+      "ReviewsFileCommentKind": {
+        "type": "string",
+        "enum": [
+          "new_thread",
+          "reply"
+        ]
+      },
+      "ReviewsFileCommentRequest": {
+        "type": "object",
+        "required": [
+          "pull_request_id",
+          "kind",
+          "body"
+        ],
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ReviewsFileCommentKind"
+          },
+          "line": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pull_request_id": {
+            "type": "string"
+          },
+          "repository": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "side": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "thread_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ReviewsFileCommentResponse": {
+        "type": "object",
+        "required": [
+          "pull_request_id",
+          "fetched_at"
+        ],
+        "properties": {
+          "comment_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fetched_at": {
+            "type": "string"
+          },
+          "pull_request_id": {
+            "type": "string"
+          },
+          "thread_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ReviewsFilesBlobRequest": {
+        "type": "object",
+        "description": "Request the bytes for one image blob by repository node id + git OID.",
+        "required": [
+          "repository_id",
+          "oid",
+          "path"
+        ],
+        "properties": {
+          "oid": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "repository_id": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewsFilesBlobResponse": {
+        "type": "object",
+        "description": "Response carrying the blob bytes (base64-encoded for JSON transport) +\nmetadata + a per-call rate-limit snapshot.",
+        "required": [
+          "path",
+          "oid",
+          "mime",
+          "content_base64",
+          "byte_size",
+          "fetched_at"
+        ],
+        "properties": {
+          "byte_size": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "content_base64": {
+            "type": "string",
+            "description": "Base64-encoded bytes. Empty for `is_too_large == true`."
+          },
+          "fetched_at": {
+            "type": "string"
+          },
+          "is_too_large": {
+            "type": "boolean"
+          },
+          "is_truncated": {
+            "type": "boolean"
+          },
+          "mime": {
+            "$ref": "#/components/schemas/ReviewImageMime"
+          },
+          "oid": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "rate_limit_snapshot": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReviewsRateLimitSnapshot"
+              }
+            ]
+          }
+        }
+      },
+      "ReviewsFilesListRequest": {
+        "type": "object",
+        "description": "Request a list of changed files for a single pull request.",
+        "required": [
+          "pull_request_id"
+        ],
+        "properties": {
+          "force_refresh": {
+            "type": "boolean"
+          },
+          "pull_request_id": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewsFilesListResponse": {
+        "type": "object",
+        "description": "Response shape for a files-list call.",
+        "required": [
+          "pull_request_id",
+          "head_ref_oid",
+          "viewer_can_mark_viewed",
+          "files",
+          "fetched_at"
+        ],
+        "properties": {
+          "base_ref_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "base_ref_oid": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Merge-base OID for the PR. Required for the local-clone diff path\nto compute `base..head` patches."
+          },
+          "fetched_at": {
+            "type": "string"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewFile"
+            }
+          },
+          "head_ref_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "PR's source branch name (e.g. `renovate/foo`). Used by the local-clone\npath so `ensure_clone` fetches the right ref instead of always\nopening `refs/heads/main`."
+          },
+          "head_ref_oid": {
+            "type": "string"
+          },
+          "number": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "pagination_complete": {
+            "type": "boolean",
+            "description": "`true` when the pagination loop drained every page from GitHub.\n`false` when the loop bailed out under `FILES_PAGE_CAP` while\nGitHub still had `hasNextPage == true` - the response is partial\nand the caller should surface a warning. Defaults to `true` for\nbackwards compatibility with older callers that don't read this\nfield."
+          },
+          "pull_request_id": {
+            "type": "string"
+          },
+          "rate_limit_snapshot": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReviewsRateLimitSnapshot"
+              }
+            ]
+          },
+          "repository_full_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`owner/name` of the repository the PR lives in. Lets the Monitor\nhand the patch request a clone target without re-querying GraphQL."
+          },
+          "viewer_can_mark_viewed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ReviewsFilesPatchRequest": {
+        "type": "object",
+        "description": "Batched patch request for one PR. The caller supplies the head ref oid it\nbelieves it's still on; the daemon compares against the current head and\nreturns `drifted: true` with the fresh oid if a force-push intervened.",
+        "required": [
+          "pull_request_id",
+          "head_ref_oid_expected",
+          "paths"
+        ],
+        "properties": {
+          "base_ref_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "PR base branch name. When present, the local clone fetches it directly\nbefore computing the expected base/head OID diff."
+          },
+          "base_ref_oid_expected": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Merge-base OID against which to compute the diff. Required for the\nlocal-clone path; when absent the handler falls back to REST."
+          },
+          "head_ref_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "PR's source branch name (e.g. `renovate/foo`). When present, the\nlocal-clone runtime fetches that ref directly instead of the\ndaemon's default-branch fallback."
+          },
+          "head_ref_oid_expected": {
+            "type": "string"
+          },
+          "large_diff_strategy": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FilesLargeDiffStrategy",
+                "description": "User's `filesLargeDiffStrategy` choice from Settings. Daemon honors\n`ForceGitHubRest` by skipping the local-clone runtime entirely.\nDefaults to `AutoLocalClone` for callers that don't supply it."
+              }
+            ]
+          },
+          "number": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "GitHub PR number (the integer in `pulls/{n}/files`). Required for\nthe REST path; when absent, the daemon can only route to the\nlocal-clone path (which uses GitHub's synthetic\n`refs/pull/<number>/head` ref for forks + same-repo PR branches).",
+            "minimum": 0
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "pull_request_id": {
+            "type": "string"
+          },
+          "repository_full_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Owner/name of the repository the PR lives in. When present, the\ndaemon can route the patch fetch through the local-clone runtime\n(zero-rate-limit) or the REST path."
+          }
+        }
+      },
+      "ReviewsFilesPatchResponse": {
+        "type": "object",
+        "description": "Response carrying the per-path patches plus drift detection.",
+        "required": [
+          "pull_request_id",
+          "patches",
+          "drifted",
+          "current_head_ref_oid",
+          "fetched_at"
+        ],
+        "properties": {
+          "current_head_ref_oid": {
+            "type": "string"
+          },
+          "drifted": {
+            "type": "boolean"
+          },
+          "fetched_at": {
+            "type": "string"
+          },
+          "patches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewFilePatch"
+            }
+          },
+          "pull_request_id": {
+            "type": "string"
+          },
+          "rate_limit_snapshot": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReviewsRateLimitSnapshot"
+              }
+            ]
+          }
+        }
+      },
+      "ReviewsFilesPreviewRequest": {
+        "type": "object",
+        "required": [
+          "pull_request_id",
+          "head_ref_oid_expected",
+          "paths"
+        ],
+        "properties": {
+          "base_ref_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "base_ref_oid_expected": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "head_ref_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "head_ref_oid_expected": {
+            "type": "string"
+          },
+          "large_diff_strategy": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FilesLargeDiffStrategy"
+              }
+            ]
+          },
+          "line_limit": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "number": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "pull_request_id": {
+            "type": "string"
+          },
+          "repository_full_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ReviewsFilesPreviewResponse": {
+        "type": "object",
+        "required": [
+          "pull_request_id",
+          "previews",
+          "drifted",
+          "current_head_ref_oid",
+          "fetched_at"
+        ],
+        "properties": {
+          "current_head_ref_oid": {
+            "type": "string"
+          },
+          "drifted": {
+            "type": "boolean"
+          },
+          "fetched_at": {
+            "type": "string"
+          },
+          "previews": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewFilePreview"
+            }
+          },
+          "pull_request_id": {
+            "type": "string"
+          },
+          "rate_limit_snapshot": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReviewsRateLimitSnapshot"
+              }
+            ]
+          }
+        }
+      },
+      "ReviewsFilesViewedRequest": {
+        "type": "object",
+        "description": "Request to flip viewed-state on one or more paths within a PR.",
+        "required": [
+          "pull_request_id",
+          "paths"
+        ],
+        "properties": {
+          "paths": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewFilesViewedTarget"
+            }
+          },
+          "pull_request_id": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewsFilesViewedResponse": {
+        "type": "object",
+        "description": "Response shape.",
+        "required": [
+          "pull_request_id",
+          "results",
+          "fetched_at"
+        ],
+        "properties": {
+          "fetched_at": {
+            "type": "string"
+          },
+          "pull_request_id": {
+            "type": "string"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewFilesViewedResult"
+            }
+          }
+        }
+      },
+      "ReviewsLabelRequest": {
+        "type": "object",
+        "required": [
+          "targets",
+          "label"
+        ],
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewTarget"
+            }
+          }
+        }
+      },
+      "ReviewsMergeRequest": {
+        "type": "object",
+        "required": [
+          "targets"
+        ],
+        "properties": {
+          "method": {
+            "$ref": "#/components/schemas/GitHubMergeMethod"
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewTarget"
+            }
+          }
+        }
+      },
+      "ReviewsPolicyHistoryRequest": {
+        "type": "object",
+        "required": [
+          "subject"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/ReviewsPolicySubject"
+          },
+          "workflow_id": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewsPolicyHistoryResponse": {
+        "type": "object",
+        "required": [
+          "workflow_id",
+          "subject"
+        ],
+        "properties": {
+          "metrics": {
+            "$ref": "#/components/schemas/ReviewsPolicyRunMetrics"
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewsPolicyRunResponse"
+            }
+          },
+          "subject": {
+            "$ref": "#/components/schemas/ReviewsPolicySubject"
+          },
+          "timeline": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewsPolicyTimelineEntry"
+            }
+          },
+          "workflow_id": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewsPolicyPreviewRequest": {
+        "type": "object",
+        "required": [
+          "target"
+        ],
+        "properties": {
+          "method": {
+            "$ref": "#/components/schemas/GitHubMergeMethod"
+          },
+          "target": {
+            "$ref": "#/components/schemas/ReviewTarget"
+          },
+          "workflow_id": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewsPolicyPreviewResponse": {
+        "type": "object",
+        "required": [
+          "workflow_id",
+          "subject",
+          "eligible"
+        ],
+        "properties": {
+          "eligible": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewsPolicyPreviewStep"
+            }
+          },
+          "subject": {
+            "$ref": "#/components/schemas/ReviewsPolicySubject"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "workflow_id": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewsPolicyPreviewStep": {
+        "type": "object",
+        "required": [
+          "step_type"
+        ],
+        "properties": {
+          "action_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "step_type": {
+            "$ref": "#/components/schemas/ReviewsPolicyStepType"
+          },
+          "waiting_on": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReviewsPolicyWait"
+              }
+            ]
+          }
+        }
+      },
+      "ReviewsPolicyRunMetrics": {
+        "type": "object",
+        "description": "Aggregate status and trigger counts for the runs in a history response.\nMirrors the runtime metrics summary so the Monitor app can render totals\nwithout re-deriving them from the run list.",
+        "required": [
+          "total",
+          "running",
+          "waiting",
+          "completed",
+          "failed",
+          "cancelled"
+        ],
+        "properties": {
+          "by_trigger": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "cancelled": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "completed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "running": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "waiting": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "ReviewsPolicyRunResponse": {
+        "type": "object",
+        "required": [
+          "workflow_id",
+          "run_id",
+          "subject",
+          "trigger",
+          "status",
+          "started_at",
+          "updated_at"
+        ],
+        "properties": {
+          "completed_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "error_message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "run_id": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ReviewsPolicyRunStatus"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewsPolicyRunStep"
+            }
+          },
+          "subject": {
+            "$ref": "#/components/schemas/ReviewsPolicySubject"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/ReviewsPolicyTrigger"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "waiting_on": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReviewsPolicyWait"
+              }
+            ]
+          },
+          "workflow_id": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewsPolicyRunStartRequest": {
+        "type": "object",
+        "required": [
+          "target"
+        ],
+        "properties": {
+          "method": {
+            "$ref": "#/components/schemas/GitHubMergeMethod"
+          },
+          "target": {
+            "$ref": "#/components/schemas/ReviewTarget"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/ReviewsPolicyTrigger"
+          },
+          "workflow_id": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewsPolicyRunStatus": {
+        "type": "string",
+        "enum": [
+          "completed",
+          "failed",
+          "running",
+          "waiting",
+          "cancelled"
+        ]
+      },
+      "ReviewsPolicyRunStep": {
+        "type": "object",
+        "required": [
+          "step_type",
+          "recorded_at"
+        ],
+        "properties": {
+          "action_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recorded_at": {
+            "type": "string"
+          },
+          "step_type": {
+            "$ref": "#/components/schemas/ReviewsPolicyStepType"
+          },
+          "waiting_on": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReviewsPolicyWait"
+              }
+            ]
+          }
+        }
+      },
+      "ReviewsPolicyStatusRequest": {
+        "type": "object",
+        "required": [
+          "subject"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/ReviewsPolicySubject"
+          },
+          "workflow_id": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewsPolicyStatusResponse": {
+        "type": "object",
+        "required": [
+          "workflow_id",
+          "subject"
+        ],
+        "properties": {
+          "active_run": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReviewsPolicyRunResponse"
+              }
+            ]
+          },
+          "recent_runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewsPolicyRunResponse"
+            }
+          },
+          "subject": {
+            "$ref": "#/components/schemas/ReviewsPolicySubject"
+          },
+          "workflow_id": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewsPolicyStepType": {
+        "type": "string",
+        "enum": [
+          "action",
+          "wait"
+        ]
+      },
+      "ReviewsPolicySubject": {
+        "type": "object",
+        "required": [
+          "repository",
+          "pull_request_number"
+        ],
+        "properties": {
+          "pull_request_number": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "repository": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewsPolicyTimelineEntry": {
+        "type": "object",
+        "description": "A single structured entry in a policy run timeline export, flattened from\nthe recorded step list across the response's runs.",
+        "required": [
+          "recorded_at",
+          "run_id",
+          "event"
+        ],
+        "properties": {
+          "event": {
+            "type": "string"
+          },
+          "recorded_at": {
+            "type": "string"
+          },
+          "run_id": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewsPolicyTrigger": {
+        "type": "string",
+        "enum": [
+          "background",
+          "event",
+          "manual",
+          "manual_nudge",
+          "timer"
+        ]
+      },
+      "ReviewsPolicyWait": {
+        "type": "object",
+        "properties": {
+          "duration_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "event_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ReviewsPullRequestReference": {
+        "type": "object",
+        "required": [
+          "repository",
+          "number"
+        ],
+        "properties": {
+          "number": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "repository": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewsPullRequestResolveRequest": {
+        "type": "object",
+        "properties": {
+          "backport_detection_enabled": {
+            "type": "boolean"
+          },
+          "backport_patterns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewsPullRequestReference"
+            }
+          }
+        }
+      },
+      "ReviewsPullRequestResolveResponse": {
+        "type": "object",
+        "required": [
+          "fetched_at"
+        ],
+        "properties": {
+          "fetched_at": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewItem"
+            }
+          },
+          "missing_references": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewsPullRequestReference"
+            }
+          }
+        }
+      },
+      "ReviewsQueryRequest": {
+        "type": "object",
+        "properties": {
+          "authors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "backport_detection_enabled": {
+            "type": "boolean"
+          },
+          "backport_patterns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cache_max_age_seconds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "exclude_repositories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "force_refresh": {
+            "type": "boolean"
+          },
+          "organizations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "repositories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ReviewsQueryResponse": {
+        "type": "object",
+        "required": [
+          "fetched_at",
+          "from_cache",
+          "summary",
+          "items"
+        ],
+        "properties": {
+          "fetched_at": {
+            "type": "string"
+          },
+          "from_cache": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewItem"
+            }
+          },
+          "repository_labels": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/ReviewRepositoryLabel"
+              }
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ReviewsSummary"
+          },
+          "viewer_login": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "GitHub login of the authenticated viewer for \"(you)\" reviewer and\n\"Commenting as @viewer\" UI copy. `None` means lookup failed."
+          }
+        }
+      },
+      "ReviewsRateLimitSnapshot": {
+        "type": "object",
+        "description": "Lightweight echo of the rate-limit budget at the time of the response.\nThe Monitor uses this to surface a cooling banner without polling a\nseparate endpoint.",
+        "required": [
+          "remaining",
+          "limit"
+        ],
+        "properties": {
+          "cost": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "remaining": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "reset_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ReviewsRefreshRequest": {
+        "type": "object",
+        "properties": {
+          "backport_detection_enabled": {
+            "type": "boolean"
+          },
+          "backport_patterns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewTarget"
+            }
+          }
+        }
+      },
+      "ReviewsRefreshResponse": {
+        "type": "object",
+        "required": [
+          "fetched_at"
+        ],
+        "properties": {
+          "fetched_at": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewItem"
+            }
+          },
+          "missing_pull_request_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ReviewsRepositoryCatalogRequest": {
+        "type": "object",
+        "required": [
+          "organization"
+        ],
+        "properties": {
+          "organization": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewsRepositoryCatalogResponse": {
+        "type": "object",
+        "required": [
+          "organization"
+        ],
+        "properties": {
+          "organization": {
+            "type": "string"
+          },
+          "repositories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ReviewsRequestReviewRequest": {
+        "type": "object",
+        "description": "Re-request a fresh review from a specific GitHub login on each target\npull request. Mirrors GitHub's \"Re-request review\" affordance: when a\nreviewer has already submitted a review (approved, dismissed, or\nrequested changes), this drops them back into the requested-reviewers\nlist so they get notified to look again.",
+        "required": [
+          "targets",
+          "reviewer_login"
+        ],
+        "properties": {
+          "reviewer_login": {
+            "type": "string"
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewTarget"
+            }
+          }
+        }
+      },
+      "ReviewsRerunChecksRequest": {
+        "type": "object",
+        "required": [
+          "targets"
+        ],
+        "properties": {
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewTarget"
+            }
+          }
+        }
+      },
+      "ReviewsReviewThreadResolveRequest": {
+        "type": "object",
+        "required": [
+          "thread_id",
+          "resolved",
+          "pull_request_id"
+        ],
+        "properties": {
+          "pull_request_id": {
+            "type": "string",
+            "description": "PR cache key — the daemon drains the per-PR timeline cache\nafter a successful mutation so the next fetch reflects the new\n`isResolved` state."
+          },
+          "resolved": {
+            "type": "boolean"
+          },
+          "thread_id": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewsReviewThreadResolveResponse": {
+        "type": "object",
+        "required": [
+          "thread_id",
+          "resolved"
+        ],
+        "properties": {
+          "resolved": {
+            "type": "boolean"
+          },
+          "thread_id": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewsSummary": {
+        "type": "object",
+        "required": [
+          "total",
+          "review_required",
+          "ready_to_merge",
+          "auto_approvable",
+          "waiting_on_checks",
+          "blocked"
+        ],
+        "properties": {
+          "auto_approvable": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "blocked": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "ready_to_merge": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "review_required": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "waiting_on_checks": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "ReviewsTimelineRequest": {
+        "type": "object",
+        "required": [
+          "pull_request_id",
+          "page_size",
+          "direction"
+        ],
+        "properties": {
+          "cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "direction": {
+            "$ref": "#/components/schemas/TimelinePageDirection"
+          },
+          "force_refresh": {
+            "type": "boolean"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "pull_request_id": {
+            "type": "string"
+          },
+          "pull_request_updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "ReviewsTimelineResponse": {
+        "type": "object",
+        "required": [
+          "pull_request_id",
+          "entries",
+          "page_info",
+          "viewer_can_comment",
+          "fetched_at"
+        ],
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewTimelineEntry"
+            }
+          },
+          "fetched_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "page_info": {
+            "$ref": "#/components/schemas/TimelinePageInfo"
+          },
+          "pull_request_id": {
+            "type": "string"
+          },
+          "viewer_can_comment": {
+            "type": "boolean"
           }
         }
       },
@@ -8516,6 +13691,189 @@
           "urgent"
         ]
       },
+      "SimpleActorEventEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "event_kind"
+        ],
+        "properties": {
+          "actor": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Actor"
+              }
+            ]
+          },
+          "after_oid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "assignee_login": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "before_oid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "branch_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "destination_repository": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dismissal_message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "event_kind": {
+            "$ref": "#/components/schemas/SimpleActorEventKind"
+          },
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "label_color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lock_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "milestone_title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "new_title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "old_title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requested_reviewer_login": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requested_reviewer_team_slug": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_number": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "source_repository": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "SimpleActorEventKind": {
+        "type": "string",
+        "enum": [
+          "head_ref_deleted",
+          "head_ref_restored",
+          "base_ref_changed",
+          "base_ref_force_pushed",
+          "base_ref_deleted",
+          "labeled",
+          "unlabeled",
+          "assigned",
+          "unassigned",
+          "merged",
+          "closed",
+          "reopened",
+          "renamed_title",
+          "review_requested",
+          "review_request_removed",
+          "review_dismissed",
+          "ready_for_review",
+          "convert_to_draft",
+          "auto_merge_enabled",
+          "auto_merge_disabled",
+          "auto_rebase_enabled",
+          "auto_squash_enabled",
+          "locked",
+          "unlocked",
+          "pinned",
+          "unpinned",
+          "milestoned",
+          "demilestoned",
+          "referenced",
+          "cross_referenced",
+          "mentioned",
+          "subscribed",
+          "unsubscribed",
+          "marked_as_duplicate",
+          "unmarked_as_duplicate",
+          "transferred",
+          "connected",
+          "disconnected",
+          "revision_marker"
+        ]
+      },
       "TaskArbitrateRequest": {
         "type": "object",
         "required": [
@@ -8970,6 +14328,40 @@
           }
         }
       },
+      "TimelinePageDirection": {
+        "type": "string",
+        "enum": [
+          "older",
+          "newer"
+        ]
+      },
+      "TimelinePageInfo": {
+        "type": "object",
+        "required": [
+          "has_older",
+          "has_newer"
+        ],
+        "properties": {
+          "end_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "has_newer": {
+            "type": "boolean"
+          },
+          "has_older": {
+            "type": "boolean"
+          },
+          "start_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "TimelineWindowResponse": {
         "type": "object",
         "required": [
@@ -9035,6 +14427,39 @@
           "window_start": {
             "type": "integer",
             "minimum": 0
+          }
+        }
+      },
+      "UnknownEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "typename"
+        ],
+        "properties": {
+          "actor": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Actor"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string"
+          },
+          "raw_payload": {
+            "type": "object"
+          },
+          "typename": {
+            "type": "string"
           }
         }
       },

@@ -236,12 +236,16 @@ pub fn pat_clone_url(repo_full_name: &str, token: &Sensitive) -> Sensitive {
 
 /// One row in the Settings-panel projection of the clones registry.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct LocalCloneListEntry {
     pub repo_full_name: String,
     pub repo_key_segment: String,
     pub size_bytes: u64,
+    #[cfg_attr(feature = "openapi", schema(value_type = String, format = DateTime))]
     pub created_at: DateTime<Utc>,
+    #[cfg_attr(feature = "openapi", schema(value_type = String, format = DateTime))]
     pub last_used_at: DateTime<Utc>,
+    #[cfg_attr(feature = "openapi", schema(value_type = String, format = DateTime))]
     pub last_fetched_at: DateTime<Utc>,
 }
 

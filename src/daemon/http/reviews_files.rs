@@ -15,6 +15,8 @@ use crate::reviews::LocalCloneListEntry;
 
 use super::DaemonHttpState;
 use super::auth::require_auth;
+#[cfg(feature = "openapi")]
+use super::openapi::DaemonErrorBody;
 use super::response::{extract_request_id, timed_json};
 
 /// Wire the review-files endpoints onto the reviews router. These handlers live
@@ -49,7 +51,17 @@ pub(super) fn merge_files_routes(router: Router<DaemonHttpState>) -> Router<Daem
         )
 }
 
-async fn post_review_files_list(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/files/list",
+    tag = "reviews",
+    request_body = ReviewsFilesListRequest,
+    responses(
+        (status = 200, description = "Changed files for a pull request", body = crate::daemon::protocol::ReviewsFilesListResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_review_files_list(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsFilesListRequest>,
@@ -69,7 +81,17 @@ async fn post_review_files_list(
     )
 }
 
-async fn post_review_files_patch(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/files/patch",
+    tag = "reviews",
+    request_body = ReviewsFilesPatchRequest,
+    responses(
+        (status = 200, description = "Per-path patches with drift detection", body = crate::daemon::protocol::ReviewsFilesPatchResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_review_files_patch(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsFilesPatchRequest>,
@@ -89,7 +111,17 @@ async fn post_review_files_patch(
     )
 }
 
-async fn post_review_files_preview(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/files/preview",
+    tag = "reviews",
+    request_body = ReviewsFilesPreviewRequest,
+    responses(
+        (status = 200, description = "Line-limited patch previews with drift detection", body = crate::daemon::protocol::ReviewsFilesPreviewResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_review_files_preview(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsFilesPreviewRequest>,
@@ -109,7 +141,17 @@ async fn post_review_files_preview(
     )
 }
 
-async fn post_review_files_viewed(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/files/viewed",
+    tag = "reviews",
+    request_body = ReviewsFilesViewedRequest,
+    responses(
+        (status = 200, description = "Per-path viewed-state outcomes", body = crate::daemon::protocol::ReviewsFilesViewedResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_review_files_viewed(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsFilesViewedRequest>,
@@ -129,7 +171,17 @@ async fn post_review_files_viewed(
     )
 }
 
-async fn post_review_files_blob(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/files/blob",
+    tag = "reviews",
+    request_body = ReviewsFilesBlobRequest,
+    responses(
+        (status = 200, description = "Base64-encoded image blob with metadata", body = crate::daemon::protocol::ReviewsFilesBlobResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_review_files_blob(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsFilesBlobRequest>,
@@ -149,7 +201,17 @@ async fn post_review_files_blob(
     )
 }
 
-async fn post_review_files_comment(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/files/comment",
+    tag = "reviews",
+    request_body = ReviewsFileCommentRequest,
+    responses(
+        (status = 200, description = "Result of posting the file comment or thread reply", body = crate::daemon::protocol::ReviewsFileCommentResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_review_files_comment(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsFileCommentRequest>,
@@ -169,7 +231,16 @@ async fn post_review_files_comment(
     )
 }
 
-async fn post_review_files_local_clones(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/files/local-clones",
+    tag = "reviews",
+    responses(
+        (status = 200, description = "Local bare-clone registry entries", body = Vec<crate::reviews::LocalCloneListEntry>),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_review_files_local_clones(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
@@ -189,16 +260,28 @@ async fn post_review_files_local_clones(
 }
 
 #[derive(serde::Deserialize)]
-struct DeleteLocalClonePayload {
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub(super) struct DeleteLocalClonePayload {
     repo_key_segment: String,
 }
 
 #[derive(serde::Serialize)]
-struct DeleteLocalCloneResponseBody {
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub(super) struct DeleteLocalCloneResponseBody {
     clones: Vec<LocalCloneListEntry>,
 }
 
-async fn post_review_files_local_clones_delete(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/files/local-clones/delete",
+    tag = "reviews",
+    request_body = DeleteLocalClonePayload,
+    responses(
+        (status = 200, description = "Local bare-clone registry after the deletion", body = DeleteLocalCloneResponseBody),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_review_files_local_clones_delete(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(payload): Json<DeleteLocalClonePayload>,

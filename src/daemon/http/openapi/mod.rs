@@ -149,6 +149,42 @@ struct TasksAgentsApi;
 ))]
 struct ManagedAgentsApi;
 
+#[derive(utoipa::OpenApi)]
+#[openapi(paths(
+    super::reviews::get_review_capabilities,
+    super::reviews::post_review_repositories,
+    super::reviews::post_query_reviews,
+    super::reviews::post_resolve_review_pull_requests,
+    super::reviews::post_review_action_preview,
+    super::reviews::delete_reviews_cache,
+    super::reviews::post_refresh_reviews,
+    super::reviews::post_review_body,
+    super::reviews::post_review_body_update,
+    super::reviews::post_review_timeline,
+    super::reviews::post_review_avatar,
+    super::reviews::post_review_review_threads_resolve,
+    super::reviews_actions::post_approve_reviews,
+    super::reviews_actions::post_merge_reviews,
+    super::reviews_actions::post_rerun_reviews_checks,
+    super::reviews_actions::post_label_reviews,
+    super::reviews_actions::post_auto_reviews,
+    super::reviews_actions::post_request_review,
+    super::reviews_actions::post_comment_reviews,
+    super::reviews_policy::post_reviews_policy_preview,
+    super::reviews_policy::post_reviews_policy_start,
+    super::reviews_policy::post_reviews_policy_status,
+    super::reviews_policy::post_reviews_policy_history,
+    super::reviews_files::post_review_files_list,
+    super::reviews_files::post_review_files_patch,
+    super::reviews_files::post_review_files_preview,
+    super::reviews_files::post_review_files_viewed,
+    super::reviews_files::post_review_files_blob,
+    super::reviews_files::post_review_files_comment,
+    super::reviews_files::post_review_files_local_clones,
+    super::reviews_files::post_review_files_local_clones_delete,
+))]
+struct ReviewsApi;
+
 /// Build the typed `OpenAPI` document from every domain aggregator.
 ///
 /// Aggregators merge in registration order; component schemas deduplicate by
@@ -161,6 +197,7 @@ pub fn openapi_document() -> utoipa::openapi::OpenApi {
     doc.merge(SessionsApi::openapi());
     doc.merge(TasksAgentsApi::openapi());
     doc.merge(ManagedAgentsApi::openapi());
+    doc.merge(ReviewsApi::openapi());
     env!("CARGO_PKG_VERSION").clone_into(&mut doc.info.version);
     doc
 }
