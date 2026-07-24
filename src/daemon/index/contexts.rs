@@ -143,15 +143,39 @@ fn inferred_checkout_from_root(
         };
     }
 
-    // TODO(b-task-8): is_worktree and worktree_name are no longer stored in
-    // ProjectOriginRecord; resolve via git identity when available.
-    let repository_root = repository_root_hint.map_or_else(|| checkout_root.clone(), PathBuf::from);
+    // ProjectOriginRecord stores no worktree flag, but a recorded repository
+    // root that differs from the checkout is exactly what a linked worktree
+    // looks like. Defaulting to `false` here drops worktree status for every
+    // checkout whose live git read failed.
+    let Some(repository_root) = repository_root_hint.map(PathBuf::from) else {
+        return InferredCheckout {
+            repository_root: checkout_root.clone(),
+            checkout_root,
+            is_worktree: false,
+            worktree_name: None,
+        };
+    };
+    // The recorded repository root is canonical, but the checkout root can fall
+    // back to the raw `recorded_from_dir`, so compare resolved forms. A textual
+    // difference alone - a symlinked or relative path - would otherwise make a
+    // plain repository look like a worktree of itself.
+    let resolved_repository_root = canonicalized(&repository_root);
+    let resolved_checkout_root = canonicalized(&checkout_root);
+    let is_worktree = resolved_repository_root != resolved_checkout_root;
+    let worktree_name = is_worktree
+        .then(|| resolved_checkout_root.file_name())
+        .flatten()
+        .map(|name| name.to_string_lossy().to_string());
     InferredCheckout {
         repository_root,
         checkout_root,
-        is_worktree: false,
-        worktree_name: None,
+        is_worktree,
+        worktree_name,
     }
+}
+
+fn canonicalized(path: &Path) -> PathBuf {
+    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
 }
 
 fn infer_state_origin(context_root: &Path) -> Option<PathBuf> {

@@ -313,7 +313,7 @@ pub use direct::{
     register_agent_runtime_session_direct, start_session_direct, update_session_title_direct,
 };
 pub(crate) use direct::{
-    delete_session_direct_async, disconnect_agent_direct_async, ensure_project_registered_async,
+    delete_session_direct_async, disconnect_agent_direct_async,
     join_session_direct_async, register_agent_runtime_session_direct_async,
     start_session_direct_async, update_session_title_direct_async,
 };

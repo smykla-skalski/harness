@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 
 use tokio::task::spawn_blocking;
 
+use crate::daemon::index::{self, DiscoveredProject};
 use crate::errors::{CliError, CliErrorKind};
 use crate::sandbox;
 use crate::session::types::SessionState;
@@ -25,6 +26,7 @@ use super::session_storage;
 pub(super) struct PreparedSession {
     pub(super) layout: SessionLayout,
     pub(super) canonical_origin: PathBuf,
+    pub(super) project: DiscoveredProject,
     pub(super) state: SessionState,
 }
 
@@ -125,10 +127,16 @@ pub(super) fn prepare_session(
         return Err(error);
     }
 
+    // The origin's git identity has to be read while the sandbox grant still
+    // covers it. Reading it after the scope drops fails, and the checkout then
+    // registers as its own repository root with its worktree status lost.
+    let project = index::discovered_project_for_checkout(&canonical_origin);
+
     drop(project_scope);
     Ok(PreparedSession {
         layout,
         canonical_origin,
+        project,
         state,
     })
 }
