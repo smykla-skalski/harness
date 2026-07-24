@@ -316,6 +316,1281 @@
         "x-websocket-method": "health"
       }
     },
+    "/v1/managed-agents/acp/inspect": {
+      "get": {
+        "tags": [
+          "managed-agents"
+        ],
+        "operationId": "get_acp_inspect",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "query",
+            "description": "Restrict the inspection to one session",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ACP managed-agent inspection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcpAgentInspectResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "managed_agent.acp_inspect"
+      }
+    },
+    "/v1/managed-agents/acp/transcript": {
+      "get": {
+        "tags": [
+          "managed-agents"
+        ],
+        "operationId": "get_acp_transcript",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "query",
+            "description": "Session whose ACP transcript to read (required)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ACP agent transcript entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcpTranscriptResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "managed_agent.acp_transcript"
+      }
+    },
+    "/v1/managed-agents/codex/inspect": {
+      "get": {
+        "tags": [
+          "managed-agents"
+        ],
+        "operationId": "get_codex_inspect",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "query",
+            "description": "Restrict the inspection to one session",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Codex managed-agent inspection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexAgentInspectResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "managed_agent.codex_inspect"
+      }
+    },
+    "/v1/managed-agents/codex/transcript": {
+      "get": {
+        "tags": [
+          "managed-agents"
+        ],
+        "operationId": "get_codex_transcript",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "query",
+            "description": "Session whose Codex transcript to read (required)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Codex agent transcript entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexTranscriptResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "managed_agent.codex_transcript"
+      }
+    },
+    "/v1/managed-agents/{managed_agent_id}": {
+      "get": {
+        "tags": [
+          "managed-agents"
+        ],
+        "operationId": "get_managed_agent",
+        "parameters": [
+          {
+            "name": "managed_agent_id",
+            "in": "path",
+            "description": "Managed agent identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Managed agent snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedAgentSnapshotSchema"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "managed_agent.detail"
+      },
+      "delete": {
+        "tags": [
+          "managed-agents"
+        ],
+        "operationId": "delete_acp_agent",
+        "parameters": [
+          {
+            "name": "managed_agent_id",
+            "in": "path",
+            "description": "Managed agent identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "session_id",
+            "in": "query",
+            "description": "Reject the delete unless the agent belongs to this session",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Final ACP agent snapshot after stop",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedAgentSnapshotSchema"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "managed_agent.stop_acp"
+      }
+    },
+    "/v1/managed-agents/{managed_agent_id}/approvals/{approval_id}": {
+      "post": {
+        "tags": [
+          "managed-agents"
+        ],
+        "operationId": "post_codex_agent_approval",
+        "parameters": [
+          {
+            "name": "managed_agent_id",
+            "in": "path",
+            "description": "Managed agent identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "approval_id",
+            "in": "path",
+            "description": "Pending approval identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodexApprovalDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Codex agent snapshot after resolving the approval",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedAgentSnapshotSchema"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "managed_agent.resolve_codex_approval"
+      }
+    },
+    "/v1/managed-agents/{managed_agent_id}/input": {
+      "post": {
+        "tags": [
+          "managed-agents"
+        ],
+        "operationId": "post_terminal_agent_input",
+        "parameters": [
+          {
+            "name": "managed_agent_id",
+            "in": "path",
+            "description": "Managed agent identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentTuiInputRequestSchema"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Terminal agent snapshot after input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedAgentSnapshotSchema"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "managed_agent.input"
+      }
+    },
+    "/v1/managed-agents/{managed_agent_id}/interrupt": {
+      "post": {
+        "tags": [
+          "managed-agents"
+        ],
+        "operationId": "post_codex_agent_interrupt",
+        "parameters": [
+          {
+            "name": "managed_agent_id",
+            "in": "path",
+            "description": "Managed agent identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Codex agent snapshot after interrupt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedAgentSnapshotSchema"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "managed_agent.interrupt_codex"
+      }
+    },
+    "/v1/managed-agents/{managed_agent_id}/logout": {
+      "post": {
+        "tags": [
+          "managed-agents"
+        ],
+        "operationId": "post_acp_agent_logout",
+        "parameters": [
+          {
+            "name": "managed_agent_id",
+            "in": "path",
+            "description": "Managed agent identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ACP agent logged out",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
+    "/v1/managed-agents/{managed_agent_id}/permission-batches/{batch_id}": {
+      "post": {
+        "tags": [
+          "managed-agents"
+        ],
+        "operationId": "post_acp_permission",
+        "parameters": [
+          {
+            "name": "managed_agent_id",
+            "in": "path",
+            "description": "Managed agent identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "batch_id",
+            "in": "path",
+            "description": "Pending permission batch identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcpPermissionDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "ACP agent snapshot after resolving the permission batch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedAgentSnapshotSchema"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "managed_agent.resolve_acp_permission"
+      }
+    },
+    "/v1/managed-agents/{managed_agent_id}/prompt": {
+      "post": {
+        "tags": [
+          "managed-agents"
+        ],
+        "operationId": "post_acp_agent_prompt",
+        "parameters": [
+          {
+            "name": "managed_agent_id",
+            "in": "path",
+            "description": "Managed agent identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcpPromptRequestBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "ACP agent snapshot after sending the prompt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedAgentSnapshotSchema"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "managed_agent.prompt_acp"
+      }
+    },
+    "/v1/managed-agents/{managed_agent_id}/ready": {
+      "post": {
+        "tags": [
+          "managed-agents"
+        ],
+        "operationId": "post_terminal_agent_ready",
+        "parameters": [
+          {
+            "name": "managed_agent_id",
+            "in": "path",
+            "description": "Managed agent identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Terminal agent snapshot after readiness signal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedAgentSnapshotSchema"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "managed_agent.ready"
+      }
+    },
+    "/v1/managed-agents/{managed_agent_id}/resize": {
+      "post": {
+        "tags": [
+          "managed-agents"
+        ],
+        "operationId": "post_terminal_agent_resize",
+        "parameters": [
+          {
+            "name": "managed_agent_id",
+            "in": "path",
+            "description": "Managed agent identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentTuiResizeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Terminal agent snapshot after resize",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedAgentSnapshotSchema"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "managed_agent.resize"
+      }
+    },
+    "/v1/managed-agents/{managed_agent_id}/sessions": {
+      "get": {
+        "tags": [
+          "managed-agents"
+        ],
+        "operationId": "get_acp_sessions",
+        "parameters": [
+          {
+            "name": "managed_agent_id",
+            "in": "path",
+            "description": "Managed agent identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cwd",
+            "in": "query",
+            "description": "Working directory the agent scopes its session list to",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque pagination cursor from a previous page",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of agent-reported sessions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcpSessionListPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
+    "/v1/managed-agents/{managed_agent_id}/sessions/{agent_session_id}": {
+      "delete": {
+        "tags": [
+          "managed-agents"
+        ],
+        "operationId": "delete_acp_session",
+        "parameters": [
+          {
+            "name": "managed_agent_id",
+            "in": "path",
+            "description": "Managed agent identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "agent_session_id",
+            "in": "path",
+            "description": "Agent-owned session identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agent session deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
+    "/v1/managed-agents/{managed_agent_id}/sessions/{agent_session_id}/close": {
+      "post": {
+        "tags": [
+          "managed-agents"
+        ],
+        "operationId": "post_acp_session_close",
+        "parameters": [
+          {
+            "name": "managed_agent_id",
+            "in": "path",
+            "description": "Managed agent identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "agent_session_id",
+            "in": "path",
+            "description": "Agent-owned session identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agent session closed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
+    "/v1/managed-agents/{managed_agent_id}/steer": {
+      "post": {
+        "tags": [
+          "managed-agents"
+        ],
+        "operationId": "post_codex_agent_steer",
+        "parameters": [
+          {
+            "name": "managed_agent_id",
+            "in": "path",
+            "description": "Managed agent identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodexSteerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Codex agent snapshot after steering prompt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedAgentSnapshotSchema"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "managed_agent.steer_codex"
+      }
+    },
+    "/v1/managed-agents/{managed_agent_id}/stop": {
+      "post": {
+        "tags": [
+          "managed-agents"
+        ],
+        "operationId": "post_terminal_agent_stop",
+        "parameters": [
+          {
+            "name": "managed_agent_id",
+            "in": "path",
+            "description": "Managed agent identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Managed agent snapshot after stop",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedAgentSnapshotSchema"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "managed_agent.stop"
+      }
+    },
     "/v1/projects": {
       "get": {
         "tags": [
@@ -1397,6 +2672,285 @@
           }
         },
         "x-websocket-method": "session.leave"
+      }
+    },
+    "/v1/sessions/{session_id}/managed-agents": {
+      "get": {
+        "tags": [
+          "managed-agents"
+        ],
+        "operationId": "get_managed_agents",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Managed agents running in the session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedAgentListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "session.managed_agents"
+      }
+    },
+    "/v1/sessions/{session_id}/managed-agents/acp": {
+      "post": {
+        "tags": [
+          "managed-agents"
+        ],
+        "operationId": "post_acp_agent_start",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcpAgentStartRequestSchema"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Started ACP managed agent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedAgentSnapshotSchema"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "managed_agent.start_acp"
+      }
+    },
+    "/v1/sessions/{session_id}/managed-agents/codex": {
+      "post": {
+        "tags": [
+          "managed-agents"
+        ],
+        "operationId": "post_codex_agent_start",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodexRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Started Codex managed agent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedAgentSnapshotSchema"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "managed_agent.start_codex"
+      }
+    },
+    "/v1/sessions/{session_id}/managed-agents/terminal": {
+      "post": {
+        "tags": [
+          "managed-agents"
+        ],
+        "operationId": "post_terminal_agent_start",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentTuiStartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Started terminal managed agent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedAgentSnapshotSchema"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "managed_agent.start_terminal"
       }
     },
     "/v1/sessions/{session_id}/observe": {
@@ -2724,6 +4278,867 @@
           "expired"
         ]
       },
+      "AcpAgentHandshake": {
+        "type": "object",
+        "description": "Result of the ACP `initialize` exchange with a live agent process.",
+        "required": [
+          "protocol_version"
+        ],
+        "properties": {
+          "agent_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "agent_title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "agent_version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "auth_method_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "protocol_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "supports_additional_directories": {
+            "type": "boolean"
+          },
+          "supports_load_session": {
+            "type": "boolean"
+          },
+          "supports_logout": {
+            "type": "boolean"
+          },
+          "supports_mcp_http": {
+            "type": "boolean"
+          },
+          "supports_mcp_sse": {
+            "type": "boolean"
+          },
+          "supports_session_close": {
+            "type": "boolean"
+          },
+          "supports_session_delete": {
+            "type": "boolean"
+          },
+          "supports_session_list": {
+            "type": "boolean"
+          },
+          "supports_session_resume": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AcpAgentInspectResponse": {
+        "type": "object",
+        "required": [
+          "agents"
+        ],
+        "properties": {
+          "agents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AcpAgentInspectSnapshotSchema"
+            }
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "daemon_perceived_now": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "issue_message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AcpAgentInspectSnapshotSchema": {
+        "type": "object",
+        "description": "Wire shape of the ACP inspect snapshot.",
+        "required": [
+          "managed_agent_id",
+          "managed_agent_family",
+          "session_id",
+          "session_agent_id",
+          "display_name",
+          "pid",
+          "pgid",
+          "uptime_ms",
+          "last_update_at",
+          "watchdog_state",
+          "pending_permissions",
+          "terminal_count",
+          "prompt_deadline_remaining_ms"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "handshake": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AcpAgentHandshake"
+              }
+            ]
+          },
+          "last_client_call_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_update_at": {
+            "type": "string"
+          },
+          "managed_agent_family": {
+            "$ref": "#/components/schemas/ManagedAgentKind"
+          },
+          "managed_agent_id": {
+            "type": "string"
+          },
+          "pending_permissions": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "permission_log_path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "permission_mode": {
+            "type": "string"
+          },
+          "permission_queue_depth": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "pgid": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pid": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "process_key": {
+            "type": "string"
+          },
+          "prompt_deadline_remaining_ms": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "session_agent_id": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "session_state": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AcpAgentSessionState"
+              }
+            ]
+          },
+          "terminal_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "uptime_ms": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "watchdog_state": {
+            "type": "string"
+          }
+        }
+      },
+      "AcpAgentSessionState": {
+        "type": "object",
+        "description": "Live per-session agent state assembled from ACP session notifications.",
+        "properties": {
+          "available_commands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "config_options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AcpSessionConfigOptionState"
+            }
+          },
+          "current_mode_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_stop_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the most recent prompt turn stopped, as reported by the agent."
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AcpAgentSnapshotSchema": {
+        "type": "object",
+        "description": "Wire shape of a live ACP managed-agent snapshot.",
+        "required": [
+          "managed_agent_id",
+          "managed_agent_family",
+          "session_id",
+          "session_agent_id",
+          "display_name",
+          "status",
+          "pid",
+          "pgid",
+          "project_dir",
+          "process_key",
+          "pending_permissions",
+          "permission_queue_depth",
+          "pending_permission_batches",
+          "terminal_count",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "managed_agent_family": {
+            "$ref": "#/components/schemas/ManagedAgentKind"
+          },
+          "managed_agent_id": {
+            "type": "string"
+          },
+          "pending_permission_batches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AcpPermissionBatchSchema"
+            }
+          },
+          "pending_permissions": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "permission_log_path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "permission_mode": {
+            "type": "string"
+          },
+          "permission_queue_depth": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "pgid": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pid": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "process_key": {
+            "type": "string"
+          },
+          "project_dir": {
+            "type": "string"
+          },
+          "session_agent_id": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AgentStatusSchema"
+          },
+          "terminal_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        }
+      },
+      "AcpAgentStartRequestSchema": {
+        "type": "object",
+        "description": "Wire shape of the ACP agent start request. The descriptor is named\n`descriptor_id` on the wire, not `agent`.",
+        "required": [
+          "descriptor_id",
+          "role"
+        ],
+        "properties": {
+          "additional_directories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "allow_custom_model": {
+            "type": "boolean"
+          },
+          "board_item_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "descriptor_id": {
+            "type": "string"
+          },
+          "effort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "endpoint": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AcpEndpoint"
+              }
+            ]
+          },
+          "fallback_role": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SessionRole"
+              }
+            ]
+          },
+          "mcp_servers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AcpMcpServer"
+            }
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "persona": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project_dir": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "prompt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "record_permissions": {
+            "type": "boolean"
+          },
+          "resume_disabled": {
+            "type": "boolean"
+          },
+          "resume_session_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role": {
+            "$ref": "#/components/schemas/SessionRole"
+          },
+          "task_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workflow_execution_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AcpEndpoint": {
+        "type": "object",
+        "description": "A remote ACP endpoint the daemon connects to instead of spawning a child.\n\nThe URL scheme selects the transport: `ws`/`wss` uses WebSocket, `http`/\n`https` uses SSE with POST. Only header names and the environment variables\nholding their values cross the wire; the daemon resolves the values at\nconnect time so a token never rides the request. `headers_env` applies only\nto `http`/`https` endpoints - the WebSocket transport drops request headers,\nso the daemon rejects headers set on a `ws`/`wss` endpoint.",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "headers_env": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "AcpMcpEnvVariable": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "AcpMcpHttpHeader": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "AcpMcpServer": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "name",
+              "command",
+              "transport"
+            ],
+            "properties": {
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "command": {
+                "type": "string"
+              },
+              "env": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AcpMcpEnvVariable"
+                }
+              },
+              "name": {
+                "type": "string"
+              },
+              "transport": {
+                "type": "string",
+                "enum": [
+                  "stdio"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "name",
+              "url",
+              "transport"
+            ],
+            "properties": {
+              "headers": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AcpMcpHttpHeader"
+                }
+              },
+              "name": {
+                "type": "string"
+              },
+              "transport": {
+                "type": "string",
+                "enum": [
+                  "http"
+                ]
+              },
+              "url": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "name",
+              "url",
+              "transport"
+            ],
+            "properties": {
+              "headers": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AcpMcpHttpHeader"
+                }
+              },
+              "name": {
+                "type": "string"
+              },
+              "transport": {
+                "type": "string",
+                "enum": [
+                  "sse"
+                ]
+              },
+              "url": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "description": "One MCP server a descriptor offers to its agent.\n\nMirrors the ACP `McpServer` shape without depending on the SDK, so the\ncatalog and daemon wire format stay independent of the protocol crate."
+      },
+      "AcpPermissionBatchSchema": {
+        "type": "object",
+        "description": "Wire shape of a pending ACP permission batch.",
+        "required": [
+          "batch_id",
+          "managed_agent_id",
+          "managed_agent_family",
+          "session_id",
+          "requests",
+          "created_at",
+          "expires_at"
+        ],
+        "properties": {
+          "batch_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "managed_agent_family": {
+            "$ref": "#/components/schemas/ManagedAgentKind"
+          },
+          "managed_agent_id": {
+            "type": "string"
+          },
+          "requests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AcpPermissionItem"
+            }
+          },
+          "session_id": {
+            "type": "string"
+          }
+        }
+      },
+      "AcpPermissionDecision": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "decision"
+            ],
+            "properties": {
+              "decision": {
+                "type": "string",
+                "enum": [
+                  "approve_all"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "request_ids",
+              "decision"
+            ],
+            "properties": {
+              "decision": {
+                "type": "string",
+                "enum": [
+                  "approve_some"
+                ]
+              },
+              "request_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "uniqueItems": true
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "decision"
+            ],
+            "properties": {
+              "decision": {
+                "type": "string",
+                "enum": [
+                  "deny_all"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "AcpPermissionItem": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "session_id",
+          "tool_call",
+          "options"
+        ],
+        "properties": {
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AcpPermissionOption"
+            }
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "tool_call": {
+            "type": "object"
+          }
+        }
+      },
+      "AcpPermissionOption": {
+        "type": "object",
+        "required": [
+          "optionId",
+          "name",
+          "kind"
+        ],
+        "properties": {
+          "_meta": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AcpPermissionOptionKind"
+          },
+          "name": {
+            "type": "string"
+          },
+          "optionId": {
+            "type": "string"
+          }
+        }
+      },
+      "AcpPermissionOptionKind": {
+        "type": "string",
+        "enum": [
+          "allow_once",
+          "allow_always",
+          "reject_once",
+          "reject_always"
+        ]
+      },
+      "AcpPromptRequestBody": {
+        "type": "object",
+        "required": [
+          "prompt"
+        ],
+        "properties": {
+          "prompt": {
+            "type": "string"
+          }
+        }
+      },
+      "AcpSessionConfigOptionState": {
+        "type": "object",
+        "description": "Compact view of one advertised session config option and its value.",
+        "required": [
+          "id",
+          "name",
+          "current_value"
+        ],
+        "properties": {
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "current_value": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "AcpSessionListPage": {
+        "type": "object",
+        "description": "One page of `session/list` results, carrying the agent's opaque cursor.",
+        "properties": {
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AcpSessionSummary"
+            }
+          }
+        }
+      },
+      "AcpSessionSummary": {
+        "type": "object",
+        "description": "One session an agent reports from `session/list`.\n\nDistinct from a harness session: the agent owns these ids and may report\nsessions harness never started, so callers treat the list as display data\nrather than a source of harness session state.",
+        "required": [
+          "session_id",
+          "cwd"
+        ],
+        "properties": {
+          "additional_directories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AcpTranscriptResponse": {
+        "type": "object",
+        "required": [
+          "entries"
+        ],
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimelineEntry"
+            }
+          }
+        }
+      },
       "AdoptSessionRequest": {
         "type": "object",
         "required": [
@@ -3047,6 +5462,403 @@
           }
         }
       },
+      "AgentTuiInput": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "text",
+              "type"
+            ],
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "text",
+              "type"
+            ],
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "paste"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "key",
+              "type"
+            ],
+            "properties": {
+              "key": {
+                "$ref": "#/components/schemas/AgentTuiKey"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "key"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "key",
+              "type"
+            ],
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "control"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "data",
+              "type"
+            ],
+            "properties": {
+              "data": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "raw_bytes_base64"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Structured keyboard-like input sent into the PTY master."
+      },
+      "AgentTuiInputRequestSchema": {
+        "type": "object",
+        "description": "Documented wire shape of [`AgentTuiInputRequest`], which hand-rolls its serde\nthrough `RawAgentTuiInputRequest`. Exactly one of `input` or `sequence` is\naccepted; the validation lives in the handler, so the schema documents both\nas optional.",
+        "properties": {
+          "input": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AgentTuiInput"
+              }
+            ]
+          },
+          "sequence": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AgentTuiInputSequence"
+              }
+            ]
+          }
+        }
+      },
+      "AgentTuiInputSequence": {
+        "type": "object",
+        "description": "Ordered keyboard-like input replayed into an active terminal agent.",
+        "required": [
+          "steps"
+        ],
+        "properties": {
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentTuiInputSequenceStep"
+            }
+          }
+        }
+      },
+      "AgentTuiInputSequenceStep": {
+        "type": "object",
+        "description": "One timed input step replayed into an active terminal agent.",
+        "required": [
+          "delay_before_ms",
+          "input"
+        ],
+        "properties": {
+          "delay_before_ms": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "input": {
+            "$ref": "#/components/schemas/AgentTuiInput"
+          }
+        }
+      },
+      "AgentTuiKey": {
+        "type": "string",
+        "description": "Named keyboard input supported by the headless TUI steering API.",
+        "enum": [
+          "enter",
+          "escape",
+          "tab",
+          "backspace",
+          "arrow_up",
+          "arrow_down",
+          "arrow_right",
+          "arrow_left"
+        ]
+      },
+      "AgentTuiResizeRequest": {
+        "type": "object",
+        "required": [
+          "rows",
+          "cols"
+        ],
+        "properties": {
+          "cols": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "AgentTuiSize": {
+        "type": "object",
+        "required": [
+          "rows",
+          "cols"
+        ],
+        "properties": {
+          "cols": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "AgentTuiSnapshot": {
+        "type": "object",
+        "required": [
+          "tui_id",
+          "session_id",
+          "agent_id",
+          "runtime",
+          "status",
+          "argv",
+          "project_dir",
+          "size",
+          "screen",
+          "transcript_path",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "agent_id": {
+            "type": "string"
+          },
+          "argv": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "exit_code": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "project_dir": {
+            "type": "string"
+          },
+          "runtime": {
+            "type": "string"
+          },
+          "screen": {
+            "$ref": "#/components/schemas/TerminalScreenSnapshot"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "signal": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "size": {
+            "$ref": "#/components/schemas/AgentTuiSize"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AgentTuiStatus"
+          },
+          "transcript_path": {
+            "type": "string"
+          },
+          "tui_id": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        }
+      },
+      "AgentTuiStartRequest": {
+        "type": "object",
+        "required": [
+          "runtime"
+        ],
+        "properties": {
+          "allow_custom_model": {
+            "type": "boolean"
+          },
+          "argv": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "board_item_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cols": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "effort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fallback_role": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SessionRole"
+              }
+            ]
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "persona": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project_dir": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "prompt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role": {
+            "$ref": "#/components/schemas/SessionRole"
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "runtime": {
+            "type": "string"
+          },
+          "task_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workflow_execution_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AgentTuiStatus": {
+        "type": "string",
+        "enum": [
+          "starting",
+          "running",
+          "exited",
+          "failed",
+          "stopped"
+        ]
+      },
       "ArbitrationOutcome": {
         "type": "object",
         "description": "Leader arbitration result for a task that exhausted the three-round\nreview cycle with outstanding disputed points.",
@@ -3159,6 +5971,553 @@
               "null"
             ],
             "description": "Optional summary text the worker attached on submission."
+          }
+        }
+      },
+      "CodexAgentInspectResponse": {
+        "type": "object",
+        "required": [
+          "agents",
+          "daemon_perceived_now",
+          "available"
+        ],
+        "properties": {
+          "agents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CodexAgentInspectSnapshot"
+            }
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "daemon_perceived_now": {
+            "type": "string"
+          },
+          "issue_message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "CodexAgentInspectSnapshot": {
+        "type": "object",
+        "required": [
+          "run_id",
+          "session_id",
+          "display_name",
+          "status",
+          "project_dir",
+          "active",
+          "attached",
+          "pending_approvals",
+          "resolved_approvals",
+          "event_count",
+          "last_update_at"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "agent_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "attached": {
+            "type": "boolean"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "effort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "event_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "last_update_at": {
+            "type": "string"
+          },
+          "latest_summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pending_approvals": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "project_dir": {
+            "type": "string"
+          },
+          "resolved_approvals": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "run_id": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CodexRunStatus"
+          },
+          "thread_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "turn_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "CodexApprovalDecision": {
+        "type": "string",
+        "enum": [
+          "accept",
+          "accept_for_session",
+          "decline",
+          "cancel"
+        ]
+      },
+      "CodexApprovalDecisionRequest": {
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/CodexApprovalDecision"
+          }
+        }
+      },
+      "CodexApprovalRequest": {
+        "type": "object",
+        "required": [
+          "approval_id",
+          "request_id",
+          "kind",
+          "title",
+          "detail"
+        ],
+        "properties": {
+          "approval_id": {
+            "type": "string"
+          },
+          "command": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cwd": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "detail": {
+            "type": "string"
+          },
+          "file_path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "item_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "thread_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "turn_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "CodexResolvedApproval": {
+        "type": "object",
+        "required": [
+          "approval_id",
+          "decision",
+          "resolved_at"
+        ],
+        "properties": {
+          "approval_id": {
+            "type": "string"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/CodexApprovalDecision"
+          },
+          "resolved_at": {
+            "type": "string"
+          }
+        }
+      },
+      "CodexRunEvent": {
+        "type": "object",
+        "required": [
+          "event_id",
+          "sequence",
+          "recorded_at",
+          "kind",
+          "summary",
+          "payload"
+        ],
+        "properties": {
+          "event_id": {
+            "type": "string"
+          },
+          "item_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "object"
+          },
+          "recorded_at": {
+            "type": "string"
+          },
+          "sequence": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "summary": {
+            "type": "string"
+          },
+          "thread_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "turn_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "CodexRunMode": {
+        "type": "string",
+        "enum": [
+          "report",
+          "workspace_write",
+          "approval"
+        ]
+      },
+      "CodexRunRequest": {
+        "type": "object",
+        "required": [
+          "prompt",
+          "mode"
+        ],
+        "properties": {
+          "actor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "allow_custom_model": {
+            "type": "boolean",
+            "description": "When `true`, the `model` field is accepted as-is without catalog\nvalidation and any effort value is forwarded without checking the\nmodel's `effort_values`."
+          },
+          "board_item_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "effort": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional reasoning effort level (e.g. `low`, `medium`, `high`,\n`xhigh`). Forwarded to the codex app-server `turn/start` payload as\n`effort` and ignored when the selected model does not support reasoning."
+          },
+          "fallback_role": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SessionRole"
+              }
+            ]
+          },
+          "mode": {
+            "$ref": "#/components/schemas/CodexRunMode"
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional model identifier validated against the codex catalog. `None`\nmeans use the runtime default selected by the codex app-server."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "persona": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "resume_thread_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role": {
+            "$ref": "#/components/schemas/SessionRole"
+          },
+          "task_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workflow_execution_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "CodexRunSnapshot": {
+        "type": "object",
+        "required": [
+          "run_id",
+          "session_id",
+          "project_dir",
+          "mode",
+          "status",
+          "prompt",
+          "pending_approvals",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "board_item_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "effort": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional reasoning effort forwarded to the codex app-server turn context."
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CodexRunEvent"
+            }
+          },
+          "final_message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "latest_summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mode": {
+            "$ref": "#/components/schemas/CodexRunMode"
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional model identifier passed to the codex app-server for the thread\nand turn context."
+          },
+          "pending_approvals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CodexApprovalRequest"
+            }
+          },
+          "project_dir": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "resolved_approvals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CodexResolvedApproval"
+            }
+          },
+          "run_id": {
+            "type": "string"
+          },
+          "session_agent_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CodexRunStatus"
+          },
+          "task_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "thread_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "turn_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "workflow_execution_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "CodexRunStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "waiting_approval",
+          "completed",
+          "failed",
+          "cancelled"
+        ]
+      },
+      "CodexSteerRequest": {
+        "type": "object",
+        "required": [
+          "prompt"
+        ],
+        "properties": {
+          "prompt": {
+            "type": "string"
+          }
+        }
+      },
+      "CodexTranscriptResponse": {
+        "type": "object",
+        "required": [
+          "entries"
+        ],
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimelineEntry"
+            }
           }
         }
       },
@@ -3782,6 +7141,79 @@
           "codex"
         ]
       },
+      "ManagedAgentListResponse": {
+        "type": "object",
+        "required": [
+          "agents"
+        ],
+        "properties": {
+          "agents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ManagedAgentSnapshotSchema"
+            }
+          }
+        }
+      },
+      "ManagedAgentSnapshotSchema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "snapshot",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "terminal"
+                ]
+              },
+              "snapshot": {
+                "$ref": "#/components/schemas/AgentTuiSnapshot"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "snapshot",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "codex"
+                ]
+              },
+              "snapshot": {
+                "$ref": "#/components/schemas/CodexRunSnapshot"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "snapshot",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "acp"
+                ]
+              },
+              "snapshot": {
+                "$ref": "#/components/schemas/AcpAgentSnapshotSchema"
+              }
+            }
+          }
+        ],
+        "description": "Documented wire shape of [`ManagedAgentSnapshot`]. utoipa cannot override an\nenum variant's inner type, and the `Acp` variant hand-serializes its identity\nfields, so this mirror points that variant at [`AcpAgentSnapshotSchema`]. It\nis referenced from the handlers via `body = ManagedAgentSnapshotSchema`."
+      },
       "ObserveSessionRequest": {
         "type": "object",
         "properties": {
@@ -3972,6 +7404,18 @@
           "resolved_issue_count": {
             "type": "integer",
             "minimum": 0
+          }
+        }
+      },
+      "OkResponse": {
+        "type": "object",
+        "description": "Minimal success envelope for endpoints that acknowledge with `{\"ok\": true}`\nand carry no other payload.",
+        "required": [
+          "ok"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean"
           }
         }
       },
@@ -5432,6 +8876,41 @@
           },
           "status": {
             "$ref": "#/components/schemas/TaskStatus"
+          }
+        }
+      },
+      "TerminalScreenSnapshot": {
+        "type": "object",
+        "required": [
+          "rows",
+          "cols",
+          "cursor_row",
+          "cursor_col",
+          "text"
+        ],
+        "properties": {
+          "cols": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "cursor_col": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "cursor_row": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "text": {
+            "type": "string"
           }
         }
       },

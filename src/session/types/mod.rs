@@ -22,6 +22,8 @@ pub use agents::{
     AgentPersona, AgentRegistration, AgentRegistrationWire, AgentStatus, ManagedAgentKind,
     ManagedAgentRef, PendingLeaderTransfer, PersonaSymbol, SessionRole,
 };
+#[cfg(feature = "openapi")]
+pub use agents::AgentStatusSchema;
 pub use events::{SessionLogEntry, SessionSignalRecord, SessionSignalStatus, SessionTransition};
 pub use identity::{
     AgentDescriptorId, HarnessSessionId, ManagedAgentId, RuntimeSessionId, SessionAgentId,

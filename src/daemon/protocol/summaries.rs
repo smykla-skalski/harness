@@ -428,6 +428,7 @@ pub struct TimelineWindowResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AcpTranscriptResponse {
     pub entries: Vec<TimelineEntry>,
 }

@@ -50,6 +50,13 @@ pub struct SessionAdHocError {
     pub error: String,
 }
 
+/// Minimal success envelope for endpoints that acknowledge with `{"ok": true}`
+/// and carry no other payload.
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct OkResponse {
+    pub ok: bool,
+}
+
 #[derive(utoipa::OpenApi)]
 #[openapi(
     info(
@@ -57,7 +64,7 @@ pub struct SessionAdHocError {
         description = "REST API served by the Harness daemon (harness-daemon). The API is dual-transport: most endpoints mirror a WebSocket JSON-RPC method, recorded per operation as the `x-websocket-method` extension. Generated from annotated handlers - do not edit docs/api/openapi.json by hand; regenerate with `mise run openapi:generate`.",
         license(name = "MIT")
     ),
-    components(schemas(DaemonErrorBody, DaemonErrorDetail))
+    components(schemas(DaemonErrorBody, DaemonErrorDetail, OkResponse))
 )]
 struct HarnessDaemonApi;
 
@@ -114,6 +121,34 @@ struct SessionsApi;
 ))]
 struct TasksAgentsApi;
 
+#[derive(utoipa::OpenApi)]
+#[openapi(paths(
+    super::managed_agents::reads::get_managed_agents,
+    super::managed_agents::reads::get_managed_agent,
+    super::managed_agents::mutations::post_terminal_agent_start,
+    super::managed_agents::mutations::post_codex_agent_start,
+    super::managed_agents::acp_start::post_acp_agent_start,
+    super::managed_agents::acp_delete::delete_acp_agent,
+    super::managed_agents::mutations::post_terminal_agent_input,
+    super::managed_agents::mutations::post_terminal_agent_resize,
+    super::managed_agents::mutations::post_terminal_agent_stop,
+    super::managed_agents::mutations::post_terminal_agent_ready,
+    super::managed_agents::mutations::post_codex_agent_steer,
+    super::managed_agents::mutations::post_codex_agent_interrupt,
+    super::managed_agents::mutations::post_codex_agent_approval,
+    super::managed_agents::mutations_acp::post_acp_permission,
+    super::managed_agents::mutations_acp::post_acp_agent_prompt,
+    super::managed_agents::mutations_acp::post_acp_agent_logout,
+    super::managed_agents::acp_sessions::get_acp_sessions,
+    super::managed_agents::acp_sessions::delete_acp_session,
+    super::managed_agents::acp_sessions::post_acp_session_close,
+    super::managed_agents::codex_inspect::get_codex_inspect,
+    super::managed_agents::codex_transcript::get_codex_transcript,
+    super::managed_agents::acp_inspect::get_acp_inspect,
+    super::managed_agents::acp_transcript::get_acp_transcript,
+))]
+struct ManagedAgentsApi;
+
 /// Build the typed `OpenAPI` document from every domain aggregator.
 ///
 /// Aggregators merge in registration order; component schemas deduplicate by
@@ -125,6 +160,7 @@ pub fn openapi_document() -> utoipa::openapi::OpenApi {
     doc.merge(CoreApi::openapi());
     doc.merge(SessionsApi::openapi());
     doc.merge(TasksAgentsApi::openapi());
+    doc.merge(ManagedAgentsApi::openapi());
     env!("CARGO_PKG_VERSION").clone_into(&mut doc.info.version);
     doc
 }

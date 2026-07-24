@@ -6,6 +6,7 @@ use super::input::AgentTuiInput;
 
 /// One timed input step replayed into an active terminal agent.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AgentTuiInputSequenceStep {
     pub delay_before_ms: u64,
     pub input: AgentTuiInput,
@@ -13,6 +14,7 @@ pub struct AgentTuiInputSequenceStep {
 
 /// Ordered keyboard-like input replayed into an active terminal agent.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AgentTuiInputSequence {
     pub steps: Vec<AgentTuiInputSequenceStep>,
 }
@@ -130,4 +132,17 @@ impl From<AgentTuiInputRequest> for RawAgentTuiInputRequest {
             sequence: request.sequence,
         }
     }
+}
+
+/// Documented wire shape of [`AgentTuiInputRequest`], which hand-rolls its serde
+/// through `RawAgentTuiInputRequest`. Exactly one of `input` or `sequence` is
+/// accepted; the validation lives in the handler, so the schema documents both
+/// as optional.
+#[cfg(feature = "openapi")]
+#[derive(serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+pub struct AgentTuiInputRequestSchema {
+    #[serde(default)]
+    pub input: Option<AgentTuiInput>,
+    #[serde(default)]
+    pub sequence: Option<AgentTuiInputSequence>,
 }
