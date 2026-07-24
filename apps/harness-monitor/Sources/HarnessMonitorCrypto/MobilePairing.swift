@@ -2,7 +2,7 @@ import CryptoKit
 import Foundation
 import HarnessMonitorCore
 
-public enum MobilePairingError: Error, Equatable, Sendable {
+public enum MobilePairingError: Error, LocalizedError, Equatable, Sendable {
   case unsupportedURL(String)
   case missingPayload
   case invalidPayload
@@ -13,6 +13,37 @@ public enum MobilePairingError: Error, Equatable, Sendable {
   case stationFingerprintMismatch(expected: String, actual: String)
   case invalidDeviceAgreementKey
   case invalidStationAgreementKey
+
+  public var errorDescription: String? {
+    switch self {
+    case .unsupportedURL:
+      "This is not a recognized Harness pairing link. Check that you copied the "
+        + "whole link, then try again."
+    case .missingPayload:
+      "The pairing link is missing its payload. Create a new pairing link and try again."
+    case .invalidPayload:
+      "The pairing link's payload is unreadable or ambiguous. Create a new pairing "
+        + "link and try again."
+    case .expired:
+      "This pairing link has expired. Create a new pairing link and try again."
+    case .unsupportedEndpointScheme:
+      "The pairing link points to an unsupported address. Create a new pairing "
+        + "link and try again."
+    case .stationMismatch:
+      "The station responded with a different identity than the link expected. "
+        + "Create a new pairing link and try again."
+    case .nonceMismatch:
+      "The station's response did not match this pairing link. Create a new "
+        + "pairing link and try again."
+    case .stationFingerprintMismatch:
+      "The station's identity did not match the pairing link. Do not continue; "
+        + "create a new pairing link and try again."
+    case .invalidDeviceAgreementKey:
+      "This device's pairing key is invalid. Restart the app, then try again."
+    case .invalidStationAgreementKey:
+      "The station's pairing key is invalid. Create a new pairing link and try again."
+    }
+  }
 }
 
 public enum MobilePairingInvitationCodec {

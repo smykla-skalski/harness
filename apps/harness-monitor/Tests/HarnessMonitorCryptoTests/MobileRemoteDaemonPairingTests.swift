@@ -97,6 +97,23 @@ final class MobileRemoteDaemonPairingTests: XCTestCase {
     XCTAssertFalse(MobilePairingLink.isRemotePairingLink(remoteOnRoute))
   }
 
+  func testAmbiguousPayloadRejectionSurfacesReadableMessage() throws {
+    let ambiguous = try payloadURL(object: [
+      "server_spki_sha256": testSPKIPin,
+      "publicKeyFingerprint": "00:11:22:33:44:55:66:77",
+    ])
+
+    XCTAssertThrowsError(try MobilePairingLink.decode(ambiguous)) { error in
+      let message = mobileMirrorReadableErrorDescription(error)
+      XCTAssertTrue(
+        message.contains("recognized Harness pairing link"),
+        "expected a clear rejection message, got: \(message)"
+      )
+      XCTAssertFalse(message.localizedCaseInsensitiveContains("couldn’t be completed"))
+      XCTAssertFalse(message.localizedCaseInsensitiveContains("couldn't be completed"))
+    }
+  }
+
   func testManualPayloadNormalizesRemoteAndRelayInvitations() throws {
     let now = Date(timeIntervalSince1970: 1_752_124_400)
     let remoteURL = try remoteInvitationURL(now: now)
