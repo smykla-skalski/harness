@@ -35,7 +35,7 @@ placeholder.
 
 Eleven routes are exempt. All were reviewed and judged sound.
 
-### Structural (6)
+### Structural (5)
 
 | Method | Path | Why it has no RPC form |
 | --- | --- | --- |
@@ -50,7 +50,7 @@ subscription primitives `stream.subscribe` / `session.subscribe` are the
 WebSocket equivalents and are intentionally socket-only, listed in
 `WS_ONLY_METHODS`.)
 
-### Standing decision (5)
+### Standing decision (6)
 
 | Method | Path | Durable reason to stay HTTP-only |
 | --- | --- | --- |
@@ -58,7 +58,8 @@ WebSocket equivalents and are intentionally socket-only, listed in
 | POST | `/v1/remote/pair/claim` | Pre-auth pairing claim that mints the first credential; cannot ride the authenticated RPC channel it bootstraps. |
 | POST | `/v1/remote/pair/status` | Pre-auth pairing lifecycle check; part of the bootstrap that precedes the authenticated RPC channel. |
 | POST | `/v1/remote/clients/self/revoke` | Self-revoke destroys the caller's own credential; kept a one-shot HTTP action rather than a method on the RPC session it would invalidate mid-call. |
-| POST | `/v1/policies/dump` and `/v1/policies/import` | Bulk policy transfer is a CLI administrative operation kept off the interactive RPC surface. |
+| POST | `/v1/policies/dump` | Bulk policy export is a CLI administrative transfer kept off the interactive RPC surface. |
+| POST | `/v1/policies/import` | Bulk policy import is a CLI administrative transfer kept off the interactive RPC surface. |
 
 ## Gaps closed by this audit
 
