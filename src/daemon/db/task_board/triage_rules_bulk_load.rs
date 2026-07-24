@@ -53,10 +53,11 @@ struct CurrentDecisionRow {
 }
 
 /// Load every live Backlog/Todo item -- the full domain `triage_eligible`
-/// callers further filter (dispatchable kind, unlinked) -- in exactly two
-/// queries (items, then their external refs), regardless of how many items
-/// match. Used by rule-set activation's bulk reevaluation and by preview,
-/// neither of which may resolve its item set through N per-item reads.
+/// callers further filter (dispatchable kind, unlinked) -- in a fixed number
+/// of bulk queries (items, their external refs, and their current decisions)
+/// regardless of how many items match. Used by rule-set activation's bulk
+/// reevaluation and by preview, neither of which may resolve its item set
+/// through N per-item reads.
 pub(super) async fn load_triage_bulk_entries_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
 ) -> Result<Vec<TriageBulkEntry>, CliError> {

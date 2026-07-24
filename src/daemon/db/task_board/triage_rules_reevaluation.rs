@@ -23,7 +23,7 @@ use crate::task_board::{
 /// Bulk-reevaluate every triage-eligible item against whichever evaluator
 /// activation just made current, inside the caller's activation
 /// transaction. Loads the eligible item set and the active-reservation id
-/// set in exactly two round trips total (see [`load_triage_bulk_entries_in_tx`]
+/// set with a fixed set of bulk queries (see [`load_triage_bulk_entries_in_tx`]
 /// and [`load_active_dispatch_reservation_item_ids_in_tx`]) and never
 /// re-reads an item individually; only items whose decision, placement, or
 /// priority actually changes get an item-row write, so an activation that
