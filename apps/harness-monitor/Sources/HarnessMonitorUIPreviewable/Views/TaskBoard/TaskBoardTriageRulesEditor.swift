@@ -76,15 +76,30 @@ struct TaskBoardTriageRulesEditor: View {
     HStack {
       Button("Load") { actions.load() }
         .disabled(state.isBusy)
+        .harnessActionButtonStyle(variant: .bordered)
+        .harnessNativeFormControl()
+        .controlSize(HarnessMonitorControlMetrics.compactControlSize)
       Button("Preview") { actions.preview() }
         .disabled(state.isBusy)
+        .harnessActionButtonStyle(variant: .bordered)
+        .harnessNativeFormControl()
+        .controlSize(HarnessMonitorControlMetrics.compactControlSize)
       if actions.isWriteAuthorized {
         Button("Save Draft") { actions.saveDraft() }
           .disabled(state.isBusy)
+          .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
+          .harnessNativeFormControl()
+          .controlSize(HarnessMonitorControlMetrics.compactControlSize)
         Button("Activate") { actions.activate() }
           .disabled(state.isBusy)
+          .harnessActionButtonStyle(variant: .prominent, tint: HarnessMonitorTheme.accent)
+          .harnessNativeFormControl()
+          .controlSize(HarnessMonitorControlMetrics.compactControlSize)
         Button("Deactivate") { actions.deactivate() }
           .disabled(state.isBusy || state.activeRevision == nil)
+          .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.caution)
+          .harnessNativeFormControl()
+          .controlSize(HarnessMonitorControlMetrics.compactControlSize)
       } else {
         Text("Remote viewer access is read-only")
           .font(.caption)
