@@ -131,6 +131,40 @@ struct RemoteDaemonPairingInvitationTests {
     #expect(!RemoteDaemonPairingInvitation.isRemotePairingLink(junkOnPair))
   }
 
+  @Test("Handles any legacy remote-pair link as a pairing attempt, even a corrupt one")
+  func handlesLegacyRemotePairAsPairingAttempt() throws {
+    let validLegacy = try invitationURL(
+      endpoint: "https://daemon.example.com",
+      expiresAt: "2026-07-10T04:10:00Z",
+      host: "remote-pair"
+    )
+    let corruptLegacy = try #require(URL(string: "harness://remote-pair?payload=not-a-payload"))
+
+    #expect(RemoteDaemonPairingInvitation.isRemotePairingDeepLink(validLegacy))
+    #expect(RemoteDaemonPairingInvitation.isRemotePairingDeepLink(corruptLegacy))
+  }
+
+  @Test("Handles the shared pair host as a pairing attempt only for remote payloads")
+  func handlesSharedPairHostByPayload() throws {
+    let remoteOnPair = try invitationURL(
+      endpoint: "https://daemon.example.com",
+      expiresAt: "2026-07-10T04:10:00Z"
+    )
+    let relayOnPair = try payloadURL(
+      object: [
+        "stationID": "station-mac-studio",
+        "publicKeyFingerprint": "00:11:22:33:44:55:66:77",
+        "nonce": "pairing-nonce",
+      ],
+      host: "pair"
+    )
+    let reviewsRoute = try #require(URL(string: "harness://reviews/octo/repo/1"))
+
+    #expect(RemoteDaemonPairingInvitation.isRemotePairingDeepLink(remoteOnPair))
+    #expect(!RemoteDaemonPairingInvitation.isRemotePairingDeepLink(relayOnPair))
+    #expect(!RemoteDaemonPairingInvitation.isRemotePairingDeepLink(reviewsRoute))
+  }
+
   @Test("Rejects non-HTTPS endpoints")
   func rejectsNonHTTPSEndpoint() throws {
     let now = try #require(ISO8601DateFormatter().date(from: "2026-07-10T04:00:00Z"))

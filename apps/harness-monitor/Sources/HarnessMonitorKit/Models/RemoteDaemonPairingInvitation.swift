@@ -139,6 +139,23 @@ public struct RemoteDaemonPairingInvitation: Codable, Equatable, Sendable {
     return object["server_spki_sha256"] != nil && object["publicKeyFingerprint"] == nil
   }
 
+  /// True when the macOS deep-link handler should treat `url` as a remote-daemon
+  /// pairing attempt — showing the confirmation sheet or a clear pairing error —
+  /// rather than routing it for navigation. The legacy `remote-pair` host only
+  /// ever carried remote-daemon invitations, so any link on it qualifies and a
+  /// corrupt legacy link still surfaces a clear error instead of being silently
+  /// ignored. On the shared `pair` host the payload decides via
+  /// `isRemotePairingLink`, so a relay invitation is left for the router.
+  public static func isRemotePairingDeepLink(_ url: URL) -> Bool {
+    guard url.scheme?.lowercased() == "harness" else {
+      return false
+    }
+    if url.host?.lowercased() == "remote-pair" {
+      return true
+    }
+    return isRemotePairingLink(url)
+  }
+
   private static func payloadObject(from url: URL) -> [String: Any]? {
     let payloads =
       URLComponents(url: url, resolvingAgainstBaseURL: false)?
