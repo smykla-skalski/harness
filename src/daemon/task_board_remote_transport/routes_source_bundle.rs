@@ -7,7 +7,21 @@ use super::routes_support::{assignment_route, map_route_result, wire_error};
 use super::wire::{RemoteSourceBundleAbandonRequest, RemoteSourceBundleUploadRequest};
 use crate::daemon::db::utc_now;
 use crate::daemon::http::DaemonHttpState;
+#[cfg(feature = "openapi")]
+use crate::daemon::http::openapi::DaemonErrorBody;
+#[cfg(feature = "openapi")]
+use super::wire::{RemoteSourceBundleAbandonResponse, RemoteSourceBundleReceiptVerificationResponse};
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/task-board-execution/source-bundles/receipt",
+    tag = "task-board-execution",
+    request_body = RemoteSourceBundleUploadRequest,
+    responses(
+        (status = 200, description = "Verification of the stored source-bundle receipt", body = RemoteSourceBundleReceiptVerificationResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn verify_source_bundle_receipt(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -35,6 +49,16 @@ pub(super) async fn verify_source_bundle_receipt(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/task-board-execution/source-bundles/abandon",
+    tag = "task-board-execution",
+    request_body = RemoteSourceBundleAbandonRequest,
+    responses(
+        (status = 200, description = "Abandonment record for the source bundle", body = RemoteSourceBundleAbandonResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn abandon_source_bundle(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,

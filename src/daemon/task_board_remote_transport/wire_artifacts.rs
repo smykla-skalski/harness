@@ -12,6 +12,7 @@ const MAX_ARTIFACT_PATH_BYTES: usize = 512;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemoteArtifactEntry {
     pub(crate) relative_path: String,
     pub(crate) sha256: String,
@@ -21,6 +22,7 @@ pub(crate) struct RemoteArtifactEntry {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemoteArtifactManifest {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) entries: Vec<RemoteArtifactEntry>,

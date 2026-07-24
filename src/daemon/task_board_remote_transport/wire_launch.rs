@@ -13,6 +13,7 @@ const MAX_LAUNCH_TEXT_BYTES: usize = 1_024;
 /// Private, path-free Codex launch contract sealed into one remote offer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemoteCodexLaunchEnvelope {
     pub(crate) schema_version: u32,
     pub(crate) runtime: String,

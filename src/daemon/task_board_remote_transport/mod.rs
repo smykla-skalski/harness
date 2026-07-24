@@ -18,7 +18,7 @@ mod controller_trust;
 pub(crate) mod credentials;
 pub(crate) mod routes;
 pub(crate) mod routes_cleanup;
-mod routes_source_bundle;
+pub(crate) mod routes_source_bundle;
 mod routes_status;
 mod routes_support;
 pub(crate) mod tls_pin;

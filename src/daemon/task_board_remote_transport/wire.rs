@@ -108,6 +108,7 @@ impl Error for RemoteWireError {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemoteAttemptBinding {
     pub(crate) assignment_id: String,
     pub(crate) execution_id: String,
@@ -198,6 +199,7 @@ fn valid_revision(value: &str) -> bool {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemoteOfferRequest {
     pub(crate) schema_version: u32,
     pub(crate) binding: RemoteAttemptBinding,
@@ -211,6 +213,7 @@ pub(crate) struct RemoteOfferRequest {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) enum RemoteOfferDisposition {
     Accepted,
     Rejected,
@@ -218,6 +221,7 @@ pub(crate) enum RemoteOfferDisposition {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemoteLease {
     pub(crate) lease_id: String,
     pub(crate) expires_at: String,
@@ -225,6 +229,7 @@ pub(crate) struct RemoteLease {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemoteOfferResponse {
     pub(crate) schema_version: u32,
     pub(crate) binding: RemoteAttemptBinding,
@@ -238,6 +243,7 @@ pub(crate) struct RemoteOfferResponse {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemoteClaimRequest {
     pub(crate) schema_version: u32,
     pub(crate) binding: RemoteAttemptBinding,
@@ -248,6 +254,7 @@ pub(crate) struct RemoteClaimRequest {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemoteClaimResponse {
     pub(crate) schema_version: u32,
     pub(crate) binding: RemoteAttemptBinding,
@@ -258,6 +265,7 @@ pub(crate) struct RemoteClaimResponse {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemoteLeaseRenewRequest {
     pub(crate) schema_version: u32,
     pub(crate) binding: RemoteAttemptBinding,
@@ -269,6 +277,7 @@ pub(crate) struct RemoteLeaseRenewRequest {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemoteLeaseRenewResponse {
     pub(crate) schema_version: u32,
     pub(crate) binding: RemoteAttemptBinding,
@@ -278,6 +287,7 @@ pub(crate) struct RemoteLeaseRenewResponse {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemoteStatusRequest {
     pub(crate) schema_version: u32,
     pub(crate) binding: RemoteAttemptBinding,
@@ -288,6 +298,7 @@ pub(crate) struct RemoteStatusRequest {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) enum RemoteAssignmentWireState {
     Offered,
     Claimed,
@@ -301,6 +312,7 @@ pub(crate) enum RemoteAssignmentWireState {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub(crate) struct RemoteStatusResponse {
     pub(crate) schema_version: u32,
     pub(crate) binding: RemoteAttemptBinding,

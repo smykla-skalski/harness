@@ -11,6 +11,7 @@ use crate::task_board::{
 pub const MAX_TASK_BOARD_REVIEW_REVISION_CYCLES: u32 = 3;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TaskBoardReviewerOutcome {
     pub profile_id: String,
     pub result: TaskBoardReviewResult,

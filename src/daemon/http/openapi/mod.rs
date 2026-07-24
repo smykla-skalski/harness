@@ -17,6 +17,12 @@ use crate::daemon::protocol::{HTTP_API_CONTRACT, HttpRouteMethod};
 
 mod policy_api;
 mod task_board_api;
+mod task_board_execution_api;
+
+/// Route recogniser for the remote-execution transport, surfaced here (only
+/// under the `openapi` feature) so the contract test can accept documented
+/// transport routes while the transport module stays `pub(crate)`.
+pub use crate::daemon::task_board_remote_transport::routes::execution_operation;
 
 /// Error envelope returned by daemon handlers on failure.
 ///
@@ -202,6 +208,7 @@ pub fn openapi_document() -> utoipa::openapi::OpenApi {
     doc.merge(ManagedAgentsApi::openapi());
     doc.merge(ReviewsApi::openapi());
     doc.merge(task_board_api::TaskBoardApi::openapi());
+    doc.merge(task_board_execution_api::TaskBoardExecutionApi::openapi());
     doc.merge(policy_api::PolicyApi::openapi());
     env!("CARGO_PKG_VERSION").clone_into(&mut doc.info.version);
     doc
