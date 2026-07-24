@@ -29,18 +29,18 @@ url = "https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9
 url_api = "https://api.github.com/repos/nextest-rs/nextest/releases/assets/467468113"
 
 [[tools.ripgrep]]
-version = "15.1.0"
+version = "15.2.0"
 backend = "aqua:BurntSushi/ripgrep"
 
 [tools.ripgrep."platforms.linux-x64"]
-checksum = "sha256:1c9297be4a084eea7ecaedf93eb03d058d6faae29bbc57ecdaf5063921491599"
-url = "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-x86_64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/BurntSushi/ripgrep/releases/assets/307306614"
+checksum = "sha256:33e15bcf1624b25cdd2a55813a47a2f95dbe126268203e76aa6a585d1e7b149c"
+url = "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/BurntSushi/ripgrep/releases/assets/478120097"
 
 [tools.ripgrep."platforms.macos-arm64"]
-checksum = "sha256:378e973289176ca0c6054054ee7f631a065874a352bf43f0fa60ef079b6ba715"
-url = "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-aarch64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/BurntSushi/ripgrep/releases/assets/307305438"
+checksum = "sha256:3750b2e93f37e0c692657da574d7019a101c0084da05a790c83fd335bad973e4"
+url = "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/BurntSushi/ripgrep/releases/assets/478118851"
 
 [[tools.rust]]
 version = "nightly-2026-05-19"
