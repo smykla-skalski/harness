@@ -24,6 +24,7 @@ struct TaskBoardTriageRulesEditor: View {
           )
           .disabled(!actions.isWriteAuthorized)
           .accessibilityIdentifier("harness.task-board.triage-rules.editor")
+          .accessibilityLabel("Triage rules JSON")
         controlRow
         if let validation = state.validation, !validation.issues.isEmpty {
           validationIssuesList(validation.issues)
