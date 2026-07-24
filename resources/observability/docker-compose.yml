@@ -148,7 +148,7 @@ services:
       - "127.0.0.1:4040:4040"
 
   grafana:
-    image: grafana/grafana:13.0.1@sha256:0f86bada30d65ef9d0183b90c1e2682ac92d53d95da8bed322b984ea78a4a73a
+    image: grafana/grafana:13.1.1@sha256:7cb8c64c4d57a57e734073f3cc94620adb24a0acb929bd80ba9f14017e3a975b
     user: "0"
     restart: unless-stopped
     environment:
