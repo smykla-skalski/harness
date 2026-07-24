@@ -3,9 +3,10 @@ use std::time::Instant;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum::routing::post;
-use axum::{Json, Router};
+use axum::Json;
 use serde::Serialize;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
 use uuid::Uuid;
 
 use crate::daemon::protocol::http_paths;
@@ -21,11 +22,8 @@ use super::{DaemonHttpState, authenticated_remote_client, require_async_db};
 
 use super::openapi::DaemonErrorBody;
 
-pub(super) fn remote_client_routes() -> Router<DaemonHttpState> {
-    Router::new().route(
-        http_paths::REMOTE_CLIENT_SELF_REVOKE,
-        post(post_remote_client_self_revoke),
-    )
+pub(super) fn remote_client_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new().routes(routes!(post_remote_client_self_revoke))
 }
 
 #[derive(Debug, Serialize)]

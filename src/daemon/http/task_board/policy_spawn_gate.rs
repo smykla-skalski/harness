@@ -3,11 +3,10 @@
 //! `policy.rs` to keep each file under the source-length cap.
 
 use axum::Json;
-use axum::Router;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::routing::{get, post};
+use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{
     PolicyApprovalGrantResolveRequest, PolicyApprovalGrantRevokeRequest,
@@ -25,29 +24,14 @@ use super::super::{DaemonHttpState, require_async_db, task_board_route_executor}
 use super::authenticated_request;
 
 pub(super) fn merge_policy_spawn_gate_routes(
-    router: Router<DaemonHttpState>,
-) -> Router<DaemonHttpState> {
+    router: OpenApiRouter<DaemonHttpState>,
+) -> OpenApiRouter<DaemonHttpState> {
     router
-        .route(
-            http_paths::POLICY_CANVASES_SPAWN_REQUIRES_LIVE_POLICY,
-            post(post_policy_canvas_set_spawn_requires_live_policy),
-        )
-        .route(
-            http_paths::POLICY_CANVASES_SPAWN_KILL_SWITCH,
-            post(post_policy_canvas_set_spawn_kill_switch),
-        )
-        .route(
-            http_paths::POLICY_APPROVAL_GRANTS,
-            get(get_policy_approval_grants),
-        )
-        .route(
-            http_paths::POLICY_APPROVAL_GRANT_RESOLVE,
-            post(post_policy_approval_grant_resolve),
-        )
-        .route(
-            http_paths::POLICY_APPROVAL_GRANT_REVOKE,
-            post(post_policy_approval_grant_revoke),
-        )
+        .routes(routes!(post_policy_canvas_set_spawn_requires_live_policy))
+        .routes(routes!(post_policy_canvas_set_spawn_kill_switch))
+        .routes(routes!(get_policy_approval_grants))
+        .routes(routes!(post_policy_approval_grant_resolve))
+        .routes(routes!(post_policy_approval_grant_revoke))
 }
 
 #[utoipa::path(

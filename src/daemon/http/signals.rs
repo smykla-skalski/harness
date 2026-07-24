@@ -3,8 +3,9 @@ use std::time::Instant;
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::routing::post;
-use axum::{Json, Router};
+use axum::Json;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
 
 use crate::daemon::protocol::{
     SessionDetail, SignalAckRequest, SignalCancelRequest, SignalSendRequest, http_paths,
@@ -18,11 +19,11 @@ use super::response::{extract_request_id, timed_json};
 
 use super::openapi::{DaemonErrorBody, OkResponse};
 
-pub(super) fn signal_routes() -> Router<DaemonHttpState> {
-    Router::new()
-        .route(http_paths::SESSION_SIGNAL_SEND, post(post_send_signal))
-        .route(http_paths::SESSION_SIGNAL_CANCEL, post(post_cancel_signal))
-        .route(http_paths::SESSION_SIGNAL_ACK, post(post_signal_ack))
+pub(super) fn signal_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
+        .routes(routes!(post_send_signal))
+        .routes(routes!(post_cancel_signal))
+        .routes(routes!(post_signal_ack))
 }
 
 #[utoipa::path(

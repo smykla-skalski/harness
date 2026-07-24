@@ -1,9 +1,8 @@
 use axum::Json;
-use axum::Router;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::routing::{get, post};
+use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{
     PolicyCanvasCreateRequest, PolicyCanvasDeleteRequest, PolicyCanvasDuplicateRequest,
@@ -18,52 +17,21 @@ use super::super::response::timed_json;
 use super::super::{DaemonHttpState, require_async_db, task_board_route_executor};
 use super::authenticated_request;
 
-pub(super) fn merge_policy_routes(router: Router<DaemonHttpState>) -> Router<DaemonHttpState> {
+pub(super) fn merge_policy_routes(
+    router: OpenApiRouter<DaemonHttpState>,
+) -> OpenApiRouter<DaemonHttpState> {
     router
-        .route(
-            http_paths::POLICY_CANVASES,
-            get(get_policy_canvas_workspace),
-        )
-        .route(
-            http_paths::POLICY_CANVASES_CREATE,
-            post(post_policy_canvas_create),
-        )
-        .route(
-            http_paths::POLICY_CANVASES_DUPLICATE,
-            post(post_policy_canvas_duplicate),
-        )
-        .route(
-            http_paths::POLICY_CANVASES_RENAME,
-            post(post_policy_canvas_rename),
-        )
-        .route(
-            http_paths::POLICY_CANVASES_ACTIVE,
-            post(post_policy_canvas_set_active),
-        )
-        .route(
-            http_paths::POLICY_CANVASES_DELETE,
-            post(post_policy_canvas_delete),
-        )
-        .route(
-            http_paths::POLICY_CANVASES_GLOBAL_ENFORCEMENT,
-            post(post_policy_canvas_set_global_enforcement),
-        )
-        .route(
-            http_paths::POLICY_SCENARIOS_CREATE,
-            post(post_policy_scenario_create),
-        )
-        .route(
-            http_paths::POLICY_SCENARIOS_UPDATE,
-            post(post_policy_scenario_update),
-        )
-        .route(
-            http_paths::POLICY_SCENARIOS_DELETE,
-            post(post_policy_scenario_delete),
-        )
-        .route(
-            http_paths::POLICY_SCENARIOS_RESET,
-            post(post_policy_scenario_reset),
-        )
+        .routes(routes!(get_policy_canvas_workspace))
+        .routes(routes!(post_policy_canvas_create))
+        .routes(routes!(post_policy_canvas_duplicate))
+        .routes(routes!(post_policy_canvas_rename))
+        .routes(routes!(post_policy_canvas_set_active))
+        .routes(routes!(post_policy_canvas_delete))
+        .routes(routes!(post_policy_canvas_set_global_enforcement))
+        .routes(routes!(post_policy_scenario_create))
+        .routes(routes!(post_policy_scenario_update))
+        .routes(routes!(post_policy_scenario_delete))
+        .routes(routes!(post_policy_scenario_reset))
 }
 
 #[utoipa::path(

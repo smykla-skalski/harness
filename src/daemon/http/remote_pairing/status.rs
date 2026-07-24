@@ -3,9 +3,10 @@ use std::time::Instant;
 use axum::extract::{ConnectInfo, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum::routing::post;
-use axum::{Json, Router};
+use axum::Json;
 use serde::{Deserialize, Serialize};
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
 use uuid::Uuid;
 
 use crate::daemon::db::DaemonDb;
@@ -28,11 +29,8 @@ const ROUTE_REMOTE_PAIR_STATUS_RATE_LIMIT: &str = "remote.pair.status.rate_limit
 const UNAVAILABLE_DETAIL: &str = "remote pairing status unavailable";
 const RATE_LIMIT_DETAIL: &str = "remote pairing status attempts are rate limited";
 
-pub(super) fn remote_pairing_status_routes() -> Router<DaemonHttpState> {
-    Router::new().route(
-        http_paths::REMOTE_PAIR_STATUS,
-        post(post_remote_pair_status),
-    )
+pub(super) fn remote_pairing_status_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new().routes(routes!(post_remote_pair_status))
 }
 
 #[derive(Debug, Deserialize)]

@@ -1,10 +1,10 @@
 use std::time::Instant;
 
-use axum::Router;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::routing::get;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
 
 use crate::daemon::protocol::http_paths;
 use crate::daemon::service;
@@ -16,8 +16,8 @@ use super::response::{extract_request_id, timed_json};
 use super::openapi::DaemonErrorBody;
 use crate::daemon::protocol::OpenRouterModelCatalogResponse;
 
-pub(super) fn openrouter_model_routes() -> Router<DaemonHttpState> {
-    Router::new().route(http_paths::OPENROUTER_MODELS, get(get_openrouter_models))
+pub(super) fn openrouter_model_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new().routes(routes!(get_openrouter_models))
 }
 
 #[utoipa::path(

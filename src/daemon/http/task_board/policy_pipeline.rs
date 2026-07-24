@@ -1,9 +1,8 @@
 use axum::Json;
-use axum::Router;
 use axum::extract::{Query, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::routing::{get, post};
+use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{
     PolicyPipelineAuditRequest, PolicyPipelineGetRequest, PolicyPipelineGoLiveDiffRequest,
@@ -22,22 +21,16 @@ use super::super::{DaemonHttpState, require_async_db, task_board_route_executor}
 use super::authenticated_request;
 
 pub(super) fn merge_policy_pipeline_routes(
-    router: Router<DaemonHttpState>,
-) -> Router<DaemonHttpState> {
+    router: OpenApiRouter<DaemonHttpState>,
+) -> OpenApiRouter<DaemonHttpState> {
     router
-        .route(
-            http_paths::POLICY_PIPELINE,
-            get(get_policy_pipeline).put(put_policy_pipeline_draft),
-        )
-        .route(http_paths::POLICY_SIMULATE, post(post_policy_simulate))
-        .route(http_paths::POLICY_PROMOTE, post(post_policy_promote))
-        .route(http_paths::POLICY_MAKE_LIVE, post(post_policy_make_live))
-        .route(
-            http_paths::POLICY_GO_LIVE_DIFF,
-            post(post_policy_go_live_diff),
-        )
-        .route(http_paths::POLICY_REPLAY, post(post_policy_replay))
-        .route(http_paths::POLICY_AUDIT, get(get_policy_audit))
+        .routes(routes!(get_policy_pipeline, put_policy_pipeline_draft))
+        .routes(routes!(post_policy_simulate))
+        .routes(routes!(post_policy_promote))
+        .routes(routes!(post_policy_make_live))
+        .routes(routes!(post_policy_go_live_diff))
+        .routes(routes!(post_policy_replay))
+        .routes(routes!(get_policy_audit))
 }
 
 #[utoipa::path(

@@ -3,8 +3,10 @@ use std::time::Instant;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::routing::{get, post};
-use axum::{Json, Router};
+use axum::Json;
+use axum::routing::get;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
 
 use axum::extract::Query;
 
@@ -29,36 +31,26 @@ use crate::daemon::protocol::{
     HealthResponse, LogLevelResponse, ProjectSummary, WsConfigPayload,
 };
 
-use super::audit::get_audit_events;
 use super::auth::{authenticated_remote_client, require_auth};
 use super::response::{extract_request_id, timed_json};
 use super::stream::stream_global;
 use super::{DaemonHttpState, require_async_db};
 
-pub(super) fn core_routes() -> Router<DaemonHttpState> {
-    Router::new()
-        .route(http_paths::HEALTH, get(get_health))
-        .route(http_paths::READY, get(get_ready))
-        .route(http_paths::DIAGNOSTICS, get(get_diagnostics))
-        .route(http_paths::GITHUB_STATUS, get(get_github_status))
-        .route(http_paths::AUDIT_EVENTS, get(get_audit_events))
-        .route(http_paths::DAEMON_TELEMETRY, post(post_daemon_telemetry))
-        .route(http_paths::CONFIG, get(get_config))
-        .route(http_paths::DAEMON_STOP, post(post_stop_daemon))
-        .route(
-            http_paths::BRIDGE_RECONFIGURE,
-            post(post_bridge_reconfigure),
-        )
-        .route(
-            http_paths::DAEMON_LOG_LEVEL,
-            get(get_log_level).put(put_log_level),
-        )
-        .route(http_paths::PROJECTS, get(get_projects))
-        .route(
-            http_paths::RUNTIME_SESSION_RESOLVE,
-            get(get_runtime_session_resolution),
-        )
-        .route(http_paths::RUNTIMES_PROBE, get(get_runtimes_probe))
+pub(super) fn core_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
+        .routes(routes!(get_health))
+        .routes(routes!(get_ready))
+        .routes(routes!(get_diagnostics))
+        .routes(routes!(get_github_status))
+        .routes(routes!(super::audit::get_audit_events))
+        .routes(routes!(post_daemon_telemetry))
+        .routes(routes!(get_config))
+        .routes(routes!(post_stop_daemon))
+        .routes(routes!(post_bridge_reconfigure))
+        .routes(routes!(get_log_level, put_log_level))
+        .routes(routes!(get_projects))
+        .routes(routes!(get_runtime_session_resolution))
+        .routes(routes!(get_runtimes_probe))
         .route(http_paths::WS, get(ws_upgrade_handler))
         .route(http_paths::STREAM, get(stream_global))
 }

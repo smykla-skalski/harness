@@ -1,9 +1,9 @@
 use axum::Json;
-use axum::Router;
 use axum::extract::{DefaultBodyLimit, State};
 use axum::http::{HeaderMap, Method};
 use axum::response::Response;
-use axum::routing::post;
+use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
+use utoipa_axum::routes;
 
 use crate::daemon::protocol::{
     PolicyCanvasExportRequest, PolicyCanvasImportRequest, PolicyTransferDumpRequest,
@@ -21,20 +21,20 @@ use super::authenticated_request;
 
 pub(in crate::daemon::http) const POLICY_TRANSFER_HTTP_BODY_LIMIT_BYTES: usize = 64 * 1024 * 1024;
 
-pub(super) fn merge_policy_io_routes(router: Router<DaemonHttpState>) -> Router<DaemonHttpState> {
+pub(super) fn merge_policy_io_routes(
+    router: OpenApiRouter<DaemonHttpState>,
+) -> OpenApiRouter<DaemonHttpState> {
     // Keep a finite last-resort ceiling for every buffered transfer request.
     // Remote requests are also bounded by the runtime-configured middleware.
     router
-        .route(http_paths::POLICY_CANVAS_EXPORT, post(post_policy_export))
-        .route(http_paths::POLICY_CANVAS_IMPORT, post(post_policy_import))
-        .route(
-            http_paths::POLICIES_DUMP,
-            post(post_policy_dump)
+        .routes(routes!(post_policy_export))
+        .routes(routes!(post_policy_import))
+        .routes(
+            routes!(post_policy_dump)
                 .layer(DefaultBodyLimit::max(POLICY_TRANSFER_HTTP_BODY_LIMIT_BYTES)),
         )
-        .route(
-            http_paths::POLICIES_IMPORT,
-            post(post_policy_import_batch)
+        .routes(
+            routes!(post_policy_import_batch)
                 .layer(DefaultBodyLimit::max(POLICY_TRANSFER_HTTP_BODY_LIMIT_BYTES)),
         )
 }

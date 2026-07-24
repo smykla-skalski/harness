@@ -1,8 +1,8 @@
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::routing::{get, post};
-use axum::{Json, Router};
+use axum::Json;
+use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{
     TaskBoardAutomationForceCancelRequest, TaskBoardAutomationHistoryRequest,
@@ -25,45 +25,21 @@ use super::task_board_route_executor;
 /// secret-handoff endpoints live in `task_board_git` so both files stay within
 /// the file-length cap.
 pub(super) fn merge_orchestrator_routes(
-    router: Router<DaemonHttpState>,
-) -> Router<DaemonHttpState> {
+    router: OpenApiRouter<DaemonHttpState>,
+) -> OpenApiRouter<DaemonHttpState> {
     router
-        .route(
-            http_paths::TASK_BOARD_ORCHESTRATOR_STATUS,
-            get(get_task_board_orchestrator_status),
-        )
-        .route(
-            http_paths::TASK_BOARD_ORCHESTRATOR_START,
-            post(post_task_board_orchestrator_start),
-        )
-        .route(
-            http_paths::TASK_BOARD_ORCHESTRATOR_STOP,
-            post(post_task_board_orchestrator_stop),
-        )
-        .route(
-            http_paths::TASK_BOARD_ORCHESTRATOR_RUN_ONCE,
-            post(post_task_board_orchestrator_run_once),
-        )
-        .route(
-            http_paths::TASK_BOARD_ORCHESTRATOR_RUNS,
-            get(get_task_board_automation_runs),
-        )
-        .route(
-            http_paths::TASK_BOARD_ORCHESTRATOR_RUN_DETAIL,
-            get(get_task_board_automation_run_detail),
-        )
-        .route(
-            http_paths::TASK_BOARD_ORCHESTRATOR_METRICS,
-            get(get_task_board_automation_metrics),
-        )
-        .route(
-            http_paths::TASK_BOARD_ORCHESTRATOR_FORCE_CANCEL,
-            post(post_task_board_automation_force_cancel),
-        )
-        .route(
-            http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
-            get(get_task_board_orchestrator_settings).put(put_task_board_orchestrator_settings),
-        )
+        .routes(routes!(get_task_board_orchestrator_status))
+        .routes(routes!(post_task_board_orchestrator_start))
+        .routes(routes!(post_task_board_orchestrator_stop))
+        .routes(routes!(post_task_board_orchestrator_run_once))
+        .routes(routes!(get_task_board_automation_runs))
+        .routes(routes!(get_task_board_automation_run_detail))
+        .routes(routes!(get_task_board_automation_metrics))
+        .routes(routes!(post_task_board_automation_force_cancel))
+        .routes(routes!(
+            get_task_board_orchestrator_settings,
+            put_task_board_orchestrator_settings
+        ))
 }
 
 #[utoipa::path(

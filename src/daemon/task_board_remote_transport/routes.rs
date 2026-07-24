@@ -1,8 +1,9 @@
 use axum::extract::{DefaultBodyLimit, State};
 use axum::http::{HeaderMap, Method, StatusCode};
 use axum::response::Response;
-use axum::routing::{get, post};
-use axum::{Json, Router};
+use axum::Json;
+use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
+use utoipa_axum::routes;
 
 use super::routes_status::{mutation_record, status_response, verify_operation_record};
 use super::routes_support::{
@@ -60,56 +61,35 @@ const fn max_body_limit(left: usize, right: usize) -> usize {
     if left > right { left } else { right }
 }
 
-pub(crate) fn execution_routes() -> Router<DaemonHttpState> {
-    Router::new()
-        .route(ADVERTISE_PATH, get(advertise))
-        .route(
-            OFFER_PATH,
-            post(offer).layer(DefaultBodyLimit::max(OFFER_HTTP_BODY_LIMIT_BYTES)),
-        )
-        .route(
-            SOURCE_BUNDLE_PATH,
-            post(upload_source_bundle)
+pub(crate) fn execution_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
+        .routes(routes!(advertise))
+        .routes(routes!(offer).layer(DefaultBodyLimit::max(OFFER_HTTP_BODY_LIMIT_BYTES)))
+        .routes(
+            routes!(upload_source_bundle)
                 .layer(DefaultBodyLimit::max(SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES)),
         )
-        .route(
-            SOURCE_BUNDLE_RECEIPT_PATH,
-            post(super::routes_source_bundle::verify_source_bundle_receipt)
+        .routes(
+            routes!(super::routes_source_bundle::verify_source_bundle_receipt)
                 .layer(DefaultBodyLimit::max(SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES)),
         )
-        .route(
-            SOURCE_BUNDLE_ABANDON_PATH,
-            post(super::routes_source_bundle::abandon_source_bundle).layer(DefaultBodyLimit::max(
-                SOURCE_BUNDLE_ABANDON_HTTP_BODY_LIMIT_BYTES,
-            )),
+        .routes(
+            routes!(super::routes_source_bundle::abandon_source_bundle).layer(
+                DefaultBodyLimit::max(SOURCE_BUNDLE_ABANDON_HTTP_BODY_LIMIT_BYTES),
+            ),
         )
-        .route(
-            CLAIM_PATH,
-            post(claim).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)),
+        .routes(routes!(claim).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)))
+        .routes(
+            routes!(renew_lease).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)),
         )
-        .route(
-            LEASE_RENEW_PATH,
-            post(renew_lease).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)),
+        .routes(routes!(status).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)))
+        .routes(routes!(cancel).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)))
+        .routes(routes!(settled).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)))
+        .routes(
+            routes!(fetch_artifact).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)),
         )
-        .route(
-            STATUS_PATH,
-            post(status).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)),
-        )
-        .route(
-            CANCEL_PATH,
-            post(cancel).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)),
-        )
-        .route(
-            SETTLED_PATH,
-            post(settled).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)),
-        )
-        .route(
-            ARTIFACT_PATH,
-            post(fetch_artifact).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)),
-        )
-        .route(
-            super::routes_cleanup::CLEANUP_OBSERVATION_PATH,
-            post(super::routes_cleanup::observe_cleanup)
+        .routes(
+            routes!(super::routes_cleanup::observe_cleanup)
                 .layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)),
         )
 }
@@ -140,8 +120,8 @@ pub(crate) fn execution_http_body_limit(method: &Method, path: &str) -> Option<u
 /// Every remote-execution transport operation as `(method, path,
 /// operation_id)`. The auth recognizer ([`execution_operation`]) and the
 /// OpenAPI contract test both read this table, so a documented transport route
-/// cannot drift from the recognized set. Re-exported under `http::openapi`
-/// (openapi feature only); the transport module itself stays crate-internal.
+/// cannot drift from the recognized set. Re-exported under `http::openapi`;
+/// the transport module itself stays crate-internal.
 pub const EXECUTION_OPERATIONS: &[(Method, &str, &str)] = &[
     (Method::GET, ADVERTISE_PATH, "advertise"),
     (Method::POST, OFFER_PATH, "offer"),

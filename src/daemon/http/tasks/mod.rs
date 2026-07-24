@@ -7,29 +7,28 @@ use super::DaemonHttpState;
 pub(super) mod mutations;
 pub(super) mod review;
 
+#[cfg(test)]
 pub(super) use mutations::{
-    post_task_assign, post_task_checkpoint, post_task_create, post_task_delete, post_task_drop,
+    post_task_assign, post_task_checkpoint, post_task_create, post_task_drop,
     post_task_queue_policy, post_task_update,
 };
-pub(super) use review::{
-    post_task_arbitrate, post_task_claim_review, post_task_respond_review,
-    post_task_submit_for_review, post_task_submit_review,
-};
+#[cfg(test)]
+pub(super) use review::post_task_submit_for_review;
 
 pub(super) fn task_routes() -> OpenApiRouter<DaemonHttpState> {
     OpenApiRouter::new()
-        .routes(routes!(post_task_create))
-        .routes(routes!(post_task_delete))
-        .routes(routes!(post_task_assign))
-        .routes(routes!(post_task_drop))
-        .routes(routes!(post_task_queue_policy))
-        .routes(routes!(post_task_update))
-        .routes(routes!(post_task_checkpoint))
-        .routes(routes!(post_task_submit_for_review))
-        .routes(routes!(post_task_claim_review))
-        .routes(routes!(post_task_submit_review))
-        .routes(routes!(post_task_respond_review))
-        .routes(routes!(post_task_arbitrate))
+        .routes(routes!(mutations::post_task_create))
+        .routes(routes!(mutations::post_task_delete))
+        .routes(routes!(mutations::post_task_assign))
+        .routes(routes!(mutations::post_task_drop))
+        .routes(routes!(mutations::post_task_queue_policy))
+        .routes(routes!(mutations::post_task_update))
+        .routes(routes!(mutations::post_task_checkpoint))
+        .routes(routes!(review::post_task_submit_for_review))
+        .routes(routes!(review::post_task_claim_review))
+        .routes(routes!(review::post_task_submit_review))
+        .routes(routes!(review::post_task_respond_review))
+        .routes(routes!(review::post_task_arbitrate))
 }
 
 async fn broadcast_task_snapshot(state: &DaemonHttpState, session_id: &str) {

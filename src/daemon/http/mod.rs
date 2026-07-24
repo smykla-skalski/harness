@@ -401,21 +401,8 @@ where
 }
 
 fn daemon_http_router(state: DaemonHttpState) -> Router<()> {
-    Router::new()
-        .merge(core::core_routes())
-        .merge(sessions::session_routes())
-        .merge(reviews::reviews_routes())
-        .merge(task_board::task_board_routes())
-        .merge(tasks::task_routes())
-        .merge(improver::improver_routes())
-        .merge(agents::agent_routes())
-        .merge(managed_agents::managed_agent_routes())
-        .merge(openrouter_models::openrouter_model_routes())
-        .merge(remote_clients::remote_client_routes())
-        .merge(remote_pairing::remote_pairing_routes())
-        .merge(crate::daemon::task_board_remote_transport::routes::execution_routes())
-        .merge(signals::signal_routes())
-        .merge(voice::voice_routes())
+    let (router, _openapi) = openapi::daemon_openapi_router().split_for_parts();
+    router
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::authorize_remote_http_request,

@@ -3,8 +3,9 @@ use std::time::Instant;
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::routing::post;
-use axum::{Json, Router};
+use axum::Json;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
 
 use crate::daemon::protocol::{
     VoiceAudioChunkRequest, VoiceSessionFinishRequest, VoiceSessionStartRequest,
@@ -21,15 +22,12 @@ use super::response::{extract_request_id, timed_json};
 use super::openapi::DaemonErrorBody;
 use crate::daemon::protocol::{VoiceSessionMutationResponse, VoiceSessionStartResponse};
 
-pub(super) fn voice_routes() -> Router<DaemonHttpState> {
-    Router::new()
-        .route(http_paths::SESSION_VOICE_START, post(post_voice_session))
-        .route(http_paths::VOICE_AUDIO_APPEND, post(post_voice_audio_chunk))
-        .route(
-            http_paths::VOICE_TRANSCRIPT_APPEND,
-            post(post_voice_transcript),
-        )
-        .route(http_paths::VOICE_FINISH, post(post_voice_finish))
+pub(super) fn voice_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
+        .routes(routes!(post_voice_session))
+        .routes(routes!(post_voice_audio_chunk))
+        .routes(routes!(post_voice_transcript))
+        .routes(routes!(post_voice_finish))
 }
 
 #[utoipa::path(

@@ -1,8 +1,8 @@
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::routing::{get, post, put};
-use axum::{Json, Router};
+use axum::Json;
+use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
@@ -29,45 +29,22 @@ use super::task_board_route_executor;
 /// secret-handoff endpoints onto the task-board router. Split from
 /// `task_board_orchestrator_handlers` so both files stay within the
 /// file-length cap.
-pub(super) fn merge_git_routes(router: Router<DaemonHttpState>) -> Router<DaemonHttpState> {
+pub(super) fn merge_git_routes(
+    router: OpenApiRouter<DaemonHttpState>,
+) -> OpenApiRouter<DaemonHttpState> {
     router
-        .route(
-            http_paths::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG,
-            get(get_task_board_orchestrator_runtime_config)
-                .put(put_task_board_orchestrator_runtime_config),
-        )
-        .route(
-            http_paths::TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS,
-            put(put_task_board_orchestrator_github_tokens),
-        )
-        .route(
-            http_paths::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN,
-            put(put_task_board_orchestrator_todoist_token),
-        )
-        .route(
-            http_paths::TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN,
-            put(put_task_board_orchestrator_openrouter_token),
-        )
-        .route(
-            http_paths::TASK_BOARD_GIT_IDENTITY_DEFAULTS,
-            get(get_task_board_git_identity_defaults),
-        )
-        .route(
-            http_paths::TASK_BOARD_GIT_SIGNING_VERIFY,
-            post(post_task_board_git_signing_verify),
-        )
-        .route(
-            http_paths::TASK_BOARD_GIT_RUNTIME_KEY_MATERIAL,
-            put(put_task_board_git_runtime_key_material),
-        )
-        .route(
-            http_paths::TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_PREPARE,
-            post(post_task_board_git_runtime_secret_handoff_prepare),
-        )
-        .route(
-            http_paths::TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_ACK,
-            post(post_task_board_git_runtime_secret_handoff_ack),
-        )
+        .routes(routes!(
+            get_task_board_orchestrator_runtime_config,
+            put_task_board_orchestrator_runtime_config
+        ))
+        .routes(routes!(put_task_board_orchestrator_github_tokens))
+        .routes(routes!(put_task_board_orchestrator_todoist_token))
+        .routes(routes!(put_task_board_orchestrator_openrouter_token))
+        .routes(routes!(get_task_board_git_identity_defaults))
+        .routes(routes!(post_task_board_git_signing_verify))
+        .routes(routes!(put_task_board_git_runtime_key_material))
+        .routes(routes!(post_task_board_git_runtime_secret_handoff_prepare))
+        .routes(routes!(post_task_board_git_runtime_secret_handoff_ack))
 }
 
 #[utoipa::path(

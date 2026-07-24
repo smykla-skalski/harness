@@ -1,10 +1,11 @@
 use std::time::Instant;
 
-use axum::Router;
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::routing::{get, post};
+use axum::routing::get;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
 
 use crate::daemon::protocol::{
     SessionDetail, TimelineCursor, TimelineWindowRequest, TimelineWindowResponse, http_paths,
@@ -15,47 +16,41 @@ use crate::errors::CliError;
 
 use super::auth::require_auth;
 use super::response::{extract_request_id, timed_json};
-use super::runtime_session::post_runtime_session;
 use super::{DaemonHttpState, require_async_db};
 
 use super::openapi::DaemonErrorBody;
 use crate::daemon::protocol::SessionSummary;
 
+pub(super) use super::sessions_mutations::broadcast_observe_session;
+#[cfg(test)]
 pub(super) use super::sessions_mutations::{
-    broadcast_observe_session, delete_session, post_end_session, post_leave_session,
-    post_observe_session, post_session_archive, post_session_join, post_session_start,
-    post_session_title,
+    delete_session, post_end_session, post_observe_session, post_session_archive,
+    post_session_join, post_session_start, post_session_title,
 };
 
-pub(super) fn session_routes() -> Router<DaemonHttpState> {
-    Router::new()
-        .route(
-            http_paths::SESSIONS,
-            get(get_sessions).post(post_session_start),
-        )
-        .route(
-            http_paths::SESSIONS_ADOPT,
-            post(super::sessions_adopt::post_session_adopt),
-        )
-        .route(
-            http_paths::SESSION_DETAIL,
-            get(get_session).delete(delete_session),
-        )
-        .route(http_paths::SESSION_TIMELINE, get(get_timeline))
+pub(super) fn session_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
+        .routes(routes!(
+            get_sessions,
+            super::sessions_mutations::post_session_start
+        ))
+        .routes(routes!(super::sessions_adopt::post_session_adopt))
+        .routes(routes!(
+            get_session,
+            super::sessions_mutations::delete_session
+        ))
+        .routes(routes!(get_timeline))
         .route(
             http_paths::SESSION_STREAM,
             get(super::stream::stream_session),
         )
-        .route(http_paths::SESSION_JOIN, post(post_session_join))
-        .route(
-            http_paths::SESSION_RUNTIME_SESSION,
-            post(post_runtime_session),
-        )
-        .route(http_paths::SESSION_TITLE, post(post_session_title))
-        .route(http_paths::SESSION_END, post(post_end_session))
-        .route(http_paths::SESSION_ARCHIVE, post(post_session_archive))
-        .route(http_paths::SESSION_LEAVE, post(post_leave_session))
-        .route(http_paths::SESSION_OBSERVE, post(post_observe_session))
+        .routes(routes!(super::sessions_mutations::post_session_join))
+        .routes(routes!(super::runtime_session::post_runtime_session))
+        .routes(routes!(super::sessions_mutations::post_session_title))
+        .routes(routes!(super::sessions_mutations::post_end_session))
+        .routes(routes!(super::sessions_mutations::post_session_archive))
+        .routes(routes!(super::sessions_mutations::post_leave_session))
+        .routes(routes!(super::sessions_mutations::post_observe_session))
 }
 
 #[derive(utoipa::IntoParams)]
