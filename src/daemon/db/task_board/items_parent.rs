@@ -25,6 +25,15 @@ pub(in crate::daemon::db::task_board) async fn check_parent_assignment_in_tx(
     item_id: &str,
     parent_id: &str,
 ) -> Result<ParentAssignmentValidation, CliError> {
+    // A direct self-link is a distinct, clearer failure than a cycle found
+    // further up the chain, and the create-path validation already rejects it
+    // with this wording. Without this the ancestor walk below reports every
+    // self-parent as a generic cycle.
+    if parent_id == item_id {
+        return Ok(ParentAssignmentValidation::Invalid(format!(
+            "task-board item '{item_id}' cannot be its own parent"
+        )));
+    }
     let mut current = parent_id.to_owned();
     let mut first_hop = true;
     let mut remaining_hops = MAX_PARENT_CHAIN_DEPTH;

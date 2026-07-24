@@ -88,7 +88,15 @@ fn websocket_task_board_crud_sync_audit_and_orchestrator_routes_use_real_state()
                 &connection,
                 "req-crud-update",
                 ws_methods::TASK_BOARD_UPDATE,
-                json!({ "id": "board-ws-crud", "status": "todo", "priority": "high" }),
+                // The label lands with this update so `BuiltInV1` triage keeps
+                // its Todo verdict; an unlabelled item is `NoMeaningfulLabels`
+                // and the same update would demote it back to Backlog.
+                json!({
+                    "id": "board-ws-crud",
+                    "status": "todo",
+                    "priority": "high",
+                    "tags": ["kind/task"],
+                }),
             )
             .await;
             assert_eq!(updated["status"].as_str(), Some("todo"));
@@ -360,7 +368,7 @@ async fn call(
     .await;
     assert!(
         response.error.is_none(),
-        "unexpected error: {:?}",
+        "unexpected error from {method} ({id}): {:?}",
         response.error
     );
     response.result.expect("websocket result")

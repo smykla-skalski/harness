@@ -2,9 +2,14 @@ use chrono::{DateTime, Duration, Utc};
 use sqlx::{Sqlite, SqliteConnection, Transaction, query_as};
 
 mod targets;
+mod values;
 mod wake;
 
 use super::super::ORCHESTRATOR_CHANGE_SCOPE;
+use values::{
+    StoredInstant, keep_latest, nonnegative, parse_admission_state, parse_desired_mode,
+    stored_instant, unset_instant, validate_control,
+};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
     TASK_BOARD_AUTOMATION_SNAPSHOT_SCHEMA_VERSION, TaskBoardAutomationAdmissionState,
@@ -45,12 +50,6 @@ struct ControlObservation {
     desired_mode: TaskBoardAutomationDesiredMode,
     admission_state: TaskBoardAutomationAdmissionState,
     updated_at: StoredInstant,
-}
-
-#[derive(Debug, Clone)]
-struct StoredInstant {
-    value: String,
-    instant: DateTime<Utc>,
 }
 
 #[derive(Debug)]
@@ -232,8 +231,18 @@ async fn load_control(connection: &mut SqliteConnection) -> Result<ControlObserv
         db_error(format!(
             "load task board automation snapshot control: {error}"
         ))
-    })?
-    .ok_or_else(|| db_error("task board automation control is not initialized"))?;
+    })?;
+    // The singleton row only appears once automation is first started, and the
+    // schema's own column defaults say what its absence means: off, stopped.
+    // `task_board_automation_control` already reads it that way, so failing
+    // here would make a never-started daemon unable to report its own status.
+    let Some(row) = row else {
+        return Ok(ControlObservation {
+            desired_mode: TaskBoardAutomationDesiredMode::Off,
+            admission_state: TaskBoardAutomationAdmissionState::Stopped,
+            updated_at: unset_instant(),
+        });
+    };
     let desired_mode = parse_desired_mode(&row.0)?;
     let admission_state = parse_admission_state(&row.1)?;
     validate_control(desired_mode, admission_state)?;
@@ -451,57 +460,6 @@ fn derive_effective_state(
         return (TaskBoardAutomationEffectiveState::Scheduled, None);
     }
     (TaskBoardAutomationEffectiveState::Idle, None)
-}
-
-fn stored_instant(value: String, context: &str) -> Result<StoredInstant, CliError> {
-    let instant = DateTime::parse_from_rfc3339(&value)
-        .map_err(|error| db_error(format!("parse task board {context}: {error}")))?
-        .with_timezone(&Utc);
-    Ok(StoredInstant { value, instant })
-}
-
-fn keep_latest(current: &mut StoredInstant, candidate: StoredInstant) {
-    if candidate.instant > current.instant {
-        *current = candidate;
-    }
-}
-
-fn nonnegative(value: i64, context: &str) -> Result<u64, CliError> {
-    u64::try_from(value).map_err(|error| db_error(format!("parse task board {context}: {error}")))
-}
-
-fn parse_desired_mode(value: &str) -> Result<TaskBoardAutomationDesiredMode, CliError> {
-    match value {
-        "off" => Ok(TaskBoardAutomationDesiredMode::Off),
-        "continuous" => Ok(TaskBoardAutomationDesiredMode::Continuous),
-        "step" => Ok(TaskBoardAutomationDesiredMode::Step),
-        value => Err(db_error(format!(
-            "invalid task board automation desired mode '{value}'"
-        ))),
-    }
-}
-
-fn parse_admission_state(value: &str) -> Result<TaskBoardAutomationAdmissionState, CliError> {
-    match value {
-        "accepting" => Ok(TaskBoardAutomationAdmissionState::Accepting),
-        "draining" => Ok(TaskBoardAutomationAdmissionState::Draining),
-        "stopped" => Ok(TaskBoardAutomationAdmissionState::Stopped),
-        value => Err(db_error(format!(
-            "invalid task board automation admission state '{value}'"
-        ))),
-    }
-}
-
-fn validate_control(
-    desired: TaskBoardAutomationDesiredMode,
-    admission: TaskBoardAutomationAdmissionState,
-) -> Result<(), CliError> {
-    use TaskBoardAutomationAdmissionState::{Accepting, Draining, Stopped};
-    use TaskBoardAutomationDesiredMode::{Continuous, Off, Step};
-    match (desired, admission) {
-        (Off, Stopped | Draining) | (Continuous | Step, Accepting) => Ok(()),
-        _ => Err(db_error("incoherent task board automation control state")),
-    }
 }
 
 fn state(

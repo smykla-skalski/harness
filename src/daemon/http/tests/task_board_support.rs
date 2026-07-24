@@ -144,6 +144,10 @@ pub(super) async fn seed_ready_board_item(
         "2026-05-14T00:00:00Z".to_string(),
     );
     item.status = TaskBoardStatus::Todo;
+    // A meaningful label keeps `BuiltInV1` triage on the Todo verdict. Without
+    // one the evaluator reads `NoMeaningfulLabels`, and the next triage-bearing
+    // update on the item demotes it straight back to Backlog.
+    item.tags = vec!["kind/task".to_string()];
     item.workflow_kind = crate::task_board::TaskBoardWorkflowKind::Unknown;
     let item = submit_plan(&item, "Use task dispatch.").apply_to(&item);
     let item = approve_plan(&item, "lead", "2026-05-14T01:00:00Z").apply_to(&item);
