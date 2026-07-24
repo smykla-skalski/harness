@@ -57,6 +57,46 @@ struct RemoteDaemonPairingInvitationTests {
     }
   }
 
+  @Test("Recognizes remote-daemon links from the payload marker, not the host")
+  func recognizesRemotePairingLinkByPayload() throws {
+    let remoteOnPair = try invitationURL(
+      endpoint: "https://daemon.example.com",
+      expiresAt: "2026-07-10T04:10:00Z"
+    )
+    let remoteOnLegacy = try invitationURL(
+      endpoint: "https://daemon.example.com",
+      expiresAt: "2026-07-10T04:10:00Z",
+      host: "remote-pair"
+    )
+    #expect(RemoteDaemonPairingInvitation.isRemotePairingLink(remoteOnPair))
+    #expect(RemoteDaemonPairingInvitation.isRemotePairingLink(remoteOnLegacy))
+  }
+
+  @Test("Leaves a relay invitation on the shared pair host for the router")
+  func ignoresRelayInvitationOnSharedHost() throws {
+    let relayOnPair = try payloadURL(
+      object: [
+        "stationID": "station-mac-studio",
+        "publicKeyFingerprint": "00:11:22:33:44:55:66:77",
+        "nonce": "pairing-nonce",
+      ],
+      host: "pair"
+    )
+    #expect(!RemoteDaemonPairingInvitation.isRemotePairingLink(relayOnPair))
+  }
+
+  @Test("Rejects remote-daemon classification for non-pairing hosts and junk payloads")
+  func rejectsRemoteClassificationForNonPairingHostsAndJunk() throws {
+    let remotePayloadOnRoute = try invitationURL(
+      endpoint: "https://daemon.example.com",
+      expiresAt: "2026-07-10T04:10:00Z",
+      host: "reviews"
+    )
+    let junkOnPair = try #require(URL(string: "harness://pair?payload=not-a-payload"))
+    #expect(!RemoteDaemonPairingInvitation.isRemotePairingLink(remotePayloadOnRoute))
+    #expect(!RemoteDaemonPairingInvitation.isRemotePairingLink(junkOnPair))
+  }
+
   @Test("Rejects non-HTTPS endpoints")
   func rejectsNonHTTPSEndpoint() throws {
     let now = try #require(ISO8601DateFormatter().date(from: "2026-07-10T04:00:00Z"))
@@ -144,7 +184,11 @@ struct RemoteDaemonPairingInvitationTests {
       "scopes": ["read", "write"],
       "expires_at": expiresAt,
     ]
-    let data = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+    return try payloadURL(object: payload, host: host)
+  }
+
+  private func payloadURL(object: [String: Any], host: String) throws -> URL {
+    let data = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
     let encoded = data.base64EncodedString()
       .replacingOccurrences(of: "+", with: "-")
       .replacingOccurrences(of: "/", with: "_")

@@ -118,6 +118,43 @@ public struct RemoteDaemonPairingInvitation: Codable, Equatable, Sendable {
     return host == "pair" || host == "remote-pair"
   }
 
+  /// True when `url` is a remote-daemon pairing link: a `harness://` pairing
+  /// host carrying a payload with the `server_spki_sha256` marker. The flow is
+  /// chosen from the payload, not the host — the `pair` host is shared with
+  /// relay invitations, which carry `publicKeyFingerprint` instead. A payload
+  /// that carries the marker but is otherwise malformed still returns true so
+  /// the caller can reject it with a clear pairing error rather than routing it
+  /// elsewhere; a payload without the marker is left for the deep-link router.
+  public static func isRemotePairingLink(_ url: URL) -> Bool {
+    guard url.scheme?.lowercased() == "harness", isPairingHost(url.host) else {
+      return false
+    }
+    return payloadObject(from: url)?["server_spki_sha256"] != nil
+  }
+
+  private static func payloadObject(from url: URL) -> [String: Any]? {
+    guard
+      let encoded = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+        .queryItems?
+        .first(where: { $0.name == "payload" })?
+        .value
+    else {
+      return nil
+    }
+    let padding = String(repeating: "=", count: (4 - encoded.count % 4) % 4)
+    let base64 =
+      encoded
+      .replacingOccurrences(of: "-", with: "+")
+      .replacingOccurrences(of: "_", with: "/") + padding
+    guard
+      let data = Data(base64Encoded: base64),
+      let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    else {
+      return nil
+    }
+    return object
+  }
+
   enum CodingKeys: String, CodingKey {
     case version
     case endpoint
