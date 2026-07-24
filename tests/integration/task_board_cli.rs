@@ -14,7 +14,8 @@ use harness::task_board::dispatch::DispatchLifecycle;
 use harness::task_board::transport::{
     TaskBoardCommand, TaskBoardDispatchDeliverArgs, TaskBoardDispatchPickArgs,
     TaskBoardPolicyCommand, TaskBoardPolicyGrantResolveArgs, TaskBoardPolicyGrantRevokeArgs,
-    TaskBoardPolicyJsonArgs, TaskBoardPolicyToggleArgs,
+    TaskBoardPolicyJsonArgs, TaskBoardPolicyToggleArgs, TaskBoardTriageEscalationCommand,
+    TaskBoardTriageEscalationReportArgs,
 };
 use harness::task_board::{
     AgentMode, DispatchAppliedTask, EvaluatorIntent, FollowUpPhase, PolicyAction,
@@ -385,4 +386,32 @@ fn spawn_kill_switch_toggle_routes_through_public_command() {
     assert_eq!(captured.path, "/v1/policy-canvases/spawn-kill-switch");
     let body: Value = serde_json::from_str(&captured.body).expect("toggle body");
     assert_eq!(body["enabled"], true);
+}
+
+#[test]
+fn triage_escalation_report_rejects_quote_characters_in_rationale() {
+    let temporary = tempdir().expect("tempdir");
+    with_isolated_harness_env(temporary.path(), || {
+        for quote in ['\'', '"', '`'] {
+            let command = TaskBoardCommand::TriageEscalation {
+                command: TaskBoardTriageEscalationCommand::Report(
+                    TaskBoardTriageEscalationReportArgs {
+                        escalation_id: "esc-1".to_string(),
+                        token: "token-1".to_string(),
+                        fingerprint: "fp-1".to_string(),
+                        verdict: "todo".to_string(),
+                        rationale: format!("title is vague{quote} no labels"),
+                        json: false,
+                    },
+                ),
+            };
+            let error = command
+                .execute(&AppContext)
+                .expect_err("quoted rationale must fail validation");
+            assert!(
+                error.to_string().contains("no quote characters"),
+                "unexpected error for {quote:?}: {error}"
+            );
+        }
+    });
 }

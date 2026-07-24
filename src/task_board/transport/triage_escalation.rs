@@ -24,10 +24,12 @@ pub struct TaskBoardTriageEscalationReportArgs {
     /// `todo` or `undecided`.
     #[arg(long)]
     pub verdict: String,
-    /// At most 256 bytes, no control characters -- validated here so a
-    /// verbose agent gets an immediate, actionable CLI error and can re-run
-    /// with the same still-running token, instead of the daemon silently
-    /// dropping an out-of-bounds rationale.
+    /// At most 256 bytes, no control characters, and -- because the
+    /// rendered prompt wraps this argument in single quotes -- no quote
+    /// characters. Validated here so a non-conforming agent gets an
+    /// immediate, actionable CLI error and can re-run with the same
+    /// still-running token, instead of a confusing shell error or the
+    /// daemon silently dropping an out-of-bounds rationale.
     #[arg(long)]
     pub rationale: String,
     #[arg(long)]
@@ -40,6 +42,12 @@ impl Execute for TaskBoardTriageEscalationReportArgs {
             return Err(CliErrorKind::workflow_io(format!(
                 "--rationale must be 1-256 bytes with no control characters (got {} bytes)",
                 self.rationale.len()
+            ))
+            .into());
+        }
+        if let Some(quote) = self.rationale.chars().find(|c| matches!(c, '\'' | '"' | '`')) {
+            return Err(CliErrorKind::workflow_io(format!(
+                "--rationale must be plain text with no quote characters (found {quote})"
             ))
             .into());
         }
