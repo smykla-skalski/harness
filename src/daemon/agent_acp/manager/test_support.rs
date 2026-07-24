@@ -24,6 +24,29 @@ use crate::session::types::{
 /// happy path returns as soon as the state is observed.
 pub(super) const ACP_CONDITION_DEADLINE: Duration = Duration::from_secs(30);
 
+/// Drain `events` until `name` arrives or [`ACP_CONDITION_DEADLINE`] passes.
+/// Draining a fixed number of times instead loses the race: `try_recv` never
+/// waits, so a whole batch of polls can finish before the manager publishes.
+pub(super) fn waits_for_stream_event(
+    events: &mut broadcast::Receiver<StreamEvent>,
+    name: &str,
+) -> bool {
+    let deadline = std::time::Instant::now() + ACP_CONDITION_DEADLINE;
+    loop {
+        match events.try_recv() {
+            Ok(event) if event.event == name => return true,
+            Ok(_) | Err(broadcast::error::TryRecvError::Lagged(_)) => {}
+            Err(broadcast::error::TryRecvError::Closed) => return false,
+            Err(broadcast::error::TryRecvError::Empty) => {
+                if std::time::Instant::now() >= deadline {
+                    return false;
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        }
+    }
+}
+
 #[track_caller]
 pub(super) fn assert_ok<T, E: std::fmt::Debug>(result: Result<T, E>, context: &str) -> T {
     assert!(
