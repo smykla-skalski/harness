@@ -113,7 +113,7 @@ struct SettingsRepositoryWorkingDirectoriesSection: View {
 
   private func obtain(_ repository: String) {
     obtaining.insert(repository)
-    Task {
+    Task { @MainActor in
       _ = await store.obtainRepositoryWorkingCopy(repository: repository)
       obtaining.remove(repository)
       await reload()
