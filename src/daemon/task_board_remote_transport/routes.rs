@@ -142,6 +142,7 @@ pub const EXECUTION_OPERATIONS: &[(Method, &str, &str)] = &[
 ];
 
 /// Recognise a remote-execution transport route, returning its operation id.
+#[must_use]
 pub fn execution_operation(method: &Method, path: &str) -> Option<&'static str> {
     EXECUTION_OPERATIONS
         .iter()
