@@ -15,6 +15,7 @@ use utoipa::OpenApi;
 
 use crate::daemon::protocol::{HTTP_API_CONTRACT, HttpRouteMethod};
 
+mod policy_api;
 mod task_board_api;
 
 /// Error envelope returned by daemon handlers on failure.
@@ -201,6 +202,7 @@ pub fn openapi_document() -> utoipa::openapi::OpenApi {
     doc.merge(ManagedAgentsApi::openapi());
     doc.merge(ReviewsApi::openapi());
     doc.merge(task_board_api::TaskBoardApi::openapi());
+    doc.merge(policy_api::PolicyApi::openapi());
     env!("CARGO_PKG_VERSION").clone_into(&mut doc.info.version);
     doc
 }

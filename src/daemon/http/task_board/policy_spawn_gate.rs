@@ -10,11 +10,14 @@ use axum::response::Response;
 use axum::routing::{get, post};
 
 use crate::daemon::protocol::{
-    PolicyApprovalGrantResolveRequest, PolicyApprovalGrantRevokeRequest,
-    PolicyCanvasSetSpawnKillSwitchRequest, PolicyCanvasSetSpawnRequiresLivePolicyRequest,
-    http_paths,
+    PolicyApprovalGrantResolveRequest, PolicyApprovalGrantResolveResponse,
+    PolicyApprovalGrantRevokeRequest, PolicyApprovalGrantRevokeResponse,
+    PolicyApprovalGrantsListResponse, PolicyCanvasSetSpawnKillSwitchRequest,
+    PolicyCanvasSetSpawnRequiresLivePolicyRequest, PolicyCanvasWorkspaceResponse, http_paths,
 };
 
+#[cfg(feature = "openapi")]
+use super::super::openapi::DaemonErrorBody;
 use super::super::response::timed_json;
 use super::super::{DaemonHttpState, require_async_db, task_board_route_executor};
 use super::authenticated_request;
@@ -45,6 +48,16 @@ pub(super) fn merge_policy_spawn_gate_routes(
         )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/policy-canvases/spawn-requires-live-policy",
+    tag = "policy",
+    request_body = PolicyCanvasSetSpawnRequiresLivePolicyRequest,
+    responses(
+        (status = 200, description = "Workspace after toggling the spawn-requires-live-policy switch", body = PolicyCanvasWorkspaceResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_policy_canvas_set_spawn_requires_live_policy(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -70,6 +83,16 @@ pub(super) async fn post_policy_canvas_set_spawn_requires_live_policy(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/policy-canvases/spawn-kill-switch",
+    tag = "policy",
+    request_body = PolicyCanvasSetSpawnKillSwitchRequest,
+    responses(
+        (status = 200, description = "Workspace after toggling the spawn kill switch", body = PolicyCanvasWorkspaceResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_policy_canvas_set_spawn_kill_switch(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -94,6 +117,15 @@ pub(super) async fn post_policy_canvas_set_spawn_kill_switch(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/v1/policy-approval-grants",
+    tag = "policy",
+    responses(
+        (status = 200, description = "All durable spawn-gate approval grants", body = PolicyApprovalGrantsListResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn get_policy_approval_grants(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -115,6 +147,16 @@ pub(super) async fn get_policy_approval_grants(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/policy-approval-grants/resolve",
+    tag = "policy",
+    request_body = PolicyApprovalGrantResolveRequest,
+    responses(
+        (status = 200, description = "The approval grant after approve or deny", body = PolicyApprovalGrantResolveResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_policy_approval_grant_resolve(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
@@ -137,6 +179,16 @@ pub(super) async fn post_policy_approval_grant_resolve(
     )
 }
 
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/policy-approval-grants/revoke",
+    tag = "policy",
+    request_body = PolicyApprovalGrantRevokeRequest,
+    responses(
+        (status = 200, description = "The approval grant after revocation", body = PolicyApprovalGrantRevokeResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
 pub(super) async fn post_policy_approval_grant_revoke(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,

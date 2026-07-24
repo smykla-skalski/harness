@@ -9,10 +9,10 @@ use super::task_board_orchestrator_handlers::merge_orchestrator_routes;
 
 pub(super) mod items;
 pub(super) mod operations;
-mod policy;
-mod policy_io;
-mod policy_pipeline;
-mod policy_spawn_gate;
+pub(super) mod policy;
+pub(super) mod policy_io;
+pub(super) mod policy_pipeline;
+pub(super) mod policy_spawn_gate;
 pub(super) mod positions;
 pub(super) mod triage;
 pub(super) mod triage_rules;
