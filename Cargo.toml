@@ -111,7 +111,7 @@ rusqlite = { version = "0.37", features = ["bundled"], optional = true }
 sea-query = { version = "1.0.0-rc.33", default-features = false, features = ["backend-sqlite"], optional = true }
 sqlx = { version = "0.9.0-alpha.1", default-features = false, features = ["sqlite", "sqlite-bundled", "runtime-tokio", "tls-rustls-ring", "migrate", "macros", "chrono", "uuid", "json"], optional = true }
 async-trait = "0.1.83"
-tokio-tungstenite = { version = "0.29.0", default-features = false, features = ["connect"] }
+tokio-tungstenite = { version = "0.30.0", default-features = false, features = ["connect"] }
 portable-pty = { version = "0.9.0", optional = true }
 vt100 = { version = "0.16.2", optional = true }
 crossterm = "0.29.0"
