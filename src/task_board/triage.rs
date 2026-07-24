@@ -39,13 +39,18 @@ pub enum TriageVerdict {
 }
 
 /// Closed, ordered reason codes. `NeedsInfoLabel` and `NoMeaningfulLabels` are
-/// evaluated in that order before falling through to `MeaningfulLabel`.
+/// evaluated in that order before falling through to `MeaningfulLabel`; those
+/// three are `BuiltInV1`-only. `RuleMatched` and `RuleSetDefault` are the
+/// runtime-authored-rules evaluator's reason codes -- the matched rule id (or
+/// nothing, for the default) travels in the decision's `reason_detail`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TriageReasonCode {
     NeedsInfoLabel,
     NoMeaningfulLabels,
     MeaningfulLabel,
+    RuleMatched,
+    RuleSetDefault,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
