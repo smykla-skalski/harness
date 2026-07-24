@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::daemon::agent_acp::AcpAgentSnapshot;
+#[cfg(feature = "openapi")]
+use crate::daemon::agent_acp::AcpAgentSnapshotSchema;
 use crate::daemon::agent_tui::AgentTuiSnapshot;
 use crate::session::types::{HarnessSessionId, ManagedAgentId, SessionAgentId};
 
@@ -12,6 +14,19 @@ pub enum ManagedAgentSnapshot {
     Terminal(AgentTuiSnapshot),
     Codex(CodexRunSnapshot),
     Acp(AcpAgentSnapshot),
+}
+
+/// Documented wire shape of [`ManagedAgentSnapshot`]. utoipa cannot override an
+/// enum variant's inner type, and the `Acp` variant hand-serializes its identity
+/// fields, so this mirror points that variant at [`AcpAgentSnapshotSchema`]. It
+/// is referenced from the handlers via `body = ManagedAgentSnapshotSchema`.
+#[cfg(feature = "openapi")]
+#[derive(serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", content = "snapshot")]
+pub enum ManagedAgentSnapshotSchema {
+    Terminal(AgentTuiSnapshot),
+    Codex(CodexRunSnapshot),
+    Acp(AcpAgentSnapshotSchema),
 }
 
 impl ManagedAgentSnapshot {
@@ -72,7 +87,9 @@ impl ManagedAgentSnapshot {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ManagedAgentListResponse {
+    #[cfg_attr(feature = "openapi", schema(value_type = Vec<ManagedAgentSnapshotSchema>))]
     pub agents: Vec<ManagedAgentSnapshot>,
 }
 

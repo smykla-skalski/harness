@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 /// catalog and daemon wire format stay independent of the protocol crate.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "transport", rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum AcpMcpServer {
     Stdio {
         name: String,
@@ -112,6 +113,7 @@ where
 }
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AcpMcpEnvVariable {
     pub name: String,
     #[serde(default)]
@@ -119,6 +121,7 @@ pub struct AcpMcpEnvVariable {
 }
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AcpMcpHttpHeader {
     pub name: String,
     #[serde(default)]

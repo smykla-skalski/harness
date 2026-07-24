@@ -5,6 +5,7 @@ use crate::errors::{CliError, CliErrorKind};
 /// Named keyboard input supported by the headless TUI steering API.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum AgentTuiKey {
     Enter,
     Escape,
@@ -35,6 +36,7 @@ impl AgentTuiKey {
 /// Structured keyboard-like input sent into the PTY master.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum AgentTuiInput {
     Text { text: String },
     Paste { text: String },

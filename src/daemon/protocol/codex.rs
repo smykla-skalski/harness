@@ -8,6 +8,7 @@ use super::summaries::TimelineEntry;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum CodexRunMode {
     Report,
     WorkspaceWrite,
@@ -16,6 +17,7 @@ pub enum CodexRunMode {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum CodexRunStatus {
     Queued,
     Running,
@@ -34,6 +36,7 @@ impl CodexRunStatus {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum CodexApprovalDecision {
     Accept,
     AcceptForSession,
@@ -42,6 +45,7 @@ pub enum CodexApprovalDecision {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CodexRunRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub actor: Option<String>,
@@ -86,11 +90,13 @@ fn default_codex_agent_role() -> SessionRole {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CodexSteerRequest {
     pub prompt: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CodexApprovalDecisionRequest {
     pub decision: CodexApprovalDecision,
 }
@@ -101,6 +107,7 @@ pub struct CodexRunListResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CodexAgentInspectResponse {
     pub agents: Vec<CodexAgentInspectSnapshot>,
     pub daemon_perceived_now: String,
@@ -109,6 +116,7 @@ pub struct CodexAgentInspectResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CodexAgentInspectSnapshot {
     pub run_id: String,
     pub session_id: String,
@@ -131,11 +139,13 @@ pub struct CodexAgentInspectSnapshot {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CodexTranscriptResponse {
     pub entries: Vec<TimelineEntry>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CodexApprovalRequest {
     pub approval_id: String,
     pub request_id: String,
@@ -151,6 +161,7 @@ pub struct CodexApprovalRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CodexResolvedApproval {
     pub approval_id: String,
     pub decision: CodexApprovalDecision,
@@ -158,6 +169,7 @@ pub struct CodexResolvedApproval {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CodexRunEvent {
     pub event_id: String,
     pub sequence: u64,
@@ -167,10 +179,12 @@ pub struct CodexRunEvent {
     pub thread_id: Option<String>,
     pub turn_id: Option<String>,
     pub item_id: Option<String>,
+    #[cfg_attr(feature = "openapi", schema(value_type = Object))]
     pub payload: Value,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CodexRunSnapshot {
     pub run_id: String,
     pub session_id: String,

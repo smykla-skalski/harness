@@ -25,6 +25,8 @@ use super::identity::{AgentDescriptorId, ManagedAgentId, RuntimeSessionId, Sessi
 use crate::agents::runtime::RuntimeCapabilities;
 mod wire;
 pub use wire::AgentRegistrationWire;
+#[cfg(feature = "openapi")]
+pub use wire::AgentStatusSchema;
 
 /// Stable reference to a daemon-managed agent instance that owns this session registration.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
