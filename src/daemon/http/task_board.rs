@@ -11,6 +11,7 @@ pub(super) mod items;
 pub(super) mod operations;
 mod policy;
 mod policy_io;
+mod policy_pipeline;
 mod policy_spawn_gate;
 pub(super) mod positions;
 pub(super) mod triage;
@@ -34,6 +35,7 @@ use self::operations::{
 };
 use self::policy::merge_policy_routes;
 use self::policy_io::merge_policy_io_routes;
+use self::policy_pipeline::merge_policy_pipeline_routes;
 use self::policy_spawn_gate::merge_policy_spawn_gate_routes;
 use self::positions::{
     get_task_board_item_position_snapshot, post_task_board_item_position_reset,
@@ -173,7 +175,7 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
             get(get_task_board_machines),
         )
         .merge(task_board_host_routes());
-    merge_policy_spawn_gate_routes(merge_policy_io_routes(merge_policy_routes(merge_git_routes(
-        merge_orchestrator_routes(router),
-    ))))
+    merge_policy_pipeline_routes(merge_policy_spawn_gate_routes(merge_policy_io_routes(
+        merge_policy_routes(merge_git_routes(merge_orchestrator_routes(router))),
+    )))
 }
