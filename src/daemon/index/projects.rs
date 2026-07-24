@@ -219,9 +219,7 @@ pub fn discovered_project_for_checkout(project_dir: &Path) -> DiscoveredProject 
 /// restore and must keep registering as a directory.
 fn recorded_git_project(context_root: &Path) -> Option<DiscoveredProject> {
     let origin = storage::load_project_origin(context_root)?;
-    if origin.repository_root.is_none() {
-        return None;
-    }
+    origin.repository_root.as_ref()?;
     build_discovered_project(context_root)
 }
 
