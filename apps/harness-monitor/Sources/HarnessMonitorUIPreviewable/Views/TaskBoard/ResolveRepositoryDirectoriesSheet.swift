@@ -11,6 +11,8 @@ struct ResolveRepositoryDirectoriesSheet: View {
 
   @State private var resolved: Set<String> = []
   @State private var importingRepository: String?
+  @State private var obtaining: Set<String> = []
+  @State private var obtainFailed: Set<String> = []
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
@@ -70,14 +72,39 @@ struct ResolveRepositoryDirectoriesSheet: View {
           Text("\(repository), \(isResolved ? "folder selected" : "no folder selected")")
         )
       Spacer(minLength: 12)
-      Button("Clone") {}
-        .disabled(true)
-        .help("Cloning a repository that has no local checkout comes in a later update")
+      if obtainFailed.contains(repository) {
+        Image(systemName: "exclamationmark.triangle.fill")
+          .foregroundStyle(.orange)
+          .help("Could not obtain a copy - check the repository token, then retry")
+      }
+      if obtaining.contains(repository) {
+        ProgressView()
+          .controlSize(.small)
+          .accessibilityLabel(Text("Obtaining a copy of \(repository)"))
+      } else {
+        Button("Obtain a Copy") { obtain(repository) }
+          .disabled(isResolved)
+          .help("Clone this repository into a daemon-managed working copy")
+      }
       Button(isResolved ? "Change Folder…" : "Choose Folder…") {
         importingRepository = repository
       }
     }
     .padding(.vertical, 4)
+  }
+
+  private func obtain(_ repository: String) {
+    obtaining.insert(repository)
+    obtainFailed.remove(repository)
+    Task { @MainActor in
+      let entry = await store.obtainRepositoryWorkingCopy(repository: repository)
+      obtaining.remove(repository)
+      if entry == nil {
+        obtainFailed.insert(repository)
+      } else {
+        resolved.insert(repository)
+      }
+    }
   }
 
   private var footer: some View {
