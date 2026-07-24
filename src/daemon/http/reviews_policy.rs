@@ -13,6 +13,8 @@ use crate::daemon::service;
 
 use super::DaemonHttpState;
 use super::auth::require_auth;
+#[cfg(feature = "openapi")]
+use super::openapi::DaemonErrorBody;
 use super::response::{extract_request_id, timed_json};
 
 /// Resolve the request id and enforce auth in one step so each policy handler
@@ -49,7 +51,17 @@ pub(super) fn merge_policy_routes(router: Router<DaemonHttpState>) -> Router<Dae
         )
 }
 
-async fn post_reviews_policy_preview(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/policy/preview",
+    tag = "reviews",
+    request_body = ReviewsPolicyPreviewRequest,
+    responses(
+        (status = 200, description = "Preview of the policy workflow steps for a target", body = crate::daemon::protocol::ReviewsPolicyPreviewResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_reviews_policy_preview(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsPolicyPreviewRequest>,
@@ -68,7 +80,17 @@ async fn post_reviews_policy_preview(
     )
 }
 
-async fn post_reviews_policy_start(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/policy/start",
+    tag = "reviews",
+    request_body = ReviewsPolicyRunStartRequest,
+    responses(
+        (status = 200, description = "The started (or resumed) policy run", body = crate::daemon::protocol::ReviewsPolicyRunResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_reviews_policy_start(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsPolicyRunStartRequest>,
@@ -89,7 +111,17 @@ async fn post_reviews_policy_start(
     )
 }
 
-async fn post_reviews_policy_status(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/policy/status",
+    tag = "reviews",
+    request_body = ReviewsPolicyStatusRequest,
+    responses(
+        (status = 200, description = "Active and recent policy runs for a subject", body = crate::daemon::protocol::ReviewsPolicyStatusResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_reviews_policy_status(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsPolicyStatusRequest>,
@@ -107,7 +139,17 @@ async fn post_reviews_policy_status(
     )
 }
 
-async fn post_reviews_policy_history(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/v1/reviews/policy/history",
+    tag = "reviews",
+    request_body = ReviewsPolicyHistoryRequest,
+    responses(
+        (status = 200, description = "Historical policy runs with aggregate metrics", body = crate::daemon::protocol::ReviewsPolicyHistoryResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+))]
+pub(super) async fn post_reviews_policy_history(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsPolicyHistoryRequest>,

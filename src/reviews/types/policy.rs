@@ -8,12 +8,14 @@ use super::super::logic::default_reviews_policy_workflow_id;
 use super::ReviewTarget;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsPolicySubject {
     pub repository: String,
     pub pull_request_number: u64,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ReviewsPolicyTrigger {
     Background,
@@ -25,6 +27,7 @@ pub enum ReviewsPolicyTrigger {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ReviewsPolicyRunStatus {
     Completed,
@@ -35,6 +38,7 @@ pub enum ReviewsPolicyRunStatus {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ReviewsPolicyStepType {
     Action,
@@ -42,6 +46,7 @@ pub enum ReviewsPolicyStepType {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsPolicyWait {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub event_key: Option<String>,
@@ -50,6 +55,7 @@ pub struct ReviewsPolicyWait {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsPolicyPreviewStep {
     pub step_type: ReviewsPolicyStepType,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -59,6 +65,7 @@ pub struct ReviewsPolicyPreviewStep {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsPolicyPreviewRequest {
     #[serde(default = "default_reviews_policy_workflow_id")]
     pub workflow_id: String,
@@ -68,6 +75,7 @@ pub struct ReviewsPolicyPreviewRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsPolicyPreviewResponse {
     pub workflow_id: String,
     pub subject: ReviewsPolicySubject,
@@ -81,6 +89,7 @@ pub struct ReviewsPolicyPreviewResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsPolicyRunStartRequest {
     #[serde(default = "default_reviews_policy_workflow_id")]
     pub workflow_id: String,
@@ -92,6 +101,7 @@ pub struct ReviewsPolicyRunStartRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsPolicyRunStep {
     pub step_type: ReviewsPolicyStepType,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -102,6 +112,7 @@ pub struct ReviewsPolicyRunStep {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsPolicyRunResponse {
     pub workflow_id: String,
     pub run_id: String,
@@ -121,6 +132,7 @@ pub struct ReviewsPolicyRunResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsPolicyStatusRequest {
     #[serde(default = "default_reviews_policy_workflow_id")]
     pub workflow_id: String,
@@ -128,6 +140,7 @@ pub struct ReviewsPolicyStatusRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsPolicyStatusResponse {
     pub workflow_id: String,
     pub subject: ReviewsPolicySubject,
@@ -138,6 +151,7 @@ pub struct ReviewsPolicyStatusResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsPolicyHistoryRequest {
     #[serde(default = "default_reviews_policy_workflow_id")]
     pub workflow_id: String,
@@ -148,6 +162,7 @@ pub struct ReviewsPolicyHistoryRequest {
 /// Mirrors the runtime metrics summary so the Monitor app can render totals
 /// without re-deriving them from the run list.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsPolicyRunMetrics {
     pub total: usize,
     pub running: usize,
@@ -162,6 +177,7 @@ pub struct ReviewsPolicyRunMetrics {
 /// A single structured entry in a policy run timeline export, flattened from
 /// the recorded step list across the response's runs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsPolicyTimelineEntry {
     pub recorded_at: String,
     pub run_id: String,
@@ -169,6 +185,7 @@ pub struct ReviewsPolicyTimelineEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsPolicyHistoryResponse {
     pub workflow_id: String,
     pub subject: ReviewsPolicySubject,

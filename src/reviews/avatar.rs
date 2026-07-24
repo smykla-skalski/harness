@@ -14,11 +14,13 @@ const AVATAR_REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
 const MAX_AVATAR_BYTES: usize = 256 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsAvatarRequest {
     pub avatar_url: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsAvatarResponse {
     pub avatar_url: String,
     pub mime_type: String,

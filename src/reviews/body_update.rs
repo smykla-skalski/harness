@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsBodyUpdateRequest {
     pub pull_request_id: String,
     pub expected_prior_body_sha256: String,
@@ -9,6 +10,7 @@ pub struct ReviewsBodyUpdateRequest {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ReviewsBodyUpdateOutcome {
     Updated,
@@ -16,11 +18,13 @@ pub enum ReviewsBodyUpdateOutcome {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ReviewsBodyUpdateResponse {
     pub pull_request_id: String,
     pub outcome: ReviewsBodyUpdateOutcome,
     pub current_body: String,
     pub current_body_sha256: String,
+    #[cfg_attr(feature = "openapi", schema(value_type = String, format = DateTime))]
     pub pr_updated_at: DateTime<Utc>,
     pub fetched_at: String,
 }

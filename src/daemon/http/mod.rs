@@ -52,6 +52,7 @@ mod remote_limits;
 mod remote_pairing;
 mod response;
 mod reviews;
+mod reviews_actions;
 mod reviews_files;
 mod reviews_policy;
 mod runtime_session;

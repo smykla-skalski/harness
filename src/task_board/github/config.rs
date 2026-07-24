@@ -39,6 +39,7 @@ fn empty_path(path: &Path) -> bool {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum GitHubMergeMethod {
     #[default]
