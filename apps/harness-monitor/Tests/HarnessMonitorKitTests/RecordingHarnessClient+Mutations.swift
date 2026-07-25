@@ -9,7 +9,7 @@ extension RecordingHarnessClient {
   ) async throws -> SessionDetail {
     recordActiveTraceContext(operation: "createTask")
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(
+    record(
       .createTask(
         sessionID: sessionID,
         title: request.title,
@@ -46,7 +46,7 @@ extension RecordingHarnessClient {
     request: TaskDeleteRequest
   ) async throws -> SessionDetail {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(.deleteTask(sessionID: sessionID, taskID: taskID, actor: request.actor))
+    record(.deleteTask(sessionID: sessionID, taskID: taskID, actor: request.actor))
 
     let tasks = detail.tasks.filter { $0.taskId != taskID }
     detail = SessionDetail(
@@ -66,7 +66,7 @@ extension RecordingHarnessClient {
     request: TaskAssignRequest
   ) async throws -> SessionDetail {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(
+    record(
       .assignTask(
         sessionID: sessionID,
         taskID: taskID,
@@ -102,7 +102,7 @@ extension RecordingHarnessClient {
     request: TaskDropRequest
   ) async throws -> SessionDetail {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(
+    record(
       .dropTask(
         sessionID: sessionID,
         taskID: taskID,
@@ -147,7 +147,7 @@ extension RecordingHarnessClient {
     request: TaskQueuePolicyRequest
   ) async throws -> SessionDetail {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(
+    record(
       .updateTaskQueuePolicy(
         sessionID: sessionID,
         taskID: taskID,
@@ -185,7 +185,7 @@ extension RecordingHarnessClient {
     request: TaskUpdateRequest
   ) async throws -> SessionDetail {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(
+    record(
       .updateTask(
         sessionID: sessionID,
         taskID: taskID,
@@ -225,7 +225,7 @@ extension RecordingHarnessClient {
     request: TaskCheckpointRequest
   ) async throws -> SessionDetail {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(
+    record(
       .checkpointTask(
         sessionID: sessionID,
         taskID: taskID,
@@ -268,7 +268,7 @@ extension RecordingHarnessClient {
     request: TaskSubmitForReviewRequest
   ) async throws -> SessionDetail {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(
+    record(
       .submitTaskForReview(
         sessionID: sessionID,
         taskID: taskID,
@@ -287,7 +287,7 @@ extension RecordingHarnessClient {
     request: TaskClaimReviewRequest
   ) async throws -> SessionDetail {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(
+    record(
       .claimTaskReview(sessionID: sessionID, taskID: taskID, actor: request.actor)
     )
     detail = touchingDetail()
@@ -300,7 +300,7 @@ extension RecordingHarnessClient {
     request: TaskSubmitReviewRequest
   ) async throws -> SessionDetail {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(
+    record(
       .submitTaskReview(
         sessionID: sessionID,
         taskID: taskID,
@@ -320,7 +320,7 @@ extension RecordingHarnessClient {
     request: TaskRespondReviewRequest
   ) async throws -> SessionDetail {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(
+    record(
       .respondTaskReview(
         sessionID: sessionID,
         taskID: taskID,
@@ -340,7 +340,7 @@ extension RecordingHarnessClient {
     request: TaskArbitrateRequest
   ) async throws -> SessionDetail {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(
+    record(
       .arbitrateTask(
         sessionID: sessionID,
         taskID: taskID,
@@ -359,7 +359,7 @@ extension RecordingHarnessClient {
     decision: AcpPermissionDecision
   ) async throws -> ManagedAgentSnapshot {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(
+    record(
       .resolveAcpPermission(
         agentID: agentID,
         batchID: batchID,
@@ -377,7 +377,7 @@ extension RecordingHarnessClient {
     request: ImproverApplyRequest
   ) async throws -> SessionDetail {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(
+    record(
       .applyImproverPatch(
         sessionID: sessionID,
         actor: request.actor,

@@ -168,7 +168,7 @@ extension RecordingHarnessClient {
         latestSimulation: policyAuditByCanvasID[canvasID]?.latestSimulation
       )
     }
-    calls.append(
+    record(
       .savePolicyPipelineDraft(
         revision: request.document.revision
       )
@@ -191,7 +191,7 @@ extension RecordingHarnessClient {
       simulatedPolicyCanvasIDs.append(canvasID)
       return canvasID
     }
-    calls.append(.simulatePolicyPipeline)
+    record(.simulatePolicyPipeline)
     let validation =
       lock.withLock { policyValidationOverride }
       ?? PolicyPipelineValidation(isValid: true)
@@ -247,7 +247,7 @@ extension RecordingHarnessClient {
       promotedPolicyCanvasIDs.append(canvasID)
       return canvasID
     }
-    calls.append(
+    record(
       .promotePolicyPipeline(revision: request.revision)
     )
     let document =
@@ -281,7 +281,7 @@ extension RecordingHarnessClient {
       promotedPolicyCanvasIDs.append(canvasID)
       return canvasID
     }
-    calls.append(
+    record(
       .makeLivePolicyPipeline(revision: request.revision)
     )
     return lock.withLock {

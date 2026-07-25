@@ -44,7 +44,7 @@ extension RecordingHarnessClient {
     id: String,
     request: TaskBoardSetItemPositionRequest
   ) async throws -> TaskBoardItemPositionMutationResponse {
-    calls.append(
+    record(
       .setTaskBoardItemPosition(
         id: id,
         status: request.status,
@@ -96,7 +96,7 @@ extension RecordingHarnessClient {
     id: String,
     request: TaskBoardResetItemPositionRequest
   ) async throws -> TaskBoardItemPositionMutationResponse {
-    calls.append(.resetTaskBoardItemPosition(id: id))
+    record(.resetTaskBoardItemPosition(id: id))
     return try lock.withLock {
       if let error = try dequeuePositionError() {
         throw error

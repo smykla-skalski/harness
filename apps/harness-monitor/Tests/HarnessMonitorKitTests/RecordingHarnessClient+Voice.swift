@@ -7,7 +7,7 @@ extension RecordingHarnessClient {
     sessionID: String,
     request: VoiceSessionStartRequest
   ) async throws -> VoiceSessionStartResponse {
-    calls.append(
+    record(
       .startVoiceSession(
         sessionID: sessionID,
         localeIdentifier: request.localeIdentifier,
@@ -29,7 +29,7 @@ extension RecordingHarnessClient {
     voiceSessionID: String,
     request: VoiceAudioChunkRequest
   ) async throws -> VoiceSessionMutationResponse {
-    calls.append(
+    record(
       .appendVoiceAudioChunk(
         voiceSessionID: voiceSessionID,
         sequence: request.sequence,
@@ -43,7 +43,7 @@ extension RecordingHarnessClient {
     voiceSessionID: String,
     request: VoiceTranscriptUpdateRequest
   ) async throws -> VoiceSessionMutationResponse {
-    calls.append(
+    record(
       .appendVoiceTranscript(
         voiceSessionID: voiceSessionID,
         sequence: request.segment.sequence,
@@ -57,7 +57,7 @@ extension RecordingHarnessClient {
     voiceSessionID: String,
     request: VoiceSessionFinishRequest
   ) async throws -> VoiceSessionMutationResponse {
-    calls.append(
+    record(
       .finishVoiceSession(
         voiceSessionID: voiceSessionID,
         reason: request.reason,

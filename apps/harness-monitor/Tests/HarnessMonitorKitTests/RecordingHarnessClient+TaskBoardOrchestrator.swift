@@ -22,7 +22,7 @@ extension RecordingHarnessClient {
   }
 
   func createTaskBoardItem(request: TaskBoardCreateItemRequest) async throws -> TaskBoardItem {
-    calls.append(
+    record(
       .createTaskBoardItem(
         title: request.title,
         priority: request.priority,
@@ -64,7 +64,7 @@ extension RecordingHarnessClient {
     request: TaskBoardUpdateItemRequest
   ) async throws -> TaskBoardItem {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(.updateTaskBoardItem(id: id, status: request.status))
+    record(.updateTaskBoardItem(id: id, status: request.status))
     return try lock.withLock {
       if let error = taskBoardUpdateError {
         throw error
@@ -80,7 +80,7 @@ extension RecordingHarnessClient {
   }
 
   func deleteTaskBoardItem(id: String) async throws -> TaskBoardItem {
-    calls.append(.deleteTaskBoardItem(id: id))
+    record(.deleteTaskBoardItem(id: id))
     return try lock.withLock {
       guard let index = taskBoardItemsStorage.firstIndex(where: { $0.id == id }) else {
         throw HarnessMonitorAPIError.server(code: 404, message: "Task board item unavailable.")
@@ -93,7 +93,7 @@ extension RecordingHarnessClient {
   }
 
   func beginTaskBoardPlan(id: String) async throws -> TaskBoardPlanningResponse {
-    calls.append(.beginTaskBoardPlan(id: id))
+    record(.beginTaskBoardPlan(id: id))
     return try updateTaskBoardPlanning(
       id: id,
       toStatus: .planning,
@@ -105,7 +105,7 @@ extension RecordingHarnessClient {
     id: String,
     request: TaskBoardPlanSubmitRequest
   ) async throws -> TaskBoardPlanningResponse {
-    calls.append(.submitTaskBoardPlan(id: id, summary: request.summary))
+    record(.submitTaskBoardPlan(id: id, summary: request.summary))
     return try updateTaskBoardPlanning(
       id: id,
       toStatus: .agenticReview,
@@ -117,7 +117,7 @@ extension RecordingHarnessClient {
     id: String,
     request: TaskBoardPlanApproveRequest
   ) async throws -> TaskBoardPlanningResponse {
-    calls.append(
+    record(
       .approveTaskBoardPlan(
         id: id,
         approvedBy: request.approvedBy,
@@ -137,7 +137,7 @@ extension RecordingHarnessClient {
     id: String,
     request: TaskBoardPlanRevokeRequest
   ) async throws -> TaskBoardPlanningResponse {
-    calls.append(.revokeTaskBoardPlan(id: id, actor: request.actor))
+    record(.revokeTaskBoardPlan(id: id, actor: request.actor))
     return try updateTaskBoardPlanning(
       id: id,
       toStatus: .planning,
@@ -146,7 +146,7 @@ extension RecordingHarnessClient {
   }
 
   func syncTaskBoard(request: TaskBoardSyncRequest) async throws -> TaskBoardSyncSummary {
-    calls.append(
+    record(
       .syncTaskBoard(
         direction: request.direction,
         dryRun: request.dryRun,
@@ -170,7 +170,7 @@ extension RecordingHarnessClient {
   func dispatchTaskBoard(
     request: TaskBoardDispatchRequest
   ) async throws -> TaskBoardDispatchSummary {
-    calls.append(
+    record(
       .dispatchTaskBoard(
         dryRun: request.dryRun,
         status: request.status,
@@ -237,7 +237,7 @@ extension RecordingHarnessClient {
   func deliverTaskBoardDispatch(
     request: TaskBoardDispatchDeliverRequest
   ) async throws -> TaskBoardDispatchDelivery {
-    calls.append(
+    record(
       .deliverTaskBoardDispatch(itemID: request.itemId, dryRun: request.dryRun)
     )
     return try lock.withLock {
@@ -280,19 +280,19 @@ extension RecordingHarnessClient {
   }
 
   func startTaskBoardOrchestrator() async throws -> TaskBoardOrchestratorStatus {
-    calls.append(.startTaskBoardOrchestrator)
+    record(.startTaskBoardOrchestrator)
     return sampleTaskBoardOrchestratorStatus(enabled: true, running: true)
   }
 
   func stopTaskBoardOrchestrator() async throws -> TaskBoardOrchestratorStatus {
-    calls.append(.stopTaskBoardOrchestrator)
+    record(.stopTaskBoardOrchestrator)
     return sampleTaskBoardOrchestratorStatus(enabled: true, running: false)
   }
 
   func runTaskBoardOrchestratorOnce(
     request: TaskBoardOrchestratorRunOnceRequest
   ) async throws -> TaskBoardOrchestratorRunOnceResponse {
-    calls.append(
+    record(
       .runTaskBoardOrchestratorOnce(
         itemID: request.itemId,
         dryRun: request.dryRun,
@@ -306,7 +306,7 @@ extension RecordingHarnessClient {
   func evaluateTaskBoard(request: TaskBoardEvaluateRequest) async throws
     -> TaskBoardEvaluationSummary
   {
-    calls.append(
+    record(
       .evaluateTaskBoard(
         dryRun: request.dryRun,
         status: request.status,
@@ -334,7 +334,7 @@ extension RecordingHarnessClient {
   }
 
   func auditTaskBoard(status: TaskBoardStatus?) async throws -> TaskBoardAuditSummary {
-    calls.append(.auditTaskBoard(status: status))
+    record(.auditTaskBoard(status: status))
     return lock.withLock {
       if let summary = taskBoardAuditSummaryStorage {
         return summary
@@ -351,7 +351,7 @@ extension RecordingHarnessClient {
   }
 
   func taskBoardProjects(status: TaskBoardStatus?) async throws -> [TaskBoardProjectSummary] {
-    calls.append(.taskBoardProjects(status: status))
+    record(.taskBoardProjects(status: status))
     return lock.withLock {
       if let summaries = taskBoardProjectSummariesStorage {
         return summaries
@@ -398,7 +398,7 @@ extension RecordingHarnessClient {
   }
 
   func taskBoardMachines(status: TaskBoardStatus?) async throws -> [TaskBoardMachineSummary] {
-    calls.append(.taskBoardMachines(status: status))
+    record(.taskBoardMachines(status: status))
     return lock.withLock {
       if let summaries = taskBoardMachineSummariesStorage {
         return summaries
@@ -422,19 +422,19 @@ extension RecordingHarnessClient {
   }
 
   func taskBoardHostLocal() async throws -> TaskBoardHostMachine {
-    calls.append(.taskBoardHostLocal)
+    record(.taskBoardHostLocal)
     return sampleTaskBoardHostMachine()
   }
 
   func taskBoardHostList() async throws -> [TaskBoardHostMachine] {
-    calls.append(.taskBoardHostList)
+    record(.taskBoardHostList)
     return [sampleTaskBoardHostMachine()]
   }
 
   func setTaskBoardHostProjectTypes(
     request: TaskBoardHostSetProjectTypesRequest
   ) async throws -> TaskBoardHostMachine {
-    calls.append(.setTaskBoardHostProjectTypes(projectTypes: request.projectTypes))
+    record(.setTaskBoardHostProjectTypes(projectTypes: request.projectTypes))
     return TaskBoardHostMachine(
       id: "recording-host-local",
       label: "Recording Mac",

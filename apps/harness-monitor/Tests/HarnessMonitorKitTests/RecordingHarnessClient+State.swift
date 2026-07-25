@@ -3,9 +3,17 @@ import Foundation
 @testable import HarnessMonitorKit
 
 extension RecordingHarnessClient {
+  /// Read-only on purpose. A settable array property records through
+  /// get-append-set, which takes the lock twice and lets two concurrent calls
+  /// read the same list and write back over each other. Record through
+  /// `record(_:)` instead, which appends under one acquisition; leaving this
+  /// get-only means a new call type cannot reintroduce the lost update.
   var calls: [Call] {
-    get { lock.withLock { callsStorage } }
-    set { lock.withLock { callsStorage = newValue } }
+    lock.withLock { callsStorage }
+  }
+
+  func record(_ call: Call) {
+    lock.withLock { callsStorage.append(call) }
   }
 
   var detail: SessionDetail {

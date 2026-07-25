@@ -7,7 +7,7 @@ extension RecordingHarnessClient {
     request: HostBridgeReconfigureRequest
   ) async throws -> BridgeStatusReport {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(
+    record(
       .reconfigureHostBridge(
         enable: request.enable,
         disable: request.disable,
@@ -46,7 +46,7 @@ extension RecordingHarnessClient {
     request: CodexRunRequest
   ) async throws -> CodexRunSnapshot {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(
+    record(
       .startCodexRun(
         sessionID: sessionID,
         prompt: request.prompt,
@@ -75,7 +75,7 @@ extension RecordingHarnessClient {
     request: CodexSteerRequest
   ) async throws -> CodexRunSnapshot {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(.steerCodexRun(runID: runID, prompt: request.prompt))
+    record(.steerCodexRun(runID: runID, prompt: request.prompt))
     guard let run = configuredCodexRun(id: runID) else {
       throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable")
     }
@@ -93,7 +93,7 @@ extension RecordingHarnessClient {
 
   func interruptCodexRun(runID: String) async throws -> CodexRunSnapshot {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(.interruptCodexRun(runID: runID))
+    record(.interruptCodexRun(runID: runID))
     guard let run = configuredCodexRun(id: runID) else {
       throw HarnessMonitorAPIError.server(code: 404, message: "Codex run unavailable")
     }
@@ -114,7 +114,7 @@ extension RecordingHarnessClient {
     request: CodexApprovalDecisionRequest
   ) async throws -> CodexRunSnapshot {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(
+    record(
       .resolveCodexApproval(
         runID: runID,
         approvalID: approvalID,
@@ -161,7 +161,7 @@ extension RecordingHarnessClient {
     if let error = configuredAgentTuiStartError() {
       throw error
     }
-    calls.append(
+    record(
       .startAgentTui(
         sessionID: sessionID,
         runtime: request.runtime,
@@ -194,7 +194,7 @@ extension RecordingHarnessClient {
     request: AgentTuiInputRequest
   ) async throws -> AgentTuiSnapshot {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(.sendAgentTuiInput(tuiID: tuiID, request: request))
+    record(.sendAgentTuiInput(tuiID: tuiID, request: request))
     if let error = configuredAgentTuiInputError(id: tuiID) {
       throw error
     }
@@ -236,7 +236,7 @@ extension RecordingHarnessClient {
     request: AgentTuiResizeRequest
   ) async throws -> AgentTuiSnapshot {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(.resizeAgentTui(tuiID: tuiID, rows: request.rows, cols: request.cols))
+    record(.resizeAgentTui(tuiID: tuiID, rows: request.rows, cols: request.cols))
     if let error = configuredAgentTuiResizeError(id: tuiID) {
       throw error
     }
@@ -258,7 +258,7 @@ extension RecordingHarnessClient {
 
   func stopAgentTui(tuiID: String) async throws -> AgentTuiSnapshot {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(.stopAgentTui(tuiID: tuiID))
+    record(.stopAgentTui(tuiID: tuiID))
     if let error = configuredAgentTuiStopError(id: tuiID) {
       throw error
     }

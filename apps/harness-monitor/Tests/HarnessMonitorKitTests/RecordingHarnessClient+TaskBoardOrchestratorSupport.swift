@@ -6,7 +6,7 @@ extension RecordingHarnessClient {
   func forceCancelTaskBoardAutomation(
     request: TaskBoardAutomationForceCancelRequest
   ) async throws -> TaskBoardAutomationForceCancelResponse {
-    calls.append(.forceCancelTaskBoardAutomation(request: request))
+    record(.forceCancelTaskBoardAutomation(request: request))
     return TaskBoardAutomationForceCancelResponse(disposition: .acceptedPending)
   }
 
@@ -28,16 +28,14 @@ extension RecordingHarnessClient {
   func updateTaskBoardOrchestratorSettings(
     request: TaskBoardOrchestratorSettingsUpdateRequest
   ) async throws -> TaskBoardOrchestratorSettings {
-    lock.withLock {
-      callsStorage.append(
-        .updateTaskBoardOrchestratorSettings(
-          stepMode: request.stepMode,
-          policyVersion: request.policyVersion,
-          clearProjectDir: request.clearProjectDir,
-          clearDispatchStatusFilter: request.clearDispatchStatusFilter
-        )
+    record(
+      .updateTaskBoardOrchestratorSettings(
+        stepMode: request.stepMode,
+        policyVersion: request.policyVersion,
+        clearProjectDir: request.clearProjectDir,
+        clearDispatchStatusFilter: request.clearDispatchStatusFilter
       )
-    }
+    )
     await orchestratorSettingsMutationGate.suspendIfConfigured()
     if let error = lock.withLock({ taskBoardOrchestratorSettingsError }) {
       throw error
@@ -65,7 +63,7 @@ extension RecordingHarnessClient {
   func updateTaskBoardGitRuntimeConfig(
     request: TaskBoardGitRuntimeConfig
   ) async throws -> TaskBoardGitRuntimeConfig {
-    calls.append(.updateTaskBoardGitRuntimeConfig(overrideCount: request.repositoryOverrides.count))
+    record(.updateTaskBoardGitRuntimeConfig(overrideCount: request.repositoryOverrides.count))
     if let error = lock.withLock({ taskBoardRuntimeConfigError }) {
       throw error
     }
@@ -75,15 +73,13 @@ extension RecordingHarnessClient {
   func syncTaskBoardGitHubTokens(
     request: TaskBoardGitHubTokensSyncRequest
   ) async throws -> TaskBoardGitHubTokensSyncResponse {
-    let error = lock.withLock {
-      callsStorage.append(
-        .syncTaskBoardGitHubTokens(
-          globalTokenConfigured: request.globalToken != nil,
-          repositoryTokenCount: request.repositoryTokens.count
-        )
+    record(
+      .syncTaskBoardGitHubTokens(
+        globalTokenConfigured: request.globalToken != nil,
+        repositoryTokenCount: request.repositoryTokens.count
       )
-      return taskBoardGitHubTokensSyncError
-    }
+    )
+    let error = lock.withLock { taskBoardGitHubTokensSyncError }
     if let error {
       throw error
     }
@@ -96,10 +92,8 @@ extension RecordingHarnessClient {
   func syncTaskBoardTodoistToken(
     request: TaskBoardTodoistTokenSyncRequest
   ) async throws -> TaskBoardTodoistTokenSyncResponse {
-    let error = lock.withLock {
-      callsStorage.append(.syncTaskBoardTodoistToken(tokenConfigured: request.token != nil))
-      return taskBoardTodoistTokenSyncError
-    }
+    record(.syncTaskBoardTodoistToken(tokenConfigured: request.token != nil))
+    let error = lock.withLock { taskBoardTodoistTokenSyncError }
     if let error {
       throw error
     }
@@ -109,28 +103,26 @@ extension RecordingHarnessClient {
   func syncTaskBoardOpenRouterToken(
     request: TaskBoardOpenRouterTokenSyncRequest
   ) async throws -> TaskBoardOpenRouterTokenSyncResponse {
-    lock.withLock {
-      callsStorage.append(.syncTaskBoardOpenRouterToken(tokenConfigured: request.token != nil))
-    }
+    record(.syncTaskBoardOpenRouterToken(tokenConfigured: request.token != nil))
     return TaskBoardOpenRouterTokenSyncResponse(tokenConfigured: request.token != nil)
   }
 
   func taskBoardGitIdentityDefaults() async throws -> TaskBoardGitIdentityDefaults {
-    calls.append(.taskBoardGitIdentityDefaults)
+    record(.taskBoardGitIdentityDefaults)
     return lock.withLock { taskBoardGitIdentityDefaultsValue }
   }
 
   func verifyTaskBoardGitSigning(
     request: TaskBoardGitSigningVerifyRequest
   ) async throws -> TaskBoardGitSigningVerifyResponse {
-    calls.append(.verifyTaskBoardGitSigning(repository: request.repository))
+    record(.verifyTaskBoardGitSigning(repository: request.repository))
     return lock.withLock { taskBoardGitSigningVerifyValue }
   }
 
   func syncTaskBoardGitRuntimeKeyMaterial(
     request: TaskBoardGitRuntimeKeyMaterialSyncRequest
   ) async throws -> TaskBoardGitRuntimeKeyMaterialSyncResponse {
-    calls.append(
+    record(
       .syncTaskBoardGitRuntimeKeyMaterial(
         overrideCount: request.runtime.repositoryOverrides.count
       )
@@ -141,7 +133,7 @@ extension RecordingHarnessClient {
   func prepareTaskBoardGitRuntimeSecretHandoff() async throws
     -> TaskBoardGitRuntimeSecretHandoffPrepareResponse
   {
-    calls.append(.prepareTaskBoardSecretHandoff)
+    record(.prepareTaskBoardSecretHandoff)
     if let error = taskBoardSecretHandoffPrepareError {
       throw error
     }
@@ -151,7 +143,7 @@ extension RecordingHarnessClient {
   func acknowledgeTaskBoardGitRuntimeSecretHandoff(
     request: TaskBoardGitRuntimeSecretHandoffAckRequest
   ) async throws -> TaskBoardGitRuntimeSecretHandoffAckResponse {
-    calls.append(
+    record(
       .ackTaskBoardSecretHandoff(
         migrationID: request.migrationID,
         digest: request.digest
