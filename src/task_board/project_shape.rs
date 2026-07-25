@@ -51,6 +51,25 @@ impl TaskBoardProjectShape {
     pub fn parse(value: &str) -> Option<Self> {
         Self::SHAPES.into_iter().find(|shape| shape.as_str() == value)
     }
+
+    /// The shape an organization wears when its stored one cannot be read.
+    ///
+    /// Seeded by organization rather than project so the two repositories of
+    /// one owner still land together, and stable across restarts for the same
+    /// reason [`TaskBoardProjectColor::derived`] is: past the palette this is
+    /// the only channel telling two same-coloured projects apart, and falling
+    /// back to one shared default would collapse it exactly when it matters.
+    #[must_use]
+    pub fn derived(seed: &str) -> Self {
+        let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+        for byte in seed.as_bytes() {
+            hash ^= u64::from(*byte);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        let shapes_len = u64::try_from(Self::SHAPES.len()).unwrap_or(1);
+        let index = usize::try_from(hash % shapes_len).unwrap_or(0);
+        Self::SHAPES[index]
+    }
 }
 
 /// Whether a board of this size still has a spare colour for one more project.

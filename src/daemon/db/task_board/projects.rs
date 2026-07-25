@@ -6,7 +6,7 @@ use crate::task_board::project::{
     ItemProjectAttribution, TaskBoardProject, TaskBoardProjectSource, item_attribution,
 };
 use crate::task_board::project_color::{self, TaskBoardProjectColor};
-use crate::task_board::project_shape::TaskBoardProjectShape;
+use crate::task_board::project_shape::{self, TaskBoardProjectShape};
 use crate::task_board::{TaskBoardItem, TaskBoardOrchestratorSettings};
 use crate::workspace::utc_now;
 
@@ -70,14 +70,17 @@ impl TryFrom<ProjectRow> for TaskBoardProject {
             .as_deref()
             .and_then(TaskBoardProjectColor::parse)
             .unwrap_or_else(|| TaskBoardProjectColor::derived(&row.project_id));
-        // Null while the palette still covers the board, and unreadable for the
-        // same reason a color can be, so both land on the default rather than
-        // failing a read that has nothing wrong with it.
-        let shape = row
-            .shape
-            .as_deref()
-            .and_then(TaskBoardProjectShape::parse)
-            .unwrap_or(TaskBoardProjectShape::DEFAULT);
+        // Null means the palette still covers the board, where every project
+        // wears the default and the colour alone tells them apart. A stored
+        // value that cannot be read is the other case entirely: the board is
+        // past the palette, so collapsing it onto that same default would drop
+        // the channel keeping two same-coloured projects apart.
+        let shape = match row.shape.as_deref() {
+            None => TaskBoardProjectShape::DEFAULT,
+            Some(stored) => TaskBoardProjectShape::parse(stored).unwrap_or_else(|| {
+                TaskBoardProjectShape::derived(project_shape::organization_of(&row.slug))
+            }),
+        };
         Ok(Self {
             project_id: row.project_id,
             source,

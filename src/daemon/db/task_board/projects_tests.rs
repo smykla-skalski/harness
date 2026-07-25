@@ -3,6 +3,7 @@ use tempfile::tempdir;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::project::TaskBoardProjectSource;
 use crate::task_board::project_color::TaskBoardProjectColor;
+use crate::task_board::project_shape::TaskBoardProjectShape;
 
 use super::{ColorEdit, DisplayNameEdit, ProjectEdit};
 
@@ -337,4 +338,47 @@ async fn renaming_an_unregistered_project_is_a_usage_error() {
         .await
         .expect_err("an unknown project is refused");
     assert_eq!(error.code(), "USAGE", "{error}");
+}
+
+#[tokio::test]
+async fn an_unreadable_shape_falls_back_to_the_organizations_own() {
+    // An organization the fallback does not send to the default anyway,
+    // otherwise this passes just as well against the collapse it exists to
+    // catch.
+    let organization = (0..64u32)
+        .map(|index| format!("org{index}"))
+        .find(|candidate| {
+            TaskBoardProjectShape::derived(candidate) != TaskBoardProjectShape::DEFAULT
+        })
+        .expect("an organization whose derived shape is not the default");
+    let (_directory, db) = database().await;
+    let project = db
+        .ensure_task_board_project(
+            TaskBoardProjectSource::GitHub,
+            &format!("{organization}/widgets"),
+        )
+        .await
+        .expect("register project")
+        .expect("names a project");
+
+    // Passes the column's CHECK, so this is the shape of a board written by a
+    // build that knew a shape this one has since retired.
+    sqlx::query("UPDATE task_board_projects SET shape = ?2 WHERE project_id = ?1")
+        .bind(&project)
+        .bind("octagon")
+        .execute(db.pool())
+        .await
+        .expect("store a shape this build cannot read");
+
+    let read = db
+        .get_task_board_project(&project)
+        .await
+        .expect("read project")
+        .expect("the project is still there");
+
+    assert_eq!(
+        read.shape,
+        TaskBoardProjectShape::derived(&organization),
+        "an unreadable shape collapsed onto the default and took the second channel with it"
+    );
 }
