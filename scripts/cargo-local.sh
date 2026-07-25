@@ -248,7 +248,7 @@ configure_tmpdir() {
     return 0
   fi
 
-  repo_fallback="$COMMON_REPO_ROOT/target/.cargo-local/tmp/$target_segment"
+  repo_fallback="$COMMON_REPO_ROOT/target/.cargo-local/tmp/$tmpdir_id"
   if ! mkdir -p "$repo_fallback" || ! tmpdir_is_usable "$repo_fallback"; then
     printf 'failed to prepare writable TMPDIR at %s\n' "$repo_fallback" >&2
     return 1
