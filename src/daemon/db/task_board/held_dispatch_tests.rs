@@ -376,3 +376,57 @@ fn approval_graph(revision: u64) -> PolicyGraph {
     }))
     .expect("approval graph")
 }
+
+/// Delivery renders the worker prompt before claiming. The claim commits the
+/// starting transition, the attempt row and the lane move, and consumes the
+/// one-shot approval grant, and no compensation follows it -- so a prompt that
+/// cannot render has to refuse while the dispatch is still merely held.
+#[tokio::test]
+async fn an_unrenderable_prompt_leaves_the_dispatch_held_and_the_grant_live() {
+    let _lock = crate::task_board::prompt_catalog::PROMPT_CATALOG_TEST_LOCK
+        .lock()
+        .expect("catalog test lock");
+    let fixture = held_fixture().await;
+    let _installed = crate::task_board::prompt_catalog::scoped_prompt_catalog(
+        crate::task_board::prompt_catalog::PromptCatalog::from_json(
+            br#"{"worker": "Do {{ board_item_id }} for {{ project_id }}"}"#,
+        )
+        .expect("parse overrides"),
+    );
+    let held = fixture
+        .db
+        .held_task_board_dispatch(&fixture.item_id)
+        .await
+        .expect("held dispatch");
+
+    let error = crate::daemon::task_board_managed_agents::rendered_worker_prompt(
+        &held.applied,
+        &held.intent_id,
+    )
+    .expect_err("the item has no project, so the prompt cannot render");
+    assert!(error.message().contains("project_id"), "{}", error.message());
+
+    assert_eq!(
+        fixture
+            .db
+            .held_task_board_dispatch_summary()
+            .await
+            .expect("held summary")
+            .count,
+        1,
+        "a refused render must not have claimed the dispatch"
+    );
+    assert!(
+        fixture
+            .db
+            .live_approval_grant(
+                &fixture.item_id,
+                PolicyAction::SpawnAgent,
+                fixture.graph.revision
+            )
+            .await
+            .expect("live grant")
+            .is_some(),
+        "a refused render must not have consumed the one-shot approval grant"
+    );
+}

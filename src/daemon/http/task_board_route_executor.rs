@@ -76,8 +76,21 @@ pub(crate) async fn deliver(
             started_agent: None,
         });
     }
+    // Render before claiming. The claim commits the starting transition, the
+    // attempt row and the lane move, and consumes the one-shot approval grant,
+    // and nothing here compensates for a failure after it -- the item would
+    // sit claimed until its lease expired. A prompt that cannot render must
+    // refuse while refusing is still free.
+    let held = db.held_task_board_dispatch(&request.item_id).await?;
+    let held_prompt = rendered_worker_prompt(&held.applied, &held.intent_id)?;
     let mut claim = db.claim_held_task_board_dispatch(&request.item_id).await?;
-    let prompt = rendered_worker_prompt(&claim.applied, &claim.intent_id)?;
+    let prompt = if claim.intent_id == held.intent_id {
+        held_prompt
+    } else {
+        // A different intent won the claim, so the preflight was about
+        // something else and this is the honest thing to report.
+        rendered_worker_prompt(&claim.applied, &claim.intent_id)?
+    };
     let agent = worker_start::start_and_complete_delivered_worker(state, db, &mut claim).await?;
     Ok(TaskBoardDispatchDeliverResponse {
         intent_id: claim.intent_id,
