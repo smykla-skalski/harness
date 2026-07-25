@@ -13,10 +13,18 @@ pub mod http_paths {
 #[path = "../../../src/daemon/protocol/api_contract/ws_methods.rs"]
 pub mod ws_methods;
 
+// Kept in sync by hand with `src/daemon/protocol/api_contract.rs`'s
+// route-table-derived `task_board_mcp_methods()`, which never chains in
+// `routes_task_board_orchestrator` or `routes_task_board_working_copies` --
+// those routes are deliberately absent from the MCP surface.
 const NON_AGENT_FACING_TASK_BOARD_METHODS: &[&str] = &[
     ws_methods::TASK_BOARD_ORCHESTRATOR_RUNS,
     ws_methods::TASK_BOARD_ORCHESTRATOR_RUN_DETAIL,
     ws_methods::TASK_BOARD_ORCHESTRATOR_METRICS,
+    ws_methods::TASK_BOARD_ORCHESTRATOR_FORCE_CANCEL,
+    ws_methods::TASK_BOARD_WORKING_COPIES_LIST,
+    ws_methods::TASK_BOARD_WORKING_COPIES_OBTAIN,
+    ws_methods::TASK_BOARD_WORKING_COPIES_DELETE,
 ];
 
 /// Return websocket methods belonging to the task-board and policy surfaces.
