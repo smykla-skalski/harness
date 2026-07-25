@@ -39,6 +39,8 @@ pub enum DaemonCommand {
     },
     /// Show daemon manifest and project/session counts.
     Status,
+    /// Show the daemon's stable identity, optionally renaming it.
+    Identity(DaemonIdentityArgs),
     /// Stop the local daemon.
     Stop(DaemonStopArgs),
     /// Restart the local daemon.
@@ -68,6 +70,7 @@ impl Execute for DaemonCommand {
                 print_json(&report)?;
                 Ok(0)
             }
+            Self::Identity(args) => args.execute(context),
             Self::Stop(args) => args.execute(context),
             Self::Restart(args) => args.execute(context),
             Self::Doctor => {
@@ -95,6 +98,25 @@ fn execute_remote_command(
         .transpose()?
         .map(|root| state::ScopedDaemonRootOverride::set(Some(root)));
     command.execute(context)
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct DaemonIdentityArgs {
+    /// Replace the name this daemon reports to clients.
+    #[arg(long, value_name = "NAME")]
+    pub set_name: Option<String>,
+}
+
+impl Execute for DaemonIdentityArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        adopt_daemon_root_for_transport_command("daemon-identity");
+        let identity = match self.set_name.as_deref() {
+            Some(name) => state::set_daemon_name(name)?,
+            None => state::ensure_daemon_identity()?,
+        };
+        print_json(&identity)?;
+        Ok(0)
+    }
 }
 
 #[derive(Debug, Clone, Args)]

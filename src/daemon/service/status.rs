@@ -45,6 +45,7 @@ pub fn health_response(
     } else {
         index::fast_counts()
     };
+    let (daemon_id, daemon_name) = reported_identity_fields(state::reported_daemon_identity()?);
     Ok(HealthResponse {
         status: "ok".into(),
         version: manifest.version.clone(),
@@ -56,7 +57,18 @@ pub fn health_response(
         worktree_count,
         session_count,
         wire_version: DAEMON_WIRE_VERSION,
+        daemon_id,
+        daemon_name,
     })
+}
+
+/// A daemon root with no identity reports the same empty values a daemon that
+/// predates the field does, rather than inventing one on a read path.
+fn reported_identity_fields(identity: Option<state::DaemonIdentity>) -> (String, String) {
+    identity.map_or_else(
+        || (String::new(), String::new()),
+        |identity| (identity.daemon_id, identity.name),
+    )
 }
 
 /// Build the daemon health response using the async `SQLx` pool when available.
@@ -73,6 +85,8 @@ pub(crate) async fn health_response_async(
         ))
     })?;
     let (project_count, worktree_count, session_count) = async_db.health_counts().await?;
+    let (daemon_id, daemon_name) =
+        reported_identity_fields(reported_daemon_identity_async().await?);
     Ok(HealthResponse {
         status: "ok".into(),
         version: manifest.version.clone(),
@@ -84,7 +98,17 @@ pub(crate) async fn health_response_async(
         worktree_count,
         session_count,
         wire_version: DAEMON_WIRE_VERSION,
+        daemon_id,
+        daemon_name,
     })
+}
+
+/// Reading per report is what lets a rename land without a daemon restart, and
+/// that makes it a blocking read on an async path.
+async fn reported_daemon_identity_async() -> Result<Option<state::DaemonIdentity>, CliError> {
+    spawn_blocking(state::reported_daemon_identity)
+        .await
+        .unwrap_or_else(|error| Err(blocking_join_error("daemon identity", &error)))
 }
 
 fn diagnostics_manifest_load_is_ignorable(error: &CliError) -> bool {

@@ -123,6 +123,11 @@ pub fn config_path() -> PathBuf {
 }
 
 #[must_use]
+pub fn identity_path() -> PathBuf {
+    daemon_root().join("identity.json")
+}
+
+#[must_use]
 pub fn events_path() -> PathBuf {
     daemon_root().join("events.jsonl")
 }

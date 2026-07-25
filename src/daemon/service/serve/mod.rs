@@ -5,6 +5,7 @@ mod background_tasks;
 mod binary_stamp;
 mod config;
 mod github_data_change_publisher;
+mod identity;
 mod legacy_migration;
 mod local_listener;
 mod machine_heartbeat_loop;

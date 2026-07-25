@@ -16,6 +16,8 @@ pub enum DaemonRoute {
     #[command(disable_help_flag = true)]
     Status(WorkerArgs),
     #[command(disable_help_flag = true)]
+    Identity(WorkerArgs),
+    #[command(disable_help_flag = true)]
     Stop(WorkerArgs),
     #[command(disable_help_flag = true)]
     Restart(WorkerArgs),
