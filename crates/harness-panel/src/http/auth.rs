@@ -64,15 +64,31 @@ pub async fn callback(
     jar: CookieJar,
     headers: HeaderMap,
     Query(query): Query<CallbackQuery>,
-) -> Result<Response, ApiError> {
+) -> Response {
     // Whatever happens next, this browser is done with the value it was
     // holding: a failed sign-in must not leave a reusable one behind.
     let jar = without_cookie(jar, &state, SIGN_IN_COOKIE);
-    let identity = finish_sign_in(&state, &headers, query).await?;
-    let token = issue_session(&state, &identity).await?;
 
-    let jar = with_session_cookie(jar, &state, token);
-    Ok((jar, Redirect::to(&state.config.landing_path())).into_response())
+    match complete_sign_in(&state, &headers, query).await {
+        Ok(token) => (
+            with_session_cookie(jar, &state, token),
+            Redirect::to(&state.config.landing_path()),
+        )
+            .into_response(),
+        // The cleared cookie has to ride out on the failure response too. An
+        // early `?` here would drop the jar and answer without any `Set-Cookie`,
+        // leaving the browser holding the value this callback just refused.
+        Err(error) => (jar, error).into_response(),
+    }
+}
+
+async fn complete_sign_in(
+    state: &PanelState,
+    headers: &HeaderMap,
+    query: CallbackQuery,
+) -> Result<String, ApiError> {
+    let identity = finish_sign_in(state, headers, query).await?;
+    issue_session(state, &identity).await
 }
 
 #[expect(

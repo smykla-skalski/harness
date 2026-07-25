@@ -7,7 +7,7 @@ use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 
 use super::PanelState;
-use super::session::{Viewer, require_viewer};
+use super::session::require_viewer;
 use crate::error::ApiError;
 use crate::store::accounts::Account;
 
@@ -46,11 +46,8 @@ pub async fn healthz(State(state): State<PanelState>) -> Json<HealthBody> {
 ///
 /// # Errors
 /// Returns [`ApiError::Unauthenticated`] when no live session is presented.
-pub async fn me(
-    State(state): State<PanelState>,
-    headers: HeaderMap,
-) -> Result<Json<Viewer>, ApiError> {
-    Ok(Json(require_viewer(&state, &headers).await?))
+pub async fn me(State(state): State<PanelState>, headers: HeaderMap) -> Result<Response, ApiError> {
+    Ok(private_json(&require_viewer(&state, &headers).await?))
 }
 
 /// Everyone who has signed in. The owner is the only account allowed to see
@@ -62,16 +59,25 @@ pub async fn me(
 pub async fn accounts(
     State(state): State<PanelState>,
     headers: HeaderMap,
-) -> Result<Json<AccountsBody>, ApiError> {
+) -> Result<Response, ApiError> {
     let viewer = require_viewer(&state, &headers).await?;
     if !viewer.is_owner {
         return Err(ApiError::Forbidden(
             "only the panel owner can list accounts",
         ));
     }
-    Ok(Json(AccountsBody {
+    Ok(private_json(&AccountsBody {
         accounts: state.store.list_accounts().await?,
     }))
+}
+
+/// Answer with JSON that belongs to one session and nothing else.
+///
+/// A 200 is heuristically cacheable, so without this a proxy between the daemon
+/// and the browser is free to keep one person's account list and hand it to the
+/// next request that looks the same.
+fn private_json<T: Serialize>(body: &T) -> Response {
+    ([(header::CACHE_CONTROL, NO_STORE)], Json(body)).into_response()
 }
 
 pub async fn index(State(state): State<PanelState>) -> Response {
