@@ -17,6 +17,7 @@ mod attempts;
 mod ingestion;
 mod lifecycle;
 mod report_evidence;
+mod report_starts;
 mod reports;
 pub(crate) mod requests;
 mod revision_validation;
