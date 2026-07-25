@@ -2,7 +2,9 @@
 set -euo pipefail
 unalias -a 2>/dev/null || true
 
-ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
+# Physical path: COMMON_REPO_ROOT comes from git and is already resolved, and
+# the two are compared below to tell a linked worktree from the main checkout.
+ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)"
 # shellcheck source=scripts/lib/run-step.sh
 source "$ROOT/scripts/lib/run-step.sh"
 # shellcheck source=scripts/lib/common-repo-root.sh
@@ -80,19 +82,23 @@ configure_sccache_socket() {
     return 0
   fi
 
+  safe_user="$(sanitize_segment "${USER:-user}")"
   socket_root="${sccache_socket_root:-${TMPDIR:-/tmp}}"
   socket_root="${socket_root%/}/harness-sccache"
-  if (( ${#socket_root} > 70 )); then
-    safe_user="$(sanitize_segment "${USER:-user}")"
+  # Straight under world-writable /tmp the name has to carry the user, the way
+  # the long-path fallback always has. The socket name is a deterministic hash
+  # of a guessable path, so a shared root lets another local user bind it first.
+  if [[ "$socket_root" == "/tmp/harness-sccache" ]] || (( ${#socket_root} > 70 )); then
     socket_root="/tmp/harness-sccache-$safe_user"
   fi
 
-  if ! mkdir -p "$socket_root"; then
+  # Ownership and mode matter here for the same reason: a plain mkdir -p adopts
+  # a pre-existing directory whatever its owner.
+  if ! prepare_private_tmpdir "$socket_root"; then
     return 1
   fi
 
   sweep_dead_sccache_sockets "$socket_root"
-  safe_user="${safe_user:-$(sanitize_segment "${USER:-user}")}"
   if [[ "$socket_root" != "/tmp/harness-sccache-$safe_user" ]]; then
     sweep_dead_sccache_sockets "/tmp/harness-sccache-$safe_user"
   fi
@@ -312,51 +318,42 @@ detect_cpu_count() {
   printf '%s\n' "$count"
 }
 
-default_jobs() {
-  local cpu_count base_jobs divisor
-  cpu_count="$(detect_cpu_count)"
+# One concurrency model for everything this script sizes. The lease count is
+# sampled once, before the process starts working, and agents arrive
+# independently with no way to renegotiate afterwards, so an agent assumes a
+# full field of agents until the observed count is larger. Widening the divisor
+# is what reserves that room - dividing a second time would starve every late
+# arrival instead.
+concurrency_share() {
+  local budget="$1" divisor share
 
   divisor=$active_build_count
-
-  # The lease count is sampled once, before this build starts compiling, so a
-  # build that arrives alone would otherwise keep the whole machine even after
-  # other agents join, and agents cannot renegotiate afterwards. Assume a full
-  # field of them until the observed count is larger. Widening the divisor is
-  # what reserves that room - dividing a second time would starve every late
-  # arrival instead.
   if [[ -n "$session_id" ]] && (( divisor < AGENT_BUILD_SHARE )); then
     divisor=$AGENT_BUILD_SHARE
   fi
-
   if (( divisor < 1 )); then
     divisor=1
   fi
 
-  base_jobs=$(((cpu_count + divisor - 1) / divisor))
-
-  if (( base_jobs < 1 )); then
-    base_jobs=1
+  share=$(((budget + divisor - 1) / divisor))
+  if (( share < 1 )); then
+    share=1
   fi
 
-  printf '%s\n' "$base_jobs"
+  printf '%s\n' "$share"
+}
+
+default_jobs() {
+  concurrency_share "$(detect_cpu_count)"
 }
 
 default_test_jobs() {
-  local cpu_count max_jobs test_jobs
-  cpu_count="$(detect_cpu_count)"
+  local test_jobs
+  test_jobs="$(concurrency_share "$(detect_cpu_count)")"
 
-  if [[ -n "$session_id" ]]; then
-    max_jobs=8
-  else
-    max_jobs=12
-  fi
-  test_jobs=$cpu_count
-  if (( test_jobs > max_jobs )); then
-    test_jobs=$max_jobs
-  fi
-  if (( active_build_count > 1 )); then
-    test_jobs=$(((test_jobs + active_build_count - 1) / active_build_count))
-  fi
+  # Test processes hold the same share as build jobs: a group runs one phase or
+  # the other, never both, so sizing them alike keeps the reserve honest. Two is
+  # the floor because the override validation below rejects a single thread.
   if (( test_jobs < 2 )); then
     test_jobs=2
   fi
@@ -406,7 +403,10 @@ configure_tmpdir
 
 resolve_sccache_bin || true
 if [[ -n "${SCCACHE_BIN:-}" ]]; then
-  export SCCACHE_BASEDIRS="${SCCACHE_BASEDIRS:-$ROOT:$COMMON_REPO_ROOT}"
+  # sccache reads these only in the process that starts the server, so a
+  # per-worktree value would make path normalization depend on whichever
+  # checkout happened to start it. Keep it repo-wide and predictable.
+  export SCCACHE_BASEDIRS="${SCCACHE_BASEDIRS:-$COMMON_REPO_ROOT}"
   if configure_sccache_tmpdir; then
     configure_sccache_socket || true
   else
