@@ -1,0 +1,272 @@
+#!/usr/bin/env bash
+set -uo pipefail
+unalias -a 2>/dev/null || true
+
+ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd -P)"
+JOBSERVER="$ROOT/scripts/harness-jobserver.py"
+
+passed=0
+failed=0
+started_pools=()
+
+pass() {
+  printf 'PASS: %s\n' "$1"
+  passed=$((passed + 1))
+}
+
+fail() {
+  printf 'FAIL: %s\n' "$1"
+  failed=$((failed + 1))
+}
+
+# Each scenario gets its own synthetic repo root, and the pool path is a hash of
+# that root, so scenarios never share a supervisor.
+fake_root() {
+  printf '/synthetic/%s/%s' "$$" "$1"
+}
+
+pool_dir_for() {
+  python3 - "$JOBSERVER" "$1" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("js", sys.argv[1])
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+print(mod.pool_dir(sys.argv[2]))
+PY
+}
+
+track_pool() {
+  started_pools+=("$(pool_dir_for "$1")")
+}
+
+cleanup() {
+  local dir pid
+  for dir in "${started_pools[@]:-}"; do
+    [[ -n "$dir" ]] || continue
+    pid="$(head -1 "$dir/lock" 2>/dev/null || true)"
+    if [[ "$pid" =~ ^[0-9]+$ ]]; then
+      kill "$pid" 2>/dev/null || true
+    fi
+    rm -rf "$dir" 2>/dev/null || true
+  done
+}
+trap cleanup EXIT
+
+tokens_in_fifo() {
+  python3 - "$1" <<'PY'
+import os, sys
+fd = os.open(sys.argv[1], os.O_RDWR | os.O_NONBLOCK)
+total = 0
+while True:
+    try:
+        chunk = os.read(fd, 4096)
+    except BlockingIOError:
+        break
+    if not chunk:
+        break
+    total += len(chunk)
+if total:
+    os.write(fd, b"+" * total)   # put them back
+print(total)
+PY
+}
+
+scenario_ensure_starts_pool_and_prints_makeflags() {
+  local name="ensure starts a pool and prints usable MAKEFLAGS"
+  local root; root="$(fake_root ensure)"
+  track_pool "$root"
+
+  local out
+  out="$(python3 "$JOBSERVER" ensure --repo-root "$root" --budget 6 2>&1)"
+  if [[ ! "$out" =~ ^MAKEFLAGS=-j6\ --jobserver-auth=fifo:/ ]]; then
+    fail "$name (got: $out)"
+    return
+  fi
+  local fifo="${out#*fifo:}"
+  if [[ ! -p "$fifo" ]]; then
+    fail "$name (not a FIFO: $fifo)"
+    return
+  fi
+  if [[ "$(tokens_in_fifo "$fifo")" != "6" ]]; then
+    fail "$name (FIFO not filled to budget)"
+    return
+  fi
+  pass "$name"
+}
+
+scenario_ensure_is_idempotent() {
+  local name="a second ensure reuses the running supervisor"
+  local root; root="$(fake_root idem)"
+  track_pool "$root"
+  local dir; dir="$(pool_dir_for "$root")"
+
+  python3 "$JOBSERVER" ensure --repo-root "$root" --budget 4 >/dev/null 2>&1
+  local first; first="$(head -1 "$dir/lock" 2>/dev/null)"
+  python3 "$JOBSERVER" ensure --repo-root "$root" --budget 4 >/dev/null 2>&1
+  local second; second="$(head -1 "$dir/lock" 2>/dev/null)"
+
+  if [[ -z "$first" ]] || [[ "$first" != "$second" ]]; then
+    fail "$name (supervisor pid changed: '$first' -> '$second')"
+    return
+  fi
+  pass "$name"
+}
+
+scenario_run_exports_granted_width() {
+  local name="run exports the granted width and returns tokens after"
+  local root; root="$(fake_root width)"
+  track_pool "$root"
+  python3 "$JOBSERVER" ensure --repo-root "$root" --budget 5 >/dev/null 2>&1
+  local dir; dir="$(pool_dir_for "$root")"
+
+  local seen
+  seen="$(python3 "$JOBSERVER" run --repo-root "$root" --max 3 --env PROBE -- \
+    sh -c 'printf %s "$PROBE"')"
+  # 3 tokens granted plus the implicit slot every process already owns.
+  if [[ "$seen" != "4" ]]; then
+    fail "$name (expected width 4, got '$seen')"
+    return
+  fi
+  sleep 0.3
+  if [[ "$(tokens_in_fifo "$dir/fifo")" != "5" ]]; then
+    fail "$name (tokens not returned after the command exited)"
+    return
+  fi
+  pass "$name"
+}
+
+scenario_grant_is_capped_by_budget() {
+  local name="a grant never exceeds the pool budget"
+  local root; root="$(fake_root cap)"
+  track_pool "$root"
+  python3 "$JOBSERVER" ensure --repo-root "$root" --budget 3 >/dev/null 2>&1
+
+  local seen
+  seen="$(python3 "$JOBSERVER" run --repo-root "$root" --max 99 --env PROBE -- \
+    sh -c 'printf %s "$PROBE"')"
+  if [[ "$seen" != "4" ]]; then
+    fail "$name (expected 3 tokens + implicit slot = 4, got '$seen')"
+    return
+  fi
+  pass "$name"
+}
+
+scenario_second_client_gets_the_remainder() {
+  local name="a concurrent client gets only what is left"
+  local root; root="$(fake_root share)"
+  track_pool "$root"
+  python3 "$JOBSERVER" ensure --repo-root "$root" --budget 4 >/dev/null 2>&1
+
+  local holder_out; holder_out="$(mktemp)"
+  python3 "$JOBSERVER" run --repo-root "$root" --max 3 --env PROBE -- \
+    sh -c 'printf %s "$PROBE" > '"$holder_out"'; sleep 3' &
+  local holder=$!
+  sleep 1
+
+  local seen
+  seen="$(python3 "$JOBSERVER" run --repo-root "$root" --max 4 --env PROBE -- \
+    sh -c 'printf %s "$PROBE"')"
+  wait "$holder" 2>/dev/null
+  # First client took 3 of 4; only 1 remains, so the second sees 1 + implicit.
+  if [[ "$seen" != "2" ]]; then
+    fail "$name (expected width 2 for the second client, got '$seen')"
+    rm -f "$holder_out"
+    return
+  fi
+  rm -f "$holder_out"
+  pass "$name"
+}
+
+scenario_sigkilled_client_returns_its_tokens() {
+  local name="a SIGKILLed client's tokens are reclaimed"
+  local root; root="$(fake_root reclaim)"
+  track_pool "$root"
+  python3 "$JOBSERVER" ensure --repo-root "$root" --budget 4 >/dev/null 2>&1
+  local dir; dir="$(pool_dir_for "$root")"
+
+  python3 "$JOBSERVER" run --repo-root "$root" --max 4 --env PROBE -- sleep 60 &
+  local victim=$!
+  sleep 1
+  if [[ "$(tokens_in_fifo "$dir/fifo")" != "0" ]]; then
+    fail "$name (pool was not drained by the holder)"
+    kill -9 "$victim" 2>/dev/null
+    return
+  fi
+
+  # SIGKILL leaves the client no chance to release anything itself.
+  pkill -9 -P "$victim" 2>/dev/null
+  kill -9 "$victim" 2>/dev/null
+  wait "$victim" 2>/dev/null
+  sleep 1
+
+  if [[ "$(tokens_in_fifo "$dir/fifo")" != "4" ]]; then
+    fail "$name (tokens leaked after SIGKILL)"
+    return
+  fi
+  pass "$name"
+}
+
+scenario_foreign_owned_pool_dir_is_refused() {
+  local name="a symlinked pool directory is refused"
+  local root; root="$(fake_root unsafe)"
+  local dir; dir="$(pool_dir_for "$root")"
+  local decoy; decoy="$(mktemp -d)"
+
+  mkdir -p "$(dirname "$dir")"
+  rm -rf "$dir"
+  ln -s "$decoy" "$dir"
+
+  local status=0
+  python3 "$JOBSERVER" ensure --repo-root "$root" --budget 4 >/dev/null 2>&1 || status=$?
+  rm -f "$dir"
+  rm -rf "$decoy"
+
+  if (( status == 0 )); then
+    fail "$name (symlinked pool directory was accepted)"
+    return
+  fi
+  pass "$name"
+}
+
+scenario_missing_pool_still_runs_the_command() {
+  local name="run still executes when no pool is reachable"
+  local root; root="$(fake_root nopool)"
+
+  local seen
+  seen="$(python3 "$JOBSERVER" run --repo-root "$root" --max 4 --env PROBE --floor 2 -- \
+    sh -c 'printf %s "$PROBE"')"
+  # No supervisor, so the floor applies and the command must still run.
+  if [[ "$seen" != "2" ]]; then
+    fail "$name (expected floor width 2, got '$seen')"
+    return
+  fi
+  pass "$name"
+}
+
+scenario_run_propagates_exit_status() {
+  local name="run propagates the command's exit status"
+  local root; root="$(fake_root status)"
+  track_pool "$root"
+  python3 "$JOBSERVER" ensure --repo-root "$root" --budget 2 >/dev/null 2>&1
+
+  local status=0
+  python3 "$JOBSERVER" run --repo-root "$root" --max 1 --env PROBE -- sh -c 'exit 42' || status=$?
+  if (( status != 42 )); then
+    fail "$name (expected 42, got $status)"
+    return
+  fi
+  pass "$name"
+}
+
+scenario_ensure_starts_pool_and_prints_makeflags
+scenario_ensure_is_idempotent
+scenario_run_exports_granted_width
+scenario_grant_is_capped_by_budget
+scenario_second_client_gets_the_remainder
+scenario_sigkilled_client_returns_its_tokens
+scenario_foreign_owned_pool_dir_is_refused
+scenario_missing_pool_still_runs_the_command
+scenario_run_propagates_exit_status
+
+printf 'jobserver tests: %d passed, %d failed\n' "$passed" "$failed"
+(( failed == 0 ))
