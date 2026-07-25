@@ -5,7 +5,7 @@ import Foundation
 extension RecordingHarnessClient {
   func adoptSession(bookmarkID: String?, sessionRoot: URL) async throws -> SessionSummary {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(.adoptSession(bookmarkID: bookmarkID, sessionRoot: sessionRoot))
+    record(.adoptSession(bookmarkID: bookmarkID, sessionRoot: sessionRoot))
     let adoptedDetail = detail
     let adoptedSummary = adoptedDetail.session
     let mergedSummaries = lock.withLock {
@@ -30,7 +30,7 @@ extension RecordingHarnessClient {
 
   func startSession(request: SessionStartRequest) async throws -> SessionStartResult {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(
+    record(
       .startSession(
         projectDir: request.projectDir,
         baseRef: request.baseRef
@@ -45,7 +45,7 @@ extension RecordingHarnessClient {
     request: RoleChangeRequest
   ) async throws -> SessionDetail {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(
+    record(
       .changeRole(
         sessionID: sessionID,
         agentID: agentID,
@@ -79,7 +79,7 @@ extension RecordingHarnessClient {
     request: AgentRemoveRequest
   ) async throws -> SessionDetail {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(
+    record(
       .removeAgent(
         sessionID: sessionID,
         agentID: agentID,
@@ -123,7 +123,7 @@ extension RecordingHarnessClient {
     request: LeaderTransferRequest
   ) async throws -> SessionDetail {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(
+    record(
       .transferLeader(
         sessionID: sessionID,
         newLeaderID: request.newLeaderId,

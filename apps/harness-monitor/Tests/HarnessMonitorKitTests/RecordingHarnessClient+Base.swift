@@ -146,7 +146,7 @@ extension RecordingHarnessClient {
     request: ObserveSessionRequest
   ) async throws -> SessionDetail {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(.observeSession(sessionID: sessionID, actor: request.actor))
+    record(.observeSession(sessionID: sessionID, actor: request.actor))
     return detail
   }
 
@@ -155,7 +155,7 @@ extension RecordingHarnessClient {
     request: SessionEndRequest
   ) async throws -> SessionDetail {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(.endSession(sessionID: sessionID, actor: request.actor))
+    record(.endSession(sessionID: sessionID, actor: request.actor))
     detail = SessionDetail(
       session: SessionSummary(
         projectId: detail.session.projectId,
@@ -188,7 +188,7 @@ extension RecordingHarnessClient {
     request: SessionArchiveRequest
   ) async throws -> SessionArchiveResponse {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(.removeSession(sessionID: sessionID, actor: request.actor))
+    record(.removeSession(sessionID: sessionID, actor: request.actor))
     if let archiveSessionError = lock.withLock({ archiveSessionError }) {
       throw archiveSessionError
     }
@@ -219,7 +219,7 @@ extension RecordingHarnessClient {
     request: SignalSendRequest
   ) async throws -> SessionDetail {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(
+    record(
       .sendSignal(
         sessionID: sessionID,
         agentID: request.agentId,
@@ -270,7 +270,7 @@ extension RecordingHarnessClient {
     request: SignalCancelRequest
   ) async throws -> SessionDetail {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(
+    record(
       .cancelSignal(
         sessionID: sessionID,
         agentID: request.agentId,

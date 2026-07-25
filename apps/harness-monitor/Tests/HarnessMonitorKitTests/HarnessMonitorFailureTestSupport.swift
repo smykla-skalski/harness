@@ -279,7 +279,7 @@ func makeBootstrappedStore(
 
 @MainActor
 func clearRecordedCallsIfNeeded(for client: any HarnessMonitorClientProtocol) {
-  (client as? RecordingHarnessClient)?.calls = []
+  (client as? RecordingHarnessClient)?.clearRecordedCalls()
 }
 
 @MainActor

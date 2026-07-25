@@ -81,7 +81,7 @@ extension RecordingHarnessClient {
     request: AcpAgentStartRequest
   ) async throws -> ManagedAgentSnapshot {
     try await sleepIfNeeded(configuredMutationDelay())
-    calls.append(
+    record(
       .startAcpAgent(
         sessionID: sessionID,
         agentID: request.agent,
