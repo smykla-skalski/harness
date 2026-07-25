@@ -1,4 +1,5 @@
 use std::io;
+use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
 use std::sync::{LazyLock, Mutex};
 use std::thread;
@@ -9,13 +10,16 @@ pub use harness_protocol::managed_agents::acp::{
 };
 use tracing::warn;
 
-use crate::workspace::utc_now;
+use crate::workspace::{account_home_dir, dirs_home, normalized_env_value, utc_now};
 
 use super::catalog::{AcpAgentDescriptor, acp_agents};
 use super::program::resolve_program;
 
 const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
 const PROBE_CACHE_TTL: Duration = Duration::from_secs(30);
+/// Redirects the HOME handed to probed agent binaries. Tests point this at one
+/// reusable directory; `harness_testkit::env` owns that path.
+const PROBE_HOME_ENV: &str = "HARNESS_AGENT_PROBE_HOME";
 
 #[derive(Clone)]
 struct ProbeCacheEntry {
@@ -203,8 +207,13 @@ pub fn probe_descriptor(descriptor: &AcpAgentDescriptor) -> AcpRuntimeProbe {
 
 fn run_probe_command(descriptor: &AcpAgentDescriptor) -> io::Result<Output> {
     let program = resolve_program(&descriptor.doctor_probe.command)?;
+    // The refresh thread is detached, so a probe can outlive a caller that
+    // pointed HOME at a temp dir. Agents that bootstrap a package cache on
+    // first run would download it there, after that dir was already removed,
+    // leaving hundreds of megabytes nothing ever cleans up.
     let mut child = Command::new(program)
         .args(&descriptor.doctor_probe.args)
+        .env("HOME", probe_home())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
@@ -217,6 +226,33 @@ fn run_probe_command(descriptor: &AcpAgentDescriptor) -> io::Result<Output> {
     }
     let _ = child.kill();
     child.wait_with_output()
+}
+
+fn probe_home() -> PathBuf {
+    normalized_env_value(PROBE_HOME_ENV)
+        .map(PathBuf::from)
+        .unwrap_or_else(default_probe_home)
+}
+
+// Package caches belong to the OS account, so this deliberately skips
+// HARNESS_HOST_HOME. Resolving through it would aim a probe at whatever temp
+// home the caller redirected to, and the download then lands in a directory
+// that caller deletes moments later.
+fn agent_package_home() -> PathBuf {
+    account_home_dir().unwrap_or_else(dirs_home)
+}
+
+// Not every test reaches the probe through `with_isolated_harness_env`; some set
+// HOME directly. Defaulting the whole test build to the shared directory keeps
+// the developer's real home out of reach either way.
+#[cfg(test)]
+fn default_probe_home() -> PathBuf {
+    harness_testkit::shared_agent_probe_home()
+}
+
+#[cfg(not(test))]
+fn default_probe_home() -> PathBuf {
+    agent_package_home()
 }
 
 fn pending_probe_response() -> AcpRuntimeProbeResponse {
@@ -360,6 +396,77 @@ mod tests {
         assert!(!probe.binary_present);
         assert_eq!(probe.auth_state, AcpAuthState::Unavailable);
         assert_eq!(probe.version, None);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn probe_hands_agents_the_shared_home_not_an_isolated_one() {
+        use std::os::unix::fs::PermissionsExt;
+        use std::path::Path;
+
+        let bin_dir = tempfile::tempdir().expect("probe bin tempdir");
+        let command = "acp-probe-home-echo-4d2f81ab";
+        let binary = bin_dir.path().join(command);
+        fs_err::write(&binary, "#!/bin/sh\nprintf '%s\\n' \"$HOME\"\n").expect("write home echo");
+        let mut permissions = binary.metadata().expect("home echo metadata").permissions();
+        permissions.set_mode(0o755);
+        fs_err::set_permissions(&binary, permissions).expect("make home echo executable");
+
+        let shared_home = harness_testkit::shared_agent_probe_home();
+        let isolated_home = tempfile::tempdir().expect("isolated home tempdir");
+        let probe = temp_env::with_vars(
+            [
+                ("PATH", Some(bin_dir.path().to_str().expect("bin dir path"))),
+                (
+                    "HOME",
+                    Some(isolated_home.path().to_str().expect("isolated home path")),
+                ),
+                (
+                    PROBE_HOME_ENV,
+                    Some(shared_home.to_str().expect("shared home path")),
+                ),
+            ],
+            || probe_descriptor(&descriptor(command, &[])),
+        );
+
+        let reported = probe.version.expect("probe reports the child HOME");
+        assert_ne!(
+            Path::new(&reported),
+            isolated_home.path(),
+            "a probed agent that inherits an isolated HOME caches its package into a temp dir that outlives the caller"
+        );
+        assert_eq!(Path::new(&reported), shared_home);
+    }
+
+    #[test]
+    fn probe_home_never_defaults_to_the_developers_home() {
+        temp_env::with_var(PROBE_HOME_ENV, None::<&str>, || {
+            let home = probe_home();
+            assert_eq!(home, harness_testkit::shared_agent_probe_home());
+            assert_ne!(
+                home,
+                agent_package_home(),
+                "a test that probes with the real home downloads agent package caches into it"
+            );
+        });
+    }
+
+    #[test]
+    fn agent_package_home_ignores_a_redirected_host_home() {
+        let redirected = tempfile::tempdir().expect("redirected host home tempdir");
+        temp_env::with_vars(
+            [
+                ("HARNESS_HOST_HOME", Some(redirected.path())),
+                ("HOME", Some(redirected.path())),
+            ],
+            || {
+                assert_ne!(
+                    agent_package_home(),
+                    redirected.path(),
+                    "spawned binaries would download agent packages into a temp host home that the test then removes"
+                );
+            },
+        );
     }
 
     #[test]
