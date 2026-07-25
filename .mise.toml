@@ -295,15 +295,23 @@ run = "npm run build"
 [tasks."panel:frontend:lint"]
 description = "Lint, format-check, and type-check the panel frontend"
 dir = "crates/harness-panel/frontend"
-# Self-sufficient on a fresh clone. Once the tree exists the panel's build
-# script keeps it in step with the lockfile, so reinstalling here every run
-# would only cost time.
-run = ["[ -d node_modules ] || npm ci --no-audit --no-fund", "npm run lint"]
+# Self-sufficient on a fresh clone, and on a pull that moved the lockfile:
+# `-nt` is false when node_modules is missing as well as when it predates the
+# lockfile, so both cases reinstall. Checking existence alone would lint a
+# stale tree, because these tasks can run without a cargo build having brought
+# the panel's build script along to notice.
+run = [
+  "[ node_modules -nt package-lock.json ] || npm ci --no-audit --no-fund",
+  "npm run lint",
+]
 
 [tasks."panel:frontend:test"]
 description = "Run the panel frontend unit tests"
 dir = "crates/harness-panel/frontend"
-run = ["[ -d node_modules ] || npm ci --no-audit --no-fund", "npm test"]
+run = [
+  "[ node_modules -nt package-lock.json ] || npm ci --no-audit --no-fund",
+  "npm test",
+]
 
 [tasks."harness:check:stale-state"]
 hide = true

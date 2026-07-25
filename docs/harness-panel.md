@@ -64,7 +64,9 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now harness-panel.service
 ```
 
-`print-unit` reads nothing off disk, so it works on a host where the secret file does not exist yet. `--state-dir` is only echoed into the printed unit for review; the unit itself points the panel at systemd's own state directory, because `ProtectSystem=strict` makes everything else read-only.
+`print-unit` reads nothing off disk, so it works on a host where the secret file does not exist yet.
+
+It ignores `--state-dir`. The rendered unit always points the panel at `%S/<unit>`, the directory `StateDirectory=` creates for it, because `ProtectSystem=strict` leaves nowhere else writable. The flag is still required because `serve` and `print-unit` take the same arguments; pass anything, or pass the path you would use when running the panel by hand.
 
 The rendered unit runs under `DynamicUser=yes` with an empty capability bounding set, and takes the client secret through `LoadCredential=`, which re-exposes it as mode 0400 owned by that transient user. `systemd-analyze security` scores it 1.1. What it still counts against the unit is inherent to the job: the panel has host network access, allocates Internet sockets, and pins no IP allow list, because GitHub's address ranges rotate and a stale list would take sign-in down without a word.
 

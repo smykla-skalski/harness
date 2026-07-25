@@ -107,9 +107,9 @@ fn normalize_asset_path(relative_path: &str) -> Option<&str> {
     Some(trimmed)
 }
 
-/// `mime_guess` has no opinion about an extensionless file, and answering
-/// without a type lets the browser sniff one, so anything unrecognised is
-/// served as bytes.
+/// Spelled out rather than looked up in a MIME table, because the bundle only
+/// ever holds what Vite emits. Answering without a type lets the browser sniff
+/// one, so anything unrecognised is served as bytes.
 fn content_type_for(path: &str) -> &'static str {
     match path.rsplit_once('.').map(|(_, extension)| extension) {
         Some("js" | "mjs") => "text/javascript; charset=utf-8",
