@@ -36,8 +36,7 @@ Roles: `leader`, `observer`, `worker`, `reviewer`, `improver`.
 
 ## Task board
 
-Task-board commands require a running daemon with database-backed task-board
-storage. Start Harness Monitor or run `harness-daemon dev` first.
+Task-board commands require a running daemon with database-backed task-board storage. Start Harness Monitor or run `harness-daemon dev` first.
 
 ```
 harness task-board create --title "..." [--body "..."] [--priority <priority>] [--agent-mode <mode>] [--project-id <id>] [--tag <tag>] [--id <id>]
@@ -58,13 +57,9 @@ harness task-board orchestrator run-once [--json] [--dry-run|--apply] [--item-id
 harness task-board orchestrator settings [--json] [--dry-run-default <bool>] [--dispatch-status-filter <status>] [--clear-dispatch-status-filter] [--project-dir <path>] [--clear-project-dir]
 ```
 
-Task statuses: `new`, `planning`, `plan_review`, `todo`, `in_progress`, `in_review`, `done`, `blocked`.
-Task priorities: `low`, `medium`, `high`, `critical`.
-Agent modes: `headless`, `interactive`, `planning`, `evaluate`.
+Task statuses: `new`, `planning`, `plan_review`, `todo`, `in_progress`, `in_review`, `done`, `blocked`. Task priorities: `low`, `medium`, `high`, `critical`. Agent modes: `headless`, `interactive`, `planning`, `evaluate`.
 
-Read [task-board-workflow.md](task-board-workflow.md) for planning gates,
-dispatch/evaluate behavior, orchestrator routes, policy pipeline routes, and
-overview commands.
+Read [task-board-workflow.md](task-board-workflow.md) for planning gates, dispatch/evaluate behavior, orchestrator routes, policy pipeline routes, and overview commands.
 
 ## Signals
 
@@ -103,15 +98,10 @@ harness session agents approve <agent-id> <approval-id> --decision <accept|rejec
 harness session agents acp inspect [--session-id <session-id>]
 ```
 
-Task-board dispatch creates session tasks and records worker/reviewer/evaluator
-intent, but managed agent capacity is launched through these `session agents`
-commands. Terminal, Codex, and ACP starts can carry role, fallback role,
-capabilities, display name, persona, model, effort, and project-directory
-context when supported by that runtime.
+Task-board dispatch creates session tasks and records worker/reviewer/evaluator intent, but managed agent capacity is launched through these `session agents` commands. Terminal, Codex, and ACP starts can carry role, fallback role, capabilities, display name, persona, model, effort, and project-directory context when supported by that runtime.
 
 ## Runtimes
 
 Supported: `claude`, `codex`, `gemini`, `copilot`, `opencode`, `vibe`.
 
-Bootstrap all runtimes: `harness setup bootstrap`
-Narrow to subset: `harness setup bootstrap --agents <runtime[,runtime...]>`
+Bootstrap all runtimes: `harness setup bootstrap` Narrow to subset: `harness setup bootstrap --agents <runtime[,runtime...]>`

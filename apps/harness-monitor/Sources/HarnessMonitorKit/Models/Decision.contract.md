@@ -1,14 +1,10 @@
 # Decision Contract
 
-This document is a narrative index.
-Canonical operating semantics live on the Swift types and store helpers named below.
-This file exists to keep the human-facing map aligned with those concrete owners when the UI shifts.
+This document is a narrative index. Canonical operating semantics live on the Swift types and store helpers named below. This file exists to keep the human-facing map aligned with those concrete owners when the UI shifts.
 
 ## Operating Goal
 
-The Decisions system enforces a single operator queue for policy decisions.
-Goal is single-queue policy enforcement, not interruption fidelity.
-Presentation can change from modal to workspace window, but queue ownership, auditability, and idempotent resolution must remain stable.
+The Decisions system enforces a single operator queue for policy decisions. Goal is single-queue policy enforcement, not interruption fidelity. Presentation can change from modal to workspace window, but queue ownership, auditability, and idempotent resolution must remain stable.
 
 ## Canonical Type Map
 
@@ -29,15 +25,11 @@ Presentation can change from modal to workspace window, but queue ownership, aud
 
 ## Front-Hall Channel
 
-Primary signal is the Decisions queue itself.
-Later redundant channels such as dock badge, window title/count, sidebar badge, toast, and notification center may degrade without changing the contract.
+Primary signal is the Decisions queue itself. Later redundant channels such as dock badge, window title/count, sidebar badge, toast, and notification center may degrade without changing the contract.
 
 ## UI-6 Authority
 
-Authority for deleting the legacy ACP modal after dogfood sits with the Harness Monitor maintainers owning this plan.
-Default schedule is after the UI-0 dogfood kill criteria hold for the planned two-week window.
-Override rule: do not delete the modal on calendar grounds alone if abandoned pending decisions, double resolutions, or sub-95 percent Decisions-path resolution appear in the observed data.
-Compatibility deletion ledger:
+Authority for deleting the legacy ACP modal after dogfood sits with the Harness Monitor maintainers owning this plan. Default schedule is after the UI-0 dogfood kill criteria hold for the planned two-week window. Override rule: do not delete the modal on calendar grounds alone if abandoned pending decisions, double resolutions, or sub-95 percent Decisions-path resolution appear in the observed data. Compatibility deletion ledger:
 
 - `presentingAcpPermissionBatch` and `reconcilePresentedAcpPermissionBatch` in `Stores/HarnessMonitorStore+AcpAgents.swift` remain modal-only bridge seams.
 - `AcpPermissionModal` and `WorkspaceWindowView+AcpPermissionPresentation.swift` remain compatibility readers over the Decisions-owned ACP state.
@@ -45,5 +37,4 @@ Compatibility deletion ledger:
 
 ## Daemon API Stability Budget
 
-UI chunks before UI-6 may lean harder on current daemon payloads, but they do not get to silently expand the daemon surface.
-Budget one explicit post-UI-6 re-cut to simplify or rename daemon contracts once the Decisions-first UI path proves stable.
+UI chunks before UI-6 may lean harder on current daemon payloads, but they do not get to silently expand the daemon surface. Budget one explicit post-UI-6 re-cut to simplify or rename daemon contracts once the Decisions-first UI path proves stable.

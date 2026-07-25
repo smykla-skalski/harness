@@ -85,10 +85,12 @@ private var primaryContent: InspectorPrimaryContentState {
 `.repeatForever()` forces the rendering pipeline to run at 60fps permanently, consuming CPU even when the app is idle. This applies to any animation modifier - scale, opacity, rotation, offset.
 
 Allowed uses of `.repeatForever()`:
+
 - Spinner/loading indicators that are **only visible during transient loading states** (seconds, not minutes)
 - Content that the user explicitly started and will explicitly stop
 
 Banned uses:
+
 - Status indicators that are visible during normal idle operation (connection dots, activity pulses)
 - Decorative ambient animations (breathing effects, idle hints, attention-seeking loops)
 - Any view that remains on screen indefinitely
@@ -146,10 +148,12 @@ If the formatter needs per-call configuration (timezone, calendar), reuse the ca
 `while !Task.isCancelled { sleep; withAnimation { ... } }` loops that run idle hint animations, attention-seeking morphs, or decorative effects burn CPU for no user benefit. Every `withAnimation` triggers a view tree diff.
 
 Acceptable periodic patterns:
+
 - Status ticker rotating messages every 4+ seconds (one state change, minimal cost)
 - Connection probe pinging health every 10+ seconds (network I/O, not animation)
 
 Unacceptable periodic patterns:
+
 - Multi-step spring animation sequences on timers (multiple withAnimation + Task.sleep per cycle)
 - Idle hint animations that morph between states to attract attention
 - Any animation cycle that touches 3+ @State properties
@@ -265,9 +269,7 @@ mise run monitor:audit:from-ref -- \
   ...
 ```
 
-It creates the temporary worktree, runs `mise trust`, delegates to
-`mise run monitor:audit`, verifies `manifest.json` provenance, and
-removes the worktree on exit.
+It creates the temporary worktree, runs `mise trust`, delegates to `mise run monitor:audit`, verifies `manifest.json` provenance, and removes the worktree on exit.
 
 If you need to reason about that behavior or change it, the required contract is:
 
@@ -277,31 +279,21 @@ If you need to reason about that behavior or change it, the required contract is
    git worktree add /tmp/harness-monitor-audit-<sha>-<date> <sha-or-ref>
    ```
 
-2. Immediately run `mise trust` inside that new worktree before any build, audit,
-   or inspection command:
+2. Immediately run `mise trust` inside that new worktree before any build, audit, or inspection command:
 
    ```bash
    (cd /tmp/harness-monitor-audit-<sha>-<date> && mise trust)
    ```
 
-   This is required so audit logs do not get polluted by mise trust warnings and
-   so the worktree uses the expected repo tool configuration. Do not continue
-   after creating the worktree until `mise trust` has completed cleanly.
+   This is required so audit logs do not get polluted by mise trust warnings and so the worktree uses the expected repo tool configuration. Do not continue after creating the worktree until `mise trust` has completed cleanly.
 
 3. Run `mise run monitor:audit -- ...` from inside that worktree. Compare against the baseline path from the main repo only when needed; do not run the audit from the main worktree just to access the baseline.
 
 4. Verify the generated `manifest.json` before trusting the numbers. The embedded commit, dirty flag, workspace fingerprint, host binary hash, and staged host bundle ID must match the worktree/ref being measured.
 
-5. Before removing the worktree, copy the relevant audit artifacts back to the
-   main workspace so the run can be compared later. Preserve the whole run
-   directory when storage is acceptable. If storage is constrained, preserve at
-   least `manifest.json`, `summary.json`, `summary.csv`, `comparison.json`,
-   `comparison.md`, `captures.tsv`, and the `metrics/` directory. Use an
-   explicit copy command that bypasses shell aliases, such as `command rsync -a`,
-   so local aliases cannot accidentally preserve the temporary worktree path.
+5. Before removing the worktree, copy the relevant audit artifacts back to the main workspace so the run can be compared later. Preserve the whole run directory when storage is acceptable. If storage is constrained, preserve at least `manifest.json`, `summary.json`, `summary.csv`, `comparison.json`, `comparison.md`, `captures.tsv`, and the `metrics/` directory. Use an explicit copy command that bypasses shell aliases, such as `command rsync -a`, so local aliases cannot accidentally preserve the temporary worktree path.
 
-6. Clean up the temporary worktree only after required artifacts have been
-   copied or recorded:
+6. Clean up the temporary worktree only after required artifacts have been copied or recorded:
 
    ```bash
    git worktree remove /tmp/harness-monitor-audit-<sha>-<date>
@@ -313,16 +305,14 @@ Leaving audit worktrees behind is not acceptable. If cleanup fails because a pro
 
 The Python scripts under `apps/harness-monitor/Scripts/` parse Instruments XML exports. They must stay compatible with the xctrace export format, which uses ref-based deduplication for elements. The `dereference` function in `extract-instruments-metrics.py` handles transitive refs (ref -> ref -> element).
 
-When modifying the extractor, comparator, or audit contracts, run the perf tool
-tests and the parser regression tests:
+When modifying the extractor, comparator, or audit contracts, run the perf tool tests and the parser regression tests:
 
 ```
 GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.bareRepository GIT_CONFIG_VALUE_0=all mise run monitor:tools:test:perf
 mise run monitor:test:scripts
 ```
 
-`mise run monitor:audit:validation` runs both suites sequentially with
-fail-fast, which is the convenience entrypoint for "audit confidence".
+`mise run monitor:audit:validation` runs both suites sequentially with fail-fast, which is the convenience entrypoint for "audit confidence".
 
 Test fixtures in `Scripts/tests/fixtures/` are minimal XML samples. Update them when adding new schema parsers.
 

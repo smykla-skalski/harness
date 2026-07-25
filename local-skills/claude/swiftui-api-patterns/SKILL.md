@@ -12,7 +12,7 @@ How SwiftUI APIs are used in the Harness Monitor macOS app. Hard rules learned f
 ### State wrappers reference
 
 | Wrapper | Use when |
-|---|---|
+| --- | --- |
 | `@State` | View owns simple value types (Bool, String, Int, enum) |
 | `@Binding` | Child needs read-write access to parent's state |
 | `@Observable` (macro) | Preferred over ObservableObject for new code (iOS 17+/macOS 14+) |
@@ -31,6 +31,7 @@ How SwiftUI APIs are used in the Harness Monitor macOS app. Hard rules learned f
 Use `let store: HarnessStore` by default. Only use `@Bindable var store` when the view creates `$store.property` bindings (TextField text:, Picker selection:, sheet isPresented:, etc.). With @Observable, `let` still tracks property access for observation - @Bindable is only needed for the dollar-sign binding syntax.
 
 Currently only two views use @Bindable:
+
 - ContentView ($store.showConfirmation)
 - SidebarSessionList ($store.searchText)
 
@@ -319,6 +320,7 @@ Glass buttons derive background appearance and text contrast from the `.tint()` 
 For accent-colored buttons, pass `nil` tint so the button inherits from the environment and AccentColor asset. Never use `Color.accentColor` - it resolves to the macOS system accent, not the app's custom accent.
 
 For non-accent buttons, use system semantic colors:
+
 - **Primary/accent**: `nil` (inherit from environment + AccentColor asset)
 - **Neutral/secondary**: `.secondary` (translucent gray glass)
 - **Destructive**: `.red`

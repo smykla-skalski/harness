@@ -94,7 +94,7 @@ Every feature ships accessible or it doesn't ship. These are hard requirements, 
 ### Accessibility environment values reference
 
 | Value | Type | Check for |
-|---|---|---|
+| --- | --- | --- |
 | `\.accessibilityReduceMotion` | Bool | Replace animations |
 | `\.accessibilityReduceTransparency` | Bool | Opaque fallbacks |
 | `\.colorSchemeContrast` | ColorSchemeContrast | `.increased` = boost contrast |
@@ -117,17 +117,17 @@ Every feature ships accessible or it doesn't ship. These are hard requirements, 
 
 #### Text style sizes (iOS / macOS)
 
-| Style | iOS | macOS | Use |
-|---|---|---|---|
-| `.largeTitle` | 34pt | 26pt | Screen headers (one per screen) |
-| `.title` | 28pt | 22pt | Section headers |
-| `.title2` | 22pt | 17pt | Subsection headers |
-| `.title3` | 20pt | 15pt | Card titles |
-| `.headline` | 17pt SB | 13pt B | Emphasized body |
-| `.body` | 17pt | 13pt | Primary content |
-| `.subheadline` | 15pt | 11pt | Supplementary labels |
-| `.footnote` | 13pt | 10pt | Timestamps, metadata |
-| `.caption` | 12pt | 10pt | Auxiliary info |
+| Style          | iOS     | macOS  | Use                             |
+| -------------- | ------- | ------ | ------------------------------- |
+| `.largeTitle`  | 34pt    | 26pt   | Screen headers (one per screen) |
+| `.title`       | 28pt    | 22pt   | Section headers                 |
+| `.title2`      | 22pt    | 17pt   | Subsection headers              |
+| `.title3`      | 20pt    | 15pt   | Card titles                     |
+| `.headline`    | 17pt SB | 13pt B | Emphasized body                 |
+| `.body`        | 17pt    | 13pt   | Primary content                 |
+| `.subheadline` | 15pt    | 11pt   | Supplementary labels            |
+| `.footnote`    | 13pt    | 10pt   | Timestamps, metadata            |
+| `.caption`     | 12pt    | 10pt   | Auxiliary info                  |
 
 ### Color
 
@@ -149,15 +149,15 @@ Every feature ships accessible or it doesn't ship. These are hard requirements, 
 
 All spacing in multiples of 4pt (ideally 8pt):
 
-| Token | Value | Use |
-|---|---|---|
-| xs | 4pt | Icon-to-label, tight element spacing |
-| sm | 8pt | Within groups, related items |
-| md | 12pt | Compact container padding |
-| base | 16pt | Standard padding, margins (iOS 16pt, macOS 20pt) |
-| lg | 24pt | Between sections |
-| xl | 32pt | Major section breaks |
-| xxl | 48pt | Screen-level separation |
+| Token | Value | Use                                              |
+| ----- | ----- | ------------------------------------------------ |
+| xs    | 4pt   | Icon-to-label, tight element spacing             |
+| sm    | 8pt   | Within groups, related items                     |
+| md    | 12pt  | Compact container padding                        |
+| base  | 16pt  | Standard padding, margins (iOS 16pt, macOS 20pt) |
+| lg    | 24pt  | Between sections                                 |
+| xl    | 32pt  | Major section breaks                             |
+| xxl   | 48pt  | Screen-level separation                          |
 
 - Within-group spacing at most 50% of between-group spacing (Gestalt proximity).
 - Example: 8pt between items in a group, 24pt between groups.
@@ -189,16 +189,16 @@ All spacing in multiples of 4pt (ideally 8pt):
 
 #### Animation timing reference
 
-| Type | Duration | Curve |
-|---|---|---|
-| Button press | 50-100ms | ease-out |
-| Toggle/state change | 200ms | spring |
-| View push/pop | 350ms | ease-in-out |
-| Sheet present | 300ms | spring |
-| Sheet dismiss | 250ms | ease-in |
-| Fade in/out | 150-200ms | ease-in-out |
-| Skeleton shimmer | 1500ms | linear, repeat |
-| Toast auto-dismiss | 4-8s | - |
+| Type                | Duration  | Curve          |
+| ------------------- | --------- | -------------- |
+| Button press        | 50-100ms  | ease-out       |
+| Toggle/state change | 200ms     | spring         |
+| View push/pop       | 350ms     | ease-in-out    |
+| Sheet present       | 300ms     | spring         |
+| Sheet dismiss       | 250ms     | ease-in        |
+| Fade in/out         | 150-200ms | ease-in-out    |
+| Skeleton shimmer    | 1500ms    | linear, repeat |
+| Toast auto-dismiss  | 4-8s      | -              |
 
 ### Depth and elevation
 
@@ -258,11 +258,13 @@ All spacing in multiples of 4pt (ideally 8pt):
 ### Destructive actions
 
 Safeguard hierarchy (prefer higher):
+
 1. Undo with toast (8-10 seconds) - best UX
 2. Confirmation dialog with specific language
 3. Type-to-confirm for high-impact irreversible actions
 
 Rules:
+
 - Confirmation title: specific with count ("Delete 3 items?") not generic ("Are you sure?").
 - Destructive button: red, labeled with the verb ("Delete", not "OK"). Use `Button("Delete", role: .destructive)`.
 - Cancel is always the default button (Return/Enter activates it).
@@ -292,6 +294,7 @@ Rules:
 ### Data display
 
 #### Numbers and dates
+
 - Locale-aware formatting. Use system formatters (FormatStyle), not hardcoded formats.
 - Large numbers: abbreviate (1.2K, 3.4M) with tooltip for exact value.
 - Relative time: "Just now" (< 1 min), "5 minutes ago" (< 1h), "3 hours ago" (< 24h), absolute date after 7 days.
@@ -301,18 +304,21 @@ Rules:
 - Singular/plural: "1 item" not "1 items". Use localized plural rules.
 
 #### Tables and lists
+
 - Text left-aligned, numbers right-aligned, status centered.
 - Column headers: bold/semibold, sticky during scroll.
 - Sort indicators: filled arrow on sorted column, click to reverse.
 - List row minimum height: 44pt (iOS), 28pt (macOS).
 
 #### Truncation
+
 - Single line: ellipsis at tail. Filenames: middle truncation ("my_very_lo...ument.pdf").
 - Multi-line: clamp to 2-3 lines with "Show more" or tooltip for full text.
 - Never silently truncate without visual indicator.
 - Technical values (IDs, hashes, URLs): tap/click to copy with "Copied" confirmation.
 
 #### Status indicators
+
 - Green: active/success. Orange: warning. Red: error/critical. Blue: info/in-progress. Gray: inactive.
 - Always include text label alongside color (don't rely on color alone).
 - Badge counts: cap display at "99+".
@@ -343,7 +349,7 @@ Rules:
 ### Response time thresholds
 
 | Duration | Perception | Required UI |
-|---|---|---|
+| --- | --- | --- |
 | 0-100ms | Instantaneous | No feedback needed |
 | 100ms-1s | Noticeable | Subtle indicator (button state, toolbar spinner) |
 | 1-10s | Attention wanders | Spinner with label, allow cancel at 5s |

@@ -21,13 +21,9 @@ This file governs the Harness Monitor macOS app. The repo-root `AGENTS.md` still
 
 ## Project generation
 
-Optional app features are gated by `HARNESS_FEATURE_<NAME>` env vars consumed at
-Tuist generation time. The all-features-OFF graph is the canonical baseline.
+Optional app features are gated by `HARNESS_FEATURE_<NAME>` env vars consumed at Tuist generation time. The all-features-OFF graph is the canonical baseline.
 
-The Xcode project is generated from `Project.swift` and `Tuist/Package.swift`
-with Tuist 4. Existing source roots use globs, so new Swift files in an existing
-root need no manifest edit. New targets, dependencies, build phases, schemes, or
-compilation conditions belong in the manifests.
+The Xcode project is generated from `Project.swift` and `Tuist/Package.swift` with Tuist 4. Existing source roots use globs, so new Swift files in an existing root need no manifest edit. New targets, dependencies, build phases, schemes, or compilation conditions belong in the manifests.
 
 Use:
 
@@ -35,10 +31,7 @@ Use:
 mise run monitor:generate
 ```
 
-The generated `HarnessMonitor.xcodeproj` and `HarnessMonitor.xcworkspace` are
-not tracked. The tracked root and app-local `buildServer.json` files are shared
-defaults pinned to `xcode-derived`; active build lanes belong only in untracked
-workspace settings and explicit CLI env.
+The generated `HarnessMonitor.xcodeproj` and `HarnessMonitor.xcworkspace` are not tracked. The tracked root and app-local `buildServer.json` files are shared defaults pinned to `xcode-derived`; active build lanes belong only in untracked workspace settings and explicit CLI env.
 
 ## Worktrees and lanes
 
@@ -55,13 +48,9 @@ Inside a worktree:
 
 Use `mise run monitor:*` tasks and add the lane env vars above when an agent needs isolated build or runtime state.
 
-Do not use legacy runtime-profile env vars. Do not hardcode shared lane names
-such as `claude-main`.
+Do not use legacy runtime-profile env vars. Do not hardcode shared lane names such as `claude-main`.
 
-The xcodebuild wrapper enforces a hardcoded host-wide concurrency cap
-(currently 8). Do not try to raise it with env vars. Lane cache routing,
-isolated app identity, IDE Run discovery, and slot-reaper details live in
-`../../docs/agent-guides/monitor-reference.md`.
+The xcodebuild wrapper enforces a hardcoded host-wide concurrency cap (currently 8). Do not try to raise it with env vars. Lane cache routing, isolated app identity, IDE Run discovery, and slot-reaper details live in `../../docs/agent-guides/monitor-reference.md`.
 
 ## Validation
 
@@ -84,13 +73,9 @@ Approved `-derivedDataPath` values:
 - `xcode-derived-instruments` for Instruments audit work.
 - `xcode-derived-lanes/<lane>` when `HARNESS_MONITOR_BUILD_LANE=<lane>` is set.
 
-`mise run clean:stale` is the safe shared scrub and must not quit a live
-Harness Monitor session or stop live daemon work. Use
-`mise run clean:stale:full` or `mise run monitor:reset` only for an
-explicit live reset.
+`mise run clean:stale` is the safe shared scrub and must not quit a live Harness Monitor session or stop live daemon work. Use `mise run clean:stale:full` or `mise run monitor:reset` only for an explicit live reset.
 
-For local macOS `xcodebuild`, never use bare `-destination 'platform=macOS'`.
-Use:
+For local macOS `xcodebuild`, never use bare `-destination 'platform=macOS'`. Use:
 
 ```bash
 -destination "platform=macOS,arch=$(uname -m),name=My Mac"
@@ -98,58 +83,30 @@ Use:
 
 ## Test scope
 
-Do not run the full macOS UI suite by default. Run the smallest targeted
-build/test command needed for the current change: a single XCTest case, a single
-XCTest class, or a non-UI build lane.
+Do not run the full macOS UI suite by default. Run the smallest targeted build/test command needed for the current change: a single XCTest case, a single XCTest class, or a non-UI build lane.
 
-Only run the full app validation lane or full `HarnessMonitorUITests` suite when
-the user explicitly asks for it.
+Only run the full app validation lane or full `HarnessMonitorUITests` suite when the user explicitly asks for it.
 
-Targeted `HarnessMonitorUITests` runs must use the isolated
-`Harness Monitor UI Testing` host (`io.harnessmonitor.app.ui-testing`) so local
-manual app usage is not interrupted. Keep `-ApplePersistenceIgnoreState YES` in
-place for that host.
+Targeted `HarnessMonitorUITests` runs must use the isolated `Harness Monitor UI Testing` host (`io.harnessmonitor.app.ui-testing`) so local manual app usage is not interrupted. Keep `-ApplePersistenceIgnoreState YES` in place for that host.
 
-For non-UI focused tests, `XCODE_ONLY_TESTING` accepts comma-separated
-selectors:
+For non-UI focused tests, `XCODE_ONLY_TESTING` accepts comma-separated selectors:
 
 ```bash
 XCODE_ONLY_TESTING='HarnessMonitorKitTests/A/test1(),HarnessMonitorKitTests/A/test2()' \
   HARNESS_MONITOR_BUILD_LANE=agent-<id> mise run monitor:test
 ```
 
-If a UI test cannot find or tap a visually correct control, fix the test query
-or interaction path before changing product layout, copy, or semantics. New
-action-control helpers must mirror
-`HarnessMonitorUITestInteractionSupport.tapButton(...)`. For failing UI tests,
-run one selector at a time. See `../../docs/agent-guides/monitor-reference.md`
-for the full interaction contract.
+If a UI test cannot find or tap a visually correct control, fix the test query or interaction path before changing product layout, copy, or semantics. New action-control helpers must mirror `HarnessMonitorUITestInteractionSupport.tapButton(...)`. For failing UI tests, run one selector at a time. See `../../docs/agent-guides/monitor-reference.md` for the full interaction contract.
 
 ## SwiftUI and UX
 
-Prefer shared layout and control primitives for density/readability work so
-button sizing and glass treatment stay consistent across screens.
+Prefer shared layout and control primitives for density/readability work so button sizing and glass treatment stay consistent across screens.
 
-Real user-triggered work must not run on the main thread after confirmation.
-Network mutations, policy actions, approvals, filesystem work, and daemon calls
-that can outlive the interaction should be submitted to the global generic
-`HarnessMonitorAsyncWorkQueue.shared` as `WorkItem`s. Do not create separate
-queues for each feature or action type. The queue starts parallel workers up to
-the active CPU count; SwiftUI state, selection, refresh scheduling, and toast
-updates should hop back to the MainActor only when the queued job reports
-completion.
+Real user-triggered work must not run on the main thread after confirmation. Network mutations, policy actions, approvals, filesystem work, and daemon calls that can outlive the interaction should be submitted to the global generic `HarnessMonitorAsyncWorkQueue.shared` as `WorkItem`s. Do not create separate queues for each feature or action type. The queue starts parallel workers up to the active CPU count; SwiftUI state, selection, refresh scheduling, and toast updates should hop back to the MainActor only when the queued job reports completion.
 
-Use native SwiftUI split containers (`NavigationSplitView`, `HSplitView`) for
-resizable panes. Do not hand-roll pane dividers with `DragGesture`, manual
-cursor stacks, or per-drag width state unless a native split cannot express the
-behavior and the performance tradeoff is proven.
+Use native SwiftUI split containers (`NavigationSplitView`, `HSplitView`) for resizable panes. Do not hand-roll pane dividers with `DragGesture`, manual cursor stacks, or per-drag width state unless a native split cannot express the behavior and the performance tradeoff is proven.
 
-Liquid Glass summary: let `NavigationSplitView` sidebars use the system glass,
-use one stable `.backgroundExtensionEffect()` host per session surface, avoid
-duplicating that effect on individual content/detail panes, keep session scroll
-edges soft, apply glass to navigation/control surfaces only, and never stack
-glass on glass. See
-`../../docs/agent-guides/monitor-reference.md` for the full macOS 26 notes.
+Liquid Glass summary: let `NavigationSplitView` sidebars use the system glass, use one stable `.backgroundExtensionEffect()` host per session surface, avoid duplicating that effect on individual content/detail panes, keep session scroll edges soft, apply glass to navigation/control surfaces only, and never stack glass on glass. See `../../docs/agent-guides/monitor-reference.md` for the full macOS 26 notes.
 
 ## UI delivery rules
 
@@ -169,10 +126,7 @@ Research backing lives under `docs/research/`.
 
 ## Debugging
 
-Start with real data. Reproduce with the smallest targeted command and collect
-preserved app/UI traces, screenshots, and failure artifacts before changing
-behavior. If the signal path is weak, improve observability first. Patch the
-proven cause only.
+Start with real data. Reproduce with the smallest targeted command and collect preserved app/UI traces, screenshots, and failure artifacts before changing behavior. If the signal path is weak, improve observability first. Patch the proven cause only.
 
 For live `AttributeGraph: cycle detected through attribute` warnings:
 
@@ -180,63 +134,34 @@ For live `AttributeGraph: cycle detected through attribute` warnings:
 mise run monitor:debug:attributegraph
 ```
 
-The command attaches LLDB, breaks on `print_cycle`, prints all thread
-backtraces, and leaves the app stopped for copy/paste inspection.
+The command attaches LLDB, breaks on `print_cycle`, prints all thread backtraces, and leaves the app stopped for copy/paste inspection.
 
 ## Daemon modes
 
-Harness Monitor supports both managed and external daemon ownership in
-production builds. For the external-daemon path, the fastest local workflow
-uses the `HarnessMonitor (External Daemon)` scheme plus:
+Harness Monitor supports both managed and external daemon ownership in production builds. For the external-daemon path, the fastest local workflow uses the `HarnessMonitor (External Daemon)` scheme plus:
 
 ```bash
 mise run monitor:daemon:dev
 ```
 
-Production external launches should keep the daemon in an app-group runtime
-root (for example via `HARNESS_MONITOR_RUNTIME_LANE`,
-`HARNESS_DAEMON_DATA_HOME`, or the `monitor:daemon:dev` wrapper) so the
-sandboxed app can resolve the manifest. The default `HarnessMonitor` scheme
-keeps managed mode enabled and is still the shipping validation lane. Details
-and bridge behavior live in `../../docs/agent-guides/monitor-reference.md`.
+Production external launches should keep the daemon in an app-group runtime root (for example via `HARNESS_MONITOR_RUNTIME_LANE`, `HARNESS_DAEMON_DATA_HOME`, or the `monitor:daemon:dev` wrapper) so the sandboxed app can resolve the manifest. The default `HarnessMonitor` scheme keeps managed mode enabled and is still the shipping validation lane. Details and bridge behavior live in `../../docs/agent-guides/monitor-reference.md`.
 
 ## Feature references
 
 Load detailed references only when the task touches the feature:
 
-- Lane cache routing, isolated app identity, IDE Run discovery, daemon cargo
-  cache, Supervisor audit, performance, preview authoring, and Swift 6 traps:
-  `../../docs/agent-guides/monitor-reference.md`.
-- iOS app, watch app, CloudKit, NeedsMe, CloudMirror, pairing, mobile widgets,
-  and companion build commands:
-  `../../docs/agent-guides/monitor-mobile-reference.md`.
+- Lane cache routing, isolated app identity, IDE Run discovery, daemon cargo cache, Supervisor audit, performance, preview authoring, and Swift 6 traps: `../../docs/agent-guides/monitor-reference.md`.
+- iOS app, watch app, CloudKit, NeedsMe, CloudMirror, pairing, mobile widgets, and companion build commands: `../../docs/agent-guides/monitor-mobile-reference.md`.
 
 ## Preview authoring
 
-All `#Preview` blocks live in `HarnessMonitorUIPreviewable` and render through
-the `HarnessMonitorPreviewHost` app target via the `HarnessMonitorUIPreviews`
-scheme. For structure and naming rules, follow
-`Sources/HarnessMonitorUIPreviewable/AGENTS.md`.
+All `#Preview` blocks live in `HarnessMonitorUIPreviewable` and render through the `HarnessMonitorPreviewHost` app target via the `HarnessMonitorUIPreviews` scheme. For structure and naming rules, follow `Sources/HarnessMonitorUIPreviewable/AGENTS.md`.
 
-Preview render scripts are not part of the current lane model. Use Xcode canvas
-or a targeted `monitor:build` / `monitor:test` lane for compile verification.
+Preview render scripts are not part of the current lane model. Use Xcode canvas or a targeted `monitor:build` / `monitor:test` lane for compile verification.
 
 ## Gotchas
 
-- Keep `HarnessMonitor.xcodeproj`, shared workspace/scheme files, and Swift
-  source membership in sync when project metadata is regenerated.
-- For Swift-only verification in a tree with dirty Rust changes, build with the
-  `HarnessMonitor (External Daemon)` scheme. The default scheme runs the daemon
-  build phase and can fail on unrelated Rust breakage.
-- Dense Monitor surfaces often mount MCP-tracked controls through shared action
-  helpers, and the registry host is enabled in normal app flows. When Settings,
-  toolbar, or similar interactions feel slow, inspect the tracking probe before
-  rewriting the visible SwiftUI tree. Do not use `accessibilityFrame()` or an
-  unthrottled `NSWindow.didUpdateNotification` fan-out in tracked-element hot
-  paths; use clip-aware AppKit geometry conversion and throttle `didUpdate`
-  refreshes.
-- Never wrap `deinit` cleanup in `MainActor.assumeIsolated { ... }` on
-  `@MainActor` classes or SDK-overlay MainActor types under Swift 6 strict
-  concurrency on macOS 26. Use nonisolated thread-safe cleanup and move
-  MainActor-only work to representable dismantle hooks. Full rationale lives in
-  `../../docs/agent-guides/monitor-reference.md`.
+- Keep `HarnessMonitor.xcodeproj`, shared workspace/scheme files, and Swift source membership in sync when project metadata is regenerated.
+- For Swift-only verification in a tree with dirty Rust changes, build with the `HarnessMonitor (External Daemon)` scheme. The default scheme runs the daemon build phase and can fail on unrelated Rust breakage.
+- Dense Monitor surfaces often mount MCP-tracked controls through shared action helpers, and the registry host is enabled in normal app flows. When Settings, toolbar, or similar interactions feel slow, inspect the tracking probe before rewriting the visible SwiftUI tree. Do not use `accessibilityFrame()` or an unthrottled `NSWindow.didUpdateNotification` fan-out in tracked-element hot paths; use clip-aware AppKit geometry conversion and throttle `didUpdate` refreshes.
+- Never wrap `deinit` cleanup in `MainActor.assumeIsolated { ... }` on `@MainActor` classes or SDK-overlay MainActor types under Swift 6 strict concurrency on macOS 26. Use nonisolated thread-safe cleanup and move MainActor-only work to representable dismantle hooks. Full rationale lives in `../../docs/agent-guides/monitor-reference.md`.

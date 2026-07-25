@@ -71,8 +71,7 @@ The identifier you pass also becomes the view's `.accessibilityIdentifier`, so o
 
 ## Scene-level auto-harvest
 
-Production Harness Monitor scenes typically attach the registry at the window
-root instead of adding `.trackAccessibility(...)` to every control:
+Production Harness Monitor scenes typically attach the registry at the window root instead of adding `.trackAccessibility(...)` to every control:
 
 ```swift
 Window("Workspace", id: HarnessMonitorWindowID.workspace) {
@@ -81,17 +80,7 @@ Window("Workspace", id: HarnessMonitorWindowID.workspace) {
 .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
 ```
 
-`trackWindow(...)` keeps `list_windows` accurate and periodically replaces the
-registered element set for the tracked window by harvesting the live AppKit view
-tree. Existing `.accessibilityIdentifier(...)` values become discoverable over
-MCP without additional per-view registration churn. The Rust MCP server still
-prefers this in-app registry path first; the helper's `list-elements` and
-`get-element` subcommands are a fallback for live AX queries when registry data
-is empty or missing an element, and `perform-action` gives the server a
-background-safe semantic activation path for controls that expose AX actions.
-For `press`, the helper tries `AXPress` first, then closely related action names
-used by menu buttons, rows, and confirmation controls, and retries once without
-a scoped window filter when a previously matched window has been recreated.
+`trackWindow(...)` keeps `list_windows` accurate and periodically replaces the registered element set for the tracked window by harvesting the live AppKit view tree. Existing `.accessibilityIdentifier(...)` values become discoverable over MCP without additional per-view registration churn. The Rust MCP server still prefers this in-app registry path first; the helper's `list-elements` and `get-element` subcommands are a fallback for live AX queries when registry data is empty or missing an element, and `perform-action` gives the server a background-safe semantic activation path for controls that expose AX actions. For `press`, the helper tries `AXPress` first, then closely related action names used by menu buttons, rows, and confirmation controls, and retries once without a scoped window filter when a previously matched window has been recreated.
 
 ## Launching the listener
 
@@ -166,6 +155,7 @@ Failure response:
 ```
 
 Error codes:
+
 - `invalid-argument` - missing or empty argument
 - `invalid-json` - request could not be decoded
 - `not-found` - identifier not registered

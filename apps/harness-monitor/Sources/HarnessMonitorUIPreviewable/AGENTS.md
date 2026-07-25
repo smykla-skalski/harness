@@ -1,27 +1,19 @@
 # AGENTS.md
 
-This directory is the previewable SwiftUI layer for Harness Monitor. The
-app-level `apps/harness-monitor/AGENTS.md` still applies; this file is the
-local structure contract for `Sources/HarnessMonitorUIPreviewable/`.
+This directory is the previewable SwiftUI layer for Harness Monitor. The app-level `apps/harness-monitor/AGENTS.md` still applies; this file is the local structure contract for `Sources/HarnessMonitorUIPreviewable/`.
 
-Inline previews have been extracted. Runtime implementation files should stay
-free of `#Preview`; preview code belongs in the nearest `Previews/` folder.
+Inline previews have been extracted. Runtime implementation files should stay free of `#Preview`; preview code belongs in the nearest `Previews/` folder.
 
 ## How to use this file
 
 1. Apply the repo-root and app-level `AGENTS.md` files first.
 2. Use the placement and preview rules for every file in this target.
-3. Read the feature invariants only when touching the named surface. Do not
-   load unrelated review-row or diff-canvas detail for unrelated UI work.
+3. Read the feature invariants only when touching the named surface. Do not load unrelated review-row or diff-canvas detail for unrelated UI work.
 
 ## Placement
 
-- `Views/` is feature-first UI source. Do not add files directly under `Views/`;
-  choose a domain folder.
-- Existing domains: `Actions`, `Acp`, `Agents`, `App`, `Attention`,
-  `Dashboard`, `Decisions`, `NewSession`, `PolicyCanvas`, `Review`, `Search`,
-  `Sessions`, `Settings`, `Shared`, `Signals`, `Supervisor`, `TaskBoard`,
-  `Timeline`, `Toolbar`, and `Voice`.
+- `Views/` is feature-first UI source. Do not add files directly under `Views/`; choose a domain folder.
+- Existing domains: `Actions`, `Acp`, `Agents`, `App`, `Attention`, `Dashboard`, `Decisions`, `NewSession`, `PolicyCanvas`, `Review`, `Search`, `Sessions`, `Settings`, `Shared`, `Signals`, `Supervisor`, `TaskBoard`, `Timeline`, `Toolbar`, and `Voice`.
 - `Views/<Domain>/Previews/` holds dedicated preview files.
 - `Support/` holds cross-cutting non-view support for this target.
 - `Theme/` holds shared styling primitives.
@@ -32,23 +24,16 @@ free of `#Preview`; preview code belongs in the nearest `Previews/` folder.
 
 1. Prefer dedicated preview files over inline previews.
 2. Dedicated preview files live in the nearest `Previews/` folder.
-3. Preview filenames use a leading `Preview` prefix, for example
-   `PreviewWorkspaceWindowView.swift`.
-4. Do not introduce trailing preview suffixes such as `+Preview`, `+Previews`,
-   `Previews`, or one-off names such as `CrowdedPreview`.
-5. Keep preview-only helpers private and next to the preview file unless reused
-   by multiple preview files in the same domain. Only then promote them to a
-   clearly named support file such as `SettingsPreviewSupport.swift`.
+3. Preview filenames use a leading `Preview` prefix, for example `PreviewWorkspaceWindowView.swift`.
+4. Do not introduce trailing preview suffixes such as `+Preview`, `+Previews`, `Previews`, or one-off names such as `CrowdedPreview`.
+5. Keep preview-only helpers private and next to the preview file unless reused by multiple preview files in the same domain. Only then promote them to a clearly named support file such as `SettingsPreviewSupport.swift`.
 6. Before finishing a layout change, confirm that every file containing `#Preview` lives under the nearest `Previews/` folder.
 
 ## Domain notes
 
-- `PolicyCanvas/` holds canvas, viewport, layout, and scroll-coordinator
-  surfaces. Keep viewport and layout helpers near the canvas code they serve.
-- `Settings/Supervisor/` holds supervisor-specific settings panes and split
-  helpers.
-- `Shared/` is only for reusable UI primitives used by multiple domains. If a
-  file serves one feature, keep it in that feature.
+- `PolicyCanvas/` holds canvas, viewport, layout, and scroll-coordinator surfaces. Keep viewport and layout helpers near the canvas code they serve.
+- `Settings/Supervisor/` holds supervisor-specific settings panes and split helpers.
+- `Shared/` is only for reusable UI primitives used by multiple domains. If a file serves one feature, keep it in that feature.
 
 ## Reviews list row invariants
 
@@ -72,26 +57,12 @@ The Files diff renders GitHub-style inline review threads inside the AppKit draw
 
 ## Navigation discipline
 
-Keep implementation and preview files in the same domain so navigator grouping
-and Open Quickly stay predictable. If a runtime file gains a preview, add a
-mirrored companion in `Previews/` instead of dropping preview code into the
-runtime file or an unrelated folder.
+Keep implementation and preview files in the same domain so navigator grouping and Open Quickly stay predictable. If a runtime file gains a preview, add a mirrored companion in `Previews/` instead of dropping preview code into the runtime file or an unrelated folder.
 
 ## Performance gotcha
 
-Views in `Settings/` and `Shared/` often use shared action controls that opt
-into MCP accessibility tracking. If a dense pane here feels slow to open or
-react, inspect that tracking path before restructuring the visible SwiftUI
-layout. A tracked-element probe that resolves `accessibilityFrame()` or
-republishes unthrottled on `NSWindow.didUpdateNotification` can make the whole
-window feel stalled; prefer clip-aware AppKit geometry conversion plus
-throttled refreshes.
+Views in `Settings/` and `Shared/` often use shared action controls that opt into MCP accessibility tracking. If a dense pane here feels slow to open or react, inspect that tracking path before restructuring the visible SwiftUI layout. A tracked-element probe that resolves `accessibilityFrame()` or republishes unthrottled on `NSWindow.didUpdateNotification` can make the whole window feel stalled; prefer clip-aware AppKit geometry conversion plus throttled refreshes.
 
 ## Async action work
 
-SwiftUI action handlers in this target should only collect intent, update
-prompt/sheet state, or enqueue work. Real effectful work such as review
-mutations, policy actions, daemon calls, and file/IO must go through the global
-generic `HarnessMonitorAsyncWorkQueue.shared` instead of route-local tasks or
-feature-specific queues. Let the queue use its active-CPU worker pool, then hop
-back to the MainActor for visible state, refresh scheduling, and toast results.
+SwiftUI action handlers in this target should only collect intent, update prompt/sheet state, or enqueue work. Real effectful work such as review mutations, policy actions, daemon calls, and file/IO must go through the global generic `HarnessMonitorAsyncWorkQueue.shared` instead of route-local tasks or feature-specific queues. Let the queue use its active-CPU worker pool, then hop back to the MainActor for visible state, refresh scheduling, and toast results.

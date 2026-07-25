@@ -1,21 +1,16 @@
 # Local Observability Stack
 
-This stack exists for local debugging only.
-Rust CI does not enforce contracts for the shell helpers, dashboards, or Docker/Grafana/Tempo provisioning under `resources/observability/`.
-When you change this area, validate it manually with the repo-local scripts and whichever app-level checks matter for your workflow.
+This stack exists for local debugging only. Rust CI does not enforce contracts for the shell helpers, dashboards, or Docker/Grafana/Tempo provisioning under `resources/observability/`. When you change this area, validate it manually with the repo-local scripts and whichever app-level checks matter for your workflow.
 
-Tempo Explore's Service Graph is the authoritative service map for the local Harness observability stack.
-Use the provisioned `Harness Service Map` dashboard as the landing page for supporting RED metrics, then jump into Tempo Explore for the built-in graph and span table.
+Tempo Explore's Service Graph is the authoritative service map for the local Harness observability stack. Use the provisioned `Harness Service Map` dashboard as the landing page for supporting RED metrics, then jump into Tempo Explore for the built-in graph and span table.
 
-Tempo metrics-generator owns the `traces_service_graph_*` and `traces_spanmetrics_*` metrics that power the service map.
-Alloy still exports the repo's `harness.spanmetrics_*` metrics for the existing custom dashboards, but it should not emit duplicate `traces_service_graph_*` series.
+Tempo metrics-generator owns the `traces_service_graph_*` and `traces_spanmetrics_*` metrics that power the service map. Alloy still exports the repo's `harness.spanmetrics_*` metrics for the existing custom dashboards, but it should not emit duplicate `traces_service_graph_*` series.
 
 The local Grafana Tempo data source is already provisioned with `serviceMap.datasourceUid: prometheus`, so Tempo Explore can render the built-in Service Graph as soon as Prometheus receives the Tempo-generated metrics.
 
 ## Pyroscope v2 local mode
 
-The local stack now runs Pyroscope `2.0.1` from the repo-owned `resources/observability/pyroscope/config.yaml` in explicit single-node v2 mode.
-Compose mounts dedicated `harness-observability_pyroscope-v2-*` volumes for the main store, compactor state, and metastore state so resets do not reuse mixed-format local data.
+The local stack now runs Pyroscope `2.0.1` from the repo-owned `resources/observability/pyroscope/config.yaml` in explicit single-node v2 mode. Compose mounts dedicated `harness-observability_pyroscope-v2-*` volumes for the main store, compactor state, and metastore state so resets do not reuse mixed-format local data.
 
 When you first pick up the v2 change or want a clean profiling slate, prefer the helper flow:
 
@@ -26,11 +21,9 @@ scripts/observability.sh smoke
 scripts/observability.sh stop
 ```
 
-`scripts/observability.sh` is the supported entrypoint for local validation.
-It can start from a clean checkout without `resources/observability/.env`, prepares the SQLite source and snapshot mounts automatically, writes the shared app config, and waits for Prometheus, Tempo, Loki, Pyroscope, Grafana, Alloy, and sqlite-exporter readiness.
+`scripts/observability.sh` is the supported entrypoint for local validation. It can start from a clean checkout without `resources/observability/.env`, prepares the SQLite source and snapshot mounts automatically, writes the shared app config, and waits for Prometheus, Tempo, Loki, Pyroscope, Grafana, Alloy, and sqlite-exporter readiness.
 
-If you run `docker compose` directly instead, set all four SQLite mount variables in `resources/observability/.env` first:
-`HARNESS_SQLITE_SOURCE_DAEMON_DIR`, `HARNESS_SQLITE_SOURCE_MONITOR_DIR`, `HARNESS_SQLITE_SNAPSHOT_DAEMON_DIR`, and `HARNESS_SQLITE_SNAPSHOT_MONITOR_DIR`.
+If you run `docker compose` directly instead, set all four SQLite mount variables in `resources/observability/.env` first: `HARNESS_SQLITE_SOURCE_DAEMON_DIR`, `HARNESS_SQLITE_SOURCE_MONITOR_DIR`, `HARNESS_SQLITE_SNAPSHOT_DAEMON_DIR`, and `HARNESS_SQLITE_SNAPSHOT_MONITOR_DIR`.
 
 ## macOS host metrics
 
@@ -49,6 +42,7 @@ mise run host-metrics:install
 ```
 
 This installs all three services:
+
 - Alloy via Homebrew with a config at `/opt/homebrew/etc/alloy/config.alloy`
 - a repo-managed Alloy OTel launch agent with config at `/opt/homebrew/etc/alloy/harness-host-processes.otel.yaml`
 - darwin-exporter built from `vendor/darwin-exporter` (requires Go), installed to `/usr/local/bin/darwin-exporter`
@@ -67,6 +61,7 @@ mise run host-metrics:restart  # restart all host-metrics services
 ### Metrics available
 
 From Alloy (node_exporter):
+
 - `node_cpu_seconds_total` - CPU time per mode
 - `node_load1`, `node_load5`, `node_load15` - system load averages
 - `node_filesystem_avail_bytes` - available disk space
@@ -74,6 +69,7 @@ From Alloy (node_exporter):
 - `node_network_*` - network interface statistics
 
 From the Alloy OTel host-process exporter:
+
 - `system_processes_count` - process state counts across the whole workstation
 - `process_cpu_utilization_ratio` - tracked-process CPU utilization
 - `process_memory_usage_bytes` - tracked-process resident memory
@@ -83,6 +79,7 @@ From the Alloy OTel host-process exporter:
 - `process_uptime_seconds` - tracked-process uptime
 
 From darwin-exporter:
+
 - `darwin_cpu_temperature_celsius` - CPU die temperature
 - `darwin_gpu_temperature_celsius` - GPU temperature
 - `darwin_disk_temperature_celsius` - SSD/NAND temperature
@@ -113,9 +110,7 @@ The local stack now provisions a repo-managed forensic suite into the `Harness O
 
 Use Tempo Explore's Service Graph for the authoritative topology view and use the suite dashboards for metric correlation, ranked offenders, and log or trace pivots.
 
-Native OTLP logs in Loki keep most OpenTelemetry log attributes as structured metadata, not indexed stream labels.
-For Codex logs specifically, the environment field currently arrives as `env`, and level arrives as `detected_level`, so dashboard log queries must use pipeline metadata filters such as `| env=~"..."`
-and `| detected_level=~"..."` instead of stream selectors like `{deployment_environment=...}`.
+Native OTLP logs in Loki keep most OpenTelemetry log attributes as structured metadata, not indexed stream labels. For Codex logs specifically, the environment field currently arrives as `env`, and level arrives as `detected_level`, so dashboard log queries must use pipeline metadata filters such as `| env=~"..."` and `| detected_level=~"..."` instead of stream selectors like `{deployment_environment=...}`.
 
 ### Submodule
 
