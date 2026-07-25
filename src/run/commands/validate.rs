@@ -63,7 +63,7 @@ fn extract_resources(manifest: &Path) -> Result<Vec<(String, String)>, CliError>
     })?;
     let mut resources = Vec::new();
     for document in documents {
-        let parsed: serde_yml::Value = document.map_err(|error| {
+        let parsed: noyalib::Value = document.map_err(|error| {
             CliErrorKind::no_resource_kinds(format!(
                 "{} (parse error: {error})",
                 manifest.display()
@@ -183,7 +183,7 @@ fn validate_universal(manifest_path: &Path, output_path: &Path) -> Result<i32, C
 
 /// Validate a single universal YAML document for required fields.
 fn validate_universal_document(
-    parsed: &serde_yml::Value,
+    parsed: &noyalib::Value,
     log_lines: &mut Vec<String>,
     errors: &mut Vec<String>,
 ) {
