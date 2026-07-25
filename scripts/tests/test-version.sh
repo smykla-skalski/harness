@@ -2,8 +2,9 @@
 set -euo pipefail
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)"
-SCRIPT="$ROOT/scripts/version.sh"
-OPENAPI_DOC="$ROOT/docs/api/openapi.json"
+SANDBOX=""
+SCRIPT=""
+OPENAPI_DOC=""
 
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -23,31 +24,100 @@ pass() {
   log "  PASS: $CURRENT_TEST"
 }
 
+skip() {
+  log "  SKIP: $CURRENT_TEST - $*"
+}
+
 start_test() {
   CURRENT_TEST="$1"
   log "TEST: $CURRENT_TEST"
+}
+
+discard_sandbox() {
+  if [[ -n "$SANDBOX" ]]; then
+    rm -rf "$SANDBOX"
+    SANDBOX=""
+  fi
+}
+
+trap discard_sandbox EXIT
+
+# `version.sh` rewrites every version surface in place, and it resolves its own
+# root from `$0`. Seeding a copy under a sandbox therefore keeps the whole run
+# off the real worktree, including any uncommitted edits sitting in it.
+seed_sandbox() {
+  local source target
+  discard_sandbox
+  SANDBOX="$(mktemp -d "${TMPDIR:-/tmp}/version-test.XXXXXX")"
+  # The generated Xcode project is deliberately absent: `version.sh` skips it
+  # when it does not exist, which keeps this suite off the one surface a
+  # checkout cannot restore.
+  local sources=(
+    "$ROOT/scripts/version.sh"
+    "$ROOT/apps/harness-monitor/Scripts/lib/swift-tool-env.sh"
+    "$ROOT/apps/harness-monitor/Scripts/lib/xcode-version.sh"
+    "$ROOT/apps/harness-monitor/Scripts/patch-tuist-pbxproj.py"
+    "$ROOT/apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift"
+    "$ROOT/apps/harness-monitor/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist"
+    "$ROOT/Cargo.toml"
+    "$ROOT/Cargo.lock"
+    "$ROOT/testkit/Cargo.toml"
+    "$ROOT/aff/Cargo.toml"
+    "$ROOT/docs/api/openapi.json"
+    "$ROOT/src/observe/output.rs"
+    "$ROOT"/crates/*/Cargo.toml
+  )
+  for source in "${sources[@]}"; do
+    target="$SANDBOX/${source#"$ROOT/"}"
+    mkdir -p -- "$(dirname -- "$target")"
+    cp -R -- "$source" "$target"
+  done
+  SCRIPT="$SANDBOX/scripts/version.sh"
+  OPENAPI_DOC="$SANDBOX/docs/api/openapi.json"
 }
 
 openapi_version() {
   perl -0ne 'print $1 if m{"info"\s*:\s*\{.*?"version"\s*:\s*"([^"]+)"}s' "$OPENAPI_DOC"
 }
 
-# `set` rewrites tracked files in place, so every scenario runs against the
-# canonical version and restores the worktree afterwards. It also rewrites the
-# generated Xcode project, which is untracked and therefore survives a
-# checkout - re-sync it or the next `check` fails on this test's leftovers.
-restore_versioned_files() {
-  git -C "$ROOT" checkout -- \
-    Cargo.toml Cargo.lock testkit/Cargo.toml aff/Cargo.toml \
-    crates apps/harness-monitor docs/api/openapi.json 2>/dev/null || true
-  if [[ -f "$ROOT/apps/harness-monitor/HarnessMonitor.xcodeproj/project.pbxproj" ]]; then
-    "$SCRIPT" sync-monitor >/dev/null 2>&1 || true
+stale_the_openapi_document() {
+  perl -0pi -e 's{("info"\s*:\s*\{.*?"version"\s*:\s*")[^"]+(")}{${1}0.0.0${2}}s' "$OPENAPI_DOC"
+}
+
+# Without this, a sandbox that is already out of sync would make every
+# "check fails" assertion below pass for the wrong reason.
+scenario_seeded_sandbox_starts_in_sync() {
+  seed_sandbox
+  start_test "a freshly seeded sandbox passes check"
+  if "$SCRIPT" check >/dev/null 2>&1; then
+    pass
+  else
+    fail "check failed before any scenario touched the sandbox"
+  fi
+}
+
+scenario_check_rejects_a_stale_openapi_document() {
+  seed_sandbox
+  start_test "check fails when only the openapi document is stale"
+  stale_the_openapi_document
+
+  if "$SCRIPT" check >/dev/null 2>&1; then
+    fail "check passed with a stale openapi version"
+  else
+    pass
   fi
 }
 
 scenario_set_stamps_the_openapi_document() {
+  seed_sandbox
   start_test "set stamps the openapi document alongside the other surfaces"
   local original bumped stamped
+  # `set` reaches PlistBuddy through sync_monitor, so the write path is
+  # macOS-only even though `check` runs everywhere.
+  if [[ "$(uname -s)" != "Darwin" ]]; then
+    skip "version.sh set needs PlistBuddy"
+    return 0
+  fi
   original="$("$SCRIPT" show)"
   bumped="$(perl -e '
     my ($major, $minor, $patch) = split /\./, $ARGV[0];
@@ -56,7 +126,6 @@ scenario_set_stamps_the_openapi_document() {
 
   if ! "$SCRIPT" set "$bumped" >/dev/null 2>&1; then
     fail "version.sh set $bumped exited non-zero"
-    restore_versioned_files
     return 1
   fi
 
@@ -66,25 +135,11 @@ scenario_set_stamps_the_openapi_document() {
   else
     fail "openapi document reports $stamped after setting $bumped"
   fi
-  restore_versioned_files
 }
 
-scenario_check_rejects_a_stale_openapi_document() {
-  start_test "check fails when only the openapi document is stale"
-  perl -0pi -e 's{("info"\s*:\s*\{.*?"version"\s*:\s*")[^"]+(")}{${1}0.0.0${2}}s' "$OPENAPI_DOC"
-
-  if "$SCRIPT" check >/dev/null 2>&1; then
-    fail "check passed with a stale openapi version"
-  else
-    pass
-  fi
-  restore_versioned_files
-}
-
-trap restore_versioned_files EXIT
-
-scenario_set_stamps_the_openapi_document
+scenario_seeded_sandbox_starts_in_sync
 scenario_check_rejects_a_stale_openapi_document
+scenario_set_stamps_the_openapi_document
 
 log "version tests: $PASS_COUNT passed, $FAIL_COUNT failed"
 if ((FAIL_COUNT > 0)); then
