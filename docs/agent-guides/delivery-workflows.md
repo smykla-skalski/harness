@@ -160,10 +160,10 @@ Every other session holds its own `target/dev/wt-*` lane and may be building in 
 
 ```bash
 # assumes: PR merged, <worktree> clean, <worktree> spelled as its physical path, as `pwd -P` prints it
-lane="<main-checkout>/target/dev/wt-$(printf '%s' "$(basename <worktree>)" | tr -cs '[:alnum:]._-' '-')-$(printf '%s' <worktree> | shasum -a 256 | cut -c1-16)"
-[ -d "$lane" ] || ls -d <main-checkout>/target/dev/wt-*  # no match: pick this session's lane by hand
-lsof +D "$lane" 2>/dev/null | head                       # must print nothing; a live build means stop
-rm -rf <worktree>/target "$lane"
+lane="<main-checkout>/target/dev/wt-$(printf '%s' "$(basename -- "<worktree>")" | tr -cs '[:alnum:]._-' '-')-$(printf '%s' "<worktree>" | shasum -a 256 | cut -c1-16)"
+[ -d "$lane" ] || ls -d "<main-checkout>"/target/dev/wt-*  # no match: set lane= by hand before going on
+lsof +D "$lane" 2>/dev/null | head                         # must print nothing; a live build means stop
+[ -d "$lane" ] && rm -rf "<worktree>/target" "$lane"       # deletes nothing until lane names a real dir
 ```
 
 Then remove the worktree and the branch:
