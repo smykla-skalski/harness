@@ -9,10 +9,14 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::mem;
 
-/// One parsed piece of a template: literal text, or a variable reference.
+/// One parsed piece of a template: literal text, a variable reference, or a
+/// closed `{{ ... }}` pair whose contents are not a name. The last is kept as
+/// its own kind rather than folded into literal text, so a typo like
+/// `{{ item.title }}` is refused instead of reaching an agent as prose.
 enum Segment {
     Literal(String),
     Variable(String),
+    Malformed(String),
 }
 
 /// A prompt template. Cheap to clone; holds the raw source text.
@@ -77,6 +81,11 @@ impl PromptTemplate {
                     Some(value) => rendered.push_str(value),
                     None => return Err(PromptRenderError { variable: name }),
                 },
+                // Unreachable for a template that passed `validate_names`, but
+                // rendering is the last gate before an agent sees the text.
+                Segment::Malformed(inner) => {
+                    return Err(PromptRenderError { variable: inner });
+                }
             }
         }
         Ok(rendered)
@@ -89,18 +98,31 @@ impl PromptTemplate {
             .into_iter()
             .filter_map(|segment| match segment {
                 Segment::Variable(name) => Some(name),
-                Segment::Literal(_) => None,
+                Segment::Literal(_) | Segment::Malformed(_) => None,
             })
             .collect()
     }
 
-    /// Reject any referenced name outside `allowed`. Used at catalog load so a
-    /// typo fails before any agent starts.
+    /// The contents of every closed pair that is not a name.
+    fn malformed_placeholders(&self) -> BTreeSet<String> {
+        parse_segments(&self.raw)
+            .into_iter()
+            .filter_map(|segment| match segment {
+                Segment::Malformed(inner) => Some(inner),
+                Segment::Literal(_) | Segment::Variable(_) => None,
+            })
+            .collect()
+    }
+
+    /// Reject any referenced name outside `allowed`, and any closed pair that
+    /// is not a name at all. Used at catalog load so a typo fails before any
+    /// agent starts.
     pub(crate) fn validate_names(&self, allowed: &[&'static str]) -> Result<(), PromptConfigError> {
         let unknown: Vec<String> = self
             .referenced_variables()
             .into_iter()
             .filter(|name| !allowed.contains(&name.as_str()))
+            .chain(self.malformed_placeholders())
             .collect();
         if unknown.is_empty() {
             Ok(())
@@ -110,8 +132,9 @@ impl PromptTemplate {
     }
 }
 
-/// Split `raw` into literal and variable segments. A `{{` with no closing `}}`,
-/// or whose trimmed contents are not a valid identifier, stays literal.
+/// Split `raw` into segments. A `{{` with no closing `}}` anywhere after it is
+/// literal text; a closed pair is a variable when its trimmed contents are an
+/// identifier and malformed otherwise.
 fn parse_segments(raw: &str) -> Vec<Segment> {
     let chars: Vec<char> = raw.chars().collect();
     let mut segments = Vec::new();
@@ -119,11 +142,16 @@ fn parse_segments(raw: &str) -> Vec<Segment> {
     let mut index = 0;
     while index < chars.len() {
         if chars[index] == '{' && chars.get(index + 1) == Some(&'{') {
-            if let Some((name, resume)) = try_placeholder(&chars, index) {
+            if let Some((inner, resume)) = closed_pair(&chars, index) {
                 if !literal.is_empty() {
                     segments.push(Segment::Literal(mem::take(&mut literal)));
                 }
-                segments.push(Segment::Variable(name));
+                let name = inner.trim();
+                segments.push(if is_identifier(name) {
+                    Segment::Variable(name.to_string())
+                } else {
+                    Segment::Malformed(name.to_string())
+                });
                 index = resume;
                 continue;
             }
@@ -140,15 +168,21 @@ fn parse_segments(raw: &str) -> Vec<Segment> {
     segments
 }
 
-/// Given `chars[start..]` beginning with `{{`, return the referenced name and
-/// the index just past the closing `}}` when the pair forms a placeholder.
-fn try_placeholder(chars: &[char], start: usize) -> Option<(String, usize)> {
+/// Given `chars[start..]` beginning with `{{`, return the text between it and
+/// the first following `}}`, plus the index just past that `}}`.
+///
+/// The scan stops at the first `{{` it meets, so an unclosed pair costs a look
+/// at the following few characters rather than a walk to the end of the
+/// template. Without that, a prompt full of `{{` would be quadratic; the size
+/// cap on the configuration file bounds it either way, but cheaply.
+fn closed_pair(chars: &[char], start: usize) -> Option<(String, usize)> {
     let mut cursor = start + 2;
     while cursor + 1 < chars.len() {
+        if chars[cursor] == '{' && chars[cursor + 1] == '{' {
+            return None;
+        }
         if chars[cursor] == '}' && chars[cursor + 1] == '}' {
-            let inner: String = chars[start + 2..cursor].iter().collect();
-            let name = inner.trim();
-            return is_identifier(name).then(|| (name.to_string(), cursor + 2));
+            return Some((chars[start + 2..cursor].iter().collect(), cursor + 2));
         }
         cursor += 1;
     }
@@ -215,11 +249,13 @@ mod tests {
     }
 
     #[test]
-    fn unclosed_or_invalid_placeholders_stay_literal() {
+    fn a_closed_pair_after_an_unclosed_one_is_still_checked() {
         let template = PromptTemplate::new("a {{ not closed and b {{ 1bad }} c");
         assert!(template.referenced_variables().is_empty());
-        let rendered = template.render(&vars(&[])).expect("render");
-        assert_eq!(rendered, "a {{ not closed and b {{ 1bad }} c");
+        let error = template
+            .validate_names(&["title"])
+            .expect_err("the closed 1bad pair is refused");
+        assert_eq!(error.unknown, vec!["1bad".to_string()]);
     }
 
     #[test]
@@ -231,12 +267,39 @@ mod tests {
         assert!(names.contains("body"));
     }
 
+    /// A closed pair whose contents are not a name is far more likely to be a
+    /// typo than deliberate literal text, and letting it through means an
+    /// agent silently receives `{{ item.title }}` as prose.
     #[test]
-    fn empty_and_whitespace_only_placeholders_stay_literal() {
-        let template = PromptTemplate::new("a {{}} b {{   }} c");
+    fn a_placeholder_that_is_not_an_identifier_is_refused() {
+        for raw in [
+            "Item {{ item.title }}",
+            "Item {{ item-title }}",
+            "Item {{ títle }}",
+            "Item {{}}",
+            "Item {{   }}",
+            "Item {{ two words }}",
+        ] {
+            let template = PromptTemplate::new(raw);
+            let error = template
+                .validate_names(&["title"])
+                .expect_err(&format!("{raw} must be refused at load"));
+            assert_eq!(error.unknown.len(), 1, "{raw}");
+            template
+                .render(&vars(&[("title", "x")]))
+                .expect_err("a malformed placeholder must also refuse at render");
+        }
+    }
+
+    #[test]
+    fn an_unclosed_double_brace_is_still_literal() {
+        let template = PromptTemplate::new("a {{ never closed");
         assert!(template.referenced_variables().is_empty());
-        let rendered = template.render(&vars(&[])).expect("render");
-        assert_eq!(rendered, "a {{}} b {{   }} c");
+        template.validate_names(&["title"]).expect("no placeholder");
+        assert_eq!(
+            template.render(&vars(&[])).expect("render"),
+            "a {{ never closed"
+        );
     }
 
     #[test]
