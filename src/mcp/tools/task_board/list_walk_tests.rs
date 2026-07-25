@@ -7,6 +7,7 @@ fn page(ids: &[&str], next_cursor: Option<&str>) -> serde_json::Value {
         "items": ids.iter().map(|id| json!({ "id": id })).collect::<Vec<_>>(),
         "total_matched": 3,
         "progress_rollups": { "umbrella-1": { "done": 1 } },
+        "item_revisions": ids.iter().map(|id| ((*id).to_string(), json!(1))).collect::<serde_json::Map<_, _>>(),
     });
     if let Some(cursor) = next_cursor {
         page["next_cursor"] = json!(cursor);
@@ -41,6 +42,11 @@ fn every_page_folds_into_one_response_that_keeps_the_board_wide_fields() {
 
     assert_eq!(folded_ids(&response), ["task-1", "task-2", "task-3"]);
     assert_eq!(response["total_matched"], json!(3));
+    assert_eq!(
+        response["item_revisions"],
+        json!({ "task-1": 1, "task-2": 1, "task-3": 1 }),
+        "revisions are page-scoped, so a merged read carries every page's"
+    );
     assert_eq!(response["progress_rollups"]["umbrella-1"]["done"], json!(1));
     assert!(
         response.get("next_cursor").is_none(),

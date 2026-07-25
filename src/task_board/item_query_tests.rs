@@ -121,6 +121,33 @@ fn text_matches_title_body_and_tags_case_insensitively() {
     assert!(!miss.prepared().matches(&item.query_fields()));
 }
 
+/// Matching walks characters instead of lowercasing each haystack, so the
+/// cases that scan has to keep getting right are worth pinning: a match at the
+/// very end, a needle longer than what remains, and a non-ASCII fold.
+#[test]
+fn text_matching_walks_the_haystack_without_lowercasing_it() {
+    let mut item = item("task-1", "Ship the Widget", "the CAUSE was a race");
+    item.tags = vec!["Zoë".to_string()];
+
+    for (text, expected) in [
+        ("race", true),
+        ("a race and more", false),
+        ("zoë", true),
+        ("SHIP", true),
+        ("widgets", false),
+    ] {
+        let query = TaskBoardItemQuery {
+            text: Some(text.to_lowercase()),
+            ..TaskBoardItemQuery::default()
+        };
+        assert_eq!(
+            query.prepared().matches(&item.query_fields()),
+            expected,
+            "{text}"
+        );
+    }
+}
+
 #[test]
 fn paging_a_stable_selection_never_repeats_or_skips_an_item() {
     let items = (0..7)

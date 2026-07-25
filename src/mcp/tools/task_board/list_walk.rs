@@ -110,6 +110,7 @@ fn page_params(params: &Value, cursor: &Option<String>) -> Result<Value, ToolErr
 struct TaskBoardItemPages {
     items: Vec<Value>,
     seen: std::collections::HashSet<String>,
+    revisions: Map<String, Value>,
     extra: Map<String, Value>,
 }
 
@@ -134,6 +135,14 @@ impl TaskBoardItemPages {
                 self.items.push(item.clone());
             }
         }
+        // Item revisions are scoped to the page that carried them, so every
+        // page adds its own or the merged answer would describe only the
+        // first page's rows.
+        if let Some(revisions) = page.get("item_revisions").and_then(Value::as_object) {
+            for (id, revision) in revisions {
+                self.revisions.insert(id.clone(), revision.clone());
+            }
+        }
         // Every page reports the same board-wide roll-ups and totals, so the
         // first one that carries them wins and later pages add nothing.
         if self.extra.is_empty()
@@ -141,7 +150,9 @@ impl TaskBoardItemPages {
         {
             self.extra = object
                 .iter()
-                .filter(|(key, _)| !matches!(key.as_str(), "items" | "next_cursor"))
+                .filter(|(key, _)| {
+                    !matches!(key.as_str(), "items" | "next_cursor" | "item_revisions")
+                })
                 .map(|(key, value)| (key.clone(), value.clone()))
                 .collect();
         }
@@ -167,6 +178,9 @@ impl TaskBoardItemPages {
     fn into_response(self) -> Value {
         let mut object = self.extra;
         object.insert("items".to_string(), Value::Array(self.items));
+        if !self.revisions.is_empty() {
+            object.insert("item_revisions".to_string(), Value::Object(self.revisions));
+        }
         Value::Object(object)
     }
 }

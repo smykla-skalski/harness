@@ -235,8 +235,23 @@ pub fn normalize_query_text(text: Option<&str>) -> Option<String> {
     (!text.is_empty()).then(|| text.to_string())
 }
 
+/// Whether `haystack` contains `needle_lowercase`, which is already lowercased.
+///
+/// Scanning a board runs this over every title, body, and tag it looks at, and
+/// a body can be kilobytes, so it walks characters rather than lowercasing the
+/// haystack into a fresh `String` for each of those reads.
 fn contains_ignoring_case(haystack: &str, needle_lowercase: &str) -> bool {
-    haystack.to_lowercase().contains(needle_lowercase)
+    needle_lowercase.is_empty()
+        || haystack
+            .char_indices()
+            .any(|(start, _)| starts_with_ignoring_case(&haystack[start..], needle_lowercase))
+}
+
+fn starts_with_ignoring_case(haystack: &str, needle_lowercase: &str) -> bool {
+    let mut lowered = haystack.chars().flat_map(char::to_lowercase);
+    needle_lowercase
+        .chars()
+        .all(|wanted| lowered.next() == Some(wanted))
 }
 
 /// Reduce one tag to the form a facet compares, matching what

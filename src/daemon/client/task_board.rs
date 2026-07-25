@@ -72,13 +72,12 @@ impl DaemonClient {
         &self,
         request: &TaskBoardListItemsRequest,
     ) -> Result<TaskBoardListItemsResponse, CliError> {
-        self.get_with_query(
-            http_paths::TASK_BOARD_ITEMS,
-            &task_board_list_query(request)?
-                .iter()
-                .map(|(name, value)| (*name, value.as_str()))
-                .collect::<Vec<_>>(),
-        )
+        let owned = task_board_list_query(request)?;
+        let query = owned
+            .iter()
+            .map(|(name, value)| (*name, value.as_str()))
+            .collect::<Vec<_>>();
+        self.get_with_query(http_paths::TASK_BOARD_ITEMS, &query)
     }
 
     /// Read every matching task-board item by walking the daemon's pages.
