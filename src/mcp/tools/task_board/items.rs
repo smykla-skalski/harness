@@ -2,6 +2,7 @@ use serde_json::{Value, json};
 
 use crate::daemon::protocol::ws_methods;
 use crate::mcp::tool::ToolRegistry;
+use crate::task_board::{TASK_BOARD_LIST_MAX_LIMIT, TASK_BOARD_LIST_MAX_QUERY_CHARS};
 
 use super::support::{TaskBoardToolDescriptor, register_descriptors};
 
@@ -16,8 +17,10 @@ pub(super) fn register(registry: &mut ToolRegistry) {
             },
             TaskBoardToolDescriptor {
                 name: ws_methods::TASK_BOARD_LIST,
-                description: "List task-board items from the running daemon.",
-                input_schema: status_filter_schema,
+                description: "List one page of task-board items from the running daemon, \
+                    filtered by field values and by text in the title, body, or tags. \
+                    Pass the response's next_cursor back as cursor to read the next page.",
+                input_schema: list_schema,
             },
             TaskBoardToolDescriptor {
                 name: ws_methods::TASK_BOARD_GET,
@@ -148,11 +151,20 @@ fn planning_schema() -> Value {
     })
 }
 
-fn status_filter_schema() -> Value {
+fn list_schema() -> Value {
     json!({
         "type": "object",
         "properties": {
-            "status": { "type": "string" }
+            "status": { "type": "string" },
+            "priority": { "type": "string" },
+            "agent_mode": { "type": "string" },
+            "project_id": { "type": "string" },
+            "tags": string_array_schema(),
+            "query": { "type": "string", "maxLength": TASK_BOARD_LIST_MAX_QUERY_CHARS },
+            "limit": {
+                "type": "integer", "minimum": 1, "maximum": TASK_BOARD_LIST_MAX_LIMIT
+            },
+            "cursor": { "type": "string" }
         },
         "additionalProperties": false
     })
@@ -287,7 +299,8 @@ fn plan_approve_schema() -> Value {
 mod tests {
     use serde_json::json;
 
-    use super::{create_schema, update_schema};
+    use super::{create_schema, list_schema, update_schema};
+    use crate::task_board::{TASK_BOARD_LIST_MAX_LIMIT, TASK_BOARD_LIST_MAX_QUERY_CHARS};
 
     /// A `minLength` of 1 would still advertise a whitespace-only title as
     /// valid, and the daemon trims before refusing one, so the schema has to
@@ -311,6 +324,30 @@ mod tests {
                 assert_eq!(properties[field]["maximum"], json!(i64::MAX));
             }
         }
+    }
+
+    /// The daemon refuses an out-of-range page instead of clamping it, so the
+    /// advertised bounds have to match or a caller learns of the mismatch only
+    /// from a failed call.
+    #[test]
+    fn list_offers_every_facet_and_advertises_the_page_bounds() {
+        let schema = list_schema();
+        let properties = &schema["properties"];
+
+        for facet in ["status", "priority", "agent_mode", "project_id", "cursor"] {
+            assert_eq!(properties[facet]["type"], json!("string"), "{facet}");
+        }
+        assert_eq!(properties["tags"]["type"], json!("array"));
+        assert_eq!(
+            properties["query"]["maxLength"],
+            json!(TASK_BOARD_LIST_MAX_QUERY_CHARS)
+        );
+        assert_eq!(properties["limit"]["minimum"], json!(1));
+        assert_eq!(
+            properties["limit"]["maximum"],
+            json!(TASK_BOARD_LIST_MAX_LIMIT)
+        );
+        assert_eq!(schema["required"], json!(null));
     }
 
     #[test]

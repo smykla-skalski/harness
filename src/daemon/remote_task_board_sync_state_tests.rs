@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use super::{TaskBoardReadListResponse, project_task_board_list};
-use crate::daemon::protocol::TaskBoardListItemsResponse;
+use crate::daemon::protocol::TaskBoardListItemsRequest;
+use crate::daemon::service::TaskBoardListSource;
 use crate::task_board::{
     ExternalRef, ExternalRefProvider, ExternalRefSyncState, TaskBoardItem, TaskBoardStatus,
 };
@@ -32,8 +33,8 @@ fn item_with_synced_ref() -> TaskBoardItem {
     item
 }
 
-fn list_response() -> TaskBoardListItemsResponse {
-    TaskBoardListItemsResponse {
+fn list_source() -> TaskBoardListSource {
+    TaskBoardListSource {
         items: vec![item_with_synced_ref()],
         items_change_seq: 7,
         item_revisions: HashMap::new(),
@@ -41,8 +42,15 @@ fn list_response() -> TaskBoardListItemsResponse {
     }
 }
 
+fn projected(viewer: bool) -> TaskBoardReadListResponse {
+    let selection = TaskBoardListItemsRequest::default()
+        .validated_selection()
+        .expect("an unfiltered read is valid");
+    project_task_board_list(list_source(), &selection, viewer)
+}
+
 fn projected_sync_state(viewer: bool) -> Option<ExternalRefSyncState> {
-    match project_task_board_list(list_response(), viewer) {
+    match projected(viewer) {
         TaskBoardReadListResponse::Full(response) => response.items[0].external_refs[0]
             .sync_state
             .clone(),
@@ -73,8 +81,7 @@ fn the_list_keeps_what_the_client_reads() {
 
 #[test]
 fn the_ref_itself_survives_the_trim() {
-    let TaskBoardReadListResponse::Full(response) = project_task_board_list(list_response(), false)
-    else {
+    let TaskBoardReadListResponse::Full(response) = projected(false) else {
         panic!("a non-viewer read returns the full response");
     };
     let reference = &response.items[0].external_refs[0];
@@ -91,7 +98,7 @@ fn the_ref_itself_survives_the_trim() {
 /// trim must not be what that path depends on.
 #[test]
 fn the_viewer_projection_is_untouched() {
-    let response = project_task_board_list(list_response(), true);
+    let response = projected(true);
 
     assert!(
         matches!(response, TaskBoardReadListResponse::Viewer(_)),

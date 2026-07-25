@@ -61,13 +61,42 @@ impl DaemonClient {
         self.post(http_paths::TASK_BOARD_ITEMS, request)
     }
 
+    /// Read one bounded page of matching task-board items.
+    pub fn list_task_board_items_page(
+        &self,
+        request: &TaskBoardListItemsRequest,
+    ) -> Result<TaskBoardListItemsResponse, CliError> {
+        self.get_with_query(
+            http_paths::TASK_BOARD_ITEMS,
+            &task_board_list_query(request)?
+                .iter()
+                .map(|(name, value)| (*name, value.as_str()))
+                .collect::<Vec<_>>(),
+        )
+    }
+
+    /// Read every matching task-board item by walking the daemon's pages.
+    ///
+    /// The daemon bounds each response, so a caller that wants the whole
+    /// selection has to ask for the rest; this keeps that loop in one place
+    /// rather than in every command that reads the board.
     pub fn list_task_board_items(
         &self,
         request: &TaskBoardListItemsRequest,
     ) -> Result<Vec<TaskBoardItem>, CliError> {
-        let response: TaskBoardListItemsResponse =
-            self.get_task_board_with_status(http_paths::TASK_BOARD_ITEMS, request.status)?;
-        Ok(response.items)
+        let mut request = request.clone();
+        let mut items = Vec::new();
+        loop {
+            let page = self.list_task_board_items_page(&request)?;
+            let drained = page.items.is_empty();
+            items.extend(page.items);
+            match page.next_cursor {
+                // A page that advanced nothing would loop forever, so treat an
+                // empty page as the end whatever cursor came back with it.
+                Some(cursor) if !drained => request.cursor = Some(cursor),
+                _ => return Ok(items),
+            }
+        }
     }
 
     pub fn get_task_board_item(&self, item_id: &str) -> Result<TaskBoardItem, CliError> {
@@ -375,7 +404,7 @@ impl DaemonClient {
         let Some(status) = status else {
             return self.get(path);
         };
-        let status = task_board_status_label(status)?;
+        let status = enum_label(status, "status")?;
         self.get_with_query(path, &[("status", status.as_str())])
     }
 }
@@ -399,12 +428,67 @@ fn item_action_path(item_id: &str, action: &str) -> String {
     format!("{}/{action}", item_path(item_id))
 }
 
-fn task_board_status_label(status: TaskBoardStatus) -> Result<String, CliError> {
-    serde_json::to_value(status)
+/// Render a list request as the daemon's query string, in a stable order.
+fn task_board_list_query(
+    request: &TaskBoardListItemsRequest,
+) -> Result<Vec<(&'static str, String)>, CliError> {
+    let mut query = enum_facet_query(request)?;
+    append_text_query(request, &mut query);
+    append_page_query(request, &mut query);
+    Ok(query)
+}
+
+fn enum_facet_query(
+    request: &TaskBoardListItemsRequest,
+) -> Result<Vec<(&'static str, String)>, CliError> {
+    let mut query = Vec::new();
+    if let Some(status) = request.status {
+        query.push(("status", enum_label(status, "status")?));
+    }
+    if let Some(priority) = request.priority {
+        query.push(("priority", enum_label(priority, "priority")?));
+    }
+    if let Some(agent_mode) = request.agent_mode {
+        query.push(("agent_mode", enum_label(agent_mode, "agent mode")?));
+    }
+    Ok(query)
+}
+
+fn append_text_query(
+    request: &TaskBoardListItemsRequest,
+    query: &mut Vec<(&'static str, String)>,
+) {
+    if let Some(project_id) = &request.project_id {
+        query.push(("project_id", project_id.clone()));
+    }
+    for tag in &request.tags {
+        query.push(("tag", tag.clone()));
+    }
+    if let Some(text) = &request.query {
+        query.push(("query", text.clone()));
+    }
+}
+
+fn append_page_query(
+    request: &TaskBoardListItemsRequest,
+    query: &mut Vec<(&'static str, String)>,
+) {
+    if let Some(limit) = request.limit {
+        query.push(("limit", limit.to_string()));
+    }
+    if let Some(cursor) = &request.cursor {
+        query.push(("cursor", cursor.clone()));
+    }
+}
+
+fn enum_label<T: serde::Serialize>(value: T, label: &str) -> Result<String, CliError> {
+    serde_json::to_value(value)
         .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?
         .as_str()
         .map(ToOwned::to_owned)
-        .ok_or_else(|| CliErrorKind::workflow_serialize("task-board status is not a string").into())
+        .ok_or_else(|| {
+            CliErrorKind::workflow_serialize(format!("task-board {label} is not a string")).into()
+        })
 }
 
 fn task_board_upgrade_required() -> CliError {

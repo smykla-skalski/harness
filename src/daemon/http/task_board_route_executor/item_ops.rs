@@ -1,20 +1,21 @@
 use crate::daemon::protocol::{
-    TASK_BOARD_STORAGE_DATABASE, TaskBoardAuditRequest, TaskBoardAuditResponse,
-    TaskBoardCapabilitiesResponse, TaskBoardCatalogRequest, TaskBoardClearTriageOverrideRequest,
-    TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardGetItemRequest,
-    TaskBoardHostListResponse, TaskBoardHostLocalResponse, TaskBoardHostSetProjectTypesRequest,
-    TaskBoardHostSetProjectTypesResponse, TaskBoardItemPositionMutationResponse,
-    TaskBoardItemPositionSnapshot, TaskBoardListItemsRequest, TaskBoardListItemsResponse,
-    TaskBoardMachinesResponse, TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest,
-    TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse,
-    TaskBoardProjectUpdateRequest, TaskBoardProjectUpdateResponse, TaskBoardProjectsResponse,
-    TaskBoardResetItemPositionRequest, TaskBoardSetItemPositionRequest,
+    TASK_BOARD_LIST_INVALID_PARAMS, TASK_BOARD_STORAGE_DATABASE, TaskBoardAuditRequest,
+    TaskBoardAuditResponse, TaskBoardCapabilitiesResponse, TaskBoardCatalogRequest,
+    TaskBoardClearTriageOverrideRequest, TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest,
+    TaskBoardGetItemRequest, TaskBoardHostListResponse, TaskBoardHostLocalResponse,
+    TaskBoardHostSetProjectTypesRequest, TaskBoardHostSetProjectTypesResponse,
+    TaskBoardItemPositionMutationResponse, TaskBoardItemPositionSnapshot,
+    TaskBoardListItemsRequest, TaskBoardMachinesResponse, TaskBoardPlanApproveRequest,
+    TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest,
+    TaskBoardPlanningResponse, TaskBoardProjectUpdateRequest, TaskBoardProjectUpdateResponse,
+    TaskBoardProjectsResponse, TaskBoardResetItemPositionRequest, TaskBoardSetItemPositionRequest,
     TaskBoardSetTriageOverrideRequest, TaskBoardSyncRequest, TaskBoardSyncResponse,
     TaskBoardTriageCurrentResponse, TaskBoardTriageHistoryResponse,
     TaskBoardTriageOverrideMutationResponse, TaskBoardUpdateItemRequest,
 };
+use crate::daemon::remote_task_board::{TaskBoardReadListResponse, project_task_board_list};
 use crate::daemon::service;
-use harness_kernel::errors::CliError;
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::TaskBoardItem;
 
 use super::super::{DaemonHttpState, require_async_db};
@@ -39,11 +40,21 @@ pub(crate) async fn create_item(
     service::create_task_board_item_db(require_async_db(state, "task board create")?, request).await
 }
 
+/// Read the board, then select, page, and project it for this caller.
+///
+/// Selection runs after projection for a remote viewer, so a viewer's search
+/// only ever matches text that viewer is allowed to read back.
 pub(crate) async fn list_items(
     state: &DaemonHttpState,
     request: &TaskBoardListItemsRequest,
-) -> Result<TaskBoardListItemsResponse, CliError> {
-    service::list_task_board_items_db(require_async_db(state, "task board list")?, request).await
+    viewer: bool,
+) -> Result<TaskBoardReadListResponse, CliError> {
+    let selection = request
+        .validated_selection()
+        .ok_or_else(|| CliError::from(CliErrorKind::workflow_io(TASK_BOARD_LIST_INVALID_PARAMS)))?;
+    let source =
+        service::read_task_board_items_db(require_async_db(state, "task board list")?).await?;
+    Ok(project_task_board_list(source, &selection, viewer))
 }
 
 pub(crate) async fn get_item(

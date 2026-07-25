@@ -1,13 +1,21 @@
 import Foundation
 
-extension WebSocketTransport {
+extension WebSocketTransport: TaskBoardItemPageSource {
+  func taskBoardItemPage(
+    status: TaskBoardStatus?,
+    cursor: String?
+  ) async throws -> TaskBoardListItemsResponseWire {
+    let params = try encodeParams(
+      TaskBoardListItemsRequest(status: status, cursor: cursor), extra: [:]
+    )
+    let value = try await rpc(method: .taskBoardList, params: params)
+    return try decodePolicyWire(value)
+  }
+
   public func taskBoardItemsSnapshot(
     status: TaskBoardStatus? = nil
   ) async throws -> TaskBoardListItemsSnapshot {
-    let params = try encodeParams(TaskBoardListItemsRequest(status: status), extra: [:])
-    let value = try await rpc(method: .taskBoardList, params: params)
-    let wire: TaskBoardListItemsResponseWire = try decodePolicyWire(value)
-    return TaskBoardListItemsSnapshot(wire: wire)
+    TaskBoardListItemsSnapshot(wire: try await mergedTaskBoardItemPages(status: status))
   }
 
   public func taskBoardItemPositionSnapshot(id: String) async throws

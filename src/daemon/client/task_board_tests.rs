@@ -9,7 +9,9 @@ use crate::daemon::protocol::{
     TaskBoardAutomationHistoryRequest, TaskBoardClearTriageOverrideRequest,
     TaskBoardListItemsRequest, TaskBoardSetTriageOverrideRequest, TaskBoardUpdateItemRequest,
 };
-use crate::task_board::{TaskBoardItem, TaskBoardStatus, TriageVerdict};
+use crate::task_board::{
+    AgentMode, TaskBoardItem, TaskBoardPriority, TaskBoardStatus, TriageVerdict,
+};
 
 fn client_with(endpoint: String) -> DaemonClient {
     DaemonClient {
@@ -40,6 +42,29 @@ fn spawn_mock(
         );
     });
     (endpoint, request_line, handle)
+}
+
+/// Serve one scripted response per request and record every request line, for
+/// a client call that makes more than one round trip.
+fn spawn_mock_sequence(
+    responses: Vec<String>,
+) -> (String, Arc<Mutex<Vec<String>>>, thread::JoinHandle<()>) {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
+    let request_lines = Arc::new(Mutex::new(Vec::new()));
+    let captured = Arc::clone(&request_lines);
+    let handle = thread::spawn(move || {
+        for response in responses {
+            let (mut stream, _) = listener.accept().expect("accept");
+            let request = read_http_request(&mut stream);
+            captured
+                .lock()
+                .expect("request capture")
+                .push(request.lines().next().unwrap_or_default().to_string());
+            write_http_response(&mut stream, "200 OK", "application/json", &response);
+        }
+    });
+    (endpoint, request_lines, handle)
 }
 
 fn item() -> TaskBoardItem {
@@ -130,6 +155,7 @@ fn task_board_list_serializes_status_as_query() {
     let items = client_with(endpoint)
         .list_task_board_items(&TaskBoardListItemsRequest {
             status: Some(TaskBoardStatus::Backlog),
+            ..TaskBoardListItemsRequest::default()
         })
         .expect("list items");
     handle.join().expect("server");
@@ -138,6 +164,68 @@ fn task_board_list_serializes_status_as_query() {
     assert_eq!(
         *request_line.lock().expect("request line"),
         "GET /v1/task-board/items?status=backlog HTTP/1.1"
+    );
+}
+
+#[test]
+fn task_board_list_serializes_every_facet_as_query() {
+    let response = serde_json::json!({ "items": [item()] }).to_string();
+    let (endpoint, request_line, handle) = spawn_mock("200 OK", response);
+
+    client_with(endpoint)
+        .list_task_board_items(&TaskBoardListItemsRequest {
+            status: Some(TaskBoardStatus::Todo),
+            priority: Some(TaskBoardPriority::High),
+            agent_mode: Some(AgentMode::Planning),
+            project_id: Some("project-alpha".into()),
+            tags: vec!["backend".into(), "urgent".into()],
+            query: Some("widget".into()),
+            limit: Some(25),
+            cursor: None,
+        })
+        .expect("list items");
+    handle.join().expect("server");
+
+    assert_eq!(
+        *request_line.lock().expect("request line"),
+        "GET /v1/task-board/items?status=todo&priority=high&agent_mode=planning\
+         &project_id=project-alpha&tag=backend&tag=urgent&query=widget&limit=25 HTTP/1.1"
+    );
+}
+
+/// The daemon bounds every page, so the plain list call has to ask for the
+/// rest or every caller silently reads a truncated board.
+#[test]
+fn task_board_list_walks_every_page_until_the_cursor_runs_out() {
+    let first = serde_json::json!({
+        "items": [item()],
+        "total_matched": 2,
+        "next_cursor": "cursor-2",
+    })
+    .to_string();
+    let mut second_item = item();
+    second_item.id = "task-2".into();
+    let second = serde_json::json!({ "items": [second_item], "total_matched": 2 }).to_string();
+    let (endpoint, request_lines, handle) = spawn_mock_sequence(vec![first, second]);
+
+    let items = client_with(endpoint)
+        .list_task_board_items(&TaskBoardListItemsRequest::default())
+        .expect("list items");
+    handle.join().expect("server");
+
+    assert_eq!(
+        items
+            .iter()
+            .map(|item| item.id.as_str())
+            .collect::<Vec<_>>(),
+        ["task-1", "task-2"]
+    );
+    assert_eq!(
+        *request_lines.lock().expect("request lines"),
+        [
+            "GET /v1/task-board/items HTTP/1.1",
+            "GET /v1/task-board/items?cursor=cursor-2 HTTP/1.1",
+        ]
     );
 }
 

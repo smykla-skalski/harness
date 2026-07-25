@@ -7,9 +7,7 @@ extension WebSocketTransport {
   }
 
   public func taskBoardItems(status: TaskBoardStatus? = nil) async throws -> [TaskBoardItem] {
-    let params = try encodeParams(TaskBoardListItemsRequest(status: status), extra: [:])
-    let value = try await rpc(method: .taskBoardList, params: params)
-    let response: TaskBoardListItemsResponseWire = try decodePolicyWire(value)
+    let response = try await mergedTaskBoardItemPages(status: status)
     return response.items.map(TaskBoardItem.init(wire:))
   }
 

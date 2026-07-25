@@ -46,7 +46,7 @@ mod update_request;
 
 use request_validation::{validate_create_title, validate_estimate, validate_update_estimates};
 use update_request::{apply_update_request, replacement_external_refs};
-pub(crate) use list_items::list_task_board_items_db;
+pub(crate) use list_items::{TaskBoardListSource, read_task_board_items_db};
 pub(crate) use positions::{
     get_task_board_item_position_snapshot_db, reset_task_board_item_position_db,
     set_task_board_item_position_db,

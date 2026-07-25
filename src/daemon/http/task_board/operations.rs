@@ -20,7 +20,7 @@ use crate::daemon::protocol::{TaskBoardDispatchDeliverResponse, TaskBoardDispatc
 use super::super::response::timed_json;
 use super::super::task_board_route_executor;
 use super::items::{
-    TaskBoardListQuery, authenticated_request, authorized_control_request_parts,
+    TaskBoardStatusQuery, authenticated_request, authorized_control_request_parts,
 };
 
 #[utoipa::path(
@@ -175,14 +175,14 @@ pub(super) async fn post_task_board_evaluate(
     path = "/v1/task-board/audit",
     tag = "task-board",
     description = "Return an audit summary of task-board items with per-status counts, optionally filtered by status",
-    params(TaskBoardListQuery),
+    params(TaskBoardStatusQuery),
     responses(
         (status = 200, description = "Audit summary with per-status counts", body = TaskBoardAuditSummary),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
 pub(super) async fn get_task_board_audit(
-    Query(query): Query<TaskBoardListQuery>,
+    Query(query): Query<TaskBoardStatusQuery>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
@@ -207,14 +207,14 @@ pub(super) async fn get_task_board_audit(
     path = "/v1/task-board/projects",
     tag = "task-board",
     description = "List project summaries derived from the task board, optionally filtered by status",
-    params(TaskBoardListQuery),
+    params(TaskBoardStatusQuery),
     responses(
         (status = 200, description = "Project summaries derived from the board", body = Vec<TaskBoardProjectSummary>),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
 pub(super) async fn get_task_board_projects(
-    Query(query): Query<TaskBoardListQuery>,
+    Query(query): Query<TaskBoardStatusQuery>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
@@ -269,14 +269,14 @@ pub(super) async fn post_task_board_projects_update(
     path = "/v1/task-board/machines",
     tag = "task-board",
     description = "List machine summaries derived from the task board, optionally filtered by status",
-    params(TaskBoardListQuery),
+    params(TaskBoardStatusQuery),
     responses(
         (status = 200, description = "Machine summaries derived from the board", body = Vec<TaskBoardMachineSummary>),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
 pub(super) async fn get_task_board_machines(
-    Query(query): Query<TaskBoardListQuery>,
+    Query(query): Query<TaskBoardStatusQuery>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {

@@ -53,9 +53,12 @@ public struct TaskBoardCreateItemRequest: Codable, Equatable, Sendable {
 
 public struct TaskBoardListItemsRequest: Codable, Equatable, Sendable {
   public let status: TaskBoardStatus?
+  /// The previous page's `nextCursor`; the daemon bounds every page.
+  public let cursor: String?
 
-  public init(status: TaskBoardStatus? = nil) {
+  public init(status: TaskBoardStatus? = nil, cursor: String? = nil) {
     self.status = status
+    self.cursor = cursor
   }
 }
 

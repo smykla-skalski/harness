@@ -1,9 +1,11 @@
 use serde::{Deserialize, Serialize};
 
 use crate::task_board::{
-    AgentMode, ExternalRef, PlanningState, TaskBoardPriority, TaskBoardStatus,
-    TaskBoardWorkflowKind,
+    AgentMode, ExternalRef, PlanningState, TASK_BOARD_LIST_MAX_QUERY_CHARS,
+    TASK_BOARD_LIST_MAX_TAGS, TaskBoardItemQuery, TaskBoardListCursor, TaskBoardPriority,
+    TaskBoardStatus, TaskBoardWorkflowKind, normalize_query_text,
     types::{TaskBoardItemKind, TaskBoardWorkflowState},
+    validated_limit,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,10 +53,81 @@ pub struct TaskBoardCreateItemRequest {
     pub id: Option<String>,
 }
 
+pub const TASK_BOARD_LIST_INVALID_PARAMS: &str = "invalid task-board list params";
+
+/// Selection for one task-board list read: facets, free text, and one page.
+///
+/// Every facet names a field the remote-viewer projection keeps, so the same
+/// request means the same thing whoever sends it.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TaskBoardListItemsRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status: Option<TaskBoardStatus>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub priority: Option<TaskBoardPriority>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_mode: Option<AgentMode>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<String>,
+    /// An item must carry every one of these tags to match.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+    /// Substring matched case-insensitively against title, body, and tags.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query: Option<String>,
+    /// Page size. Absent takes [`TASK_BOARD_LIST_DEFAULT_LIMIT`]; anything
+    /// outside `1..=TASK_BOARD_LIST_MAX_LIMIT` is refused rather than clamped,
+    /// so a caller never silently reads a different page than it asked for.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+    /// Opaque `next_cursor` from the previous page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<String>,
+}
+
+/// A list request checked against its bounds and reduced to what a read needs.
+pub struct TaskBoardListItemsSelection {
+    pub query: TaskBoardItemQuery,
+    pub limit: u32,
+    pub cursor: Option<TaskBoardListCursor>,
+}
+
+impl TaskBoardListItemsRequest {
+    /// Validate the request's bounds and resolve it into one selection.
+    ///
+    /// `None` means the caller sent a page size, cursor, or filter the daemon
+    /// refuses; the transport turns that into an invalid-params error.
+    #[must_use]
+    pub fn validated_selection(&self) -> Option<TaskBoardListItemsSelection> {
+        if self.tags.len() > TASK_BOARD_LIST_MAX_TAGS
+            || self.tags.iter().any(|tag| tag.trim().is_empty())
+        {
+            return None;
+        }
+        let text = normalize_query_text(self.query.as_deref());
+        if text
+            .as_deref()
+            .is_some_and(|text| text.chars().count() > TASK_BOARD_LIST_MAX_QUERY_CHARS)
+        {
+            return None;
+        }
+        let cursor = match self.cursor.as_deref() {
+            Some(cursor) => Some(TaskBoardListCursor::decode(cursor)?),
+            None => None,
+        };
+        Some(TaskBoardListItemsSelection {
+            query: TaskBoardItemQuery {
+                status: self.status,
+                priority: self.priority,
+                agent_mode: self.agent_mode,
+                project_id: self.project_id.clone(),
+                tags: self.tags.clone(),
+                text,
+            },
+            limit: validated_limit(self.limit)?,
+            cursor,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -175,4 +248,81 @@ pub struct TaskBoardUpdateStateClears {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskBoardDeleteItemRequest {
     pub id: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS,
+        TaskBoardListItemsRequest};
+    use crate::task_board::{TASK_BOARD_LIST_DEFAULT_LIMIT, TaskBoardListCursor};
+
+    #[test]
+    fn an_empty_request_selects_the_whole_board_at_the_default_page_size() {
+        let selection = TaskBoardListItemsRequest::default()
+            .validated_selection()
+            .expect("an empty request is valid");
+
+        assert_eq!(selection.limit, TASK_BOARD_LIST_DEFAULT_LIMIT);
+        assert_eq!(selection.cursor, None);
+        assert_eq!(selection.query, crate::task_board::TaskBoardItemQuery::default());
+    }
+
+    #[test]
+    fn blank_query_text_is_dropped_rather_than_matched() {
+        let request = TaskBoardListItemsRequest {
+            query: Some("   ".to_string()),
+            ..TaskBoardListItemsRequest::default()
+        };
+
+        let selection = request.validated_selection().expect("blank text is valid");
+        assert_eq!(selection.query.text, None);
+    }
+
+    #[test]
+    fn a_request_outside_its_bounds_is_refused() {
+        let refused = [
+            TaskBoardListItemsRequest {
+                tags: vec!["tag".to_string(); TASK_BOARD_LIST_MAX_TAGS + 1],
+                ..TaskBoardListItemsRequest::default()
+            },
+            TaskBoardListItemsRequest {
+                tags: vec![" ".to_string()],
+                ..TaskBoardListItemsRequest::default()
+            },
+            TaskBoardListItemsRequest {
+                query: Some("x".repeat(TASK_BOARD_LIST_MAX_QUERY_CHARS + 1)),
+                ..TaskBoardListItemsRequest::default()
+            },
+            TaskBoardListItemsRequest {
+                limit: Some(0),
+                ..TaskBoardListItemsRequest::default()
+            },
+            TaskBoardListItemsRequest {
+                cursor: Some("not-a-cursor".to_string()),
+                ..TaskBoardListItemsRequest::default()
+            },
+        ];
+
+        for request in refused {
+            assert!(
+                request.validated_selection().is_none(),
+                "accepted {request:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_cursor_from_a_previous_page_is_decoded_for_the_read() {
+        let cursor = TaskBoardListCursor {
+            offset: 9,
+            item_id: "task-9".to_string(),
+        };
+        let request = TaskBoardListItemsRequest {
+            cursor: Some(cursor.encode()),
+            ..TaskBoardListItemsRequest::default()
+        };
+
+        let selection = request.validated_selection().expect("a valid cursor");
+        assert_eq!(selection.cursor, Some(cursor));
+    }
 }

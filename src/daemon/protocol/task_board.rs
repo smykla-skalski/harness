@@ -61,6 +61,7 @@ pub struct TaskBoardPlanRevokeRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[derive(utoipa::ToSchema)]
 pub struct TaskBoardListItemsResponse {
+    /// One bounded page of the matched selection, in board order.
     pub items: Vec<TaskBoardItem>,
     /// Sequence observed with `items`; clients use this to reject stale picks.
     #[serde(default)]
@@ -69,9 +70,15 @@ pub struct TaskBoardListItemsResponse {
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub item_revisions: HashMap<String, i64>,
     /// Keyed by umbrella item id, computed fresh from the full live item set
-    /// at read time regardless of any `status` filter applied to `items`.
+    /// at read time regardless of any filter applied to `items`.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub progress_rollups: HashMap<String, TaskBoardProgressRollup>,
+    /// How many items the request matched before paging.
+    #[serde(default)]
+    pub total_matched: usize,
+    /// Pass back as `cursor` for the next page. Absent on the last page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<String>,
 }
 
 /// A coherent item revision and task-board list sequence observation.

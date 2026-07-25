@@ -1,0 +1,46 @@
+import Foundation
+
+/// Stop after this many pages. A daemon that kept handing back a cursor
+/// without ever draining would otherwise spin the walk below forever.
+private let taskBoardItemPageLimit = 200
+
+/// One transport's bounded task-board page read.
+///
+/// The daemon caps every list response, so each transport exposes a single
+/// page and they share the walk below instead of folding pages their own way.
+protocol TaskBoardItemPageSource: Sendable {
+  func taskBoardItemPage(
+    status: TaskBoardStatus?,
+    cursor: String?
+  ) async throws -> TaskBoardListItemsResponseWire
+}
+
+extension TaskBoardItemPageSource {
+  /// Read the whole selection by walking from the first page.
+  ///
+  /// The merged response keeps the *first* page's `itemsChangeSeq` on purpose.
+  /// It is the oldest observation of the board, so a board that changed under
+  /// the walk fails the next position CAS instead of letting it apply against
+  /// a sequence that never described the items beside it.
+  func mergedTaskBoardItemPages(
+    status: TaskBoardStatus?
+  ) async throws -> TaskBoardListItemsResponseWire {
+    var merged = try await taskBoardItemPage(status: status, cursor: nil)
+    var cursor = merged.nextCursor
+    var pages = 1
+    while let next = cursor, pages < taskBoardItemPageLimit {
+      let page = try await taskBoardItemPage(status: status, cursor: next)
+      // A page that returned nothing advances nothing, whatever cursor came
+      // back with it.
+      if page.items.isEmpty {
+        break
+      }
+      merged.items.append(contentsOf: page.items)
+      merged.itemRevisions.merge(page.itemRevisions) { _, latest in latest }
+      cursor = page.nextCursor
+      pages += 1
+    }
+    merged.nextCursor = nil
+    return merged
+  }
+}

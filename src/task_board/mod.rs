@@ -6,6 +6,7 @@ mod external_create_intents;
 pub mod git_identity_defaults;
 pub mod github;
 pub mod item_fields;
+pub mod item_query;
 pub mod lane;
 #[allow(dead_code)]
 #[cfg(feature = "daemon-runtime")]
@@ -88,6 +89,11 @@ pub use git_identity_defaults::{
     TaskBoardEnvDefaults, TaskBoardGhCliDefaults, TaskBoardGitConfigDefaults,
     TaskBoardGitIdentityDefaults, TaskBoardSshKeyDiscovery,
     discover as discover_git_identity_defaults,
+};
+pub use item_query::{
+    TASK_BOARD_LIST_DEFAULT_LIMIT, TASK_BOARD_LIST_MAX_LIMIT, TASK_BOARD_LIST_MAX_QUERY_CHARS,
+    TASK_BOARD_LIST_MAX_TAGS, TaskBoardItemQuery, TaskBoardListCursor, TaskBoardListPage,
+    TaskBoardQueryFields, TaskBoardQueryTarget, normalize_query_text, select_page, validated_limit,
 };
 pub use lane::{
     TaskBoardLaneOrigin, sort_task_board_items, validate_lane_placement,
