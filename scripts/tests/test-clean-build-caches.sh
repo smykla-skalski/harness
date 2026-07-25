@@ -150,6 +150,32 @@ scenario_dry_run_keeps_leased_segment() {
   pass
 }
 
+scenario_missing_common_repo_root_lib_aborts_safely() {
+  start_test "missing common-repo-root.sh aborts instead of computing a wrong path"
+  reset_tmp_root
+  local repo="$TEST_TMP_ROOT/repo"
+  local output="" status=0
+
+  make_shared_target_fixture "$repo"
+  rm -f "$repo/scripts/lib/common-repo-root.sh"
+
+  output="$(cd "$repo" && HOME="$repo/fake-home" ./scripts/clean-build-caches.sh --dry-run 2>&1)" || status=$?
+
+  if (( status == 0 )); then
+    fail "expected a nonzero exit when common-repo-root.sh is missing, got 0"
+    return
+  fi
+  grep -Fq "failed to source scripts/lib/common-repo-root.sh" <<<"$output" || {
+    fail "expected the failure message in output, got: $output"
+    return
+  }
+  if grep -Fq "== clean-build-caches ==" <<<"$output"; then
+    fail "expected the script to abort before printing its normal banner"
+    return
+  fi
+  pass
+}
+
 scenario_includes_daemon_cargo_target() {
   start_test "daemon cargo target is a clean:caches target"
   assert_contains "remove_path 'daemon cargo target'" || return
@@ -189,6 +215,7 @@ scenario_includes_scope_comment() {
 }
 
 scenario_dry_run_keeps_leased_segment
+scenario_missing_common_repo_root_lib_aborts_safely
 scenario_includes_daemon_cargo_target
 scenario_includes_all_repo_rust_target_roots
 scenario_includes_all_project_xcode_roots

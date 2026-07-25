@@ -34,8 +34,15 @@ set -uo pipefail
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 readonly ROOT
 # shellcheck source=scripts/lib/common-repo-root.sh
-source "$ROOT/scripts/lib/common-repo-root.sh"
+if ! source "$ROOT/scripts/lib/common-repo-root.sh"; then
+  printf 'clean-build-caches: failed to source scripts/lib/common-repo-root.sh\n' >&2
+  exit 1
+fi
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$ROOT")"
+if [[ -z "$COMMON_REPO_ROOT" ]]; then
+  printf 'clean-build-caches: resolve_common_repo_root returned an empty path\n' >&2
+  exit 1
+fi
 readonly COMMON_REPO_ROOT
 SHARED_TARGET_ROOT="$COMMON_REPO_ROOT/target"
 readonly SHARED_TARGET_ROOT
