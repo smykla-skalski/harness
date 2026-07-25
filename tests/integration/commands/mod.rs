@@ -1,5 +1,4 @@
-// Command handler integration tests.
-// Split by topic: schema, context, session_stop, setup_gateway.
+// Command handler integration tests, one module per command surface.
 
 mod context;
 mod observe;
