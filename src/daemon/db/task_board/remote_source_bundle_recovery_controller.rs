@@ -1,3 +1,5 @@
+use sqlx::{Sqlite, Transaction};
+
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
 use super::remote_assignment_lease::require_assignment;
@@ -29,59 +31,20 @@ impl AsyncDaemonDb {
         authenticated_principal: &str,
         trust: &TaskBoardRemoteOperationTrustFence,
     ) -> Result<Option<TaskBoardRemoteSourceBundle>, CliError> {
-        verification
-            .validate(request)
-            .map_err(|error| db_error(format!("validate verified source receipt: {error}")))?;
-        nonblank(authenticated_principal, "verified source receipt principal")?;
-        if verification.observed_host_instance_id != trust.observed_host_instance_id {
-            return Err(concurrent(
-                "verified source receipt came from a different current executor instance",
-            ));
-        }
+        validate_verified_receipt_input(request, verification, authenticated_principal, trust)?;
         let mut transaction = self
             .begin_immediate_transaction("task board verified source upload receipt")
             .await?;
-        if let Some(existing) = settled_replayed_source_receipt_in_tx(
+        let (receipt, context) = adopt_verified_receipt_in_tx(
             &mut transaction,
             request,
             verification,
             authenticated_principal,
             trust,
         )
-        .await?
-        {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit replayed verified source receipt: {error}"))
-            })?;
-            return Ok(Some(existing));
-        }
-        let assignment = require_adoptable_upload_assignment_in_tx(
-            &mut transaction,
-            request,
-            authenticated_principal,
-        )
         .await?;
-        let Some(response) = verification.receipt.as_ref() else {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit verified source receipt absence: {error}"))
-            })?;
-            return Ok(None);
-        };
-        let stored = store_adopted_source_receipt_in_tx(
-            &mut transaction,
-            AdoptedSourceReceipt {
-                assignment: &assignment,
-                request,
-                response,
-                authenticated_principal,
-                trust,
-            },
-        )
-        .await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit verified source receipt adoption: {error}"))
-        })?;
-        Ok(Some(stored))
+        commit(transaction, context).await?;
+        Ok(receipt)
     }
 
     pub(crate) async fn record_task_board_remote_source_bundle_abandonment(
@@ -98,31 +61,7 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board source abandonment response")
             .await?;
-        if let Some(existing) = settled_replayed_abandonment_in_tx(
-            &mut transaction,
-            request,
-            response,
-            authenticated_principal,
-            trust,
-        )
-        .await?
-        {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!(
-                    "commit replayed source abandonment response: {error}"
-                ))
-            })?;
-            return Ok(existing);
-        }
-        if !load_source_bundle_collisions_in_tx(&mut transaction, &request.offer)
-            .await?
-            .is_empty()
-        {
-            return Err(concurrent(
-                "source abandonment conflicts with an immutable upload receipt",
-            ));
-        }
-        let stored = store_source_abandonment_in_tx(
+        let (stored, context) = record_abandonment_in_tx(
             &mut transaction,
             request,
             response,
@@ -130,10 +69,7 @@ impl AsyncDaemonDb {
             trust,
         )
         .await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit controller source abandonment: {error}")))?;
+        commit(transaction, context).await?;
         Ok(stored)
     }
 
@@ -157,14 +93,107 @@ impl AsyncDaemonDb {
     }
 }
 
+async fn adopt_verified_receipt_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    request: &RemoteSourceBundleUploadRequest,
+    verification: &RemoteSourceBundleReceiptVerificationResponse,
+    principal: &str,
+    trust: &TaskBoardRemoteOperationTrustFence,
+) -> Result<(Option<TaskBoardRemoteSourceBundle>, &'static str), CliError> {
+    require_source_recovery_operation_fence_in_tx(transaction, trust).await?;
+    if let Some(existing) =
+        settled_replayed_source_receipt_in_tx(transaction, request, verification, principal, trust)
+            .await?
+    {
+        return Ok((Some(existing), "replayed verified source receipt"));
+    }
+    let assignment =
+        require_adoptable_upload_assignment_in_tx(transaction, request, principal).await?;
+    let Some(response) = verification.receipt.as_ref() else {
+        return Ok((None, "verified source receipt absence"));
+    };
+    let stored = store_adopted_source_receipt_in_tx(
+        transaction,
+        AdoptedSourceReceipt {
+            assignment: &assignment,
+            request,
+            response,
+            authenticated_principal: principal,
+            trust,
+        },
+    )
+    .await?;
+    Ok((Some(stored), "verified source receipt adoption"))
+}
+
+async fn record_abandonment_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    request: &RemoteSourceBundleAbandonRequest,
+    response: &RemoteSourceBundleAbandonResponse,
+    principal: &str,
+    trust: &TaskBoardRemoteOperationTrustFence,
+) -> Result<(TaskBoardRemoteSourceBundleAbandonment, &'static str), CliError> {
+    require_source_recovery_operation_fence_in_tx(transaction, trust).await?;
+    if let Some(existing) =
+        settled_replayed_abandonment_in_tx(transaction, request, response, principal, trust).await?
+    {
+        return Ok((existing, "replayed source abandonment response"));
+    }
+    require_no_upload_receipt_conflict_in_tx(transaction, &request.offer).await?;
+    let stored =
+        store_source_abandonment_in_tx(transaction, request, response, principal, trust).await?;
+    Ok((stored, "controller source abandonment"))
+}
+
+async fn commit(transaction: Transaction<'_, Sqlite>, context: &str) -> Result<(), CliError> {
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit {context}: {error}")))
+}
+
+fn validate_verified_receipt_input(
+    request: &RemoteSourceBundleUploadRequest,
+    verification: &RemoteSourceBundleReceiptVerificationResponse,
+    principal: &str,
+    trust: &TaskBoardRemoteOperationTrustFence,
+) -> Result<(), CliError> {
+    verification
+        .validate(request)
+        .map_err(|error| db_error(format!("validate verified source receipt: {error}")))?;
+    nonblank(principal, "verified source receipt principal")?;
+    if verification.observed_host_instance_id == trust.observed_host_instance_id {
+        Ok(())
+    } else {
+        Err(concurrent(
+            "verified source receipt came from a different current executor instance",
+        ))
+    }
+}
+
+async fn require_no_upload_receipt_conflict_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    offer: &RemoteOfferRequest,
+) -> Result<(), CliError> {
+    if load_source_bundle_collisions_in_tx(transaction, offer)
+        .await?
+        .is_empty()
+    {
+        Ok(())
+    } else {
+        Err(concurrent(
+            "source abandonment conflicts with an immutable upload receipt",
+        ))
+    }
+}
+
 async fn settled_replayed_source_receipt_in_tx(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    transaction: &mut Transaction<'_, Sqlite>,
     request: &RemoteSourceBundleUploadRequest,
     verification: &RemoteSourceBundleReceiptVerificationResponse,
     principal: &str,
     trust: &TaskBoardRemoteOperationTrustFence,
 ) -> Result<Option<TaskBoardRemoteSourceBundle>, CliError> {
-    require_source_recovery_operation_fence_in_tx(transaction, trust).await?;
     let collisions = load_source_bundle_collisions_in_tx(transaction, &request.offer).await?;
     let Some(existing) = exact_source_receipt(&collisions, request, principal)? else {
         return Ok(None);
@@ -182,7 +211,7 @@ async fn settled_replayed_source_receipt_in_tx(
 }
 
 async fn require_adoptable_upload_assignment_in_tx(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    transaction: &mut Transaction<'_, Sqlite>,
     request: &RemoteSourceBundleUploadRequest,
     principal: &str,
 ) -> Result<super::TaskBoardRemoteAssignmentRecord, CliError> {
@@ -197,13 +226,12 @@ async fn require_adoptable_upload_assignment_in_tx(
 }
 
 async fn settled_replayed_abandonment_in_tx(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    transaction: &mut Transaction<'_, Sqlite>,
     request: &RemoteSourceBundleAbandonRequest,
     response: &RemoteSourceBundleAbandonResponse,
     principal: &str,
     trust: &TaskBoardRemoteOperationTrustFence,
 ) -> Result<Option<TaskBoardRemoteSourceBundleAbandonment>, CliError> {
-    require_source_recovery_operation_fence_in_tx(transaction, trust).await?;
     let collisions = load_abandonment_collisions_in_tx(
         transaction,
         &request.offer,
@@ -219,7 +247,7 @@ async fn settled_replayed_abandonment_in_tx(
 }
 
 async fn settle_replayed_source_receipt_in_tx(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    transaction: &mut Transaction<'_, Sqlite>,
     request: &RemoteSourceBundleUploadRequest,
     verification: &RemoteSourceBundleReceiptVerificationResponse,
     principal: &str,
@@ -246,7 +274,7 @@ struct AdoptedSourceReceipt<'a> {
 }
 
 async fn store_adopted_source_receipt_in_tx(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    transaction: &mut Transaction<'_, Sqlite>,
     adopted: AdoptedSourceReceipt<'_>,
 ) -> Result<TaskBoardRemoteSourceBundle, CliError> {
     let AdoptedSourceReceipt {
@@ -269,7 +297,7 @@ async fn store_adopted_source_receipt_in_tx(
 }
 
 async fn settle_replayed_abandonment_in_tx(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    transaction: &mut Transaction<'_, Sqlite>,
     request: &RemoteSourceBundleAbandonRequest,
     response: &RemoteSourceBundleAbandonResponse,
     principal: &str,
@@ -288,7 +316,7 @@ async fn settle_replayed_abandonment_in_tx(
 }
 
 async fn store_source_abandonment_in_tx(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    transaction: &mut Transaction<'_, Sqlite>,
     request: &RemoteSourceBundleAbandonRequest,
     response: &RemoteSourceBundleAbandonResponse,
     principal: &str,
@@ -382,7 +410,7 @@ fn require_upload_operation_for_abandonment(
 }
 
 async fn settle_upload_operation_if_present(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    transaction: &mut Transaction<'_, Sqlite>,
     request: &RemoteSourceBundleUploadRequest,
     principal: &str,
     trust: &TaskBoardRemoteOperationTrustFence,
@@ -402,7 +430,7 @@ async fn settle_upload_operation_if_present(
 }
 
 async fn settle_abandonment_operation_if_present(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    transaction: &mut Transaction<'_, Sqlite>,
     request: &RemoteSourceBundleAbandonRequest,
     principal: &str,
     trust: &TaskBoardRemoteOperationTrustFence,
@@ -422,7 +450,7 @@ async fn settle_abandonment_operation_if_present(
 }
 
 async fn consume_upload_operation(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    transaction: &mut Transaction<'_, Sqlite>,
     assignment: &super::TaskBoardRemoteAssignmentRecord,
     request: &RemoteSourceBundleUploadRequest,
     trust: &TaskBoardRemoteOperationTrustFence,
@@ -450,7 +478,7 @@ async fn consume_upload_operation(
 }
 
 async fn consume_abandonment_operation(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    transaction: &mut Transaction<'_, Sqlite>,
     assignment: &super::TaskBoardRemoteAssignmentRecord,
     request: &RemoteSourceBundleAbandonRequest,
     trust: &TaskBoardRemoteOperationTrustFence,
