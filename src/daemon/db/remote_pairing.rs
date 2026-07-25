@@ -98,7 +98,10 @@ impl DaemonDb {
         validate_pairing_audit_event_id(audit_event_id)
             .map_err(|error| db_error(error.to_string()))?;
         let scopes_json = scopes_to_json(&record.scopes)?;
-        let metadata_json = encode_remote_pairing_metadata(record.reviews_query.as_ref())?;
+        let metadata_json = encode_remote_pairing_metadata(
+            record.reviews_query.as_ref(),
+            record.minted_for.as_ref(),
+        )?;
         let transaction = self
             .conn
             .unchecked_transaction()
@@ -390,7 +393,7 @@ fn remote_pairing_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RemoteSt
     let code_hash = RemotePairingCodeHash::try_from_storage_value(row.get::<_, String>(1)?)
         .map_err(|error| rusqlite::Error::FromSqlConversionFailure(1, Type::Text, error.into()))?;
     let metadata_json = row.get::<_, String>(9)?;
-    let reviews_query = decode_remote_pairing_metadata(&metadata_json)
+    let metadata = decode_remote_pairing_metadata(&metadata_json)
         .map_err(|error| rusqlite::Error::FromSqlConversionFailure(9, Type::Text, error.into()))?;
     Ok(RemoteStoredPairing {
         pairing_id: row.get(0)?,
@@ -402,7 +405,8 @@ fn remote_pairing_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RemoteSt
         claimed_at: row.get(6)?,
         claimed_client_id: row.get(7)?,
         claim_remote_addr: row.get(8)?,
-        reviews_query,
+        reviews_query: metadata.reviews_query,
+        minted_for: metadata.minted_for,
     })
 }
 

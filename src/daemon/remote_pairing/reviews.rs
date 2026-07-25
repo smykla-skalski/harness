@@ -33,6 +33,7 @@ impl RemotePairingRecord {
             reviews_query: reviews_query
                 .map(normalize_remote_reviews_query)
                 .transpose()?,
+            minted_for: None,
         })
     }
 

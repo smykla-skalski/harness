@@ -29,12 +29,14 @@ use super::{DaemonConnectInfo, DaemonHttpState};
 
 use super::openapi::DaemonErrorBody;
 
+pub(super) mod mint;
 pub(super) mod status;
 
 pub(super) fn remote_pairing_routes() -> OpenApiRouter<DaemonHttpState> {
     OpenApiRouter::new()
         .routes(routes!(post_remote_pair_claim))
         .merge(status::remote_pairing_status_routes())
+        .merge(mint::remote_pairing_mint_routes())
 }
 
 #[derive(Debug, Deserialize)]
@@ -369,6 +371,7 @@ fn pairing_error_status(error: &RemotePairingError) -> StatusCode {
         | RemotePairingError::EmptyAuditEventId
         | RemotePairingError::InvalidStoredCodeHash
         | RemotePairingError::InvalidReviewsQuery(_)
+        | RemotePairingError::InvalidSubject(_)
         | RemotePairingError::UnknownCode
         | RemotePairingError::Identity(_) => StatusCode::BAD_REQUEST,
     }
@@ -389,6 +392,7 @@ fn pairing_error_message(error: &RemotePairingError) -> &'static str {
         RemotePairingError::EmptyAuditEventId => "remote pairing audit event id is required",
         RemotePairingError::InvalidStoredCodeHash => "remote pairing code is invalid",
         RemotePairingError::InvalidReviewsQuery(_) => "remote pairing reviews query is invalid",
+        RemotePairingError::InvalidSubject(_) => "remote pairing subject is invalid",
         RemotePairingError::UnknownCode => "remote pairing code is unknown",
         RemotePairingError::Identity(_) => "remote pairing client identity is invalid",
     }

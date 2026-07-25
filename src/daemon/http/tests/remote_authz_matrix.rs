@@ -113,7 +113,10 @@ fn assert_insufficient_scope_denied(
 ) {
     let client_id = match required_scope {
         RemoteAccessScope::Read | RemoteAccessScope::Admin => "write-only",
-        RemoteAccessScope::Write | RemoteAccessScope::Execute => "viewer",
+        // A viewer holds read alone, so it is short of every one of these.
+        RemoteAccessScope::Write | RemoteAccessScope::Execute | RemoteAccessScope::PairMint => {
+            "viewer"
+        }
     };
     let response = authorize_http_route(&remote_headers(client_id), state, route)
         .expect_err("insufficient scope must be denied");
@@ -137,6 +140,7 @@ fn assert_allowed_scope_accepted(
         RemoteAccessScope::Write => "operator",
         RemoteAccessScope::Admin => "admin",
         RemoteAccessScope::Execute => "executor",
+        RemoteAccessScope::PairMint => "broker",
     };
     authorize_http_route(&remote_headers(client_id), state, route).unwrap_or_else(|response| {
         panic!(
@@ -175,6 +179,7 @@ fn register_matrix_clients(state: &crate::daemon::http::DaemonHttpState) {
         ("operator", RemoteRole::Operator, &[][..]),
         ("admin", RemoteRole::Admin, &[][..]),
         ("executor", RemoteRole::ExecutionCoordinator, &[][..]),
+        ("broker", RemoteRole::PairingBroker, &[][..]),
         (
             "write-only",
             RemoteRole::Operator,

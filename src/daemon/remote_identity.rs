@@ -406,6 +406,7 @@ pub fn parse_remote_scope(value: &str) -> Option<RemoteAccessScope> {
         "write" => Some(RemoteAccessScope::Write),
         "admin" => Some(RemoteAccessScope::Admin),
         "execute" => Some(RemoteAccessScope::Execute),
+        "pair_mint" => Some(RemoteAccessScope::PairMint),
         _ => None,
     }
 }
@@ -417,6 +418,7 @@ pub fn parse_remote_role(value: &str) -> Option<RemoteRole> {
         "operator" => Some(RemoteRole::Operator),
         "viewer" => Some(RemoteRole::Viewer),
         "execution_coordinator" => Some(RemoteRole::ExecutionCoordinator),
+        "pairing_broker" => Some(RemoteRole::PairingBroker),
         _ => None,
     }
 }

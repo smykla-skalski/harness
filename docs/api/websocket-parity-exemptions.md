@@ -27,7 +27,7 @@ Twelve routes are exempt. All were reviewed and judged sound.
 
 (The `/stream` and `/sessions/{id}/stream` rows share the streaming rationale; the subscription primitives `stream.subscribe` / `session.subscribe` are the WebSocket equivalents and are intentionally socket-only, listed in `WS_ONLY_METHODS`.)
 
-### Standing decision (7)
+### Standing decision (8)
 
 | Method | Path | Durable reason to stay HTTP-only |
 | --- | --- | --- |
@@ -35,6 +35,7 @@ Twelve routes are exempt. All were reviewed and judged sound.
 | POST | `/v1/task-board/triage/escalations/{escalation_id}/verdict` | Report path for the daemon's own spawned triage-escalation worker, authenticated by a single-use per-escalation token instead of the control-plane session; never exposed to remote or Swift clients, so it must not gain an RPC mirror. |
 | POST | `/v1/remote/pair/claim` | Pre-auth pairing claim that mints the first credential; cannot ride the authenticated RPC channel it bootstraps. |
 | POST | `/v1/remote/pair/status` | Pre-auth pairing lifecycle check; part of the bootstrap that precedes the authenticated RPC channel. |
+| POST | `/v1/remote/pair/mint` | Mints a credential for a third party from a service that holds only the `pair_mint` scope; kept off the RPC channel so a broker never opens an authenticated session it has no scope to use. |
 | POST | `/v1/remote/clients/self/revoke` | Self-revoke destroys the caller's own credential; kept a one-shot HTTP action rather than a method on the RPC session it would invalidate mid-call. |
 | POST | `/v1/policies/dump` | Bulk policy export is a CLI administrative transfer kept off the interactive RPC surface. |
 | POST | `/v1/policies/import` | Bulk policy import is a CLI administrative transfer kept off the interactive RPC surface. |

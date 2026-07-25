@@ -3944,6 +3944,85 @@
         }
       }
     },
+    "/v1/remote/pair/mint": {
+      "post": {
+        "tags": [
+          "pairing"
+        ],
+        "description": "Mint a pairing link for an external identity the caller has already authenticated. Requires the pair_mint scope. The raw pairing code is not returned separately; it is carried inside pairing_url",
+        "operationId": "post_remote_pair_mint",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemotePairMintHttpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Pairing link minted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemotePairMintHttpResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed mint request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Requested role or scope is not mintable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Pairing store or remote identity unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
     "/v1/remote/pair/status": {
       "post": {
         "tags": [
@@ -22762,6 +22841,94 @@
           }
         }
       },
+      "RemotePairMintHttpRequest": {
+        "type": "object",
+        "required": [
+          "role",
+          "subject"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "description": "Role granted to whoever claims the link, in wire form such as\n`operator`. `pairing_broker` is refused."
+          },
+          "scopes": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "Explicit scopes, which must be a subset of the role's. Omit to take the\nrole's own scopes."
+          },
+          "subject": {
+            "$ref": "#/components/schemas/RemotePairingSubject",
+            "description": "The external identity this link is for."
+          },
+          "ttl_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "RemotePairMintHttpResponse": {
+        "type": "object",
+        "required": [
+          "pairing_id",
+          "role",
+          "scopes",
+          "created_at",
+          "expires_at",
+          "ttl_seconds",
+          "endpoint",
+          "server_spki_sha256",
+          "pairing_url",
+          "subject"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "pairing_id": {
+            "type": "string"
+          },
+          "pairing_url": {
+            "type": "string",
+            "description": "The invitation link. It already carries the one-time code, which is why\nno separate `code` field is returned."
+          },
+          "role": {
+            "type": "string"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "server_spki_sha256": {
+            "type": "string"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/RemotePairingSubject"
+          },
+          "ttl_seconds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
       "RemotePairStatusHttpRequest": {
         "type": "object",
         "required": [
@@ -22781,6 +22948,28 @@
         "properties": {
           "status": {
             "type": "string"
+          }
+        }
+      },
+      "RemotePairingSubject": {
+        "type": "object",
+        "required": [
+          "provider",
+          "subject_id",
+          "display_name"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "description": "What an operator reading the audit trail should see."
+          },
+          "provider": {
+            "type": "string",
+            "description": "Identity provider that authenticated the person, such as `github`."
+          },
+          "subject_id": {
+            "type": "string",
+            "description": "The provider's stable identifier. A login can be renamed and reused by\nsomeone else, so callers should send the immutable id."
           }
         }
       },
