@@ -32,6 +32,14 @@ enum TaskBoardApprovedAtPickerValue {
   static func approvedAtString(from date: Date) -> String {
     taskBoardApprovedAtSubmissionFormatter.string(from: date)
   }
+
+  /// Clears a non-empty `approvedAt` the old free-text field let through
+  /// malformed, so the picker's valid-looking fallback display can't mask a
+  /// bad string that would still round-trip into the approve/update request.
+  @MainActor
+  static func sanitizedApprovedAt(_ approvedAt: String) -> String {
+    approvedAt.isEmpty || TaskBoardCardDateParsing.parse(approvedAt) != nil ? approvedAt : ""
+  }
 }
 
 struct TaskBoardItemManagementPanel: View {
@@ -100,9 +108,13 @@ struct TaskBoardItemManagementPanel: View {
     self.selectionModel = selectionModel
     self.backlink = backlink
     self.childrenSummary = childrenSummary
-    _draft = State(
-      initialValue: item.map(TaskBoardItemEditorDraft.init) ?? TaskBoardItemEditorDraft()
-    )
+    _draft = State(initialValue: Self.sanitizedDraft(for: item))
+  }
+
+  private static func sanitizedDraft(for item: TaskBoardItem?) -> TaskBoardItemEditorDraft {
+    var draft = item.map(TaskBoardItemEditorDraft.init) ?? TaskBoardItemEditorDraft()
+    draft.approvedAt = TaskBoardApprovedAtPickerValue.sanitizedApprovedAt(draft.approvedAt)
+    return draft
   }
 
   var body: some View {
@@ -145,7 +157,7 @@ struct TaskBoardItemManagementPanel: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.manage-item.\(item?.id ?? "new")")
     .onChange(of: item) { _, newValue in
-      draft = newValue.map(TaskBoardItemEditorDraft.init) ?? TaskBoardItemEditorDraft()
+      draft = Self.sanitizedDraft(for: newValue)
       approvedAtPickerDefault = Date()
     }
     .onChange(of: creationOutcome.succeeded) { _, succeeded in
