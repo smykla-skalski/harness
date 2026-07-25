@@ -213,6 +213,7 @@ fn project(slug: &str) -> TaskBoardProject {
         slug: slug.into(),
         display_name: None,
         color: crate::task_board::project_color::TaskBoardProjectColor::Blue,
+        shape: crate::task_board::project_shape::TaskBoardProjectShape::DEFAULT,
         created_at: "2026-07-24T00:00:00Z".into(),
         updated_at: "2026-07-24T00:00:00Z".into(),
     }

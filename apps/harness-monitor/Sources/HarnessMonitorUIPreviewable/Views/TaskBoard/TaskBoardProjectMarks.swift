@@ -139,7 +139,7 @@ struct TaskBoardProjectMarkOutline: InsettableShape {
 
   func path(in bounds: CGRect) -> Path {
     let rect = bounds.insetBy(dx: inset, dy: inset)
-    switch shape {
+    return switch shape {
     case .circle:
       Path(ellipseIn: rect)
     case .square:
@@ -188,10 +188,12 @@ struct TaskBoardProjectMarkOutline: InsettableShape {
 struct TaskBoardProjectMark: View {
   let style: TaskBoardProjectMarkStyle
   /// The text style the mark sits beside. A mark carries no baseline of its
-  /// own, so it borrows this font's x-height to find the middle of the
-  /// lowercase letters. A plain centre guide lands on the middle of the line
-  /// box instead, which the descenders drag a quarter point below where the eye
-  /// reads the row, and the mark then floats above the name it belongs to.
+  /// own, so it borrows this font's cap height and sits on the middle of the
+  /// band between the baseline and the top of a capital. That is where the eye
+  /// reads the line: centring on the line box puts the mark high, because the
+  /// descenders stretch the box below anything actually drawn, and centring on
+  /// the x-height puts it low the moment the label starts with a capital, which
+  /// a project name usually does.
   var alignsWith: NSFont.TextStyle = .body
   @Environment(\.fontScale)
   private var fontScale
@@ -203,7 +205,7 @@ struct TaskBoardProjectMark: View {
     // back into the view's MainActor state.
     let diameter = diameter
     let baseline = diameter / 2
-      + NSFont.preferredFont(forTextStyle: alignsWith).xHeight * fontScale / 2
+      + NSFont.preferredFont(forTextStyle: alignsWith).capHeight * fontScale / 2
     let outline = TaskBoardProjectMarkOutline(shape: style.shape)
     return outline
       .fill(style.color.color)

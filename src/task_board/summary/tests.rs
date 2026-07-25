@@ -37,6 +37,7 @@ fn registered_project(slug: &str) -> TaskBoardProject {
         slug: slug.into(),
         display_name: None,
         color: crate::task_board::project_color::TaskBoardProjectColor::Blue,
+        shape: crate::task_board::project_shape::TaskBoardProjectShape::DEFAULT,
         created_at: "2026-05-14T00:00:00Z".into(),
         updated_at: "2026-05-14T00:00:00Z".into(),
     }
