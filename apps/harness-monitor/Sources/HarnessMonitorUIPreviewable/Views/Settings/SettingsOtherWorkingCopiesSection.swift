@@ -19,8 +19,11 @@ struct SettingsOtherWorkingCopiesSection: View {
       Text("Other Working Copies")
         .harnessNativeFormSectionHeader()
     } footer: {
-      Text("Copies obtained for repositories no longer listed above. Reclaim one to free its disk.")
-        .foregroundStyle(.secondary)
+      Text(
+        "Copies for repositories you stopped monitoring, or that now point at a folder you "
+          + "picked. Reclaim one to free its disk."
+      )
+      .foregroundStyle(.secondary)
     }
   }
 
