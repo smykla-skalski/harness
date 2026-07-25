@@ -216,8 +216,13 @@ clean_stale_test_temp_dirs() {
     return
   fi
 
+  # Returning quietly here would leave the report claiming a sweep that never
+  # ran, which is the same failure the sweep exists to stop hiding.
   local work
-  work="$(mktemp -d "${TMPDIR:-/tmp}/clean-build-caches-sweep.XXXXXX")" || return
+  if ! work="$(mktemp -d "${TMPDIR:-/tmp}/clean-build-caches-sweep.XXXXXX" 2>/dev/null)"; then
+    printf '  · %-46s %8s  (no scratch dir, skipped)\n' 'stale .tmp dirs' '-'
+    return
+  fi
 
   # STALE_TMP_GLOB admits only alphanumerics, so a candidate path cannot contain
   # a newline and the line-oriented set arithmetic below is safe.
