@@ -47,7 +47,7 @@ harness task-board list --json \
 
 `--query` matches a case-insensitive substring of the title, body, or any tag. Repeated `--tag` narrows to items carrying every listed tag. Facets combine as AND.
 
-The daemon bounds every list response, so `list` walks the pages and prints the whole selection. Pass `--limit <1-500>` or `--cursor <cursor>` to read exactly one page instead; that form prints the whole page object, whose `next_cursor` is the argument for the page after it. Without those flags `--json` still prints a plain array of items.
+The daemon bounds every list response, so `list` walks the pages and prints the whole selection, and `--json` prints a plain array of items. Pass `--limit <1-500>` or `--cursor <cursor>` to read exactly one page instead: `--json` then prints the whole page object, and plain output prints the item lines followed by a line naming the `--cursor` argument for the page after it.
 
 A remote viewer's facets and text match that viewer's redacted projection rather than the stored item, so searching cannot reveal text the viewer is not allowed to read.
 

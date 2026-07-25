@@ -91,8 +91,8 @@ impl TaskBoardItemQuery {
 
     fn tags_match(&self, tags: &[String]) -> bool {
         self.tags.iter().all(|wanted| {
-            let wanted = wanted.to_lowercase();
-            tags.iter().any(|tag| tag.to_lowercase() == wanted)
+            let wanted = canonical_tag(wanted);
+            tags.iter().any(|tag| canonical_tag(tag) == wanted)
         })
     }
 
@@ -209,6 +209,15 @@ pub fn normalize_query_text(text: Option<&str>) -> Option<String> {
 
 fn contains_ignoring_case(haystack: &str, needle_lowercase: &str) -> bool {
     haystack.to_lowercase().contains(needle_lowercase)
+}
+
+/// Reduce one tag to the form a facet compares, matching what
+/// [`canonicalize_labels`](super::triage::canonicalize_labels) does per tag.
+/// The write path stores tags exactly as they arrive, so an item really can
+/// hold `"backend "`, and comparing either side raw would leave it
+/// unmatchable.
+fn canonical_tag(tag: &str) -> String {
+    tag.trim().to_lowercase()
 }
 
 #[cfg(test)]

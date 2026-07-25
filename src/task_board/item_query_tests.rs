@@ -83,6 +83,20 @@ fn every_requested_tag_must_be_present() {
     assert!(!missing_one.matches(&item.query_fields()));
 }
 
+/// Tags are stored exactly as they arrive, so both sides have to be reduced
+/// the same way or a tag written with a stray space is unmatchable.
+#[test]
+fn a_tag_facet_ignores_surrounding_whitespace_on_either_side() {
+    let mut item = item("task-1", "Ship the thing", "body");
+    item.tags = vec!["Backend ".to_string()];
+
+    let query = TaskBoardItemQuery {
+        tags: vec![" backend".to_string()],
+        ..TaskBoardItemQuery::default()
+    };
+    assert!(query.matches(&item.query_fields()));
+}
+
 #[test]
 fn text_matches_title_body_and_tags_case_insensitively() {
     let mut item = item("task-1", "Ship the Widget", "the CAUSE was a race");
