@@ -16,6 +16,9 @@ struct RecordingHarnessClientCallRecordingTests {
     try await withThrowingTaskGroup(of: Void.self) { group in
       for index in 0..<concurrentCallCount {
         group.addTask {
+          // The recorded calls never suspend, so without this the group can
+          // drain tasks one at a time and the racy implementation survives.
+          await Task.yield()
           if index.isMultiple(of: 2) {
             _ = try await client.startTaskBoardOrchestrator()
           } else {
@@ -41,6 +44,7 @@ struct RecordingHarnessClientCallRecordingTests {
     try await withThrowingTaskGroup(of: Void.self) { group in
       for _ in 0..<concurrentCallCount {
         group.addTask {
+          await Task.yield()
           _ = try await client.stopTaskBoardOrchestrator()
         }
       }
