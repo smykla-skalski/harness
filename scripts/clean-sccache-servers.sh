@@ -17,6 +17,23 @@ unalias -a 2>/dev/null || true
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)"
 
+# Identifying a server needs /proc and SO_PEERCRED, so this is Linux only. The
+# mise task already routes around that, but someone reading the docs and running
+# the script directly deserves the same answer rather than a failure from inside
+# a /proc read that does not exist.
+host_os="$(uname -s)"
+case "$host_os" in
+  Linux) ;;
+  Darwin)
+    printf 'sccache: server cleanup is Linux only, skipping on macOS\n'
+    exit 0
+    ;;
+  *)
+    printf 'sccache: server cleanup is Linux only, skipping on %s\n' "$host_os"
+    exit 0
+    ;;
+esac
+
 dry_run=0
 if [[ "${1:-}" == "--dry-run" ]]; then
   dry_run=1
