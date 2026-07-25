@@ -23,6 +23,7 @@ pub(super) struct CodexInspectQuery {
     get,
     path = "/v1/managed-agents/codex/inspect",
     tag = "managed-agents",
+    description = "Inspect Codex-backed managed agent run state across the daemon, optionally scoped to one session",
     params(
         ("session_id" = Option<String>, Query, description = "Restrict the inspection to one session"),
     ),

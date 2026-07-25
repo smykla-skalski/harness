@@ -25,6 +25,7 @@ pub(super) struct AcpInspectQuery {
     get,
     path = "/v1/managed-agents/acp/inspect",
     tag = "managed-agents",
+    description = "Inspect ACP-backed managed agent state across the daemon, optionally scoped to one session. Requires the ACP feature flag to be enabled",
     params(
         ("session_id" = Option<String>, Query, description = "Restrict the inspection to one session"),
     ),

@@ -25,6 +25,7 @@ pub(super) fn improver_routes() -> OpenApiRouter<DaemonHttpState> {
     post,
     path = "/v1/sessions/{session_id}/improver/apply",
     tag = "agents",
+    description = "Apply or preview an improver-generated patch for the given session, returning the outcome of whichever mode the request specifies",
     params(("session_id" = String, Path, description = "Session identifier")),
     request_body = ImproverApplyRequest,
     responses(

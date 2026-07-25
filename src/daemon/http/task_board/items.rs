@@ -57,6 +57,7 @@ pub(super) struct TaskBoardPlanRevokeBody {
     post,
     path = "/v1/task-board/items",
     tag = "task-board",
+    description = "Create a new task-board item and return it as persisted",
     request_body = TaskBoardCreateItemRequest,
     responses(
         (status = 200, description = "The created task-board item", body = TaskBoardItem),
@@ -85,6 +86,7 @@ pub(super) async fn post_task_board_item(
     get,
     path = "/v1/task-board/capabilities",
     tag = "task-board",
+    description = "Return the task-board storage backend, current revision, and instance identifier",
     responses(
         (status = 200, description = "Task-board capability descriptor", body = TaskBoardCapabilitiesResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
@@ -111,6 +113,7 @@ pub(super) async fn get_task_board_capabilities(
     get,
     path = "/v1/task-board/items",
     tag = "task-board",
+    description = "List task-board items with per-status counts and progress rollups, optionally filtered by status. Remote viewers receive a projected response with viewer-restricted fields removed",
     params(TaskBoardListQuery),
     responses(
         (status = 200, description = "Task-board items with per-status counts and progress rollups", body = TaskBoardListItemsResponse),
@@ -145,6 +148,7 @@ pub(super) async fn get_task_board_items(
     get,
     path = "/v1/task-board/items/{item_id}",
     tag = "task-board",
+    description = "Return a single task-board item by id. Remote viewers receive a projected response with viewer-restricted fields removed",
     params(("item_id" = String, Path, description = "Task-board item identifier")),
     responses(
         (status = 200, description = "The requested task-board item", body = TaskBoardItem),
@@ -177,6 +181,7 @@ pub(super) async fn get_task_board_item(
     put,
     path = "/v1/task-board/items/{item_id}",
     tag = "task-board",
+    description = "Update an existing task-board item's editable fields and return it as persisted",
     params(("item_id" = String, Path, description = "Task-board item identifier")),
     request_body = TaskBoardUpdateItemRequest,
     responses(
@@ -207,6 +212,7 @@ pub(super) async fn put_task_board_item(
     delete,
     path = "/v1/task-board/items/{item_id}",
     tag = "task-board",
+    description = "Delete a task-board item by tombstoning it rather than removing it outright, and return the tombstoned item",
     params(("item_id" = String, Path, description = "Task-board item identifier")),
     responses(
         (status = 200, description = "The deleted (tombstoned) task-board item", body = TaskBoardItem),
@@ -236,6 +242,7 @@ pub(super) async fn delete_task_board_item(
     post,
     path = "/v1/task-board/items/{item_id}/planning/begin",
     tag = "task-board",
+    description = "Transition a task-board item into the planning phase and return the resulting planning state",
     params(("item_id" = String, Path, description = "Task-board item identifier")),
     responses(
         (status = 200, description = "Planning transition after entering planning", body = TaskBoardPlanningResponse),
@@ -265,6 +272,7 @@ pub(super) async fn post_task_board_plan_begin(
     post,
     path = "/v1/task-board/items/{item_id}/planning/submit",
     tag = "task-board",
+    description = "Submit a plan summary for a task-board item and return the resulting planning state",
     params(("item_id" = String, Path, description = "Task-board item identifier")),
     request_body = TaskBoardPlanSubmitBody,
     responses(
@@ -299,6 +307,7 @@ pub(super) async fn post_task_board_plan_submit(
     post,
     path = "/v1/task-board/items/{item_id}/planning/approve",
     tag = "task-board",
+    description = "Approve the submitted plan for a task-board item and return the resulting planning state. Requires a control-plane actor bound to the request",
     params(("item_id" = String, Path, description = "Task-board item identifier")),
     request_body = TaskBoardPlanApproveBody,
     responses(
@@ -335,6 +344,7 @@ pub(super) async fn post_task_board_plan_approve(
     post,
     path = "/v1/task-board/items/{item_id}/planning/revoke",
     tag = "task-board",
+    description = "Revoke a previously approved plan for a task-board item and return the resulting planning state. Requires a control-plane actor bound to the request",
     params(("item_id" = String, Path, description = "Task-board item identifier")),
     request_body(content = TaskBoardPlanRevokeBody, description = "Optional actor override; the body may be omitted"),
     responses(

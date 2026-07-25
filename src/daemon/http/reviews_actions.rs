@@ -41,6 +41,7 @@ pub(super) fn merge_action_routes(
     post,
     path = "/v1/reviews/approve",
     tag = "reviews",
+    description = "Approve the given review targets and report the outcome of applying each approval",
     request_body = ReviewsApproveRequest,
     responses(
         (status = 200, description = "Outcome of applying the approvals", body = crate::daemon::protocol::ReviewsActionResponse),
@@ -71,6 +72,7 @@ pub(super) async fn post_approve_reviews(
     post,
     path = "/v1/reviews/merge",
     tag = "reviews",
+    description = "Merge the given pull requests and report the outcome for each target",
     request_body = ReviewsMergeRequest,
     responses(
         (status = 200, description = "Outcome of merging the targets", body = crate::daemon::protocol::ReviewsActionResponse),
@@ -95,6 +97,7 @@ pub(super) async fn post_merge_reviews(
     post,
     path = "/v1/reviews/rerun-checks",
     tag = "reviews",
+    description = "Re-run the failed status checks for the given targets and report the outcome",
     request_body = ReviewsRerunChecksRequest,
     responses(
         (status = 200, description = "Outcome of re-running the failed checks", body = crate::daemon::protocol::ReviewsActionResponse),
@@ -125,6 +128,7 @@ pub(super) async fn post_rerun_reviews_checks(
     post,
     path = "/v1/reviews/labels",
     tag = "reviews",
+    description = "Add a label to the given review targets and report the outcome for each",
     request_body = ReviewsLabelRequest,
     responses(
         (status = 200, description = "Outcome of adding the label", body = crate::daemon::protocol::ReviewsActionResponse),
@@ -155,6 +159,7 @@ pub(super) async fn post_label_reviews(
     post,
     path = "/v1/reviews/auto",
     tag = "reviews",
+    description = "Run the automatic approve-and-merge pass over the given targets and report the outcome",
     request_body = ReviewsAutoRequest,
     responses(
         (status = 200, description = "Outcome of the automatic approve-and-merge pass", body = crate::daemon::protocol::ReviewsActionResponse),
@@ -179,6 +184,7 @@ pub(super) async fn post_auto_reviews(
     post,
     path = "/v1/reviews/request-review",
     tag = "reviews",
+    description = "Re-request review from the assigned reviewers on the given targets",
     request_body = ReviewsRequestReviewRequest,
     responses(
         (status = 200, description = "Outcome of re-requesting review", body = crate::daemon::protocol::ReviewsActionResponse),
@@ -209,6 +215,7 @@ pub(super) async fn post_request_review(
     post,
     path = "/v1/reviews/comment",
     tag = "reviews",
+    description = "Post a comment on the given review targets and report the outcome",
     request_body = ReviewsCommentRequest,
     responses(
         (status = 200, description = "Outcome of posting the comment", body = crate::daemon::protocol::ReviewsActionResponse),

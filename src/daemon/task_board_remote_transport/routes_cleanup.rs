@@ -21,7 +21,7 @@ pub(crate) const CLEANUP_OBSERVATION_PATH: &str = "/v1/task-board-execution/clea
     post,
     path = "/v1/task-board-execution/cleanup/observe",
     tag = "task-board-execution",
-    description = "Read exact executor cleanup completion evidence for a settled assignment. Responds 503 with the REMOTE_CLEANUP_PENDING code when cleanup has not yet completed.",
+    description = "Read exact executor cleanup completion evidence for a settled assignment. Responds 503 with the REMOTE_CLEANUP_PENDING code when cleanup has not yet completed",
     request_body = RemoteCleanupObservationRequest,
     responses(
         (status = 200, description = "Cleanup completion observation", body = RemoteCleanupObservationResponse),

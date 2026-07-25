@@ -33,6 +33,7 @@ pub(super) struct TaskBoardTriageRulesListQuery {
     get,
     path = "/v1/task-board/triage/rules/draft",
     tag = "task-board",
+    description = "Fetch the pending triage rule-set draft, if one has been saved but not yet activated",
     responses(
         (status = 200, description = "Current pending triage rule-set draft, if one exists", body = TaskBoardTriageRulesDraftResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
@@ -59,6 +60,7 @@ pub(super) async fn get_task_board_triage_rules_draft(
     put,
     path = "/v1/task-board/triage/rules/draft",
     tag = "task-board",
+    description = "Validate and persist a triage rule-set draft, returning the validation outcome and, when valid, the persisted revision",
     request_body = TaskBoardSaveTriageRulesDraftRequest,
     responses(
         (status = 200, description = "Validation outcome and, when valid, the persisted draft revision", body = TriageRuleSetDraftSaveResult),
@@ -88,6 +90,7 @@ pub(super) async fn put_task_board_triage_rules_draft(
     post,
     path = "/v1/task-board/triage/rules/preview",
     tag = "task-board",
+    description = "Validate a candidate triage rule set and compute its placement diff against current items without persisting anything",
     request_body = TaskBoardPreviewTriageRulesRequest,
     responses(
         (status = 200, description = "Validation outcome and the non-persisting placement diff for the candidate rule set", body = TriageRuleSetPreviewResult),
@@ -116,6 +119,7 @@ pub(super) async fn post_task_board_triage_rules_preview(
     post,
     path = "/v1/task-board/triage/rules/activate",
     tag = "task-board",
+    description = "Activate a validated triage rule set, making it the new active revision and re-evaluating existing items against it",
     request_body = TaskBoardActivateTriageRulesRequest,
     responses(
         (status = 200, description = "Validation outcome and, when activated, the new active revision and re-evaluated item count", body = TriageRuleSetActivationResult),
@@ -145,6 +149,7 @@ pub(super) async fn post_task_board_triage_rules_activate(
     get,
     path = "/v1/task-board/triage/rules/revisions",
     tag = "task-board",
+    description = "List recent triage rule-set revisions, newest first",
     params(TaskBoardTriageRulesListQuery),
     responses(
         (status = 200, description = "Recent triage rule-set revisions, newest first", body = TaskBoardTriageRulesRevisionsResponse),
@@ -173,6 +178,7 @@ pub(super) async fn get_task_board_triage_rules_revisions(
     get,
     path = "/v1/task-board/triage/rules/audit",
     tag = "task-board",
+    description = "List recent triage rule-set audit entries, newest first",
     params(TaskBoardTriageRulesListQuery),
     responses(
         (status = 200, description = "Recent triage rule-set audit entries, newest first", body = TaskBoardTriageRulesAuditResponse),

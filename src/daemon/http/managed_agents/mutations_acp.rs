@@ -37,6 +37,7 @@ pub(super) struct AcpPromptRequestBody {
     post,
     path = "/v1/managed-agents/{managed_agent_id}/prompt",
     tag = "managed-agents",
+    description = "Send a prompt to a running ACP-backed managed agent and return its snapshot after dispatch",
     params(
         ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
     ),
@@ -85,6 +86,7 @@ pub(super) async fn post_acp_agent_prompt(
     post,
     path = "/v1/managed-agents/{managed_agent_id}/logout",
     tag = "managed-agents",
+    description = "Log an ACP-backed managed agent out of its connected provider account",
     params(
         ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
     ),
@@ -130,6 +132,7 @@ pub(super) async fn post_acp_agent_logout(
     post,
     path = "/v1/managed-agents/{managed_agent_id}/permission-batches/{batch_id}",
     tag = "managed-agents",
+    description = "Resolve a pending ACP permission batch, a group of tool-call permission requests, with the caller's decision",
     params(
         ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
         ("batch_id" = String, Path, description = "Pending permission batch identifier"),

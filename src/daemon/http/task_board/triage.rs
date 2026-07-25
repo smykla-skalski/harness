@@ -36,6 +36,7 @@ pub(super) struct TaskBoardTriageHistoryQuery {
     get,
     path = "/v1/task-board/items/{item_id}/triage",
     tag = "task-board",
+    description = "Fetch the current effective triage outcome for a task-board item, projected for the authenticated viewer",
     params(("item_id" = String, Path, description = "Task-board item identifier")),
     responses(
         (status = 200, description = "Current effective triage outcome for the item", body = TaskBoardTriageCurrentResponse),
@@ -67,6 +68,7 @@ pub(super) async fn get_task_board_item_triage(
     get,
     path = "/v1/task-board/items/{item_id}/triage/history",
     tag = "task-board",
+    description = "Fetch the paged triage decision history for a task-board item, newest first. Returns 400 when the before_generation/limit pagination parameters fail validation",
     params(
         ("item_id" = String, Path, description = "Task-board item identifier"),
         TaskBoardTriageHistoryQuery,
@@ -122,6 +124,7 @@ pub(super) async fn get_task_board_item_triage_history(
     put,
     path = "/v1/task-board/items/{item_id}/triage/override",
     tag = "task-board",
+    description = "Set a manual triage override for a task-board item, returning the effective triage outcome after applying it",
     params(("item_id" = String, Path, description = "Task-board item identifier")),
     request_body = TaskBoardSetTriageOverrideRequest,
     responses(
@@ -153,6 +156,7 @@ pub(super) async fn put_task_board_item_triage_override(
     post,
     path = "/v1/task-board/items/{item_id}/triage/override/clear",
     tag = "task-board",
+    description = "Clear a manual triage override for a task-board item, returning the effective triage outcome after removing it",
     params(("item_id" = String, Path, description = "Task-board item identifier")),
     request_body = TaskBoardClearTriageOverrideRequest,
     responses(

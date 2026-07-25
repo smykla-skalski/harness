@@ -17,6 +17,7 @@ use super::{managed_agent_list_response_async, managed_agent_snapshot_async};
     get,
     path = "/v1/sessions/{session_id}/managed-agents",
     tag = "managed-agents",
+    description = "List the managed agents currently running within the given session",
     params(
         ("session_id" = String, Path, description = "Session identifier"),
     ),
@@ -49,6 +50,7 @@ pub(crate) async fn get_managed_agents(
     get,
     path = "/v1/managed-agents/{managed_agent_id}",
     tag = "managed-agents",
+    description = "Fetch the current snapshot of a managed agent by its identifier",
     params(
         ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
     ),

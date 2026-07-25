@@ -14,6 +14,7 @@ use super::wire::{RemoteSourceBundleAbandonResponse, RemoteSourceBundleReceiptVe
     post,
     path = "/v1/task-board-execution/source-bundles/receipt",
     tag = "task-board-execution",
+    description = "Verify that a previously stored source-bundle receipt matches the given upload request",
     request_body = RemoteSourceBundleUploadRequest,
     responses(
         (status = 200, description = "Verification of the stored source-bundle receipt", body = RemoteSourceBundleReceiptVerificationResponse),
@@ -51,6 +52,7 @@ pub(super) async fn verify_source_bundle_receipt(
     post,
     path = "/v1/task-board-execution/source-bundles/abandon",
     tag = "task-board-execution",
+    description = "Abandon a source bundle for an assignment, returning its abandonment record",
     request_body = RemoteSourceBundleAbandonRequest,
     responses(
         (status = 200, description = "Abandonment record for the source bundle", body = RemoteSourceBundleAbandonResponse),

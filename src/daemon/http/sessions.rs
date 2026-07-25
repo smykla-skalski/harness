@@ -113,6 +113,7 @@ fn timeline_cursor(
     get,
     path = "/v1/sessions",
     tag = "sessions",
+    description = "List all sessions across projects, including archived and otherwise-excluded sessions",
     responses(
         (status = 200, description = "All sessions across projects", body = Vec<SessionSummary>),
         (status = 400, description = "Request error", body = DaemonErrorBody),
@@ -138,6 +139,7 @@ pub(super) async fn get_sessions(
     get,
     path = "/v1/sessions/{session_id}",
     tag = "sessions",
+    description = "Fetch detail for a single session. Pass `scope=core` to receive the reduced core view instead of the full detail",
     params(
         ("session_id" = String, Path, description = "Session identifier"),
         ("scope" = Option<String>, Query, description = "Set to `core` for the reduced core view; any other value or omission returns the full detail"),
@@ -203,6 +205,7 @@ async fn read_session_detail(
     get,
     path = "/v1/sessions/{session_id}/timeline",
     tag = "sessions",
+    description = "Fetch a cursor-paginated window of the session timeline. Pass `scope=summary` to receive summary-only entries instead of full payloads",
     params(
         ("session_id" = String, Path, description = "Session identifier"),
         SessionScopeQuery,

@@ -37,6 +37,7 @@ pub(super) fn merge_policy_pipeline_routes(
     get,
     path = "/v1/policy-pipeline",
     tag = "policy",
+    description = "Load the V2 policy pipeline draft document for the active canvas, or for a specific canvas when `canvas_id` is provided",
     params(PolicyPipelineGetRequest),
     responses(
         (status = 200, description = "The draft policy graph for the selected canvas", body = PolicyPipelineResponse),
@@ -69,6 +70,7 @@ pub(super) async fn get_policy_pipeline(
     put,
     path = "/v1/policy-pipeline",
     tag = "policy",
+    description = "Validate and persist a policy pipeline draft for a canvas, returning the validation outcome and, when valid, the persisted draft. The request requires `canvas_id`; omitting it fails with an invalid-transition error",
     request_body = PolicyPipelineSaveDraftRequest,
     responses(
         (status = 200, description = "Validation outcome and, when valid, the persisted draft", body = PolicyPipelineSaveDraftResponse),
@@ -101,6 +103,7 @@ pub(super) async fn put_policy_pipeline_draft(
     post,
     path = "/v1/policy-pipeline/simulate",
     tag = "policy",
+    description = "Simulate a policy pipeline draft against the confidence scenario set and return per-scenario decisions without promoting the draft to live",
     request_body = PolicyPipelineSimulateRequest,
     responses(
         (status = 200, description = "Non-persisting simulation of the draft against the scenario set", body = PolicyPipelineSimulationResponse),
@@ -133,6 +136,7 @@ pub(super) async fn post_policy_simulate(
     post,
     path = "/v1/policy-pipeline/promote",
     tag = "policy",
+    description = "Promote a policy pipeline draft to the canvas's enforced live document and return the resulting document and trace ID. Internally this runs the same live-promotion path as `make-live`, including enabling global enforcement, but the response omits the enforcement flag and refreshed workspace",
     request_body = PolicyPipelinePromoteRequest,
     responses(
         (status = 200, description = "The promoted draft revision", body = PolicyPipelinePromoteResponse),
@@ -165,6 +169,7 @@ pub(super) async fn post_policy_promote(
     post,
     path = "/v1/policy-pipeline/make-live",
     tag = "policy",
+    description = "Make a policy pipeline draft the canvas's live enforced document: refresh its simulation, promote it to enforced mode, and enable global policy enforcement in one transaction",
     request_body = PolicyPipelineMakeLiveRequest,
     responses(
         (status = 200, description = "The now-live document and refreshed workspace", body = PolicyPipelineMakeLiveResponse),
@@ -197,6 +202,7 @@ pub(super) async fn post_policy_make_live(
     post,
     path = "/v1/policy-pipeline/go-live-diff",
     tag = "policy",
+    description = "Diff a candidate draft against the currently live enforced policy across every scenario without mutating any durable state",
     request_body = PolicyPipelineGoLiveDiffRequest,
     responses(
         (status = 200, description = "Per-scenario decision diff between the live policy and the draft", body = PolicyPipelineGoLiveDiffResponse),
@@ -229,6 +235,7 @@ pub(super) async fn post_policy_go_live_diff(
     post,
     path = "/v1/policy-pipeline/replay",
     tag = "policy",
+    description = "Replay the active draft against a window of recently recorded real policy decisions for the canvas, without mutating any durable state",
     request_body = PolicyPipelineReplayRequest,
     responses(
         (status = 200, description = "The draft replayed against a window of recorded decisions", body = PolicyPipelineReplayResponse),
@@ -261,6 +268,7 @@ pub(super) async fn post_policy_replay(
     get,
     path = "/v1/policy-pipeline/audit",
     tag = "policy",
+    description = "Summarize the active-revision status, latest simulation, and pending approval grant count for the V2 policy pipeline",
     params(PolicyPipelineAuditRequest),
     responses(
         (status = 200, description = "Active-revision and latest-simulation audit summary", body = PolicyPipelineAuditResponse),

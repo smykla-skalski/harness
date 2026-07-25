@@ -24,6 +24,7 @@ pub(super) fn openrouter_model_routes() -> OpenApiRouter<DaemonHttpState> {
     get,
     path = "/v1/openrouter/models",
     tag = "daemon",
+    description = "Return the catalog of models available through OpenRouter",
     responses(
         (status = 200, description = "OpenRouter model catalog", body = OpenRouterModelCatalogResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),

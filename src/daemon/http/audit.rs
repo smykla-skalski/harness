@@ -54,6 +54,7 @@ impl AuditEventsQuery {
     get,
     path = "/v1/audit/events",
     tag = "daemon",
+    description = "Return a filtered, paginated page of Harness Monitor audit events. The page is redacted before being returned when the authenticated caller is a paired remote viewer client",
     params(AuditEventsQuery),
     responses(
         (status = 200, description = "Filtered Harness Monitor audit events page", body = HarnessMonitorAuditEventsResponse),

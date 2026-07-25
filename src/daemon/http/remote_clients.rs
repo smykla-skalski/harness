@@ -37,7 +37,7 @@ struct RemoteClientSelfRevokeResponse {
     post,
     path = "/v1/remote/client/revoke",
     tag = "pairing",
-    description = "Revoke the remote client credential bound to the authenticated caller. Error bodies use an ad-hoc error object carrying code and message but no details field.",
+    description = "Revoke the remote client credential bound to the authenticated caller. Error bodies use an ad-hoc error object carrying code and message but no details field",
     responses(
         (status = 200, description = "Client credential revoked", body = RemoteClientSelfRevokeResponse),
         (status = 400, description = "Revocation failed", body = DaemonErrorBody),

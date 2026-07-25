@@ -27,6 +27,7 @@ use crate::daemon::protocol::http_paths;
     post,
     path = "/v1/sessions/adopt",
     tag = "sessions",
+    description = "Adopt an externally created session directory into daemon tracking. On macOS when running sandboxed, the session root is resolved through a security-scoped bookmark identifier instead of a raw path",
     request_body = AdoptSessionRequest,
     responses(
         (status = 200, description = "External session adopted", body = SessionMutationResponse),

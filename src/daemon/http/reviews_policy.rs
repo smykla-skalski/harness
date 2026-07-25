@@ -44,6 +44,7 @@ pub(super) fn merge_policy_routes(
     post,
     path = "/v1/reviews/policy/preview",
     tag = "reviews",
+    description = "Preview the policy workflow steps that would run for a target, recording the preview to the audit database when configured",
     request_body = ReviewsPolicyPreviewRequest,
     responses(
         (status = 200, description = "Preview of the policy workflow steps for a target", body = crate::daemon::protocol::ReviewsPolicyPreviewResponse),
@@ -73,6 +74,7 @@ pub(super) async fn post_reviews_policy_preview(
     post,
     path = "/v1/reviews/policy/start",
     tag = "reviews",
+    description = "Start a policy workflow run for a target, or resume an existing in-progress run",
     request_body = ReviewsPolicyRunStartRequest,
     responses(
         (status = 200, description = "The started (or resumed) policy run", body = crate::daemon::protocol::ReviewsPolicyRunResponse),
@@ -104,6 +106,7 @@ pub(super) async fn post_reviews_policy_start(
     post,
     path = "/v1/reviews/policy/status",
     tag = "reviews",
+    description = "Return the active and recent policy runs for a subject",
     request_body = ReviewsPolicyStatusRequest,
     responses(
         (status = 200, description = "Active and recent policy runs for a subject", body = crate::daemon::protocol::ReviewsPolicyStatusResponse),
@@ -132,6 +135,7 @@ pub(super) async fn post_reviews_policy_status(
     post,
     path = "/v1/reviews/policy/history",
     tag = "reviews",
+    description = "Return historical policy runs for a subject along with aggregate metrics",
     request_body = ReviewsPolicyHistoryRequest,
     responses(
         (status = 200, description = "Historical policy runs with aggregate metrics", body = crate::daemon::protocol::ReviewsPolicyHistoryResponse),

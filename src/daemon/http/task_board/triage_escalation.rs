@@ -20,6 +20,7 @@ use super::super::{DaemonHttpState, require_async_db};
     post,
     path = "/v1/task-board/triage/escalations/{escalation_id}/verdict",
     tag = "task-board",
+    description = "Record the accept/reject verdict for a triage escalation. Authenticated by the request's verdict_token matching the escalation's executor claim rather than a control-plane session, since the caller is the daemon's own spawned escalation worker",
     params(("escalation_id" = String, Path, description = "Triage escalation identifier")),
     request_body = TaskBoardTriageEscalationVerdictRequest,
     responses(
