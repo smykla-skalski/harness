@@ -145,6 +145,144 @@ PY
   rm -rf "$dir" 2>/dev/null || true
 }
 
+# Stand in for cargo and record, per invocation, how many tokens were sitting in
+# the pool FIFO when it started.
+write_token_counting_cargo() {
+  local path="$1" log="$2"
+  cat >"$path" <<'EOF'
+#!/usr/bin/env bash
+fifo="${MAKEFLAGS##*fifo:}"
+count=0
+if [[ -p "$fifo" ]]; then
+  count="$(python3 - "$fifo" <<'PY'
+import os, sys
+fd = os.open(sys.argv[1], os.O_RDWR | os.O_NONBLOCK)
+total = 0
+while True:
+    try:
+        chunk = os.read(fd, 4096)
+    except BlockingIOError:
+        break
+    if not chunk:
+        break
+    total += len(chunk)
+if total:
+    os.write(fd, b"+" * total)
+print(total)
+PY
+)"
+fi
+printf '%s %s\n' "$count" "$*" >> "$TOKEN_LOG"
+EOF
+  chmod +x "$path"
+  : >"$log"
+}
+
+scenario_nextest_build_phase_keeps_the_whole_pool() {
+  local key="pool-buildphase-$$"
+  local fake="$SANDBOX/token-cargo"
+  local log="$SANDBOX/token-log"
+  local scratch="$SANDBOX/buildphase-tmp"
+  mkdir -p "$fake" "$scratch"
+  write_token_counting_cargo "$fake/cargo" "$log"
+
+  local cpu budget
+  cpu="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.logicalcpu)"
+  budget=$((cpu - 1)); (( budget < 1 )) && budget=1
+  python3 "$ROOT/scripts/harness-jobserver.py" ensure \
+    --repo-root "$key" --budget "$budget" >/dev/null 2>&1 || true
+
+  (
+    unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR MAKEFLAGS
+    unset NEXTEST_TEST_THREADS HARNESS_NEXTEST_JOBS
+    TMPDIR="$scratch/" \
+      TOKEN_LOG="$log" \
+      SCCACHE_BIN='' RUSTC_WRAPPER='' \
+      CODEX_SESSION_ID="cargo-local-buildphase-$$" \
+      HARNESS_CARGO_SKIP_LEASE=1 \
+      HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+      HARNESS_JOBSERVER_POOL_KEY="$key" \
+      HARNESS_CARGO_BIN="$fake/cargo" \
+      "$ROOT/scripts/cargo-local.sh" nextest run --lib >/dev/null 2>&1
+  )
+  stop_pool_for_key "$key"
+
+  # cargo-local probes the binary with `cargo -V` before doing anything, so
+  # count only the invocations that carry the subcommand.
+  local build_tokens run_tokens
+  build_tokens="$(awk '/nextest/ {print $1; exit}' "$log")"
+  run_tokens="$(awk '/nextest/ {n++; if (n == 2) {print $1; exit}}' "$log")"
+
+  if [[ ! "$build_tokens" =~ ^[0-9]+$ ]] || [[ ! "$run_tokens" =~ ^[0-9]+$ ]]; then
+    fail "nextest was not split into a build and a run phase: $(tr '\n' '|' <"$log")"
+    return
+  fi
+  # The build must see the full pool. Holding the block across it starved the
+  # compile that produces the very binaries the block is reserved for.
+  if (( build_tokens < budget )); then
+    fail "nextest build phase was starved: saw $build_tokens of $budget tokens"
+    return
+  fi
+  if (( run_tokens != 0 )); then
+    fail "nextest run phase did not hold the block: $run_tokens tokens still free"
+    return
+  fi
+  pass "the nextest build phase keeps the whole pool, the run phase holds it"
+}
+
+scenario_nextest_detection_handles_toolchain_and_list() {
+  local key="pool-detect-$$"
+  local fake="$SANDBOX/detect-cargo"
+  local log="$SANDBOX/detect-log"
+  local scratch="$SANDBOX/detect-tmp"
+  mkdir -p "$fake" "$scratch"
+  write_token_counting_cargo "$fake/cargo" "$log"
+
+  local cpu budget
+  cpu="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.logicalcpu)"
+  budget=$((cpu - 1)); (( budget < 1 )) && budget=1
+  python3 "$ROOT/scripts/harness-jobserver.py" ensure \
+    --repo-root "$key" --budget "$budget" >/dev/null 2>&1 || true
+
+  run_detect() {
+    (
+      unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR MAKEFLAGS
+      unset NEXTEST_TEST_THREADS HARNESS_NEXTEST_JOBS
+      TMPDIR="$scratch/" \
+        TOKEN_LOG="$log" \
+        SCCACHE_BIN='' RUSTC_WRAPPER='' \
+        CODEX_SESSION_ID="cargo-local-detect-$$" \
+        HARNESS_CARGO_SKIP_LEASE=1 \
+        HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+        HARNESS_JOBSERVER_POOL_KEY="$key" \
+        HARNESS_CARGO_BIN="$fake/cargo" \
+        "$ROOT/scripts/cargo-local.sh" "$@" >/dev/null 2>&1
+    )
+  }
+
+  # A toolchain selector sits before the subcommand and is not a flag; missing
+  # it silently dropped the split for `cargo +nightly nextest run`.
+  : >"$log"
+  run_detect +nightly nextest run --lib
+  local toolchain_invocations; toolchain_invocations="$(grep -c nextest "$log")"
+
+  # `nextest list` builds but runs nothing, so it wants no test block.
+  : >"$log"
+  run_detect nextest list
+  local list_invocations; list_invocations="$(grep -c nextest "$log")"
+  stop_pool_for_key "$key"
+
+  if [[ "$toolchain_invocations" != "2" ]]; then
+    fail "toolchain-prefixed nextest run was not split ($toolchain_invocations cargo invocations)"
+    return
+  fi
+  if [[ "$list_invocations" != "1" ]]; then
+    fail "nextest list should not be split ($list_invocations cargo invocations)"
+    return
+  fi
+  pass "nextest detection handles a toolchain prefix and skips list"
+}
+
 scenario_jobserver_pool_takes_over_build_sizing() {
   local key="pool-sizing-$$"
   local output cpu
@@ -844,6 +982,8 @@ EOF
 scenario_jobserver_pool_takes_over_build_sizing
 scenario_jobserver_absent_falls_back_to_the_reserve
 scenario_explicit_job_override_beats_the_pool
+scenario_nextest_build_phase_keeps_the_whole_pool
+scenario_nextest_detection_handles_toolchain_and_list
 scenario_missing_tmpdir_uses_short_external_fallback
 scenario_concurrent_tmpdir_creation_is_idempotent
 scenario_unusable_tmpdir_uses_short_external_fallback

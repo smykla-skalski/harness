@@ -560,27 +560,47 @@ if [[ "${HARNESS_CARGO_GROUP_CHILD:-0}" == "1" ]]; then
   exec "$cargo_bin" "$@"
 fi
 
-command_is_nextest() {
-  local arg
+# True only for `nextest run`. `nextest list` builds but runs no tests, so it
+# wants the pool for its build and no test block at all.
+command_is_nextest_run() {
+  local arg seen_nextest=0
   for arg in "$@"; do
     case "$arg" in
-      nextest) return 0 ;;
+      # A toolchain selector precedes the subcommand and is not a flag.
+      +*) ;;
       -*) ;;
+      nextest)
+        if (( seen_nextest )); then
+          return 1
+        fi
+        seen_nextest=1
+        ;;
+      run) (( seen_nextest )) && return 0; return 1 ;;
       *) return 1 ;;
     esac
   done
   return 1
 }
 
+already_no_run() {
+  local arg
+  for arg in "$@"; do
+    [[ "$arg" == "--no-run" ]] && return 0
+  done
+  return 1
+}
+
 # nextest does not speak the jobserver protocol and has said it will not, so its
-# width cannot renegotiate mid-run. Draw a block from the same pool instead and
-# hold it for the run: the count then reflects what the machine actually had
-# free, rather than a worst case guessed before the first test started. The
-# block is held over the build phase too, which keeps one budget honest across
-# both halves of a `nextest run`.
+# test width cannot renegotiate mid-run and has to be fixed up front. Its two
+# halves want opposite things, though: the build wants the pool, and holding a
+# block across it would starve the compile that produces the very binaries the
+# block is for. So build first against the full pool, then take the block and
+# run - by then cargo has nothing left to compile.
 if [[ "$jobserver_mode" == "pool" ]] \
   && (( nextest_threads_explicit == 0 )) \
-  && command_is_nextest "$@"; then
+  && command_is_nextest_run "$@" \
+  && ! already_no_run "$@"; then
+  harness_run_step "cargo-local test build" "$cargo_bin" "$@" --no-run || exit $?
   harness_run_step "cargo-local command" \
     python3 "$(jobserver_script)" run \
     --repo-root "$(jobserver_pool_key)" \

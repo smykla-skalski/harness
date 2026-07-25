@@ -149,7 +149,7 @@ Avoid mocks; tests use real filesystem state.
 
 Under `pool`, `scripts/harness-jobserver.py` supervises one token pool per repository, holding a GNU make jobserver FIFO plus a Unix socket under `/tmp/harness-jobserver-<user>/<repo-hash>/`. Cargo attaches through `MAKEFLAGS` and renegotiates its own width for as long as it runs, so `CARGO_BUILD_JOBS` stays at the full CPU count and the pool does the limiting. The budget is one below the CPU count because every cargo may run a single job without holding a token; two builds sharing a four-token pool therefore peak at six concurrent `rustc`, not four.
 
-nextest cannot speak the protocol and upstream has declined to add it, so a `nextest` invocation instead takes a block from the same budget through the socket and holds it for the whole run, build phase included. The socket exists because a FIFO token is anonymous: a killed client would drain the pool forever, which is why the published system-wide jobservers need CUSE that macOS lacks. A socket grant returns when the kernel closes the dead client's fd.
+nextest cannot speak the protocol and upstream has declined to add it, so its test width has to be fixed before the run starts. Its two halves want opposite things: the build wants the pool, and holding a block across it would starve the compile that produces the binaries the block is for. A `nextest run` is therefore split - `--no-run` builds first against the full pool, then a block comes out of the same budget through the socket and the run itself proceeds with nothing left to compile. The socket exists because a FIFO token is anonymous: a killed client would drain the pool forever, which is why the published system-wide jobservers need CUSE that macOS lacks. A socket grant returns when the kernel closes the dead client's fd.
 
 Under `reserve` the older static split applies: each agent session divides the CPU count by `AGENT_BUILD_SHARE`, assuming that many agents may arrive, because the lease count is sampled once and cannot be renegotiated. This is the fallback whenever the pool cannot be reached, and it is what `HARNESS_JOBSERVER=0` selects. Reaching a pool is never required - a stale or empty FIFO makes cargo build serially through its implicit slot rather than block.
 
@@ -157,7 +157,9 @@ Under `reserve` the older static split applies: each agent session divides the C
 | --- | --- |
 | `HARNESS_JOBSERVER=0` | Skip the pool and use the static reserve |
 | `HARNESS_JOBSERVER_POOL_KEY` | Key the pool by this string instead of the repo root; tests use it for isolation |
-| `HARNESS_CARGO_JOBS`, `NEXTEST_TEST_THREADS` | Explicit widths, still authoritative under either mode |
+| `HARNESS_CARGO_JOBS`, `CARGO_BUILD_JOBS` | Explicit build width, authoritative under either mode |
+| `HARNESS_NEXTEST_JOBS`, `NEXTEST_TEST_THREADS` | Explicit test width; either one also suppresses the pool-backed nextest split |
+| `HARNESS_JOBSERVER_TIMEOUT` | Seconds to wait for a supervisor to come up, default 15 |
 
 ## Build lane and fsmonitor cleanup
 
