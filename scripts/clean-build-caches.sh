@@ -239,6 +239,9 @@ clean_stale_test_temp_dirs() {
   # roots before the expression, not after it.
   : > "$work/stale"
   if [[ -s "$work/candidates" ]]; then
+    # shellcheck disable=SC2016  # $STALE_TMP_MINUTES is exported, so the inner
+    # sh expands it itself; expanding it here would bake the value into the
+    # script text instead of leaving it to the child.
     tr '\n' '\0' < "$work/candidates" \
       | xargs -0 -n 200 sh -c 'find "$@" -mmin "-$STALE_TMP_MINUTES" -print 2>/dev/null' sweep \
       | awk -v prefix="$tmp_root/" '
