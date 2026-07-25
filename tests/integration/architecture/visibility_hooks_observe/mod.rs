@@ -275,6 +275,15 @@ fn hook_misc_roots_stay_prod_only() {
             "src/hooks/verify_write/tests.rs",
         ),
         (
+            "crates/harness-kernel/src/redact.rs",
+            &[
+                "fn scrubs_pem_certificate()",
+                "fn scrubs_multiple_patterns_in_one_pass()",
+                "mod tests {",
+            ][..],
+            "crates/harness-kernel/src/redact/tests.rs",
+        ),
+        (
             "crates/harness-kernel/src/errors/hook_result.rs",
             &[
                 "fn allow_has_empty_code_and_message()",

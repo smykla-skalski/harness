@@ -10,7 +10,7 @@ use crate::daemon::protocol::{
     DaemonTelemetryRequest, DaemonTelemetryResponse, GitHubApiDiagnostics,
 };
 use crate::github_api::GitHubProtectedClient;
-use crate::run::audit::scrub;
+use harness_kernel::redact::secrets;
 use tokio::task::{JoinError, spawn_blocking};
 
 /// Build a point-in-time daemon status report.
@@ -361,19 +361,19 @@ pub fn record_telemetry(
     if message.is_empty() {
         return Err(CliErrorKind::workflow_parse("telemetry message cannot be empty").into());
     }
-    let scrubbed_source = scrub(source);
+    let scrubbed_source = secrets(source);
 
     let mut event_message = format!(
         "client telemetry {} from {}: {}",
         request.kind.as_str(),
         scrubbed_source,
-        scrub(message)
+        secrets(message)
     );
     if let Some(sample) = request.sample.as_deref().map(str::trim)
         && !sample.is_empty()
     {
         event_message.push_str(" sample=");
-        event_message.push_str(&scrub(sample));
+        event_message.push_str(&secrets(sample));
     }
 
     let event = state::DaemonAuditEvent {

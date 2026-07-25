@@ -1,11 +1,10 @@
-mod scrub;
 mod summarize;
 mod types;
 
-#[cfg(any(test, feature = "bridge-runtime", feature = "daemon-runtime"))]
-pub use scrub::scrub;
 pub use summarize::{normalize_tool_output, summarize_tool_input};
 pub use types::{AuditAppendRequest, AuditEntry, AuditPhaseContext};
+
+use harness_kernel::redact::secrets;
 
 use std::fs::{self, OpenOptions};
 use std::io::Write as _;
@@ -16,7 +15,7 @@ use regex::Regex;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
-use crate::errors::{CliError, CliErrorKind, io_for};
+use harness_kernel::errors::{CliError, CliErrorKind, io_for};
 use crate::hooks::application::GuardContext as HookContext;
 use crate::infra::io::{ensure_dir, write_text};
 use crate::run::RunStatus;
@@ -69,7 +68,7 @@ pub fn append_audit_entry(request: AuditAppendRequest) -> Result<AuditEntry, Cli
         .map_err(|error| CliErrorKind::io(format!("create audit artifacts dir: {error}")))?;
 
     let timestamp = utc_now();
-    let scrubbed_output = scrub::scrub(&request.full_output);
+    let scrubbed_output = secrets(&request.full_output);
     let content_hash = hash_text(&scrubbed_output);
     let artifact_path = unique_artifact_path(&layout, &timestamp, &request.tool_name);
     write_text(&artifact_path, &scrubbed_output)?;

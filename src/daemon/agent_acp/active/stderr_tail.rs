@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Instant;
 
-use crate::run::audit::scrub;
+use harness_kernel::redact::secrets;
 
 use super::{STDERR_READER_JOIN_GRACE, STDERR_READER_JOIN_POLL, STDERR_TAIL_LIMIT, recover_lock};
 
@@ -53,7 +53,7 @@ impl SharedStderrTail {
         if tail.is_empty() {
             None
         } else {
-            Some(scrub(&String::from_utf8_lossy(&tail)))
+            Some(secrets(&String::from_utf8_lossy(&tail)))
         }
     }
 }

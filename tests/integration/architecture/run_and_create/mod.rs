@@ -193,15 +193,6 @@ fn run_small_roots_stay_prod_only() {
             "src/run/application/recording/tests.rs",
         ),
         (
-            "src/run/audit/scrub.rs",
-            &[
-                "fn scrubs_pem_certificate()",
-                "fn scrubs_multiple_patterns_in_one_pass()",
-                "mod tests {",
-            ][..],
-            "src/run/audit/scrub/tests.rs",
-        ),
-        (
             "src/run/status.rs",
             &[
                 "fn test_load_run_status()",
