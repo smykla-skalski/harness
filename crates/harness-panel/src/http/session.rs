@@ -107,10 +107,17 @@ const PENDING_SEPARATOR: char = '.';
 /// cookie cannot be grown without bound by repeatedly hitting the start route.
 pub const MAX_PENDING_SIGN_INS: usize = 4;
 
+/// Read the pending sign-ins out of a cookie value.
+///
+/// Capped here as well as where the cookie is written, because the browser is
+/// free to send back something the panel never wrote. Without the cap, a
+/// request carrying a cookie full of separators would make every handler that
+/// reads it allocate and scan a list as long as the request headers allow.
 fn pending_states(value: &str) -> Vec<String> {
     value
         .split(PENDING_SEPARATOR)
         .filter(|candidate| !candidate.is_empty())
+        .take(MAX_PENDING_SIGN_INS)
         .map(str::to_owned)
         .collect()
 }
@@ -210,4 +217,30 @@ fn set_pending(
         state,
         time::Duration::seconds(ttl_seconds),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MAX_PENDING_SIGN_INS, pending_states};
+
+    #[test]
+    fn a_cookie_the_panel_wrote_round_trips() {
+        assert_eq!(pending_states("a.b.c"), vec!["a", "b", "c"]);
+        assert!(pending_states("").is_empty());
+    }
+
+    /// The browser can return anything, so the cap has to hold on the way in
+    /// and not only on the way out.
+    #[test]
+    fn an_oversized_cookie_is_truncated_rather_than_trusted() {
+        let crafted = vec!["x"; 10_000].join(".");
+
+        assert_eq!(pending_states(&crafted).len(), MAX_PENDING_SIGN_INS);
+    }
+
+    /// A cookie that is nothing but separators must cost nothing to read.
+    #[test]
+    fn empty_segments_are_dropped() {
+        assert!(pending_states(&".".repeat(10_000)).is_empty());
+    }
 }
