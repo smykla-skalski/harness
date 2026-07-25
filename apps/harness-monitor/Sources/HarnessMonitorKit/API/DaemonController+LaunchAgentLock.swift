@@ -77,3 +77,36 @@ extension DaemonController {
     }
   }
 }
+
+extension DaemonController {
+  /// True while some process holds the daemon singleton lock.
+  ///
+  /// A stale manifest names the pid of the daemon that wrote it, and that
+  /// process is already gone by the time the manifest looks stale. Its death
+  /// says nothing about whether a replacement is on its way up, so treating it
+  /// as "no daemon" tore down a daemon that was mid-boot. The singleton lock is
+  /// taken before the daemon binds a port or writes anything, so it answers the
+  /// question the dead pid cannot.
+  ///
+  /// Mirrors the daemon's own probe: never creates the file, and holds the
+  /// exclusive lock only long enough to learn it was free. Taking it briefly
+  /// can lose a race with a daemon acquiring it at the same instant, which is
+  /// the same tradeoff the daemon-side probe already accepts.
+  func daemonSingletonLockIsHeld() -> Bool {
+    let url = HarnessMonitorPaths.daemonSingletonLockURL(using: environment)
+    let fd = Darwin.open(url.path, O_RDWR | O_CLOEXEC)
+    guard fd >= 0 else {
+      return false
+    }
+    defer { _ = Darwin.close(fd) }
+
+    if bsdFlock(fd, LOCK_EX | LOCK_NB) == 0 {
+      _ = bsdFlock(fd, LOCK_UN)
+      return false
+    }
+    // Contention is the only errno that means held. Darwin defines
+    // EWOULDBLOCK as EAGAIN, so this covers both spellings even though
+    // `withManagedLaunchAgentLock` above tests them as if they differed.
+    return errno == EWOULDBLOCK
+  }
+}

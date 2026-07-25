@@ -177,6 +177,21 @@ extension DaemonController {
     let staleSignature = Self.managedStaleManifestSignature(for: manifest)
     let gracePeriod = String(describing: managedStaleManifestGracePeriod)
     if Self.processIsAlive(pid: manifest.pid) == false {
+      // The manifest's pid is the previous daemon's, so its death does not mean
+      // no daemon exists. A replacement that holds the singleton lock has not
+      // published yet, and refreshing the launch agent here would SIGTERM it
+      // mid-boot and start the wait over.
+      if daemonSingletonLockIsHeld() {
+        if isFreshObservation {
+          HarnessMonitorLogger.lifecycle.notice(
+            """
+            Managed daemon is starting; waiting for it to publish its manifest \
+            at \(path, privacy: .public)
+            """
+          )
+        }
+        return .continueLoop
+      }
       if try await refreshManagedLaunchAgentForPendingBundledHelperChangeIfNeeded(
         state: &state
       ) {
