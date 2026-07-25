@@ -70,7 +70,7 @@ struct PreviewHarnessClientTaskBoardTests {
     let item = try #require(items.first)
 
     let planning = try await client.beginTaskBoardPlan(id: item.id)
-    #expect(planning.transition.fromStatus == .todo)
+    #expect(planning.transition.fromStatus == .backlog)
     #expect(planning.transition.toStatus == .planning)
     #expect(planning.item.status == .planning)
 
@@ -78,7 +78,7 @@ struct PreviewHarnessClientTaskBoardTests {
       id: item.id,
       request: TaskBoardPlanSubmitRequest(summary: "Plan ready")
     )
-    #expect(submitted.item.status == .planReview)
+    #expect(submitted.item.status == .agenticReview)
     #expect(submitted.item.planning.summary == "Plan ready")
 
     let approved = try await client.approveTaskBoardPlan(
@@ -356,6 +356,8 @@ struct PreviewHarnessClientTaskBoardTests {
       fixtures: .taskBoardBoardOnly,
       isLaunchAgentInstalled: true
     )
+    _ = try await client.createTaskBoardItem(
+      request: TaskBoardCreateItemRequest(title: "Ready item"))
 
     let audit = try await client.auditTaskBoard(status: nil)
     let projects = try await client.taskBoardProjects(status: nil)
