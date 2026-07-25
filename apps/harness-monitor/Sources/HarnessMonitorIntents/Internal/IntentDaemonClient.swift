@@ -59,8 +59,13 @@ public actor IntentDaemonClient {
   /// their catch block when the underlying WebSocket dies mid-flight,
   /// so a cached `IntentDaemonClient` can recover from daemon restarts
   /// without being rebuilt from scratch
-  func invalidateConnection() {
+  ///
+  /// Tearing the transport down is part of that. Dropping only the cached
+  /// task left the socket open, and because every failing pump tick lands
+  /// here, each one stranded another connection to the daemon.
+  func invalidateConnection() async {
     connectionTask = nil
+    await transport.disconnect()
   }
 
   /// Runs a leaf RPC body. Ensures the transport is connected first;
@@ -78,7 +83,7 @@ public actor IntentDaemonClient {
     } catch let error as IntentDaemonError {
       throw error
     } catch {
-      invalidateConnection()
+      await invalidateConnection()
       throw IntentDaemonError.rpcFailed(
         method: method,
         message: error.localizedDescription
