@@ -273,16 +273,12 @@ public struct TaskBoardOverviewActions: Equatable {
 
   func createTaskBoardItem(
     _ request: TaskBoardCreateItemRequest,
-    initialStatus: TaskBoardStatus,
     outcome: TaskBoardItemCreationOutcome
   ) {
     guard canCreateItem, let store else { return }
     HarnessMonitorAsyncWorkQueue.shared.submit(
       .init(title: "Creating task board item") {
-        let success = await store.createTaskBoardItem(
-          request: request,
-          initialStatus: initialStatus
-        )
+        let success = await store.createTaskBoardItem(request: request)
         guard success else { return }
         await MainActor.run {
           outcome.succeeded = true

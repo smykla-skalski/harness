@@ -4,6 +4,20 @@ import Testing
 
 @Suite("Preview harness client task board")
 struct PreviewHarnessClientTaskBoardTests {
+  @Test("Preview client creates an item in the requested lane")
+  func previewClientCreatesInTheRequestedLane() async throws {
+    let client = PreviewHarnessClient(
+      fixtures: .taskBoardBoardOnly,
+      isLaunchAgentInstalled: true
+    )
+
+    let created = try await client.createTaskBoardItem(
+      request: TaskBoardCreateItemRequest(title: "Straight to review", status: .inReview)
+    )
+
+    #expect(created.status == .inReview)
+  }
+
   @Test("Preview client mutates task board items and orchestrator status")
   func previewClientMutatesTaskBoardItemsAndOrchestratorStatus() async throws {
     let client = PreviewHarnessClient(

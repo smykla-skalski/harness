@@ -118,7 +118,7 @@ extension PreviewHarnessClientState {
       id: request.id ?? "preview-board-\(taskBoardItems.count + 1)",
       title: request.title,
       body: request.body,
-      status: .todo,
+      status: request.status ?? .todo,
       priority: request.priority,
       tags: request.tags,
       projectId: request.projectId,
