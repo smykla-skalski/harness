@@ -252,7 +252,7 @@ impl AcpSessionSupervisor {
     fn exit_client_call(&self, reason: Option<&'static str>) {
         let result = self
             .in_flight_calls
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1));
+            .try_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1));
         if result.is_err() {
             warn!("exit_client_call without matching enter; counter already at 0");
         }
@@ -350,7 +350,7 @@ impl AcpSessionSupervisor {
     fn exit_pending_request(&self, reason: Option<&'static str>) {
         let result = self
             .pending_requests
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1));
+            .try_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1));
         if result.is_err() {
             warn!("exit_pending_request without matching enter; counter already at 0");
         }
