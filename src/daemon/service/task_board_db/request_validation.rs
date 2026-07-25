@@ -27,8 +27,8 @@ fn validate_estimate_patch(name: &str, value: Option<u64>, clear: bool) -> Resul
     validate_estimate(name, value)
 }
 
-/// Refuse a nameless item before an id is minted for it. `validate_item`
-/// rejects one too, but it names the generated id the caller never chose,
+/// Refuse a nameless item before the request reaches storage. `validate_item`
+/// rejects one too, but its message names the item id rather than the title,
 /// which reads as a storage failure rather than the bad field it is.
 pub(super) fn validate_create_title(title: &str) -> Result<(), CliError> {
     if title.trim().is_empty() {
