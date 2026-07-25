@@ -12,6 +12,7 @@ struct TaskBoardCardPresentation: Equatable, Sendable {
   let updatedAt: Date?
   let repositoryLabelDefault: String?
   let repositoryLabelFullName: String?
+  let projectMark: TaskBoardProjectMarkStyle?
 
   static func forAPIItem(
     _ item: TaskBoardItem,
@@ -32,7 +33,8 @@ struct TaskBoardCardPresentation: Equatable, Sendable {
       glyph: TaskBoardGitHubCardGlyph.resolve(for: item),
       updatedAt: dateParser.parse(item.updatedAt),
       repositoryLabelDefault: repositoryLabelDefault,
-      repositoryLabelFullName: repositoryLabelFullName
+      repositoryLabelFullName: repositoryLabelFullName,
+      projectMark: projectLabelResolver.mark(for: item)
     )
   }
 
@@ -48,7 +50,8 @@ struct TaskBoardCardPresentation: Equatable, Sendable {
       glyph: nil,
       updatedAt: dateParser.parse(item.task.updatedAt),
       repositoryLabelDefault: nil,
-      repositoryLabelFullName: nil
+      repositoryLabelFullName: nil,
+      projectMark: nil
     )
   }
 }

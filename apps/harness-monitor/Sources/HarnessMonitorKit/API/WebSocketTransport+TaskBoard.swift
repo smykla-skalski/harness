@@ -134,6 +134,14 @@ extension WebSocketTransport {
     return wire.map(TaskBoardProjectSummary.init(wire:))
   }
 
+  public func updateTaskBoardProject(
+    request: TaskBoardProjectUpdateRequest
+  ) async throws -> TaskBoardProject {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .taskBoardProjectsUpdate, params: params)
+    return try decodePolicyWire(value)
+  }
+
   public func taskBoardMachines(status: TaskBoardStatus? = nil) async throws
     -> [TaskBoardMachineSummary]
   {

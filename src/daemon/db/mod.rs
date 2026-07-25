@@ -119,6 +119,8 @@ mod schema_v48;
 mod schema_v49;
 mod schema_v50;
 mod schema_v51;
+mod schema_v52;
+mod schema_v53;
 #[allow(dead_code)]
 mod task_board;
 #[cfg(test)]
@@ -184,7 +186,8 @@ pub(crate) use task_board::{
     status_request as remote_controller_status_request,
 };
 pub(crate) use task_board::{
-    DisplayNameEdit, exact_active_remote_target, parent_points_to_assignment,
+    ColorEdit, DisplayNameEdit, ProjectEdit, exact_active_remote_target,
+    parent_points_to_assignment,
 };
 mod session_data;
 mod signals;
@@ -382,7 +385,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-pub(crate) const SCHEMA_VERSION: &str = "51";
+pub(crate) const SCHEMA_VERSION: &str = "53";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]

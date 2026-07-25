@@ -122,16 +122,56 @@ struct TaskBoardProjectLabelTests {
     #expect(resolver.label(for: item(sourceProjectId: "project-b")) == "beta/console")
   }
 
+  /// The mark is only honest for a project the registry actually knows. An
+  /// item pointing at nothing, or at a project missing from this catalog, has
+  /// no mark to show and must not be given one.
+  @Test("Only a registered project carries a mark")
+  func onlyARegisteredProjectCarriesAMark() {
+    let resolver = TaskBoardProjectLabelResolver(
+      projects: [project(id: "project-a", slug: "alpha/console", color: .amber)],
+      projectIDs: []
+    )
+
+    #expect(resolver.mark(for: item(sourceProjectId: "project-a"))?.color == .amber)
+    #expect(resolver.mark(for: item(sourceProjectId: nil)) == nil)
+    #expect(
+      resolver.mark(
+        for: item(sourceProjectId: nil, executionRepository: "alpha/console")
+      ) == nil,
+      "a repository the registry has not seen yet is named but not marked"
+    )
+    #expect(resolver.mark(for: item(sourceProjectId: "project-unknown")) == nil)
+  }
+
+  /// Both halves come from the same registered project, so a board past the
+  /// palette cannot show one project's colour wearing another's outline.
+  @Test("A registered project carries both halves of its mark")
+  func aRegisteredProjectCarriesBothHalvesOfItsMark() {
+    let resolver = TaskBoardProjectLabelResolver(
+      projects: [
+        project(id: "project-a", slug: "alpha/console", color: .amber, shape: .hexagon)
+      ],
+      projectIDs: []
+    )
+
+    let mark = resolver.mark(for: item(sourceProjectId: "project-a"))
+    #expect(mark == TaskBoardProjectMarkStyle(color: .amber, shape: .hexagon))
+  }
+
   private func project(
     id: String,
     slug: String,
-    displayName: String? = nil
+    displayName: String? = nil,
+    color: TaskBoardProjectColor = .blue,
+    shape: TaskBoardProjectShape = .circle
   ) -> TaskBoardProjectSummary {
     TaskBoardProjectSummary(
       projectId: id,
       source: .gitHub,
       slug: slug,
       displayName: displayName,
+      color: color,
+      shape: shape,
       itemCount: 0,
       readyCount: 0
     )

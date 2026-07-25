@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::item_fields::ExternalRefProvider;
+use super::project_color::TaskBoardProjectColor;
+use super::project_shape::TaskBoardProjectShape;
 use super::runtime_config::normalize_repository_slug;
 
 const PROJECT_ID_PREFIX: &str = "project-";
@@ -76,6 +78,14 @@ pub struct TaskBoardProject {
     pub slug: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
+    /// Not optional even though the column is. A project with no color is not
+    /// a state any caller should have to render, so the store resolves one on
+    /// the way out rather than passing the gap along.
+    pub color: TaskBoardProjectColor,
+    /// The other half of the mark, resolved the same way. A board the palette
+    /// still covers stores nothing and every project reads back as the default,
+    /// so a client renders one shape without knowing why.
+    pub shape: TaskBoardProjectShape,
     pub created_at: String,
     pub updated_at: String,
 }

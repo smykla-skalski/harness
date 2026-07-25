@@ -138,13 +138,20 @@ struct TaskBoardCardTitleTypography {
 
 struct TaskBoardCardFooter<Badges: View>: View {
   let repository: String
+  let projectMark: TaskBoardProjectMarkStyle?
   let updatedAt: Date?
   let badges: Badges
   @Environment(\.fontScale)
   private var fontScale
 
-  init(repository: String, updatedAt: Date?, @ViewBuilder badges: () -> Badges) {
+  init(
+    repository: String,
+    projectMark: TaskBoardProjectMarkStyle? = nil,
+    updatedAt: Date?,
+    @ViewBuilder badges: () -> Badges
+  ) {
     self.repository = repository
+    self.projectMark = projectMark
     self.updatedAt = updatedAt
     self.badges = badges()
   }
@@ -159,14 +166,23 @@ struct TaskBoardCardFooter<Badges: View>: View {
 
   var body: some View {
     HStack(alignment: .center, spacing: metrics.rowTextSpacing) {
-      Text(repository)
-        .font(repositoryFont)
-        .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
-        .lineLimit(1)
-        .truncationMode(.middle)
-        .multilineTextAlignment(.leading)
-        .harnessOpticalTextCenter()
-        .layoutPriority(2)
+      // The mark and the name are one unit: the color is a faster way to spot
+      // a project you already know, never the only way to tell which it is.
+      // They align on the name's baseline, not on two centre guides that do not
+      // agree, and the pair then meets the rest of the row optically centred.
+      HStack(alignment: .firstTextBaseline, spacing: metrics.rowTextSpacing) {
+        if let projectMark {
+          TaskBoardProjectMark(style: projectMark, alignsWith: .caption1)
+        }
+        Text(repository)
+          .font(repositoryFont)
+          .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
+          .lineLimit(1)
+          .truncationMode(.middle)
+          .multilineTextAlignment(.leading)
+      }
+      .harnessOpticalTextCenter()
+      .layoutPriority(2)
       HarnessMonitorWrapLayout(
         spacing: metrics.rowTextSpacing,
         lineSpacing: metrics.rowTextSpacing

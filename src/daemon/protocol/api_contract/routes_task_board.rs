@@ -143,9 +143,7 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         parity: HttpRouteParity::Rpc {
             ws_method: ws_methods::TASK_BOARD_PROJECTS_UPDATE,
         },
-        // The monitor reads the catalog but does not edit a project yet; the
-        // Settings project editor lands with the per-project appearance work.
-        swift_client_exposed: false,
+        swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Get,

@@ -120,7 +120,8 @@ struct TaskBoardCardPresentationContractTests {
       glyph: nil,
       updatedAt: nil,
       repositoryLabelDefault: nil,
-      repositoryLabelFullName: nil
+      repositoryLabelFullName: nil,
+      projectMark: nil
     )
     let typography = TaskBoardCardTitleTypography(fontScale: 1)
     let selectionModel = TaskBoardCardSelectionModel()

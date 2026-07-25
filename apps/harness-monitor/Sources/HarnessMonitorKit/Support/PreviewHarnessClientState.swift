@@ -37,6 +37,9 @@ actor PreviewHarnessClientState {
   var taskBoardActiveTriageRuleSetRevision: Int64?
   var taskBoardTriageRuleSetRevisions: [TriageRuleSetRevisionSummary]
   var taskBoardTriageRuleSetAudit: [TriageRuleSetAuditEntry]
+  /// Per-project edits a preview or test has made. Projects themselves are
+  /// derived from the items, so only the parts a person can change are stored.
+  var taskBoardProjectEditsByID: [String: TaskBoardProjectEdit]
   var reviewItems: [ReviewItem]
   var taskBoardHostRegistry: [TaskBoardHostMachine]
   var nextAgentTuiSequence: Int
@@ -90,6 +93,7 @@ actor PreviewHarnessClientState {
     self.taskBoardActiveTriageRuleSetRevision = nil
     self.taskBoardTriageRuleSetRevisions = []
     self.taskBoardTriageRuleSetAudit = []
+    self.taskBoardProjectEditsByID = [:]
     self.reviewItems = fixtures.reviewsResponse.items
     self.taskBoardHostRegistry = [
       TaskBoardHostMachine(

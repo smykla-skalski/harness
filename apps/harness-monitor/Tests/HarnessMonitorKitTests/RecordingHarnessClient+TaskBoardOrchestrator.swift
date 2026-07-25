@@ -365,6 +365,13 @@ extension RecordingHarnessClient {
           .filter { $0.sourceProjectId != nil },
         by: \.sourceProjectId
       )
+      // Walks the palette in the same order the daemon allocates, so a
+      // recording shows the per-project marks a live board would.
+      let palette = TaskBoardProjectColor.allCases
+      let colorsByProject = Dictionary(
+        uniqueKeysWithValues: grouped.keys.compactMap { $0 }.sorted().enumerated()
+          .map { ($0.element, palette[$0.offset % palette.count]) }
+      )
       return grouped.compactMap { key, items in
         guard let projectId = key else {
           return nil
@@ -375,6 +382,8 @@ extension RecordingHarnessClient {
           source: identity?.source ?? .manual,
           slug: identity?.slug ?? "unnamed project",
           displayName: nil,
+          color: colorsByProject[projectId] ?? .blue,
+          shape: .circle,
           itemCount: items.count,
           readyCount: items.count { $0.status == .todo }
         )

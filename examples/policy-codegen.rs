@@ -2593,6 +2593,8 @@ const TASK_BOARD_ENUMS_EMIT_ONLY: &[&str] = &[
 ];
 const TASK_BOARD_SUMMARY_SOURCE: &str = include_str!("../src/task_board/summary.rs");
 const TASK_BOARD_PROJECT_SOURCE: &str = include_str!("../src/task_board/project.rs");
+const TASK_BOARD_PROJECT_COLOR_SOURCE: &str = include_str!("../src/task_board/project_color.rs");
+const TASK_BOARD_PROJECT_SHAPE_SOURCE: &str = include_str!("../src/task_board/project_shape.rs");
 const TASK_BOARD_SUMMARY_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardSummaryWireTypes.generated.swift";
 // The audit, project and machine summary structs - all over primitives plus the
 // adopted TaskBoardStatus/TaskBoardAgentMode enums. The sync summary cluster is
@@ -2602,6 +2604,10 @@ const TASK_BOARD_SUMMARY_EMIT_ONLY: &[&str] = &[
     "TaskBoardStatusCount",
     "TaskBoardProjectSummary",
     "TaskBoardProjectSource",
+    "TaskBoardProjectColor",
+    "TaskBoardProjectShape",
+    "TaskBoardProject",
+    "TaskBoardProjectUpdateRequest",
     "TaskBoardMachineSummary",
 ];
 const TASK_BOARD_ITEM_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardItemWireTypes.generated.swift";
@@ -3240,9 +3246,16 @@ fn modules() -> Vec<GeneratedModule> {
         },
         GeneratedModule {
             output: TASK_BOARD_SUMMARY_OUTPUT,
-            description: "the Rust task-board audit, project and machine summaries",
-            defaults: &[],
-            sources: &[TASK_BOARD_SUMMARY_SOURCE, TASK_BOARD_PROJECT_SOURCE],
+            description:
+                "the Rust task-board audit, project and machine summaries plus the project edit",
+            defaults: &[TASK_BOARD_PROTOCOL_SOURCE],
+            sources: &[
+                TASK_BOARD_SUMMARY_SOURCE,
+                TASK_BOARD_PROJECT_SOURCE,
+                TASK_BOARD_PROJECT_COLOR_SOURCE,
+                TASK_BOARD_PROJECT_SHAPE_SOURCE,
+                TASK_BOARD_PROTOCOL_SOURCE,
+            ],
         },
         GeneratedModule {
             output: TASK_BOARD_ITEM_OUTPUT,

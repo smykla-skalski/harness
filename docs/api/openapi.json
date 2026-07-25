@@ -11,7 +11,7 @@
     "license": {
       "name": "MIT"
     },
-    "version": "50.1.0"
+    "version": "51.0.0"
   },
   "servers": [
     {
@@ -30997,10 +30997,16 @@
           "project_id",
           "source",
           "slug",
+          "color",
+          "shape",
           "created_at",
           "updated_at"
         ],
         "properties": {
+          "color": {
+            "$ref": "#/components/schemas/TaskBoardProjectColor",
+            "description": "Not optional even though the column is. A project with no color is not\na state any caller should have to render, so the store resolves one on\nthe way out rather than passing the gap along."
+          },
           "created_at": {
             "type": "string"
           },
@@ -31013,6 +31019,10 @@
           "project_id": {
             "type": "string"
           },
+          "shape": {
+            "$ref": "#/components/schemas/TaskBoardProjectShape",
+            "description": "The other half of the mark, resolved the same way. A board the palette\nstill covers stores nothing and every project reads back as the default,\nso a client renders one shape without knowing why."
+          },
           "slug": {
             "type": "string"
           },
@@ -31023,6 +31033,48 @@
             "type": "string"
           }
         }
+      },
+      "TaskBoardProjectColor": {
+        "type": "string",
+        "description": "The mark a card wears to say which project its work came from. A closed\npalette rather than a free color: the board's guarantee is that two\nprojects look different, and that is only checkable against a known set.\n\nThe names are plain colors rather than the app's theme token names, so the\nwire format does not pin the client to one theme's vocabulary. Each family\ncarries a `_deep` tier as well, which is what takes the palette past the\ndozen hues a person can still tell apart on their own.",
+        "enum": [
+          "blue",
+          "green",
+          "purple",
+          "amber",
+          "teal",
+          "pink",
+          "mint",
+          "sky",
+          "warm",
+          "olive",
+          "graphite",
+          "red",
+          "blue_deep",
+          "green_deep",
+          "purple_deep",
+          "amber_deep",
+          "teal_deep",
+          "pink_deep",
+          "mint_deep",
+          "sky_deep",
+          "warm_deep",
+          "olive_deep",
+          "graphite_deep",
+          "red_deep"
+        ]
+      },
+      "TaskBoardProjectShape": {
+        "type": "string",
+        "description": "The outline a project's mark is drawn in. Colour alone runs out: past the\npalette two projects must share one, and a second channel is what keeps the\npair apart. Shape also survives colour blindness and small sizes, which\ncolour on its own does not.",
+        "enum": [
+          "circle",
+          "square",
+          "triangle",
+          "diamond",
+          "pentagon",
+          "hexagon"
+        ]
       },
       "TaskBoardProjectSource": {
         "type": "string",
@@ -31039,10 +31091,15 @@
           "project_id",
           "source",
           "slug",
+          "color",
+          "shape",
           "item_count",
           "ready_count"
         ],
         "properties": {
+          "color": {
+            "$ref": "#/components/schemas/TaskBoardProjectColor"
+          },
           "display_name": {
             "type": [
               "string",
@@ -31060,6 +31117,9 @@
             "type": "integer",
             "minimum": 0
           },
+          "shape": {
+            "$ref": "#/components/schemas/TaskBoardProjectShape"
+          },
           "slug": {
             "type": "string"
           },
@@ -31070,7 +31130,7 @@
       },
       "TaskBoardProjectUpdateRequest": {
         "type": "object",
-        "description": "Rename a project or retitle it. `project_id` never changes, so every item\nattached to the project stays attached across the edit.",
+        "description": "Rename a project, retitle it, or recolor it. `project_id` never changes, so\nevery item attached to the project stays attached across the edit.",
         "required": [
           "project_id"
         ],
@@ -31078,6 +31138,16 @@
           "clear_display_name": {
             "type": "boolean",
             "description": "Drop the display name so the project reads by its slug again."
+          },
+          "color": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TaskBoardProjectColor"
+              }
+            ]
           },
           "display_name": {
             "type": [
@@ -31087,6 +31157,10 @@
           },
           "project_id": {
             "type": "string"
+          },
+          "reset_color": {
+            "type": "boolean",
+            "description": "Hand the color back to the allocator instead of naming one. There is no\nclearing it: a project always has a color."
           },
           "slug": {
             "type": [

@@ -18,6 +18,7 @@ use crate::task_board::{
     TaskBoardAutomationSnapshot, TaskBoardEvaluationSummary, TaskBoardGitIdentityDefaults,
     TaskBoardItem, TaskBoardMachineSummary, TaskBoardProgressRollup, TaskBoardProjectSummary,
     project::TaskBoardProject,
+    project_color::TaskBoardProjectColor,
     TaskBoardStatus, TaskBoardSyncSummary, planning::PlanningTransition,
 };
 
@@ -151,8 +152,8 @@ pub struct TaskBoardCatalogRequest {
     pub status: Option<TaskBoardStatus>,
 }
 
-/// Rename a project or retitle it. `project_id` never changes, so every item
-/// attached to the project stays attached across the edit.
+/// Rename a project, retitle it, or recolor it. `project_id` never changes, so
+/// every item attached to the project stays attached across the edit.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[derive(utoipa::ToSchema)]
 pub struct TaskBoardProjectUpdateRequest {
@@ -164,6 +165,12 @@ pub struct TaskBoardProjectUpdateRequest {
     /// Drop the display name so the project reads by its slug again.
     #[serde(default)]
     pub clear_display_name: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<TaskBoardProjectColor>,
+    /// Hand the color back to the allocator instead of naming one. There is no
+    /// clearing it: a project always has a color.
+    #[serde(default)]
+    pub reset_color: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

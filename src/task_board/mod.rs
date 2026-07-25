@@ -16,6 +16,8 @@ pub mod planning;
 pub mod policy;
 pub mod policy_graph;
 pub mod project;
+pub mod project_color;
+pub mod project_shape;
 #[cfg(feature = "daemon-runtime")]
 pub mod policy_runtime;
 pub mod progress_rollup;
