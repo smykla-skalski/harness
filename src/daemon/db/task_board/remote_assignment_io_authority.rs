@@ -124,6 +124,10 @@ impl AsyncDaemonDb {
         self.claim_remote_io_authority(&claim).await
     }
 
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "fenced transaction guard chain; each guard settles the transaction before returning"
+    )]
     pub(super) async fn claim_remote_io_authority(
         &self,
         claim: &RemoteIoAuthorityClaim<'_>,

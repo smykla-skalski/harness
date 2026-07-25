@@ -61,6 +61,10 @@ impl AsyncDaemonDb {
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "cursor-paged scan with one wrap-around pass; each query is already its own helper"
+)]
 async fn scan_class_page(
     transaction: &mut Transaction<'_, Sqlite>,
     class: ScanClass,

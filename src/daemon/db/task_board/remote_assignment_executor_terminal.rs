@@ -31,6 +31,10 @@ pub(crate) struct TaskBoardRemoteTerminalArtifact {
 }
 
 impl AsyncDaemonDb {
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "fenced transaction guard chain; each guard settles the transaction before returning"
+    )]
     pub(crate) async fn complete_task_board_remote_executor_terminal(
         &self,
         owner: &TaskBoardRemoteExecutorLifecycleOwner,

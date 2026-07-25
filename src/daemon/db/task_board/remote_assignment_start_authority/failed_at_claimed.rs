@@ -35,6 +35,10 @@ pub(crate) const REMOTE_START_INTERRUPTED_WITHOUT_RUN_FAILURE_CLASS: TaskBoardFa
     TaskBoardFailureClass::Transient;
 
 impl AsyncDaemonDb {
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "fenced transaction guard chain; each guard settles the transaction before returning"
+    )]
     pub(crate) async fn fail_task_board_remote_executor_start_without_run(
         &self,
         permit: &TaskBoardRemoteExecutorStartIoPermit,
