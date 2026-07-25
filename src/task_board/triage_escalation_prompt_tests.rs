@@ -1,4 +1,7 @@
 use super::render_triage_escalation_prompt;
+use crate::task_board::prompt_catalog::{
+    prompt_catalog_test_lock, PromptCatalog, scoped_prompt_catalog,
+};
 use crate::task_board::types::{TaskBoardItem, TaskBoardItemKind, TaskBoardPriority};
 
 fn item(title: &str, body: &str, tags: Vec<String>) -> TaskBoardItem {
@@ -23,7 +26,8 @@ fn prompt_embeds_item_facts_and_the_exact_report_command() {
         "triage-escalation-1",
         "token-abc",
         "sha256:fingerprint-1",
-    );
+    )
+    .expect("render escalation prompt");
 
     assert!(prompt.contains("Vague thing"));
     assert!(prompt.contains("some notes"));
@@ -51,8 +55,69 @@ fn prompt_handles_empty_body_and_no_tags() {
         "triage-escalation-2",
         "token-xyz",
         "sha256:fingerprint-2",
-    );
+    )
+    .expect("render escalation prompt");
 
     assert!(prompt.contains("(empty)"));
     assert!(prompt.contains("(none)"));
+}
+
+#[test]
+fn a_configured_prompt_replaces_the_shipped_one() {
+    let _lock = prompt_catalog_test_lock();
+    let catalog = PromptCatalog::from_json(
+        br#"{"triage_escalation": ["Judge {{ title }} ({{ priority }}).", "Report with {{ escalation_id }} and {{ verdict_token }}."]}"#,
+    )
+    .expect("parse overrides");
+    let _installed = scoped_prompt_catalog(catalog);
+    let candidate = item("Vague thing", "some notes", Vec::new());
+
+    let prompt =
+        render_triage_escalation_prompt(&candidate, "escalation-9", "token-9", "sha256:finger-9")
+            .expect("render escalation prompt");
+
+    assert_eq!(
+        prompt,
+        "Judge Vague thing (Medium).\nReport with escalation-9 and token-9."
+    );
+}
+
+#[test]
+fn a_prompt_naming_an_unknown_variable_fails_before_the_agent_starts() {
+    let _lock = prompt_catalog_test_lock();
+    let catalog = PromptCatalog::from_json(br#"{"triage_escalation": "Judge {{ titel }}"}"#)
+        .expect("parse overrides");
+    let _installed = scoped_prompt_catalog(catalog);
+    let candidate = item("Vague thing", "some notes", Vec::new());
+
+    let error =
+        render_triage_escalation_prompt(&candidate, "escalation-9", "token-9", "sha256:finger-9")
+            .expect_err("unusable prompt refuses the spawn");
+
+    assert!(error.message().contains("titel"), "{}", error.message());
+}
+
+#[test]
+fn a_prompt_naming_a_fact_this_item_lacks_fails_before_the_agent_starts() {
+    let _lock = prompt_catalog_test_lock();
+    let catalog =
+        PromptCatalog::from_json(br#"{"triage_escalation": "Judge {{ title }} in {{ project_id }}"}"#)
+            .expect("parse overrides");
+    let _installed = scoped_prompt_catalog(catalog);
+    let mut candidate = item("Vague thing", "some notes", Vec::new());
+
+    let error =
+        render_triage_escalation_prompt(&candidate, "escalation-9", "token-9", "sha256:finger-9")
+            .expect_err("absent fact refuses the spawn");
+    assert!(
+        error.message().contains("project_id"),
+        "{}",
+        error.message()
+    );
+
+    candidate.project_id = Some("project-7".into());
+    let prompt =
+        render_triage_escalation_prompt(&candidate, "escalation-9", "token-9", "sha256:finger-9")
+            .expect("render escalation prompt");
+    assert_eq!(prompt, "Judge Vague thing in project-7");
 }

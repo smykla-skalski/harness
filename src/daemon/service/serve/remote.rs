@@ -17,6 +17,7 @@ use crate::daemon::state::{self, DaemonManifest, HostBridgeManifest};
 use crate::daemon::voice::cleanup_abandoned_sessions;
 use crate::daemon::websocket::ReplayBuffer;
 use crate::errors::{CliError, CliErrorKind};
+use crate::task_board::{install_prompt_catalog, resolve_prompt_catalog_from_env};
 use crate::workspace::orphan_cleanup::run_startup_sweep;
 use crate::workspace::utc_now;
 
@@ -106,6 +107,9 @@ pub async fn serve_remote_https(
         managed_agent_mutation_locks: http::ManagedAgentMutationLocks::default(),
         recovery_snapshot: Arc::default(),
     };
+    // Same ordering requirement as the local serve path: recovery renders
+    // prompts, so the catalog must already be installed.
+    install_prompt_catalog(resolve_prompt_catalog_from_env());
     if let Some(async_db) = app_state.async_db.get() {
         Box::pin(
             super::recover_remote_assignments_at_startup_with_controller(&app_state, async_db),

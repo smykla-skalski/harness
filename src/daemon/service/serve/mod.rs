@@ -33,6 +33,7 @@ use super::{
 use crate::agents::acp::probe::schedule_probe_cache_refresh;
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::http::AsyncDaemonDbSlot;
+use crate::task_board::{install_prompt_catalog, resolve_prompt_catalog_from_env};
 use crate::telemetry::current_trace_id;
 pub(crate) use background_tasks::recover_remote_assignments_before_local_work;
 use background_tasks::{
@@ -124,6 +125,11 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         managed_agent_mutation_locks: http::ManagedAgentMutationLocks::default(),
         recovery_snapshot: Arc::default(),
     };
+    // Startup recovery renders prompts (it re-seals remote offers), so the
+    // catalog has to be resolved before it, not with the background tasks
+    // further down. Installing it later meant recovery sealed offers with the
+    // shipped prompts while everything after used the configured ones.
+    install_prompt_catalog(resolve_prompt_catalog_from_env());
     if let Some(async_db) = app_state.async_db.get() {
         Box::pin(recover_remote_assignments_at_startup_with_controller(
             &app_state, async_db,

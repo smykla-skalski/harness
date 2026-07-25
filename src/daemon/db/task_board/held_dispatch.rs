@@ -17,6 +17,7 @@ use crate::daemon::db::policy::{
     consume_approval_grant_in_tx_at, live_approval_grant_in_tx_at, load_workspace_in_tx,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error, utc_now};
+use crate::daemon::task_board_managed_agents::rendered_worker_prompt;
 use crate::infra::io;
 use crate::task_board::policy_graph::PolicyCanvasWorkspace;
 use crate::task_board::{
@@ -29,6 +30,21 @@ use crate::task_board::{
 pub(crate) struct HeldTaskBoardDispatch {
     pub(crate) intent_id: String,
     pub(crate) applied: DispatchAppliedTask,
+}
+
+/// A claimed held dispatch together with the prompt its worker starts with.
+///
+/// The prompt is rendered inside the claim transaction, against the payload
+/// that same transaction commits. That is the only state worth deciding on: the
+/// item stays editable while the dispatch is held, and a plain worker dispatch
+/// carries no revision fence, so the held payload can name a fact the item no
+/// longer has. Rendering there means a refusal rolls the claim back instead of
+/// leaving the dispatch consumed, and it leaves the caller no second, staler
+/// prompt to report.
+#[derive(Debug)]
+pub(crate) struct ClaimedHeldTaskBoardDispatch {
+    pub(crate) claim: ClaimedTaskBoardDispatch,
+    pub(crate) rendered_prompt: String,
 }
 
 impl AsyncDaemonDb {
@@ -85,7 +101,7 @@ impl AsyncDaemonDb {
     pub(crate) async fn claim_held_task_board_dispatch(
         &self,
         board_item_id: &str,
-    ) -> Result<ClaimedTaskBoardDispatch, CliError> {
+    ) -> Result<ClaimedHeldTaskBoardDispatch, CliError> {
         io::validate_safe_segment(board_item_id)?;
         let mut transaction = self
             .begin_immediate_transaction("task board held dispatch delivery")
@@ -150,38 +166,67 @@ impl AsyncDaemonDb {
         let item = write.item.clone();
         advance_held_workflow_launch(&mut applied, &item, delivered_item_revision)?;
         applied.item = item;
-        let payload = serde_json::to_string(&applied)
-            .map_err(|error| db_error(format!("serialize held task board delivery: {error}")))?;
-        let claim_token = format!("dispatch-claim-{}", Uuid::new_v4().simple());
-        query(
-            "UPDATE task_board_dispatch_intents
-             SET payload_json = ?3, status = 'starting', attempts = attempts + 1,
-                 claim_token = ?2, claimed_at = ?4, updated_at = ?4,
-                 consumed_approval_grant_id = ?5
-             WHERE intent_id = ?1 AND status = 'held'",
+        // Rendering is pure, so it belongs here rather than around the call:
+        // this is the first point where `applied` is the state the commit will
+        // publish and the worker will start from. Returning before the commit
+        // drops the transaction, which rolls back the lane write, the consumed
+        // approval grant and the intent update together.
+        let rendered_prompt = rendered_worker_prompt(&applied, &intent_id)?;
+        let claim_token = start_held_intent_in_tx(
+            &mut transaction,
+            &intent_id,
+            &applied,
+            &now,
+            consumed_approval_grant_id.as_deref(),
         )
-        .bind(&intent_id)
-        .bind(&claim_token)
-        .bind(payload)
-        .bind(&now)
-        .bind(consumed_approval_grant_id.as_deref())
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("claim held task board dispatch: {error}")))?;
+        .await?;
         let change_sequence = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
         record_lane_transition_audit_in_tx(&mut transaction, &write, change_sequence).await?;
         transaction
             .commit()
             .await
             .map_err(|error| db_error(format!("commit held task board delivery: {error}")))?;
-        Ok(ClaimedTaskBoardDispatch {
-            intent_id,
-            claim_token,
-            applied,
-            consumed_approval_grant_id,
-            action: TaskBoardDispatchClaimAction::Start,
+        Ok(ClaimedHeldTaskBoardDispatch {
+            claim: ClaimedTaskBoardDispatch {
+                intent_id,
+                claim_token,
+                applied,
+                consumed_approval_grant_id,
+                action: TaskBoardDispatchClaimAction::Start,
+            },
+            rendered_prompt,
         })
     }
+}
+
+/// Move the held intent to `starting` under a fresh claim token, carrying the
+/// payload the claim decided on.
+async fn start_held_intent_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    intent_id: &str,
+    applied: &DispatchAppliedTask,
+    now: &str,
+    consumed_approval_grant_id: Option<&str>,
+) -> Result<String, CliError> {
+    let payload = serde_json::to_string(applied)
+        .map_err(|error| db_error(format!("serialize held task board delivery: {error}")))?;
+    let claim_token = format!("dispatch-claim-{}", Uuid::new_v4().simple());
+    query(
+        "UPDATE task_board_dispatch_intents
+             SET payload_json = ?3, status = 'starting', attempts = attempts + 1,
+                 claim_token = ?2, claimed_at = ?4, updated_at = ?4,
+                 consumed_approval_grant_id = ?5
+             WHERE intent_id = ?1 AND status = 'held'",
+    )
+    .bind(intent_id)
+    .bind(&claim_token)
+    .bind(payload)
+    .bind(now)
+    .bind(consumed_approval_grant_id)
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("claim held task board dispatch: {error}")))?;
+    Ok(claim_token)
 }
 
 fn advance_held_workflow_launch(

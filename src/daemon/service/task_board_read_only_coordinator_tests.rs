@@ -6,6 +6,7 @@ mod quorum;
 mod recovery;
 mod recovery_liveness;
 mod report_claim_recovery;
+mod report_prompt_recovery;
 mod runtime;
 mod write_workflow;
 

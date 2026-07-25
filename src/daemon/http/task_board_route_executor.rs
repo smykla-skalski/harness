@@ -70,19 +70,24 @@ pub(crate) async fn deliver(
     if request.dry_run {
         let held = db.held_task_board_dispatch(&request.item_id).await?;
         return Ok(TaskBoardDispatchDeliverResponse {
-            rendered_prompt: rendered_worker_prompt(&held.applied, &held.intent_id),
+            rendered_prompt: rendered_worker_prompt(&held.applied, &held.intent_id)?,
             intent_id: held.intent_id,
             applied: held.applied,
             started_agent: None,
         });
     }
-    let mut claim = db.claim_held_task_board_dispatch(&request.item_id).await?;
-    let prompt = rendered_worker_prompt(&claim.applied, &claim.intent_id);
-    let agent = worker_start::start_and_complete_delivered_worker(state, db, &mut claim).await?;
+    // The claim renders the prompt itself, inside its own transaction and
+    // against the payload it commits. Rendering here instead would decide on
+    // the held payload, which is stale the moment the item is edited during the
+    // hold, and would leave the response reporting a prompt the worker never
+    // received.
+    let mut claimed = db.claim_held_task_board_dispatch(&request.item_id).await?;
+    let agent =
+        worker_start::start_and_complete_delivered_worker(state, db, &mut claimed.claim).await?;
     Ok(TaskBoardDispatchDeliverResponse {
-        intent_id: claim.intent_id,
-        applied: claim.applied,
-        rendered_prompt: prompt,
+        intent_id: claimed.claim.intent_id,
+        applied: claimed.claim.applied,
+        rendered_prompt: claimed.rendered_prompt,
         started_agent: agent,
     })
 }

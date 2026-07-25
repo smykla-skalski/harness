@@ -404,7 +404,7 @@ async fn seed_exact_read_only_worker(
 ) -> crate::daemon::protocol::CodexRunSnapshot {
     seed_session(db, &claim.applied.session_id).await;
     let worker_id = managed_worker_id(&claim.applied, &claim.intent_id);
-    let request = codex_worker_request(&claim.applied, &worker_id);
+    let request = codex_worker_request(&claim.applied, &worker_id).expect("render worker request");
     let launch = claim
         .applied
         .read_only_workflow

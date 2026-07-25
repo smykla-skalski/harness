@@ -73,6 +73,8 @@ pub(crate) use process::{AgentTuiAttachState, AgentTuiSnapshotContext, snapshot_
 #[cfg(all(test, feature = "daemon-runtime"))]
 pub(crate) use readiness::signal_readiness_ready;
 #[cfg(all(test, feature = "daemon-runtime"))]
+pub(crate) use support::recorded_prompt_path;
+#[cfg(all(test, feature = "daemon-runtime"))]
 pub(crate) use spawn::{build_auto_join_prompt, resolved_command_argv, send_initial_prompt};
 #[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 pub(crate) use spawn::{deliver_deferred_prompts, spawn_agent_tui_process};

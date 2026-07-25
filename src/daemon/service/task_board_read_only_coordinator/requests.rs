@@ -1,6 +1,9 @@
+use std::collections::BTreeMap;
+
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest};
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole};
+use crate::task_board::prompt_catalog::{PromptId, render_prompt};
 use crate::task_board::{
     TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardAttemptResultArtifact,
     TaskBoardEvaluationResult, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
@@ -9,6 +12,54 @@ use crate::task_board::{
     TaskBoardReviewerProfile, TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
     validate_task_board_read_only_run_context,
 };
+
+/// What a durable workflow attempt's Codex run is, apart from its prompt.
+///
+/// Reconciliation needs these to find the run and to confirm its binding, and
+/// it must get them without rendering. A configured prompt that cannot render
+/// would otherwise stop an attempt that has already finished from ever being
+/// harvested: the render came first, so the result was never even loaded.
+pub(super) struct AttemptRunIdentity {
+    pub(super) mode: CodexRunMode,
+    pub(super) task_id: Option<String>,
+    pub(super) model: Option<String>,
+    pub(super) effort: Option<String>,
+}
+
+/// Derive the run identity from the frozen execution and attempt records.
+///
+/// # Errors
+///
+/// Returns an error when the phase admits no Codex run, or when the frozen
+/// fields the phase needs are missing.
+pub(super) fn attempt_run_identity(
+    execution: &TaskBoardWorkflowExecutionRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
+) -> Result<AttemptRunIdentity, CliError> {
+    if execution.transition.phase == Some(TaskBoardExecutionPhase::Implementation) {
+        return Ok(AttemptRunIdentity {
+            mode: CodexRunMode::WorkspaceWrite,
+            task_id: Some(write_task_id(execution)?.to_string()),
+            model: None,
+            effort: None,
+        });
+    }
+    if !matches!(
+        execution.transition.phase,
+        Some(TaskBoardExecutionPhase::Review | TaskBoardExecutionPhase::Evaluate)
+    ) {
+        return Err(invalid_transition(
+            "Codex Report request requires Review or Evaluate phase",
+        ));
+    }
+    let profile = attempt_profile(execution, attempt)?;
+    Ok(AttemptRunIdentity {
+        mode: CodexRunMode::Report,
+        task_id: None,
+        model: profile.model.clone(),
+        effort: profile.effort.clone(),
+    })
+}
 
 pub(crate) fn codex_attempt_request(
     execution: &TaskBoardWorkflowExecutionRecord,
@@ -192,18 +243,36 @@ fn implementation_prompt(
         .map(|criterion| format!("- {criterion}"))
         .collect::<Vec<_>>()
         .join("\n");
-    Ok(format!(
-        "Implement the exact approved plan for Task Board item '{}'.\n\nTitle: {}\n{}\nBase head: {}\n\nApproved plan:\n{}\n\nAcceptance criteria:\n{}\n\nWork only in the assigned worktree. Preserve unrelated changes, run focused validation through repository workflows, and create local commits as required by the repository; do not push, publish, or merge. Before responding, replace every REPLACE_WITH_CURRENT_HEAD token below with the exact resulting Git HEAD. Your final message must contain only one JSON value matching this exact identity and shape:\n{}",
-        execution.item_id,
-        context.title,
-        workspace_directive(context, target),
-        base_head,
-        planning.plan_markdown,
-        criteria,
-        serde_json::to_string_pretty(&response).map_err(|error| {
-            invalid_transition(format!("serialize implementation result template: {error}"))
-        })?,
-    ))
+    let mut variables = BTreeMap::from([
+        ("board_item_id", execution.item_id.clone()),
+        ("title", context.title.clone()),
+        ("workspace_directive", workspace_directive(context, target)),
+        ("base_head_revision", base_head.to_string()),
+        ("plan_markdown", planning.plan_markdown.clone()),
+        ("acceptance_criteria", criteria),
+        ("execution_id", execution.execution_id.clone()),
+        ("managed_run_id", attempt.idempotency_key.clone()),
+        (
+            "response_json",
+            serde_json::to_string_pretty(&response).map_err(|error| {
+                invalid_transition(format!("serialize implementation result template: {error}"))
+            })?,
+        ),
+    ]);
+    push_worktree(&mut variables, context, target);
+    render_prompt(PromptId::WriteImplementation, &variables)
+}
+
+/// The raw worktree only exists for a local run; a remote executor checkout is
+/// named by the workspace directive alone.
+fn push_worktree(
+    variables: &mut BTreeMap<&'static str, String>,
+    context: &TaskBoardReadOnlyRunContext,
+    target: TaskBoardCodexLaunchTarget,
+) {
+    if target == TaskBoardCodexLaunchTarget::Local {
+        variables.insert("worktree", context.worktree.clone());
+    }
 }
 
 fn review_prompt(
@@ -235,21 +304,34 @@ fn review_prompt(
         .transition
         .pull_request
         .as_ref()
-        .map_or_else(String::new, |pr| {
-            format!("\nPull request: {}#{}", pr.repository, pr.number)
-        });
-    Ok(format!(
-        "Run a strictly read-only review for Task Board item '{}'.\n\nTitle: {}\nContext: {}\nExact head: {}{}\n{}\n\nDo not modify files, commits, branches, task state, pull requests, or external systems. Verify that every inspected change belongs to the exact frozen head above; return human_required when that revision cannot be inspected. Your final message must contain only one JSON value matching this exact identity and shape (use verdict pass, changes_required, or human_required):\n{}",
-        execution.item_id,
-        context.title,
-        context.body,
-        exact_head,
-        pull_request,
-        workspace_directive(context, target),
-        serde_json::to_string_pretty(&response).map_err(|error| {
-            invalid_transition(format!("serialize review result template: {error}"))
-        })?,
-    ))
+        .map(|request| format!("{}#{}", request.repository, request.number));
+    let mut variables = BTreeMap::from([
+        ("board_item_id", execution.item_id.clone()),
+        ("title", context.title.clone()),
+        ("context", context.body.clone()),
+        ("exact_head_revision", exact_head.to_string()),
+        (
+            "pull_request_line",
+            pull_request
+                .as_ref()
+                .map_or_else(String::new, |request| format!("\nPull request: {request}")),
+        ),
+        ("workspace_directive", workspace_directive(context, target)),
+        ("execution_id", execution.execution_id.clone()),
+        ("managed_run_id", attempt.idempotency_key.clone()),
+        ("profile_id", profile_id.to_string()),
+        (
+            "response_json",
+            serde_json::to_string_pretty(&response).map_err(|error| {
+                invalid_transition(format!("serialize review result template: {error}"))
+            })?,
+        ),
+    ]);
+    push_worktree(&mut variables, context, target);
+    if let Some(pull_request) = pull_request {
+        variables.insert("pull_request", pull_request);
+    }
+    render_prompt(PromptId::ReadOnlyReview, &variables)
 }
 
 fn evaluation_prompt(
@@ -279,16 +361,21 @@ fn evaluation_prompt(
     };
     let evidence = serde_json::to_string_pretty(&execution.artifacts.review_cycles)
         .map_err(|error| invalid_transition(format!("serialize review evidence: {error}")))?;
-    Ok(format!(
-        "Evaluate the durable review evidence for Task Board item '{}'.\n\nTitle: {}\nExact head: {}\nReview evidence:\n{}\n\nDo not modify files, commits, branches, task state, pull requests, or external systems. Confirm the evidence is internally consistent and bound to the exact frozen head. Your final message must contain only one JSON value matching this exact identity and shape (use verdict pass, changes_required, or human_required):\n{}",
-        execution.item_id,
-        context.title,
-        exact_head,
-        evidence,
-        serde_json::to_string_pretty(&response).map_err(|error| {
-            invalid_transition(format!("serialize evaluation result template: {error}"))
-        })?,
-    ))
+    let variables = BTreeMap::from([
+        ("board_item_id", execution.item_id.clone()),
+        ("title", context.title.clone()),
+        ("exact_head_revision", exact_head.to_string()),
+        ("review_evidence", evidence),
+        ("execution_id", execution.execution_id.clone()),
+        ("managed_run_id", attempt.idempotency_key.clone()),
+        (
+            "response_json",
+            serde_json::to_string_pretty(&response).map_err(|error| {
+                invalid_transition(format!("serialize evaluation result template: {error}"))
+            })?,
+        ),
+    ]);
+    render_prompt(PromptId::Evaluation, &variables)
 }
 
 fn read_only_capabilities(item_id: &str, tags: &[String], run_id: &str) -> Vec<String> {
@@ -350,3 +437,7 @@ fn exact_head(execution: &TaskBoardWorkflowExecutionRecord) -> Result<&str, CliE
 fn invalid_transition(detail: impl Into<String>) -> CliError {
     CliErrorKind::invalid_transition(detail.into()).into()
 }
+
+#[cfg(test)]
+#[path = "requests_prompt_tests.rs"]
+mod prompt_tests;

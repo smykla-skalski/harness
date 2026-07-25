@@ -328,6 +328,11 @@ async fn validate_binding(
     expected: &TaskBoardWorkflowExecutionCas,
 ) -> Result<(), CliError> {
     let binding = &request.binding;
+    // This re-renders the prompt to compare launch envelopes, which is safe
+    // only because both renders happen inside one controller pass against a
+    // catalog installed once at startup: a customization takes effect on
+    // restart, never between these two. A replayed or reassigned offer never
+    // reaches here, so no frozen envelope is ever compared against a fresh one.
     let expected_request = remote_codex_attempt_request(parent, attempt)?;
     let expected_launch = RemoteCodexLaunchEnvelope::from_codex_request("codex", &expected_request)
         .map_err(|error| db_error(format!("build frozen remote launch contract: {error}")))?;

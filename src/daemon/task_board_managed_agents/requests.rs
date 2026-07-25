@@ -1,6 +1,10 @@
+use std::collections::BTreeMap;
+
 use crate::daemon::agent_tui::AgentTuiStartRequest;
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest};
+use crate::errors::CliError;
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole};
+use crate::task_board::prompt_catalog::{PromptId, render_prompt};
 use crate::task_board::{
     AgentMode, DispatchAppliedTask, TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION,
     TaskBoardAttemptResultArtifact, TaskBoardImplementationResult, TaskBoardItem,
@@ -11,24 +15,61 @@ use crate::task_board::{
 
 const DEFAULT_INTERACTIVE_RUNTIME: &str = "codex";
 
+/// What a dispatched item's Codex run is, apart from its prompt.
+///
+/// Recovery confirms identity from these and the frozen launch fields, so it
+/// must be able to compute them without rendering: a configuration edit that
+/// breaks a template cannot be allowed to strand a worker that is already
+/// running the right work.
+pub(super) struct CodexWorkerIdentity {
+    pub(super) mode: CodexRunMode,
+    pub(super) model: Option<String>,
+    pub(super) effort: Option<String>,
+}
+
+pub(super) fn codex_worker_identity(applied: &DispatchAppliedTask) -> CodexWorkerIdentity {
+    if let Some(launch) = applied.read_only_workflow.as_ref() {
+        let profile = launch.resolved_reviewers.profiles.first();
+        return CodexWorkerIdentity {
+            mode: CodexRunMode::Report,
+            model: profile.and_then(|profile| profile.model.clone()),
+            effort: profile.and_then(|profile| profile.effort.clone()),
+        };
+    }
+    let mode = if applied.write_workflow.is_some() {
+        CodexRunMode::WorkspaceWrite
+    } else {
+        match applied.item.agent_mode {
+            AgentMode::Planning | AgentMode::Evaluate => CodexRunMode::Report,
+            AgentMode::Headless | AgentMode::Interactive => CodexRunMode::WorkspaceWrite,
+        }
+    };
+    CodexWorkerIdentity {
+        mode,
+        model: None,
+        effort: None,
+    }
+}
+
+/// Build the Codex run request for one dispatched item.
+///
+/// # Errors
+/// Returns an error when the configured prompt cannot be rendered for this
+/// item, refusing the spawn before the agent starts.
 pub(crate) fn codex_worker_request(
     applied: &DispatchAppliedTask,
     managed_run_id: &str,
-) -> CodexRunRequest {
+) -> Result<CodexRunRequest, CliError> {
     if let Some(launch) = applied.read_only_workflow.as_ref() {
         return read_only_review_request(applied, launch, managed_run_id);
     }
     if let Some(launch) = applied.write_workflow.as_ref() {
         return write_implementation_request(applied, launch, managed_run_id);
     }
-    let mode = match applied.item.agent_mode {
-        AgentMode::Planning | AgentMode::Evaluate => CodexRunMode::Report,
-        AgentMode::Headless | AgentMode::Interactive => CodexRunMode::WorkspaceWrite,
-    };
-    CodexRunRequest {
+    Ok(CodexRunRequest {
         actor: Some(CONTROL_PLANE_ACTOR_ID.to_string()),
-        prompt: worker_prompt(applied, managed_run_id),
-        mode,
+        prompt: worker_prompt(applied, managed_run_id)?,
+        mode: codex_worker_identity(applied).mode,
         role: SessionRole::Leader,
         fallback_role: Some(SessionRole::Worker),
         capabilities: worker_capabilities(&applied.item),
@@ -41,17 +82,17 @@ pub(crate) fn codex_worker_request(
         model: None,
         effort: None,
         allow_custom_model: false,
-    }
+    })
 }
 
 fn write_implementation_request(
     applied: &DispatchAppliedTask,
     launch: &TaskBoardWriteWorkflowLaunch,
     managed_run_id: &str,
-) -> CodexRunRequest {
-    CodexRunRequest {
+) -> Result<CodexRunRequest, CliError> {
+    Ok(CodexRunRequest {
         actor: Some(CONTROL_PLANE_ACTOR_ID.to_string()),
-        prompt: write_implementation_prompt(applied, launch, managed_run_id),
+        prompt: write_implementation_prompt(applied, launch, managed_run_id)?,
         mode: CodexRunMode::WorkspaceWrite,
         role: SessionRole::Leader,
         fallback_role: Some(SessionRole::Worker),
@@ -72,14 +113,14 @@ fn write_implementation_request(
         model: None,
         effort: None,
         allow_custom_model: false,
-    }
+    })
 }
 
 fn write_implementation_prompt(
     applied: &DispatchAppliedTask,
     launch: &TaskBoardWriteWorkflowLaunch,
     managed_run_id: &str,
-) -> String {
+) -> Result<String, CliError> {
     let execution_id = applied
         .item
         .workflow
@@ -108,32 +149,44 @@ fn write_implementation_prompt(
         .map(|criterion| format!("- {criterion}"))
         .collect::<Vec<_>>()
         .join("\n");
-    format!(
-        "Implement the exact approved plan for Task Board item '{}'.\n\nTitle: {}\nWorktree: {}\nBase head: {}\n\nApproved plan:\n{}\n\nAcceptance criteria:\n{}\n\nWork only in the assigned worktree. Preserve unrelated changes, run focused validation through repository workflows, and create local commits as required by the repository; do not push, publish, or merge. Before responding, replace every REPLACE_WITH_CURRENT_HEAD token below with the exact resulting Git HEAD. Your final message must contain only one JSON value matching this exact identity and shape:\n{}",
-        applied.board_item_id,
-        launch.run_context.title,
-        launch.run_context.worktree,
-        launch.base_head_revision,
-        launch.planning_result.plan_markdown,
-        criteria,
-        serde_json::to_string_pretty(&response)
-            .expect("serialize implementation response template"),
-    )
+    let variables = BTreeMap::from([
+        ("board_item_id", applied.board_item_id.clone()),
+        ("title", launch.run_context.title.clone()),
+        ("worktree", launch.run_context.worktree.clone()),
+        (
+            "workspace_directive",
+            format!("Worktree: {}", launch.run_context.worktree),
+        ),
+        ("base_head_revision", launch.base_head_revision.clone()),
+        (
+            "plan_markdown",
+            launch.planning_result.plan_markdown.clone(),
+        ),
+        ("acceptance_criteria", criteria),
+        ("execution_id", execution_id.to_string()),
+        ("managed_run_id", managed_run_id.to_string()),
+        (
+            "response_json",
+            serde_json::to_string_pretty(&response)
+                .expect("serialize implementation response template"),
+        ),
+    ]);
+    render_prompt(PromptId::WriteImplementation, &variables)
 }
 
 fn read_only_review_request(
     applied: &DispatchAppliedTask,
     launch: &TaskBoardReadOnlyWorkflowLaunch,
     managed_run_id: &str,
-) -> CodexRunRequest {
+) -> Result<CodexRunRequest, CliError> {
     let profile = launch
         .resolved_reviewers
         .profiles
         .first()
         .expect("validated read-only launch has a reviewer profile");
-    CodexRunRequest {
+    Ok(CodexRunRequest {
         actor: Some(CONTROL_PLANE_ACTOR_ID.to_string()),
-        prompt: read_only_review_prompt(applied, profile.id.as_str(), managed_run_id),
+        prompt: read_only_review_prompt(applied, profile.id.as_str(), managed_run_id)?,
         mode: CodexRunMode::Report,
         role: SessionRole::Leader,
         fallback_role: Some(SessionRole::Worker),
@@ -151,14 +204,14 @@ fn read_only_review_request(
         model: profile.model.clone(),
         effort: profile.effort.clone(),
         allow_custom_model: false,
-    }
+    })
 }
 
 fn read_only_review_prompt(
     applied: &DispatchAppliedTask,
     profile_id: &str,
     managed_run_id: &str,
-) -> String {
+) -> Result<String, CliError> {
     let launch = applied
         .read_only_workflow
         .as_ref()
@@ -170,6 +223,10 @@ fn read_only_review_prompt(
         .as_deref()
         .expect("read-only prompt requires workflow execution id");
     let action_key = format!("review:{profile_id}");
+    let pull_request = launch
+        .pull_request
+        .as_ref()
+        .map(|request| format!("{}#{}", request.repository, request.number));
     let response = TaskBoardLocalAttemptResult {
         schema_version: TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION,
         execution_id: execution_id.to_string(),
@@ -187,32 +244,55 @@ fn read_only_review_prompt(
             },
         }),
     };
-    let pull_request = launch.pull_request.as_ref().map_or_else(String::new, |pr| {
-        format!("\nPull request: {}#{}", pr.repository, pr.number)
-    });
-    format!(
-        "Run a strictly read-only review for Task Board item '{}'.\n\nTitle: {}\nContext: {}\nExact head: {}{}\nWorktree: {}\n\nDo not modify files, commits, branches, task state, pull requests, or external systems. Verify that every inspected change belongs to the exact frozen head above; return human_required when that revision cannot be inspected. Your final message must contain only one JSON value matching this exact identity and shape (use verdict pass, changes_required, or human_required):\n{}",
-        applied.board_item_id,
-        launch.run_context.title,
-        launch.run_context.body,
-        launch.exact_head_revision,
-        pull_request,
-        launch.run_context.worktree,
-        serde_json::to_string_pretty(&response).expect("serialize review response template"),
-    )
+    let mut variables = BTreeMap::from([
+        ("board_item_id", applied.board_item_id.clone()),
+        ("title", launch.run_context.title.clone()),
+        ("context", launch.run_context.body.clone()),
+        (
+            "exact_head_revision",
+            launch.exact_head_revision.clone(),
+        ),
+        (
+            "pull_request_line",
+            pull_request
+                .as_ref()
+                .map_or_else(String::new, |request| format!("\nPull request: {request}")),
+        ),
+        ("worktree", launch.run_context.worktree.clone()),
+        (
+            "workspace_directive",
+            format!("Worktree: {}", launch.run_context.worktree),
+        ),
+        ("execution_id", execution_id.to_string()),
+        ("managed_run_id", managed_run_id.to_string()),
+        ("profile_id", profile_id.to_string()),
+        (
+            "response_json",
+            serde_json::to_string_pretty(&response).expect("serialize review response template"),
+        ),
+    ]);
+    if let Some(pull_request) = pull_request {
+        variables.insert("pull_request", pull_request);
+    }
+    render_prompt(PromptId::ReadOnlyReview, &variables)
 }
 
+/// Build the terminal worker start request for one dispatched item.
+///
+/// # Errors
+/// Returns an error when the configured prompt cannot be rendered for this
+/// item, refusing the spawn before the agent starts.
 pub(super) fn terminal_worker_request(
     applied: &DispatchAppliedTask,
     managed_run_id: &str,
-) -> AgentTuiStartRequest {
-    AgentTuiStartRequest {
+) -> Result<AgentTuiStartRequest, CliError> {
+    Ok(AgentTuiStartRequest {
         runtime: DEFAULT_INTERACTIVE_RUNTIME.to_string(),
         role: SessionRole::Leader,
         fallback_role: Some(SessionRole::Worker),
         capabilities: worker_capabilities(&applied.item),
         name: Some(worker_name(&applied.item)),
-        prompt: Some(worker_prompt(applied, managed_run_id)),
+        prompt: Some(worker_prompt(applied, managed_run_id)?),
         project_dir: None,
         argv: Vec::new(),
         rows: 24,
@@ -224,7 +304,7 @@ pub(super) fn terminal_worker_request(
         model: None,
         effort: None,
         allow_custom_model: false,
-    }
+    })
 }
 
 fn worker_name(item: &TaskBoardItem) -> String {
@@ -262,7 +342,15 @@ fn write_capabilities(item_id: &str, tags: &[String], managed_run_id: &str) -> V
     capabilities
 }
 
-pub(super) fn worker_prompt(applied: &DispatchAppliedTask, managed_run_id: &str) -> String {
+/// Render the ordinary worker prompt for one dispatched item.
+///
+/// # Errors
+/// Returns an error when the configured prompt cannot be rendered for this
+/// item.
+pub(super) fn worker_prompt(
+    applied: &DispatchAppliedTask,
+    managed_run_id: &str,
+) -> Result<String, CliError> {
     render_worker_prompt(
         &applied.item,
         &WorkerPromptContext {

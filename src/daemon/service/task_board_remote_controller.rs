@@ -314,9 +314,25 @@ async fn offer_remote_candidates(
             select_local_target(db, &execution, attempt, &now).await?;
             continue;
         };
-        let Some(prepared) =
-            requests::prepare_offer(&execution, attempt, &host, prepared_source, &now)?
-        else {
+        // Sealing the offer renders the prompt, and a configured prompt can
+        // fail to render for this one execution -- a name the execution has no
+        // value for, or a template past the remote request's size ceiling.
+        // That is this candidate's problem, not the pass's: propagating it
+        // aborted the whole controller pass, which is a precondition of every
+        // dispatch route, so one bad candidate stopped every unrelated item
+        // from dispatching on every tick until the daemon restarted. Refusing
+        // remote and letting it run locally is what the neighbouring branches
+        // already do when a candidate cannot go remote.
+        let prepared =
+            match requests::prepare_offer(&execution, attempt, &host, prepared_source, &now) {
+                Ok(prepared) => prepared,
+                Err(error) => {
+                    warn_offer_render_refused(&execution.execution_id, &error);
+                    select_local_target(db, &execution, attempt, &now).await?;
+                    continue;
+                }
+            };
+        let Some(prepared) = prepared else {
             select_local_target(db, &execution, attempt, &now).await?;
             continue;
         };
@@ -383,6 +399,19 @@ async fn prepare_candidate_source(
         };
     }
     requests::prepare_source(execution, phase, prior_bundle)
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing::warn! macro expands into a chain clippy reads as branchy"
+)]
+fn warn_offer_render_refused(execution_id: &str, error: &CliError) {
+    tracing::warn!(
+        target: "harness::task_board",
+        %execution_id,
+        %error,
+        "cannot seal a remote offer for this execution; running it locally instead",
+    );
 }
 
 async fn select_local_target(

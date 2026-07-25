@@ -12,6 +12,9 @@
 //! - `HARNESS_FEATURE_REVIEWS_BACKGROUND_AUTO=1` enables background Reviews
 //!   policy runs. It is off by default because it can approve or merge GitHub
 //!   pull requests without a same-moment user confirmation.
+//! - `HARNESS_FEATURE_TASK_BOARD_PROMPT_OVERRIDES=1` (2026-07-25, tracking issue
+//!   #336) lets `HARNESS_TASK_BOARD_PROMPTS_FILE` replace the prompts agents run
+//!   with. Off by default so shipped prompts stay byte-identical.
 //! - `HARNESS_FEATURE_TASK_BOARD_AUTOMATION_V2=0` disables the durable Task Board
 //!   automation engine and retains the legacy orchestrator compatibility path.
 //!   Without an override, the durable path is enabled.
@@ -55,6 +58,10 @@ pub const TASK_BOARD_TRIAGE_ESCALATION_MAX_PENDING_ENV: &str =
 /// Env var bounding how long a claimed escalation may run before timing out.
 pub const TASK_BOARD_TRIAGE_ESCALATION_TIMEOUT_SECONDS_ENV: &str =
     "HARNESS_TASK_BOARD_TRIAGE_ESCALATION_TIMEOUT_SECONDS";
+/// Env var that lets a prompt configuration file replace shipped prompts.
+pub const TASK_BOARD_PROMPT_OVERRIDES_ENV: &str = "HARNESS_FEATURE_TASK_BOARD_PROMPT_OVERRIDES";
+/// Env var naming the prompt configuration file to load when overrides are on.
+pub const TASK_BOARD_PROMPTS_FILE_ENV: &str = "HARNESS_TASK_BOARD_PROMPTS_FILE";
 
 static ACP_RUNTIME_OVERRIDE: Mutex<Option<bool>> = Mutex::new(None);
 
@@ -77,6 +84,20 @@ pub fn reviews_background_auto_enabled_from_env() -> bool {
 #[must_use]
 pub fn task_board_automation_v2_enabled_from_env() -> bool {
     env_enabled_by_default(TASK_BOARD_AUTOMATION_V2_ENV)
+}
+
+/// Whether a prompt configuration file may replace the prompts agents run
+/// with. Off by default: with the flag clear the shipped prompts render
+/// exactly as they always have, so nothing customized means nothing changed.
+#[must_use]
+pub fn task_board_prompt_overrides_enabled_from_env() -> bool {
+    env_truthy(TASK_BOARD_PROMPT_OVERRIDES_ENV)
+}
+
+/// The prompt configuration file to load, when one is configured.
+#[must_use]
+pub fn task_board_prompts_file_from_env() -> Option<String> {
+    normalized_env_value(TASK_BOARD_PROMPTS_FILE_ENV)
 }
 
 /// Ceiling for `HARNESS_TASK_BOARD_TRIAGE_ESCALATION_TIMEOUT_SECONDS`, well
