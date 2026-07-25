@@ -5,6 +5,23 @@ unalias -a 2>/dev/null || true
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd -P)"
 JOBSERVER="$ROOT/scripts/harness-jobserver.py"
 
+# The granted width reaches the command as an environment variable, so the probe
+# has to expand it in the child. Keeping that in a script rather than an inline
+# `sh -c` keeps the intent readable and out of shellcheck's single-quote rule.
+PROBE_DIR="$(mktemp -d)"
+PROBE_SCRIPT="$PROBE_DIR/probe"
+PROBE_HOLDER="$PROBE_DIR/holder"
+cat >"$PROBE_SCRIPT" <<'PROBE'
+#!/usr/bin/env bash
+printf %s "$PROBE"
+PROBE
+cat >"$PROBE_HOLDER" <<'PROBE'
+#!/usr/bin/env bash
+printf %s "$PROBE" > "$1"
+sleep 3
+PROBE
+chmod +x "$PROBE_SCRIPT" "$PROBE_HOLDER"
+
 passed=0
 failed=0
 started_pools=()
@@ -49,6 +66,7 @@ cleanup() {
     fi
     rm -rf "$dir" 2>/dev/null || true
   done
+  rm -rf "$PROBE_DIR" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -121,7 +139,7 @@ scenario_run_exports_granted_width() {
 
   local seen
   seen="$(python3 "$JOBSERVER" run --repo-root "$root" --max 3 --env PROBE -- \
-    sh -c 'printf %s "$PROBE"')"
+    "$PROBE_SCRIPT")"
   # 3 tokens granted plus the implicit slot every process already owns.
   if [[ "$seen" != "4" ]]; then
     fail "$name (expected width 4, got '$seen')"
@@ -143,7 +161,7 @@ scenario_grant_is_capped_by_budget() {
 
   local seen
   seen="$(python3 "$JOBSERVER" run --repo-root "$root" --max 99 --env PROBE -- \
-    sh -c 'printf %s "$PROBE"')"
+    "$PROBE_SCRIPT")"
   if [[ "$seen" != "4" ]]; then
     fail "$name (expected 3 tokens + implicit slot = 4, got '$seen')"
     return
@@ -159,13 +177,13 @@ scenario_second_client_gets_the_remainder() {
 
   local holder_out; holder_out="$(mktemp)"
   python3 "$JOBSERVER" run --repo-root "$root" --max 3 --env PROBE -- \
-    sh -c 'printf %s "$PROBE" > '"$holder_out"'; sleep 3' &
+    "$PROBE_HOLDER" "$holder_out" &
   local holder=$!
   sleep 1
 
   local seen
   seen="$(python3 "$JOBSERVER" run --repo-root "$root" --max 4 --env PROBE -- \
-    sh -c 'printf %s "$PROBE"')"
+    "$PROBE_SCRIPT")"
   wait "$holder" 2>/dev/null
   # First client took 3 of 4; only 1 remains, so the second sees 1 + implicit.
   if [[ "$seen" != "2" ]]; then
@@ -234,7 +252,7 @@ scenario_missing_pool_still_runs_the_command() {
 
   local seen
   seen="$(python3 "$JOBSERVER" run --repo-root "$root" --max 4 --env PROBE --floor 2 -- \
-    sh -c 'printf %s "$PROBE"')"
+    "$PROBE_SCRIPT")"
   # No supervisor, so the floor applies and the command must still run.
   if [[ "$seen" != "2" ]]; then
     fail "$name (expected floor width 2, got '$seen')"
@@ -251,7 +269,7 @@ scenario_run_preserves_argument_separators() {
 
   # Only the separator argparse needs may be stripped. Test runners forward
   # their own arguments after a second one, and eating it silently rewrites
-  # the command - `nextest run -- --nocapture` would lose the separator.
+  # the command so those flags land on the runner instead of the test binary.
   local seen
   seen="$(python3 "$JOBSERVER" run --repo-root "$root" --max 1 --env PROBE -- \
     printf '%s|' a -- b)"

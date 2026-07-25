@@ -387,8 +387,8 @@ def main() -> int:
         print(f"MAKEFLAGS=-j{budget} --jobserver-auth=fifo:{fifo_path}")
         return 0
     # Strip only the separator argparse needs to end REMAINDER. Any further one
-    # belongs to the command being wrapped - `nextest run -- --nocapture` has to
-    # reach the runner intact.
+    # belongs to the command being wrapped: a runner forwarding its own flags
+    # past a second separator has to receive that separator intact.
     command = list(args.command)
     if command and command[0] == "--":
         command = command[1:]
