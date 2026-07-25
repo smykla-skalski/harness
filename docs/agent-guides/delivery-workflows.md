@@ -151,16 +151,12 @@ It deliberately skips three things:
 
 #### Cleanup
 
-Reclaiming this session's build caches is the mandatory first step. `git worktree remove` deletes the only name that maps the shared lane back to this session, so a lane left behind is orphaned with nothing to attribute it to, and it is routinely the largest artifact the session produced.
+Reclaim this session's two build caches first, because `git worktree remove` deletes the only name that maps the shared lane back to this session. `mise run clean:lanes` reclaims neither: it covers `xcode-derived-lanes/` and always keeps the current worktree.
 
-A session writes two separate caches:
+- `<worktree>/target` - direct `cargo` and `cargo nextest` output.
+- `<main-checkout>/target/dev/wt-<worktree-name>-<hash>` - everything from `scripts/cargo-local.sh`, which every `mise run test:*` task uses. Sits outside the worktree and is usually the larger.
 
-- `<worktree>/target` holds direct `cargo` and `cargo nextest` output.
-- `<main-checkout>/target/dev/wt-<worktree-name>-<hash>` holds everything routed through `scripts/cargo-local.sh`, which every `mise run test:*` task uses. It sits outside the worktree and is usually the larger of the two.
-
-`mise run clean:lanes` reclaims neither. Its lane pass covers `xcode-derived-lanes/` rather than `target/dev/`, and it always classifies the session's own worktree as one to keep, so it can report dropped lanes and nothing reclaimed while both of these survive in full.
-
-Every other session keeps its own `target/dev/wt-*` lane and builds in it concurrently, so delete only the lane whose suffix matches this worktree, and prove nothing is using it first. A running build in a different worktree is normal and must survive.
+Every other session holds its own `target/dev/wt-*` lane and may be building in it, so match the suffix exactly and confirm nothing is using it.
 
 ```bash
 # assumes: PR merged, <worktree> clean, this session has no build of its own running
