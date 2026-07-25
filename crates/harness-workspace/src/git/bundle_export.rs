@@ -12,15 +12,15 @@ use crate::git::{GitError, GitResult};
 const MAX_STATUS_OUTPUT_BYTES: u64 = 64 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct GitBundleExport {
-    pub(crate) base_revision: String,
-    pub(crate) result_revision: String,
-    pub(crate) advertised_ref: String,
-    pub(crate) bytes: Vec<u8>,
+pub struct GitBundleExport {
+    pub base_revision: String,
+    pub result_revision: String,
+    pub advertised_ref: String,
+    pub bytes: Vec<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct GitBundleExportPlan {
+pub struct GitBundleExportPlan {
     worktree: PathBuf,
     base_revision: String,
     result_revision: String,
@@ -29,7 +29,7 @@ pub(crate) struct GitBundleExportPlan {
 }
 
 impl GitBundleExportPlan {
-    pub(crate) fn for_result(
+    pub fn for_result(
         worktree: &Path,
         base_revision: String,
         result_revision: String,
@@ -48,7 +48,7 @@ impl GitBundleExportPlan {
         Ok(plan)
     }
 
-    pub(crate) fn export(&self, max_bytes: u64) -> GitResult<GitBundleExport> {
+    pub fn export(&self, max_bytes: u64) -> GitResult<GitBundleExport> {
         if max_bytes == 0 {
             return Err(GitError::read(
                 &self.worktree,

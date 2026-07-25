@@ -4,13 +4,13 @@ use fs_err as fs;
 use serde::{Deserialize, Serialize};
 
 use harness_kernel::errors::CliError;
-use crate::infra::io::{read_json_typed, write_json_pretty};
+use harness_kernel::io::{read_json_typed, write_json_pretty};
 use harness_kernel::kernel::topology::{ClusterMode, ClusterSpec};
 
 use super::project_context_dir;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct RemoteKubernetesInstallState {
+pub struct RemoteKubernetesInstallState {
     pub mode: ClusterMode,
     pub repo_root: String,
     pub push_prefix: Option<String>,
@@ -20,7 +20,7 @@ pub(crate) struct RemoteKubernetesInstallState {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct RemoteKubernetesInstallMemberState {
+pub struct RemoteKubernetesInstallMemberState {
     pub name: String,
     pub source_kubeconfig: String,
     pub source_context: Option<String>,
@@ -32,12 +32,12 @@ pub(crate) struct RemoteKubernetesInstallMemberState {
     pub published_image_refs: Vec<String>,
 }
 
-pub(crate) fn remote_install_state_path_for_spec(spec: &ClusterSpec) -> PathBuf {
+pub fn remote_install_state_path_for_spec(spec: &ClusterSpec) -> PathBuf {
     let base = remote_cluster_state_dir(spec);
     base.join("install-state.json")
 }
 
-pub(crate) fn load_remote_install_state_for_spec(
+pub fn load_remote_install_state_for_spec(
     spec: &ClusterSpec,
 ) -> Result<Option<RemoteKubernetesInstallState>, CliError> {
     let path = remote_install_state_path_for_spec(spec);
@@ -47,7 +47,7 @@ pub(crate) fn load_remote_install_state_for_spec(
     read_json_typed(&path).map(Some)
 }
 
-pub(crate) fn persist_remote_install_state(
+pub fn persist_remote_install_state(
     spec: &ClusterSpec,
     state: &RemoteKubernetesInstallState,
 ) -> Result<(), CliError> {
@@ -55,7 +55,7 @@ pub(crate) fn persist_remote_install_state(
     write_json_pretty(&path, state)
 }
 
-pub(crate) fn cleanup_remote_install_state(
+pub fn cleanup_remote_install_state(
     spec: &ClusterSpec,
     state: &RemoteKubernetesInstallState,
 ) -> Result<(), CliError> {
@@ -79,7 +79,7 @@ pub(crate) fn cleanup_remote_install_state(
     Ok(())
 }
 
-pub(crate) fn sync_gateway_api_install_state(
+pub fn sync_gateway_api_install_state(
     repo_root: &Path,
     kubeconfig: &Path,
     installed: bool,

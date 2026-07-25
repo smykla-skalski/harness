@@ -4,7 +4,7 @@ use std::path::Path;
 use rayon::prelude::*;
 
 use harness_kernel::errors::{CliError, io_for};
-use crate::infra::io::{read_text, write_json_pretty};
+use harness_kernel::io::{read_text, write_json_pretty};
 use crate::workspace::{session_scope_key, utc_now};
 
 use super::{

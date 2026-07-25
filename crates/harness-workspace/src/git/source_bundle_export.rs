@@ -13,15 +13,15 @@ use super::source_repository_identity::{
 use crate::git::{GitError, GitRepository, GitResult};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct GitSourceBundleExport {
-    pub(crate) repository: String,
-    pub(crate) revision: String,
-    pub(crate) advertised_ref: String,
-    pub(crate) bytes: Vec<u8>,
+pub struct GitSourceBundleExport {
+    pub repository: String,
+    pub revision: String,
+    pub advertised_ref: String,
+    pub bytes: Vec<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct GitSourceBundleExportPlan {
+pub struct GitSourceBundleExportPlan {
     worktree: PathBuf,
     repository: String,
     revision: String,
@@ -31,7 +31,7 @@ pub(crate) struct GitSourceBundleExportPlan {
 }
 
 impl GitSourceBundleExportPlan {
-    pub(crate) fn for_revision(
+    pub fn for_revision(
         worktree: &Path,
         repository: String,
         revision: String,
@@ -75,7 +75,7 @@ impl GitSourceBundleExportPlan {
         Ok(plan)
     }
 
-    pub(crate) fn export(&self, max_bytes: u64) -> GitResult<GitSourceBundleExport> {
+    pub fn export(&self, max_bytes: u64) -> GitResult<GitSourceBundleExport> {
         if max_bytes == 0 {
             return Err(GitError::read(
                 &self.worktree,

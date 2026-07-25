@@ -14,7 +14,7 @@ use crate::git::{GitError, GitRepository, GitResult};
 mod operations;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct GitBundleImportPlan {
+pub struct GitBundleImportPlan {
     worktree: PathBuf,
     branch_ref: String,
     base_revision: String,
@@ -25,20 +25,20 @@ pub(crate) struct GitBundleImportPlan {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct GitBundleImportEvidence {
-    pub(crate) worktree_path: String,
-    pub(crate) git_dir: String,
-    pub(crate) common_git_dir: String,
-    pub(crate) branch_ref: String,
-    pub(crate) base_revision: String,
-    pub(crate) result_revision: String,
-    pub(crate) advertised_ref: String,
-    pub(crate) import_ref: String,
-    pub(crate) object_format: String,
+pub struct GitBundleImportEvidence {
+    pub worktree_path: String,
+    pub git_dir: String,
+    pub common_git_dir: String,
+    pub branch_ref: String,
+    pub base_revision: String,
+    pub result_revision: String,
+    pub advertised_ref: String,
+    pub import_ref: String,
+    pub object_format: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum GitBundleWorktreeState {
+pub enum GitBundleWorktreeState {
     AttachedBase,
     DetachedResultBranchBase,
     DetachedResultBranchResult,
@@ -46,7 +46,7 @@ pub(crate) enum GitBundleWorktreeState {
 }
 
 impl GitBundleImportPlan {
-    pub(crate) fn new(
+    pub fn new(
         worktree: &Path,
         branch_ref: String,
         base_revision: String,
@@ -75,7 +75,7 @@ impl GitBundleImportPlan {
         Ok(plan)
     }
 
-    pub(crate) fn evidence(&self) -> GitResult<GitBundleImportEvidence> {
+    pub fn evidence(&self) -> GitResult<GitBundleImportEvidence> {
         self.coordinates.require_current()?;
         Ok(GitBundleImportEvidence {
             worktree_path: self.worktree.to_string_lossy().into_owned(),
@@ -94,11 +94,11 @@ impl GitBundleImportPlan {
         })
     }
 
-    pub(crate) fn verify_and_import_objects(&self, bundle: &Path) -> GitResult<()> {
+    pub fn verify_and_import_objects(&self, bundle: &Path) -> GitResult<()> {
         self.verify_and_import_objects_with_limits(bundle, GitBundleContentLimits::REMOTE_RESULT)
     }
 
-    pub(crate) fn verify_and_import_bytes(&self, bytes: &[u8]) -> GitResult<()> {
+    pub fn verify_and_import_bytes(&self, bytes: &[u8]) -> GitResult<()> {
         self.verify_and_import_bytes_with_limits(
             &self.worktree,
             bytes,
@@ -156,7 +156,7 @@ impl GitBundleImportPlan {
         self.create_or_verify_import_ref()
     }
 
-    pub(crate) fn state(&self) -> GitResult<GitBundleWorktreeState> {
+    pub fn state(&self) -> GitResult<GitBundleWorktreeState> {
         self.coordinates.require_dense_checkout()?;
         self.require_no_git_operation()?;
         if GitRepository::from_path(&self.worktree).has_changes_including_untracked()? {
@@ -200,7 +200,7 @@ impl GitBundleImportPlan {
         }
     }
 
-    pub(crate) fn advance_one(&self) -> GitResult<GitBundleWorktreeState> {
+    pub fn advance_one(&self) -> GitResult<GitBundleWorktreeState> {
         self.require_import_ref()?;
         match self.state()? {
             GitBundleWorktreeState::AttachedBase => {
@@ -228,7 +228,7 @@ impl GitBundleImportPlan {
         self.state()
     }
 
-    pub(crate) fn require_applied(&self) -> GitResult<GitBundleImportEvidence> {
+    pub fn require_applied(&self) -> GitResult<GitBundleImportEvidence> {
         if self.state()? != GitBundleWorktreeState::AttachedResult {
             return Err(GitError::unsafe_state(
                 &self.worktree,
@@ -240,7 +240,7 @@ impl GitBundleImportPlan {
         self.evidence()
     }
 
-    pub(crate) fn cleanup_import_ref(&self) -> GitResult<()> {
+    pub fn cleanup_import_ref(&self) -> GitResult<()> {
         match self.optional_revision(&self.import_ref)? {
             None => Ok(()),
             Some(revision) if revision == self.result_revision => {

@@ -9,14 +9,16 @@ mod codec;
 pub mod create;
 #[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
 pub mod daemon;
-// Deliberate public API facade, not scaffolding: `harness::errors` and
-// `harness::kernel` stay stable paths for consumers of this crate. Code inside
-// the workspace names `harness_kernel::` directly, so do not add uses of
-// `crate::errors` or `crate::kernel` on the strength of these.
+// Deliberate public API facade, not scaffolding: `harness::errors`,
+// `harness::kernel`, `harness::workspace` and `harness::sandbox` stay stable
+// paths for consumers of this crate. Code inside the workspace names
+// `harness_kernel::` and `harness_workspace::` directly, so do not add uses of
+// `crate::errors`, `crate::kernel`, `crate::workspace`, `crate::sandbox` or
+// `crate::git` on the strength of these.
 pub use harness_kernel::errors;
 #[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
 pub mod feature_flags;
-pub(crate) mod git;
+pub(crate) use harness_workspace::git;
 #[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
 pub(crate) mod github_api;
 pub mod hooks;
@@ -30,7 +32,7 @@ pub(crate) mod platform;
 #[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
 pub mod reviews;
 pub mod run;
-pub mod sandbox;
+pub use harness_workspace::sandbox;
 #[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
 pub mod session;
 pub mod setup;
@@ -40,7 +42,7 @@ pub mod task_board;
 pub mod telemetry {
     pub use harness_telemetry::*;
 }
-pub mod workspace;
+pub use harness_workspace::workspace;
 
 /// Default log level for harness runtime diagnostics.
 pub const DEFAULT_LOG_LEVEL: &str = "info";

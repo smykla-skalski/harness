@@ -1,9 +1,9 @@
 use std::env;
 use std::path::PathBuf;
 
-pub use harness_hook::workspace::paths::ensure_non_indexable;
+pub use harness_hook::workspace::ensure_non_indexable;
 #[cfg(target_os = "macos")]
-pub use harness_hook::workspace::paths::legacy_macos_root;
+pub use harness_hook::workspace::legacy_macos_root;
 pub use harness_hook::workspace::{
     canonical_checkout_root, dirs_home, harness_data_root, project_context_dir, utc_now,
 };

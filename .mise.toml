@@ -306,7 +306,7 @@ run = "./scripts/cargo-local.sh --with-group-lease ./scripts/check-feature-isola
 hide = true
 run = [
   "./scripts/cargo-local.sh clippy -p harness --lib --bins",
-  "./scripts/cargo-local.sh clippy --all-targets -p harness-command -p harness-daemon-client -p harness-kernel -p harness-protocol -p harness-systemd-protocol -p harness-telemetry -p harness-daemon -p harness-bridge -p harness-mcp -p harness-hook -p policy-codegen -p openapi-codegen",
+  "./scripts/cargo-local.sh clippy --all-targets -p harness-command -p harness-daemon-client -p harness-kernel -p harness-protocol -p harness-systemd-protocol -p harness-telemetry -p harness-workspace -p harness-daemon -p harness-bridge -p harness-mcp -p harness-hook -p policy-codegen -p openapi-codegen",
   "./scripts/run-linux-only.sh ./scripts/cargo-local.sh clippy --all-targets -p harness-systemd",
 ]
 

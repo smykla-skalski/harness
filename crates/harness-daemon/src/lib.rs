@@ -22,8 +22,7 @@ pub mod infra;
 pub mod observe;
 #[path = "../../../src/reviews/mod.rs"]
 pub mod reviews;
-#[path = "../../../src/sandbox/mod.rs"]
-pub mod sandbox;
+pub use harness_workspace::sandbox;
 pub mod session;
 pub mod setup;
 #[path = "../../../src/task_board/mod.rs"]

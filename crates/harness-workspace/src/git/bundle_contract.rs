@@ -4,7 +4,7 @@ use std::str;
 use super::command::GitCommandRunner;
 use crate::git::{GitError, GitResult};
 
-pub(crate) const MAX_REMOTE_GIT_BUNDLE_BYTES: u64 = 32 * 1024 * 1024;
+pub const MAX_REMOTE_GIT_BUNDLE_BYTES: u64 = 32 * 1024 * 1024;
 pub(crate) const MAX_REMOTE_GIT_BUNDLE_OBJECTS: u32 = 100_000;
 pub(crate) const MAX_REMOTE_GIT_CHANGED_PATHS: usize = 10_000;
 pub(crate) const MAX_REMOTE_GIT_CHANGED_BLOB_BYTES: u64 = 64 * 1024 * 1024;

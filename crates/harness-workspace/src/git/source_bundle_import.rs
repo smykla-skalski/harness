@@ -16,7 +16,7 @@ use super::source_repository_identity::{
 use crate::git::{GitError, GitRepository, GitResult};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct GitSourceBundleImportPlan {
+pub struct GitSourceBundleImportPlan {
     repository: PathBuf,
     repository_slug: String,
     revision: String,
@@ -29,7 +29,7 @@ pub(crate) struct GitSourceBundleImportPlan {
 }
 
 impl GitSourceBundleImportPlan {
-    pub(crate) fn new(
+    pub fn new(
         repository: &Path,
         repository_slug: String,
         revision: String,
@@ -58,7 +58,7 @@ impl GitSourceBundleImportPlan {
         Ok(plan)
     }
 
-    pub(crate) fn verify_and_import_bytes(&self, bytes: &[u8]) -> GitResult<()> {
+    pub fn verify_and_import_bytes(&self, bytes: &[u8]) -> GitResult<()> {
         self.verify_and_import_bytes_with_limits(bytes, GitBundleContentLimits::REMOTE_RESULT)
     }
 
@@ -111,7 +111,7 @@ impl GitSourceBundleImportPlan {
         )
     }
 
-    pub(crate) fn cleanup_import_ref(&self) -> GitResult<()> {
+    pub fn cleanup_import_ref(&self) -> GitResult<()> {
         self.validate_static_contract()?;
         match self.optional_revision(&self.import_ref)? {
             None => Ok(()),

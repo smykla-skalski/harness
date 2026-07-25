@@ -30,7 +30,7 @@ pub fn dirs_home() -> PathBuf {
     dead_code,
     reason = "shared facade crates do not all use host-home resolution"
 )]
-pub(crate) fn host_home_dir() -> PathBuf {
+pub fn host_home_dir() -> PathBuf {
     if let Some(value) = normalized_env_value(HARNESS_HOST_HOME_ENV) {
         return PathBuf::from(value);
     }
@@ -44,7 +44,7 @@ pub(crate) fn host_home_dir() -> PathBuf {
     dead_code,
     reason = "shared facade crates do not all use host-home resolution"
 )]
-pub(crate) fn account_home_dir() -> Option<PathBuf> {
+pub fn account_home_dir() -> Option<PathBuf> {
     use uzers::os::unix::UserExt as _;
 
     uzers::get_user_by_uid(uzers::get_current_uid()).map(|user| user.home_dir().to_path_buf())
@@ -55,12 +55,12 @@ pub(crate) fn account_home_dir() -> Option<PathBuf> {
     dead_code,
     reason = "shared facade crates do not all use host-home resolution"
 )]
-pub(crate) fn account_home_dir() -> Option<PathBuf> {
+pub fn account_home_dir() -> Option<PathBuf> {
     None
 }
 
 #[must_use]
-pub(crate) fn normalized_env_value(name: &str) -> Option<String> {
+pub fn normalized_env_value(name: &str) -> Option<String> {
     let value = env::var(name).unwrap_or_default();
     let trimmed = value.trim();
     if trimmed.is_empty() {

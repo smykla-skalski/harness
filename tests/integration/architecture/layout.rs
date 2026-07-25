@@ -13,7 +13,7 @@ fn new_domain_roots_exist() {
         "src/create",
         "src/observe",
         "src/setup",
-        "src/workspace",
+        "crates/harness-workspace/src/workspace",
         "crates/harness-kernel/src/kernel",
         "src/platform",
         "src/infra",
@@ -57,7 +57,8 @@ fn legacy_scatter_roots_are_gone() {
 fn cluster_topology_is_owned_by_kernel() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     assert!(
-        root.join("crates/harness-kernel/src/kernel/topology.rs").exists(),
+        root.join("crates/harness-kernel/src/kernel/topology.rs")
+            .exists(),
         "kernel topology module should exist"
     );
 
@@ -242,17 +243,20 @@ fn app_context_stays_app_wiring_only() {
 #[test]
 fn workspace_session_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let session = read_repo_file(root, "src/workspace/session.rs");
+    let session = read_repo_file(root, "crates/harness-workspace/src/workspace/session.rs");
 
     for needle in ["fn data_root_prefers_xdg_data_home()", "mod tests {"] {
         assert!(
             !session.contains(needle),
-            "src/workspace/session.rs should stay focused on production workspace scope logic instead of owning `{needle}`"
+            "crates/harness-workspace/src/workspace/session.rs should stay focused on production workspace scope logic instead of owning `{needle}`"
         );
     }
 
     assert!(
-        repo_path_exists(root, "src/workspace/session/tests.rs"),
+        repo_path_exists(
+            root,
+            "crates/harness-workspace/src/workspace/session/tests.rs"
+        ),
         "workspace session split test module should exist"
     );
 }

@@ -101,7 +101,7 @@ flowchart LR
 | `src/setup/`     | environment bootstrap, capabilities/readiness evaluation, wrapper/session lifecycle, provider-aware cluster setup entrypoints, remote kubeconfig materialization, setup install-state tracking |
 | `src/hooks/`     | hook payload handling, guard policy, protocol normalization, hook effects          |
 | `src/kernel/`    | pure shared concepts such as command intent, topology, skill ids, gates            |
-| `src/workspace/` | XDG paths, current session pointers, compact handoff, ambient harness files        |
+| `crates/harness-workspace/src/workspace/` | XDG paths, current session pointers, compact handoff, ambient harness files        |
 | `src/infra/`     | generic execution, persistence, environment, HTTP, process, and block abstractions |
 | `src/errors/`    | typed error families plus transport-safe rendering                                 |
 

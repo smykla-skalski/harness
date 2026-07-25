@@ -24,6 +24,6 @@ pub(super) const SECTION_CHAR_LIMIT: usize = 1600;
 pub(super) const SECTION_LINE_LIMIT: usize = 25;
 
 #[must_use]
-pub(crate) const fn handoff_version() -> u32 {
+pub const fn handoff_version() -> u32 {
     HANDOFF_VERSION
 }

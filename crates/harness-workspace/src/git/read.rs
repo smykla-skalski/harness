@@ -11,7 +11,7 @@ use gix::status::UntrackedFiles;
 use crate::git::{GitError, GitResult};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct GitRepository {
+pub struct GitRepository {
     path: PathBuf,
 }
 
@@ -23,7 +23,7 @@ impl GitRepository {
         }
     }
 
-    pub(crate) fn discover(path: &Path) -> GitResult<Self> {
+    pub fn discover(path: &Path) -> GitResult<Self> {
         let repo = gix::discover(path).map_err(|error| GitError::discover(path, error))?;
         let resolved = repo
             .workdir()
@@ -36,7 +36,7 @@ impl GitRepository {
         &self.path
     }
 
-    pub(crate) fn open_gix(&self) -> GitResult<gix::Repository> {
+    pub fn open_gix(&self) -> GitResult<gix::Repository> {
         gix::open(self.path()).map_err(|error| GitError::open(self.path(), error))
     }
 
@@ -47,7 +47,7 @@ impl GitRepository {
             .map_err(|error| GitError::read(self.path(), error))
     }
 
-    pub(crate) fn current_branch_remote_name(&self) -> GitResult<Option<String>> {
+    pub fn current_branch_remote_name(&self) -> GitResult<Option<String>> {
         let repo = self.open_gix()?;
         let Some(head_name) = repo
             .head_name()
@@ -76,7 +76,7 @@ impl GitRepository {
         }
     }
 
-    pub(crate) fn remote_names(&self) -> GitResult<Vec<String>> {
+    pub fn remote_names(&self) -> GitResult<Vec<String>> {
         let repo = self.open_gix()?;
         Ok(repo
             .remote_names()
@@ -85,7 +85,7 @@ impl GitRepository {
             .collect())
     }
 
-    pub(crate) fn resolve_revision_to_commit(&self, spec: &str) -> GitResult<String> {
+    pub fn resolve_revision_to_commit(&self, spec: &str) -> GitResult<String> {
         let repo = self.open_gix()?;
         let id = repo
             .rev_parse_single(spec.as_bytes())
@@ -93,13 +93,13 @@ impl GitRepository {
         Ok(id.detach().to_hex().to_string())
     }
 
-    pub(crate) fn is_dirty(&self) -> GitResult<bool> {
+    pub fn is_dirty(&self) -> GitResult<bool> {
         let repo = self.open_gix()?;
         repo.is_dirty()
             .map_err(|error| GitError::read(self.path(), error))
     }
 
-    pub(crate) fn has_changes_including_untracked(&self) -> GitResult<bool> {
+    pub fn has_changes_including_untracked(&self) -> GitResult<bool> {
         let repo = self.open_gix()?;
         let platform = repo
             .status(Discard)
@@ -116,7 +116,7 @@ impl GitRepository {
         Ok(self.is_dirty()? || has_untracked)
     }
 
-    pub(crate) fn short_head_sha(&self, hex_len: usize) -> GitResult<Option<String>> {
+    pub fn short_head_sha(&self, hex_len: usize) -> GitResult<Option<String>> {
         let repo = self.open_gix()?;
         let head = repo
             .head()

@@ -7,7 +7,7 @@ use fs_err as fs;
 use super::render::{ordered_sections, truncate_lines};
 use super::storage::write_json_atomic;
 use super::*;
-use crate::infra::io::read_text;
+use harness_kernel::io::read_text;
 
 fn test_handoff(project_dir: &str) -> CompactHandoff<'static> {
     CompactHandoff {
