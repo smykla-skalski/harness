@@ -160,6 +160,7 @@ async fn hop_by_hop_headers_do_not_cross_the_proxy() {
         .get(format!("{base_url}/panel/"))
         .header("connection", "x-custom-hop")
         .header("x-custom-hop", "secret")
+        .header("proxy-connection", "keep-alive")
         .header("x-kept", "1")
         .send()
         .await
@@ -168,6 +169,7 @@ async fn hop_by_hop_headers_do_not_cross_the_proxy() {
     let body: Value = response.json().await.expect("companion echo body");
     assert!(header(&body, "x-custom-hop").is_none());
     assert!(header(&body, "connection").is_none());
+    assert!(header(&body, "proxy-connection").is_none());
     assert_eq!(header(&body, "x-kept").as_deref(), Some("1"));
     server.abort();
     upstream_server.abort();

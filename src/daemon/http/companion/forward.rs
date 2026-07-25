@@ -30,7 +30,6 @@ use super::CompanionRouteConfig;
 const COMPANION_ERROR_CODE: &str = "COMPANION_UPSTREAM";
 
 /// Headers that describe one hop and must never be forwarded to the next one.
-/// `keep-alive` has no `http` constant, so the list is spelled out.
 const HOP_BY_HOP_HEADERS: &[HeaderName] = &[
     CONNECTION,
     PROXY_AUTHENTICATE,
@@ -41,7 +40,19 @@ const HOP_BY_HOP_HEADERS: &[HeaderName] = &[
     UPGRADE,
 ];
 
-const KEEP_ALIVE: HeaderName = HeaderName::from_static("keep-alive");
+/// The same, for names `http` has no constant for. They cannot join
+/// `HOP_BY_HOP_HEADERS`: a custom `HeaderName` is interior-mutable, and a
+/// `const` slice of them is a borrow of a temporary the compiler refuses.
+///
+/// `Proxy-Connection` is in no RFC, but browsers and intermediaries still send
+/// it and it means what `Connection` means, so forwarding it hands the
+/// companion a directive about a connection it is not on.
+fn unnamed_hop_by_hop_headers() -> [HeaderName; 2] {
+    [
+        HeaderName::from_static("keep-alive"),
+        HeaderName::from_static("proxy-connection"),
+    ]
+}
 /// RFC 7239's header. The daemon states the hop in `X-Forwarded-*` instead, so
 /// a caller-supplied `Forwarded` would be an unverified claim the companion
 /// might believe.
@@ -161,7 +172,9 @@ fn strip_hop_by_hop_headers(headers: &mut HeaderMap) {
     for name in HOP_BY_HOP_HEADERS {
         headers.remove(name);
     }
-    headers.remove(KEEP_ALIVE);
+    for name in unnamed_hop_by_hop_headers() {
+        headers.remove(name);
+    }
 }
 
 fn connection_listed_headers(headers: &HeaderMap) -> Vec<HeaderName> {
@@ -281,6 +294,7 @@ mod tests {
         );
         headers.insert("x-custom-hop", HeaderValue::from_static("1"));
         headers.insert("keep-alive", HeaderValue::from_static("timeout=5"));
+        headers.insert("proxy-connection", HeaderValue::from_static("keep-alive"));
         headers.insert("x-kept", HeaderValue::from_static("1"));
 
         strip_hop_by_hop_headers(&mut headers);
@@ -288,6 +302,7 @@ mod tests {
         assert!(!headers.contains_key("connection"));
         assert!(!headers.contains_key("x-custom-hop"));
         assert!(!headers.contains_key("keep-alive"));
+        assert!(!headers.contains_key("proxy-connection"));
         assert!(headers.contains_key("x-kept"));
     }
 
