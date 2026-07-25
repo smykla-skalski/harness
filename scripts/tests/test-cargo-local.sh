@@ -35,6 +35,18 @@ assert_line() {
   grep -Fxq -- "$line" <<<"$haystack"
 }
 
+# GNU and BSD stat disagree on the format flag, and GNU's -f means something
+# else entirely and still exits 0, so validate the shape before trusting it.
+dir_mode() {
+  local path="$1" mode
+  mode="$(stat -c '%a' "$path" 2>/dev/null || true)"
+  if [[ ! "$mode" =~ ^[0-7]{3,4}$ ]]; then
+    mode="$(stat -f '%Lp' "$path" 2>/dev/null || true)"
+  fi
+  [[ "$mode" =~ ^[0-7]{3,4}$ ]] || return 1
+  printf '%s\n' "$mode"
+}
+
 write_fake_sccache() {
   local path="$1" version="$2"
   cat >"$path" <<EOF
@@ -55,11 +67,44 @@ print_cargo_env() {
     unset SCCACHE_SERVER_UDS SCCACHE_SERVER_PORT SCCACHE_NO_DAEMON
     unset SCCACHE_BASEDIRS SCCACHE_IDLE_TIMEOUT SCCACHE_CACHE_SIZE SCCACHE_VERSION
     unset HARNESS_SCCACHE_TMPDIR
+    unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR
     PATH="$fake_bin:$PATH" \
       SCCACHE_BIN="$sccache_bin" \
       RUSTC_WRAPPER='' \
       TMPDIR="$tmpdir/" \
       CODEX_SESSION_ID="cargo-local-test-$$" \
+      HARNESS_CARGO_SKIP_LEASE=1 \
+      HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+      "$ROOT/scripts/cargo-local.sh" --print-env
+  )
+}
+
+# Read the reserve from the script so the curve assertions track the source
+# rather than a copy of it. A missing or absurd value has to fail loudly: left
+# empty it would silently take every scenario that depends on it out of the run.
+agent_build_share() {
+  local share
+  share="$(awk -F= '/^AGENT_BUILD_SHARE=/ { print $2; exit }' "$ROOT/scripts/cargo-local.sh")"
+  if [[ ! "$share" =~ ^[0-9]+$ ]] || (( share < 2 )) || (( share > 8 )); then
+    printf 'AGENT_BUILD_SHARE must be an integer in 2..8 (got %s)\n' "${share:-unset}" >&2
+    return 1
+  fi
+  printf '%s\n' "$share"
+}
+
+print_cargo_env_without_tmpdir() {
+  local fake_bin="$1" sccache_bin="$2" session="$3"
+  (
+    unset SCCACHE_SERVER_UDS SCCACHE_SERVER_PORT SCCACHE_NO_DAEMON
+    unset SCCACHE_BASEDIRS SCCACHE_IDLE_TIMEOUT SCCACHE_CACHE_SIZE SCCACHE_VERSION
+    unset HARNESS_SCCACHE_TMPDIR TMPDIR
+    unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR
+    unset CODEX_THREAD_ID CLAUDE_SESSION_ID CLAUDE_CODE_SESSION_ID
+    unset GEMINI_SESSION_ID COPILOT_SESSION_ID OPENCODE_SESSION_ID
+    PATH="$fake_bin:$PATH" \
+      SCCACHE_BIN="$sccache_bin" \
+      RUSTC_WRAPPER='' \
+      CODEX_SESSION_ID="$session" \
       HARNESS_CARGO_SKIP_LEASE=1 \
       HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
       "$ROOT/scripts/cargo-local.sh" --print-env
@@ -72,6 +117,7 @@ print_tmpdir_env() {
     unset SCCACHE_SERVER_UDS SCCACHE_SERVER_PORT SCCACHE_NO_DAEMON
     unset SCCACHE_BASEDIRS SCCACHE_IDLE_TIMEOUT SCCACHE_CACHE_SIZE SCCACHE_VERSION
     unset HARNESS_SCCACHE_TMPDIR
+    unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR
     unset CODEX_SESSION_ID CODEX_THREAD_ID CLAUDE_SESSION_ID CLAUDE_CODE_SESSION_ID
     unset GEMINI_SESSION_ID COPILOT_SESSION_ID OPENCODE_SESSION_ID
     if [[ -n "$configured_tmpdir" ]]; then
@@ -208,14 +254,23 @@ scenario_usable_tmpdir_is_preserved() {
   fi
 }
 
-scenario_default_build_jobs_use_all_logical_cpus() {
+scenario_agent_build_jobs_leave_room_for_later_arrivals() {
   local fake_bin="$SANDBOX/cpu-bin"
   local agent_output local_output
+  local cpu_count=24 share expected_agent_jobs
+  # An agent that starts alone still has to leave room for agents that join
+  # later, because the lease count it saw can only shrink its share, never
+  # grow it back.
+  if ! share="$(agent_build_share)"; then
+    fail "agent build share is missing or out of range"
+    return
+  fi
+  expected_agent_jobs=$(((cpu_count + share - 1) / share))
   mkdir -p "$fake_bin"
-  cat >"$fake_bin/getconf" <<'EOF'
+  cat >"$fake_bin/getconf" <<EOF
 #!/usr/bin/env bash
-if [[ "${1:-}" == "_NPROCESSORS_ONLN" ]]; then
-  printf '24\n'
+if [[ "\${1:-}" == "_NPROCESSORS_ONLN" ]]; then
+  printf '$cpu_count\n'
   exit 0
 fi
 exit 1
@@ -241,12 +296,130 @@ EOF
       "$ROOT/scripts/cargo-local.sh" --print-env
   )"
 
-  if assert_line "CARGO_BUILD_JOBS=24" "$agent_output" \
-    && assert_line "CARGO_BUILD_JOBS=24" "$local_output"; then
-    pass "default build jobs use all detected logical CPUs"
+  if assert_line "CARGO_BUILD_JOBS=$expected_agent_jobs" "$agent_output" \
+    && assert_line "CARGO_BUILD_JOBS=$cpu_count" "$local_output"; then
+    pass "local builds take every CPU and agent builds keep a bounded share"
   else
-    fail "default build jobs were capped: agent=$agent_output local=$local_output"
+    fail "unexpected build job split: agent=$agent_output local=$local_output"
   fi
+}
+
+scenario_agent_jobs_hold_their_reserved_share() {
+  local fake_bin="$SANDBOX/curve-bin"
+  local cpu_count=24 share reserved n jobs observed="" beyond="" problems=""
+  if ! share="$(agent_build_share)"; then
+    fail "agent build share is missing or out of range"
+    return
+  fi
+  reserved=$(((cpu_count + share - 1) / share))
+  mkdir -p "$fake_bin"
+  cat >"$fake_bin/getconf" <<EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == "_NPROCESSORS_ONLN" ]]; then
+  printf '$cpu_count\n'
+  exit 0
+fi
+exit 1
+EOF
+  chmod +x "$fake_bin/getconf"
+
+  # Probe both sides of the reserve. Up to it the share must stay flat, because
+  # the reserve already assumes that many agents and dividing again starved
+  # every late arrival. Past it the lease count is the better estimate, so the
+  # share has to start falling - a reserve that never shrinks would let a
+  # crowded host hand out far more jobs than it has CPUs.
+  for n in $(seq 1 $((share * 2))); do
+    jobs="$(
+      unset CODEX_THREAD_ID CLAUDE_SESSION_ID CLAUDE_CODE_SESSION_ID
+      unset GEMINI_SESSION_ID COPILOT_SESSION_ID OPENCODE_SESSION_ID
+      PATH="$fake_bin:$PATH" \
+        CARGO_BUILD_JOBS='' \
+        HARNESS_CARGO_JOBS='' \
+        CODEX_SESSION_ID="cargo-local-curve-$$" \
+        SCCACHE_BIN="$SANDBOX/missing-sccache" \
+        RUSTC_WRAPPER='' \
+        HARNESS_CARGO_SKIP_LEASE=1 \
+        HARNESS_CARGO_ACTIVE_BUILD_COUNT="$n" \
+        "$ROOT/scripts/cargo-local.sh" --print-env \
+        | awk -F= '$1 == "CARGO_BUILD_JOBS" { print substr($0, index($0, "=") + 1) }'
+    )"
+    [[ "$jobs" =~ ^[0-9]+$ ]] || { problems="$problems $n:non-numeric($jobs)"; continue; }
+    observed="$observed $n:$jobs"
+    if (( n <= share )); then
+      (( jobs == reserved )) || problems="$problems $n:$jobs!=$reserved"
+    else
+      beyond="$jobs"
+      (( jobs <= reserved )) || problems="$problems $n:$jobs>reserve"
+      (( jobs >= 1 )) || problems="$problems $n:$jobs<1"
+    fi
+  done
+
+  # The reserve has to actually give way once the observed count passes it.
+  if [[ -n "$beyond" ]] && (( beyond >= reserved )); then
+    problems="$problems reserve-never-shrinks(at-$((share * 2)):$beyond)"
+  fi
+
+  if [[ -z "$problems" ]]; then
+    pass "agent job share holds the reserve, then yields to the lease count"
+  else
+    fail "agent job curve wrong:$problems (reserved=$reserved observed:$observed)"
+  fi
+}
+
+scenario_target_dir_is_shared_across_sessions() {
+  local first second first_dir second_dir first_tmp second_tmp
+
+  first="$(print_tmpdir_env "cargo-local-target-a-$$")"
+  second="$(print_tmpdir_env "cargo-local-target-b-$$")"
+  first_dir="$(
+    awk -F= '$1 == "CARGO_TARGET_DIR" { print substr($0, index($0, "=") + 1) }' <<<"$first"
+  )"
+  second_dir="$(
+    awk -F= '$1 == "CARGO_TARGET_DIR" { print substr($0, index($0, "=") + 1) }' <<<"$second"
+  )"
+  first_tmp="$(awk -F= '$1 == "TMPDIR" { print substr($0, index($0, "=") + 1) }' <<<"$first")"
+  second_tmp="$(awk -F= '$1 == "TMPDIR" { print substr($0, index($0, "=") + 1) }' <<<"$second")"
+
+  if [[ -n "$first_dir" ]] \
+    && [[ "$first_dir" == "$second_dir" ]] \
+    && [[ "$first_dir" != *"cargo-local-target-a-$$"* ]] \
+    && [[ "$first_tmp" != "$second_tmp" ]]; then
+    pass "sessions in one checkout share a build cache and keep separate TMPDIRs"
+  else
+    fail "build cache is still session-scoped: a=$first_dir b=$second_dir"
+  fi
+
+  rm -rf "${first_tmp%/}" "${second_tmp%/}"
+}
+
+scenario_sccache_socket_survives_session_scoped_tmpdir() {
+  local fake_bin="$SANDBOX/socket-share-bin"
+  local first second first_sock second_sock first_tmp second_tmp
+  mkdir -p "$fake_bin"
+  write_fake_sccache "$fake_bin/sccache" "0.16.0"
+
+  first="$(print_cargo_env_without_tmpdir "$fake_bin" "$fake_bin/sccache" "sock-a-$$")"
+  second="$(print_cargo_env_without_tmpdir "$fake_bin" "$fake_bin/sccache" "sock-b-$$")"
+  first_sock="$(
+    awk -F= '$1 == "SCCACHE_SERVER_UDS" { print substr($0, index($0, "=") + 1) }' <<<"$first"
+  )"
+  second_sock="$(
+    awk -F= '$1 == "SCCACHE_SERVER_UDS" { print substr($0, index($0, "=") + 1) }' <<<"$second"
+  )"
+  first_tmp="$(awk -F= '$1 == "TMPDIR" { print substr($0, index($0, "=") + 1) }' <<<"$first")"
+  second_tmp="$(awk -F= '$1 == "TMPDIR" { print substr($0, index($0, "=") + 1) }' <<<"$second")"
+
+  # Distinct session TMPDIRs must not drag the socket along with them, or each
+  # session quietly gets its own sccache server over the same on-disk cache.
+  if [[ -n "$first_sock" ]] \
+    && [[ "$first_tmp" != "$second_tmp" ]] \
+    && [[ "$first_sock" == "$second_sock" ]]; then
+    pass "one sccache socket per repo despite session-scoped TMPDIRs"
+  else
+    fail "sccache socket followed the session TMPDIR: a=$first_sock b=$second_sock"
+  fi
+
+  rm -rf "${first_tmp%/}" "${second_tmp%/}"
 }
 
 scenario_single_thread_nextest_override_is_rejected() {
@@ -298,10 +471,13 @@ scenario_supported_sccache_is_resolved_once() {
   write_fake_sccache "$fake_bin/sccache" "0.16.0"
 
   output="$(print_cargo_env "$fake_bin" "$fake_bin/sccache" "$tmpdir")"
+  # A sandbox under the macOS per-user TMPDIR already exceeds the socket-root
+  # length limit, so the short /tmp root is a correct answer here too.
   if assert_line "SCCACHE_BIN=$fake_bin/sccache" "$output" \
     && assert_line "SCCACHE_VERSION=0.16.0" "$output" \
-    && assert_line "SCCACHE_BASEDIRS=$ROOT:$COMMON_REPO_ROOT" "$output" \
-    && assert_contains "SCCACHE_SERVER_UDS=$tmpdir/harness-sccache/" "$output" \
+    && assert_line "SCCACHE_BASEDIRS=$COMMON_REPO_ROOT" "$output" \
+    && { assert_contains "SCCACHE_SERVER_UDS=$tmpdir/harness-sccache/" "$output" \
+      || assert_contains "SCCACHE_SERVER_UDS=/tmp/harness-sccache-" "$output"; } \
     && assert_line "CACHE_MODE=sccache" "$output"; then
     pass "supported sccache is resolved once"
   else
@@ -349,10 +525,167 @@ EOF
   fi
 }
 
+scenario_sccache_socket_is_shared_across_checkouts() {
+  local base="$ROOT/tmp/cargo-local-checkouts-$$"
+  local fake_bin="$SANDBOX/checkout-bin"
+  local co out a_sock="" b_sock="" a_target="" b_target=""
+  mkdir -p "$fake_bin"
+  write_fake_sccache "$fake_bin/sccache" "0.16.0"
+
+  # Two checkout roots under one git common root. The socket follows the
+  # repository, so it must match while the build caches stay distinct.
+  for co in alpha beta; do
+    mkdir -p "$base/$co/scripts/lib"
+    cp "$ROOT/scripts/cargo-local.sh" "$base/$co/scripts/cargo-local.sh"
+    cp "$ROOT/scripts/lib/"*.sh "$base/$co/scripts/lib/"
+    chmod +x "$base/$co/scripts/cargo-local.sh"
+
+    out="$(
+      unset SCCACHE_SERVER_UDS SCCACHE_SERVER_PORT SCCACHE_NO_DAEMON
+      unset SCCACHE_BASEDIRS SCCACHE_IDLE_TIMEOUT SCCACHE_CACHE_SIZE SCCACHE_VERSION
+      unset HARNESS_SCCACHE_TMPDIR
+      unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR
+      unset CODEX_THREAD_ID CLAUDE_SESSION_ID CLAUDE_CODE_SESSION_ID
+      unset GEMINI_SESSION_ID COPILOT_SESSION_ID OPENCODE_SESSION_ID
+      SCCACHE_BIN="$fake_bin/sccache" \
+        RUSTC_WRAPPER='' \
+        CODEX_SESSION_ID="cargo-local-checkout-$$" \
+        HARNESS_CARGO_SKIP_LEASE=1 \
+        HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+        "$base/$co/scripts/cargo-local.sh" --print-env
+    )"
+    if [[ "$co" == alpha ]]; then
+      a_sock="$(awk -F= '$1 == "SCCACHE_SERVER_UDS" { print substr($0, index($0, "=") + 1) }' <<<"$out")"
+      a_target="$(awk -F= '$1 == "CARGO_TARGET_DIR" { print substr($0, index($0, "=") + 1) }' <<<"$out")"
+    else
+      b_sock="$(awk -F= '$1 == "SCCACHE_SERVER_UDS" { print substr($0, index($0, "=") + 1) }' <<<"$out")"
+      b_target="$(awk -F= '$1 == "CARGO_TARGET_DIR" { print substr($0, index($0, "=") + 1) }' <<<"$out")"
+    fi
+  done
+
+  if [[ -n "$a_sock" ]] \
+    && [[ "$a_target" != "$b_target" ]] \
+    && [[ "$a_sock" == "$b_sock" ]]; then
+    pass "one sccache socket per repository across separate checkouts"
+  else
+    fail "socket did not follow the repository: a=$a_sock b=$b_sock targets=$a_target,$b_target"
+  fi
+
+  rm -rf "$base"
+}
+
+scenario_symlinked_repo_tmpdir_base_is_rejected() {
+  local fake_bin="$SANDBOX/symbase-bin"
+  local base="$COMMON_REPO_ROOT/target/.cargo-local/tmp"
+  local stash="$COMMON_REPO_ROOT/target/.cargo-local/tmp-stashed-$$"
+  local real_touch output status moved=0
+  real_touch="$(command -v touch)"
+  mkdir -p "$fake_bin" "$COMMON_REPO_ROOT/target/.cargo-local"
+  cat >"$fake_bin/touch" <<'EOF'
+#!/usr/bin/env bash
+for arg in "$@"; do
+  if [[ "$arg" == /tmp/* ]]; then
+    exit 1
+  fi
+done
+exec "$HARNESS_TEST_REAL_TOUCH" "$@"
+EOF
+  chmod +x "$fake_bin/touch"
+
+  if [[ -e "$base" || -L "$base" ]]; then
+    mv "$base" "$stash"
+    moved=1
+  fi
+  # mkdir -p would adopt this happily; only the base check catches it.
+  ln -sfn "$SANDBOX" "$base"
+
+  set +e
+  output="$(PATH="$fake_bin:$PATH" HARNESS_TEST_REAL_TOUCH="$real_touch" \
+    print_tmpdir_env "cargo-local-symbase-$$" 2>&1)"
+  status=$?
+  set -e
+
+  rm -f "$base"
+  if (( moved == 1 )); then
+    mv "$stash" "$base"
+  fi
+
+  if (( status != 0 )) \
+    && assert_contains "failed to prepare private TMPDIR base" "$output"; then
+    pass "a symlinked in-repo TMPDIR base is rejected"
+  else
+    fail "symlinked in-repo TMPDIR base was accepted (status=$status): $output"
+  fi
+}
+
+scenario_unsafe_socket_dir_disables_sccache() {
+  local fake_bin="$SANDBOX/unsafe-sock-bin"
+  local short_tmp="/tmp/hs-$$"
+  local output
+  mkdir -p "$fake_bin" "$short_tmp"
+  write_fake_sccache "$fake_bin/sccache" "0.16.0"
+  # A symlinked socket root is exactly what prepare_private_tmpdir refuses.
+  ln -sfn "$SANDBOX" "$short_tmp/harness-sccache"
+
+  output="$(print_cargo_env "$fake_bin" "$fake_bin/sccache" "$short_tmp")"
+
+  # Leaving sccache enabled here would hand it whatever default endpoint it
+  # picks, which can be a localhost port other local users can reach.
+  if assert_line "SCCACHE_BIN=" "$output" \
+    && assert_line "CACHE_MODE=none" "$output" \
+    && assert_line "SCCACHE_SERVER_UDS=" "$output"; then
+    pass "an unsafe socket directory disables sccache instead of falling back"
+  else
+    fail "sccache stayed enabled without a private socket dir: $output"
+  fi
+
+  rm -rf "$short_tmp"
+}
+
+scenario_repo_tmpdir_fallback_is_session_scoped() {
+  local fake_bin="$SANDBOX/no-tmp-bin"
+  local real_touch first second first_tmp second_tmp
+  real_touch="$(command -v touch)"
+  mkdir -p "$fake_bin"
+  # Force the in-repo TMPDIR branch by making every /tmp probe fail.
+  cat >"$fake_bin/touch" <<'EOF'
+#!/usr/bin/env bash
+for arg in "$@"; do
+  if [[ "$arg" == /tmp/* ]]; then
+    exit 1
+  fi
+done
+exec "$HARNESS_TEST_REAL_TOUCH" "$@"
+EOF
+  chmod +x "$fake_bin/touch"
+
+  first="$(PATH="$fake_bin:$PATH" HARNESS_TEST_REAL_TOUCH="$real_touch" \
+    print_tmpdir_env "cargo-local-repofb-a-$$")"
+  second="$(PATH="$fake_bin:$PATH" HARNESS_TEST_REAL_TOUCH="$real_touch" \
+    print_tmpdir_env "cargo-local-repofb-b-$$")"
+  first_tmp="$(awk -F= '$1 == "TMPDIR" { print substr($0, index($0, "=") + 1) }' <<<"$first")"
+  second_tmp="$(awk -F= '$1 == "TMPDIR" { print substr($0, index($0, "=") + 1) }' <<<"$second")"
+
+  # It also has to carry the same ownership and mode guarantees as the /tmp
+  # fallback, or the session scoping above is only skin deep.
+  if [[ "$first_tmp" == "$COMMON_REPO_ROOT/target/.cargo-local/tmp/"* ]] \
+    && [[ "$first_tmp" != "$second_tmp" ]] \
+    && [[ ! -L "${first_tmp%/}" ]] \
+    && [[ -O "${first_tmp%/}" ]] \
+    && [[ "$(dir_mode "${first_tmp%/}")" == "700" ]]; then
+    pass "in-repo TMPDIR fallback stays session scoped and private"
+  else
+    fail "in-repo TMPDIR fallback was not session scoped or not private: a=$first_tmp b=$second_tmp"
+  fi
+
+  rm -rf "${first_tmp%/}" "${second_tmp%/}"
+}
+
 scenario_cache_wrapper_shortens_long_tmpdir() {
   local fake_bin="$SANDBOX/wrapper-bin"
   local long_tmp
   local observed_tmp="$SANDBOX/observed-tmp"
+  local observed_size="$SANDBOX/observed-size"
   long_tmp="$SANDBOX/$(printf 'long-path-%.0s' {1..10})"
   mkdir -p "$fake_bin" "$long_tmp"
   cat >"$fake_bin/sccache" <<EOF
@@ -362,16 +695,29 @@ if [[ "\${1:-}" == "--version" ]]; then
   exit 92
 fi
 printf '%s\n' "\${TMPDIR:-}" >"$observed_tmp"
+printf '%s\n' "\${SCCACHE_CACHE_SIZE:-UNSET}" >"$observed_size"
 exit 0
 EOF
   chmod +x "$fake_bin/sccache"
 
   TMPDIR="$long_tmp/" SCCACHE_BIN="$fake_bin/sccache" SCCACHE_VERSION="0.16.0" \
     "$ROOT/scripts/rustc-cache-wrapper.sh" fake-rustc -vV
-  if [[ "$(<"$observed_tmp")" == "/tmp/" ]]; then
-    pass "cache wrapper shortens long TMPDIR paths"
+  # A server pins its cache limit at startup and a plain Cargo or Xcode build is
+  # often what starts it, so the wrapper has to carry a default of its own.
+  if [[ "$(<"$observed_tmp")" == "/tmp/" ]] \
+    && [[ "$(<"$observed_size")" != "UNSET" ]]; then
+    pass "cache wrapper shortens long TMPDIR paths and defaults the cache size"
   else
-    fail "cache wrapper retained an overlong TMPDIR: $(<"$observed_tmp")"
+    fail "cache wrapper env wrong: tmpdir=$(<"$observed_tmp") size=$(<"$observed_size")"
+  fi
+
+  # An explicit size must win over the wrapper's default.
+  TMPDIR="$long_tmp/" SCCACHE_BIN="$fake_bin/sccache" SCCACHE_VERSION="0.16.0" \
+    SCCACHE_CACHE_SIZE="7G" "$ROOT/scripts/rustc-cache-wrapper.sh" fake-rustc -vV
+  if [[ "$(<"$observed_size")" == "7G" ]]; then
+    pass "cache wrapper preserves an explicit cache size"
+  else
+    fail "cache wrapper overrode an explicit cache size: $(<"$observed_size")"
   fi
 }
 
@@ -379,7 +725,14 @@ scenario_missing_tmpdir_uses_short_external_fallback
 scenario_concurrent_tmpdir_creation_is_idempotent
 scenario_unusable_tmpdir_uses_short_external_fallback
 scenario_usable_tmpdir_is_preserved
-scenario_default_build_jobs_use_all_logical_cpus
+scenario_agent_build_jobs_leave_room_for_later_arrivals
+scenario_agent_jobs_hold_their_reserved_share
+scenario_target_dir_is_shared_across_sessions
+scenario_sccache_socket_survives_session_scoped_tmpdir
+scenario_sccache_socket_is_shared_across_checkouts
+scenario_repo_tmpdir_fallback_is_session_scoped
+scenario_symlinked_repo_tmpdir_base_is_rejected
+scenario_unsafe_socket_dir_disables_sccache
 scenario_single_thread_nextest_override_is_rejected
 scenario_noncanonical_nextest_override_is_rejected
 scenario_supported_sccache_is_resolved_once

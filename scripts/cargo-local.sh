@@ -2,7 +2,9 @@
 set -euo pipefail
 unalias -a 2>/dev/null || true
 
-ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
+# Physical path: COMMON_REPO_ROOT comes from git and is already resolved, and
+# the two are compared below to tell a linked worktree from the main checkout.
+ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)"
 # shellcheck source=scripts/lib/run-step.sh
 source "$ROOT/scripts/lib/run-step.sh"
 # shellcheck source=scripts/lib/common-repo-root.sh
@@ -11,6 +13,9 @@ COMMON_REPO_ROOT="$(resolve_common_repo_root "$ROOT")"
 lease_dir="$COMMON_REPO_ROOT/target/.cargo-local/leases"
 lease_path=""
 active_build_count=1
+# How many concurrent agent builds a single agent assumes it must leave room
+# for when the lease count cannot tell it yet.
+AGENT_BUILD_SHARE=4
 skip_build_lease="${HARNESS_CARGO_SKIP_LEASE:-0}"
 
 first_nonempty_env() {
@@ -77,24 +82,31 @@ configure_sccache_socket() {
     return 0
   fi
 
-  socket_root="${TMPDIR:-/tmp}"
+  safe_user="$(sanitize_segment "${USER:-user}")"
+  socket_root="${sccache_socket_root:-${TMPDIR:-/tmp}}"
   socket_root="${socket_root%/}/harness-sccache"
-  if (( ${#socket_root} > 70 )); then
-    safe_user="$(sanitize_segment "${USER:-user}")"
+  # Straight under world-writable /tmp the name has to carry the user, the way
+  # the long-path fallback always has. The socket name is a deterministic hash
+  # of a guessable path, so a shared root lets another local user bind it first.
+  if [[ "$socket_root" == "/tmp/harness-sccache" ]] || (( ${#socket_root} > 70 )); then
     socket_root="/tmp/harness-sccache-$safe_user"
   fi
 
-  if ! mkdir -p "$socket_root"; then
+  # Ownership and mode matter here for the same reason: a plain mkdir -p adopts
+  # a pre-existing directory whatever its owner.
+  if ! prepare_private_tmpdir "$socket_root"; then
     return 1
   fi
 
   sweep_dead_sccache_sockets "$socket_root"
-  safe_user="${safe_user:-$(sanitize_segment "${USER:-user}")}"
   if [[ "$socket_root" != "/tmp/harness-sccache-$safe_user" ]]; then
     sweep_dead_sccache_sockets "/tmp/harness-sccache-$safe_user"
   fi
 
-  socket_id="$(short_hash "$COMMON_REPO_ROOT:$target_segment")"
+  # Every server enforces its own size limit over the same on-disk cache, so
+  # keying the socket per checkout put several of them in an eviction fight.
+  # One server per repository keeps a single owner of that cache.
+  socket_id="$(short_hash "$COMMON_REPO_ROOT")"
   export SCCACHE_SERVER_UDS="$socket_root/$socket_id.sock"
   export SCCACHE_IDLE_TIMEOUT="${SCCACHE_IDLE_TIMEOUT:-1800}"
   export SCCACHE_CACHE_SIZE="${SCCACHE_CACHE_SIZE:-30G}"
@@ -229,7 +241,9 @@ configure_tmpdir() {
     return 0
   fi
 
-  tmpdir_id="$(short_hash "${UID:-${USER:-user}}:$COMMON_REPO_ROOT:$ROOT:$target_segment")"
+  # Scratch files stay per session even though the build cache is per checkout,
+  # so concurrent sessions in one worktree cannot collide over a shared TMPDIR.
+  tmpdir_id="$(short_hash "${UID:-${USER:-user}}:$COMMON_REPO_ROOT:$ROOT:${session_id:-local}")"
   external_fallback="/tmp/harness-cargo-$tmpdir_id"
   if tmpdir_is_usable "/tmp"; then
     if ! prepare_private_tmpdir "$external_fallback"; then
@@ -240,12 +254,23 @@ configure_tmpdir() {
     return 0
   fi
 
-  repo_fallback="$COMMON_REPO_ROOT/target/.cargo-local/tmp/$target_segment"
-  if ! mkdir -p "$repo_fallback" || ! tmpdir_is_usable "$repo_fallback"; then
-    printf 'failed to prepare writable TMPDIR at %s\n' "$repo_fallback" >&2
+  # Same ownership and symlink guarantees the /tmp fallback gets. A plain
+  # mkdir -p would adopt a pre-existing directory, or follow a symlink out of
+  # the repository, and the per-session isolation above would mean nothing.
+  # The base has to be checked too, not just the session directory inside it.
+  # A symlinked or foreign-owned base is accepted by mkdir -p, and the session
+  # directory created underneath it would look perfectly private while sitting
+  # somewhere another user controls.
+  repo_fallback="$COMMON_REPO_ROOT/target/.cargo-local/tmp"
+  if ! mkdir -p "${repo_fallback%/*}" || ! prepare_private_tmpdir "$repo_fallback"; then
+    printf 'failed to prepare private TMPDIR base at %s\n' "$repo_fallback" >&2
     return 1
   fi
-  export TMPDIR="$repo_fallback/"
+  if ! prepare_private_tmpdir "$repo_fallback/$tmpdir_id"; then
+    printf 'failed to prepare writable TMPDIR at %s\n' "$repo_fallback/$tmpdir_id" >&2
+    return 1
+  fi
+  export TMPDIR="$repo_fallback/$tmpdir_id/"
 }
 
 cleanup_stale_leases() {
@@ -304,41 +329,42 @@ detect_cpu_count() {
   printf '%s\n' "$count"
 }
 
+# One concurrency model for everything this script sizes. The lease count is
+# sampled once, before the process starts working, and agents arrive
+# independently with no way to renegotiate afterwards, so an agent assumes a
+# full field of agents until the observed count is larger. Widening the divisor
+# is what reserves that room - dividing a second time would starve every late
+# arrival instead.
+concurrency_share() {
+  local budget="$1" divisor share
+
+  divisor=$active_build_count
+  if [[ -n "$session_id" ]] && (( divisor < AGENT_BUILD_SHARE )); then
+    divisor=$AGENT_BUILD_SHARE
+  fi
+  if (( divisor < 1 )); then
+    divisor=1
+  fi
+
+  share=$(((budget + divisor - 1) / divisor))
+  if (( share < 1 )); then
+    share=1
+  fi
+
+  printf '%s\n' "$share"
+}
+
 default_jobs() {
-  local cpu_count base_jobs
-  cpu_count="$(detect_cpu_count)"
-
-  # A single build group receives the full logical CPU budget. Concurrent
-  # groups divide that shared budget below.
-  base_jobs=$cpu_count
-
-  if (( active_build_count > 1 )); then
-    base_jobs=$(((base_jobs + active_build_count - 1) / active_build_count))
-  fi
-
-  if (( base_jobs < 1 )); then
-    base_jobs=1
-  fi
-
-  printf '%s\n' "$base_jobs"
+  concurrency_share "$(detect_cpu_count)"
 }
 
 default_test_jobs() {
-  local cpu_count max_jobs test_jobs
-  cpu_count="$(detect_cpu_count)"
+  local test_jobs
+  test_jobs="$(concurrency_share "$(detect_cpu_count)")"
 
-  if [[ -n "$session_id" ]]; then
-    max_jobs=8
-  else
-    max_jobs=12
-  fi
-  test_jobs=$cpu_count
-  if (( test_jobs > max_jobs )); then
-    test_jobs=$max_jobs
-  fi
-  if (( active_build_count > 1 )); then
-    test_jobs=$(((test_jobs + active_build_count - 1) / active_build_count))
-  fi
+  # Test processes hold the same share as build jobs: a group runs one phase or
+  # the other, never both, so sizing them alike keeps the reserve honest. Two is
+  # the floor because the override validation below rejects a single thread.
   if (( test_jobs < 2 )); then
     test_jobs=2
   fi
@@ -367,19 +393,35 @@ else
   trap release_build_lease EXIT
 fi
 
+# Key the build cache by checkout, not by session. Session keying handed every
+# new agent a cold rebuild of the whole workspace, and Cargo's incremental
+# output is opaque to sccache, so no shared cache could absorb that cost.
 target_segment="local"
-if [[ -n "$session_id" ]]; then
-  target_segment="agent-$(sanitize_segment "$session_id")"
+if [[ "$ROOT" != "$COMMON_REPO_ROOT" ]]; then
+  target_segment="wt-$(sanitize_segment "$(basename -- "$ROOT")")-$(short_hash "$ROOT")"
+fi
+
+# Capture the socket root before configure_tmpdir can install a session-scoped
+# TMPDIR. Letting the socket follow that TMPDIR would hand every session its own
+# server again, however repo-scoped the socket id is.
+if tmpdir_is_usable "${TMPDIR:-}"; then
+  sccache_socket_root="${TMPDIR%/}"
+else
+  sccache_socket_root="/tmp"
 fi
 
 configure_tmpdir
 
 resolve_sccache_bin || true
 if [[ -n "${SCCACHE_BIN:-}" ]]; then
-  export SCCACHE_BASEDIRS="${SCCACHE_BASEDIRS:-$ROOT:$COMMON_REPO_ROOT}"
-  if configure_sccache_tmpdir; then
-    configure_sccache_socket || true
-  else
+  # sccache reads these only in the process that starts the server, so a
+  # per-worktree value would make path normalization depend on whichever
+  # checkout happened to start it. Keep it repo-wide and predictable.
+  export SCCACHE_BASEDIRS="${SCCACHE_BASEDIRS:-$COMMON_REPO_ROOT}"
+  # Swallowing a socket failure would leave sccache enabled on whatever default
+  # endpoint it picks, which can be a localhost TCP port any local user can
+  # reach. Losing the cache is the safer trade.
+  if ! configure_sccache_tmpdir || ! configure_sccache_socket; then
     export SCCACHE_BIN=""
     unset SCCACHE_VERSION
   fi

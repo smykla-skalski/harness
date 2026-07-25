@@ -60,7 +60,11 @@ run_sccache() {
   shift
 
   temp_dir="$(sccache_tmpdir)" || exec "$@"
-  TMPDIR="$temp_dir/" exec "$binary" "$@"
+  # A server fixes its cache limit at startup, and a plain Cargo or Xcode build
+  # is often what starts it. Without a default here those builds pin the whole
+  # repository to sccache's 10G default for as long as that server lives.
+  TMPDIR="$temp_dir/" SCCACHE_CACHE_SIZE="${SCCACHE_CACHE_SIZE:-30G}" \
+    exec "$binary" "$@"
 }
 
 if [[ "${SCCACHE_BIN+x}" == "x" ]]; then
