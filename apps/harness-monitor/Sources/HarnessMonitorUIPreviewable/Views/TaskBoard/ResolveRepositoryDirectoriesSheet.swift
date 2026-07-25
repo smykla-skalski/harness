@@ -13,6 +13,10 @@ struct ResolveRepositoryDirectoriesSheet: View {
   @State private var importingRepository: String?
   @State private var obtaining: Set<String> = []
   @State private var obtainFailed: Set<String> = []
+  /// Live obtain progress per repository, fed by the catch-all
+  /// `observeAllWorkingCopyProgress()` subscription. Terminal events drop the
+  /// entry, returning the row to its resolved or retry state.
+  @State private var progress = TaskBoardWorkingCopyProgressTracker()
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
@@ -29,6 +33,7 @@ struct ResolveRepositoryDirectoriesSheet: View {
       footer
     }
     .padding(20)
+    .task { await observeProgress() }
     .fileImporter(
       isPresented: Binding(
         get: { importingRepository != nil },
@@ -79,9 +84,7 @@ struct ResolveRepositoryDirectoriesSheet: View {
           .accessibilityLabel(Text("Could not obtain a copy of \(repository)"))
       }
       if obtaining.contains(repository) {
-        ProgressView()
-          .controlSize(.small)
-          .accessibilityLabel(Text("Obtaining a copy of \(repository)"))
+        obtainProgress(for: repository)
       } else {
         Button("Obtain a Copy") { obtain(repository) }
           .disabled(isResolved)
@@ -94,12 +97,39 @@ struct ResolveRepositoryDirectoriesSheet: View {
     .padding(.vertical, 4)
   }
 
+  /// Re-renders once a second so a clone that stops reporting still reads as
+  /// stalled. Without the tick, silence would leave the last advancing frame on
+  /// screen indefinitely.
+  @ViewBuilder
+  private func obtainProgress(for repository: String) -> some View {
+    if let entry = progress.entry(for: repository) {
+      TimelineView(.periodic(from: .now, by: 1)) { context in
+        TaskBoardWorkingCopyProgressView(
+          repository: repository,
+          entry: entry,
+          now: context.date
+        )
+      }
+    } else {
+      ProgressView()
+        .controlSize(.small)
+        .accessibilityLabel(Text("Obtaining a copy of \(repository)"))
+    }
+  }
+
+  private func observeProgress() async {
+    for await event in store.observeAllWorkingCopyProgress() {
+      progress.ingest(event, at: Date())
+    }
+  }
+
   private func obtain(_ repository: String) {
     obtaining.insert(repository)
     obtainFailed.remove(repository)
     Task { @MainActor in
       let entry = await store.obtainRepositoryWorkingCopy(repository: repository)
       obtaining.remove(repository)
+      progress.forget(repository)
       if entry == nil {
         obtainFailed.insert(repository)
       } else {

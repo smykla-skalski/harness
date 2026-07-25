@@ -1269,6 +1269,9 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "AcpAgentsReconciledPayload",
     // reviews local-clone progress push payload: internally-tagged enum the Swift hand flattens.
     "LocalCloneProgressEventPayload",
+    // task-board working-copy obtain progress push payload: same shape, same treatment - the
+    // Swift hand TaskBoardWorkingCopyProgress flattens it.
+    "WorkingCopyProgressEventPayload",
     // permission_bridge.rs acp permission item: Swift hand is AcpPermissionItem (toolCall and
     // options modelled as raw JSON); referenced by AcpPermissionBatchWire.requests.
     "AcpPermissionItem",
@@ -3069,6 +3072,13 @@ const LOCAL_CLONE_PROGRESS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessM
 // hand struct.
 const LOCAL_CLONE_PROGRESS_EMIT_ONLY: &[&str] =
     &["LocalCloneProgressEventPayload", "LocalCloneOperationWire"];
+const WORKING_COPY_PROGRESS_SOURCE: &str =
+    include_str!("../src/task_board/working_copy/progress.rs");
+const WORKING_COPY_PROGRESS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardWorkingCopyProgressWireTypes.generated.swift";
+// The task-board working-copy obtain progress push payload: an internally-tagged enum (tag =
+// "kind") whose `advanced` variant carries the live clone counts. The Swift hand
+// TaskBoardWorkingCopyProgress flattens it the same way the reviews payload is flattened.
+const WORKING_COPY_PROGRESS_EMIT_ONLY: &[&str] = &["WorkingCopyProgressEventPayload"];
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -3480,6 +3490,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[LOCAL_CLONE_PROGRESS_SOURCE],
         },
+        GeneratedModule {
+            output: WORKING_COPY_PROGRESS_OUTPUT,
+            description: "the Rust task-board working-copy obtain progress push payload",
+            defaults: &[],
+            sources: &[WORKING_COPY_PROGRESS_SOURCE],
+        },
     ]
 }
 
@@ -3548,6 +3564,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         ACP_EVENT_BATCH_OUTPUT => ACP_EVENT_BATCH_EMIT_ONLY,
         ACP_INCIDENT_OUTPUT => ACP_INCIDENT_EMIT_ONLY,
         LOCAL_CLONE_PROGRESS_OUTPUT => LOCAL_CLONE_PROGRESS_EMIT_ONLY,
+        WORKING_COPY_PROGRESS_OUTPUT => WORKING_COPY_PROGRESS_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {
