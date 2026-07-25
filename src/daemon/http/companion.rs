@@ -57,7 +57,7 @@ pub enum CompanionConfigError {
     UpstreamSchemeUnsupported(String),
     UpstreamMissingHost,
     UpstreamNotLoopback(String),
-    UpstreamHasPath(String),
+    UpstreamHasPathOrQuery(String),
     PrefixEmpty,
     PrefixNotAbsolute(String),
     PrefixIsRoot,
@@ -83,10 +83,10 @@ impl fmt::Display for CompanionConfigError {
                 "companion upstream host must be loopback, got {host}; the daemon forwards public \
                  traffic only to a service on its own machine"
             ),
-            Self::UpstreamHasPath(path) => write!(
+            Self::UpstreamHasPathOrQuery(value) => write!(
                 f,
-                "companion upstream must carry no path, got {path}; the request path is forwarded \
-                 unchanged"
+                "companion upstream must be an origin with no path or query, got {value}; the \
+                 request path and query are forwarded unchanged"
             ),
             Self::PrefixEmpty => write!(f, "companion path prefix is required"),
             Self::PrefixNotAbsolute(prefix) => {
@@ -200,10 +200,14 @@ fn validate_upstream(upstream: &str) -> Result<String, CompanionConfigError> {
         .authority()
         .ok_or(CompanionConfigError::UpstreamMissingHost)?;
     if !authority.as_str().is_empty() && !uri.path().is_empty() && uri.path() != "/" {
-        return Err(CompanionConfigError::UpstreamHasPath(uri.path().to_owned()));
+        return Err(CompanionConfigError::UpstreamHasPathOrQuery(
+            uri.path().to_owned(),
+        ));
     }
     if uri.query().is_some() {
-        return Err(CompanionConfigError::UpstreamHasPath(upstream.to_owned()));
+        return Err(CompanionConfigError::UpstreamHasPathOrQuery(
+            upstream.to_owned(),
+        ));
     }
     let host = authority.host();
     if host.is_empty() {

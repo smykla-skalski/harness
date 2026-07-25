@@ -71,11 +71,21 @@ fn rejects_a_non_http_upstream() {
 }
 
 #[test]
-fn rejects_an_upstream_carrying_a_path() {
-    let error =
-        config("http://127.0.0.1:8787/panel", "/panel").expect_err("upstream path must be refused");
+fn rejects_an_upstream_carrying_a_path_or_query() {
+    for upstream in ["http://127.0.0.1:8787/panel", "http://127.0.0.1:8787?x=1"] {
+        let Err(error) = config(upstream, "/panel") else {
+            panic!("{upstream} must be refused as more than an origin");
+        };
 
-    assert!(matches!(error, CompanionConfigError::UpstreamHasPath(_)));
+        assert!(
+            matches!(error, CompanionConfigError::UpstreamHasPathOrQuery(_)),
+            "{upstream} should report the path-or-query rejection, got {error}"
+        );
+        assert!(
+            error.to_string().contains("no path or query"),
+            "the message must name both, got {error}"
+        );
+    }
 }
 
 #[test]

@@ -78,7 +78,7 @@ fn build_upstream_request(
     request: Request<Body>,
 ) -> Result<Request<Body>, Box<Response>> {
     let (mut parts, body) = request.into_parts();
-    let forwarded_host = parts.headers.get(HOST).cloned();
+    let forwarded_host = original_host(&parts.headers, &parts.uri);
     parts.uri = upstream_uri(config, &parts.uri)
         .ok_or_else(|| Box::new(upstream_uri_invalid_response()))?;
     strip_hop_by_hop_headers(&mut parts.headers);
@@ -98,6 +98,20 @@ fn strip_daemon_credentials(headers: &mut HeaderMap) {
     headers.remove(AUTHORIZATION);
     headers.remove(REMOTE_CLIENT_ID_HEADER);
     headers.remove(FORWARDED);
+}
+
+/// The public host the caller actually addressed.
+///
+/// The remote listener advertises `h2` ahead of `http/1.1`, so a browser
+/// normally negotiates HTTP/2, where there is no `Host` header at all - the
+/// authority arrives as `:authority` and hyper records it on the URI. Reading
+/// only the header would drop `X-Forwarded-Host` for exactly the callers the
+/// companion is built for.
+fn original_host(headers: &HeaderMap, uri: &Uri) -> Option<HeaderValue> {
+    headers.get(HOST).cloned().or_else(|| {
+        uri.authority()
+            .and_then(|authority| HeaderValue::from_str(authority.as_str()).ok())
+    })
 }
 
 /// Rebuild the request URI against the upstream origin, keeping the path and
@@ -228,8 +242,8 @@ pub(super) fn companion_unconfigured_response() -> Response {
 #[cfg(test)]
 mod tests {
     use super::{
-        HeaderMap, HeaderName, HeaderValue, SocketAddr, X_FORWARDED_FOR, X_FORWARDED_HOST,
-        X_FORWARDED_PROTO, apply_forwarded_headers, connection_listed_headers,
+        HOST, HeaderMap, HeaderName, HeaderValue, SocketAddr, X_FORWARDED_FOR, X_FORWARDED_HOST,
+        X_FORWARDED_PROTO, apply_forwarded_headers, connection_listed_headers, original_host,
         requests_protocol_upgrade, strip_daemon_credentials, strip_hop_by_hop_headers,
         upstream_uri,
     };
@@ -315,6 +329,30 @@ mod tests {
         apply_forwarded_headers(&mut headers, peer(), None);
 
         assert!(!headers.contains_key(X_FORWARDED_HOST));
+    }
+
+    #[test]
+    fn public_host_survives_an_http2_request_that_carries_no_host_header() {
+        let uri = "https://daemon.example.com/panel/"
+            .parse()
+            .expect("valid h2 request uri");
+
+        let host = original_host(&HeaderMap::new(), &uri).expect("authority stands in for Host");
+
+        assert_eq!(host, "daemon.example.com");
+    }
+
+    #[test]
+    fn an_explicit_host_header_wins_over_the_uri_authority() {
+        let mut headers = HeaderMap::new();
+        headers.insert(HOST, HeaderValue::from_static("daemon.example.com"));
+        let uri = "http://127.0.0.1:8787/panel/"
+            .parse()
+            .expect("valid origin-form uri");
+
+        let host = original_host(&headers, &uri).expect("header host");
+
+        assert_eq!(host, "daemon.example.com");
     }
 
     #[test]
