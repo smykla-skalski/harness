@@ -4,8 +4,8 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use super::types::{AgentMode, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
 
 pub use super::item_query_bounds::{
-    TASK_BOARD_LIST_DEFAULT_LIMIT, TASK_BOARD_LIST_MAX_LIMIT, TASK_BOARD_LIST_MAX_QUERY_CHARS,
-    TASK_BOARD_LIST_MAX_TAGS,
+    TASK_BOARD_LIST_DEFAULT_LIMIT, TASK_BOARD_LIST_MAX_CURSOR_CHARS, TASK_BOARD_LIST_MAX_LIMIT,
+    TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS,
 };
 
 /// The one view of an item a list query is allowed to read.
@@ -148,8 +148,14 @@ impl TaskBoardListCursor {
         URL_SAFE_NO_PAD.encode(format!("{}:{}", self.offset, self.item_id))
     }
 
+    /// Refuses an over-long cursor before decoding it: the daemon never issues
+    /// one, and decoding is the only step here that scales with what a caller
+    /// sends.
     #[must_use]
     pub fn decode(raw: &str) -> Option<Self> {
+        if raw.len() > TASK_BOARD_LIST_MAX_CURSOR_CHARS {
+            return None;
+        }
         let decoded = URL_SAFE_NO_PAD.decode(raw).ok()?;
         let decoded = String::from_utf8(decoded).ok()?;
         let (offset, item_id) = decoded.split_once(':')?;

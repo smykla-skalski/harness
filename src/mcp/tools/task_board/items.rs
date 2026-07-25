@@ -177,7 +177,7 @@ fn list_schema() -> Value {
             "limit": {
                 "type": "integer", "minimum": 1, "maximum": TASK_BOARD_LIST_MAX_LIMIT
             },
-            "cursor": { "type": "string" }
+            "cursor": { "type": "string", "maxLength": TASK_BOARD_LIST_MAX_CURSOR_CHARS }
         },
         "additionalProperties": false
     })

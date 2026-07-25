@@ -10543,7 +10543,8 @@
             "description": "`next_cursor` from the previous page.",
             "required": false,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 512
             }
           },
           {

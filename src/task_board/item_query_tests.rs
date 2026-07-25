@@ -1,6 +1,7 @@
 use super::{
-    TASK_BOARD_LIST_DEFAULT_LIMIT, TASK_BOARD_LIST_MAX_LIMIT, TaskBoardItemQuery,
-    TaskBoardListCursor, TaskBoardQueryTarget, normalize_query_text, select_page, validated_limit,
+    TASK_BOARD_LIST_DEFAULT_LIMIT, TASK_BOARD_LIST_MAX_CURSOR_CHARS, TASK_BOARD_LIST_MAX_LIMIT,
+    TaskBoardItemQuery, TaskBoardListCursor, TaskBoardQueryTarget, normalize_query_text,
+    select_page, validated_limit,
 };
 use crate::task_board::types::{AgentMode, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
 
@@ -151,10 +152,18 @@ fn a_cursor_survives_an_encode_and_decode_round_trip() {
 }
 
 /// `MTI` is base64url for `12`: well-formed base64 carrying no
-/// `offset:item_id` separator.
+/// `offset:item_id` separator. An over-long cursor is refused before it is
+/// decoded at all, since the daemon never issues one.
 #[test]
 fn a_malformed_cursor_decodes_to_nothing() {
-    for raw in ["", "not-base64!!", "MTI", "eDp0YXNrLTE"] {
+    let oversized = TaskBoardListCursor {
+        offset: 1,
+        item_id: "x".repeat(TASK_BOARD_LIST_MAX_CURSOR_CHARS),
+    }
+    .encode();
+    assert!(oversized.len() > TASK_BOARD_LIST_MAX_CURSOR_CHARS);
+
+    for raw in ["", "not-base64!!", "MTI", "eDp0YXNrLTE", oversized.as_str()] {
         assert_eq!(TaskBoardListCursor::decode(raw), None, "accepted {raw}");
     }
 }

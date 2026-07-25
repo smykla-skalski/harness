@@ -92,7 +92,8 @@ pub use git_identity_defaults::{
     discover as discover_git_identity_defaults,
 };
 pub use item_query::{
-    PreparedTaskBoardItemQuery, TASK_BOARD_LIST_DEFAULT_LIMIT, TASK_BOARD_LIST_MAX_LIMIT,
+    PreparedTaskBoardItemQuery, TASK_BOARD_LIST_DEFAULT_LIMIT,
+    TASK_BOARD_LIST_MAX_CURSOR_CHARS, TASK_BOARD_LIST_MAX_LIMIT,
     TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS, TaskBoardItemQuery,
     TaskBoardListCursor, TaskBoardListPage, TaskBoardQueryFields, TaskBoardQueryTarget,
     normalize_query_text, select_page, validated_limit,

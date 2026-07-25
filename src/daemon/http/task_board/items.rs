@@ -16,8 +16,8 @@ use crate::daemon::remote_task_board::{TaskBoardReadListResponse, project_task_b
 use crate::daemon::remote_viewer::is_remote_viewer;
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::{
-    AgentMode, TASK_BOARD_LIST_MAX_LIMIT, TASK_BOARD_LIST_MAX_QUERY_CHARS, TaskBoardPriority,
-    TaskBoardStatus,
+    AgentMode, TASK_BOARD_LIST_MAX_CURSOR_CHARS, TASK_BOARD_LIST_MAX_LIMIT,
+    TASK_BOARD_LIST_MAX_QUERY_CHARS, TaskBoardPriority, TaskBoardStatus,
 };
 
 use super::super::DaemonHttpState;
@@ -59,6 +59,7 @@ pub(super) struct TaskBoardListQuery {
     #[param(minimum = 1, maximum = 500)]
     pub limit: Option<u32>,
     /// `next_cursor` from the previous page.
+    #[param(max_length = 512)]
     pub cursor: Option<String>,
 }
 
@@ -66,6 +67,7 @@ pub(super) struct TaskBoardListQuery {
 // stop describing what the daemon enforces if either constant moved.
 const _: () = assert!(TASK_BOARD_LIST_MAX_LIMIT == 500);
 const _: () = assert!(TASK_BOARD_LIST_MAX_QUERY_CHARS == 512);
+const _: () = assert!(TASK_BOARD_LIST_MAX_CURSOR_CHARS == 512);
 
 #[derive(Debug, Clone, Deserialize)]
 #[derive(utoipa::ToSchema)]
