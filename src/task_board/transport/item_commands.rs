@@ -18,6 +18,7 @@ impl Execute for TaskBoardCreateArgs {
         let request = TaskBoardCreateItemRequest {
             title: self.title.clone(),
             body: self.body.clone(),
+            status: self.status,
             priority: self.priority,
             agent_mode: self.agent_mode,
             kind: self.kind.clone(),

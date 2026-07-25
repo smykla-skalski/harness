@@ -2,7 +2,7 @@ use crate::daemon::protocol::TaskBoardUpdateItemRequest;
 use crate::errors::CliError;
 use crate::task_board::{ExternalRef, PlanningState, TaskBoardItem, TaskBoardWorkflowState};
 
-use super::estimate_validation::validate_update_estimates;
+use super::request_validation::validate_update_estimates;
 
 pub(super) fn apply_update_request(
     item: &mut TaskBoardItem,

@@ -115,6 +115,8 @@ pub struct TaskBoardCreateArgs {
     pub title: String,
     #[arg(long, default_value = "")]
     pub body: String,
+    #[arg(long, value_enum)]
+    pub status: Option<TaskBoardStatus>,
     #[arg(long, value_enum, default_value = "medium")]
     pub priority: TaskBoardPriority,
     #[arg(long, value_enum, default_value = "headless")]

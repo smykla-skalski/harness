@@ -54,6 +54,7 @@ struct TaskBoardItemEditorDraft: Equatable {
     TaskBoardCreateItemRequest(
       title: normalized(title) ?? "",
       body: body.trimmingCharacters(in: .whitespacesAndNewlines),
+      status: status,
       priority: priority,
       agentMode: agentMode,
       tags: tags,

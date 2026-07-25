@@ -256,6 +256,44 @@ async fn run_flow() {
     let _ = server.await;
 }
 
+#[test]
+fn task_board_http_create_refuses_a_blank_title_as_a_bad_request() {
+    let sandbox = tempdir().expect("tempdir");
+    without_durable_task_board_automation(|| {
+        harness_testkit::with_isolated_harness_env(sandbox.path(), || {
+            let runtime = tokio::runtime::Runtime::new().expect("runtime");
+            runtime.block_on(run_blank_title_flow());
+        });
+    });
+}
+
+/// Pins the status, not just the refusal. The remote executor transport maps
+/// `WORKFLOW_IO` to 503, so a create surface that ever picked up that mapping
+/// would turn a permanently bad request into one clients retry forever.
+async fn run_blank_title_flow() {
+    let state = test_http_state_with_db();
+    let (base_url, server) = serve_http(state).await;
+    let client = reqwest::Client::new();
+
+    let (status, error) = post_json_with_status(
+        &client,
+        &base_url,
+        http_paths::TASK_BOARD_ITEMS,
+        json!({ "title": " \t " }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(
+        error["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("title must not be blank")),
+        "unexpected error body: {error}"
+    );
+
+    server.abort();
+    let _ = server.await;
+}
+
 async fn assert_task_board_sync_audit(client: &reqwest::Client, base_url: &str) {
     let sync_audit = get_json(
         client,

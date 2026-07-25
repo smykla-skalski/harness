@@ -291,7 +291,7 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
     #expect(store.currentSuccessFeedbackMessage == "Moved task board item")
   }
 
-  @Test("Create task board item saves the draft and applies the chosen status")
+  @Test("Create task board item saves the draft in the chosen lane in one call")
   func createTaskBoardItemSavesDraftAndAppliesStatus() async {
     let client = RecordingHarnessClient()
     let store = await makeBootstrappedStore(client: client)
@@ -300,36 +300,42 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
       request: TaskBoardCreateItemRequest(
         title: "New board item",
         body: "Body",
+        status: .agenticReview,
         priority: .critical,
         agentMode: .planning,
         tags: ["monitor"],
         projectId: "project-1",
         planning: TaskBoardPlanningState(summary: "Plan first")
-      ),
-      initialStatus: .agenticReview
+      )
     )
 
     #expect(success)
     #expect(
       client.recordedCalls().contains(
-        .createTaskBoardItem(title: "New board item", priority: .critical)
+        .createTaskBoardItem(
+          title: "New board item",
+          priority: .critical,
+          status: .agenticReview
+        )
       )
     )
     #expect(
-      client.recordedCalls().contains(
-        .updateTaskBoardItem(id: "board-1", status: .agenticReview)
-      )
+      client.recordedCalls().contains {
+        if case .updateTaskBoardItem = $0 { return true }
+        return false
+      } == false,
+      "the chosen lane must not cost a follow-up update"
     )
     #expect(store.globalTaskBoardItems.first?.title == "New board item")
     #expect(store.globalTaskBoardItems.first?.status == .agenticReview)
     #expect(store.currentSuccessFeedbackMessage == "Created task board item")
   }
 
-  @Test("Update fails after create keeps local item with the created status")
-  func updateFailsAfterCreateKeepsLocalItem() async {
+  @Test("A failed create reports failure and caches nothing")
+  func failedCreateCachesNothing() async {
     let client = RecordingHarnessClient()
-    client.configureTaskBoardUpdateError(
-      HarnessMonitorAPIError.server(code: 503, message: "Status update unavailable.")
+    client.configureTaskBoardCreateError(
+      HarnessMonitorAPIError.server(code: 503, message: "Task board unavailable.")
     )
     let store = await makeBootstrappedStore(client: client)
 
@@ -337,33 +343,18 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
       request: TaskBoardCreateItemRequest(
         title: "New board item",
         body: "Body",
+        status: .agenticReview,
         priority: .high,
         agentMode: .planning,
         tags: ["monitor"],
         projectId: "project-1",
         planning: TaskBoardPlanningState(summary: "Plan first")
-      ),
-      initialStatus: .agenticReview
+      )
     )
 
     #expect(success == false)
-    #expect(
-      client.recordedCalls().contains(
-        .createTaskBoardItem(title: "New board item", priority: .high)
-      )
-    )
-    #expect(
-      client.recordedCalls().contains(
-        .updateTaskBoardItem(id: "board-1", status: .agenticReview)
-      )
-    )
-    #expect(store.globalTaskBoardItems.count == 1)
-    let cached = store.globalTaskBoardItems.first
-    #expect(cached?.id == "board-1")
-    #expect(cached?.title == "New board item")
-    #expect(cached?.status == .todo)
-    #expect(store.currentFailureFeedbackMessage?.contains("Created task board item") == true)
-    #expect(store.currentFailureFeedbackMessage?.contains("agentic_review") == true)
+    #expect(store.globalTaskBoardItems.isEmpty)
+    #expect(store.currentFailureFeedbackMessage != nil)
   }
 
   @Test("Edit task board item saves full editor fields")

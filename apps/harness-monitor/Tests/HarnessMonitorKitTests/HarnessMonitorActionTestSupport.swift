@@ -186,7 +186,11 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       status: TaskBoardStatus?,
       itemID: String?
     )
-    case createTaskBoardItem(title: String, priority: TaskBoardPriority)
+    case createTaskBoardItem(
+      title: String,
+      priority: TaskBoardPriority,
+      status: TaskBoardStatus?
+    )
     case updateTaskBoardItem(
       id: String,
       status: TaskBoardStatus?
@@ -301,6 +305,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var taskBoardProjectSummariesStorage: [TaskBoardProjectSummary]?
   var taskBoardMachineSummariesStorage: [TaskBoardMachineSummary]?
   var taskBoardWorkingCopiesStorage: [WorkingCopyListEntry] = []
+  var taskBoardCreateError: (any Error)?
   var taskBoardUpdateError: (any Error)?
   var taskBoardItemRevisionsStorage: [String: Int64] = [:]
   var taskBoardItemsChangeSeqStorage: Int64 = 0

@@ -435,11 +435,7 @@ struct TaskBoardItemManagementPanel: View {
     if let item {
       actions.updateTaskBoardItem(item.id, request: draft.updateRequest)
     } else {
-      actions.createTaskBoardItem(
-        draft.createRequest,
-        initialStatus: draft.status,
-        outcome: creationOutcome
-      )
+      actions.createTaskBoardItem(draft.createRequest, outcome: creationOutcome)
     }
   }
 }

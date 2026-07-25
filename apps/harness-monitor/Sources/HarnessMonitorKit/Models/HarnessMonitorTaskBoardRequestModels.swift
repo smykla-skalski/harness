@@ -3,6 +3,9 @@ import Foundation
 public struct TaskBoardCreateItemRequest: Codable, Equatable, Sendable {
   public let title: String
   public let body: String
+  /// Starting lane. `nil` leaves the placement to the daemon's default status
+  /// and automatic triage; naming one places the item there in the same call.
+  public let status: TaskBoardStatus?
   public let priority: TaskBoardPriority
   public let agentMode: TaskBoardAgentMode
   public let tags: [String]
@@ -18,6 +21,7 @@ public struct TaskBoardCreateItemRequest: Codable, Equatable, Sendable {
   public init(
     title: String,
     body: String = "",
+    status: TaskBoardStatus? = nil,
     priority: TaskBoardPriority = .medium,
     agentMode: TaskBoardAgentMode = .headless,
     tags: [String] = [],
@@ -32,6 +36,7 @@ public struct TaskBoardCreateItemRequest: Codable, Equatable, Sendable {
   ) {
     self.title = title
     self.body = body
+    self.status = status?.canonicalPersistedStatus
     self.priority = priority
     self.agentMode = agentMode
     self.tags = tags

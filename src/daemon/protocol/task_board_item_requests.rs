@@ -12,6 +12,11 @@ pub struct TaskBoardCreateItemRequest {
     pub title: String,
     #[serde(default)]
     pub body: String,
+    /// Starting lane. Omitted leaves the placement to the default status and
+    /// automatic triage; naming one makes the caller own it, and automatic
+    /// triage records its decision without moving the item back out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<TaskBoardStatus>,
     #[serde(default)]
     pub priority: TaskBoardPriority,
     #[serde(default)]

@@ -22,14 +22,23 @@ extension RecordingHarnessClient {
   }
 
   func createTaskBoardItem(request: TaskBoardCreateItemRequest) async throws -> TaskBoardItem {
-    calls.append(.createTaskBoardItem(title: request.title, priority: request.priority))
-    return lock.withLock {
+    calls.append(
+      .createTaskBoardItem(
+        title: request.title,
+        priority: request.priority,
+        status: request.status
+      )
+    )
+    return try lock.withLock {
+      if let error = taskBoardCreateError {
+        throw error
+      }
       let item = TaskBoardItem(
         schemaVersion: 1,
         id: request.id ?? "board-\(taskBoardItemsStorage.count + 1)",
         title: request.title,
         body: request.body,
-        status: .todo,
+        status: request.status ?? .todo,
         priority: request.priority,
         tags: request.tags,
         projectId: request.projectId,

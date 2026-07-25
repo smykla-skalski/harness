@@ -28,7 +28,6 @@ pub(crate) use crate::task_board::external::{
     TaskBoardSyncCoordinatorFence, TaskBoardSyncCoordinatorFenceDecision,
 };
 
-mod estimate_validation;
 #[cfg(test)]
 mod external_ref_tests;
 mod list_items;
@@ -37,6 +36,7 @@ mod provider_sync_context_store;
 mod provider_sync_exclusion;
 mod provider_sync_execution;
 mod provider_sync_store;
+mod request_validation;
 mod reviews_sync;
 mod sync_audit;
 mod sync_run_context;
@@ -44,7 +44,7 @@ mod triage_reads;
 mod triage_rules_reads;
 mod update_request;
 
-use estimate_validation::{validate_estimate, validate_update_estimates};
+use request_validation::{validate_create_title, validate_estimate, validate_update_estimates};
 use update_request::{apply_update_request, replacement_external_refs};
 pub(crate) use list_items::list_task_board_items_db;
 pub(crate) use positions::{
@@ -73,6 +73,7 @@ pub(crate) async fn create_task_board_item_db(
     db: &AsyncDaemonDb,
     request: &TaskBoardCreateItemRequest,
 ) -> Result<TaskBoardItem, CliError> {
+    validate_create_title(&request.title)?;
     validate_estimate("estimated_tokens", request.estimated_tokens)?;
     validate_estimate("estimated_cost_microusd", request.estimated_cost_microusd)?;
     let mut item = TaskBoardItem::new(
@@ -84,6 +85,9 @@ pub(crate) async fn create_task_board_item_db(
         request.body.clone(),
         utc_now(),
     );
+    if let Some(status) = request.status {
+        item.status = status;
+    }
     item.priority = request.priority;
     item.agent_mode = request.agent_mode;
     item.workflow_kind = request.workflow_kind;
@@ -103,7 +107,12 @@ pub(crate) async fn create_task_board_item_db(
     }
     item.session_id.clone_from(&request.session_id);
     item.work_item_id.clone_from(&request.work_item_id);
-    Ok(db.create_task_board_item_with_triage(item).await?.item)
+    let mutation = if request.status.is_some() {
+        db.create_task_board_item_at_requested_status(item).await?
+    } else {
+        db.create_task_board_item_with_triage(item).await?
+    };
+    Ok(mutation.item)
 }
 
 pub(crate) async fn get_task_board_item_db(

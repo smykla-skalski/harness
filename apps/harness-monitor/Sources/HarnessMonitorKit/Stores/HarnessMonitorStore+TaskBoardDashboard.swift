@@ -29,10 +29,7 @@ extension HarnessMonitorStore {
   }
 
   @discardableResult
-  public func createTaskBoardItem(
-    request: TaskBoardCreateItemRequest,
-    initialStatus: TaskBoardStatus = .todo
-  ) async -> Bool {
+  public func createTaskBoardItem(request: TaskBoardCreateItemRequest) async -> Bool {
     guard let client else {
       return false
     }
@@ -43,42 +40,17 @@ extension HarnessMonitorStore {
       endTaskBoardAction()
     }
 
-    let createdItem: TaskBoardItem
     do {
       let measuredItem = try await Self.measureOperation {
         try await client.createTaskBoardItem(request: request)
       }
       recordRequestSuccess()
-      createdItem = measuredItem.value
-      mergeTaskBoardItem(createdItem)
+      mergeTaskBoardItem(measuredItem.value)
+      await refreshTaskBoardDashboardSnapshot(using: client)
+      presentSuccessFeedback("Created task board item")
+      return true
     } catch {
       presentFailureFeedback(error.localizedDescription)
-      return false
-    }
-
-    guard createdItem.status != initialStatus else {
-      await refreshTaskBoardDashboardSnapshot(using: client)
-      presentSuccessFeedback("Created task board item")
-      return true
-    }
-
-    do {
-      let updatedItem = try await client.updateTaskBoardItem(
-        id: createdItem.id,
-        request: TaskBoardUpdateItemRequest(status: initialStatus)
-      )
-      mergeTaskBoardItem(updatedItem)
-      await refreshTaskBoardDashboardSnapshot(using: client)
-      presentSuccessFeedback("Created task board item")
-      return true
-    } catch {
-      await refreshTaskBoardDashboardSnapshot(using: client)
-      presentFailureFeedback(
-        """
-        Created task board item but couldn't set status to \(initialStatus.rawValue): \
-        \(error.localizedDescription)
-        """
-      )
       return false
     }
   }

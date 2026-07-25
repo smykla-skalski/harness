@@ -28649,6 +28649,17 @@
               "null"
             ]
           },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TaskBoardStatus",
+                "description": "Starting lane. Omitted leaves the placement to the default status and\nautomatic triage; naming one makes the caller own it, and automatic\ntriage records its decision without moving the item back out."
+              }
+            ]
+          },
           "tags": {
             "type": "array",
             "items": {

@@ -153,6 +153,8 @@ fn parse_task_board_create() {
         "Add inbox",
         "--body",
         "Track cross-project work",
+        "--status",
+        "in_review",
         "--priority",
         "high",
         "--agent-mode",
@@ -171,6 +173,7 @@ fn parse_task_board_create() {
         TaskBoardCommand::Create(args) => {
             assert_eq!(args.title, "Add inbox");
             assert_eq!(args.body, "Track cross-project work");
+            assert_eq!(args.status, Some(TaskBoardStatus::InReview));
             assert_eq!(args.tag, ["monitor"]);
             let external_ref = args.fields.external_ref[0].as_external_ref();
             assert_eq!(external_ref.provider, ExternalRefProvider::GitHub);

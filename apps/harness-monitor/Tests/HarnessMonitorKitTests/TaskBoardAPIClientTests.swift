@@ -229,6 +229,31 @@ struct TaskBoardAPIClientTests {
     #expect(json["target_project_types"] as? [String] == ["web", "data"])
   }
 
+  @Test("Task board create request carries the chosen lane, canonicalized")
+  func taskBoardCreateItemRequestEncodesStatus() throws {
+    let json = try encodedCreateRequest(
+      TaskBoardCreateItemRequest(title: "Straight to review", status: .needsYou)
+    )
+
+    #expect(json["status"] as? String == "human_required")
+  }
+
+  @Test("Task board create request omits the lane when none was chosen")
+  func taskBoardCreateItemRequestOmitsAbsentStatus() throws {
+    let json = try encodedCreateRequest(TaskBoardCreateItemRequest(title: "No lane"))
+
+    #expect(json["status"] == nil)
+  }
+
+  private func encodedCreateRequest(
+    _ request: TaskBoardCreateItemRequest
+  ) throws -> [String: Any] {
+    let encoder = JSONEncoder()
+    encoder.keyEncodingStrategy = .convertToSnakeCase
+    let data = try encoder.encode(request)
+    return try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+  }
+
   @Test("Task board update request includes target project types when set")
   func taskBoardUpdateItemRequestEncodesTargetProjectTypes() throws {
     let request = TaskBoardUpdateItemRequest(
