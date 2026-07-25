@@ -101,7 +101,8 @@ final class RepositoryDirectoryStoreTests: XCTestCase {
 
   private func makeTempDir() throws -> URL {
     let dir = FileManager.default.temporaryDirectory
-      .appendingPathComponent("RepositoryDirectoryStoreTests-\(UUID().uuidString)", isDirectory: true)
+      .appendingPathComponent(
+        "RepositoryDirectoryStoreTests-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     return dir
   }

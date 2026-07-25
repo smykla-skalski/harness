@@ -259,7 +259,8 @@ private enum TaskBoardGitHubRepositoryIdentity {
       return slug
     }
     // External-ref ids arrive as "owner/repo#123"; drop the issue/PR suffix before splitting.
-    let withoutReference = trimmed.split(separator: "#", maxSplits: 1).first.map(String.init) ?? trimmed
+    let withoutReference =
+      trimmed.split(separator: "#", maxSplits: 1).first.map(String.init) ?? trimmed
     let components = withoutReference.split(separator: "/")
     guard components.count >= 2 else {
       return nil

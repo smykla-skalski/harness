@@ -250,9 +250,9 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
     Route("/v1/task-board/audit"): #"{"total":1,"ready":1,"blocked":0,"deleted":0,"by_status":[]}"#,
     Route("/v1/task-board/projects"):
       #"""
-      [{"project_id":"project-0123456789abcdef0123456789abcdef","source":"github",
-        "slug":"acme/widgets","color":"teal","shape":"circle","item_count":1,"ready_count":1}]
-      """#,
+    [{"project_id":"project-0123456789abcdef0123456789abcdef","source":"github",
+      "slug":"acme/widgets","color":"teal","shape":"circle","item_count":1,"ready_count":1}]
+    """#,
     Route("/v1/task-board/machines"): #"[{"mode":"interactive","item_count":1,"ready_count":1}]"#,
     Route("/v1/task-board/orchestrator/status"): sampleOrchestratorStatusText,
     Route("/v1/task-board/orchestrator/start"): sampleOrchestratorStatusText,

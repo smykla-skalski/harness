@@ -282,10 +282,12 @@ extension PreviewHarnessClientState {
     var byOrganization: [String: TaskBoardProjectShape] = [:]
     var assigned: [String: TaskBoardProjectShape] = [:]
     for projectId in projectIDs {
-      let slug = slugs[projectId]?.first
+      let slug =
+        slugs[projectId]?.first
         .flatMap(TaskBoardProjectSummary.inferredIdentity(from:))?.slug ?? projectId
       let organization = slug.split(separator: "/").first.map(String.init) ?? slug
-      let shape = byOrganization[organization]
+      let shape =
+        byOrganization[organization]
         ?? shapes[byOrganization.count % shapes.count]
       byOrganization[organization] = shape
       assigned[projectId] = shape
@@ -380,7 +382,8 @@ extension PreviewHarnessClientState {
     edit.color = request.resetColor ? nil : (request.color ?? edit.color)
     taskBoardProjectEditsByID[request.projectId] = edit
 
-    let updated = taskBoardProjects(status: nil)
+    let updated =
+      taskBoardProjects(status: nil)
       .first { $0.projectId == request.projectId } ?? current
     return TaskBoardProject(
       projectId: updated.projectId,

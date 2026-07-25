@@ -1,4 +1,5 @@
 import Foundation
+
 extension PreviewHarnessClient.Fixtures {
   public static let defaultTaskBoardGitIdentityDefaults = TaskBoardGitIdentityDefaults(
     gitConfig: TaskBoardGitConfigDefaults(

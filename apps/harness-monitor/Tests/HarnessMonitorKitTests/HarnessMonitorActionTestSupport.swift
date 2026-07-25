@@ -312,12 +312,12 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var taskBoardTriageDecisionsStorage: [String: [TaskBoardTriageDecisionRecord]] = [:]
   var taskBoardTriageOverridesStorage: [String: TaskBoardTriageOverride] = [:]
   var taskBoardTriageOverrideError: (any Error)?
-  var taskBoardTriageOverrideErrorRemainingUses = 0
+  var triageOverrideErrorRemainingUses = 0
   var taskBoardTriageOverrideItemsAfterError: [TaskBoardItem]?
   var taskBoardTriageOverrideSetRequests: [TaskBoardSetTriageOverrideRequest] = []
   var taskBoardTriageOverrideClearRequests: [TaskBoardClearTriageOverrideRequest] = []
   var taskBoardTriageRuleSetDraftStorage: TriageRuleSetDraft?
-  var taskBoardActiveTriageRuleSetRevisionStorage: Int64?
+  var activeTriageRuleSetRevisionStorage: Int64?
   var taskBoardTriageRuleSetRevisionsStorage: [TriageRuleSetRevisionSummary] = []
   var taskBoardTriageRuleSetAuditStorage: [TriageRuleSetAuditEntry] = []
   var taskBoardTriageRulesSaveDraftRequests: [TaskBoardSaveTriageRulesDraftRequest] = []
