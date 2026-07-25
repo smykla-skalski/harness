@@ -13,6 +13,27 @@ private struct TaskBoardTriageInspectorLoadKey: Hashable {
   let updatedAt: String
 }
 
+@MainActor private let taskBoardApprovedAtSubmissionFormatter: ISO8601DateFormatter = {
+  let formatter = ISO8601DateFormatter()
+  formatter.formatOptions = [.withInternetDateTime]
+  return formatter
+}()
+
+/// Bridges the RFC3339 `approvedAt` draft string to the `Date` a native
+/// `DatePicker` needs. `fallback` covers both the never-approved case and a
+/// pre-existing string the old free-text field let through malformed.
+enum TaskBoardApprovedAtPickerValue {
+  @MainActor
+  static func date(fromApprovedAt approvedAt: String, fallback: Date) -> Date {
+    TaskBoardCardDateParsing.parse(approvedAt) ?? fallback
+  }
+
+  @MainActor
+  static func approvedAtString(from date: Date) -> String {
+    taskBoardApprovedAtSubmissionFormatter.string(from: date)
+  }
+}
+
 struct TaskBoardItemManagementPanel: View {
   let item: TaskBoardItem?
   let metrics: TaskBoardOverviewMetrics
@@ -29,6 +50,10 @@ struct TaskBoardItemManagementPanel: View {
   @State private var projectTypeSuggestions: [String] = []
   @State private var creationOutcome = TaskBoardItemCreationOutcome()
   @State private var triageInspector = TaskBoardTriageInspectorState()
+  /// Stable "now" shown by the Approved At picker until an approval time exists;
+  /// captured once per panel/item so the field doesn't visibly drift while the
+  /// sheet stays open and unrelated state re-renders the body.
+  @State private var approvedAtPickerDefault = Date()
   @Environment(\.fontScale)
   var fontScale
   @Environment(\.dismiss)
@@ -121,6 +146,7 @@ struct TaskBoardItemManagementPanel: View {
     .accessibilityIdentifier("harness.task-board.manage-item.\(item?.id ?? "new")")
     .onChange(of: item) { _, newValue in
       draft = newValue.map(TaskBoardItemEditorDraft.init) ?? TaskBoardItemEditorDraft()
+      approvedAtPickerDefault = Date()
     }
     .onChange(of: creationOutcome.succeeded) { _, succeeded in
       if succeeded {
@@ -140,6 +166,18 @@ struct TaskBoardItemManagementPanel: View {
 
   var targetProjectTypesBinding: Binding<[String]> {
     $draft.targetProjectTypes
+  }
+
+  var approvedAtBinding: Binding<Date> {
+    Binding(
+      get: {
+        TaskBoardApprovedAtPickerValue.date(
+          fromApprovedAt: draft.approvedAt,
+          fallback: approvedAtPickerDefault
+        )
+      },
+      set: { draft.approvedAt = TaskBoardApprovedAtPickerValue.approvedAtString(from: $0) }
+    )
   }
 
   var projectTypeSuggestionValues: [String] {
@@ -259,7 +297,7 @@ struct TaskBoardItemManagementPanel: View {
       )
       HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
         TaskBoardManagementNativeField(label: "Approver", text: $draft.approvedBy)
-        TaskBoardManagementNativeField(label: "Approved At", text: $draft.approvedAt)
+        TaskBoardManagementDateField(label: "Approved At", date: approvedAtBinding)
       }
       HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
         TaskBoardManagementNativeField(label: "Linked Session", text: $draft.sessionId)

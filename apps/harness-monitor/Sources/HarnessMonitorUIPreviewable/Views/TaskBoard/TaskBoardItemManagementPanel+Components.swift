@@ -99,6 +99,28 @@ struct TaskBoardManagementReadOnlyField: View {
   }
 }
 
+struct TaskBoardManagementDateField: View {
+  let label: String
+  @Binding var date: Date
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var captionSemibold: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      Text(label)
+        .font(captionSemibold)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      DatePicker(label, selection: $date, displayedComponents: [.date, .hourAndMinute])
+        .labelsHidden()
+        .harnessNativeFormControl()
+    }
+  }
+}
+
 struct TaskBoardManagementPickerField<
   Value: CaseIterable & Hashable & Identifiable & TitledTaskBoardValue
 >: View where Value.AllCases: RandomAccessCollection {
