@@ -85,6 +85,10 @@ pub(super) async fn persist_terminal_snapshot(
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 async fn terminal_evidence(
     record: &TaskBoardRemoteAssignmentRecord,
     snapshot: &CodexRunSnapshot,

@@ -179,6 +179,10 @@ fn prepare_remote_daemon_environment(config: &DaemonServeConfig) -> Result<(), C
     Ok(())
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 async fn prepare_remote_tls_listener(
     config: &DaemonServeConfig,
     acme_plan: &RemoteAcmeRuntimePlan,

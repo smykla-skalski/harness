@@ -31,6 +31,10 @@ pub(super) struct TaskBoardReadOnlyReconcileReport {
     pub(super) failures: Vec<String>,
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 pub(crate) async fn reconcile_task_board_read_only_workflows(
     state: &DaemonHttpState,
     db: &AsyncDaemonDb,
@@ -55,6 +59,10 @@ pub(crate) async fn reconcile_task_board_read_only_workflows(
     Ok(())
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "sequential project/recoverable/ready passes, each already its own helper"
+)]
 pub(super) async fn reconcile_task_board_read_only_workflows_with_runtime<R>(
     db: &AsyncDaemonDb,
     runtime: &R,

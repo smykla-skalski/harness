@@ -186,6 +186,10 @@ where
     .await
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "single match over publish verification result; every arm is one delegate call"
+)]
 async fn verify_successful_publish<R>(
     db: &AsyncDaemonDb,
     runtime: &R,
@@ -367,6 +371,10 @@ fn publish_verification_due(
     Ok(available_at <= now)
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "single match over publish verification result; every arm is one delegate call"
+)]
 async fn settle_ambiguous_publish<R>(
     db: &AsyncDaemonDb,
     runtime: &R,

@@ -39,6 +39,10 @@ pub(super) fn spawn_task_board_automation_loop(
     ))
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tokio::select! and tracing macro expansion inflate this two-branch receive loop"
+)]
 async fn run_task_board_automation_loop(
     state: DaemonHttpState,
     db: Arc<AsyncDaemonDb>,
@@ -156,6 +160,10 @@ fn deterministic_jitter(base: u64, stable_key: &str, attempt: u32, percent: u8) 
     u64::try_from(scaled.max(1)).unwrap_or(u64::MAX)
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "sequential legacy-intent/state/wake-enqueue steps, each already its own helper"
+)]
 async fn initialize_automation(db: &AsyncDaemonDb) -> Result<i64, CliError> {
     let now = Utc::now();
     initialize_control_from_legacy_intent(db, now).await?;

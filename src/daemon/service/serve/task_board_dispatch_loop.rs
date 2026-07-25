@@ -100,6 +100,10 @@ async fn recover_pending_dispatches(state: &DaemonHttpState, db: &AsyncDaemonDb)
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 async fn finish_claim(
     state: &DaemonHttpState,
     db: &AsyncDaemonDb,
@@ -127,6 +131,10 @@ fn compensation_reason(action: &TaskBoardDispatchClaimAction) -> Option<&str> {
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 async fn finish_compensating_claim(
     state: &DaemonHttpState,
     db: &AsyncDaemonDb,
