@@ -18,7 +18,9 @@
 # rooted at the common repo. Segments with a live
 # target/.cargo-local/leases/ entry are actively building and are kept,
 # not deleted, so this script never rips a build out from under a running
-# session; everything else under target/ is swept as usual.
+# session; every other entry under target/dev/ is swept. target/.cargo-local
+# itself (the lease and tmp bookkeeping cargo-local.sh depends on) is never
+# touched.
 #
 # --aggressive also wipes Xcode UI HarnessMonitor-* DerivedData (slow regen,
 # loses SourcePackages cache - only use when truly desperate for space).
