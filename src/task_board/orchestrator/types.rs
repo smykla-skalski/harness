@@ -207,6 +207,10 @@ pub struct TaskBoardOrchestratorState {
 /// build no longer has a variant for. Parsing it strictly makes one stale row
 /// fatal to daemon startup, which is how removing the Todoist provider left
 /// existing installs crash-looping before they could publish a manifest.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 fn readable_last_run<'de, D>(
     deserializer: D,
 ) -> Result<Option<TaskBoardOrchestratorRunSummary>, D::Error>
