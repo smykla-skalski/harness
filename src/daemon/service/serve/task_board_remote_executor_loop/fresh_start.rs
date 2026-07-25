@@ -17,7 +17,7 @@ use super::{
     utc_now,
 };
 use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteAssignmentRecord};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 pub(super) async fn prepare_fresh_remote_worker_start(
     db: &AsyncDaemonDb,
