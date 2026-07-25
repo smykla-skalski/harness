@@ -202,6 +202,10 @@ fn log_remote_pairing_minted(request_id: &str, pairing_id: &str) {
 /// The `remote.pair.create` event the store writes says a link was made. This
 /// one says who asked and who it was for, which is the question an operator
 /// reading the trail after the fact actually has.
+///
+/// The context rides `metadata_json`, not `error_detail`. This event is a
+/// success, and every other writer sets `error_detail` only on failure, so a
+/// reader treating it as a failure signal would misclassify every mint.
 fn record_mint_audit_event(
     db: &DaemonDb,
     request_id: &str,
@@ -210,19 +214,26 @@ fn record_mint_audit_event(
     pairing_id: &str,
 ) -> Result<(), CliError> {
     let event_id = format!("remote-pair-mint-audit-{}", Uuid::new_v4());
-    let detail = format!("{} as pairing {pairing_id}", subject.audit_detail());
-    db.record_remote_audit_event(&RemoteAuditEvent::new(
-        event_id.as_str(),
-        utc_now().as_str(),
-        Some(request_id),
-        client.map(|client| client.client_id.as_str()),
-        "remote.pair.mint",
-        RemoteAccessScope::PairMint,
-        RemoteAuditScopeDecision::Allowed,
-        RemoteAuditOutcome::Success,
-        None,
-        Some(detail.as_str()),
-    ))
+    let metadata = serde_json::json!({
+        "pairing_id": pairing_id,
+        "minted_for": subject,
+    })
+    .to_string();
+    db.record_remote_audit_event(
+        &RemoteAuditEvent::new(
+            event_id.as_str(),
+            utc_now().as_str(),
+            Some(request_id),
+            client.map(|client| client.client_id.as_str()),
+            "remote.pair.mint",
+            RemoteAccessScope::PairMint,
+            RemoteAuditScopeDecision::Allowed,
+            RemoteAuditOutcome::Success,
+            None,
+            None,
+        )
+        .with_metadata_json(metadata),
+    )
 }
 
 struct MintPlan {

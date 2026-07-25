@@ -68,18 +68,25 @@ async fn a_broker_mints_a_link_that_records_who_it_was_for() {
         )
         .expect("stored pairing metadata");
     assert!(metadata.contains("\"subject_id\":\"4242\""), "{metadata}");
-    let (minted_events, audit_detail): (i64, String) = db
+    let (minted_events, audit_metadata, audit_errors): (i64, String, i64) = db
         .connection()
         .query_row(
-            "SELECT COUNT(*), COALESCE(MAX(error_detail), '') FROM remote_audit_events
+            "SELECT COUNT(*), COALESCE(MAX(metadata_json), ''),
+                    COUNT(error_detail) FROM remote_audit_events
              WHERE route_or_method = 'remote.pair.mint'",
             [],
-            |row| Ok((row.get(0)?, row.get(1)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )
-        .expect("mint audit count");
+        .expect("mint audit row");
     assert_eq!(minted_events, 1);
-    assert!(audit_detail.contains("github:4242"), "{audit_detail}");
-    assert!(audit_detail.contains(pairing_id), "{audit_detail}");
+    assert!(
+        audit_metadata.contains("\"subject_id\":\"4242\""),
+        "{audit_metadata}"
+    );
+    assert!(audit_metadata.contains(pairing_id), "{audit_metadata}");
+    // A successful mint must leave error_detail null, or a reader that treats
+    // that column as a failure signal misclassifies every minted link.
+    assert_eq!(audit_errors, 0, "mint success must not set error_detail");
 
     server.abort();
 }
