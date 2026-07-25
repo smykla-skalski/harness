@@ -36,9 +36,9 @@ pub(super) enum SnapshotMatch<'a> {
 }
 
 impl<'a> SnapshotMatch<'a> {
-    /// The snapshot when exactly one item claimed the reference. A reference
-    /// nothing claims and one several items claim both resolve to `None`;
-    /// callers that must tell those apart match the variants instead.
+    /// The snapshot when exactly one item claimed the reference. `Missing` and
+    /// `Ambiguous` both answer `None` here, so a caller that has to tell them
+    /// apart matches the variants instead.
     fn found(self) -> Option<&'a TaskBoardSyncItemSnapshot> {
         match self {
             Self::Found(snapshot) => Some(snapshot),
