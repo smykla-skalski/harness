@@ -3949,7 +3949,7 @@
         "tags": [
           "pairing"
         ],
-        "description": "Mint a pairing link for an external identity the caller has already authenticated. Requires the pair_mint scope. The raw pairing code is not returned separately; it is carried inside pairing_url",
+        "description": "Mint a pairing link for an external identity the caller has already authenticated. Requires the pair_mint scope. The raw pairing code is not returned separately; it is carried inside pairing_url. Beyond the shared middleware causes, this route also answers 503 when the pairing store is unavailable or the link could not be minted",
         "operationId": "post_remote_pair_mint",
         "requestBody": {
           "content": {
@@ -3992,16 +3992,6 @@
               }
             }
           },
-          "503": {
-            "description": "Pairing store or remote identity unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DaemonErrorBody"
-                }
-              }
-            }
-          },
           "401": {
             "$ref": "#/components/responses/RemoteAuthRequired"
           },
@@ -4016,6 +4006,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
           },
           "504": {
             "$ref": "#/components/responses/RemoteRequestTimedOut"
