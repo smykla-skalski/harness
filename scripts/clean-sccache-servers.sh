@@ -24,8 +24,23 @@ fi
 
 socket_path="${SCCACHE_SERVER_UDS:-}"
 if [[ -z "$socket_path" ]]; then
+  # Guarded because set -e would otherwise abort on the assignment itself when
+  # the wrapper is missing, losing the explanation below to a bare exit 127.
   socket_path="$("$ROOT/scripts/cargo-local.sh" --print-env 2>/dev/null \
-    | awk -F= '/^SCCACHE_SERVER_UDS=/ {print $2; exit}')"
+    | awk -F= '/^SCCACHE_SERVER_UDS=/ {print $2; exit}' || true)"
+fi
+
+# Without the socket there is no way to tell the live server from the orphans,
+# and without python3 there is no way to ask it. Carrying on either way would
+# make every server look orphaned and kill the whole set, which is the opposite
+# of the point.
+if [[ -z "$socket_path" ]]; then
+  printf 'sccache: cannot resolve SCCACHE_SERVER_UDS, refusing to guess which server is live\n' >&2
+  exit 1
+fi
+if ! command -v python3 >/dev/null 2>&1; then
+  printf 'sccache: python3 is required to identify the live server\n' >&2
+  exit 1
 fi
 
 # Every orphan still shows as listening on this path, so "is something listening"
@@ -52,11 +67,16 @@ PY
 # A server's command line is the binary and nothing else. A client is
 # `sccache /path/to/rustc ...`, and killing one kills a live compilation, so the
 # argument count is the only safe discriminator available here.
+#
+# The socket is keyed per repository, so a server holding a different one belongs
+# to a different checkout and its orphans are not ours to collect. Matching on
+# the environment keeps this from reaching across repositories.
 server_pids() {
   local pid arg_count
   for pid in $(pgrep -u "$(id -u)" -x sccache 2>/dev/null || true); do
     arg_count="$(tr '\0' '\n' <"/proc/$pid/cmdline" 2>/dev/null | grep -c . || true)"
     [[ "$arg_count" == "1" ]] || continue
+    grep -qz "^SCCACHE_SERVER_UDS=$socket_path$" "/proc/$pid/environ" 2>/dev/null || continue
     printf '%s\n' "$pid"
   done
 }
