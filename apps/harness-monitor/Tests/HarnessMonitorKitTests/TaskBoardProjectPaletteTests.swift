@@ -1,3 +1,4 @@
+import Foundation
 import HarnessMonitorKit
 import Testing
 
@@ -37,26 +38,33 @@ struct TaskBoardProjectPaletteTests {
 
   /// A mark is a mark in both appearances. An entry that only exists in light
   /// would leave a dark board a project short.
-  @Test("Every palette entry defines both appearances")
+  @Test("Every palette entry defines both appearances inside the gamut")
   func everyEntryDefinesBothAppearances() {
     for color in TaskBoardProjectColor.allCases {
-      let components = color.components
-      #expect(components.light != components.dark, "\(color.rawValue) is the same in both modes")
-      for channel in [components.light.red, components.light.green, components.light.blue]
-        + [components.dark.red, components.dark.green, components.dark.blue] {
-        #expect(channel >= 0 && channel <= 1, "\(color.rawValue) leaves the sRGB gamut")
-      }
+      let light = color.components.light
+      let dark = color.components.dark
+      let sameInBothModes = light == dark
+      #expect(!sameInBothModes, "\(color.rawValue) is the same in both modes")
+
+      var channels: [Double] = [light.red, light.green, light.blue]
+      channels.append(contentsOf: [dark.red, dark.green, dark.blue])
+      let outside = channels.filter { $0 < 0 || $0 > 1 }.count
+      #expect(outside == 0, "\(color.rawValue) leaves the sRGB gamut")
     }
   }
 
   @Test("Every palette entry and shape carries a spoken name")
   func everyEntryCarriesASpokenName() {
     let colorTitles = Set(TaskBoardProjectColor.allCases.map(\.title))
-    #expect(colorTitles.count == TaskBoardProjectColor.allCases.count)
-    #expect(!colorTitles.contains(where: \.isEmpty))
+    let colorsNamed = colorTitles.count == TaskBoardProjectColor.allCases.count
+    #expect(colorsNamed, "two palette entries share a spoken name")
+
+    let blankTitles = colorTitles.filter { $0.isEmpty }.count
+    #expect(blankTitles == 0, "a palette entry has nothing to speak")
 
     let shapeTitles = Set(TaskBoardProjectShape.allCases.map(\.title))
-    #expect(shapeTitles.count == TaskBoardProjectShape.allCases.count)
+    let shapesNamed = shapeTitles.count == TaskBoardProjectShape.allCases.count
+    #expect(shapesNamed, "two outlines share a spoken name")
   }
 
   private enum Appearance: String {
@@ -71,26 +79,49 @@ struct TaskBoardProjectPaletteTests {
   ) -> Double {
     let lhs = lab(of: first, in: appearance)
     let rhs = lab(of: second, in: appearance)
-    return ((lhs.0 - rhs.0) * (lhs.0 - rhs.0) + (lhs.1 - rhs.1) * (lhs.1 - rhs.1)
-      + (lhs.2 - rhs.2) * (lhs.2 - rhs.2)).squareRoot()
+    let lightness = lhs.lightness - rhs.lightness
+    let green = lhs.green - rhs.green
+    let blue = lhs.blue - rhs.blue
+    let sum = lightness * lightness + green * green + blue * blue
+    return sum.squareRoot()
   }
 
   private static func lab(
     of color: TaskBoardProjectColor,
     in appearance: Appearance
-  ) -> (Double, Double, Double) {
+  ) -> (lightness: Double, green: Double, blue: Double) {
     let components = appearance == .light ? color.components.light : color.components.dark
-    let linear = [components.red, components.green, components.blue].map { channel in
-      channel <= 0.04045 ? channel / 12.92 : pow((channel + 0.055) / 1.055, 2.4)
-    }
-    let x = (0.4124 * linear[0] + 0.3576 * linear[1] + 0.1805 * linear[2]) / 0.95047
-    let y = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
-    let z = (0.0193 * linear[0] + 0.1192 * linear[1] + 0.9505 * linear[2]) / 1.08883
-    let (fx, fy, fz) = (pivot(x), pivot(y), pivot(z))
+    let red = linear(components.red)
+    let green = linear(components.green)
+    let blue = linear(components.blue)
+
+    var x = 0.4124 * red
+    x += 0.3576 * green
+    x += 0.1805 * blue
+    var y = 0.2126 * red
+    y += 0.7152 * green
+    y += 0.0722 * blue
+    var z = 0.0193 * red
+    z += 0.1192 * green
+    z += 0.9505 * blue
+
+    let fx = pivot(x / 0.95047)
+    let fy = pivot(y)
+    let fz = pivot(z / 1.08883)
     return (116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz))
   }
 
+  private static func linear(_ channel: Double) -> Double {
+    guard channel > 0.04045 else {
+      return channel / 12.92
+    }
+    return pow((channel + 0.055) / 1.055, 2.4)
+  }
+
   private static func pivot(_ value: Double) -> Double {
-    value > 0.008856 ? pow(value, 1.0 / 3.0) : 7.787 * value + 16.0 / 116.0
+    guard value > 0.008856 else {
+      return 7.787 * value + 16.0 / 116.0
+    }
+    return pow(value, 1.0 / 3.0)
   }
 }
