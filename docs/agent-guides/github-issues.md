@@ -41,6 +41,21 @@ gh api --method POST repos/<owner>/<repo>/issues/<umbrella-number>/sub_issues \
   -F sub_issue_id="$(gh api repos/<owner>/<repo>/issues/<child-number> --jq '.id')"
 ```
 
+## Issue types
+
+GitHub's issue type field is separate from the `kind/*` label and sits alongside it. Set it after filing:
+
+- A sub-issue attached to an umbrella gets type `Task`.
+- An umbrella whose children are new work gets type `Feature`.
+- Any issue labeled `kind/bug` gets type `Bug`.
+
+`gh issue create` and `gh issue edit` have no flag for it, so set it through the GraphQL API. Look up the repo's type ids rather than hardcoding them, since they differ per repo:
+
+```bash
+gh api graphql -f query='{ repository(owner: "<owner>", name: "<repo>") { issueTypes(first: 20) { nodes { id name } } } }'
+gh api graphql -f query='mutation { updateIssue(input: {id: "<issue-node-id>", issueTypeId: "<type-node-id>"}) { issue { issueType { name } } } }'
+```
+
 ## What never goes in an issue
 
 - File paths, type names, function names, line numbers
