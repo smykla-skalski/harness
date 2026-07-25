@@ -42,5 +42,6 @@ fn setup_gateway_check_finds_gateway_api_crds() {
         })
         .execute();
         assert!(result.is_ok(), "gateway check should succeed: {result:?}");
+        assert_eq!(result.unwrap(), 0, "gateway check should exit zero");
     });
 }
