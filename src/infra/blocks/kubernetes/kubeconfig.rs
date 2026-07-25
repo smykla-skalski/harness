@@ -92,6 +92,7 @@ pub(crate) fn flatten_selected_kubeconfig(
         extensions: kubeconfig.extensions,
         kind: kubeconfig.kind.or(Some("Config".to_string())),
         api_version: kubeconfig.api_version.or(Some("v1".to_string())),
+        other: kubeconfig.other,
     };
 
     serde_yml::to_string(&flattened)
