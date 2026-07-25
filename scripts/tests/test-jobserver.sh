@@ -526,6 +526,41 @@ PY
   pass "$name"
 }
 
+scenario_pipelined_requests_are_all_answered() {
+  local name="every request in one packet is answered, not just the first"
+  local root; root="$(fake_root pipelined)"
+  track_pool "$root"
+  python3 "$JOBSERVER" ensure --repo-root "$root" --budget 6 >/dev/null 2>&1
+  local dir; dir="$(pool_dir_for "$root")"
+
+  # Handling one line per readable event left the rest sitting in the server's
+  # buffer, which both stalled them and let the buffer grow without a bound.
+  local replies
+  replies="$(python3 - "$dir/sock" <<'PY'
+import socket, sys
+c = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+c.settimeout(5.0)
+c.connect(sys.argv[1])
+c.sendall(b"ACQUIRE 1\n" * 3)
+buf = b""
+try:
+    while buf.count(b"\n") < 3:
+        chunk = c.recv(64)
+        if not chunk:
+            break
+        buf += chunk
+except OSError:
+    pass
+print(buf.count(b"GRANTED"))
+PY
+)"
+  if [[ "$replies" != "3" ]]; then
+    fail "$name (expected 3 grants, got $replies)"
+    return
+  fi
+  pass "$name"
+}
+
 scenario_symlinked_pool_parent_is_refused() {
   local name="a symlinked pool parent is refused"
   local root; root="$(fake_root unsafeparent)"
@@ -634,6 +669,7 @@ scenario_idle_exit_leaves_no_tokens_behind
 scenario_partial_pool_keeps_its_tokens
 scenario_signal_death_reports_a_shell_signal_status
 scenario_split_request_is_still_granted
+scenario_pipelined_requests_are_all_answered
 scenario_symlinked_pool_parent_is_refused
 scenario_stalled_supervisor_does_not_hang_the_command
 scenario_run_propagates_exit_status

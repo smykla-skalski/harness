@@ -203,6 +203,23 @@ def serve(pool: Pool, stop: threading.Event) -> None:
         with contextlib.suppress(OSError):
             conn.close()
 
+    def serve_line(conn: socket.socket, raw_line: bytes) -> bool:
+        """Answer one request; False once the connection has been dropped."""
+        try:
+            verb, _, raw = raw_line.decode().strip().partition(" ")
+            want = max(0, int(raw or "0"))
+        except ValueError:
+            drop(conn)
+            return False
+        if verb != "ACQUIRE":
+            drop(conn)
+            return False
+        granted = pool.acquire(want)
+        holdings[conn] += granted
+        with contextlib.suppress(OSError):
+            conn.sendall(f"GRANTED {granted}\n".encode())
+        return True
+
     while not stop.is_set():
         for key, _ in selector.select(timeout=POLL_SECONDS):
             if key.fileobj is server:
@@ -227,28 +244,20 @@ def serve(pool: Pool, stop: threading.Event) -> None:
             # arrive split. Parsing whatever one recv returned would reject a
             # valid ACQUIRE and hand the client a silent zero-width grant.
             buffered = pending[conn] + chunk
-            if b"\n" not in buffered:
-                if len(buffered) > MAX_REQUEST_BYTES:
-                    drop(conn)
-                else:
-                    pending[conn] = buffered
+            alive = True
+            while alive and b"\n" in buffered:
+                raw_line, _, buffered = buffered.partition(b"\n")
+                alive = serve_line(conn, raw_line)
+            if not alive:
                 continue
-            raw_line, _, rest = buffered.partition(b"\n")
-            pending[conn] = rest
-
-            try:
-                verb, _, raw = raw_line.decode().strip().partition(" ")
-                want = max(0, int(raw or "0"))
-            except ValueError:
+            # The leftover needs the same cap as an unterminated line. Consuming
+            # one line per readable event while swallowing the whole packet let a
+            # client whose lines all parse grow this buffer without ever reaching
+            # the check below, because there was always another newline in it.
+            if len(buffered) > MAX_REQUEST_BYTES:
                 drop(conn)
                 continue
-            if verb != "ACQUIRE":
-                drop(conn)
-                continue
-            granted = pool.acquire(want)
-            holdings[conn] += granted
-            with contextlib.suppress(OSError):
-                conn.sendall(f"GRANTED {granted}\n".encode())
+            pending[conn] = buffered
 
         # Deadline first: idle_and_whole drains the FIFO to count it, and doing
         # that every poll would briefly hold every token outside the pipe for no

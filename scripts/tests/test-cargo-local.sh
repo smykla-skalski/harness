@@ -270,6 +270,60 @@ scenario_build_only_flag_precedes_a_separator() {
   pass "the build-only flag precedes a caller's argument separator"
 }
 
+scenario_nextest_detection_skips_global_flag_values() {
+  local key="pool-flagvalue-$$"
+  local fake="$SANDBOX/flagvalue-cargo"
+  local log="$SANDBOX/flagvalue-log"
+  local scratch="$SANDBOX/flagvalue-tmp"
+  mkdir -p "$fake" "$scratch"
+  write_token_counting_cargo "$fake/cargo" "$log"
+
+  local cpu budget
+  cpu="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.logicalcpu)"
+  budget=$((cpu - 1)); (( budget < 1 )) && budget=1
+  python3 "$ROOT/scripts/harness-jobserver.py" ensure \
+    --repo-root "$key" --budget "$budget" >/dev/null 2>&1 || true
+
+  run_flagvalue() {
+    (
+      unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR MAKEFLAGS
+      unset NEXTEST_TEST_THREADS HARNESS_NEXTEST_JOBS
+      TMPDIR="$scratch/" \
+        TOKEN_LOG="$log" \
+        SCCACHE_BIN='' RUSTC_WRAPPER='' \
+        CODEX_SESSION_ID="cargo-local-flagvalue-$$" \
+        HARNESS_CARGO_SKIP_LEASE=1 \
+        HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+        HARNESS_JOBSERVER_POOL_KEY="$key" \
+        HARNESS_CARGO_BIN="$fake/cargo" \
+        "$ROOT/scripts/cargo-local.sh" "$@" >/dev/null 2>&1
+    )
+  }
+
+  # `--color always` puts a bare word before the subcommand, and reading it as
+  # the subcommand dropped the split silently.
+  : >"$log"
+  run_flagvalue --color always nextest run --lib
+  local split_invocations; split_invocations="$(grep -c nextest "$log")"
+
+  # Same shape without nextest, which must still not split. Count only the
+  # forwarded command; cargo-local also probes the binary with a bare -V.
+  : >"$log"
+  run_flagvalue --color always run
+  local plain_invocations; plain_invocations="$(grep -c -- '--color' "$log")"
+  stop_pool_for_key "$key"
+
+  if [[ "$split_invocations" != "2" ]]; then
+    fail "a value-taking global flag broke the split ($split_invocations cargo invocations)"
+    return
+  fi
+  if [[ "$plain_invocations" != "1" ]]; then
+    fail "cargo run after a global flag should not split ($plain_invocations cargo invocations)"
+    return
+  fi
+  pass "nextest detection skips the value of a global flag"
+}
+
 scenario_nextest_detection_handles_toolchain_and_list() {
   local key="pool-detect-$$"
   local fake="$SANDBOX/detect-cargo"
@@ -1025,6 +1079,7 @@ scenario_explicit_job_override_beats_the_pool
 scenario_nextest_build_phase_keeps_the_whole_pool
 scenario_build_only_flag_precedes_a_separator
 scenario_nextest_detection_handles_toolchain_and_list
+scenario_nextest_detection_skips_global_flag_values
 scenario_missing_tmpdir_uses_short_external_fallback
 scenario_concurrent_tmpdir_creation_is_idempotent
 scenario_unusable_tmpdir_uses_short_external_fallback

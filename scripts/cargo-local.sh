@@ -563,9 +563,17 @@ fi
 # True only for `nextest run`. `nextest list` builds but runs no tests, so it
 # wants the pool for its build and no test block at all.
 command_is_nextest_run() {
-  local arg seen_nextest=0
+  local arg seen_nextest=0 skip_value=0
   for arg in "$@"; do
+    if (( skip_value )); then
+      skip_value=0
+      continue
+    fi
     case "$arg" in
+      # Global flags whose value is a separate bare word, which would otherwise
+      # read as the subcommand and make this look like something else entirely.
+      # The --flag=value spelling needs no help; it already matches -*.
+      --color|--config|-C|-Z) skip_value=1 ;;
       # A toolchain selector precedes the subcommand and is not a flag.
       +*) ;;
       -*) ;;
