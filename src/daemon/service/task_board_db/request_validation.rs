@@ -27,6 +27,16 @@ fn validate_estimate_patch(name: &str, value: Option<u64>, clear: bool) -> Resul
     validate_estimate(name, value)
 }
 
+/// Refuse a nameless item before an id is minted for it. `validate_item`
+/// rejects one too, but it names the generated id the caller never chose,
+/// which reads as a storage failure rather than the bad field it is.
+pub(super) fn validate_create_title(title: &str) -> Result<(), CliError> {
+    if title.trim().is_empty() {
+        return Err(db_error("task-board title must not be blank"));
+    }
+    Ok(())
+}
+
 pub(super) fn validate_estimate(name: &str, value: Option<u64>) -> Result<(), CliError> {
     if value.is_none_or(|value| (1..=MAX_TASK_BOARD_ESTIMATE).contains(&value)) {
         return Ok(());
@@ -40,6 +50,13 @@ pub(super) fn validate_estimate(name: &str, value: Option<u64>) -> Result<(), Cl
 mod tests {
     use super::*;
     use crate::daemon::protocol::{TaskBoardUpdateEstimateClears, TaskBoardUpdateItemRequest};
+
+    #[test]
+    fn titles_must_carry_a_visible_character() {
+        assert!(validate_create_title("Ship it").is_ok());
+        assert!(validate_create_title("").is_err());
+        assert!(validate_create_title(" \t\n").is_err());
+    }
 
     #[test]
     fn estimates_accept_absence_and_the_persisted_range() {

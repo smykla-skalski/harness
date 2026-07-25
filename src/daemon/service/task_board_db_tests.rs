@@ -2,12 +2,124 @@ use tempfile::tempdir;
 
 use crate::daemon::db::{AsyncDaemonDb, DisplayNameEdit};
 use crate::daemon::protocol::{
-    TaskBoardCreateItemRequest, TaskBoardProjectUpdateRequest, TaskBoardUpdateIdentityClears,
-    TaskBoardUpdateItemRequest,
+    TaskBoardCreateItemRequest, TaskBoardListItemsRequest, TaskBoardProjectUpdateRequest,
+    TaskBoardUpdateIdentityClears, TaskBoardUpdateItemRequest,
 };
+use crate::task_board::TaskBoardStatus;
 use crate::task_board::project::TaskBoardProjectSource;
 
-use super::{create_task_board_item_db, update_task_board_item_db, update_task_board_project_db};
+use super::{
+    create_task_board_item_db, list_task_board_items_db, update_task_board_item_db,
+    update_task_board_project_db,
+};
+
+async fn connect(directory: &tempfile::TempDir) -> AsyncDaemonDb {
+    AsyncDaemonDb::connect(&directory.path().join("harness.db"))
+        .await
+        .expect("database")
+}
+
+/// A create that names its starting lane lands there in one call. The board
+/// used to create into Todo and immediately update, so a failed second call
+/// left the item in a lane nobody chose.
+#[tokio::test]
+async fn a_requested_status_creates_the_item_in_that_lane() {
+    let directory = tempdir().expect("tempdir");
+    let db = connect(&directory).await;
+    let create: TaskBoardCreateItemRequest = serde_json::from_value(serde_json::json!({
+        "title": "Land in review",
+        "status": "in_review",
+    }))
+    .expect("create request");
+
+    let created = create_task_board_item_db(&db, &create)
+        .await
+        .expect("create item");
+
+    assert_eq!(created.status, TaskBoardStatus::InReview);
+}
+
+/// Omitting the status keeps the historical default, so an older client that
+/// never learned the field still creates a usable item.
+#[tokio::test]
+async fn an_omitted_status_still_lands_in_the_default_lane() {
+    let directory = tempdir().expect("tempdir");
+    let db = connect(&directory).await;
+    let create: TaskBoardCreateItemRequest =
+        serde_json::from_value(serde_json::json!({ "title": "No lane chosen" }))
+            .expect("create request");
+
+    let created = create_task_board_item_db(&db, &create)
+        .await
+        .expect("create item");
+
+    assert_eq!(created.status, TaskBoardStatus::Todo);
+}
+
+/// Automatic triage promotes a labelled Backlog item to Todo. A caller that
+/// asked for Backlog owns that placement, so triage records its decision
+/// without moving the item back out of the lane the request chose.
+#[tokio::test]
+async fn a_requested_status_survives_automatic_triage() {
+    let directory = tempdir().expect("tempdir");
+    let db = connect(&directory).await;
+    let create: TaskBoardCreateItemRequest = serde_json::from_value(serde_json::json!({
+        "title": "Stay in the backlog",
+        "status": "backlog",
+        "tags": ["kind/bug"],
+    }))
+    .expect("create request");
+
+    let created = create_task_board_item_db(&db, &create)
+        .await
+        .expect("create item");
+
+    assert_eq!(created.status, TaskBoardStatus::Backlog);
+}
+
+/// The same labelled item with no requested lane is still triage's to place,
+/// which is what makes the assertion above a real suppression and not an
+/// evaluator that never fires.
+#[tokio::test]
+async fn an_omitted_status_leaves_placement_to_triage() {
+    let directory = tempdir().expect("tempdir");
+    let db = connect(&directory).await;
+    let mut create: TaskBoardCreateItemRequest = serde_json::from_value(serde_json::json!({
+        "title": "Stay in the backlog",
+        "status": "backlog",
+        "tags": ["kind/bug"],
+    }))
+    .expect("create request");
+    create.status = None;
+
+    let created = create_task_board_item_db(&db, &create)
+        .await
+        .expect("create item");
+
+    assert_eq!(created.status, TaskBoardStatus::Todo);
+}
+
+/// A nameless item is unusable on the board and unreachable by search, and the
+/// only guard used to live in the macOS sheet, so every other client could
+/// create one.
+#[tokio::test]
+async fn a_blank_title_is_refused_and_persists_nothing() {
+    let directory = tempdir().expect("tempdir");
+    let db = connect(&directory).await;
+    let create: TaskBoardCreateItemRequest =
+        serde_json::from_value(serde_json::json!({ "title": "   ", "status": "todo" }))
+            .expect("create request");
+
+    let error = create_task_board_item_db(&db, &create)
+        .await
+        .expect_err("a blank title is refused");
+    assert!(error.message().contains("title"), "unexpected: {error}");
+
+    let listed = list_task_board_items_db(&db, &TaskBoardListItemsRequest::default())
+        .await
+        .expect("list items");
+    assert!(listed.items.is_empty(), "a refused create persisted an item");
+}
 
 /// Moving an item to another project has to re-resolve its attribution.
 /// `resolve_item_project_in_tx` treats an assigned project as settled, so a
@@ -16,9 +128,7 @@ use super::{create_task_board_item_db, update_task_board_item_db, update_task_bo
 #[tokio::test]
 async fn moving_an_item_re_resolves_its_project() {
     let directory = tempdir().expect("tempdir");
-    let db = AsyncDaemonDb::connect(&directory.path().join("harness.db"))
-        .await
-        .expect("database");
+    let db = connect(&directory).await;
     let create: TaskBoardCreateItemRequest = serde_json::from_value(serde_json::json!({
         "title": "Move me",
         "project_id": "acme/widgets",
@@ -71,9 +181,7 @@ async fn moving_an_item_re_resolves_its_project() {
 #[tokio::test]
 async fn setting_and_clearing_a_display_name_together_is_refused() {
     let directory = tempdir().expect("tempdir");
-    let db = AsyncDaemonDb::connect(&directory.path().join("harness.db"))
-        .await
-        .expect("database");
+    let db = connect(&directory).await;
     let project_id = db
         .ensure_task_board_project(TaskBoardProjectSource::GitHub, "acme/widgets")
         .await

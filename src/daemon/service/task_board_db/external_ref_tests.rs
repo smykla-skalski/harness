@@ -97,6 +97,7 @@ async fn external_ref_creation_rejects_client_sync_state() {
     let request = TaskBoardCreateItemRequest {
         title: "Task".into(),
         body: "Body".into(),
+        status: None,
         priority: Default::default(),
         agent_mode: Default::default(),
         workflow_kind: Default::default(),

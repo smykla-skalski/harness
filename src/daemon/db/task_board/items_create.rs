@@ -25,7 +25,7 @@ impl AsyncDaemonDb {
         &self,
         item: TaskBoardItem,
     ) -> Result<TaskBoardMutation, CliError> {
-        self.create_task_board_item_impl(item, TaskBoardTriageIngress::None)
+        self.create_task_board_item_impl(item, TaskBoardTriageIngress::None, false)
             .await
     }
 
@@ -35,7 +35,20 @@ impl AsyncDaemonDb {
         &self,
         item: TaskBoardItem,
     ) -> Result<TaskBoardMutation, CliError> {
-        self.create_task_board_item_impl(item, TaskBoardTriageIngress::HumanUpdate)
+        self.create_task_board_item_impl(item, TaskBoardTriageIngress::HumanUpdate, false)
+            .await
+    }
+
+    /// Like [`create_task_board_item_with_triage`], but for a create whose
+    /// request named the starting lane. The decision is still recorded, so a
+    /// later clear or re-evaluation has one to reconcile against, but the
+    /// placement effect never runs -- exactly how a human status move through
+    /// the update API is treated.
+    pub(crate) async fn create_task_board_item_at_requested_status(
+        &self,
+        item: TaskBoardItem,
+    ) -> Result<TaskBoardMutation, CliError> {
+        self.create_task_board_item_impl(item, TaskBoardTriageIngress::HumanUpdate, true)
             .await
     }
 
@@ -45,7 +58,7 @@ impl AsyncDaemonDb {
         &self,
         item: TaskBoardItem,
     ) -> Result<TaskBoardMutation, CliError> {
-        self.create_task_board_item_impl(item, TaskBoardTriageIngress::ProviderReconcile)
+        self.create_task_board_item_impl(item, TaskBoardTriageIngress::ProviderReconcile, false)
             .await
     }
 
@@ -57,6 +70,7 @@ impl AsyncDaemonDb {
         &self,
         mut item: TaskBoardItem,
         ingress: TaskBoardTriageIngress,
+        suppress_placement: bool,
     ) -> Result<TaskBoardMutation, CliError> {
         validate_item(&item)?;
         item.status = item.status.canonical_persisted_status();
@@ -71,7 +85,8 @@ impl AsyncDaemonDb {
         let (write, outcome) = match ingress {
             TaskBoardTriageIngress::None => (inserted, None),
             TaskBoardTriageIngress::HumanUpdate | TaskBoardTriageIngress::ProviderReconcile => {
-                apply_triage_after_insert_in_tx(&mut transaction, inserted).await?
+                apply_triage_after_insert_in_tx(&mut transaction, inserted, suppress_placement)
+                    .await?
             }
         };
         let change_revision = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
@@ -115,20 +130,28 @@ async fn reject_if_item_exists_in_tx(
 /// Evaluate `BuiltInV1` against a just-inserted item and, only if it changed
 /// status or placement, persist that through a follow-up automatic lane
 /// transition. Returns the original insert write unchanged otherwise, so a
-/// non-promoting create costs no extra revision bump. A fresh create never
-/// has a manual placement or an explicit status signal (the create request
-/// exposes neither), so placement is never suppressed here. The item did not
-/// exist a moment ago, so it cannot carry a triage override yet -- no query
-/// needed to know that.
+/// non-promoting create costs no extra revision bump. `suppress_placement`
+/// carries the create request's own explicit status choice, the direct human
+/// effect an update derives from a status field it just applied. A fresh
+/// create never carries a manual placement, and the item did not exist a
+/// moment ago, so it cannot carry a triage override yet -- no query needed to
+/// know that.
 async fn apply_triage_after_insert_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     inserted: LaneTransitionWrite,
+    suppress_placement: bool,
 ) -> Result<(LaneTransitionWrite, Option<TriageOutcome>), CliError> {
     let before_triage = inserted.item.clone();
     let mut item = inserted.item.clone();
     let decided_at = utc_now();
-    let outcome =
-        apply_active_triage_in_tx(transaction, &mut item, &decided_at, false, None).await?;
+    let outcome = apply_active_triage_in_tx(
+        transaction,
+        &mut item,
+        &decided_at,
+        suppress_placement,
+        None,
+    )
+    .await?;
     if item == before_triage {
         return Ok((inserted, outcome));
     }
