@@ -78,6 +78,7 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
     case githubDataChanged(GitHubDataChangedPayload)
     case taskBoardUpdated(TaskBoardUpdatedPayload)
     case reviewsLocalCloneProgress(ReviewLocalCloneProgress)
+    case taskBoardWorkingCopyProgress(TaskBoardWorkingCopyProgress)
     case auditEvent(HarnessMonitorAuditEvent)
     case unknown(eventName: String, payload: JSONValue)
   }
@@ -152,6 +153,16 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
         kind: .reviewsLocalCloneProgress(
           ReviewLocalCloneProgress(
             wire: try streamEvent.decodePayloadWire(as: LocalCloneProgressEventPayloadWire.self)
+          )
+        )
+      )
+    case "task_board_working_copy_progress":
+      return Self(
+        recordedAt: at,
+        sessionId: nil,
+        kind: .taskBoardWorkingCopyProgress(
+          TaskBoardWorkingCopyProgress(
+            wire: try streamEvent.decodePayloadWire(as: WorkingCopyProgressEventPayloadWire.self)
           )
         )
       )

@@ -41,6 +41,8 @@ extension HarnessMonitorStore {
       break
     case .reviewsLocalCloneProgress(let progress):
       applyLocalCloneProgress(progress)
+    case .taskBoardWorkingCopyProgress(let progress):
+      applyWorkingCopyProgress(progress)
     case .githubDataChanged(let payload):
       applyGitHubDataChange(payload)
     case .taskBoardUpdated(let payload):

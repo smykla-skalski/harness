@@ -234,6 +234,8 @@ extension HarnessMonitorStore {
       break
     case .reviewsLocalCloneProgress(let progress):
       applyLocalCloneProgress(progress)
+    case .taskBoardWorkingCopyProgress(let progress):
+      applyWorkingCopyProgress(progress)
     }
     if shouldTickSupervisor {
       scheduleSupervisorTick(reason: "session-update")

@@ -48,6 +48,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var dependencyFilesViewedBatchTasks: [String: Task<Void, Never>] = [:]
   @ObservationIgnored var dependencyFilesViewedPending: ReviewFilesViewedPending = [:]
   @ObservationIgnored var cloneProgressStreams = ReviewCloneProgressStreams()
+  @ObservationIgnored var workingCopyProgressStreams = TaskBoardWorkingCopyProgressStreams()
 
   public var openFolderRequest = 0
   public var attachSessionRequest = 0
