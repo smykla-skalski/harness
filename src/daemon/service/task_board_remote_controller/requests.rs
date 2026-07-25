@@ -1,6 +1,7 @@
 use chrono::{DateTime, Duration, SecondsFormat, Utc};
 use sha2::{Digest, Sha256};
 
+use crate::daemon::db::TaskBoardRemoteSettlementReceipt;
 use crate::daemon::db::{
     TaskBoardRemoteAssignmentRecord, TaskBoardRemoteHostSelection, TaskBoardRemotePriorPhaseBundle,
 };
@@ -237,7 +238,7 @@ pub(super) fn settlement_request(
 }
 
 pub(super) fn cleanup_observation_request(
-    settlement: &crate::daemon::db::TaskBoardRemoteSettlementReceipt,
+    settlement: &TaskBoardRemoteSettlementReceipt,
 ) -> Result<RemoteCleanupObservationRequest, CliError> {
     RemoteCleanupObservationRequest::for_settlement(&settlement.request)
         .map_err(|error| invalid(format!("seal remote cleanup observation: {error}")))

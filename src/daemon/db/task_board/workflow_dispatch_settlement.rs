@@ -14,6 +14,9 @@ use super::workflow_dispatch::workflow_owner;
 use super::workflow_executions::load_execution_in_tx;
 use super::workflow_start_admission::commit_frozen_start_admission_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
+use crate::task_board::TaskBoardAttemptState;
+use crate::task_board::TaskBoardExecutionState;
+use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::{
     DispatchAppliedTask, TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE,
     TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE, TASK_BOARD_EXECUTION_TARGET_RESOURCE,
@@ -194,13 +197,12 @@ pub(super) async fn workflow_start_is_durable_in_tx(
     }
     let promoted = !matches!(
         attempt.state,
-        crate::task_board::TaskBoardAttemptState::Preparing
-            | crate::task_board::TaskBoardAttemptState::Starting
+        TaskBoardAttemptState::Preparing | TaskBoardAttemptState::Starting
     ) && !matches!(
         execution.transition.execution_state,
-        crate::task_board::TaskBoardExecutionState::Pending
-            | crate::task_board::TaskBoardExecutionState::Preparing
-            | crate::task_board::TaskBoardExecutionState::Starting
+        TaskBoardExecutionState::Pending
+            | TaskBoardExecutionState::Preparing
+            | TaskBoardExecutionState::Starting
     );
     let started = assignment.started_at.is_some()
         && assignment
@@ -216,13 +218,13 @@ pub(super) async fn workflow_start_is_durable_in_tx(
         return Ok(assignment.claimed_at.is_some()
             && matches!(
                 assignment.state,
-                crate::task_board::TaskBoardRemoteAssignmentState::Started
-                    | crate::task_board::TaskBoardRemoteAssignmentState::Running
-                    | crate::task_board::TaskBoardRemoteAssignmentState::Completed
-                    | crate::task_board::TaskBoardRemoteAssignmentState::Failed
-                    | crate::task_board::TaskBoardRemoteAssignmentState::Cancelled
-                    | crate::task_board::TaskBoardRemoteAssignmentState::Unknown
-                    | crate::task_board::TaskBoardRemoteAssignmentState::Superseded
+                TaskBoardRemoteAssignmentState::Started
+                    | TaskBoardRemoteAssignmentState::Running
+                    | TaskBoardRemoteAssignmentState::Completed
+                    | TaskBoardRemoteAssignmentState::Failed
+                    | TaskBoardRemoteAssignmentState::Cancelled
+                    | TaskBoardRemoteAssignmentState::Unknown
+                    | TaskBoardRemoteAssignmentState::Superseded
             ));
     }
     if assignment.started_at.is_none() && assignment.workspace_ref.is_none() {

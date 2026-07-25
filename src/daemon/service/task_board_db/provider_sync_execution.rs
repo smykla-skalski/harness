@@ -1,6 +1,7 @@
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{TaskBoardSyncRequest, TaskBoardSyncResponse};
 use crate::errors::{CliError, CliErrorKind};
+use crate::github_api::refresh_read_generation;
 use crate::task_board::external::{
     ExternalSyncBatch, TaskBoardExternalCreateStore, assign_external_create_recovery,
     blocked_external_create_follow_ups, blocked_external_create_recovery,
@@ -70,7 +71,7 @@ pub(super) async fn execute(
     // branch and keep their cache; only the reconcile right after a manual Sync
     // refetches once.
     if requested_github_read(context, options, &config) {
-        crate::github_api::refresh_read_generation().await;
+        refresh_read_generation().await;
     }
     let mut clients =
         match configured_sync_clients_without_review_requests(&config, request.provider) {
@@ -140,7 +141,7 @@ fn combine_follow_up_error(existing: Option<CliError>, follow_up: CliError) -> C
     let Some(existing) = existing else {
         return follow_up;
     };
-    crate::errors::CliErrorKind::workflow_io(format!(
+    CliErrorKind::workflow_io(format!(
         "task-board provider sync failed: {existing}; \
 external create follow-up persistence failed: {follow_up}"
     ))

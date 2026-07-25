@@ -29,6 +29,7 @@ use crate::daemon::service::task_board_read_only_coordinator::requests::remote_c
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteCodexLaunchEnvelope, RemoteOfferRequest,
 };
+use crate::task_board::TaskBoardExecutionPhase;
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE, TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TaskBoardAttemptState, TaskBoardExecutionAttemptCas,
@@ -389,13 +390,10 @@ fn revision_binding_matches(
     expected_head: Option<&str>,
 ) -> bool {
     match parent.transition.phase {
-        Some(crate::task_board::TaskBoardExecutionPhase::Implementation) => {
+        Some(TaskBoardExecutionPhase::Implementation) => {
             expected_head.is_none() && implementation_base(parent) == Some(base)
         }
-        Some(
-            crate::task_board::TaskBoardExecutionPhase::Review
-            | crate::task_board::TaskBoardExecutionPhase::Evaluate,
-        ) => {
+        Some(TaskBoardExecutionPhase::Review | TaskBoardExecutionPhase::Evaluate) => {
             parent.transition.exact_head_revision.as_deref() == Some(base)
                 && expected_head == Some(base)
         }

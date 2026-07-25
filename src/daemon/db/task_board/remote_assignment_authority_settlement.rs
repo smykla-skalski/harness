@@ -13,6 +13,7 @@ use super::workflow_executions::{load_execution_in_tx, update_execution_in_tx};
 use super::workflow_terminal::project_terminal_execution_in_tx;
 use crate::daemon::db::{CliError, db_error};
 use crate::daemon::task_board_remote_transport::wire::{RemoteCancelRequest, RemoteClaimRequest};
+use crate::task_board::TaskBoardWorkflowExecutionRecord;
 use crate::task_board::{
     TASK_BOARD_REMOTE_CANCEL_INTENT_AT_RESOURCE, TASK_BOARD_REMOTE_CANCEL_INTENT_REASON_RESOURCE,
     TASK_BOARD_REMOTE_CANCEL_INTENT_RESOURCE, TASK_BOARD_REMOTE_CANCEL_IO_AUTHORITY_RESOURCE,
@@ -59,7 +60,7 @@ pub(super) async fn adopt_remote_claim_evidence_in_tx(
     assignment: &TaskBoardRemoteAssignmentRecord,
     claimed_at: &str,
     authority_digest: Option<&str>,
-) -> Result<crate::task_board::TaskBoardWorkflowExecutionRecord, CliError> {
+) -> Result<TaskBoardWorkflowExecutionRecord, CliError> {
     let parent = claim_parent(transaction, assignment, authority_digest).await?;
     let offer = assignment.require_offer()?;
     let mut active = parent.attempts.iter().enumerate().filter(|(_, attempt)| {
@@ -126,7 +127,7 @@ async fn claim_parent(
     transaction: &mut Transaction<'_, Sqlite>,
     assignment: &TaskBoardRemoteAssignmentRecord,
     authority_digest: Option<&str>,
-) -> Result<crate::task_board::TaskBoardWorkflowExecutionRecord, CliError> {
+) -> Result<TaskBoardWorkflowExecutionRecord, CliError> {
     if let Some(digest) = authority_digest {
         return require_authority_parent(
             transaction,
@@ -196,7 +197,7 @@ pub(super) async fn project_cancelled_workflow_in_tx(
     assignment: &TaskBoardRemoteAssignmentRecord,
     request: &RemoteCancelRequest,
     durable_state: TaskBoardRemoteAssignmentState,
-    parent: crate::task_board::TaskBoardWorkflowExecutionRecord,
+    parent: TaskBoardWorkflowExecutionRecord,
     settled_at: &str,
 ) -> Result<(), CliError> {
     let offer = assignment.require_offer()?;

@@ -31,6 +31,7 @@ use super::remote_operation_trust::{
 use super::workflow_executions::load_execution_in_tx;
 use super::{ORCHESTRATOR_CHANGE_SCOPE, items::bump_change_in_tx};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
+use crate::daemon::task_board_remote_transport::wire::RemoteClaimRequest;
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteAssignmentWireState, RemoteStatusRequest, RemoteStatusResponse,
 };
@@ -414,7 +415,7 @@ async fn persist_lost_claim_receipt_in_tx(
     record: &TaskBoardRemoteAssignmentRecord,
     response: &RemoteStatusResponse,
     principal: &str,
-    pending_claim: Option<&crate::daemon::task_board_remote_transport::wire::RemoteClaimRequest>,
+    pending_claim: Option<&RemoteClaimRequest>,
 ) -> Result<(), CliError> {
     let Some(claimed_at) = response.claimed_at.as_deref() else {
         return Ok(());

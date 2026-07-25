@@ -1,3 +1,4 @@
+use std::sync::PoisonError;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -190,7 +191,7 @@ impl RemoteRequestLimits {
     ) -> RemoteUnauthenticatedAuditAdmission {
         self.unauthenticated_audit_limiter
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .unwrap_or_else(PoisonError::into_inner)
             .admit(remote_addr)
     }
 

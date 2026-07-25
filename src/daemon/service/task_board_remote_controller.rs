@@ -6,7 +6,10 @@ use std::time::Duration;
 use chrono::{SecondsFormat, Utc};
 use futures_util::future::join_all;
 use tokio::sync::Mutex;
+use tokio::task::spawn_blocking;
+use tokio::time::timeout;
 
+use crate::daemon::db::TaskBoardRemotePriorPhaseBundle;
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteHostTrustFence,
     TaskBoardRemoteOfferOutcome,
@@ -14,7 +17,11 @@ use crate::daemon::db::{
 use crate::daemon::task_board_remote_transport::controller::{
     RemoteExecutionControllerClient, RemoteExecutionControllerError,
 };
+use crate::daemon::task_board_remote_transport::wire::RemoteStatusRequest;
 use crate::errors::CliError;
+use crate::errors::CliErrorKind;
+use crate::git::bundle_contract::MAX_REMOTE_GIT_BUNDLE_BYTES;
+use crate::git::source_bundle_export::GitSourceBundleExportPlan;
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptRecord,
     TaskBoardExecutionPhase, TaskBoardRemoteAssignmentState, TaskBoardWorkflowExecutionCas,
@@ -131,7 +138,7 @@ async fn refresh_host_ids(
         let result = refresh_host(db, &host_id).await;
         (host_id, result)
     }));
-    let Ok(results) = tokio::time::timeout(CONTROLLER_REFRESH_BUDGET, refreshes).await else {
+    let Ok(results) = timeout(CONTROLLER_REFRESH_BUDGET, refreshes).await else {
         report.failures.push(format!(
             "remote host refresh exceeded its {}s cycle budget",
             CONTROLLER_REFRESH_BUDGET.as_secs()
@@ -235,9 +242,7 @@ async fn poll_unknown_assignment_with<Status, StatusFuture, FinishTerminal, Fini
     finish_terminal: FinishTerminal,
 ) -> Result<bool, CliError>
 where
-    Status: FnOnce(
-        crate::daemon::task_board_remote_transport::wire::RemoteStatusRequest,
-    ) -> StatusFuture,
+    Status: FnOnce(RemoteStatusRequest) -> StatusFuture,
     StatusFuture: Future<Output = Result<(), CliError>>,
     FinishTerminal: FnOnce(TaskBoardRemoteAssignmentRecord) -> FinishFuture,
     FinishFuture: Future<Output = Result<bool, CliError>>,
@@ -338,7 +343,7 @@ async fn offer_remote_candidates(
         };
         match Box::pin(db.offer_task_board_remote_assignment_with_source(
             &TaskBoardWorkflowExecutionCas::from(&execution),
-            &crate::task_board::TaskBoardExecutionAttemptCas::from(attempt),
+            &TaskBoardExecutionAttemptCas::from(attempt),
             &prepared.request,
             prepared.source_content.as_deref(),
             &host.config.host_id,
@@ -359,7 +364,7 @@ async fn offer_remote_candidates(
             // back to local at this pre-I/O offer boundary if that provenance invariant is broken.
             TaskBoardRemoteOfferOutcome::AcceptedReplay(_)
             | TaskBoardRemoteOfferOutcome::Rejected(_) => {
-                return Err(crate::errors::CliErrorKind::concurrent_modification(
+                return Err(CliErrorKind::concurrent_modification(
                     "controller offer creation returned an executor-inbox receipt outcome",
                 )
                 .into());
@@ -373,17 +378,15 @@ async fn offer_remote_candidates(
 async fn prepare_candidate_source(
     execution: &TaskBoardWorkflowExecutionRecord,
     phase: TaskBoardExecutionPhase,
-    prior_bundle: Option<&crate::daemon::db::TaskBoardRemotePriorPhaseBundle>,
+    prior_bundle: Option<&TaskBoardRemotePriorPhaseBundle>,
 ) -> Result<Option<requests::PreparedRemoteSource>, CliError> {
     if let Some(identity) = requests::initial_snapshot_identity(execution, phase)? {
         let worktree = PathBuf::from(identity.0);
         let repository = identity.1.to_owned();
         let revision = identity.2.to_owned();
-        let exported = tokio::task::spawn_blocking(move || {
-            crate::git::source_bundle_export::GitSourceBundleExportPlan::for_revision(
-                &worktree, repository, revision,
-            )?
-            .export(crate::git::bundle_contract::MAX_REMOTE_GIT_BUNDLE_BYTES)
+        let exported = spawn_blocking(move || {
+            GitSourceBundleExportPlan::for_revision(&worktree, repository, revision)?
+                .export(MAX_REMOTE_GIT_BUNDLE_BYTES)
         })
         .await;
         return match exported {
@@ -477,13 +480,13 @@ fn controller_database_error(error: RemoteExecutionControllerError) -> CliError 
     match error {
         RemoteExecutionControllerError::Database(error) => error,
         RemoteExecutionControllerError::Transport(error) => {
-            crate::errors::CliErrorKind::workflow_io(error.to_string()).into()
+            CliErrorKind::workflow_io(error.to_string()).into()
         }
     }
 }
 
 fn missing_execution() -> CliError {
-    crate::errors::CliErrorKind::concurrent_modification(
+    CliErrorKind::concurrent_modification(
         "remote execution disappeared during controller progression",
     )
     .into()

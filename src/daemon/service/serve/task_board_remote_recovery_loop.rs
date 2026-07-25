@@ -7,6 +7,8 @@ use tokio::time::{Instant as TokioInstant, sleep_until};
 
 use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteRecoveryBatch, utc_now};
 use crate::daemon::http::DaemonHttpState;
+use crate::daemon::service::task_board_remote_controller::drive_task_board_remote_controller;
+use crate::daemon::service::task_board_remote_controller::drive_task_board_remote_controller_before_local_work;
 use crate::errors::{CliError, CliErrorKind};
 
 const MINIMUM_RETRY: Duration = Duration::from_secs(1);
@@ -78,10 +80,7 @@ pub(crate) async fn recover_remote_assignments_before_local_work(
     db: &AsyncDaemonDb,
 ) -> Result<(), CliError> {
     for _ in 0..MAXIMUM_FOREGROUND_PAGES {
-        let report = Box::pin(
-            crate::daemon::service::task_board_remote_controller::drive_task_board_remote_controller_before_local_work(db),
-        )
-        .await?;
+        let report = Box::pin(drive_task_board_remote_controller_before_local_work(db)).await?;
         if !report.scan_incomplete {
             return Box::pin(recover_remote_assignments_before_work(db)).await;
         }
@@ -134,10 +133,7 @@ pub(crate) async fn recover_remote_assignments_at_startup_with_controller(
     db: &AsyncDaemonDb,
 ) -> Result<(), CliError> {
     for _ in 0..MAXIMUM_STARTUP_PAGES {
-        let report = Box::pin(
-            crate::daemon::service::task_board_remote_controller::drive_task_board_remote_controller_before_local_work(db),
-        )
-        .await?;
+        let report = Box::pin(drive_task_board_remote_controller_before_local_work(db)).await?;
         if report.scan_incomplete {
             continue;
         }
@@ -162,13 +158,7 @@ async fn maintain_remote_recovery_after_controller(
     db: &AsyncDaemonDb,
     schedule: &mut RecoverySchedule,
 ) {
-    let coverage = match Box::pin(
-        crate::daemon::service::task_board_remote_controller::drive_task_board_remote_controller(
-            db,
-        ),
-    )
-    .await
-    {
+    let coverage = match Box::pin(drive_task_board_remote_controller(db)).await {
         Ok(report) => {
             for failure in &report.failures {
                 tracing::warn!(error = %failure, "task-board remote controller operation failed");

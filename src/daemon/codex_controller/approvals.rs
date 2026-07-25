@@ -1,3 +1,4 @@
+use std::env::var_os;
 use std::path::Path;
 
 use serde_json::{Map, Value, json};
@@ -40,7 +41,7 @@ pub(super) fn runtime_workspace_roots(project_dir: &str) -> Vec<String> {
 }
 
 pub(super) fn workspace_permission_config(project_dir: &str) -> Value {
-    let signing_socket = std::env::var_os("SSH_AUTH_SOCK");
+    let signing_socket = var_os("SSH_AUTH_SOCK");
     workspace_permission_config_with_signing_socket(
         project_dir,
         signing_socket.as_deref().map(Path::new),

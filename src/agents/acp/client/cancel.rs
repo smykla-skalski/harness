@@ -12,6 +12,8 @@
 //! [`ClientCallCancel::on_cancel`].
 
 use std::sync::Mutex;
+use std::sync::MutexGuard;
+use std::sync::PoisonError;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use std::sync::Arc;
@@ -94,11 +96,11 @@ impl ClientCallCancel {
         self.lock_wake().take()
     }
 
-    fn lock_wake(&self) -> std::sync::MutexGuard<'_, Option<WakeCallback>> {
+    fn lock_wake(&self) -> MutexGuard<'_, Option<WakeCallback>> {
         self.state
             .wake
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .unwrap_or_else(PoisonError::into_inner)
     }
 }
 

@@ -6,6 +6,7 @@ use super::{
     TaskBoardRemoteOperationKind, load_operation_fence_for_kind_in_tx,
     persist_operation_trust_in_tx, require_sha256,
 };
+use crate::daemon::db::TaskBoardRemoteControllerOperationToken;
 use crate::daemon::db::task_board::remote_assignment_model::{concurrent, to_i64};
 use crate::daemon::db::task_board::remote_lifecycle_trust::{
     TaskBoardRemoteLifecycleTrustSnapshot, digest_values, load_generation_lifecycle_trust_in_tx,
@@ -237,7 +238,7 @@ fn cleanup_operation_digest(
 }
 
 fn cleanup_operation_matches(
-    operation: &crate::daemon::db::TaskBoardRemoteControllerOperationToken,
+    operation: &TaskBoardRemoteControllerOperationToken,
     request_sha256: &str,
     trust_sha256: &str,
     fence: &TaskBoardRemoteLifecycleTrustSnapshot,

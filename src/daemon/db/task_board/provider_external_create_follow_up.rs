@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use chrono::{DateTime, Duration, Utc};
 use serde_json::{Value, json};
 use sqlx::{Sqlite, Transaction, query, query_as};
@@ -225,7 +227,7 @@ fn deterministic_completion_timestamp(attached_at: &str) -> Result<String, CliEr
 fn compare_intents(
     left: &TaskBoardExternalCreateIntent,
     right: &TaskBoardExternalCreateIntent,
-) -> std::cmp::Ordering {
+) -> Ordering {
     provider_label(left.provider)
         .cmp(provider_label(right.provider))
         .then_with(|| left.scope_id.cmp(&right.scope_id))

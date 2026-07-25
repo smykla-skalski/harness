@@ -10,6 +10,10 @@ pub use harness_protocol::managed_agents::acp::{
 };
 use tracing::warn;
 
+#[cfg(feature = "daemon-runtime")]
+use crate::daemon::sandboxed_from_env;
+#[cfg(feature = "daemon-runtime")]
+use crate::errors::CliError;
 use crate::workspace::{account_home_dir, dirs_home, normalized_env_value, utc_now};
 
 use super::catalog::{AcpAgentDescriptor, acp_agents};
@@ -125,8 +129,7 @@ fn schedule_probe_cache_refresh_with(spawn_refresh: fn()) {
 }
 
 #[cfg(feature = "daemon-runtime")]
-fn bridge_cached_probe_snapshot() -> Result<Option<AcpRuntimeProbeResponse>, crate::errors::CliError>
-{
+fn bridge_cached_probe_snapshot() -> Result<Option<AcpRuntimeProbeResponse>, CliError> {
     use crate::daemon::bridge::{BridgeCapability, BridgeClient};
 
     BridgeClient::for_capability(BridgeCapability::Acp).and_then(|bridge| bridge.acp_probe())
@@ -134,7 +137,7 @@ fn bridge_cached_probe_snapshot() -> Result<Option<AcpRuntimeProbeResponse>, cra
 
 fn spawn_routed_probe_cache_refresh() {
     #[cfg(feature = "daemon-runtime")]
-    if crate::daemon::sandboxed_from_env() {
+    if sandboxed_from_env() {
         spawn_bridge_probe_cache_refresh();
         return;
     }

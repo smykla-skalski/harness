@@ -1,3 +1,4 @@
+use sqlx::error::DatabaseError;
 use sqlx::{FromRow, Sqlite, Transaction, query, query_as};
 
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
@@ -359,7 +360,7 @@ impl AsyncDaemonDb {
             // it, which is what an IO code invites, can never succeed.
             if error
                 .as_database_error()
-                .is_some_and(sqlx::error::DatabaseError::is_unique_violation)
+                .is_some_and(DatabaseError::is_unique_violation)
             {
                 return CliError::from(CliErrorKind::usage_error(format!(
                     "another {} project already uses the slug '{slug}'",

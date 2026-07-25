@@ -13,9 +13,11 @@
 
 use serde::{Deserialize, Serialize};
 use utoipa::OpenApi;
+use utoipa::openapi::OpenApi as OpenApiDocument;
 use utoipa_axum::router::OpenApiRouter;
 
 use crate::daemon::protocol::{HTTP_API_CONTRACT, HttpRouteMethod};
+use crate::daemon::task_board_remote_transport::routes::execution_routes;
 
 /// Route recogniser and full operation table for the remote-execution
 /// transport, surfaced here (only under the `openapi` feature) so the contract
@@ -104,14 +106,14 @@ pub(super) fn daemon_openapi_router() -> OpenApiRouter<super::DaemonHttpState> {
         .merge(super::openrouter_models::openrouter_model_routes())
         .merge(super::remote_clients::remote_client_routes())
         .merge(super::remote_pairing::remote_pairing_routes())
-        .merge(crate::daemon::task_board_remote_transport::routes::execution_routes())
+        .merge(execution_routes())
         .merge(super::signals::signal_routes())
         .merge(super::voice::voice_routes())
 }
 
 /// Build the typed `OpenAPI` document from the daemon router.
 #[must_use]
-pub fn openapi_document() -> utoipa::openapi::OpenApi {
+pub fn openapi_document() -> OpenApiDocument {
     let mut doc = daemon_openapi_router().into_openapi();
     env!("CARGO_PKG_VERSION").clone_into(&mut doc.info.version);
     doc

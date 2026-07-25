@@ -12,6 +12,7 @@ use agent_client_protocol::schema::v1::{
 };
 
 use super::session_config::AcpSessionRequestConfig;
+use crate::daemon::agent_acp::AcpMcpHttpHeader;
 use crate::daemon::agent_acp::{AcpAgentHandshake, AcpMcpServer};
 
 /// The inputs both `session/new` and `session/resume` carry, after the
@@ -122,7 +123,7 @@ fn mcp_server(server: &AcpMcpServer) -> McpServer {
     }
 }
 
-fn http_headers(headers: &[crate::daemon::agent_acp::AcpMcpHttpHeader]) -> Vec<HttpHeader> {
+fn http_headers(headers: &[AcpMcpHttpHeader]) -> Vec<HttpHeader> {
     headers
         .iter()
         .map(|header| HttpHeader::new(header.name.clone(), header.value.clone()))

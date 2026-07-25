@@ -13,6 +13,8 @@ use super::remote_claim_receipts::{
     claim_receipt_values, claim_response_for_record, exact_claim_response,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
+use crate::daemon::task_board_remote_transport::wire::RemoteClaimResponse;
+use crate::daemon::task_board_remote_transport::wire::TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION;
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteAttemptBinding, RemoteClaimRequest, RemoteLeaseRenewRequest,
 };
@@ -222,8 +224,7 @@ pub(super) fn renew_request_for_record(
         .clone()
         .ok_or_else(|| db_error("remote renewal lease id is missing"))?;
     RemoteLeaseRenewRequest {
-        schema_version:
-            crate::daemon::task_board_remote_transport::wire::TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
+        schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: offer.binding.clone(),
         lease_id,
         offer_request_sha256: offer.request_sha256.clone(),
@@ -243,8 +244,7 @@ pub(super) fn claim_request_for_record(
         .clone()
         .ok_or_else(|| db_error("remote claim lease id is missing"))?;
     RemoteClaimRequest {
-        schema_version:
-            crate::daemon::task_board_remote_transport::wire::TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
+        schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: offer.binding.clone(),
         lease_id,
         offer_request_sha256: offer.request_sha256.clone(),
@@ -314,7 +314,7 @@ async fn claim_assignment_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     record: &TaskBoardRemoteAssignmentRecord,
     request: &RemoteClaimRequest,
-    response: &crate::daemon::task_board_remote_transport::wire::RemoteClaimResponse,
+    response: &RemoteClaimResponse,
     principal: &str,
     claimed_at: &str,
 ) -> Result<(), CliError> {

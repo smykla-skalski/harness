@@ -12,6 +12,7 @@ use crate::daemon::db::CliError;
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteAssignmentWireState, RemoteClaimRequest, RemoteStatusResponse,
 };
+use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::{
     TASK_BOARD_REMOTE_CLAIM_IO_AUTHORITY_RESOURCE, TaskBoardAttemptState, TaskBoardExecutionState,
     TaskBoardWorkflowExecutionRecord,
@@ -211,7 +212,7 @@ fn recovered_unknown_status_is_definitive(
     assignment: &TaskBoardRemoteAssignmentRecord,
     response: &RemoteStatusResponse,
 ) -> bool {
-    assignment.state == crate::task_board::TaskBoardRemoteAssignmentState::Unknown
+    assignment.state == TaskBoardRemoteAssignmentState::Unknown
         && matches!(
             response.state,
             RemoteAssignmentWireState::Completed

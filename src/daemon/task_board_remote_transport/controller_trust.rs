@@ -6,10 +6,12 @@ use super::controller::{
 };
 use super::controller_clock::ControllerClock;
 use super::wire_conversion::domain_host_advertisement;
+use crate::daemon::db::TaskBoardRemoteOperationKind;
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteHostSelection, TaskBoardRemoteHostTrustFence,
     TaskBoardRemoteOperationTrustFence,
 };
+use crate::task_board::TaskBoardExecutionHostConfig;
 
 impl RemoteExecutionControllerClient {
     pub(crate) fn connect(
@@ -101,7 +103,7 @@ impl RemoteExecutionControllerClient {
     pub(super) async fn current_operation_trust_for(
         &self,
         db: &AsyncDaemonDb,
-        kind: crate::daemon::db::TaskBoardRemoteOperationKind,
+        kind: TaskBoardRemoteOperationKind,
         assignment_id: &str,
     ) -> Result<TaskBoardRemoteOperationTrustFence, RemoteExecutionControllerError> {
         if kind.requires_enabled_host() {
@@ -186,7 +188,7 @@ impl RemoteExecutionControllerClient {
 }
 
 fn client_config(
-    host: &crate::task_board::TaskBoardExecutionHostConfig,
+    host: &TaskBoardExecutionHostConfig,
 ) -> Result<RemoteExecutionHttpClientConfig, super::client::RemoteExecutionHttpError> {
     RemoteExecutionHttpClientConfig::new(
         &host.endpoint,

@@ -2,6 +2,7 @@ use chrono::{DateTime, Duration, Utc};
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::errors::CliError;
+use crate::task_board::TaskBoardWorkflowExecutionCas;
 use crate::task_board::{
     TASK_BOARD_SIDE_EFFECT_CLAIM_GRACE_SECONDS, TaskBoardAttemptResultArtifact,
     TaskBoardAttemptState, TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptCasOutcome,
@@ -317,7 +318,7 @@ async fn claim_lifecycle_attempt(
         claimed.available_at = Some(publish_claim_deadline(now)?);
         return db
             .claim_task_board_workflow_side_effect(
-                &crate::task_board::TaskBoardWorkflowExecutionCas::from(&current_execution),
+                &TaskBoardWorkflowExecutionCas::from(&current_execution),
                 &TaskBoardExecutionAttemptCas::from(current),
                 &claimed,
                 now,

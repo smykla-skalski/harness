@@ -23,6 +23,7 @@ use super::wire_limits::{
 use crate::daemon::db::utc_now;
 use crate::daemon::http::{DaemonHttpState, require_async_db, require_execution_remote_client};
 use crate::daemon::http::openapi::DaemonErrorBody;
+use crate::errors::CliErrorKind;
 use super::wire::{
     RemoteArtifactFetchResponse, RemoteClaimResponse, RemoteHostAdvertisement, RemoteOfferResponse,
     RemoteSettledResponse, RemoteSourceBundleUploadResponse, RemoteStatusResponse,
@@ -207,7 +208,7 @@ async fn advertise(headers: HeaderMap, State(state): State<DaemonHttpState>) -> 
             let host = local_host(db).await?;
             let client =
                 require_execution_remote_client(&headers, &state, "advertise").map_err(|_| {
-                    crate::errors::CliErrorKind::session_permission_denied(
+                    CliErrorKind::session_permission_denied(
                         "remote executor authorization denied",
                     )
                 })?;

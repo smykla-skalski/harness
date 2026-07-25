@@ -1,11 +1,14 @@
+use std::fmt::Display;
 use std::path::{Path, PathBuf};
 
 use tokio::task::spawn_blocking;
 
 use super::{RemoteWorkerIdentity, concurrent, invalid_transition};
 use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteAssignmentRecord};
+use crate::daemon::task_board_remote_transport::wire::RemoteSourceBundleUploadRequest;
 use crate::daemon::task_board_remote_transport::wire::{RemoteOfferRequest, RemoteSourceMaterial};
 use crate::errors::{CliError, CliErrorKind};
+use crate::git::GitError;
 use crate::git::bundle::{GitBundleImportPlan, GitBundleWorktreeState};
 use crate::git::source_bundle_import::GitSourceBundleImportPlan;
 
@@ -177,10 +180,7 @@ async fn exact_materialized_request(
     db: &AsyncDaemonDb,
     record: &TaskBoardRemoteAssignmentRecord,
     offer: &RemoteOfferRequest,
-) -> Result<
-    crate::daemon::task_board_remote_transport::wire::RemoteSourceBundleUploadRequest,
-    CliError,
-> {
+) -> Result<RemoteSourceBundleUploadRequest, CliError> {
     let stored = db
         .task_board_remote_source_bundle(record)
         .await?
@@ -229,10 +229,10 @@ impl SourceBundleImportPlan {
     }
 }
 
-fn git_error(error: &crate::git::GitError) -> CliError {
+fn git_error(error: &GitError) -> CliError {
     CliErrorKind::workflow_io(format!("apply remote source bundle: {error}")).into()
 }
 
-fn wire_error(error: &impl std::fmt::Display) -> CliError {
+fn wire_error(error: &impl Display) -> CliError {
     CliErrorKind::workflow_io(format!("materialize remote source bundle: {error}")).into()
 }

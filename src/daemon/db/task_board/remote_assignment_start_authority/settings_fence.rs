@@ -7,6 +7,7 @@ use super::{
     executor_settings_still_match, executor_start_authority, executor_start_io_permit,
     remote_executor_identity, start_authority_eligible,
 };
+use crate::daemon::db::TaskBoardRemoteAssignmentRecord;
 use crate::daemon::db::task_board::remote_assignment_lease::{
     commit_noop, finish_mutation, require_assignment,
 };
@@ -42,7 +43,7 @@ pub(crate) async fn refuse_settings_replacement_during_executor_start_io(
 
 pub(super) async fn revoke_unpermitted_start_in_tx(
     mut transaction: Transaction<'_, Sqlite>,
-    record: &crate::daemon::db::TaskBoardRemoteAssignmentRecord,
+    record: &TaskBoardRemoteAssignmentRecord,
     identity: &TaskBoardRemoteExecutorIdentity,
     observed_at: &str,
 ) -> Result<(), CliError> {

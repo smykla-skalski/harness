@@ -10,6 +10,7 @@ use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::remote_pairing_expiry_loop::spawn_remote_pairing_expiry_loop;
 use crate::daemon::websocket::{PreparedBroadcast, ReplayBuffer, run_broadcast_fanout};
+use crate::feature_flags::task_board_triage_escalation_config_from_env;
 
 #[path = "task_board_automation_loop.rs"]
 mod task_board_automation_loop;
@@ -120,7 +121,7 @@ pub(super) fn spawn_background_tasks(
         }),
         _task_board_remote_recovery_loop: remote_recovery,
         _task_board_triage_escalation_loop: app_state.async_db.get().map(|db| {
-            let config = crate::feature_flags::task_board_triage_escalation_config_from_env();
+            let config = task_board_triage_escalation_config_from_env();
             db.set_triage_escalation_config(config);
             spawn_task_board_triage_escalation_loop(app_state.clone(), config, shutdown_rx.clone())
         }),

@@ -4,6 +4,7 @@
 //! stderr to tail, and no process pool to key on. The session otherwise runs
 //! the same protocol loop as a local agent, behind a childless supervisor.
 
+use std::env::var;
 use std::sync::Arc;
 
 use agent_client_protocol_http::HttpClient;
@@ -165,7 +166,7 @@ fn build_http_client(endpoint: &AcpEndpoint) -> Result<HttpClient, CliError> {
     }
     let mut headers = HeaderMap::new();
     for (name, env_var) in &endpoint.headers_env {
-        let value = std::env::var(env_var).map_err(|_| {
+        let value = var(env_var).map_err(|_| {
             CliErrorKind::workflow_io(format!(
                 "header '{name}' needs environment variable '{env_var}', which is not set"
             ))

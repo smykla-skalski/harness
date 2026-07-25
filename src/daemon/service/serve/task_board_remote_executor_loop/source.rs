@@ -1,5 +1,6 @@
 #[cfg(test)]
 use std::collections::HashMap;
+use std::io::Error;
 use std::path::{Path, PathBuf};
 #[cfg(test)]
 use std::sync::{Arc, Mutex, OnceLock};
@@ -16,7 +17,9 @@ use crate::daemon::protocol::SessionStartRequest;
 use crate::daemon::service::start_session_direct_async;
 use crate::daemon::task_board_remote_transport::wire::{RemoteOfferRequest, RemoteSourceMaterial};
 use crate::errors::{CliError, CliErrorKind};
+use crate::git::GitError;
 use crate::git::GitRepository;
+use crate::session::types::SessionState;
 use crate::task_board::{
     TaskBoardExecutionPhase, TaskBoardOrchestratorSettings, validate_local_execution_host_config,
 };
@@ -262,7 +265,7 @@ async fn verify_repository_revision(origin: PathBuf, revision: String) -> Result
 }
 
 async fn validate_remote_session(
-    session: &crate::session::types::SessionState,
+    session: &SessionState,
     origin: &Path,
     revision: &str,
     session_id: &str,
@@ -311,10 +314,10 @@ pub(super) fn validate_remote_worktree_head(
     }
 }
 
-fn git_error(error: &crate::git::GitError) -> CliError {
+fn git_error(error: &GitError) -> CliError {
     CliErrorKind::workflow_io(format!("verify remote executor Git source: {error}")).into()
 }
 
-fn io_error(error: &std::io::Error) -> CliError {
+fn io_error(error: &Error) -> CliError {
     CliErrorKind::workflow_io(format!("verify remote executor path: {error}")).into()
 }

@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
@@ -34,7 +36,7 @@ pub(super) async fn post_task_board_triage_escalation_verdict(
     State(state): State<DaemonHttpState>,
     Json(request): Json<TaskBoardTriageEscalationVerdictRequest>,
 ) -> Response {
-    let start = std::time::Instant::now();
+    let start = Instant::now();
     let request_id = extract_request_id(&headers);
     let result = match require_async_db(&state, "task board triage escalation verdict") {
         Ok(db) => db

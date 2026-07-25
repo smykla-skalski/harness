@@ -15,6 +15,7 @@ use super::remote_source_bundles::{
     load_source_bundle_in_tx,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
+use crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest;
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteSourceBundleUploadRequest, RemoteSourceBundleUploadResponse,
 };
@@ -226,7 +227,7 @@ pub(super) fn require_upload_assignment(
 
 pub(super) fn require_upload_assignment_without_content(
     assignment: &super::TaskBoardRemoteAssignmentRecord,
-    offer: &crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest,
+    offer: &RemoteOfferRequest,
     principal: &str,
 ) -> Result<(), CliError> {
     let exact = assignment.state == TaskBoardRemoteAssignmentState::Offered

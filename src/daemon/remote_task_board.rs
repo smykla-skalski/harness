@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::Serialize;
 
 use crate::daemon::protocol::{
@@ -39,7 +41,7 @@ pub(crate) enum TaskBoardPositionSnapshotResponse {
 pub(crate) struct RemoteViewerTaskBoardListResponse {
     items: Vec<RemoteViewerTaskBoardItem>,
     items_change_seq: i64,
-    item_revisions: std::collections::HashMap<String, i64>,
+    item_revisions: HashMap<String, i64>,
 }
 
 #[derive(Serialize)]

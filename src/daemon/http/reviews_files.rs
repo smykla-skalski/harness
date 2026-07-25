@@ -7,8 +7,10 @@ use axum::Json;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{
-    ReviewsFileCommentRequest, ReviewsFilesBlobRequest, ReviewsFilesListRequest,
-    ReviewsFilesPatchRequest, ReviewsFilesPreviewRequest, ReviewsFilesViewedRequest, http_paths,
+    ReviewsFileCommentRequest, ReviewsFileCommentResponse, ReviewsFilesBlobRequest,
+    ReviewsFilesBlobResponse, ReviewsFilesListRequest, ReviewsFilesListResponse,
+    ReviewsFilesPatchRequest, ReviewsFilesPatchResponse, ReviewsFilesPreviewRequest,
+    ReviewsFilesPreviewResponse, ReviewsFilesViewedRequest, ReviewsFilesViewedResponse, http_paths,
 };
 use crate::daemon::service;
 use crate::reviews::LocalCloneListEntry;
@@ -41,7 +43,7 @@ pub(super) fn merge_files_routes(
     description = "List the files changed in a pull request",
     request_body = ReviewsFilesListRequest,
     responses(
-        (status = 200, description = "Changed files for a pull request", body = crate::daemon::protocol::ReviewsFilesListResponse),
+        (status = 200, description = "Changed files for a pull request", body = ReviewsFilesListResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -72,7 +74,7 @@ pub(super) async fn post_review_files_list(
     description = "Fetch the per-path patches for a pull request, detecting drift against the current upstream state",
     request_body = ReviewsFilesPatchRequest,
     responses(
-        (status = 200, description = "Per-path patches with drift detection", body = crate::daemon::protocol::ReviewsFilesPatchResponse),
+        (status = 200, description = "Per-path patches with drift detection", body = ReviewsFilesPatchResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -103,7 +105,7 @@ pub(super) async fn post_review_files_patch(
     description = "Fetch line-limited previews of the per-path patches for a pull request, detecting drift against upstream",
     request_body = ReviewsFilesPreviewRequest,
     responses(
-        (status = 200, description = "Line-limited patch previews with drift detection", body = crate::daemon::protocol::ReviewsFilesPreviewResponse),
+        (status = 200, description = "Line-limited patch previews with drift detection", body = ReviewsFilesPreviewResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -134,7 +136,7 @@ pub(super) async fn post_review_files_preview(
     description = "Mark the given files as viewed or unviewed and report the outcome for each path",
     request_body = ReviewsFilesViewedRequest,
     responses(
-        (status = 200, description = "Per-path viewed-state outcomes", body = crate::daemon::protocol::ReviewsFilesViewedResponse),
+        (status = 200, description = "Per-path viewed-state outcomes", body = ReviewsFilesViewedResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -165,7 +167,7 @@ pub(super) async fn post_review_files_viewed(
     description = "Fetch a base64-encoded image blob for a file in a pull request, along with its metadata",
     request_body = ReviewsFilesBlobRequest,
     responses(
-        (status = 200, description = "Base64-encoded image blob with metadata", body = crate::daemon::protocol::ReviewsFilesBlobResponse),
+        (status = 200, description = "Base64-encoded image blob with metadata", body = ReviewsFilesBlobResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -196,7 +198,7 @@ pub(super) async fn post_review_files_blob(
     description = "Post a line comment on a file or reply to an existing review thread",
     request_body = ReviewsFileCommentRequest,
     responses(
-        (status = 200, description = "Result of posting the file comment or thread reply", body = crate::daemon::protocol::ReviewsFileCommentResponse),
+        (status = 200, description = "Result of posting the file comment or thread reply", body = ReviewsFileCommentResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -226,7 +228,7 @@ pub(super) async fn post_review_files_comment(
     tag = "reviews",
     description = "List the entries in the local bare-clone registry used to serve review file content",
     responses(
-        (status = 200, description = "Local bare-clone registry entries", body = Vec<crate::reviews::LocalCloneListEntry>),
+        (status = 200, description = "Local bare-clone registry entries", body = Vec<LocalCloneListEntry>),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]

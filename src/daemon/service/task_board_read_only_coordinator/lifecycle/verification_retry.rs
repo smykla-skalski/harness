@@ -17,7 +17,7 @@ pub(super) async fn schedule_publish_verification_retry(
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     detail: &str,
-    provisional: Option<&crate::task_board::TaskBoardLifecycleOutcome>,
+    provisional: Option<&TaskBoardLifecycleOutcome>,
     now: &str,
 ) -> Result<(), CliError> {
     let current = db
@@ -75,8 +75,7 @@ pub(super) async fn schedule_publish_verification_retry(
     updated_attempt.available_at = Some(retry.available_at);
     updated_attempt.updated_at = now.to_string();
     if let Some(outcome) = provisional {
-        updated_attempt.artifact =
-            Some(crate::task_board::TaskBoardAttemptResultArtifact::Lifecycle(outcome.clone()));
+        updated_attempt.artifact = Some(TaskBoardAttemptResultArtifact::Lifecycle(outcome.clone()));
     }
     let outcome = db
         .compare_and_set_task_board_workflow_execution_and_attempt(

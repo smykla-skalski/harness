@@ -8,6 +8,7 @@ use tracing::warn;
 use crate::daemon::db::{AsyncDaemonDb, ClaimedTaskBoardDispatch, TaskBoardDispatchClaimAction};
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::service::task_board::prepare_claimed_task_board_dispatch;
+use crate::daemon::service::task_board_read_only_coordinator::reconcile_task_board_read_only_workflows;
 use crate::daemon::task_board_managed_agents::{
     maintain_task_board_dispatch_claim, managed_worker_id, resume_worker_compensation,
     settle_claimed_task_board_worker,
@@ -94,13 +95,7 @@ async fn recover_pending_dispatches(state: &DaemonHttpState, db: &AsyncDaemonDb)
         };
         finish_claim(state, db, claim).await;
     }
-    if let Err(error) = Box::pin(
-        crate::daemon::service::task_board_read_only_coordinator::reconcile_task_board_read_only_workflows(
-            state, db,
-        ),
-    )
-    .await
-    {
+    if let Err(error) = Box::pin(reconcile_task_board_read_only_workflows(state, db)).await {
         warn!(%error, "read-only workflow recovery failed");
     }
 }

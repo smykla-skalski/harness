@@ -4,6 +4,7 @@ use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::workflow_owner;
 use crate::daemon::http::{
     DaemonHttpState, require_async_db, run_codex_agent_blocking, run_terminal_agent_blocking,
 };
@@ -441,7 +442,7 @@ pub(crate) fn managed_admission_owner_id(
 ) -> String {
     let workflow = applied.read_only_workflow.is_some() || applied.write_workflow.is_some();
     if workflow && let Some(execution_id) = applied.item.workflow.execution_id.as_deref() {
-        crate::daemon::db::workflow_owner(execution_id)
+        workflow_owner(execution_id)
     } else {
         managed_worker_id(applied, dispatch_intent_id)
     }

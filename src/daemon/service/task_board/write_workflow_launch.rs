@@ -1,5 +1,6 @@
 use crate::daemon::db::AsyncDaemonDb;
 use crate::errors::{CliError, CliErrorKind};
+use crate::task_board::TaskBoardResolvedReviewer;
 use crate::task_board::{
     AgentMode, DispatchAppliedTask, PlanApprovalGate, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
     TaskBoardItem, TaskBoardPullRequestIdentity, TaskBoardReadOnlyRunContext,
@@ -238,7 +239,7 @@ fn workflow_snapshot(
     item_revision: i64,
     configuration_revision: u64,
     policy_version: String,
-    reviewer: crate::task_board::TaskBoardResolvedReviewer,
+    reviewer: TaskBoardResolvedReviewer,
     execution_repository: Option<String>,
     provider_revision: Option<String>,
 ) -> TaskBoardWorkflowSnapshot {

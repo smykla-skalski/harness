@@ -5,6 +5,7 @@ use chrono::Utc;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::http::DaemonHttpState;
 use crate::errors::CliError;
+use crate::task_board::TaskBoardWorkflowExecutionRecord;
 use crate::task_board::task_board_remote_execution_target;
 
 use super::task_board_read_only_runtime::{
@@ -101,7 +102,7 @@ where
 async fn reconcile_candidate<R>(
     db: &AsyncDaemonDb,
     runtime: &R,
-    execution: crate::task_board::TaskBoardWorkflowExecutionRecord,
+    execution: TaskBoardWorkflowExecutionRecord,
     now: &str,
     seen: &mut BTreeSet<String>,
     report: &mut TaskBoardReadOnlyReconcileReport,

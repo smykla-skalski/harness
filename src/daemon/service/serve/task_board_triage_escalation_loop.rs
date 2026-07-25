@@ -7,6 +7,7 @@
 //! `CodexRunMode::Report` (no workspace-write capability), the run has zero
 //! repository access, matching what a pure triage judgment call needs.
 
+use std::fs::create_dir_all;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -18,6 +19,7 @@ use tracing::warn;
 use crate::daemon::db::{AsyncDaemonDb, ClaimedTaskBoardTriageEscalation};
 use crate::daemon::http::{DaemonHttpState, run_codex_agent_blocking};
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest};
+use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole};
 use crate::task_board::{TaskBoardTriageEscalationConfig, render_triage_escalation_prompt};
 
@@ -138,7 +140,7 @@ async fn spawn_escalation_worker(
     state: &DaemonHttpState,
     db: &AsyncDaemonDb,
     escalation: &ClaimedTaskBoardTriageEscalation,
-) -> Result<(), crate::errors::CliError> {
+) -> Result<(), CliError> {
     let item = db.task_board_item(&escalation.item_id).await?;
     let project_dir = ensure_escalation_scratch_dir(db, &escalation.escalation_id)?;
     let prompt = render_triage_escalation_prompt(
@@ -182,14 +184,14 @@ async fn spawn_escalation_worker(
 fn ensure_escalation_scratch_dir(
     db: &AsyncDaemonDb,
     escalation_id: &str,
-) -> Result<String, crate::errors::CliError> {
+) -> Result<String, CliError> {
     let base = db
         .storage_path()
         .parent()
         .map_or_else(|| PathBuf::from(SCRATCH_DIR_NAME), |parent| parent.join(SCRATCH_DIR_NAME));
     let dir = base.join(sanitized_escalation_segment(escalation_id));
-    std::fs::create_dir_all(&dir).map_err(|error| {
-        crate::errors::CliErrorKind::workflow_io(format!(
+    create_dir_all(&dir).map_err(|error| {
+        CliErrorKind::workflow_io(format!(
             "create triage escalation scratch dir: {error}"
         ))
     })?;

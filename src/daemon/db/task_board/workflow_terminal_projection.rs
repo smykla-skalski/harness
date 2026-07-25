@@ -1,12 +1,14 @@
 use super::super::workflow_dispatch::workflow_owner;
 use crate::daemon::db::{CliError, db_error};
+use crate::task_board::TaskBoardAttemptResultArtifact;
+use crate::task_board::TaskBoardStatus;
 use crate::task_board::{
     TaskBoardExecutionState, TaskBoardItem, TaskBoardWorkflowExecutionRecord,
     TaskBoardWorkflowKind, TaskBoardWorkflowStatus,
 };
 
 pub(super) struct TerminalTarget {
-    pub(super) item_status: crate::task_board::TaskBoardStatus,
+    pub(super) item_status: TaskBoardStatus,
     pub(super) workflow_status: TaskBoardWorkflowStatus,
     pub(super) last_error: Option<String>,
     pub(super) pr_number: Option<u64>,
@@ -140,7 +142,7 @@ fn publication_identity(
             return None;
         }
         match attempt.artifact.as_ref() {
-            Some(crate::task_board::TaskBoardAttemptResultArtifact::Lifecycle(outcome)) => {
+            Some(TaskBoardAttemptResultArtifact::Lifecycle(outcome)) => {
                 outcome.external_url.clone()
             }
             _ => None,

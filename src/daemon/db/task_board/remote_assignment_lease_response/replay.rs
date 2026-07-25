@@ -1,4 +1,5 @@
 use super::{persist_renewal_response, renewal_response_replayed};
+use crate::daemon::db::TaskBoardRemoteAssignmentRecord;
 use crate::daemon::db::task_board::remote_assignment_authority_settlement::clear_renew_io_authority_in_tx;
 use crate::daemon::db::task_board::remote_assignment_controller_recovery::recover_controller_remote_assignment_in_tx;
 use crate::daemon::db::task_board::remote_assignment_lease::{
@@ -83,7 +84,7 @@ struct ReplayWindow {
 }
 
 fn replay_window(
-    record: &crate::daemon::db::TaskBoardRemoteAssignmentRecord,
+    record: &TaskBoardRemoteAssignmentRecord,
     request: &RemoteLeaseRenewRequest,
     response: &RemoteLeaseRenewResponse,
     principal: &str,

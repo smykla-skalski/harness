@@ -4,6 +4,8 @@ use sqlx::query_as;
 use super::remote_artifacts::validate_artifact_evidence;
 use super::remote_assignment_model::concurrent;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
+use crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest;
+use crate::daemon::task_board_remote_transport::wire::RemoteSourceMaterial;
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteArtifactEntry, RemoteSourceBundleUploadRequest,
 };
@@ -29,7 +31,7 @@ pub(crate) struct TaskBoardRemotePriorPhaseBundle {
 impl TaskBoardRemotePriorPhaseBundle {
     pub(crate) fn upload_request(
         &self,
-        offer: crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest,
+        offer: RemoteOfferRequest,
     ) -> Result<RemoteSourceBundleUploadRequest, CliError> {
         RemoteSourceBundleUploadRequest::seal(offer, &self.content)
             .map_err(|error| db_error(format!("seal prior-phase source upload: {error}")))
@@ -181,14 +183,12 @@ impl MaterializedPriorBundleRow {
         self,
         expected: &PriorImplementationIdentity,
     ) -> Result<TaskBoardRemotePriorPhaseBundle, CliError> {
-        let offer = serde_json::from_str::<
-            crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest,
-        >(&self.offer_json)
-        .map_err(|error| db_error(format!("decode materialized prior-phase offer: {error}")))?;
+        let offer = serde_json::from_str::<RemoteOfferRequest>(&self.offer_json)
+            .map_err(|error| db_error(format!("decode materialized prior-phase offer: {error}")))?;
         offer.validate().map_err(|error| {
             db_error(format!("validate materialized prior-phase offer: {error}"))
         })?;
-        let crate::daemon::task_board_remote_transport::wire::RemoteSourceMaterial::PriorPhaseBundle {
+        let RemoteSourceMaterial::PriorPhaseBundle {
             repository,
             base_revision,
             revision,
@@ -197,7 +197,9 @@ impl MaterializedPriorBundleRow {
             ..
         } = offer.source
         else {
-            return Err(concurrent("materialized source is not a prior-phase bundle"));
+            return Err(concurrent(
+                "materialized source is not a prior-phase bundle",
+            ));
         };
         let fencing_epoch = u64::try_from(self.fencing_epoch)
             .ok()
