@@ -11,7 +11,7 @@ import SwiftUI
 /// twenty-three, which is a property `TaskBoardProjectPaletteTests` can check
 /// and a borrowed token cannot promise.
 enum TaskBoardProjectPalette {
-  struct Components {
+  struct Components: Equatable {
     let red: Double
     let green: Double
     let blue: Double
