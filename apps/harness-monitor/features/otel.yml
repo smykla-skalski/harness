@@ -1,13 +1,13 @@
 packages:
   OpenTelemetrySwift:
     url: https://github.com/open-telemetry/opentelemetry-swift
-    exactVersion: 2.3.0
+    exactVersion: 2.5.0
   OpenTelemetrySwiftCore:
     url: https://github.com/open-telemetry/opentelemetry-swift-core
-    exactVersion: 2.4.1
+    exactVersion: 2.5.1
   GRPCSwift:
     url: https://github.com/grpc/grpc-swift
-    exactVersion: 1.27.0
+    exactVersion: 1.27.5
 targets:
   HarnessMonitorKit:
     sources:
