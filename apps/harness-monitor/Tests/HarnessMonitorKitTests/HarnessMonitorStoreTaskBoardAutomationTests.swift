@@ -51,7 +51,10 @@ struct HarnessMonitorStoreTaskBoardAutomationTests {
     let succeeded = await store.forceCancelTaskBoardAutomation(request: request)
 
     #expect(succeeded)
-    #expect(client.recordedCalls() == [.forceCancelTaskBoardAutomation(request: request)])
+    #expect(
+      client.recordedCallsIgnoringProjectCatalogReads()
+        == [.forceCancelTaskBoardAutomation(request: request)]
+    )
     #expect(client.readCallCount(.taskBoardOrchestratorStatus) > initialStatusReads)
   }
 
@@ -103,6 +106,9 @@ struct HarnessMonitorStoreTaskBoardAutomationTests {
       HarnessMonitorStore.TaskBoardRefreshSnapshot(
         items: HarnessMonitorStore.TaskBoardSnapshotLoad<[TaskBoardItem]>(measured: nil),
         orchestratorStatus: HarnessMonitorStore.TaskBoardSnapshotLoad(measured: nil),
+        projects: HarnessMonitorStore.TaskBoardSnapshotLoad<[TaskBoardProjectSummary]>(
+          measured: nil
+        ),
         stepModeConfirmationRevision: 0
       )
     )

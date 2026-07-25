@@ -181,6 +181,9 @@ struct HarnessMonitorStoreTaskBoardStepModeTests {
           latencyMs: 0
         )
       ),
+      projects: HarnessMonitorStore.TaskBoardSnapshotLoad<[TaskBoardProjectSummary]>(
+        measured: nil
+      ),
       stepModeConfirmationRevision: confirmationRevision
     )
   }

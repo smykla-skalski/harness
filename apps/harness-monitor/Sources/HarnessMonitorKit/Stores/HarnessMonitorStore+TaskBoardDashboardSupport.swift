@@ -90,6 +90,7 @@ extension HarnessMonitorStore {
       // unavailable endpoints must not erase the last visible board snapshot.
       globalTaskBoardItems = resolvedItems
       globalTaskBoardOrchestratorStatus = resolvedStatus
+      globalTaskBoardProjects = snapshot.projects.value ?? globalTaskBoardProjects
       mergeTaskBoardAutomationSnapshot(measuredAutomationSnapshot)
     }
     if didChangeTaskBoardSnapshot {

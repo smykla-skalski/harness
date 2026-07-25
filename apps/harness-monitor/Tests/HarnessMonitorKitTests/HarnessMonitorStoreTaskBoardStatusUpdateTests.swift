@@ -28,7 +28,7 @@ struct HarnessMonitorStoreTaskBoardStatusUpdateTests {
 
     #expect(success)
     #expect(
-      client.recordedCalls() == [
+      client.recordedCallsIgnoringProjectCatalogReads() == [
         .updateTaskBoardItem(id: "board-1", status: .inProgress),
         .updateTask(
           sessionID: PreviewFixtures.summary.sessionId,
@@ -104,7 +104,7 @@ struct HarnessMonitorStoreTaskBoardStatusUpdateTests {
 
     #expect(success)
     #expect(
-      client.recordedCalls() == [
+      client.recordedCallsIgnoringProjectCatalogReads() == [
         .updateTask(
           sessionID: PreviewFixtures.summary.sessionId,
           taskID: first.taskId,

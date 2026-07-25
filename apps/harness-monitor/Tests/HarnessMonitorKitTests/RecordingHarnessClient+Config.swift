@@ -7,6 +7,21 @@ extension RecordingHarnessClient {
     calls
   }
 
+  /// Recorded calls without the unscoped project-catalog read. A test asserting
+  /// an exact mutation sequence wants what it asked the store to do, not the
+  /// catalog the board refresh loads behind it.
+  ///
+  /// A recorded call carries no origin, so this drops every unscoped read and
+  /// not only the refresh's own. Status-scoped calls survive: those come from a
+  /// caller that asked for one, and hiding them would let an unexpected fetch
+  /// pass a mutation assertion.
+  func recordedCallsIgnoringProjectCatalogReads() -> [Call] {
+    calls.filter {
+      if case .taskBoardProjects(let status) = $0 { return status != nil }
+      return true
+    }
+  }
+
   func clearRecordedCalls() {
     lock.withLock { callsStorage.removeAll() }
   }
@@ -74,6 +89,12 @@ extension RecordingHarnessClient {
   func configureTaskBoardItemsErrors(_ errors: [any Error]) {
     lock.withLock {
       queuedTaskBoardItemsErrors = errors
+    }
+  }
+
+  func configureTaskBoardProjectsErrors(_ errors: [any Error]) {
+    lock.withLock {
+      queuedTaskBoardProjectsErrors = errors
     }
   }
 

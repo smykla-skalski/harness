@@ -23,7 +23,7 @@ struct HarnessMonitorStoreTaskBoardReorderTests {
 
     #expect(success)
     #expect(
-      client.recordedCalls() == [
+      client.recordedCallsIgnoringProjectCatalogReads() == [
         .setTaskBoardItemPosition(id: "board-1", status: .todo, lanePosition: 1)
       ]
     )
@@ -178,7 +178,7 @@ struct HarnessMonitorStoreTaskBoardReorderTests {
     #expect(todoSnapshot.items.map(\.id) == ["third", "canonical", "legacy"])
     #expect(legacySnapshot.items.map(\.id) == todoSnapshot.items.map(\.id))
     #expect(
-      client.recordedCalls() == [
+      client.recordedCallsIgnoringProjectCatalogReads() == [
         .setTaskBoardItemPosition(id: "legacy", status: .todo, lanePosition: 1),
         .setTaskBoardItemPosition(id: "legacy", status: .todo, lanePosition: 2),
       ]
@@ -227,7 +227,10 @@ struct HarnessMonitorStoreTaskBoardReorderTests {
     let success = await store.resetTaskBoardItemManualPosition(id: "board-1")
 
     #expect(success)
-    #expect(client.recordedCalls() == [.resetTaskBoardItemPosition(id: "board-1")])
+    #expect(
+      client.recordedCallsIgnoringProjectCatalogReads()
+        == [.resetTaskBoardItemPosition(id: "board-1")]
+    )
     let item = store.globalTaskBoardItems.first(where: { $0.id == "board-1" })
     #expect(item?.lanePosition == nil)
     #expect(item?.laneOrigin == nil)
@@ -253,7 +256,7 @@ struct HarnessMonitorStoreTaskBoardReorderTests {
 
     #expect(success)
     #expect(
-      client.recordedCalls() == [
+      client.recordedCallsIgnoringProjectCatalogReads() == [
         .resetTaskBoardItemPosition(id: "board-1"),
         .resetTaskBoardItemPosition(id: "board-1"),
       ]
