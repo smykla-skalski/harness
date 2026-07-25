@@ -80,6 +80,8 @@ Validation should match risk:
 - Shared CLI, hook, runtime, or storage behavior: run the focused test and the owning package gate before `mise run check`.
 - `aff` code or aff-owned runtime hooks: include `mise run aff:check`.
 
+A package gate does not approximate the full one, so a clean focused run is evidence about the code you changed and nothing else. Only the Rust step resembles what an author runs directly; stale state, version consistency, script lint, binary contracts, source size, and feature isolation have no package-level equivalent and fail on work that every targeted command accepted. Read the gate's own exit status too, rather than whatever the shell reported last.
+
 ## OpenAPI schema
 
 The daemon HTTP API is described by an OpenAPI 3.1 document at `docs/api/openapi.json`, generated from `#[utoipa::path]` annotations on the handlers plus `#[derive(utoipa::ToSchema)]` on their wire types. Registering a route in the `utoipa-axum` router (`.routes(routes!(handler))`) also produces its OpenAPI path, so `utoipa` is a permanent dependency with no `openapi` feature to gate. Regenerate the document with `mise run openapi:generate` after changing an annotated handler or wire type; `mise run openapi:check` fails on drift and runs inside `mise run test`. Never edit the generated file by hand. What stays manual and why is audited in `docs/api/openapi-upkeep.md`.
