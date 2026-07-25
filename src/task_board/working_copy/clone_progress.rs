@@ -11,8 +11,8 @@
 //! time passed without the numbers changing, which it cannot infer from
 //! silence - silence also means finished.
 
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::Ordering;
+use std::sync::{Arc, Condvar, Mutex, PoisonError};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
@@ -32,14 +32,14 @@ const SAMPLE_INTERVAL: Duration = Duration::from_millis(500);
 /// thread by skipping [`Self::finish`].
 pub(super) struct CloneProgressReporter {
     root: Arc<tree::Root>,
-    stop: Arc<AtomicBool>,
+    stop: Arc<StopSignal>,
     sampler: Option<JoinHandle<()>>,
 }
 
 impl CloneProgressReporter {
     pub(super) fn start(sink: Arc<dyn WorkingCopyProgressSink>, repo_full_name: String) -> Self {
         let root = tree::Root::new();
-        let stop = Arc::new(AtomicBool::new(false));
+        let stop = Arc::new(StopSignal::default());
         let sampler = thread::spawn({
             let root = Arc::clone(&root);
             let stop = Arc::clone(&stop);
@@ -65,10 +65,44 @@ impl CloneProgressReporter {
     }
 
     fn stop_and_join(&mut self) {
-        self.stop.store(true, Ordering::Relaxed);
+        self.stop.stop();
         if let Some(sampler) = self.sampler.take() {
             let _ = sampler.join();
         }
+    }
+}
+
+/// The sampler's stop flag, waited on rather than polled.
+///
+/// A plain flag plus `thread::sleep` would make every caller absorb whatever
+/// remained of the current interval before its terminal event, adding up to
+/// [`SAMPLE_INTERVAL`] to each clone. Waiting on a condvar lets `stop` wake the
+/// sampler at once, and the mutex around the flag is the same handoff that
+/// publishes it.
+#[derive(Default)]
+struct StopSignal {
+    stopped: Mutex<bool>,
+    changed: Condvar,
+}
+
+impl StopSignal {
+    fn stop(&self) {
+        let mut stopped = self.stopped.lock().unwrap_or_else(PoisonError::into_inner);
+        *stopped = true;
+        self.changed.notify_all();
+    }
+
+    /// Wait up to `timeout` for a stop request, reporting whether one arrived.
+    fn wait_for_stop(&self, timeout: Duration) -> bool {
+        let stopped = self.stopped.lock().unwrap_or_else(PoisonError::into_inner);
+        if *stopped {
+            return true;
+        }
+        let (stopped, _) = self
+            .changed
+            .wait_timeout(stopped, timeout)
+            .unwrap_or_else(PoisonError::into_inner);
+        *stopped
     }
 }
 
@@ -80,16 +114,12 @@ impl Drop for CloneProgressReporter {
 
 fn sample_until_stopped(
     root: &tree::Root,
-    stop: &AtomicBool,
+    stop: &StopSignal,
     sink: &dyn WorkingCopyProgressSink,
     repo_full_name: &str,
 ) {
     let mut tasks = Vec::new();
-    while !stop.load(Ordering::Relaxed) {
-        thread::sleep(SAMPLE_INTERVAL);
-        if stop.load(Ordering::Relaxed) {
-            break;
-        }
+    while !stop.wait_for_stop(SAMPLE_INTERVAL) {
         root.sorted_snapshot(&mut tasks);
         if let Some(event) = advanced_event(&tasks, repo_full_name) {
             sink.report(event);

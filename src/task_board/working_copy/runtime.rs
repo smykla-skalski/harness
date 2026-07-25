@@ -356,7 +356,6 @@ fn write_registry_atomically(registry_path: &Path, body: &[u8]) -> Result<(), St
     Ok(())
 }
 
-/// Synchronous gix clone + checkout executed inside `spawn_blocking`.
 /// Fold a panicked or cancelled clone task into an ordinary clone error.
 ///
 /// A `JoinError` must not short-circuit past the caller's failure arm: a
@@ -368,6 +367,7 @@ fn flatten_clone_join(
     joined.unwrap_or_else(|join| Err(WorkingCopyRuntimeError::Join(join.to_string())))
 }
 
+/// Synchronous gix clone + checkout executed inside `spawn_blocking`.
 fn run_clone_checkout(
     clone_url: &str,
     checkout_path: &Path,
