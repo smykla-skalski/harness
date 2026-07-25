@@ -543,6 +543,37 @@ PY
   pass "$name"
 }
 
+scenario_nonsense_widths_are_refused() {
+  local name="a width below one is refused instead of building a dead pool"
+  local root; root="$(fake_root nonsense)"
+  local dir; dir="$(pool_dir_for "$root")"
+  local status=0 spec
+
+  # Each of these used to be accepted and then fail silently: a pool nothing
+  # can draw from looks exactly like a healthy one from outside.
+  for spec in "ensure --budget 0" "ensure --budget -1" "supervise --budget 0"; do
+    status=0
+    # shellcheck disable=SC2086
+    python3 "$JOBSERVER" $spec --repo-root "$root" >/dev/null 2>&1 || status=$?
+    if (( status == 0 )); then
+      fail "$name ('$spec' was accepted)"
+      return
+    fi
+  done
+
+  status=0
+  python3 "$JOBSERVER" run --repo-root "$root" --max 0 -- true >/dev/null 2>&1 || status=$?
+  if (( status == 0 )); then
+    fail "$name ('run --max 0' was accepted)"
+    return
+  fi
+  if [[ -e "$dir/fifo" ]]; then
+    fail "$name (a pool was created anyway at $dir)"
+    return
+  fi
+  pass "$name"
+}
+
 scenario_cleanup_only_signals_a_supervisor() {
   local name="cleanup tells a live supervisor apart from any other pid"
   local root; root="$(fake_root killguard)"
@@ -754,6 +785,7 @@ scenario_idle_exit_leaves_no_tokens_behind
 scenario_partial_pool_keeps_its_tokens
 scenario_signal_death_reports_a_shell_signal_status
 scenario_split_request_is_still_granted
+scenario_nonsense_widths_are_refused
 scenario_cleanup_only_signals_a_supervisor
 scenario_a_client_that_never_reads_cannot_wedge_the_pool
 scenario_pipelined_requests_are_all_answered

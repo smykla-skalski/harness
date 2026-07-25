@@ -437,23 +437,35 @@ def run_with_tokens(repo_root: str, want: int, env_var: str, floor: int, argv: l
                 conn.close()
 
 
+def positive_int(raw: str) -> int:
+    """A width of zero or less is never meaningful, and it fails quietly.
+
+    A zero budget builds a pool nothing can draw from, which looks identical to
+    a healthy pool from outside and just makes every build serial.
+    """
+    value = int(raw)
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"must be 1 or greater, got {value}")
+    return value
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="harness-jobserver")
     sub = parser.add_subparsers(dest="mode", required=True)
 
     p_sup = sub.add_parser("supervise")
     p_sup.add_argument("--repo-root", required=True)
-    p_sup.add_argument("--budget", type=int, required=True)
+    p_sup.add_argument("--budget", type=positive_int, required=True)
 
     p_ens = sub.add_parser("ensure")
     p_ens.add_argument("--repo-root", required=True)
-    p_ens.add_argument("--budget", type=int, required=True)
+    p_ens.add_argument("--budget", type=positive_int, required=True)
 
     p_run = sub.add_parser("run")
     p_run.add_argument("--repo-root", required=True)
-    p_run.add_argument("--max", type=int, required=True)
+    p_run.add_argument("--max", type=positive_int, required=True)
     p_run.add_argument("--env", default="")
-    p_run.add_argument("--floor", type=int, default=2)
+    p_run.add_argument("--floor", type=positive_int, default=2)
     p_run.add_argument("command", nargs=argparse.REMAINDER)
 
     args = parser.parse_args()
