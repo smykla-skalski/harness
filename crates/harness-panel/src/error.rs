@@ -32,6 +32,11 @@ pub enum PanelError {
     #[error("github sign-in: {0}")]
     GitHub(String),
 
+    /// Carries no path, because this failure is about the host's ability to
+    /// start threads and has nothing to do with any file the panel names.
+    #[error("starting the panel async runtime: {0}")]
+    Runtime(#[source] IoError),
+
     #[error("serving the panel on {address}: {source}")]
     Bind {
         address: String,

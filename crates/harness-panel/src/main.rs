@@ -89,8 +89,6 @@ fn serve_blocking(args: &PanelArgs) -> Result<(), PanelError> {
     let runtime = Builder::new_multi_thread()
         .enable_all()
         .build()
-        .map_err(|source| {
-            PanelError::io("building the panel runtime for", &config.state_dir, source)
-        })?;
+        .map_err(PanelError::Runtime)?;
     runtime.block_on(serve::run(config))
 }
