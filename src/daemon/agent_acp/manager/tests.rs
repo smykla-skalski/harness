@@ -13,8 +13,8 @@ use crate::agents::runtime::signal::{
     DeliveryConfig, Signal, SignalPayload, SignalPriority, write_signal_file,
 };
 use crate::daemon::agent_acp::manager::test_support::{
-    ACP_CONDITION_DEADLINE, seeded_manager, seeded_manager_with_events, write_executable,
-    write_sleeping_acp_agent,
+    ACP_CONDITION_DEADLINE, seeded_manager, seeded_manager_with_events, waits_for_stream_event,
+    write_executable, write_sleeping_acp_agent,
 };
 use crate::daemon::agent_acp::permission_bridge::DEFAULT_PERMISSION_CAP;
 use crate::session::types::ManagedAgentRef;
@@ -452,11 +452,10 @@ async fn abnormal_exit_populates_disconnect_reason_and_stderr_tail() {
             unreachable!();
         };
         assert!(matches!(stderr_tail.as_deref(), Some(tail) if tail.contains("boom")));
-        let saw_process_incident = (0..32).any(|_| match events.try_recv() {
-            Ok(event) => event.event == "acp_process_incident",
-            Err(_) => false,
-        });
-        assert!(saw_process_incident, "expected acp_process_incident event");
+        assert!(
+            waits_for_stream_event(&mut events, "acp_process_incident"),
+            "expected acp_process_incident event"
+        );
     });
 }
 

@@ -280,6 +280,16 @@ fn normalized_item(item: &Value) -> Value {
     item["id"] = json!("<id>");
     item["created_at"] = json!("<created_at>");
     item["updated_at"] = json!("<updated_at>");
+    // Triage ranks each new item against the lane it lands in, so the second
+    // item created here necessarily gets the later slot. That is board state,
+    // not a transport difference, and comparing it would only assert the order
+    // this test creates its two items in.
+    if item.get("lane_position").is_some() {
+        item["lane_position"] = json!("<lane_position>");
+    }
+    if item.get("lane_set_at").is_some() {
+        item["lane_set_at"] = json!("<lane_set_at>");
+    }
     if item.get("deleted_at").is_some() {
         item["deleted_at"] = json!("<deleted_at>");
     }

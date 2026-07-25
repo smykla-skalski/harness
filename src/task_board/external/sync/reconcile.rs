@@ -17,6 +17,10 @@ use super::{
 mod patch;
 pub(super) use patch::reconciliation_patch;
 
+/// `CliErrorKind::ConcurrentModification`'s wire code, the only failure a
+/// reconciliation write can lose to another writer with.
+const CONCURRENT_MODIFICATION_CODE: &str = "WORKFLOW_CONCURRENT";
+
 #[expect(
     clippy::cognitive_complexity,
     clippy::too_many_arguments,
@@ -95,7 +99,28 @@ pub(super) async fn reconcile_existing_item(
         return Ok(());
     }
     let patch_for_convergence = patch.clone();
-    let applied_revision = apply_reconciliation(board, item, expected_revision, patch).await?;
+    let applied_revision = match apply_reconciliation(board, item, expected_revision, patch).await {
+        Ok(revision) => revision,
+        Err(error) => {
+            // The writer that won the race may have applied this very pull.
+            // Only a stored item that still needs the patch actually lost
+            // something; one that already carries it has converged, and
+            // failing the pass would report a conflict that no longer exists.
+            if error.code() == CONCURRENT_MODIFICATION_CODE
+                && pull_already_converged(
+                    board,
+                    item,
+                    &task,
+                    prefer_remote,
+                    resolved_parent_item_id,
+                )
+                .await
+            {
+                return Ok(());
+            }
+            return Err(error);
+        }
+    };
     record_reconciliation_write(
         board,
         options,
@@ -209,8 +234,30 @@ async fn record_reconciliation_write(
     .await
 }
 
+/// Whether the stored item already carries everything this pull would have
+/// written. A failed point read answers "no": without evidence that the race
+/// was harmless, the caller keeps failing closed.
+async fn pull_already_converged(
+    board: &dyn TaskBoardSyncStore,
+    item: &TaskBoardItem,
+    task: &ExternalTask,
+    prefer_remote: bool,
+    resolved_parent_item_id: Option<&str>,
+) -> bool {
+    let Ok(latest) = board.item_snapshot(&item.id).await else {
+        return false;
+    };
+    !has_reconciliation_change(&reconciliation_patch(
+        &latest.item,
+        task,
+        prefer_remote,
+        resolved_parent_item_id,
+    ))
+}
+
 /// Returns the resulting revision without a point read. A concurrent writer
-/// makes this sync pass fail closed; the next batch snapshot retries it.
+/// makes this sync pass fail closed unless the winning write already converged
+/// the item; the next batch snapshot retries anything genuinely lost.
 async fn apply_reconciliation(
     board: &dyn TaskBoardSyncStore,
     item: &TaskBoardItem,

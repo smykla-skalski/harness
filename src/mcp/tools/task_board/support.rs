@@ -77,6 +77,15 @@ fn validate_value(path: &str, value: &Value, schema: &Value) -> Result<(), ToolE
             validate_value(path, value, constraint)?;
         }
     }
+    if let Some(variants) = schema.get("anyOf").and_then(Value::as_array)
+        && !variants
+            .iter()
+            .any(|variant| validate_value(path, value, variant).is_ok())
+    {
+        return Err(ToolError::invalid(format!(
+            "{path} matches none of the advertised variants"
+        )));
+    }
     if let Some(excluded) = schema.get("not")
         && validate_value(path, value, excluded).is_ok()
     {
@@ -401,6 +410,27 @@ mod validation_tests {
         });
 
         assert!(validate_params(json!({ "unexpected": true }), &schema).is_err());
+    }
+
+    #[test]
+    fn any_of_accepts_each_variant_and_rejects_the_rest() {
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "cursor": {
+                    "anyOf": [
+                        { "type": "integer", "minimum": 1 },
+                        { "type": "string" }
+                    ]
+                }
+            },
+            "additionalProperties": false
+        });
+
+        assert!(validate_params(json!({ "cursor": 12 }), &schema).is_ok());
+        assert!(validate_params(json!({ "cursor": "18446744073709551615" }), &schema).is_ok());
+        assert!(validate_params(json!({ "cursor": 0 }), &schema).is_err());
+        assert!(validate_params(json!({ "cursor": true }), &schema).is_err());
     }
 
     #[test]
