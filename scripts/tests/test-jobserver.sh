@@ -388,6 +388,49 @@ scenario_symlinked_pool_parent_is_refused() {
   pass "$name"
 }
 
+scenario_stalled_supervisor_does_not_hang_the_command() {
+  local name="a stalled supervisor cannot hang the command"
+  local root; root="$(fake_root stalled)"
+  local dir; dir="$(pool_dir_for "$root")"
+  started_pools+=("$dir")
+
+  # Accept the connection and then say nothing, which is the shape of a wedged
+  # supervisor. Without a deadline the wrapper blocks before the child starts.
+  mkdir -p "$dir"
+  chmod 700 "$dir"
+  python3 - "$dir/sock" <<'PY' &
+import socket, sys, time
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+s.bind(sys.argv[1])
+s.listen(8)
+held = []
+while True:
+    conn, _ = s.accept()
+    held.append(conn)   # accepted, never answered
+    time.sleep(0.1)
+PY
+  local silent=$!
+  sleep 1
+
+  local started elapsed seen
+  started="$(date +%s)"
+  seen="$(python3 "$JOBSERVER" run --repo-root "$root" --max 4 --env PROBE --floor 2 -- \
+    "$PROBE_SCRIPT")"
+  elapsed=$(($(date +%s) - started))
+  kill -9 "$silent" 2>/dev/null
+  wait "$silent" 2>/dev/null
+
+  if [[ "$seen" != "2" ]]; then
+    fail "$name (expected the floor width 2, got '$seen')"
+    return
+  fi
+  if (( elapsed > 20 )); then
+    fail "$name (took ${elapsed}s, so the handshake had no deadline)"
+    return
+  fi
+  pass "$name"
+}
+
 scenario_run_propagates_exit_status() {
   local name="run propagates the command's exit status"
   local root; root="$(fake_root status)"
@@ -416,6 +459,7 @@ scenario_lock_file_holds_only_the_current_pid
 scenario_signal_death_reports_a_shell_signal_status
 scenario_split_request_is_still_granted
 scenario_symlinked_pool_parent_is_refused
+scenario_stalled_supervisor_does_not_hang_the_command
 scenario_run_propagates_exit_status
 
 printf 'jobserver tests: %d passed, %d failed\n' "$passed" "$failed"

@@ -40,6 +40,9 @@ MAX_SOCKET_PATH = 100
 # A request is one short line; anything longer is a client that will never
 # terminate its line, so cap what we buffer for it.
 MAX_REQUEST_BYTES = 256
+# Ceiling on the grant handshake. It is local IPC, so anything slower than this
+# means the supervisor is wedged and the command should just run without a grant.
+HANDSHAKE_TIMEOUT = 5.0
 
 
 def pool_dir(repo_root: str) -> str:
@@ -320,6 +323,10 @@ def run_with_tokens(repo_root: str, want: int, env_var: str, floor: int, argv: l
     if _connectable(sock_path):
         conn = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
+            # A supervisor that accepts and then stalls would otherwise hang the
+            # wrapper before the child ever starts. Losing the grant and falling
+            # back to the floor is always better than not running the command.
+            conn.settimeout(HANDSHAKE_TIMEOUT)
             conn.connect(sock_path)
             conn.sendall(f"ACQUIRE {want}\n".encode())
             # Same stream-boundary problem in reverse: read until the newline
@@ -333,6 +340,9 @@ def run_with_tokens(repo_root: str, want: int, env_var: str, floor: int, argv: l
             reply = buffered.partition(b"\n")[0].decode().strip()
             if reply.startswith("GRANTED"):
                 granted = int(reply.split()[1])
+            # The connection is only held from here on, and holding it is what
+            # keeps the grant alive, so the deadline must not outlive the child.
+            conn.settimeout(None)
         except (OSError, ValueError, IndexError):
             with contextlib.suppress(OSError):
                 conn.close()

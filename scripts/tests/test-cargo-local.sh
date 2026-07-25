@@ -230,6 +230,46 @@ scenario_nextest_build_phase_keeps_the_whole_pool() {
   pass "the nextest build phase keeps the whole pool, the run phase holds it"
 }
 
+scenario_build_only_flag_precedes_a_separator() {
+  local key="pool-sep-$$"
+  local fake="$SANDBOX/sep-cargo"
+  local log="$SANDBOX/sep-log"
+  local scratch="$SANDBOX/sep-tmp"
+  mkdir -p "$fake" "$scratch"
+  write_token_counting_cargo "$fake/cargo" "$log"
+
+  local cpu budget
+  cpu="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.logicalcpu)"
+  budget=$((cpu - 1)); (( budget < 1 )) && budget=1
+  python3 "$ROOT/scripts/harness-jobserver.py" ensure \
+    --repo-root "$key" --budget "$budget" >/dev/null 2>&1 || true
+
+  (
+    unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR MAKEFLAGS
+    unset NEXTEST_TEST_THREADS HARNESS_NEXTEST_JOBS
+    TMPDIR="$scratch/" \
+      TOKEN_LOG="$log" \
+      SCCACHE_BIN='' RUSTC_WRAPPER='' \
+      CODEX_SESSION_ID="cargo-local-sep-$$" \
+      HARNESS_CARGO_SKIP_LEASE=1 \
+      HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+      HARNESS_JOBSERVER_POOL_KEY="$key" \
+      HARNESS_CARGO_BIN="$fake/cargo" \
+      "$ROOT/scripts/cargo-local.sh" nextest run --lib -- --exact >/dev/null 2>&1
+  )
+  stop_pool_for_key "$key"
+
+  local build_args
+  build_args="$(awk '/nextest/ {sub(/^[0-9]+ /, ""); print; exit}' "$log")"
+  # Appended at the end, --no-run would sit past the caller's separator and
+  # reach the test binary, so the build phase would run the suite instead.
+  if [[ "$build_args" != *"--no-run -- --exact" ]]; then
+    fail "--no-run did not precede the caller's separator: '$build_args'"
+    return
+  fi
+  pass "the build-only flag precedes a caller's argument separator"
+}
+
 scenario_nextest_detection_handles_toolchain_and_list() {
   local key="pool-detect-$$"
   local fake="$SANDBOX/detect-cargo"
@@ -983,6 +1023,7 @@ scenario_jobserver_pool_takes_over_build_sizing
 scenario_jobserver_absent_falls_back_to_the_reserve
 scenario_explicit_job_override_beats_the_pool
 scenario_nextest_build_phase_keeps_the_whole_pool
+scenario_build_only_flag_precedes_a_separator
 scenario_nextest_detection_handles_toolchain_and_list
 scenario_missing_tmpdir_uses_short_external_fallback
 scenario_concurrent_tmpdir_creation_is_idempotent

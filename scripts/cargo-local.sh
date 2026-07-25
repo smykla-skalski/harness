@@ -590,6 +590,24 @@ already_no_run() {
   return 1
 }
 
+# Place --no-run ahead of any separator. Appended at the end it would land past
+# a caller's `--` and reach the test binary as one of its arguments, leaving the
+# build phase to run the whole suite instead of only compiling it.
+build_only_args() {
+  local arg inserted=0
+  build_only_argv=()
+  for arg in "$@"; do
+    if (( ! inserted )) && [[ "$arg" == "--" ]]; then
+      build_only_argv+=(--no-run)
+      inserted=1
+    fi
+    build_only_argv+=("$arg")
+  done
+  if (( ! inserted )); then
+    build_only_argv+=(--no-run)
+  fi
+}
+
 # nextest does not speak the jobserver protocol and has said it will not, so its
 # test width cannot renegotiate mid-run and has to be fixed up front. Its two
 # halves want opposite things, though: the build wants the pool, and holding a
@@ -600,7 +618,8 @@ if [[ "$jobserver_mode" == "pool" ]] \
   && (( nextest_threads_explicit == 0 )) \
   && command_is_nextest_run "$@" \
   && ! already_no_run "$@"; then
-  harness_run_step "cargo-local test build" "$cargo_bin" "$@" --no-run || exit $?
+  build_only_args "$@"
+  harness_run_step "cargo-local test build" "$cargo_bin" "${build_only_argv[@]}" || exit $?
   harness_run_step "cargo-local command" \
     python3 "$(jobserver_script)" run \
     --repo-root "$(jobserver_pool_key)" \
