@@ -7,6 +7,7 @@
 #   - Repo Xcode artifacts:  xcode-derived*, xcode-derived-e2e/,
 #                            xcode-derived-instruments/, tmp/
 #   - Repo SwiftPM artifacts: apps/**/.build, mcp-servers/**/.build
+#   - Stale test temp dirs:  $TMPDIR/.tmpXXXXXX abandoned by killed tests
 #   - Global build caches:   ~/Library/Caches/go-build, Mozilla.sccache, Yarn,
 #                            ~/.cache/tuist
 #   - Tool caches:           JetBrains, Homebrew prune, swiftpm
@@ -53,6 +54,18 @@ DRY_RUN=0
 AGGRESSIVE=0
 FORCE=0
 TOTAL_RECLAIMED_KB=0
+# Rust's tempfile crate names temp dirs `.tmp` plus six random characters, and
+# nothing reclaims one whose owning process died mid-write. An ACP probe leak
+# left 27498 of them holding 177G because no cleanup path looked at $TMPDIR.
+# Three hours is far longer than any fixture legitimately outlives its test.
+# Exported because the batched freshness check below runs find through sh.
+STALE_TMP_MINUTES=180
+export STALE_TMP_MINUTES
+# Spelling the six characters as alnum classes rather than `?` is what makes the
+# line-oriented set arithmetic in the sweep safe: `?` matches any byte including
+# a newline, which would split one directory into two bogus lines.
+STALE_TMP_GLOB='.tmp[[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]]'
+readonly STALE_TMP_GLOB
 
 usage() {
   cat <<EOF
@@ -188,6 +201,86 @@ clean_shared_target() {
   done < <(find "$SHARED_TARGET_ROOT" -mindepth 1 -maxdepth 1 -print0 2>/dev/null)
 }
 
+# Sweeps abandoned tempfile-crate directories out of $TMPDIR. A directory
+# survives when anything inside it changed within the window, not just when its
+# own mtime is recent: a long suite writes deep in its fixture without touching
+# the top level, so trusting the directory mtime alone would delete a live
+# fixture out from under it. Reports counts rather than one line per directory
+# because a neglected $TMPDIR holds tens of thousands of these, and sizing each
+# one separately would take minutes.
+clean_stale_test_temp_dirs() {
+  local tmp_root="${TMPDIR:-/tmp}"
+  tmp_root="${tmp_root%/}"
+  if [[ ! -d "$tmp_root" ]]; then
+    printf '  · %-46s %8s  (absent, skip)\n' 'stale .tmp dirs' '-'
+    return
+  fi
+
+  # Returning quietly here would leave the report claiming a sweep that never
+  # ran, which is the same failure the sweep exists to stop hiding.
+  local work
+  if ! work="$(mktemp -d "${TMPDIR:-/tmp}/clean-build-caches-sweep.XXXXXX" 2>/dev/null)"; then
+    printf '  · %-46s %8s  (no scratch dir, skipped)\n' 'stale .tmp dirs' '-'
+    return
+  fi
+
+  # STALE_TMP_GLOB admits only alphanumerics, so a candidate path cannot contain
+  # a newline and the line-oriented set arithmetic below is safe.
+  find "$tmp_root" -maxdepth 1 -mindepth 1 -type d -name "$STALE_TMP_GLOB" \
+    -mmin "+$STALE_TMP_MINUTES" -print 2>/dev/null | sort > "$work/candidates"
+  local recent_count
+  recent_count=$(find "$tmp_root" -maxdepth 1 -mindepth 1 -type d -name "$STALE_TMP_GLOB" \
+    ! -mmin "+$STALE_TMP_MINUTES" -print 2>/dev/null | wc -l | tr -d ' ')
+
+  # One batched find across every candidate spots the trees with live writes.
+  # A find per directory instead takes minutes once $TMPDIR holds tens of
+  # thousands of these, which is exactly when the sweep matters most. It goes
+  # through sh because xargs appends its arguments, and find needs its search
+  # roots before the expression, not after it.
+  : > "$work/stale"
+  if [[ -s "$work/candidates" ]]; then
+    tr '\n' '\0' < "$work/candidates" \
+      | xargs -0 -n 200 sh -c 'find "$@" -mmin "-$STALE_TMP_MINUTES" -print 2>/dev/null' sweep \
+      | awk -v prefix="$tmp_root/" '
+          index($0, prefix) == 1 {
+            rest = substr($0, length(prefix) + 1)
+            split(rest, parts, "/")
+            if (parts[1] != "") print prefix parts[1]
+          }' \
+      | sort -u > "$work/live"
+    grep -Fxv -f "$work/live" "$work/candidates" > "$work/stale" 2>/dev/null || true
+  fi
+
+  local stale_count kept_count size_kb=0
+  stale_count=$(wc -l < "$work/stale" | tr -d ' ')
+  kept_count=$(( recent_count + $(wc -l < "$work/candidates" | tr -d ' ') - stale_count ))
+
+  if (( stale_count > 0 )); then
+    size_kb=$(tr '\n' '\0' < "$work/stale" \
+      | xargs -0 -n 50 du -sk 2>/dev/null \
+      | awk '{total += $1} END {print total + 0}')
+    TOTAL_RECLAIMED_KB=$((TOTAL_RECLAIMED_KB + size_kb))
+  fi
+
+  local human
+  human=$(bytes_to_human "$size_kb")
+  if (( DRY_RUN )); then
+    printf '  · %-46s %8s  (dry-run)\n' "stale .tmp dirs ($stale_count)" "$human"
+  else
+    printf '  · %-46s %8s  removing...\n' "stale .tmp dirs ($stale_count)" "$human"
+    if (( stale_count > 0 )); then
+      # A silent failure here would report reclaimed bytes that are still on
+      # disk, so surface it the way remove_path does.
+      if ! tr '\n' '\0' < "$work/stale" | xargs -0 -n 50 rm -rf 2>"$work/rm.err"; then
+        printf '    (warning: some stale temp dirs survived: %s)\n' \
+          "$(tr '\n' ' ' < "$work/rm.err")"
+      fi
+    fi
+  fi
+  printf '  · %-46s %8s\n' "recent .tmp dirs kept ($kept_count)" '-'
+  rm -rf "$work"
+}
+
 disk_free_g() {
   df -k / | awk 'NR==2 {printf "%.1fG free of %.1fG (%s used)", $4/1024/1024, $2/1024/1024, $5}'
 }
@@ -219,6 +312,9 @@ done < <(find "$ROOT/apps" "$ROOT/mcp-servers" -mindepth 2 -type d -name '.build
 
 section 'Repo tmp + scratch'
 remove_path 'tmp/'                                  "$ROOT/tmp"
+
+section 'Stale test temp dirs'
+clean_stale_test_temp_dirs
 
 section 'Global build caches'
 remove_path 'go-build cache'                        "$HOME/Library/Caches/go-build"

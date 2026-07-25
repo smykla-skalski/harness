@@ -69,6 +69,14 @@ assert_output_line_contains() {
   }
 }
 
+assert_output_lacks() {
+  local haystack="$1" needle="$2"
+  if grep -Fq -- "$needle" <<<"$haystack"; then
+    fail "expected output NOT to mention: $needle"
+    return 1
+  fi
+}
+
 # kill -0 fails both when a PID is gone and when it belongs to another user
 # we can't signal, so a live foreign-owned PID would look unused. ps -p
 # reports existence without needing signal permission.
@@ -153,7 +161,9 @@ scenario_dry_run_keeps_leased_segment() {
   local output=""
 
   make_shared_target_fixture "$repo"
-  output="$(cd "$repo" && HOME="$repo/fake-home" ./scripts/clean-build-caches.sh --dry-run)"
+  mkdir -p "$repo/fake-tmp"
+  output="$(cd "$repo" && HOME="$repo/fake-home" TMPDIR="$repo/fake-tmp" \
+    ./scripts/clean-build-caches.sh --dry-run)"
 
   assert_output_line_contains "$output" "target/dev/local" "(active build, kept)"
   assert_output_line_contains "$output" "target/dev/wt-live-0e4eb0f4" "(active build, kept)"
@@ -164,6 +174,64 @@ scenario_dry_run_keeps_leased_segment() {
   pass
 }
 
+# Builds a fake TMPDIR holding the shapes the sweep has to tell apart: a
+# leaked test temp dir old enough to reclaim, one young enough that a running
+# suite may still hold it, one whose own mtime is old but whose contents are
+# live (a long suite that writes deep inside without touching the top level),
+# the reusable agent probe home that must survive because tests share it, and
+# an unrelated directory the sweep must never consider, plus a six-character name
+# holding a space to prove the selector demands alphanumerics: the sweep's
+# line-oriented set arithmetic breaks on a name containing a newline, so a `?`
+# wildcard there would be a latent bug. Old timestamps use a fixed date far in
+# the past rather than date arithmetic, which differs between BSD and GNU date,
+# and stay old on any plausible system clock. Every fixture name carries exactly
+# six characters after `.tmp` because that is what the tempfile crate emits and
+# what the sweep matches; a five-character name falls outside it entirely.
+make_stale_tmp_fixture() {
+  local tmp="$1"
+  mkdir -p "$tmp"
+
+  mkdir -p "$tmp/.tmpstale1"
+  echo "leaked" > "$tmp/.tmpstale1/payload"
+  touch -t 200001010000 "$tmp/.tmpstale1/payload" "$tmp/.tmpstale1"
+
+  mkdir -p "$tmp/.tmpfresh1"
+  echo "in use" > "$tmp/.tmpfresh1/payload"
+
+  mkdir -p "$tmp/.tmpbusy01/nested"
+  echo "still writing" > "$tmp/.tmpbusy01/nested/payload"
+  touch -t 200001010000 "$tmp/.tmpbusy01"
+
+  mkdir -p "$tmp/harness-agent-probe-home/Library/Caches/copilot"
+  touch -t 200001010000 "$tmp/harness-agent-probe-home"
+
+  mkdir -p "$tmp/not-a-temp-dir"
+  touch -t 200001010000 "$tmp/not-a-temp-dir"
+
+  mkdir -p "$tmp/.tmp ab123"
+  touch -t 200001010000 "$tmp/.tmp ab123"
+}
+
+scenario_dry_run_sweeps_only_stale_test_temp_dirs() {
+  start_test "dry-run reclaims stale .tmp dirs and keeps live ones"
+  reset_tmp_root
+  local repo="$TEST_TMP_ROOT/repo"
+  local faketmp="$TEST_TMP_ROOT/faketmp"
+  local output=""
+
+  make_shared_target_fixture "$repo"
+  make_stale_tmp_fixture "$faketmp"
+
+  output="$(cd "$repo" && HOME="$repo/fake-home" TMPDIR="$faketmp" \
+    ./scripts/clean-build-caches.sh --dry-run)"
+
+  assert_output_line_contains "$output" "stale .tmp dirs (1)" "(dry-run)" || return
+  assert_output_line_contains "$output" "recent .tmp dirs kept (2)" "-" || return
+  assert_output_lacks "$output" "not-a-temp-dir" || return
+  assert_output_lacks "$output" "harness-agent-probe-home" || return
+  pass
+}
+
 scenario_missing_common_repo_root_lib_aborts_safely() {
   start_test "missing common-repo-root.sh aborts instead of computing a wrong path"
   reset_tmp_root
@@ -171,9 +239,11 @@ scenario_missing_common_repo_root_lib_aborts_safely() {
   local output="" status=0
 
   make_shared_target_fixture "$repo"
+  mkdir -p "$repo/fake-tmp"
   rm -f "$repo/scripts/lib/common-repo-root.sh"
 
-  output="$(cd "$repo" && HOME="$repo/fake-home" ./scripts/clean-build-caches.sh --dry-run 2>&1)" || status=$?
+  output="$(cd "$repo" && HOME="$repo/fake-home" TMPDIR="$repo/fake-tmp" \
+    ./scripts/clean-build-caches.sh --dry-run 2>&1)" || status=$?
 
   if (( status == 0 )); then
     fail "expected a nonzero exit when common-repo-root.sh is missing, got 0"
@@ -229,6 +299,7 @@ scenario_includes_scope_comment() {
 }
 
 scenario_dry_run_keeps_leased_segment
+scenario_dry_run_sweeps_only_stale_test_temp_dirs
 scenario_missing_common_repo_root_lib_aborts_safely
 scenario_includes_daemon_cargo_target
 scenario_includes_all_repo_rust_target_roots
