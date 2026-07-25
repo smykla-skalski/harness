@@ -172,24 +172,14 @@ impl AsyncDaemonDb {
         // drops the transaction, which rolls back the lane write, the consumed
         // approval grant and the intent update together.
         let rendered_prompt = rendered_worker_prompt(&applied, &intent_id)?;
-        let payload = serde_json::to_string(&applied)
-            .map_err(|error| db_error(format!("serialize held task board delivery: {error}")))?;
-        let claim_token = format!("dispatch-claim-{}", Uuid::new_v4().simple());
-        query(
-            "UPDATE task_board_dispatch_intents
-             SET payload_json = ?3, status = 'starting', attempts = attempts + 1,
-                 claim_token = ?2, claimed_at = ?4, updated_at = ?4,
-                 consumed_approval_grant_id = ?5
-             WHERE intent_id = ?1 AND status = 'held'",
+        let claim_token = start_held_intent_in_tx(
+            &mut transaction,
+            &intent_id,
+            &applied,
+            &now,
+            consumed_approval_grant_id.as_deref(),
         )
-        .bind(&intent_id)
-        .bind(&claim_token)
-        .bind(payload)
-        .bind(&now)
-        .bind(consumed_approval_grant_id.as_deref())
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("claim held task board dispatch: {error}")))?;
+        .await?;
         let change_sequence = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
         record_lane_transition_audit_in_tx(&mut transaction, &write, change_sequence).await?;
         transaction
@@ -207,6 +197,36 @@ impl AsyncDaemonDb {
             rendered_prompt,
         })
     }
+}
+
+/// Move the held intent to `starting` under a fresh claim token, carrying the
+/// payload the claim decided on.
+async fn start_held_intent_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    intent_id: &str,
+    applied: &DispatchAppliedTask,
+    now: &str,
+    consumed_approval_grant_id: Option<&str>,
+) -> Result<String, CliError> {
+    let payload = serde_json::to_string(applied)
+        .map_err(|error| db_error(format!("serialize held task board delivery: {error}")))?;
+    let claim_token = format!("dispatch-claim-{}", Uuid::new_v4().simple());
+    query(
+        "UPDATE task_board_dispatch_intents
+             SET payload_json = ?3, status = 'starting', attempts = attempts + 1,
+                 claim_token = ?2, claimed_at = ?4, updated_at = ?4,
+                 consumed_approval_grant_id = ?5
+             WHERE intent_id = ?1 AND status = 'held'",
+    )
+    .bind(intent_id)
+    .bind(&claim_token)
+    .bind(payload)
+    .bind(now)
+    .bind(consumed_approval_grant_id)
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("claim held task board dispatch: {error}")))?;
+    Ok(claim_token)
 }
 
 fn advance_held_workflow_launch(
