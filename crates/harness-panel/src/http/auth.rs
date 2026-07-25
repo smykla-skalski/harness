@@ -197,11 +197,18 @@ pub async fn signout(
     jar: CookieJar,
     headers: HeaderMap,
 ) -> Result<Response, ApiError> {
-    if let Some(token) = session_token(&headers) {
-        // Deleting server-side is what makes signing out real; expiring the
-        // cookie only asks the browser to cooperate.
-        state.store.delete_session(&token).await?;
-    }
+    // A request that presented no session has none to end, and answering it
+    // with a `Set-Cookie` anyway would sign someone out from another origin:
+    // `SameSite=Lax` keeps the cookie off a cross-site POST, but it does not
+    // stop the browser applying the expiry that comes back. Doing nothing makes
+    // that request the no-op it already was on the server.
+    let Some(token) = session_token(&headers) else {
+        return Ok(StatusCode::NO_CONTENT.into_response());
+    };
+
+    // Deleting server-side is what makes signing out real; expiring the cookie
+    // only asks the browser to cooperate.
+    state.store.delete_session(&token).await?;
     let jar = without_cookie(jar, &state, super::session::SESSION_COOKIE);
     Ok((jar, StatusCode::NO_CONTENT).into_response())
 }

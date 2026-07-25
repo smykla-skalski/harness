@@ -42,6 +42,37 @@ async fn signing_out_clears_the_session_on_the_server() {
     );
 }
 
+/// A cross-site POST arrives without the session cookie, because `SameSite=Lax`
+/// keeps it off such a request. Answering with an expiry anyway would still
+/// reach the browser, so another origin could sign someone out at will.
+#[tokio::test]
+async fn signing_out_without_a_session_sets_no_cookie() {
+    let harness = Harness::new("ada").await;
+    let token = harness.sign_in("ada").await;
+
+    let response = router(harness.state.clone())
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/panel/auth/signout")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    assert!(
+        response.headers().get(header::SET_COOKIE).is_none(),
+        "a request with no session must not carry an expiry back"
+    );
+    // And the session it never presented is untouched.
+    assert_eq!(
+        harness.get("/panel/api/me", Some(&token)).await.0,
+        StatusCode::OK
+    );
+}
+
 /// Signing out is a state change, so a plain link or an image tag must not be
 /// able to trigger it.
 #[tokio::test]
