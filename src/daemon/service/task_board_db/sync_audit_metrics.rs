@@ -74,6 +74,7 @@ impl ScopeAuditEvidence {
 pub(in crate::daemon::service::task_board_db) struct SyncExecutionMetrics {
     operations: Vec<ExternalSyncOperation>,
     scope_outcomes: Vec<ScopeAuditEvidence>,
+    ambiguous_references: Vec<String>,
     attempted_scope_count: usize,
     result_scope_count: usize,
     succeeded_scope_count: usize,
@@ -84,6 +85,8 @@ pub(in crate::daemon::service::task_board_db) struct SyncExecutionMetrics {
 impl SyncExecutionMetrics {
     pub(in crate::daemon::service::task_board_db) fn capture(&mut self, batch: &ExternalSyncBatch) {
         self.operations.clone_from(&batch.operations);
+        self.ambiguous_references
+            .clone_from(&batch.ambiguous_references);
         self.scope_outcomes = batch
             .scope_outcomes
             .iter()
@@ -141,6 +144,12 @@ pub(super) fn add_execution_metrics(payload: &mut Value, metrics: &SyncExecution
     payload["failed_scope_count"] = json!(metrics.failed_scope_count);
     payload["backing_off_scope_count"] = json!(metrics.backing_off_scope_count);
     add_operation_metrics(payload, &metrics.operations);
+    // Only when something was skipped, so a clean run's payload keeps its
+    // current shape and the key means "these need attention" wherever it shows.
+    if !metrics.ambiguous_references.is_empty() {
+        payload["ambiguous_reference_count"] = json!(metrics.ambiguous_references.len());
+        payload["ambiguous_references"] = json!(metrics.ambiguous_references);
+    }
     payload["scope_outcomes"] = Value::Array(
         metrics
             .scope_outcomes

@@ -21,6 +21,7 @@ async fn each_orchestrator_run_keeps_its_correlated_sync_evidence() {
             "scope-a".into(),
             &provider_error,
         )],
+        ambiguous_references: Vec::new(),
         first_provider_failure: Some(provider_error),
         terminal_error: None,
     };
@@ -97,6 +98,7 @@ async fn correlated_failure_seeds_scope_recovery_tracking() {
             "scope-a".into(),
             &provider_error,
         )],
+        ambiguous_references: Vec::new(),
         first_provider_failure: Some(provider_error),
         terminal_error: None,
     };
@@ -123,6 +125,7 @@ async fn correlated_failure_seeds_scope_recovery_tracking() {
             ExternalProvider::GitHub,
             "scope-a".into(),
         )],
+        ambiguous_references: Vec::new(),
         first_provider_failure: None,
         terminal_error: None,
     };

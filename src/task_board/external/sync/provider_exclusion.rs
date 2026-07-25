@@ -7,7 +7,7 @@ use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::types::{ExternalRef, TaskBoardItem};
 
 use super::conflicts::build_sync_conflicts;
-use super::lookup::ProviderItemIndex;
+use super::lookup::{ProviderItemIndex, SnapshotMatch};
 use super::merge::{changed_fields, matching_ref, pull_conflict_fields};
 use super::reconcile::reconciliation_patch;
 use super::{
@@ -307,7 +307,8 @@ pub(super) async fn try_restore_provider_exclusion_tombstone(
     resolved_parent_item_id: Option<String>,
     operations: &mut Vec<ExternalSyncOperation>,
 ) -> Result<bool, CliError> {
-    let Some(expected) = index.excluded_snapshot(&task.reference, task.project_id.as_deref())?
+    let SnapshotMatch::Found(expected) =
+        index.excluded_snapshot(&task.reference, task.project_id.as_deref())
     else {
         return Ok(false);
     };

@@ -56,3 +56,41 @@ fn operation(applied: bool, action: ExternalSyncAction) -> ExternalSyncOperation
         unsupported_fields: Vec::new(),
     }
 }
+
+fn metrics_with_ambiguous(references: &[&str]) -> SyncExecutionMetrics {
+    let mut metrics = SyncExecutionMetrics::default();
+    metrics.capture(&crate::task_board::external::ExternalSyncBatch {
+        operations: Vec::new(),
+        external_create_follow_ups: Vec::new(),
+        scope_outcomes: Vec::new(),
+        ambiguous_references: references.iter().map(|value| (*value).to_owned()).collect(),
+        first_provider_failure: None,
+        terminal_error: None,
+    });
+    metrics
+}
+
+#[test]
+fn a_skipped_reference_is_named_in_the_payload() {
+    let mut payload = json!({ "trigger": "requested" });
+
+    add_execution_metrics(
+        &mut payload,
+        &metrics_with_ambiguous(&["Owner/repo#689"]),
+    );
+
+    assert_eq!(payload["ambiguous_reference_count"], 1);
+    assert_eq!(payload["ambiguous_references"][0], "Owner/repo#689");
+}
+
+/// A clean run keeps the payload it always had, so the key showing up at all
+/// means something needs attention.
+#[test]
+fn a_run_that_skipped_nothing_carries_no_ambiguity_keys() {
+    let mut payload = json!({ "trigger": "requested" });
+
+    add_execution_metrics(&mut payload, &metrics_with_ambiguous(&[]));
+
+    assert!(payload.get("ambiguous_references").is_none());
+    assert!(payload.get("ambiguous_reference_count").is_none());
+}
