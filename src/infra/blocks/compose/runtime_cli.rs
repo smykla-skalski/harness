@@ -7,12 +7,10 @@ use crate::infra::blocks::{BlockError, ProcessExecutor};
 use crate::infra::exec::CommandResult;
 
 /// Production compose implementation backed by `docker compose`.
-#[cfg(feature = "compose")]
 pub struct DockerComposeOrchestrator {
     process: Arc<dyn ProcessExecutor>,
 }
 
-#[cfg(feature = "compose")]
 impl DockerComposeOrchestrator {
     #[must_use]
     pub fn new(process: Arc<dyn ProcessExecutor>) -> Self {
@@ -20,7 +18,6 @@ impl DockerComposeOrchestrator {
     }
 }
 
-#[cfg(feature = "compose")]
 impl ComposeOrchestrator for DockerComposeOrchestrator {
     fn up(
         &self,

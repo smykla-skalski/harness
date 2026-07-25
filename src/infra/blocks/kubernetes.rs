@@ -6,12 +6,16 @@ use serde::{Deserialize, Serialize};
 use crate::infra::blocks::BlockError;
 
 mod backend;
+#[cfg(feature = "kubernetes")]
 mod diff;
+#[cfg(feature = "kubernetes")]
 mod dynamic;
+#[cfg(feature = "kubernetes")]
 mod kubeconfig;
 mod local_cluster;
 mod pods;
 mod runtime_cli;
+#[cfg(feature = "kubernetes")]
 mod runtime_kube;
 
 pub const KUBERNETES_RUNTIME_ENV: &str = "HARNESS_KUBERNETES_RUNTIME";
@@ -24,6 +28,7 @@ pub use backend::{
 pub use local_cluster::K3dClusterManager;
 pub use local_cluster::LocalClusterManager;
 pub use runtime_cli::KubectlRuntime;
+#[cfg(feature = "kubernetes")]
 pub use runtime_kube::KubeRuntime;
 
 /// Snapshot of a Kubernetes pod.

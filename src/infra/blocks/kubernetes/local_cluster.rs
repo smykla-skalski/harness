@@ -1,6 +1,9 @@
+#[cfg(feature = "k3d")]
 use std::sync::Arc;
 
-use crate::infra::blocks::{BlockError, ProcessExecutor};
+#[cfg(feature = "k3d")]
+use crate::infra::blocks::ProcessExecutor;
+use crate::infra::blocks::BlockError;
 use crate::infra::exec::CommandResult;
 
 /// Local disposable cluster operations backed by `k3d`.
