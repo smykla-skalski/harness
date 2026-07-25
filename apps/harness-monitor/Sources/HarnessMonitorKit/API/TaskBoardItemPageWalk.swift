@@ -27,18 +27,16 @@ extension TaskBoardItemPageSource {
   /// selection. A walk that stopped early still carries the cursor it never
   /// consumed, so a truncated read is distinguishable from a complete one.
   ///
-  /// Ids are tracked because a repeat does not only come from a cursor that
-  /// stalls. A cursor whose anchor left the selection between two reads resumes
-  /// at the slot that anchor held, so a page can re-serve a row an earlier page
-  /// returned while still advancing to a *different* cursor - the stall check
-  /// below never sees it. These items reach `ForEach(..., id: \.id)`, which
-  /// breaks on a duplicate identity, so the walk drops the repeat.
+  /// A cursor whose anchor left the selection between two reads resumes at the
+  /// slot that anchor held, so a page can re-serve a row an earlier page
+  /// already returned. Ids are tracked and a repeat is dropped: these items
+  /// reach `ForEach(..., id: \.id)`, which breaks on a duplicate identity.
   func mergedTaskBoardItemPages(
     status: TaskBoardStatus?
   ) async throws -> TaskBoardListItemsResponseWire {
     var merged = try await taskBoardItemPage(status: status, cursor: nil)
-    var seen = Set<String>()
-    merged.items = merged.items.filter { seen.insert($0.id).inserted }
+    merged.items = deduplicated(merged.items)
+    var seen = Set(merged.items.map(\.id))
     var cursor = merged.nextCursor
     var pages = 1
     while let next = cursor {
@@ -56,7 +54,8 @@ extension TaskBoardItemPageSource {
       cursor = page.nextCursor
       pages += 1
       // A cursor naming the resume point it was just given would re-fetch this
-      // same page and append it again, so stop rather than keep asking.
+      // same page every round until the cap, so stop at the first repeat.
+      // Deduplication keeps those rows out of the result, but not the work.
       if page.nextCursor == next {
         break
       }
@@ -64,4 +63,14 @@ extension TaskBoardItemPageSource {
     merged.nextCursor = cursor
     return merged
   }
+}
+
+/// Keep the first item carrying each id, in order.
+///
+/// The first page is trusted no less than the rest: a daemon that repeated a row
+/// inside one page would otherwise put a duplicate identity straight into the
+/// merged result.
+private func deduplicated(_ items: [TaskBoardItemWire]) -> [TaskBoardItemWire] {
+  var seen = Set<String>()
+  return items.filter { seen.insert($0.id).inserted }
 }
