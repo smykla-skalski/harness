@@ -11,7 +11,11 @@ import SwiftUI
 /// twenty-three, which is a property `TaskBoardProjectPaletteTests` can check
 /// and a borrowed token cannot promise.
 enum TaskBoardProjectPalette {
-  typealias Components = (red: Double, green: Double, blue: Double)
+  struct Components {
+    let red: Double
+    let green: Double
+    let blue: Double
+  }
 
   /// The stored name means one colour in light and another in dark, which is
   /// what lets the daemon keep storing a plain name while the mark still
@@ -19,7 +23,8 @@ enum TaskBoardProjectPalette {
   static func color(light: Components, dark: Components) -> Color {
     Color(
       nsColor: NSColor(name: nil) { appearance in
-        let components = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        let components =
+          appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
           ? dark
           : light
         return NSColor(
@@ -34,35 +39,135 @@ enum TaskBoardProjectPalette {
 }
 
 extension TaskBoardProjectColor {
+  fileprivate typealias Components = TaskBoardProjectPalette.Components
+
   /// Twelve hue families in two lightness tiers. Generated against a minimum
   /// pairwise distance rather than picked by eye, so the worst pair on a full
   /// board is dE 17.6 in light and 18.1 in dark.
-  var components: (light: TaskBoardProjectPalette.Components, dark: TaskBoardProjectPalette.Components) {
+  var components:
+    (light: TaskBoardProjectPalette.Components, dark: TaskBoardProjectPalette.Components)
+  {
     switch self {
-    case .blue: ((0.254, 0.572, 0.919), (0.584, 0.740, 1.000))
-    case .green: ((0.312, 0.629, 0.331), (0.536, 0.797, 0.535))
-    case .purple: ((0.635, 0.495, 0.846), (0.807, 0.678, 0.984))
-    case .amber: ((0.671, 0.549, 0.181), (0.845, 0.722, 0.416))
-    case .teal: ((0.025, 0.627, 0.617), (0.013, 0.818, 0.806))
-    case .pink: ((0.833, 0.419, 0.677), (0.981, 0.623, 0.836))
-    case .mint: ((0.030, 0.638, 0.478), (0.364, 0.813, 0.653))
-    case .sky: ((0.001, 0.611, 0.757), (0.042, 0.797, 0.983))
-    case .warm: ((0.808, 0.481, 0.258), (0.969, 0.666, 0.472))
-    case .olive: ((0.532, 0.592, 0.206), (0.719, 0.761, 0.436))
-    case .graphite: ((0.666, 0.666, 0.665), (0.629, 0.629, 0.629))
-    case .red: ((0.879, 0.426, 0.382), (1.000, 0.641, 0.594))
-    case .blueDeep: ((0.021, 0.393, 0.677), (0.230, 0.536, 0.866))
-    case .greenDeep: ((0.011, 0.447, 0.136), (0.288, 0.590, 0.307))
-    case .purpleDeep: ((0.447, 0.309, 0.681), (0.596, 0.462, 0.796))
-    case .amberDeep: ((0.469, 0.373, 0.006), (0.629, 0.514, 0.163))
-    case .tealDeep: ((0.013, 0.430, 0.423), (0.010, 0.588, 0.578))
-    case .pinkDeep: ((0.657, 0.198, 0.504), (0.784, 0.390, 0.636))
-    case .mintDeep: ((0.006, 0.439, 0.324), (0.015, 0.599, 0.447))
-    case .skyDeep: ((0.003, 0.419, 0.522), (0.035, 0.572, 0.708))
-    case .warmDeep: ((0.616, 0.293, 0.029), (0.759, 0.449, 0.237))
-    case .oliveDeep: ((0.346, 0.412, 0.004), (0.497, 0.555, 0.188))
-    case .graphiteDeep: ((0.481, 0.481, 0.481), (0.427, 0.427, 0.427))
-    case .redDeep: ((0.692, 0.213, 0.197), (0.827, 0.397, 0.355))
+    case .blue:
+      (
+        Components(red: 0.254, green: 0.572, blue: 0.919),
+        Components(red: 0.584, green: 0.740, blue: 1.000)
+      )
+    case .green:
+      (
+        Components(red: 0.312, green: 0.629, blue: 0.331),
+        Components(red: 0.536, green: 0.797, blue: 0.535)
+      )
+    case .purple:
+      (
+        Components(red: 0.635, green: 0.495, blue: 0.846),
+        Components(red: 0.807, green: 0.678, blue: 0.984)
+      )
+    case .amber:
+      (
+        Components(red: 0.671, green: 0.549, blue: 0.181),
+        Components(red: 0.845, green: 0.722, blue: 0.416)
+      )
+    case .teal:
+      (
+        Components(red: 0.025, green: 0.627, blue: 0.617),
+        Components(red: 0.013, green: 0.818, blue: 0.806)
+      )
+    case .pink:
+      (
+        Components(red: 0.833, green: 0.419, blue: 0.677),
+        Components(red: 0.981, green: 0.623, blue: 0.836)
+      )
+    case .mint:
+      (
+        Components(red: 0.030, green: 0.638, blue: 0.478),
+        Components(red: 0.364, green: 0.813, blue: 0.653)
+      )
+    case .sky:
+      (
+        Components(red: 0.001, green: 0.611, blue: 0.757),
+        Components(red: 0.042, green: 0.797, blue: 0.983)
+      )
+    case .warm:
+      (
+        Components(red: 0.808, green: 0.481, blue: 0.258),
+        Components(red: 0.969, green: 0.666, blue: 0.472)
+      )
+    case .olive:
+      (
+        Components(red: 0.532, green: 0.592, blue: 0.206),
+        Components(red: 0.719, green: 0.761, blue: 0.436)
+      )
+    case .graphite:
+      (
+        Components(red: 0.666, green: 0.666, blue: 0.665),
+        Components(red: 0.629, green: 0.629, blue: 0.629)
+      )
+    case .red:
+      (
+        Components(red: 0.879, green: 0.426, blue: 0.382),
+        Components(red: 1.000, green: 0.641, blue: 0.594)
+      )
+    case .blueDeep:
+      (
+        Components(red: 0.021, green: 0.393, blue: 0.677),
+        Components(red: 0.230, green: 0.536, blue: 0.866)
+      )
+    case .greenDeep:
+      (
+        Components(red: 0.011, green: 0.447, blue: 0.136),
+        Components(red: 0.288, green: 0.590, blue: 0.307)
+      )
+    case .purpleDeep:
+      (
+        Components(red: 0.447, green: 0.309, blue: 0.681),
+        Components(red: 0.596, green: 0.462, blue: 0.796)
+      )
+    case .amberDeep:
+      (
+        Components(red: 0.469, green: 0.373, blue: 0.006),
+        Components(red: 0.629, green: 0.514, blue: 0.163)
+      )
+    case .tealDeep:
+      (
+        Components(red: 0.013, green: 0.430, blue: 0.423),
+        Components(red: 0.010, green: 0.588, blue: 0.578)
+      )
+    case .pinkDeep:
+      (
+        Components(red: 0.657, green: 0.198, blue: 0.504),
+        Components(red: 0.784, green: 0.390, blue: 0.636)
+      )
+    case .mintDeep:
+      (
+        Components(red: 0.006, green: 0.439, blue: 0.324),
+        Components(red: 0.015, green: 0.599, blue: 0.447)
+      )
+    case .skyDeep:
+      (
+        Components(red: 0.003, green: 0.419, blue: 0.522),
+        Components(red: 0.035, green: 0.572, blue: 0.708)
+      )
+    case .warmDeep:
+      (
+        Components(red: 0.616, green: 0.293, blue: 0.029),
+        Components(red: 0.759, green: 0.449, blue: 0.237)
+      )
+    case .oliveDeep:
+      (
+        Components(red: 0.346, green: 0.412, blue: 0.004),
+        Components(red: 0.497, green: 0.555, blue: 0.188)
+      )
+    case .graphiteDeep:
+      (
+        Components(red: 0.481, green: 0.481, blue: 0.481),
+        Components(red: 0.427, green: 0.427, blue: 0.427)
+      )
+    case .redDeep:
+      (
+        Components(red: 0.692, green: 0.213, blue: 0.197),
+        Components(red: 0.827, green: 0.397, blue: 0.355)
+      )
     }
   }
 
@@ -143,7 +248,9 @@ struct TaskBoardProjectMarkOutline: InsettableShape {
     case .circle:
       Path(ellipseIn: rect)
     case .square:
-      Path(roundedRect: rect.insetBy(dx: rect.width * 0.06, dy: rect.height * 0.06), cornerRadius: rect.width * 0.16)
+      Path(
+        roundedRect: rect.insetBy(dx: rect.width * 0.06, dy: rect.height * 0.06),
+        cornerRadius: rect.width * 0.16)
     case .triangle:
       Self.polygon(sides: 3, in: rect)
     case .diamond:
@@ -223,14 +330,16 @@ struct TaskBoardProjectMark: View {
     // Read outside the guide: its closure is `@Sendable`, so it cannot reach
     // back into the view's MainActor state.
     let diameter = diameter
-    let baseline = diameter / 2
+    let baseline =
+      diameter / 2
       + TaskBoardProjectMarkCapHeights.capHeight(for: alignsWith) * fontScale / 2
     let outline = TaskBoardProjectMarkOutline(shape: style.shape)
     // The border keeps a light mark from vanishing on the card's own light
     // fill, and past the palette it is also what makes the shape readable, so
     // Increased Contrast gets a border that can carry that on its own.
     let increased = colorSchemeContrast == .increased
-    return outline
+    return
+      outline
       .fill(style.color.color)
       .overlay {
         outline.strokeBorder(

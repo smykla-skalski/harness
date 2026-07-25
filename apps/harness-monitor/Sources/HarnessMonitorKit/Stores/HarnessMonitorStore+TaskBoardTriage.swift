@@ -102,10 +102,8 @@ extension HarnessMonitorStore {
       try await Self.setTaskBoardTriageOverrideWithRetry(
         using: client,
         id: id,
-        verdict: verdict,
-        reason: reason,
-        actor: actor,
-        remainingRetries: Self.taskBoardTriageOverrideConflictRetryLimit
+        SetTriageOverrideParams(verdict: verdict, reason: reason, actor: actor),
+        remainingRetries: Self.triageOverrideConflictRetryLimit
       )
     }
   }
@@ -121,19 +119,23 @@ extension HarnessMonitorStore {
         using: client,
         id: id,
         actor: actor,
-        remainingRetries: Self.taskBoardTriageOverrideConflictRetryLimit
+        remainingRetries: Self.triageOverrideConflictRetryLimit
       )
     }
   }
 
-  private static let taskBoardTriageOverrideConflictRetryLimit = 1
+  private static let triageOverrideConflictRetryLimit = 1
+
+  private struct SetTriageOverrideParams {
+    let verdict: TriageVerdict
+    let reason: String?
+    let actor: String
+  }
 
   private static func setTaskBoardTriageOverrideWithRetry(
     using client: any HarnessMonitorClientProtocol,
     id: String,
-    verdict: TriageVerdict,
-    reason: String?,
-    actor: String,
+    _ params: SetTriageOverrideParams,
     remainingRetries: Int
   ) async throws -> TaskBoardTriageOverrideMutationResponse {
     var snapshot = try await client.taskBoardItemPositionSnapshot(id: id)
@@ -141,16 +143,16 @@ extension HarnessMonitorStore {
     var retries = remainingRetries
     while true {
       let request = TaskBoardSetTriageOverrideRequest(
-        verdict: verdict,
-        reason: reason,
+        verdict: params.verdict,
+        reason: params.reason,
         expectedItemRevision: snapshot.itemRevision,
         expectedItemsChangeSeq: snapshot.itemsChangeSeq,
-        actor: actor
+        actor: params.actor
       )
       do {
         return try await client.setTaskBoardItemTriageOverride(id: id, request: request)
       } catch {
-        guard retries > 0, error.isTaskBoardTriageOverrideConcurrentModification else {
+        guard retries > 0, error.isTriageOverrideConcurrentModification else {
           throw error
         }
         let refreshed = try await client.taskBoardItemPositionSnapshot(id: id)
@@ -181,7 +183,7 @@ extension HarnessMonitorStore {
       do {
         return try await client.clearTaskBoardItemTriageOverride(id: id, request: request)
       } catch {
-        guard retries > 0, error.isTaskBoardTriageOverrideConcurrentModification else {
+        guard retries > 0, error.isTriageOverrideConcurrentModification else {
           throw error
         }
         let refreshed = try await client.taskBoardItemPositionSnapshot(id: id)
@@ -196,7 +198,7 @@ extension HarnessMonitorStore {
 }
 
 extension Error {
-  fileprivate var isTaskBoardTriageOverrideConcurrentModification: Bool {
+  fileprivate var isTriageOverrideConcurrentModification: Bool {
     (self as? HarnessMonitorAPIError)?.serverSemanticCode == "WORKFLOW_CONCURRENT"
   }
 }

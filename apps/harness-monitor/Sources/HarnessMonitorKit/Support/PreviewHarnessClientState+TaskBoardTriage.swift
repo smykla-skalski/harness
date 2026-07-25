@@ -150,10 +150,12 @@ extension PreviewHarnessClientState {
       {
         replacePosition(
           item,
-          status: .todo,
-          lanePosition: item.lanePosition,
-          laneOrigin: item.laneOrigin,
-          laneSetAt: item.laneSetAt,
+          PreviewLanePlacement(
+            status: .todo,
+            lanePosition: item.lanePosition,
+            laneOrigin: item.laneOrigin,
+            laneSetAt: item.laneSetAt
+          ),
           updatedAt: Self.mutationTimestamp
         )
         return []
@@ -168,10 +170,12 @@ extension PreviewHarnessClientState {
       )
       replacePosition(
         item,
-        status: .todo,
-        lanePosition: position,
-        laneOrigin: .automatic(producer: producer),
-        laneSetAt: Self.mutationTimestamp,
+        PreviewLanePlacement(
+          status: .todo,
+          lanePosition: position,
+          laneOrigin: .automatic(producer: producer),
+          laneSetAt: Self.mutationTimestamp
+        ),
         updatedAt: Self.mutationTimestamp
       )
       return shifted
@@ -188,10 +192,12 @@ extension PreviewHarnessClientState {
       }
       replacePosition(
         item,
-        status: .backlog,
-        lanePosition: nil,
-        laneOrigin: nil,
-        laneSetAt: nil,
+        PreviewLanePlacement(
+          status: .backlog,
+          lanePosition: nil,
+          laneOrigin: nil,
+          laneSetAt: nil
+        ),
         updatedAt: Self.mutationTimestamp
       )
       return shifted
@@ -365,10 +371,12 @@ extension PreviewHarnessClientState {
       // every set/clear, so this call must too.
       replacePosition(
         item,
-        status: sourceStatus,
-        lanePosition: item.lanePosition,
-        laneOrigin: item.laneOrigin,
-        laneSetAt: item.laneSetAt,
+        PreviewLanePlacement(
+          status: sourceStatus,
+          lanePosition: item.lanePosition,
+          laneOrigin: item.laneOrigin,
+          laneSetAt: item.laneSetAt
+        ),
         updatedAt: Self.mutationTimestamp
       )
       return []
@@ -390,10 +398,12 @@ extension PreviewHarnessClientState {
     )
     replacePosition(
       item,
-      status: destinationStatus,
-      lanePosition: clamped,
-      laneOrigin: item.laneOrigin,
-      laneSetAt: item.laneSetAt,
+      PreviewLanePlacement(
+        status: destinationStatus,
+        lanePosition: clamped,
+        laneOrigin: item.laneOrigin,
+        laneSetAt: item.laneSetAt
+      ),
       updatedAt: Self.mutationTimestamp
     )
     return shifted

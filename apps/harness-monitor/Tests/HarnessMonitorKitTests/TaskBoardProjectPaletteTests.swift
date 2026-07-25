@@ -86,10 +86,16 @@ struct TaskBoardProjectPaletteTests {
     return sum.squareRoot()
   }
 
+  private struct LabComponents {
+    let lightness: Double
+    let green: Double
+    let blue: Double
+  }
+
   private static func lab(
     of color: TaskBoardProjectColor,
     in appearance: Appearance
-  ) -> (lightness: Double, green: Double, blue: Double) {
+  ) -> LabComponents {
     let components = appearance == .light ? color.components.light : color.components.dark
     let red = linear(components.red)
     let green = linear(components.green)
@@ -101,14 +107,14 @@ struct TaskBoardProjectPaletteTests {
     var y = 0.2126 * red
     y += 0.7152 * green
     y += 0.0722 * blue
-    var z = 0.0193 * red
-    z += 0.1192 * green
-    z += 0.9505 * blue
+    var zAxis = 0.0193 * red
+    zAxis += 0.1192 * green
+    zAxis += 0.9505 * blue
 
     let fx = pivot(x / 0.95047)
     let fy = pivot(y)
-    let fz = pivot(z / 1.08883)
-    return (116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz))
+    let fz = pivot(zAxis / 1.08883)
+    return LabComponents(lightness: 116 * fy - 16, green: 500 * (fx - fy), blue: 200 * (fy - fz))
   }
 
   private static func linear(_ channel: Double) -> Double {

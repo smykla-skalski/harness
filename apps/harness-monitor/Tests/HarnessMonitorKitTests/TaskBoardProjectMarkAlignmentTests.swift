@@ -22,10 +22,16 @@ struct TaskBoardProjectMarkAlignmentTests {
   private static let scale: CGFloat = 8
   private static let toleranceInPoints = 0.13
 
-  private static let surfaces: [(name: String, font: Font, style: NSFont.TextStyle)] = [
-    ("card footer", .caption, .caption1),
-    ("palette row", .callout, .callout),
-    ("settings row", .body, .body),
+  private struct Surface {
+    let name: String
+    let font: Font
+    let style: NSFont.TextStyle
+  }
+
+  private static let surfaces: [Surface] = [
+    Surface(name: "card footer", font: .caption, style: .caption1),
+    Surface(name: "palette row", font: .callout, style: .callout),
+    Surface(name: "settings row", font: .body, style: .body),
   ]
 
   @Test("The mark centres on the cap band of the text beside it")

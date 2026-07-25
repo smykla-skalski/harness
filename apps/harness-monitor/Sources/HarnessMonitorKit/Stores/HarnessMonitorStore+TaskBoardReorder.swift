@@ -1,7 +1,7 @@
 import Foundation
 
 extension Error {
-  fileprivate var isTaskBoardPositionConcurrentModification: Bool {
+  fileprivate var isPositionConcurrentModification: Bool {
     (self as? HarnessMonitorAPIError)?.serverSemanticCode == "WORKFLOW_CONCURRENT"
   }
 }
@@ -48,9 +48,7 @@ extension HarnessMonitorStore {
         try await Self.setTaskBoardItemPositionWithRetry(
           using: client,
           id: id,
-          status: status,
-          placement: placement,
-          actor: actor,
+          PositionPlacement(status: status, placement: placement, actor: actor),
           remainingRetries: Self.taskBoardPositionConflictRetryLimit
         )
       }.value
@@ -103,41 +101,44 @@ extension HarnessMonitorStore {
 
   /// Recomputes the relative drop against one canonical server snapshot per
   /// attempt, so a bounded retry cannot replay an obsolete absolute slot.
+  struct PositionPlacement {
+    let status: TaskBoardStatus
+    let placement: TaskBoardRelativeLanePlacement
+    let actor: String
+  }
+
   nonisolated static func setTaskBoardItemPositionWithRetry(
     using client: any HarnessMonitorClientProtocol,
     id: String,
-    status: TaskBoardStatus,
-    placement: TaskBoardRelativeLanePlacement,
-    actor: String,
+    _ target: PositionPlacement,
     remainingRetries: Int
   ) async throws -> TaskBoardItemPositionMutationResponse {
-    let canonicalStatus = status.canonicalPersistedStatus
+    let canonicalStatus = target.status.canonicalPersistedStatus
     let snapshot = try await client.taskBoardItemsSnapshot(status: canonicalStatus)
     let request = try taskBoardReorderRequest(
       snapshot: snapshot,
       id: id,
       status: canonicalStatus,
-      placement: placement,
-      actor: actor
+      placement: target.placement,
+      actor: target.actor
     )
     do {
       return try await client.setTaskBoardItemPosition(id: id, request: request)
     } catch {
-      guard remainingRetries > 0, error.isTaskBoardPositionConcurrentModification else {
+      guard remainingRetries > 0, error.isPositionConcurrentModification else {
         throw error
       }
       return try await setTaskBoardItemPositionWithRetry(
         using: client,
         id: id,
-        status: canonicalStatus,
-        placement: placement,
-        actor: actor,
+        PositionPlacement(
+          status: canonicalStatus, placement: target.placement, actor: target.actor),
         remainingRetries: remainingRetries - 1
       )
     }
   }
 
-  private nonisolated static func taskBoardReorderRequest(
+  nonisolated private static func taskBoardReorderRequest(
     snapshot: TaskBoardListItemsSnapshot,
     id: String,
     status: TaskBoardStatus,
@@ -192,7 +193,7 @@ extension HarnessMonitorStore {
     do {
       return try await client.resetTaskBoardItemPosition(id: id, request: request)
     } catch {
-      guard remainingRetries > 0, error.isTaskBoardPositionConcurrentModification else {
+      guard remainingRetries > 0, error.isPositionConcurrentModification else {
         throw error
       }
       return try await resetTaskBoardItemPositionWithRetry(
