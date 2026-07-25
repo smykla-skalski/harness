@@ -141,9 +141,10 @@ fn run_git_output(dir: &Path, args: &[&str]) -> String {
 /// Panics if the shared home cannot be created.
 #[must_use]
 pub fn shared_agent_probe_home() -> PathBuf {
-    let home = std::env::var_os(AGENT_PROBE_HOME_ENV)
-        .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::temp_dir().join("harness-agent-probe-home"));
+    let home = std::env::var_os(AGENT_PROBE_HOME_ENV).map_or_else(
+        || std::env::temp_dir().join("harness-agent-probe-home"),
+        PathBuf::from,
+    );
     std::fs::create_dir_all(&home).expect("create shared agent probe home");
     home
 }
