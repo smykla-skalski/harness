@@ -27,6 +27,10 @@ use super::stop::settle_lifecycle_settings_drift;
 use super::terminal::persist_terminal_snapshot;
 use super::{RemoteWorkerIdentity, claim_active_lifecycle_owner, concurrent};
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "sequential start/validate/adopt/settle pipeline, each step already its own helper"
+)]
 pub(super) async fn execute_and_reconcile_remote_worker(
     state: &DaemonHttpState,
     db: &AsyncDaemonDb,
@@ -67,20 +71,14 @@ pub(super) async fn execute_and_reconcile_remote_worker(
         return Err(error);
     }
     if record.state == TaskBoardRemoteAssignmentState::Claimed {
-        let permit = permit
-            .ok_or_else(|| concurrent("claimed remote worker has no durable Start I/O permit"))?;
-        let Some(started) =
-            Box::pin(adopt_remote_start(state, db, permit, &snapshot, workspace)).await?
+        let Some(adopted) = Box::pin(reconcile_claimed_adoption(
+            state, db, permit, &snapshot, workspace,
+        ))
+        .await?
         else {
             return Ok(());
         };
-        let Some(owned) = claim_active_lifecycle_owner(state, db, &started).await? else {
-            return Ok(());
-        };
-        record = owned.record;
-        if owned.stop_only {
-            return settle_lifecycle_settings_drift(state, db, &record, &snapshot).await;
-        }
+        record = adopted;
     }
     if !snapshot.status.is_active() {
         return Box::pin(persist_terminal_snapshot(
@@ -93,6 +91,34 @@ pub(super) async fn execute_and_reconcile_remote_worker(
         .await;
     }
     mark_running_if_active(db, &record, &snapshot).await
+}
+
+/// Adopts a claimed worker's start and takes its lifecycle ownership.
+/// `Ok(None)` means this assignment is done for the pass - another owner won
+/// the race, or settings drift was settled here - and the caller must stop
+/// reconciling it rather than treat the record as adopted.
+async fn reconcile_claimed_adoption(
+    state: &DaemonHttpState,
+    db: &AsyncDaemonDb,
+    permit: Option<&TaskBoardRemoteExecutorStartIoPermit>,
+    snapshot: &CodexRunSnapshot,
+    workspace: &Path,
+) -> Result<Option<TaskBoardRemoteAssignmentRecord>, CliError> {
+    let permit = permit
+        .ok_or_else(|| concurrent("claimed remote worker has no durable Start I/O permit"))?;
+    let Some(started) =
+        Box::pin(adopt_remote_start(state, db, permit, snapshot, workspace)).await?
+    else {
+        return Ok(None);
+    };
+    let Some(owned) = claim_active_lifecycle_owner(state, db, &started).await? else {
+        return Ok(None);
+    };
+    if owned.stop_only {
+        settle_lifecycle_settings_drift(state, db, &owned.record, snapshot).await?;
+        return Ok(None);
+    }
+    Ok(Some(owned.record))
 }
 
 /// A matching deterministic run without a persisted Start-I/O permit is not

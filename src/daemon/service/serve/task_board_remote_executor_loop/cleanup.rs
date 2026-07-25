@@ -39,22 +39,13 @@ pub(super) async fn reconcile_settled_executor_cleanup(
         return Ok(false);
     };
     require_exact_cleanup_generation(record, &receipt.request)?;
-    if preclaim_superseded_cleanup_is_empty(db, record, identity).await? {
-        // A never-claimed offer performed no executor work and owns no local filesystem state.
-    } else {
-        if let Some(run) = db.codex_run(&identity.run_id).await? {
-            validate_cleanup_run(db, record, identity, &run).await?;
-            if run.status.is_active() {
-                stop_codex_run(state, &identity.run_id).await?;
-                return Ok(true);
-            }
-        }
-        let workspace = db
-            .resolve_session(&identity.session_id)
-            .await?
-            .map(|session| session.state.worktree_path);
-        cleanup_prior_phase_import_ref(record, identity, workspace.as_deref()).await?;
-        cleanup_executor_session(db, record, identity).await?;
+    // A never-claimed offer performed no executor work and owns no local filesystem state.
+    if !preclaim_superseded_cleanup_is_empty(db, record, identity).await?
+        && release_executor_local_state(state, db, record, identity).await?
+    {
+        // An active run was only just asked to stop, so the cleanup fence stays
+        // open for the pass that observes it settled.
+        return Ok(true);
     }
     match db
         .complete_task_board_remote_assignment_cleanup(
@@ -70,6 +61,35 @@ pub(super) async fn reconcile_settled_executor_cleanup(
             "remote executor cleanup lost its exact settlement fence",
         )),
     }
+}
+
+/// Releases the local state an executor built for a settled assignment.
+/// `Ok(true)` means an active Codex run was asked to stop and nothing else was
+/// released yet, so the caller must leave the cleanup fence open this pass.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "one guarded run-stop check ahead of the sequential local-state release"
+)]
+async fn release_executor_local_state(
+    state: &DaemonHttpState,
+    db: &AsyncDaemonDb,
+    record: &TaskBoardRemoteAssignmentRecord,
+    identity: &RemoteWorkerIdentity,
+) -> Result<bool, CliError> {
+    if let Some(run) = db.codex_run(&identity.run_id).await? {
+        validate_cleanup_run(db, record, identity, &run).await?;
+        if run.status.is_active() {
+            stop_codex_run(state, &identity.run_id).await?;
+            return Ok(true);
+        }
+    }
+    let workspace = db
+        .resolve_session(&identity.session_id)
+        .await?
+        .map(|session| session.state.worktree_path);
+    cleanup_prior_phase_import_ref(record, identity, workspace.as_deref()).await?;
+    cleanup_executor_session(db, record, identity).await?;
+    Ok(false)
 }
 
 pub(super) async fn cleanup_unstarted_executor_provisioning(
@@ -93,20 +113,8 @@ pub(super) async fn cleanup_unstarted_executor_provisioning(
     let origin = PathBuf::from(record.executor_checkout_path.as_deref().ok_or_else(|| {
         concurrent("remote executor provisioning cleanup has no frozen checkout path")
     })?);
-    let resolved = db.resolve_session(&authority.identity.session_id).await?;
-    let layout =
-        match resolved.as_ref() {
-            Some(session) => cleanup_layout(
-                session.state.worktree_path.to_str().ok_or_else(|| {
-                    concurrent("remote executor provisioning worktree is not UTF-8")
-                })?,
-                &authority.identity.session_id,
-            )?,
-            None => deterministic_session_layout(&origin, &authority.identity.session_id)?,
-        };
-    if let Some(session) = resolved.as_ref() {
-        validate_provisioning_session(&record, authority, &session.state, &layout)?;
-    }
+    let (layout, had_session_row) =
+        resolve_provisioning_layout(db, &record, authority, &origin).await?;
     let workspace = layout.workspace();
     cleanup_prior_phase_import_ref(
         &record,
@@ -118,11 +126,36 @@ pub(super) async fn cleanup_unstarted_executor_provisioning(
     spawn_blocking(move || destroy_executor_session(&cleanup_origin, &layout))
         .await
         .map_err(|error| workflow_io(format!("join remote provisioning cleanup: {error}")))??;
-    if resolved.is_some() {
+    if had_session_row {
         db.delete_session_row(&authority.identity.session_id)
             .await?;
     }
     Ok(true)
+}
+
+/// Resolves the session layout whose filesystem state must be destroyed. The
+/// flag reports whether a session row backed that layout, which is what decides
+/// if the row itself has to be deleted once the files are gone.
+async fn resolve_provisioning_layout(
+    db: &AsyncDaemonDb,
+    record: &TaskBoardRemoteAssignmentRecord,
+    authority: &TaskBoardRemoteExecutorStartAuthority,
+    origin: &Path,
+) -> Result<(SessionLayout, bool), CliError> {
+    let Some(session) = db.resolve_session(&authority.identity.session_id).await? else {
+        let layout = deterministic_session_layout(origin, &authority.identity.session_id)?;
+        return Ok((layout, false));
+    };
+    let layout = cleanup_layout(
+        session
+            .state
+            .worktree_path
+            .to_str()
+            .ok_or_else(|| concurrent("remote executor provisioning worktree is not UTF-8"))?,
+        &authority.identity.session_id,
+    )?;
+    validate_provisioning_session(record, authority, &session.state, &layout)?;
+    Ok((layout, true))
 }
 
 fn exact_unstarted_provisioning(
