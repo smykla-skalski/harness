@@ -1,4 +1,5 @@
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::DaemonDb;
 use crate::daemon::protocol::CodexRunRequest;
 use crate::daemon::service as daemon_service;
 use crate::errors::{CliError, CliErrorKind};
@@ -158,7 +159,7 @@ pub(super) fn register_sync(
 }
 
 fn persist_sync_registration(
-    db: &crate::daemon::db::DaemonDb,
+    db: &DaemonDb,
     session_id: &str,
     state: &SessionState,
     agent_id: &str,
@@ -182,11 +183,7 @@ fn persist_sync_registration(
     ))
 }
 
-fn rollback_sync_registration(
-    db: &crate::daemon::db::DaemonDb,
-    session_id: &str,
-    original_state: &SessionState,
-) {
+fn rollback_sync_registration(db: &DaemonDb, session_id: &str, original_state: &SessionState) {
     let restore_result = db
         .project_id_for_session(session_id)
         .and_then(|project_id| {

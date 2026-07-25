@@ -4,6 +4,7 @@ use std::thread;
 
 use super::super::active::ActiveAcpSession;
 use super::{AcpAgentManagerHandle, AcpAgentSnapshot};
+use crate::daemon::sandboxed_from_env;
 use crate::errors::{CliError, CliErrorKind};
 
 impl AcpAgentManagerHandle {
@@ -25,7 +26,7 @@ impl AcpAgentManagerHandle {
             ))
             .into());
         }
-        if crate::daemon::sandboxed_from_env() {
+        if sandboxed_from_env() {
             return Err(CliErrorKind::workflow_io(format!(
                 "acp_prompt_unsupported_in_sandbox: ACP managed agent '{acp_id}' follow-up prompts \
                  require an unsandboxed daemon"

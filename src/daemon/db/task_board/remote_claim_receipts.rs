@@ -2,6 +2,8 @@ use sha2::{Digest, Sha256};
 
 use super::remote_assignment_model::{TaskBoardRemoteAssignmentRecord, concurrent, nonblank};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
+use crate::daemon::task_board_remote_transport::wire::RemoteLease;
+use crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest;
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteClaimRequest, RemoteClaimResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
@@ -18,8 +20,7 @@ pub(crate) struct TaskBoardRemoteClaimReceipt {
 pub(super) struct ClaimReceiptDecodeInput<'a> {
     pub(super) assignment_id: &'a str,
     pub(super) fencing_epoch: u64,
-    pub(super) offer:
-        Option<&'a crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest>,
+    pub(super) offer: Option<&'a RemoteOfferRequest>,
     pub(super) principal: Option<&'a str>,
     pub(super) claimed_at: Option<&'a str>,
     pub(super) request_sha256: Option<&'a str>,
@@ -64,7 +65,7 @@ pub(super) fn claim_response_for_record(
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: request.binding.clone(),
         offer_request_sha256: request.offer_request_sha256.clone(),
-        lease: crate::daemon::task_board_remote_transport::wire::RemoteLease {
+        lease: RemoteLease {
             lease_id: request.lease_id.clone(),
             expires_at: lease_expires_at,
         },

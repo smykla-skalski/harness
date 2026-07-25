@@ -1,4 +1,5 @@
 use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use sha2::{Digest, Sha256};
 use sqlx::{Sqlite, Transaction, query, query_as};
 
@@ -53,7 +54,7 @@ impl TaskBoardRemoteArtifact {
             binding: request.binding.clone(),
             offer_request_sha256: request.offer_request_sha256.clone(),
             artifact: self.artifact.clone(),
-            content_base64: base64::engine::general_purpose::STANDARD.encode(&self.content),
+            content_base64: BASE64_STANDARD.encode(&self.content),
         })
     }
 

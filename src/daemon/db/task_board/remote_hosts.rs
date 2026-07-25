@@ -7,6 +7,7 @@ use super::mapper::{parse_json, to_json};
 use super::remote_assignment_cleanup::active_remote_assignments_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::errors::CliErrorKind;
+use crate::task_board::TaskBoardRepositoryAutomationConfig;
 use crate::task_board::{
     TASK_BOARD_REMOTE_HEARTBEAT_TTL_SECONDS, TaskBoardExecutionHostAdvertisement,
     TaskBoardExecutionHostConfig, TaskBoardExecutionPhase, TaskBoardOrchestratorSettings,
@@ -292,7 +293,7 @@ fn configured_repository<'a>(
     settings: &'a TaskBoardOrchestratorSettings,
     repository: &str,
     kind: TaskBoardWorkflowKind,
-) -> Option<&'a crate::task_board::TaskBoardRepositoryAutomationConfig> {
+) -> Option<&'a TaskBoardRepositoryAutomationConfig> {
     let workflow = workflow_setting(kind)?;
     settings.repositories.iter().find(|candidate| {
         candidate.enabled

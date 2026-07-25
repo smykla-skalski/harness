@@ -6,7 +6,11 @@ use crate::daemon::db::{
 };
 use crate::daemon::task_board_remote_transport::controller::RemoteExecutionControllerClient;
 use crate::daemon::task_board_remote_transport::wire::RemoteAssignmentWireState;
+use crate::daemon::task_board_remote_transport::wire::RemoteCancelRequest;
+use crate::daemon::task_board_remote_transport::wire::RemoteLeaseRenewRequest;
+use crate::daemon::task_board_remote_transport::wire::RemoteStatusRequest;
 use crate::errors::CliError;
+use crate::errors::CliErrorKind;
 use crate::task_board::TaskBoardRemoteAssignmentState;
 
 pub(super) async fn poll_active_assignment(
@@ -54,14 +58,14 @@ async fn poll_cancel_intent(
     db: &AsyncDaemonDb,
     client: &RemoteExecutionControllerClient,
     assignment: &TaskBoardRemoteAssignmentRecord,
-    request: &crate::daemon::task_board_remote_transport::wire::RemoteCancelRequest,
+    request: &RemoteCancelRequest,
 ) -> Result<bool, CliError> {
     let pending = assignment
         .controller_operation
         .as_ref()
         .map(|operation| operation.kind.as_str());
     if pending.is_some_and(|kind| kind != "cancel") {
-        return Err(crate::errors::CliErrorKind::concurrent_modification(
+        return Err(CliErrorKind::concurrent_modification(
             "remote cancellation intent overlaps another controller operation",
         )
         .into());
@@ -92,12 +96,10 @@ fn require_cancel_progress(outcome: &TaskBoardRemoteMutationOutcome) -> Result<(
     match outcome {
         TaskBoardRemoteMutationOutcome::Updated(_)
         | TaskBoardRemoteMutationOutcome::Replayed(_) => Ok(()),
-        TaskBoardRemoteMutationOutcome::Stale(_) => {
-            Err(crate::errors::CliErrorKind::concurrent_modification(
-                "remote cancellation lost its exact generation",
-            )
-            .into())
-        }
+        TaskBoardRemoteMutationOutcome::Stale(_) => Err(CliErrorKind::concurrent_modification(
+            "remote cancellation lost its exact generation",
+        )
+        .into()),
     }
 }
 
@@ -120,19 +122,13 @@ pub(super) async fn poll_active_assignment_with<
     now: Now,
 ) -> Result<bool, CliError>
 where
-    Status: FnOnce(
-        crate::daemon::task_board_remote_transport::wire::RemoteStatusRequest,
-    ) -> StatusFuture,
+    Status: FnOnce(RemoteStatusRequest) -> StatusFuture,
     StatusFuture: Future<Output = Result<TaskBoardRemoteMutationOutcome, CliError>>,
     Enabled: FnOnce() -> EnabledFuture,
     EnabledFuture: Future<Output = Result<bool, CliError>>,
-    Renew: FnOnce(
-        crate::daemon::task_board_remote_transport::wire::RemoteLeaseRenewRequest,
-    ) -> RenewFuture,
+    Renew: FnOnce(RemoteLeaseRenewRequest) -> RenewFuture,
     RenewFuture: Future<Output = Result<TaskBoardRemoteMutationOutcome, CliError>>,
-    ReplayRenew: FnOnce(
-        crate::daemon::task_board_remote_transport::wire::RemoteLeaseRenewRequest,
-    ) -> ReplayRenewFuture,
+    ReplayRenew: FnOnce(RemoteLeaseRenewRequest) -> ReplayRenewFuture,
     ReplayRenewFuture: Future<Output = Result<TaskBoardRemoteMutationOutcome, CliError>>,
     Now: FnOnce() -> String,
 {
@@ -143,7 +139,7 @@ where
     if pending == Some("renew") {
         let outcome = replay_renew(requests::renewal_request(assignment)?).await?;
         let Some(current) = accepted_mutation_record(outcome) else {
-            return Err(crate::errors::CliErrorKind::concurrent_modification(
+            return Err(CliErrorKind::concurrent_modification(
                 "pending remote lease renewal could not be reconciled",
             )
             .into());

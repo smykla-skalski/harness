@@ -15,6 +15,7 @@ use super::lane_order::{
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error, utc_now};
 use crate::infra::io;
+use crate::task_board::TaskBoardItem;
 use crate::task_board::dispatch::DispatchLifecycle;
 use crate::task_board::{DispatchAppliedTask, TaskBoardStatus, TaskBoardWorkflowStatus};
 
@@ -260,7 +261,7 @@ impl AsyncDaemonDb {
         intent_id: &str,
         claim_token: &str,
         managed_worker_id: &str,
-    ) -> Result<crate::task_board::TaskBoardItem, CliError> {
+    ) -> Result<TaskBoardItem, CliError> {
         let mut transaction = self
             .begin_immediate_transaction("task board dispatch completion")
             .await?;
@@ -342,7 +343,7 @@ impl AsyncDaemonDb {
 }
 
 pub(super) fn ensure_dispatch_item_startable(
-    item: &crate::task_board::TaskBoardItem,
+    item: &TaskBoardItem,
     session_id: &str,
     work_item_id: &str,
     execution_id: Option<&str>,

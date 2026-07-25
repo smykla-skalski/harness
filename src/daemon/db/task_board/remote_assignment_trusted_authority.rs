@@ -8,6 +8,7 @@ use super::remote_operation_trust::{
     require_pending_operation_replay_trust_in_tx,
 };
 use super::{TaskBoardRemoteIoAuthority, TaskBoardRemoteIoAuthorityKind};
+use crate::daemon::db::db_error;
 use crate::daemon::db::{AsyncDaemonDb, CliError, TaskBoardRemoteHostTrustFence};
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteCancelRequest, RemoteClaimRequest, RemoteLeaseRenewRequest, RemoteOfferRequest,
@@ -22,9 +23,9 @@ impl AsyncDaemonDb {
         authority_at: &str,
         trust: &TaskBoardRemoteOperationTrustFence,
     ) -> Result<Option<TaskBoardRemoteIoAuthority>, CliError> {
-        request.validate().map_err(|error| {
-            crate::daemon::db::db_error(format!("validate remote offer I/O authority: {error}"))
-        })?;
+        request
+            .validate()
+            .map_err(|error| db_error(format!("validate remote offer I/O authority: {error}")))?;
         let claim = RemoteIoAuthorityClaim {
             request: RemoteIoAuthorityRequestEvidence::Offer(request),
             principal: authenticated_principal,
@@ -41,9 +42,9 @@ impl AsyncDaemonDb {
         authority_at: &str,
         trust: &TaskBoardRemoteOperationTrustFence,
     ) -> Result<Option<TaskBoardRemoteIoAuthority>, CliError> {
-        request.validate().map_err(|error| {
-            crate::daemon::db::db_error(format!("validate remote claim I/O authority: {error}"))
-        })?;
+        request
+            .validate()
+            .map_err(|error| db_error(format!("validate remote claim I/O authority: {error}")))?;
         let claim = RemoteIoAuthorityClaim {
             request: RemoteIoAuthorityRequestEvidence::Claim(request),
             principal: authenticated_principal,
@@ -60,9 +61,9 @@ impl AsyncDaemonDb {
         authority_at: &str,
         trust: &TaskBoardRemoteOperationTrustFence,
     ) -> Result<Option<TaskBoardRemoteIoAuthority>, CliError> {
-        request.validate().map_err(|error| {
-            crate::daemon::db::db_error(format!("validate remote renewal I/O authority: {error}"))
-        })?;
+        request
+            .validate()
+            .map_err(|error| db_error(format!("validate remote renewal I/O authority: {error}")))?;
         let claim = RemoteIoAuthorityClaim {
             request: RemoteIoAuthorityRequestEvidence::Renew(request),
             principal: authenticated_principal,
@@ -79,9 +80,9 @@ impl AsyncDaemonDb {
         authority_at: &str,
         trust: &TaskBoardRemoteOperationTrustFence,
     ) -> Result<Option<TaskBoardRemoteIoAuthority>, CliError> {
-        request.validate().map_err(|error| {
-            crate::daemon::db::db_error(format!("validate remote cancel I/O authority: {error}"))
-        })?;
+        request
+            .validate()
+            .map_err(|error| db_error(format!("validate remote cancel I/O authority: {error}")))?;
         let claim = RemoteIoAuthorityClaim {
             request: RemoteIoAuthorityRequestEvidence::Cancel(request),
             principal: authenticated_principal,
@@ -98,7 +99,7 @@ impl AsyncDaemonDb {
         trust: &TaskBoardRemoteHostTrustFence,
     ) -> Result<bool, CliError> {
         request.validate().map_err(|error| {
-            crate::daemon::db::db_error(format!("validate pending remote renewal replay: {error}"))
+            db_error(format!("validate pending remote renewal replay: {error}"))
         })?;
         let mut transaction = self
             .begin_immediate_transaction("pending remote renewal replay authority")

@@ -18,6 +18,7 @@ use crate::daemon::task_board_remote_transport::wire::RemoteAttemptBinding;
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteCancelRequest, RemoteClaimRequest, RemoteLeaseRenewRequest, RemoteOfferRequest,
 };
+use crate::task_board::TaskBoardExecutionAttemptRecord;
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE, TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TASK_BOARD_REMOTE_CANCEL_IO_AUTHORITY_RESOURCE,
@@ -400,7 +401,7 @@ pub(super) fn active_target_matches(
 fn exact_target_attempt<'a>(
     parent: &'a TaskBoardWorkflowExecutionRecord,
     binding: &RemoteAttemptBinding,
-) -> Option<&'a crate::task_board::TaskBoardExecutionAttemptRecord> {
+) -> Option<&'a TaskBoardExecutionAttemptRecord> {
     parent.attempts.iter().find(|attempt| {
         attempt.action_key == binding.action_key
             && attempt.attempt == binding.attempt

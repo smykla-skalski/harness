@@ -10,6 +10,7 @@ use super::workflow_executions::{cas_mismatch, load_execution_in_tx, update_exec
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::task_board_remote_transport::wire::{RemoteArtifactEntry, RemoteTypedResult};
 use crate::git::bundle::GitBundleImportEvidence;
+use crate::task_board::TaskBoardAttemptResultArtifact;
 use crate::task_board::{
     TASK_BOARD_REMOTE_RESULT_IMPORT_AUTHORITY_RESOURCE, TaskBoardExecutionAttemptRecord,
     TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
@@ -311,9 +312,7 @@ pub(super) async fn require_adopted_remote_implementation_import_in_tx(
         .result
         .as_ref()
         .ok_or_else(|| concurrent("adopted implementation typed result is missing"))?;
-    let crate::task_board::TaskBoardAttemptResultArtifact::Implementation(result) =
-        &typed.result.artifact
-    else {
+    let TaskBoardAttemptResultArtifact::Implementation(result) = &typed.result.artifact else {
         return Err(concurrent(
             "adopted implementation import changed its result kind",
         ));

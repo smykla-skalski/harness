@@ -1,5 +1,6 @@
 use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
+use crate::daemon::db::utc_now;
 use crate::daemon::db::{CliError, db_error};
 use crate::errors::CliErrorKind;
 use crate::task_board::{
@@ -52,14 +53,14 @@ async fn sync_local_executor_host(
          WHERE host_role = 'executor_self' AND (?1 = '' OR host_id != ?1)",
     )
     .bind(&host.host_id)
-    .bind(crate::daemon::db::utc_now())
+    .bind(utc_now())
     .execute(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("disable replaced local executor: {error}")))?;
     if host.host_id.is_empty() {
         return Ok(());
     }
-    let now = crate::daemon::db::utc_now();
+    let now = utc_now();
     let changed = query(
         "INSERT INTO task_board_execution_hosts (
            host_id, host_role, configured_endpoint, configured_leaf_sha256,
@@ -115,7 +116,7 @@ async fn disable_removed_remote_hosts(
          WHERE host_role = 'controller_remote' AND configuration_revision != ?1",
     )
     .bind(current_revision)
-    .bind(crate::daemon::db::utc_now())
+    .bind(utc_now())
     .execute(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("disable removed remote hosts: {error}")))?;
@@ -209,7 +210,7 @@ async fn upsert_configured_host(
                     && leaf.as_deref() == Some(host.certificate_fingerprint.as_str())
                     && credential.as_deref() == Some(host.credential_reference.as_str())
             });
-    let now = crate::daemon::db::utc_now();
+    let now = utc_now();
     let changed = query(
         "INSERT INTO task_board_execution_hosts (
            host_id, host_role, configured_endpoint, configured_leaf_sha256,

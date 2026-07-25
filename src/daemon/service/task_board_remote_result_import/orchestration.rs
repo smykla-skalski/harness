@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use tokio::task::spawn_blocking;
 
 use super::super::super::db::{
@@ -11,6 +13,7 @@ use crate::task_board::{
     TaskBoardAttemptResultArtifact, TaskBoardExecutionPhase, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionRecord,
 };
+use crate::workspace::utc_now;
 
 pub(crate) async fn import_and_adopt_task_board_remote_implementation_result(
     db: &AsyncDaemonDb,
@@ -84,7 +87,7 @@ async fn import_request(
         advertised_ref: plan.advertised_ref,
         import_ref: plan.import_ref,
         object_format: plan.object_format,
-        prepared_at: crate::workspace::utc_now(),
+        prepared_at: utc_now(),
     };
     Ok((
         TaskBoardWorkflowExecutionCas::from(&parent),
@@ -147,7 +150,7 @@ fn import_plan_input(
 async fn import_plan_evidence(input: ImportPlanInput) -> Result<GitBundleImportEvidence, CliError> {
     spawn_blocking(move || {
         GitBundleImportPlan::new(
-            std::path::Path::new(&input.worktree_path),
+            Path::new(&input.worktree_path),
             input.branch_ref,
             input.base_revision,
             input.result_revision,

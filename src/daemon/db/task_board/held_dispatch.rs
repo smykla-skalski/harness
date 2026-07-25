@@ -364,7 +364,7 @@ fn held_conflict(board_item_id: &str) -> CliError {
 
 fn ensure_held_linkage(
     applied: &DispatchAppliedTask,
-    item: &crate::task_board::TaskBoardItem,
+    item: &TaskBoardItem,
 ) -> Result<(), CliError> {
     let matches = applied.board_item_id == item.id
         && item.session_id.as_deref() == Some(applied.session_id.as_str())

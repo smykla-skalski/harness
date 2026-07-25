@@ -1,3 +1,5 @@
+use std::cmp::max;
+
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde_json::json;
 use sha2::{Digest, Sha256};
@@ -12,6 +14,7 @@ use crate::daemon::protocol::{
 use crate::errors::{CliError, CliErrorKind};
 use crate::feature_flags::task_board_automation_v2_enabled_from_env;
 use crate::infra::io::validate_safe_segment;
+use crate::task_board::TaskBoardExecutionAttemptRecord;
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE, TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
     TASK_BOARD_REMOTE_CANCEL_INTENT_REASON_RESOURCE, TaskBoardAttemptState,
@@ -292,7 +295,7 @@ fn target_matches_record(
 
 fn target_matches_attempt(
     target: &TaskBoardAutomationCancelTarget,
-    attempt: &crate::task_board::TaskBoardExecutionAttemptRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
 ) -> bool {
     attempt.action_key == target.action_key
         && attempt.attempt == target.attempt
@@ -309,14 +312,14 @@ fn pending_reason(record: &TaskBoardWorkflowExecutionRecord) -> Option<&str> {
 
 fn cancellation_time(
     record: &TaskBoardWorkflowExecutionRecord,
-    attempt: &crate::task_board::TaskBoardExecutionAttemptRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
 ) -> String {
     let now = Utc::now();
     [&record.updated_at, &attempt.updated_at]
         .into_iter()
         .filter_map(|value| DateTime::parse_from_rfc3339(value).ok())
         .map(|value| value.with_timezone(&Utc))
-        .fold(now, std::cmp::max)
+        .fold(now, max)
         .to_rfc3339_opts(SecondsFormat::AutoSi, true)
 }
 

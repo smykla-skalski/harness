@@ -1,3 +1,4 @@
+use crate::daemon::protocol::CodexRunStatus;
 use crate::daemon::protocol::{CodexRunRequest, CodexRunSnapshot, TaskBoardEvaluateRequest};
 use crate::daemon::service as daemon_service;
 use crate::errors::CliError;
@@ -47,14 +48,12 @@ impl CodexControllerHandle {
         &self,
         run: &CodexRunSnapshot,
     ) -> Result<Option<CodexRunSnapshot>, CliError> {
-        if run.status != crate::daemon::protocol::CodexRunStatus::Completed
-            || self.completed_run_has_evidence(run)?
-        {
+        if run.status != CodexRunStatus::Completed || self.completed_run_has_evidence(run)? {
             return Ok(None);
         }
         let mut failed = run.clone();
         let error = super::completion_evidence::missing_completion_evidence_error(run);
-        failed.status = crate::daemon::protocol::CodexRunStatus::Failed;
+        failed.status = CodexRunStatus::Failed;
         failed.latest_summary = Some(error.clone());
         failed.error = Some(error);
         failed.updated_at = utc_now();

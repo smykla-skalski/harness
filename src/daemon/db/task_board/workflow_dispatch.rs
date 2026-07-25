@@ -7,6 +7,7 @@ use super::items::bump_change_in_tx;
 use super::workflow_execution_attempts::insert_attempt_in_tx;
 use super::workflow_executions::insert_execution_in_tx;
 use crate::daemon::db::{CliError, db_error, utc_now};
+use crate::task_board::TaskBoardItem;
 use crate::task_board::{
     AgentMode, PlanApprovalGate, TaskBoardAttemptState, TaskBoardExecutionAttemptRecord,
     TaskBoardExecutionOwnership, TaskBoardExecutionState, TaskBoardReadOnlyWorkflowLaunch,
@@ -20,7 +21,7 @@ use crate::task_board::{
 
 pub(super) async fn insert_started_read_only_workflow_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
-    item: &crate::task_board::TaskBoardItem,
+    item: &TaskBoardItem,
     item_revision: i64,
     intent_id: &str,
     launch: &TaskBoardReadOnlyWorkflowLaunch,
@@ -109,7 +110,7 @@ pub(super) async fn insert_started_read_only_workflow_in_tx(
 
 pub(super) async fn insert_started_write_workflow_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
-    item: &crate::task_board::TaskBoardItem,
+    item: &TaskBoardItem,
     item_revision: i64,
     intent_id: &str,
     launch: &TaskBoardWriteWorkflowLaunch,
@@ -204,7 +205,7 @@ pub(super) async fn insert_started_write_workflow_in_tx(
 }
 
 fn validate_write_launch(
-    item: &crate::task_board::TaskBoardItem,
+    item: &TaskBoardItem,
     item_revision: i64,
     execution_id: &str,
     launch: &TaskBoardWriteWorkflowLaunch,
@@ -291,7 +292,7 @@ fn validate_write_launch(
 }
 
 fn validate_launch(
-    item: &crate::task_board::TaskBoardItem,
+    item: &TaskBoardItem,
     item_revision: i64,
     launch: &TaskBoardReadOnlyWorkflowLaunch,
 ) -> Result<(), CliError> {

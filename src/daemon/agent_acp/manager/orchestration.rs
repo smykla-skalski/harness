@@ -2,6 +2,7 @@ use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use async_trait::async_trait;
 use tokio::sync::broadcast;
+use tokio::task::spawn_blocking;
 
 use crate::agents::kind::DisconnectReason;
 use crate::agents::runtime::event::ConversationEvent;
@@ -125,7 +126,7 @@ impl AcpManagerPort for DaemonAcpManagerPort {
         }
         let db = self.db()?;
         let binding = OwnedRuntimeBinding::from(binding);
-        tokio::task::spawn_blocking(move || bind_runtime_session_sync(&db, &binding))
+        spawn_blocking(move || bind_runtime_session_sync(&db, &binding))
             .await
             .map_err(|error| {
                 CliError::from(CliErrorKind::workflow_io(format!(

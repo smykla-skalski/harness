@@ -14,6 +14,7 @@ use super::triage_override::triage_override_from_item_row;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::errors::CliErrorKind;
 use crate::infra::io;
+use crate::task_board::TaskBoardTombstoneCause;
 use crate::task_board::types::{CURRENT_TASK_BOARD_ITEM_VERSION, MAX_TASK_BOARD_ESTIMATE};
 use crate::task_board::{
     TaskBoardItem, TaskBoardStatus, TaskBoardTriageEscalationConfig, TaskBoardTriageOverride,
@@ -155,7 +156,7 @@ impl AsyncDaemonDb {
     ) -> Result<TaskBoardMutation, CliError> {
         self.update_task_board_item(item_id, |item| {
             item.deleted_at = Some(utc_now());
-            item.tombstone_cause = Some(crate::task_board::TaskBoardTombstoneCause::Manual);
+            item.tombstone_cause = Some(TaskBoardTombstoneCause::Manual);
             Ok(true)
         })
         .await?

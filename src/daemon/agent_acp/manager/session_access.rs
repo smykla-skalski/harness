@@ -14,6 +14,7 @@ use super::{
 use crate::agents::runtime::AgentRuntime;
 #[cfg(feature = "daemon-runtime")]
 use crate::agents::runtime::signal::{AckResult, SignalAck, acknowledge_signal};
+use crate::daemon::sandboxed_from_env;
 #[cfg(feature = "daemon-runtime")]
 use crate::daemon::service::{WakeEventLevel, record_wake_event};
 use crate::errors::{CliError, CliErrorKind};
@@ -145,7 +146,7 @@ impl AcpAgentManagerHandle {
         batch_id: &str,
         decision: &AcpPermissionDecision,
     ) -> Result<AcpAgentSnapshot, CliError> {
-        if crate::daemon::sandboxed_from_env() {
+        if sandboxed_from_env() {
             return self.resolve_permission_batch_via_bridge(acp_id, batch_id, decision);
         }
         let session = self.session(acp_id)?;
@@ -163,7 +164,7 @@ impl AcpAgentManagerHandle {
     #[must_use]
     /// Return the number of pending ACP permission prompts for one ACP session.
     pub fn pending_permission_count(&self, acp_id: &str) -> Option<usize> {
-        if crate::daemon::sandboxed_from_env() {
+        if sandboxed_from_env() {
             return self.pending_permission_count_via_bridge(acp_id);
         }
         let sessions = self.sessions_guard().ok()?;
@@ -175,7 +176,7 @@ impl AcpAgentManagerHandle {
     #[must_use]
     /// Return the queued ACP permission batches for one ACP session.
     pub fn pending_permission_batches(&self, acp_id: &str) -> Option<Vec<AcpPermissionBatch>> {
-        if crate::daemon::sandboxed_from_env() {
+        if sandboxed_from_env() {
             return self.pending_permission_batches_via_bridge(acp_id);
         }
         let sessions = self.sessions_guard().ok()?;

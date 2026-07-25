@@ -17,6 +17,7 @@ use super::lane_order::{
 };
 use crate::daemon::db::policy::consume_approval_grant_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
+use crate::errors::CliErrorKind;
 use crate::infra::io;
 use crate::task_board::{
     DispatchAppliedTask, DispatchPlan, SessionIntent, TaskBoardItem,
@@ -257,7 +258,7 @@ impl AsyncDaemonDb {
             transaction.commit().await.map_err(|error| {
                 db_error(format!("commit stale task board preparation: {error}"))
             })?;
-            return Err(crate::errors::CliErrorKind::invalid_transition(reason).into());
+            return Err(CliErrorKind::invalid_transition(reason).into());
         }
         validate_reservable_item(&item, &preparation.plan)?;
         if let TaskBoardAdmissionCheck::Blocked(admission) =
@@ -273,10 +274,7 @@ impl AsyncDaemonDb {
             transaction.commit().await.map_err(|error| {
                 db_error(format!("commit refused task board preparation: {error}"))
             })?;
-            return Err(crate::errors::CliErrorKind::invalid_transition(
-                admission.refusal_message(),
-            )
-            .into());
+            return Err(CliErrorKind::invalid_transition(admission.refusal_message()).into());
         }
         let claim_token = format!("dispatch-prepare-{}", Uuid::new_v4().simple());
         query(

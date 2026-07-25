@@ -10,9 +10,16 @@ use crate::daemon::db::{
     TaskBoardRemoteExecutorStopReason, TaskBoardRemoteMutationOutcome,
 };
 use crate::daemon::http::DaemonHttpState;
+use crate::daemon::protocol::CodexRunSnapshot;
+use crate::daemon::task_board_remote_transport::wire::RemoteSettledRequest;
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::storage as session_storage;
+use crate::session::types::SessionState;
+use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::workspace::harness_data_root;
 use crate::workspace::layout::SessionLayout;
+use crate::workspace::layout::sessions_root;
+use crate::workspace::project_resolver::resolve_name;
 use crate::workspace::utc_now;
 use crate::workspace::worktree::WorktreeController;
 
@@ -122,7 +129,7 @@ fn exact_unstarted_provisioning(
     record: &TaskBoardRemoteAssignmentRecord,
     authority: &TaskBoardRemoteExecutorStartAuthority,
 ) -> bool {
-    record.state == crate::task_board::TaskBoardRemoteAssignmentState::Claimed
+    record.state == TaskBoardRemoteAssignmentState::Claimed
         && record.fencing_epoch == authority.fencing_epoch
         && record.executor_start_authority_sha256.as_deref() == Some(authority.sha256.as_str())
         && record.executor_start_authority_at.as_deref() == Some(authority.acquired_at.as_str())
@@ -138,7 +145,7 @@ async fn preclaim_superseded_cleanup_is_empty(
     record: &TaskBoardRemoteAssignmentRecord,
     identity: &RemoteWorkerIdentity,
 ) -> Result<bool, CliError> {
-    if record.state != crate::task_board::TaskBoardRemoteAssignmentState::Superseded {
+    if record.state != TaskBoardRemoteAssignmentState::Superseded {
         return Ok(false);
     }
     let exact = record.claimed_at.is_none()
@@ -169,7 +176,7 @@ async fn preclaim_superseded_cleanup_is_empty(
 
 fn require_exact_cleanup_generation(
     record: &TaskBoardRemoteAssignmentRecord,
-    request: &crate::daemon::task_board_remote_transport::wire::RemoteSettledRequest,
+    request: &RemoteSettledRequest,
 ) -> Result<(), CliError> {
     let offer = record.require_offer()?;
     if request.binding != offer.binding
@@ -215,7 +222,7 @@ async fn validate_cleanup_run(
     db: &AsyncDaemonDb,
     record: &TaskBoardRemoteAssignmentRecord,
     identity: &RemoteWorkerIdentity,
-    run: &crate::daemon::protocol::CodexRunSnapshot,
+    run: &CodexRunSnapshot,
 ) -> Result<(), CliError> {
     if let Some(start) = record.start_receipt.as_ref() {
         return validate_run_snapshot(
@@ -247,7 +254,7 @@ async fn validate_cleanup_run(
 fn validate_cleanup_session(
     record: &TaskBoardRemoteAssignmentRecord,
     identity: &RemoteWorkerIdentity,
-    state: &crate::session::types::SessionState,
+    state: &SessionState,
     layout: &SessionLayout,
 ) -> Result<(), CliError> {
     if record.start_receipt.is_none() {
@@ -259,7 +266,7 @@ fn validate_cleanup_session(
 fn validate_provisioning_session(
     record: &TaskBoardRemoteAssignmentRecord,
     authority: &TaskBoardRemoteExecutorStartAuthority,
-    state: &crate::session::types::SessionState,
+    state: &SessionState,
     layout: &SessionLayout,
 ) -> Result<(), CliError> {
     if !exact_unstarted_provisioning(record, authority) {
@@ -273,7 +280,7 @@ fn validate_provisioning_session(
 fn validate_executor_session_identity(
     record: &TaskBoardRemoteAssignmentRecord,
     identity: &RemoteWorkerIdentity,
-    state: &crate::session::types::SessionState,
+    state: &SessionState,
     layout: &SessionLayout,
 ) -> Result<(), CliError> {
     let expected_origin = PathBuf::from(
@@ -331,11 +338,9 @@ fn require_unadopted_stop_cleanup(
         && record.executor_start_authority_sha256.is_none()
         && record.executor_lifecycle_owner.is_none()
         && record.executor_stop_pending.is_none();
-    let stopped_unknown = record.state
-        == crate::task_board::TaskBoardRemoteAssignmentState::Unknown
+    let stopped_unknown = record.state == TaskBoardRemoteAssignmentState::Unknown
         && (stop_reason || start_expired || settings_changed || executor_restarted);
-    let failed_at_claimed = record.state
-        == crate::task_board::TaskBoardRemoteAssignmentState::Failed
+    let failed_at_claimed = record.state == TaskBoardRemoteAssignmentState::Failed
         && record.start_failure_receipt.is_some();
     if unadopted_shape && (stopped_unknown || failed_at_claimed) {
         Ok(())
@@ -381,11 +386,9 @@ fn deterministic_session_layout(
     let canonical_origin = origin
         .canonicalize()
         .map_err(|error| workflow_io(format!("canonicalize remote cleanup origin: {error}")))?;
-    let sessions_root =
-        crate::workspace::layout::sessions_root(&crate::workspace::harness_data_root());
-    let project_name =
-        crate::workspace::project_resolver::resolve_name(&canonical_origin, &sessions_root)
-            .map_err(|error| workflow_io(format!("resolve remote cleanup project: {error}")))?;
+    let sessions_root = sessions_root(&harness_data_root());
+    let project_name = resolve_name(&canonical_origin, &sessions_root)
+        .map_err(|error| workflow_io(format!("resolve remote cleanup project: {error}")))?;
     Ok(SessionLayout {
         sessions_root,
         project_name,

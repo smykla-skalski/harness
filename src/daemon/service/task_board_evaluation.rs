@@ -13,6 +13,7 @@ use crate::session::service as session_service;
 #[cfg(test)]
 use crate::session::storage as session_storage;
 use crate::session::types::{SessionSignalRecord, TaskStatus, WorkItem};
+use crate::task_board::TaskBoardWorkflowKind;
 #[cfg(test)]
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::{
@@ -100,8 +101,7 @@ pub(crate) async fn evaluate_task_board_async(
     for item in &items {
         if matches!(
             item.workflow_kind,
-            crate::task_board::TaskBoardWorkflowKind::Review
-                | crate::task_board::TaskBoardWorkflowKind::PrReview
+            TaskBoardWorkflowKind::Review | TaskBoardWorkflowKind::PrReview
         ) {
             continue;
         }

@@ -6,6 +6,7 @@ mod wake;
 
 use super::super::ORCHESTRATOR_CHANGE_SCOPE;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
+use crate::task_board::TaskBoardAutomationCancelTarget;
 use crate::task_board::{
     TASK_BOARD_AUTOMATION_SNAPSHOT_SCHEMA_VERSION, TaskBoardAutomationAdmissionState,
     TaskBoardAutomationDesiredMode, TaskBoardAutomationEffectiveState,
@@ -27,7 +28,7 @@ struct SnapshotLedger {
     provider_backoff: Option<ProviderBackoff>,
     open_conflict: bool,
     wake: wake::WakeObservation,
-    cancelable_targets: Vec<crate::task_board::TaskBoardAutomationCancelTarget>,
+    cancelable_targets: Vec<TaskBoardAutomationCancelTarget>,
     cancelable_targets_truncated: bool,
 }
 

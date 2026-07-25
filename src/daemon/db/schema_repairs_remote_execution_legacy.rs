@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 
+use rusqlite::types::Type;
+
 use super::{CliError, Connection, db_error};
 use crate::task_board::{
     TASK_BOARD_REMOTE_PROTOCOL_VERSION, TaskBoardExecutionHostConfig, normalize_repository_slug,
@@ -81,11 +83,7 @@ fn decode_legacy_host(row: &rusqlite::Row<'_>) -> rusqlite::Result<LegacyHostEvi
 
 fn decode_json_column(value: &str, index: usize) -> rusqlite::Result<Vec<String>> {
     serde_json::from_str(value).map_err(|error| {
-        rusqlite::Error::FromSqlConversionFailure(
-            index,
-            rusqlite::types::Type::Text,
-            Box::new(error),
-        )
+        rusqlite::Error::FromSqlConversionFailure(index, Type::Text, Box::new(error))
     })
 }
 

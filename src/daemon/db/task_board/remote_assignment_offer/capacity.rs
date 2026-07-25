@@ -1,4 +1,5 @@
 use chrono::{DateTime, Duration, Utc};
+use serde::de::DeserializeOwned;
 use sqlx::{Sqlite, Transaction, query_as};
 
 use super::super::remote_assignment_cleanup::active_remote_assignments_in_tx;
@@ -95,7 +96,7 @@ fn optional_time(value: Option<&str>, field: &str) -> Result<Option<DateTime<Utc
 
 fn optional_json<T>(value: Option<&str>) -> Result<T, CliError>
 where
-    T: serde::de::DeserializeOwned + Default,
+    T: DeserializeOwned + Default,
 {
     value.map_or_else(
         || Ok(T::default()),

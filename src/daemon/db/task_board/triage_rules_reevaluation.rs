@@ -16,8 +16,9 @@ use super::triage_rules_bulk_load::{
 use crate::daemon::db::CliError;
 use crate::task_board::{
     BUILTIN_V1_EVALUATOR_IDENTITY, BUILTIN_V1_EVALUATOR_VERSION, OVERRIDE_PLACEMENT_PRODUCER,
-    TaskBoardLaneOrigin, TriagePriorityAction, TriageReasonCode, TriageRuleMatch, evaluate_builtin_v1,
-    evaluate_triage_rule_set, evidence_fingerprint,
+    RUNTIME_RULES_EVALUATOR_IDENTITY, TaskBoardItem, TaskBoardLaneOrigin, TriagePriorityAction,
+    TriageReasonCode, TriageRuleMatch, TriageVerdict, evaluate_builtin_v1, evaluate_triage_rule_set,
+    evidence_fingerprint,
 };
 
 /// Bulk-reevaluate every triage-eligible item against whichever evaluator
@@ -149,7 +150,7 @@ async fn reevaluate_one_item_in_tx(
 }
 
 struct Decided<'a> {
-    verdict: crate::task_board::TriageVerdict,
+    verdict: TriageVerdict,
     reason_code: TriageReasonCode,
     reason_detail: Option<String>,
     evaluator_identity: &'a str,
@@ -159,7 +160,7 @@ struct Decided<'a> {
 
 fn decide<'a>(
     active: Option<&'a ActiveRuleSetEvaluator>,
-    item: &crate::task_board::TaskBoardItem,
+    item: &TaskBoardItem,
 ) -> Decided<'a> {
     if let Some(active) = active {
         let evaluation = evaluate_triage_rule_set(&active.rules, item);
@@ -171,7 +172,7 @@ fn decide<'a>(
             verdict: evaluation.verdict,
             reason_code,
             reason_detail,
-            evaluator_identity: crate::task_board::RUNTIME_RULES_EVALUATOR_IDENTITY,
+            evaluator_identity: RUNTIME_RULES_EVALUATOR_IDENTITY,
             evaluator_version: active.evaluator_version,
             priority_action: evaluation.priority_action,
         }

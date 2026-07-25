@@ -8,6 +8,9 @@ use tokio::sync::broadcast;
 
 use crate::daemon::bridge::{BridgeCapability, BridgeClient};
 use crate::daemon::protocol::StreamEvent;
+use crate::daemon::sandboxed_from_env;
+#[cfg(feature = "daemon-runtime")]
+use crate::daemon::state::task_board_openrouter_token;
 use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
@@ -61,7 +64,7 @@ impl AcpAgentManagerHandle {
         }
         #[cfg(feature = "daemon-runtime")]
         let openrouter_token = if bridge_request.agent.trim() == "openrouter" {
-            crate::daemon::state::task_board_openrouter_token()
+            task_board_openrouter_token()
         } else {
             None
         };
@@ -157,7 +160,7 @@ impl AcpAgentManagerHandle {
     }
 
     fn ensure_sandbox_event_poller(&self) {
-        if !crate::daemon::sandboxed_from_env() || self.swap_sandbox_event_poller_running() {
+        if !sandboxed_from_env() || self.swap_sandbox_event_poller_running() {
             return;
         }
         let manager = self.clone();

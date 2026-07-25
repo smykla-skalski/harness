@@ -8,6 +8,7 @@ use crate::daemon::protocol::{
     TaskBoardOrchestratorRunOnceResponse, TaskBoardSyncRequest,
 };
 use crate::errors::CliError;
+use crate::task_board::TaskBoardWorkflowKind;
 use crate::task_board::github::GitHubAutomation;
 use crate::task_board::orchestrator::TaskBoardOrchestratorPreparedRun;
 use crate::task_board::{
@@ -170,8 +171,7 @@ async fn execute_run(
         items.retain(|item| {
             !matches!(
                 item.workflow_kind,
-                crate::task_board::TaskBoardWorkflowKind::Review
-                    | crate::task_board::TaskBoardWorkflowKind::PrReview
+                TaskBoardWorkflowKind::Review | TaskBoardWorkflowKind::PrReview
             )
         });
         run_task_board_github_automation_async(settings, &prepared.input, &items, db).await

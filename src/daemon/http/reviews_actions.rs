@@ -11,8 +11,9 @@ use axum::Json;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{
-    ReviewsApproveRequest, ReviewsAutoRequest, ReviewsCommentRequest, ReviewsLabelRequest,
-    ReviewsMergeRequest, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest, http_paths,
+    ReviewsActionResponse, ReviewsApproveRequest, ReviewsAutoRequest, ReviewsCommentRequest,
+    ReviewsLabelRequest, ReviewsMergeRequest, ReviewsRequestReviewRequest,
+    ReviewsRerunChecksRequest, http_paths,
 };
 use crate::daemon::service;
 
@@ -44,7 +45,7 @@ pub(super) fn merge_action_routes(
     description = "Approve the given review targets and report the outcome of applying each approval",
     request_body = ReviewsApproveRequest,
     responses(
-        (status = 200, description = "Outcome of applying the approvals", body = crate::daemon::protocol::ReviewsActionResponse),
+        (status = 200, description = "Outcome of applying the approvals", body = ReviewsActionResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -75,7 +76,7 @@ pub(super) async fn post_approve_reviews(
     description = "Merge the given pull requests and report the outcome for each target",
     request_body = ReviewsMergeRequest,
     responses(
-        (status = 200, description = "Outcome of merging the targets", body = crate::daemon::protocol::ReviewsActionResponse),
+        (status = 200, description = "Outcome of merging the targets", body = ReviewsActionResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -100,7 +101,7 @@ pub(super) async fn post_merge_reviews(
     description = "Re-run the failed status checks for the given targets and report the outcome",
     request_body = ReviewsRerunChecksRequest,
     responses(
-        (status = 200, description = "Outcome of re-running the failed checks", body = crate::daemon::protocol::ReviewsActionResponse),
+        (status = 200, description = "Outcome of re-running the failed checks", body = ReviewsActionResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -131,7 +132,7 @@ pub(super) async fn post_rerun_reviews_checks(
     description = "Add a label to the given review targets and report the outcome for each",
     request_body = ReviewsLabelRequest,
     responses(
-        (status = 200, description = "Outcome of adding the label", body = crate::daemon::protocol::ReviewsActionResponse),
+        (status = 200, description = "Outcome of adding the label", body = ReviewsActionResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -162,7 +163,7 @@ pub(super) async fn post_label_reviews(
     description = "Run the automatic approve-and-merge pass over the given targets and report the outcome",
     request_body = ReviewsAutoRequest,
     responses(
-        (status = 200, description = "Outcome of the automatic approve-and-merge pass", body = crate::daemon::protocol::ReviewsActionResponse),
+        (status = 200, description = "Outcome of the automatic approve-and-merge pass", body = ReviewsActionResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -187,7 +188,7 @@ pub(super) async fn post_auto_reviews(
     description = "Re-request review from the assigned reviewers on the given targets",
     request_body = ReviewsRequestReviewRequest,
     responses(
-        (status = 200, description = "Outcome of re-requesting review", body = crate::daemon::protocol::ReviewsActionResponse),
+        (status = 200, description = "Outcome of re-requesting review", body = ReviewsActionResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -218,7 +219,7 @@ pub(super) async fn post_request_review(
     description = "Post a comment on the given review targets and report the outcome",
     request_body = ReviewsCommentRequest,
     responses(
-        (status = 200, description = "Outcome of posting the comment", body = crate::daemon::protocol::ReviewsActionResponse),
+        (status = 200, description = "Outcome of posting the comment", body = ReviewsActionResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]

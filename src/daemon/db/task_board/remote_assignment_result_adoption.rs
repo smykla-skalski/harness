@@ -28,6 +28,7 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionRecord, validate_task_board_attempt_update,
     validate_task_board_remote_failure_handoff, validate_task_board_remote_result_handoff,
 };
+use crate::workspace::utc_now;
 
 #[path = "remote_assignment_result_adoption/evidence.rs"]
 mod evidence;
@@ -85,7 +86,7 @@ impl AsyncDaemonDb {
             &parent,
             &current_attempt,
             attempt_index,
-            &crate::workspace::utc_now(),
+            &utc_now(),
         )
         .await?;
         transaction

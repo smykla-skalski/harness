@@ -56,7 +56,7 @@ pub(super) struct DeleteWorkingCopyResponseBody {
     tag = "task-board",
     description = "List the daemon-owned working-copy registry entries for imported task-board item repositories",
     responses(
-        (status = 200, description = "Working-copy registry entries", body = Vec<crate::task_board::working_copy::WorkingCopyListEntry>),
+        (status = 200, description = "Working-copy registry entries", body = Vec<WorkingCopyListEntry>),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]

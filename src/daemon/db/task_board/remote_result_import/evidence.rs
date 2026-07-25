@@ -9,9 +9,11 @@ use super::super::remote_assignment_io_authority::active_target_matches;
 use super::super::remote_assignment_model::{TaskBoardRemoteAssignmentRecord, concurrent, to_i64};
 use super::model::TaskBoardRemoteResultImportRequest;
 use crate::daemon::db::{CliError, db_error};
+use crate::daemon::task_board_remote_transport::wire::RemoteStatusResponse;
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteAssignmentWireState, RemoteTypedResult,
 };
+use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::{
     TaskBoardAttemptResultArtifact, TaskBoardAttemptState, TaskBoardExecutionAttemptRecord,
     TaskBoardExecutionPhase, TaskBoardExecutionState, TaskBoardWorkflowExecutionRecord,
@@ -110,7 +112,7 @@ fn require_import_target(
         .as_ref()
         .ok_or_else(|| db_error("remote result import has no frozen run context"))?;
     let expected_branch = format!("refs/heads/harness/{}", run_context.session_id);
-    let exact = assignment.state == crate::task_board::TaskBoardRemoteAssignmentState::Completed
+    let exact = assignment.state == TaskBoardRemoteAssignmentState::Completed
         && assignment.phase == TaskBoardExecutionPhase::Implementation
         && assignment.fencing_epoch == request.fencing_epoch
         && assignment.assignment_id == request.assignment_id
@@ -134,9 +136,7 @@ fn require_import_target(
     }
 }
 
-fn require_manifest(
-    response: &crate::daemon::task_board_remote_transport::wire::RemoteStatusResponse,
-) -> Result<(), CliError> {
+fn require_manifest(response: &RemoteStatusResponse) -> Result<(), CliError> {
     let entries = &response.output_artifacts.entries;
     let exact = response.state == RemoteAssignmentWireState::Completed
         && entries.len() == 2

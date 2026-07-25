@@ -1,4 +1,5 @@
 use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 
@@ -45,7 +46,7 @@ impl RemoteSourceBundleUploadRequest {
         let mut request = Self {
             schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
             offer,
-            content_base64: base64::engine::general_purpose::STANDARD.encode(content),
+            content_base64: BASE64_STANDARD.encode(content),
             request_sha256: String::new(),
         };
         request.request_sha256 = source_bundle_request_digest(&request)?;
@@ -72,7 +73,7 @@ impl RemoteSourceBundleUploadRequest {
         if self.content_base64.len() != expected_encoded_len {
             return Err(RemoteWireError::InvalidSourceMaterial);
         }
-        let content = base64::engine::general_purpose::STANDARD
+        let content = BASE64_STANDARD
             .decode(&self.content_base64)
             .map_err(|_| RemoteWireError::InvalidSourceMaterial)?;
         require_bundle_content(artifact, &content)?;

@@ -1,5 +1,7 @@
 use std::sync::{Arc, Mutex};
 
+use tokio::task::spawn_blocking;
+
 use super::super::db;
 use super::{CliError, CliErrorKind, SessionStatus, index, state};
 
@@ -9,7 +11,7 @@ use super::{CliError, CliErrorKind, SessionStatus, index, state};
 /// as the walk took.
 pub(crate) fn spawn_background_reconciliation(db: &Arc<Mutex<db::DaemonDb>>) {
     let db = Arc::clone(db);
-    tokio::task::spawn_blocking(move || run_background_reconciliation(&db));
+    spawn_blocking(move || run_background_reconciliation(&db));
 }
 
 #[expect(

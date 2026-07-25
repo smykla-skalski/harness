@@ -5,6 +5,9 @@ use crate::daemon::db::{
     TaskBoardRemoteResultAdoptionOutcome, exact_active_remote_target, parent_points_to_assignment,
 };
 use crate::daemon::service::import_and_adopt_task_board_remote_implementation_result;
+use crate::daemon::task_board_remote_transport::wire::RemoteSettledRequest;
+use crate::daemon::task_board_remote_transport::wire_cleanup::RemoteCleanupObservationRequest;
+use crate::workspace::utc_now;
 
 use crate::daemon::task_board_remote_transport::controller::{
     RemoteExecutionControllerClient, RemoteExecutionControllerError,
@@ -61,13 +64,9 @@ pub(super) async fn finish_terminal_assignment_with<
 where
     FetchManifest: FnOnce() -> FetchFuture,
     FetchFuture: Future<Output = Result<(), CliError>>,
-    ObserveCleanup: FnOnce(
-        crate::daemon::task_board_remote_transport::wire_cleanup::RemoteCleanupObservationRequest,
-    ) -> CleanupFuture,
+    ObserveCleanup: FnOnce(RemoteCleanupObservationRequest) -> CleanupFuture,
     CleanupFuture: Future<Output = Result<bool, CliError>>,
-    Settle: FnOnce(
-        crate::daemon::task_board_remote_transport::wire::RemoteSettledRequest,
-    ) -> SettleFuture,
+    Settle: FnOnce(RemoteSettledRequest) -> SettleFuture,
     SettleFuture: Future<Output = Result<(), CliError>>,
 {
     if assignment.cleanup_completed_at.is_some() {
@@ -155,7 +154,7 @@ async fn classify_terminal_handoff(
         .record_task_board_remote_terminal_cleanup_handoff(
             assignment,
             &TaskBoardWorkflowExecutionCas::from(parent),
-            &crate::workspace::utc_now(),
+            &utc_now(),
         )
         .await?
     {

@@ -7,8 +7,9 @@ use axum::Json;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{
-    ReviewsPolicyHistoryRequest, ReviewsPolicyPreviewRequest, ReviewsPolicyRunStartRequest,
-    ReviewsPolicyStatusRequest, http_paths,
+    ReviewsPolicyHistoryRequest, ReviewsPolicyHistoryResponse, ReviewsPolicyPreviewRequest,
+    ReviewsPolicyPreviewResponse, ReviewsPolicyRunResponse, ReviewsPolicyRunStartRequest,
+    ReviewsPolicyStatusRequest, ReviewsPolicyStatusResponse, http_paths,
 };
 use crate::daemon::service;
 
@@ -47,7 +48,7 @@ pub(super) fn merge_policy_routes(
     description = "Preview the policy workflow steps that would run for a target, recording the preview to the audit database when configured",
     request_body = ReviewsPolicyPreviewRequest,
     responses(
-        (status = 200, description = "Preview of the policy workflow steps for a target", body = crate::daemon::protocol::ReviewsPolicyPreviewResponse),
+        (status = 200, description = "Preview of the policy workflow steps for a target", body = ReviewsPolicyPreviewResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -77,7 +78,7 @@ pub(super) async fn post_reviews_policy_preview(
     description = "Start a policy workflow run for a target, or resume an existing in-progress run",
     request_body = ReviewsPolicyRunStartRequest,
     responses(
-        (status = 200, description = "The started (or resumed) policy run", body = crate::daemon::protocol::ReviewsPolicyRunResponse),
+        (status = 200, description = "The started (or resumed) policy run", body = ReviewsPolicyRunResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -109,7 +110,7 @@ pub(super) async fn post_reviews_policy_start(
     description = "Return the active and recent policy runs for a subject",
     request_body = ReviewsPolicyStatusRequest,
     responses(
-        (status = 200, description = "Active and recent policy runs for a subject", body = crate::daemon::protocol::ReviewsPolicyStatusResponse),
+        (status = 200, description = "Active and recent policy runs for a subject", body = ReviewsPolicyStatusResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -138,7 +139,7 @@ pub(super) async fn post_reviews_policy_status(
     description = "Return historical policy runs for a subject along with aggregate metrics",
     request_body = ReviewsPolicyHistoryRequest,
     responses(
-        (status = 200, description = "Historical policy runs with aggregate metrics", body = crate::daemon::protocol::ReviewsPolicyHistoryResponse),
+        (status = 200, description = "Historical policy runs with aggregate metrics", body = ReviewsPolicyHistoryResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]

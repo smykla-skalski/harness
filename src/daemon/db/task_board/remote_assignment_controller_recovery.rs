@@ -14,6 +14,7 @@ use super::workflow_execution_attempts::update_attempt_in_tx;
 use super::workflow_executions::{load_execution_in_tx, update_execution_in_tx};
 use super::workflow_terminal::project_terminal_execution_in_tx;
 use crate::daemon::db::{CliError, db_error};
+use crate::task_board::TASK_BOARD_EXECUTION_TARGET_RESOURCE;
 use crate::task_board::{
     TASK_BOARD_REMOTE_CANCEL_IO_AUTHORITY_RESOURCE, TASK_BOARD_REMOTE_CLAIM_IO_AUTHORITY_RESOURCE,
     TASK_BOARD_REMOTE_OFFER_IO_AUTHORITY_RESOURCE, TASK_BOARD_REMOTE_RENEW_IO_AUTHORITY_RESOURCE,
@@ -108,7 +109,7 @@ fn parent_is_terminal_or_non_remote(
     let target = parent
         .ownership
         .resources
-        .get(crate::task_board::TASK_BOARD_EXECUTION_TARGET_RESOURCE);
+        .get(TASK_BOARD_EXECUTION_TARGET_RESOURCE);
     let non_remote = target.is_none_or(|value| !value.starts_with("remote:"));
     (terminal && !reconciliable_unknown) || non_remote
 }

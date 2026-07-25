@@ -10,6 +10,7 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::git::bundle::{GitBundleImportEvidence, GitBundleImportPlan, GitBundleWorktreeState};
 use crate::git::{GitError, GitResult};
 use crate::task_board::TaskBoardWorkflowExecutionCas;
+use crate::workspace::utc_now;
 
 #[path = "task_board_remote_result_import/orchestration.rs"]
 mod orchestration;
@@ -100,7 +101,7 @@ pub(crate) async fn import_task_board_remote_implementation_result(
             return Box::pin(settle_git_failure(db, request, &work.record, plan, error)).await;
         }
     };
-    let applied_at = crate::workspace::utc_now();
+    let applied_at = utc_now();
     db.record_task_board_remote_result_import_applied(
         &request.assignment_id,
         request.fencing_epoch,
@@ -205,7 +206,7 @@ async fn settle_git_failure(
                         request.fencing_epoch,
                         &record.import_sha256,
                         &git,
-                        &crate::workspace::utc_now(),
+                        &utc_now(),
                     )
                     .await;
             }
@@ -233,7 +234,7 @@ async fn mark_or_retry(
         request.fencing_epoch,
         &record.import_sha256,
         &detail,
-        &crate::workspace::utc_now(),
+        &utc_now(),
     ))
     .await?;
     Err(CliErrorKind::concurrent_modification(format!(
@@ -254,7 +255,7 @@ async fn mark_verification_failure(
         request.fencing_epoch,
         &record.import_sha256,
         &detail,
-        &crate::workspace::utc_now(),
+        &utc_now(),
     ))
     .await?;
     Err(CliErrorKind::concurrent_modification(format!(

@@ -6,6 +6,7 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::errors::{CliError, CliErrorKind};
 use crate::git::GitRepository;
 use crate::reviews::ReviewPullRequestState;
+use crate::task_board::TaskBoardResolvedReviewer;
 use crate::task_board::{
     AgentMode, DispatchAppliedTask, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardItem,
     TaskBoardPullRequestIdentity, TaskBoardReadOnlyRunContext, TaskBoardReadOnlyWorkflowLaunch,
@@ -191,7 +192,7 @@ fn local_head(worktree: &Path) -> Result<String, CliError> {
 }
 
 pub(super) fn ensure_supported_runtimes(
-    reviewers: &crate::task_board::TaskBoardResolvedReviewer,
+    reviewers: &TaskBoardResolvedReviewer,
 ) -> Result<(), CliError> {
     if reviewers
         .profiles

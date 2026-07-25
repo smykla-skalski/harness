@@ -14,6 +14,7 @@ use super::wire_cleanup::{RemoteCleanupObservationRequest, RemoteCleanupObservat
 use crate::daemon::db::TaskBoardRemoteAssignmentRecord;
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::http::openapi::DaemonErrorBody;
+use crate::errors::CliError;
 
 pub(crate) const CLEANUP_OBSERVATION_PATH: &str = "/v1/task-board-execution/cleanup/observe";
 
@@ -56,7 +57,7 @@ fn cleanup_response(
     record: &TaskBoardRemoteAssignmentRecord,
     request: &RemoteCleanupObservationRequest,
     principal: &str,
-) -> Result<Option<RemoteCleanupObservationResponse>, crate::errors::CliError> {
+) -> Result<Option<RemoteCleanupObservationResponse>, CliError> {
     let offer = record.require_offer()?;
     let exact = offer.binding == request.binding
         && offer.request_sha256 == request.offer_request_sha256

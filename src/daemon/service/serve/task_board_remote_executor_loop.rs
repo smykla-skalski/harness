@@ -8,9 +8,11 @@ use crate::daemon::db::{
     executor_start_io_permit, remote_executor_identity,
 };
 use crate::daemon::http::DaemonHttpState;
+use crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest;
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::workspace::utc_now;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
@@ -248,14 +250,14 @@ async fn reconcile_active_remote_worker(
 }
 
 struct PreparedRemoteWorker {
-    workspace: std::path::PathBuf,
+    workspace: PathBuf,
     action: PreparedRemoteWorkerAction,
 }
 
 async fn prepare_active_remote_worker(
     db: &AsyncDaemonDb,
     record: &TaskBoardRemoteAssignmentRecord,
-    offer: &crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest,
+    offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
     action: RemoteWorkerAction,
     daemon_epoch: &str,
@@ -361,7 +363,7 @@ async fn authorize_or_cleanup_remote_provisioning(
 async fn claim_or_cleanup_remote_start_io(
     db: &AsyncDaemonDb,
     authority: Option<&TaskBoardRemoteExecutorStartAuthority>,
-    workspace: &std::path::Path,
+    workspace: &Path,
 ) -> Result<TaskBoardRemoteExecutorStartIoPermitOutcome, CliError> {
     let authority = authority
         .ok_or_else(|| concurrent("claimed remote worker has no provisioning authority"))?;

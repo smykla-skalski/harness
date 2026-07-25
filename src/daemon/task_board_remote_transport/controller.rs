@@ -10,6 +10,7 @@ use super::wire::{
     RemoteOfferResponse, RemoteSettledRequest, RemoteSettledResponse, RemoteStatusRequest,
     RemoteStatusResponse,
 };
+use crate::daemon::db::TaskBoardRemoteIoAuthority;
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteArtifact, TaskBoardRemoteAssignmentRecord,
     TaskBoardRemoteHostTrustFence, TaskBoardRemoteMutationOutcome, TaskBoardRemoteOperationKind,
@@ -440,7 +441,7 @@ impl RemoteExecutionControllerClient {
 }
 
 fn require_io_authority(
-    authority: Option<crate::daemon::db::TaskBoardRemoteIoAuthority>,
+    authority: Option<TaskBoardRemoteIoAuthority>,
     message: &'static str,
 ) -> Result<(), RemoteExecutionControllerError> {
     authority

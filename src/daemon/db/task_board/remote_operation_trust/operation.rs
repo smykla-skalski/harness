@@ -4,6 +4,7 @@ use super::{
     TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence,
     load_operation_fence_for_kind_in_tx, require_sha256,
 };
+use crate::daemon::db::TaskBoardRemoteControllerOperationToken;
 use crate::daemon::db::task_board::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, concurrent, to_i64,
 };
@@ -292,7 +293,7 @@ fn require_assignment_fence(
 }
 
 fn operation_matches(
-    operation: &crate::daemon::db::TaskBoardRemoteControllerOperationToken,
+    operation: &TaskBoardRemoteControllerOperationToken,
     kind: TaskBoardRemoteOperationKind,
     request_sha256: &str,
     trust_sha256: &str,
@@ -307,7 +308,7 @@ fn operation_matches(
 pub(super) async fn clear_operation_trust_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     assignment: &TaskBoardRemoteAssignmentRecord,
-    operation: &crate::daemon::db::TaskBoardRemoteControllerOperationToken,
+    operation: &TaskBoardRemoteControllerOperationToken,
 ) -> Result<(), CliError> {
     let fence_json = operation
         .fence

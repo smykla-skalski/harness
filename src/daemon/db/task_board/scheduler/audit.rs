@@ -2,6 +2,7 @@ use serde_json::{Value, json};
 use sqlx::{Sqlite, Transaction};
 use uuid::Uuid;
 
+use crate::daemon::audit_events::broadcast_audit_event;
 use crate::daemon::db::audit::upsert_audit_event_in_tx;
 use crate::daemon::db::{CliError, db_error};
 use crate::daemon::protocol::HarnessMonitorAuditEvent;
@@ -30,7 +31,7 @@ pub(super) fn parse_scope(value: &str, run_id: &str) -> Result<TaskBoardAutomati
 
 pub(super) fn broadcast_automation_audits(events: &[HarnessMonitorAuditEvent]) {
     for event in events {
-        crate::daemon::audit_events::broadcast_audit_event(event);
+        broadcast_audit_event(event);
     }
 }
 

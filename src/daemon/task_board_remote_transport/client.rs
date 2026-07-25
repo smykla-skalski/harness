@@ -3,6 +3,7 @@ use std::fmt;
 use std::time::Duration;
 
 use reqwest::header::{ACCEPT, CONTENT_TYPE};
+use reqwest::redirect::Policy;
 use reqwest::{Method, Url};
 use rustls::ClientConfig;
 use serde::Serialize;
@@ -186,7 +187,7 @@ impl RemoteExecutionHttpClient {
     ) -> Result<Self, RemoteExecutionHttpError> {
         let client = reqwest::Client::builder()
             .https_only(true)
-            .redirect(reqwest::redirect::Policy::none())
+            .redirect(Policy::none())
             .no_proxy()
             .connect_timeout(CONNECT_TIMEOUT)
             .read_timeout(READ_TIMEOUT)

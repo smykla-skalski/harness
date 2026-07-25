@@ -19,6 +19,7 @@ use super::{TaskBoardRemoteExecutorStartIoPermit, executor_start_io_permit};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::task_board_remote_transport::wire::RemoteStatusResponse;
 use crate::task_board::TaskBoardFailureClass;
+use crate::task_board::TaskBoardRemoteAssignmentState;
 
 /// Canonical wire evidence for a failed fresh Codex endpoint preflight.
 pub(crate) const REMOTE_START_PREFLIGHT_ERROR_CODE: &str = "CODEX001";
@@ -117,7 +118,7 @@ fn failed_at_claimed_replays(
     record: &TaskBoardRemoteAssignmentRecord,
     response: &RemoteStatusResponse,
 ) -> bool {
-    record.state == crate::task_board::TaskBoardRemoteAssignmentState::Failed
+    record.state == TaskBoardRemoteAssignmentState::Failed
         && record.start_receipt.is_none()
         && record.started_at.is_none()
         && record.executor_start_io_permit_sha256.is_none()

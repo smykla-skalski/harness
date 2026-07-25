@@ -7,10 +7,14 @@ use axum::Json;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{
-    ReviewsActionPreviewRequest, ReviewsAvatarRequest, ReviewsBodyRequest, ReviewsBodyUpdateRequest,
-    ReviewsPullRequestResolveRequest, ReviewsQueryRequest, ReviewsRefreshRequest,
-    ReviewsRepositoryCatalogRequest, ReviewsReviewThreadResolveRequest, ReviewsTimelineRequest,
-    http_paths,
+    ReviewsActionPreviewRequest, ReviewsActionPreviewResponse, ReviewsAvatarRequest,
+    ReviewsAvatarResponse, ReviewsBodyRequest, ReviewsBodyResponse, ReviewsBodyUpdateRequest,
+    ReviewsBodyUpdateResponse, ReviewsCacheClearResponse, ReviewsCapabilitiesResponse,
+    ReviewsPullRequestResolveRequest, ReviewsPullRequestResolveResponse, ReviewsQueryRequest,
+    ReviewsQueryResponse, ReviewsRefreshRequest, ReviewsRefreshResponse,
+    ReviewsRepositoryCatalogRequest, ReviewsRepositoryCatalogResponse,
+    ReviewsReviewThreadResolveRequest, ReviewsReviewThreadResolveResponse, ReviewsTimelineRequest,
+    ReviewsTimelineResponse, http_paths,
 };
 use crate::daemon::service;
 
@@ -53,7 +57,7 @@ pub(super) fn reviews_routes() -> OpenApiRouter<DaemonHttpState> {
     tag = "reviews",
     description = "Return the feature flags that gate review tooling capabilities for the authenticated caller",
     responses(
-        (status = 200, description = "Feature flags for the review tooling", body = crate::daemon::protocol::ReviewsCapabilitiesResponse),
+        (status = 200, description = "Feature flags for the review tooling", body = ReviewsCapabilitiesResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -82,7 +86,7 @@ pub(super) async fn get_review_capabilities(
     description = "List the repositories the organization exposes for review, based on the request filters",
     request_body = ReviewsRepositoryCatalogRequest,
     responses(
-        (status = 200, description = "Repositories the organization exposes for review", body = crate::daemon::protocol::ReviewsRepositoryCatalogResponse),
+        (status = 200, description = "Repositories the organization exposes for review", body = ReviewsRepositoryCatalogResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -113,7 +117,7 @@ pub(super) async fn post_review_repositories(
     description = "Query reviews matching the given filters and return each with its summary",
     request_body = ReviewsQueryRequest,
     responses(
-        (status = 200, description = "Matching reviews with their summary", body = crate::daemon::protocol::ReviewsQueryResponse),
+        (status = 200, description = "Matching reviews with their summary", body = ReviewsQueryResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -144,7 +148,7 @@ pub(super) async fn post_query_reviews(
     description = "Resolve pull request references to review items, reporting any that could not be found",
     request_body = ReviewsPullRequestResolveRequest,
     responses(
-        (status = 200, description = "Resolved pull requests plus any that were not found", body = crate::daemon::protocol::ReviewsPullRequestResolveResponse),
+        (status = 200, description = "Resolved pull requests plus any that were not found", body = ReviewsPullRequestResolveResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -175,7 +179,7 @@ pub(super) async fn post_resolve_review_pull_requests(
     description = "Preview per-target eligibility for a review action before it is applied, recording the preview to the audit database when configured",
     request_body = ReviewsActionPreviewRequest,
     responses(
-        (status = 200, description = "Per-target eligibility preview for an action", body = crate::daemon::protocol::ReviewsActionPreviewResponse),
+        (status = 200, description = "Per-target eligibility preview for an action", body = ReviewsActionPreviewResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -204,7 +208,7 @@ pub(super) async fn post_review_action_preview(
     tag = "reviews",
     description = "Clear all cached review data, including the timeline cache, and report the number of entries removed",
     responses(
-        (status = 200, description = "Number of cache entries cleared", body = crate::daemon::protocol::ReviewsCacheClearResponse),
+        (status = 200, description = "Number of cache entries cleared", body = ReviewsCacheClearResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -233,7 +237,7 @@ pub(super) async fn delete_reviews_cache(
     description = "Refresh the given review items from the upstream provider and return their updated state",
     request_body = ReviewsRefreshRequest,
     responses(
-        (status = 200, description = "Refreshed review items", body = crate::daemon::protocol::ReviewsRefreshResponse),
+        (status = 200, description = "Refreshed review items", body = ReviewsRefreshResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -264,7 +268,7 @@ pub(super) async fn post_refresh_reviews(
     description = "Fetch the current body text of a pull request",
     request_body = ReviewsBodyRequest,
     responses(
-        (status = 200, description = "Pull request body text", body = crate::daemon::protocol::ReviewsBodyResponse),
+        (status = 200, description = "Pull request body text", body = ReviewsBodyResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -289,7 +293,7 @@ pub(super) async fn post_review_body(
     description = "Update a pull request body, detecting drift if the body changed upstream since it was last read",
     request_body = ReviewsBodyUpdateRequest,
     responses(
-        (status = 200, description = "Result of the body update, including drift detection", body = crate::daemon::protocol::ReviewsBodyUpdateResponse),
+        (status = 200, description = "Result of the body update, including drift detection", body = ReviewsBodyUpdateResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -320,7 +324,7 @@ pub(super) async fn post_review_body_update(
     description = "Fetch a page of a pull request's timeline events",
     request_body = ReviewsTimelineRequest,
     responses(
-        (status = 200, description = "Paged pull request timeline", body = crate::daemon::protocol::ReviewsTimelineResponse),
+        (status = 200, description = "Paged pull request timeline", body = ReviewsTimelineResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -351,7 +355,7 @@ pub(super) async fn post_review_timeline(
     description = "Fetch and proxy a user's avatar image from GitHub, returned base64-encoded",
     request_body = ReviewsAvatarRequest,
     responses(
-        (status = 200, description = "Base64-encoded avatar image proxied from GitHub", body = crate::daemon::protocol::ReviewsAvatarResponse),
+        (status = 200, description = "Base64-encoded avatar image proxied from GitHub", body = ReviewsAvatarResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -382,7 +386,7 @@ pub(super) async fn post_review_avatar(
     description = "Mark a review thread as resolved or unresolved and confirm the resulting state",
     request_body = ReviewsReviewThreadResolveRequest,
     responses(
-        (status = 200, description = "Confirmed resolved state of the review thread", body = crate::daemon::protocol::ReviewsReviewThreadResolveResponse),
+        (status = 200, description = "Confirmed resolved state of the review thread", body = ReviewsReviewThreadResolveResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]

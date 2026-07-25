@@ -1,4 +1,5 @@
 use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use sha2::{Digest, Sha256};
 
 use super::wire::{
@@ -13,6 +14,7 @@ use super::wire::{
 use super::wire_limits::{
     MAX_REMOTE_LIFECYCLE_JSON_BYTES, MAX_REMOTE_RECEIPT_JSON_BYTES, require_serialized_size,
 };
+use crate::task_board::TaskBoardFailureClass;
 
 impl RemoteLease {
     fn validate(&self) -> Result<(), RemoteWireError> {
@@ -135,7 +137,7 @@ impl RemoteStatusResponse {
                 let failure_class = self
                     .failure_class
                     .ok_or(RemoteWireError::MissingField("failure_class"))?;
-                if failure_class == crate::task_board::TaskBoardFailureClass::UnknownOutcome {
+                if failure_class == TaskBoardFailureClass::UnknownOutcome {
                     return Err(RemoteWireError::ResultBindingMismatch);
                 }
                 require_text("error_code", self.error_code.as_deref().unwrap_or_default())?;
@@ -298,7 +300,7 @@ impl RemoteArtifactFetchResponse {
             entries: vec![self.artifact.clone()],
         }
         .validate()?;
-        let content = base64::engine::general_purpose::STANDARD
+        let content = BASE64_STANDARD
             .decode(&self.content_base64)
             .map_err(|_| RemoteWireError::InvalidManifest)?;
         if content.len() as u64 != self.artifact.size_bytes

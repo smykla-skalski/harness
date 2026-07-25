@@ -3,6 +3,8 @@ use std::fmt;
 use std::sync::Arc;
 
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
+use rustls::crypto::CryptoProvider;
+use rustls::crypto::ring::default_provider;
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::{
     CertificateError, ClientConfig, DigitallySignedStruct, DistinguishedName, SignatureScheme,
@@ -40,7 +42,7 @@ pub(super) fn pinned_platform_client_config(
     if let Some(roots) = test_extra_roots()? {
         return pinned_client_config_with_roots(expected_spki_sha256, roots);
     }
-    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let provider = Arc::new(default_provider());
     let platform =
         Verifier::new(Arc::clone(&provider)).map_err(|_| RemoteTlsPinError::PlatformVerifier)?;
     pinned_client_config(expected_spki_sha256, Arc::new(platform), provider)
@@ -83,7 +85,7 @@ pub(super) fn pinned_client_config_with_roots(
 fn pinned_client_config(
     expected_spki_sha256: &str,
     verifier: Arc<dyn ServerCertVerifier>,
-    provider: Arc<rustls::crypto::CryptoProvider>,
+    provider: Arc<CryptoProvider>,
 ) -> Result<ClientConfig, RemoteTlsPinError> {
     let expected =
         remote_spki_pin::decode(expected_spki_sha256).ok_or(RemoteTlsPinError::InvalidPin)?;

@@ -10,13 +10,19 @@ pub(crate) use harness_protocol::managed_agents::acp::{
     AcpSessionListPage,
 };
 use tokio::sync::broadcast;
+use tokio::task::spawn_blocking;
 use tokio::time::Instant;
 
 use super::active::{ActiveAcpProcess, ActiveAcpSession, process_incident_from_snapshot};
 use super::permission_bridge::{AcpPermissionBatch, AcpPermissionDecision};
 use crate::agents::acp::catalog;
 use crate::agents::kind::DisconnectReason;
+#[cfg(feature = "daemon-runtime")]
+use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::protocol::StreamEvent;
+use crate::daemon::sandboxed_from_env;
+#[cfg(feature = "daemon-runtime")]
+use crate::daemon::state::task_board_openrouter_token;
 use crate::errors::{CliError, CliErrorKind};
 use crate::feature_flags;
 #[cfg(all(test, feature = "daemon-runtime"))]
@@ -84,7 +90,7 @@ impl AcpAgentManagerHandle {
     #[must_use]
     pub fn new(
         sender: broadcast::Sender<StreamEvent>,
-        db: Arc<std::sync::OnceLock<Arc<Mutex<crate::daemon::db::DaemonDb>>>>,
+        db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
     ) -> Self {
         Self::new_with_async_db(sender, db, Arc::new(OnceLock::new()))
     }
@@ -93,8 +99,8 @@ impl AcpAgentManagerHandle {
     #[must_use]
     pub(crate) fn new_with_async_db(
         sender: broadcast::Sender<StreamEvent>,
-        db: Arc<std::sync::OnceLock<Arc<Mutex<crate::daemon::db::DaemonDb>>>>,
-        async_db: Arc<std::sync::OnceLock<Arc<crate::daemon::db::AsyncDaemonDb>>>,
+        db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
+        async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
     ) -> Self {
         Self::with_port(Arc::new(DaemonAcpManagerPort::new(sender, db, async_db)))
     }
@@ -158,7 +164,7 @@ impl AcpAgentManagerHandle {
                 request.agent
             )))
         })?;
-        if crate::daemon::sandboxed_from_env() {
+        if sandboxed_from_env() {
             return self.start_via_bridge_with_pooling_disabled(
                 session_id,
                 request,
@@ -167,7 +173,7 @@ impl AcpAgentManagerHandle {
         }
         #[cfg(feature = "daemon-runtime")]
         let openrouter_token = if descriptor.id.as_str() == "openrouter" {
-            crate::daemon::state::task_board_openrouter_token()
+            task_board_openrouter_token()
         } else {
             None
         };
@@ -216,7 +222,7 @@ impl AcpAgentManagerHandle {
     /// # Errors
     /// Returns [`CliError`] when a live refresh fails.
     pub fn list(&self, session_id: &str) -> Result<Vec<AcpAgentSnapshot>, CliError> {
-        if crate::daemon::sandboxed_from_env() {
+        if sandboxed_from_env() {
             return self.list_via_bridge(session_id);
         }
         let sessions = self.sessions_for(session_id)?;
@@ -240,7 +246,7 @@ impl AcpAgentManagerHandle {
     /// # Errors
     /// Returns [`CliError`] when the live session registry is unavailable.
     pub fn inspect(&self, session_id: Option<&str>) -> Result<AcpAgentInspectResponse, CliError> {
-        if crate::daemon::sandboxed_from_env() {
+        if sandboxed_from_env() {
             return Ok(self.inspect_via_bridge(session_id));
         }
         let sessions = self
@@ -275,7 +281,7 @@ impl AcpAgentManagerHandle {
     /// # Errors
     /// Returns [`CliError`] when the session is unknown.
     pub fn get(&self, acp_id: &str) -> Result<AcpAgentSnapshot, CliError> {
-        if crate::daemon::sandboxed_from_env() {
+        if sandboxed_from_env() {
             return self.get_via_bridge(acp_id);
         }
         let session = self.session(acp_id)?;
@@ -289,7 +295,7 @@ impl AcpAgentManagerHandle {
     /// Returns [`CliError`] when the daemon is sandboxed, the session is
     /// unknown, the capability is missing, or the agent rejects the call.
     pub fn logout(&self, acp_id: &str) -> Result<(), CliError> {
-        if crate::daemon::sandboxed_from_env() {
+        if sandboxed_from_env() {
             return Err(CliErrorKind::workflow_io(
                 "ACP logout is not available from a sandboxed daemon".to_string(),
             )
@@ -306,7 +312,7 @@ impl AcpAgentManagerHandle {
     /// # Errors
     /// Returns [`CliError`] when the session is unknown.
     pub fn stop(&self, acp_id: &str) -> Result<AcpAgentSnapshot, CliError> {
-        if crate::daemon::sandboxed_from_env() {
+        if sandboxed_from_env() {
             return self.stop_via_bridge(acp_id);
         }
         let session = self.session(acp_id)?;
@@ -335,7 +341,7 @@ impl AcpAgentManagerHandle {
     /// Returns [`CliError`] when the live ACP registry cannot be drained
     /// cleanly during daemon shutdown.
     pub fn shutdown_all(&self) -> Result<(), CliError> {
-        if crate::daemon::sandboxed_from_env() {
+        if sandboxed_from_env() {
             Self::shutdown_all_via_bridge();
             return Ok(());
         }
@@ -366,7 +372,7 @@ impl AcpAgentManagerHandle {
     /// Returns [`CliError`] when the drain fails or its thread panics.
     pub async fn shutdown_all_async(&self) -> Result<(), CliError> {
         let manager = self.clone();
-        tokio::task::spawn_blocking(move || manager.shutdown_all())
+        spawn_blocking(move || manager.shutdown_all())
             .await
             .map_err(|error| {
                 CliError::from(CliErrorKind::workflow_io(format!(
@@ -434,7 +440,7 @@ impl AcpAgentManagerHandle {
     /// Returns [`CliError`] when the sandbox bridge inspect call fails.
     ///
     pub fn count_live_sessions(&self) -> Result<usize, CliError> {
-        if crate::daemon::sandboxed_from_env() {
+        if sandboxed_from_env() {
             return Self::live_session_count_via_bridge();
         }
         let sessions: Vec<_> = self.sessions_guard()?.values().cloned().collect();
