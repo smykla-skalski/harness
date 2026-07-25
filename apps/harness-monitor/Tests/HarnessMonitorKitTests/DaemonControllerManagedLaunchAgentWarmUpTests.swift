@@ -4,6 +4,12 @@ import Testing
 
 @testable import HarnessMonitorKit
 
+// `Darwin.flock` resolves to `struct flock` (used by `fcntl(2)`).
+// Bind the BSD `flock(2)` C symbol to a private name so test
+// helpers can hold the lock unambiguously.
+@_silgen_name("flock")
+private func bsdFlock(_ fd: Int32, _ operation: Int32) -> Int32
+
 private let managedLaunchAgentHelperPathFixture =
   "/Users/example/Library/Developer/Xcode/DerivedData/HarnessMonitor/Build/Products/Debug/"
   + "Harness Monitor.app/Contents/Helpers/harness-daemon"
@@ -426,7 +432,7 @@ extension DaemonControllerManagedLaunchAgentWarmUpTests {
       FileManager.default.createFile(atPath: lockURL.path, contents: nil)
       let heldDescriptor = Darwin.open(lockURL.path, O_RDWR | O_CLOEXEC)
       #expect(heldDescriptor >= 0)
-      #expect(flock(heldDescriptor, LOCK_EX | LOCK_NB) == 0)
+      #expect(bsdFlock(heldDescriptor, LOCK_EX | LOCK_NB) == 0)
       defer { _ = Darwin.close(heldDescriptor) }
 
       let manager = HookedLaunchAgentManager(state: .enabled)
