@@ -193,7 +193,10 @@ def serve(pool: Pool, stop: threading.Event) -> None:
             with contextlib.suppress(OSError):
                 conn.sendall(f"GRANTED {granted}\n".encode())
 
-        if pool.idle_and_whole() and time.monotonic() - pool.last_activity > IDLE_EXIT_SECONDS:
+        # Deadline first: idle_and_whole drains the FIFO to count it, and doing
+        # that every poll would briefly hold every token outside the pipe for no
+        # reason. Only pay it once the supervisor is already a candidate to exit.
+        if time.monotonic() - pool.last_activity > IDLE_EXIT_SECONDS and pool.idle_and_whole():
             break
 
     for conn in list(holdings):
