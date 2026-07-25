@@ -73,8 +73,13 @@ fn a_prompt_change_does_not_excuse_a_different_worktree() {
     assert_eq!(error.code(), "KSRCLI092");
 }
 
+/// Identity is structural, so recovery must not need the prompt to render at
+/// all. It used to: an unrenderable template turned a healthy running worker
+/// into a conflict, and because the claim is fenced before rollback that
+/// looped until the daemon restarted — not the one-line configuration edit it
+/// looked like.
 #[test]
-fn an_unusable_prompt_refuses_recovery_the_way_it_refuses_a_spawn() {
+fn a_worker_recovers_even_when_the_configured_prompt_cannot_render() {
     let _lock = PROMPT_CATALOG_TEST_LOCK.lock().expect("catalog test lock");
     let (applied, snapshot) = running_review_worker();
 
@@ -83,8 +88,6 @@ fn an_unusable_prompt_refuses_recovery_the_way_it_refuses_a_spawn() {
             .expect("parse overrides"),
     );
 
-    let error = recover_same_applied_worker(snapshot, &applied)
-        .expect_err("an unusable prompt cannot confirm anything");
-
-    assert!(error.message().contains("titel"), "{}", error.message());
+    recover_same_applied_worker(snapshot, &applied)
+        .expect("a broken template must not strand a healthy worker");
 }

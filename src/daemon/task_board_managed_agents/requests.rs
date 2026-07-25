@@ -15,6 +15,42 @@ use crate::task_board::{
 
 const DEFAULT_INTERACTIVE_RUNTIME: &str = "codex";
 
+/// What a dispatched item's Codex run is, apart from its prompt.
+///
+/// Recovery confirms identity from these and the frozen launch fields, so it
+/// must be able to compute them without rendering: a configuration edit that
+/// breaks a template cannot be allowed to strand a worker that is already
+/// running the right work.
+pub(super) struct CodexWorkerIdentity {
+    pub(super) mode: CodexRunMode,
+    pub(super) model: Option<String>,
+    pub(super) effort: Option<String>,
+}
+
+pub(super) fn codex_worker_identity(applied: &DispatchAppliedTask) -> CodexWorkerIdentity {
+    if let Some(launch) = applied.read_only_workflow.as_ref() {
+        let profile = launch.resolved_reviewers.profiles.first();
+        return CodexWorkerIdentity {
+            mode: CodexRunMode::Report,
+            model: profile.and_then(|profile| profile.model.clone()),
+            effort: profile.and_then(|profile| profile.effort.clone()),
+        };
+    }
+    let mode = if applied.write_workflow.is_some() {
+        CodexRunMode::WorkspaceWrite
+    } else {
+        match applied.item.agent_mode {
+            AgentMode::Planning | AgentMode::Evaluate => CodexRunMode::Report,
+            AgentMode::Headless | AgentMode::Interactive => CodexRunMode::WorkspaceWrite,
+        }
+    };
+    CodexWorkerIdentity {
+        mode,
+        model: None,
+        effort: None,
+    }
+}
+
 /// Build the Codex run request for one dispatched item.
 ///
 /// # Errors
@@ -30,14 +66,10 @@ pub(crate) fn codex_worker_request(
     if let Some(launch) = applied.write_workflow.as_ref() {
         return write_implementation_request(applied, launch, managed_run_id);
     }
-    let mode = match applied.item.agent_mode {
-        AgentMode::Planning | AgentMode::Evaluate => CodexRunMode::Report,
-        AgentMode::Headless | AgentMode::Interactive => CodexRunMode::WorkspaceWrite,
-    };
     Ok(CodexRunRequest {
         actor: Some(CONTROL_PLANE_ACTOR_ID.to_string()),
         prompt: worker_prompt(applied, managed_run_id)?,
-        mode,
+        mode: codex_worker_identity(applied).mode,
         role: SessionRole::Leader,
         fallback_role: Some(SessionRole::Worker),
         capabilities: worker_capabilities(&applied.item),

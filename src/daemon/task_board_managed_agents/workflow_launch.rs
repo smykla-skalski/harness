@@ -4,7 +4,7 @@ use crate::daemon::service::{validate_read_only_workflow_launch, validate_write_
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::{DispatchAppliedTask, validate_task_board_read_only_run_context};
 
-use super::requests::codex_worker_request;
+use super::requests::{codex_worker_identity, codex_worker_request};
 
 pub(super) async fn validate_workflow_launch(
     state: &DaemonHttpState,
@@ -53,12 +53,13 @@ pub(super) fn validate_recovered_workflow_worker(
     let ManagedAgentSnapshot::Codex(run) = snapshot else {
         return Err(workflow_recovery_conflict(snapshot.agent_id()));
     };
-    // The prompt is no longer part of the identity: it is configuration, and a
+    // The prompt is not part of the identity: it is configuration, and a
     // customization landing between launch and recovery would otherwise strand
     // a worker that is demonstrably doing the work it was started for. The
-    // frozen structural fields carry that proof instead, and a prompt that
-    // still matches is logged as the stronger confirmation it is.
-    let expected = codex_worker_request(applied, &run.run_id)?;
+    // frozen structural fields carry that proof, and they are computed without
+    // rendering so that a template nobody can render cannot fence the claim
+    // and loop until the daemon restarts.
+    let expected = codex_worker_identity(applied);
     let matches = run.project_dir == worktree
         && run.board_item_id.as_deref() == Some(applied.board_item_id.as_str())
         && run.workflow_execution_id == applied.item.workflow.execution_id
@@ -69,7 +70,11 @@ pub(super) fn validate_recovered_workflow_worker(
     if !matches {
         return Err(workflow_recovery_conflict(&run.run_id));
     }
-    if run.prompt != expected.prompt {
+    // Best-effort confirmation only. A prompt that still matches is the
+    // stronger signal, but one that cannot be rendered says nothing either way.
+    if codex_worker_request(applied, &run.run_id)
+        .is_ok_and(|expected| expected.prompt != run.prompt)
+    {
         note_recovered_prompt_change(&run.run_id);
     }
     Ok(())
