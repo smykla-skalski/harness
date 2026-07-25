@@ -279,16 +279,18 @@ extension PreviewHarnessClient.Fixtures {
     deletedAt: nil
   )
 
+  private static let standardHealth = HealthResponse(
+    status: "ok",
+    version: "14.5.0",
+    pid: 4242,
+    endpoint: "http://127.0.0.1:9999",
+    startedAt: "2026-03-28T14:00:00Z",
+    projectCount: 1,
+    sessionCount: 1
+  )
+
   public static let populated = Self(
-    health: HealthResponse(
-      status: "ok",
-      version: "14.5.0",
-      pid: 4242,
-      endpoint: "http://127.0.0.1:9999",
-      startedAt: "2026-03-28T14:00:00Z",
-      projectCount: 1,
-      sessionCount: 1
-    ),
+    health: standardHealth,
     projects: PreviewFixtures.projects,
     sessions: [PreviewFixtures.summary],
     detail: PreviewFixtures.detail,
@@ -300,15 +302,7 @@ extension PreviewHarnessClient.Fixtures {
   )
 
   public static let taskDrop = Self(
-    health: HealthResponse(
-      status: "ok",
-      version: "14.5.0",
-      pid: 4242,
-      endpoint: "http://127.0.0.1:9999",
-      startedAt: "2026-03-28T14:00:00Z",
-      projectCount: 1,
-      sessionCount: 1
-    ),
+    health: standardHealth,
     projects: PreviewFixtures.projects,
     sessions: [PreviewFixtures.taskDropSummary],
     detail: PreviewFixtures.taskDropDetail,
@@ -319,15 +313,7 @@ extension PreviewHarnessClient.Fixtures {
     timelinesBySessionID: [PreviewFixtures.summary.sessionId: PreviewFixtures.timeline]
   )
   public static let dashboardLanding = Self(
-    health: HealthResponse(
-      status: "ok",
-      version: "14.5.0",
-      pid: 4242,
-      endpoint: "http://127.0.0.1:9999",
-      startedAt: "2026-03-28T14:00:00Z",
-      projectCount: 1,
-      sessionCount: 1
-    ),
+    health: standardHealth,
     projects: PreviewFixtures.projects,
     sessions: [PreviewFixtures.summary],
     detail: PreviewFixtures.detail,
@@ -338,15 +324,7 @@ extension PreviewHarnessClient.Fixtures {
     timelinesBySessionID: [PreviewFixtures.summary.sessionId: PreviewFixtures.timeline]
   )
   public static let taskBoardBoardOnly = Self(
-    health: HealthResponse(
-      status: "ok",
-      version: "14.5.0",
-      pid: 4242,
-      endpoint: "http://127.0.0.1:9999",
-      startedAt: "2026-03-28T14:00:00Z",
-      projectCount: 1,
-      sessionCount: 1
-    ),
+    health: standardHealth,
     projects: PreviewFixtures.projects,
     sessions: [PreviewFixtures.summary],
     detail: PreviewFixtures.detail,
@@ -358,15 +336,7 @@ extension PreviewHarnessClient.Fixtures {
     taskBoardItems: [boardOnlyTaskBoardItem]
   )
   public static let singleAgent = Self(
-    health: HealthResponse(
-      status: "ok",
-      version: "14.5.0",
-      pid: 4242,
-      endpoint: "http://127.0.0.1:9999",
-      startedAt: "2026-03-28T14:00:00Z",
-      projectCount: 1,
-      sessionCount: 1
-    ),
+    health: standardHealth,
     projects: PreviewFixtures.singleAgentProjects,
     sessions: PreviewFixtures.singleAgentSessions,
     detail: PreviewFixtures.singleAgentDetail,
@@ -379,15 +349,7 @@ extension PreviewHarnessClient.Fixtures {
     timelinesBySessionID: [:]
   )
   public static let emptyCockpit = Self(
-    health: HealthResponse(
-      status: "ok",
-      version: "14.5.0",
-      pid: 4242,
-      endpoint: "http://127.0.0.1:9999",
-      startedAt: "2026-03-28T14:00:00Z",
-      projectCount: 1,
-      sessionCount: 1
-    ),
+    health: standardHealth,
     projects: PreviewFixtures.projects,
     sessions: [PreviewFixtures.emptyCockpitSummary],
     detail: PreviewFixtures.emptyCockpitDetail,
