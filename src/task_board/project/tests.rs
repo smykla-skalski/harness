@@ -69,6 +69,36 @@ fn provider_project_values_are_not_mistaken_for_identifiers() {
     }
 }
 
+/// The column's CHECK counts bytes, so normalizing has to as well. A slug that
+/// only the database rejects turns a caller mistake into a store failure.
+#[test]
+fn a_slug_past_the_column_limit_does_not_normalize() {
+    let long = "a".repeat(257);
+    let fits = "a".repeat(256);
+
+    assert_eq!(TaskBoardProjectSource::Manual.normalize_slug(&long), None);
+    assert_eq!(
+        TaskBoardProjectSource::Manual.normalize_slug(&fits),
+        Some(fits.clone())
+    );
+    assert_eq!(TaskBoardProjectSource::Todoist.normalize_slug(&long), None);
+
+    // Bytes, not characters: 129 two-byte characters overflow 256 bytes.
+    let multibyte = "é".repeat(129);
+    assert_eq!(multibyte.chars().count(), 129);
+    assert_eq!(
+        TaskBoardProjectSource::Manual.normalize_slug(&multibyte),
+        None
+    );
+
+    let owner = "o".repeat(200);
+    let repository = "r".repeat(200);
+    assert_eq!(
+        TaskBoardProjectSource::GitHub.normalize_slug(&format!("{owner}/{repository}")),
+        None
+    );
+}
+
 /// Both producers emit lowercase and the column's CHECK enforces it, so an
 /// uppercase body is not a spelling variant - it is a value the database
 /// would refuse, and calling it assigned here would split the two rules.

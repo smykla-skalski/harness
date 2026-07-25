@@ -39,6 +39,41 @@ INSERT INTO task_board_items (
      NULL, '{}', '{}', '{}', 0,
      '2026-07-24T00:00:00Z', '2026-07-24T00:00:00Z', 1, 'task');";
 
+/// A legacy row whose project value is longer than the column's CHECK allows.
+/// The `INSERT OR IGNORE` skips the unstorable project and the join then finds
+/// nothing, so the item lands unattributed. Pinned because the alternative is
+/// a migration that refuses to boot over one absurd string.
+#[test]
+fn the_backfill_skips_a_value_the_column_would_refuse() {
+    let directory = tempdir().expect("tempdir");
+    let path = directory.path().join("harness.db");
+    let oversize = "z".repeat(300);
+    let seed = format!(
+        "INSERT INTO task_board_items (
+            item_id, schema_version, title, body, status, priority, tags_json, project_id,
+            target_project_types_json, agent_mode, workflow_kind, execution_repository,
+            imported_from_provider, planning_json, workflow_json, usage_json, child_order,
+            created_at, updated_at, revision, kind
+        ) VALUES
+            ('oversize', 1, 'Oversize', '', 'todo', 'medium', '[]', '{oversize}',
+             '[]', 'headless', 'default_task', NULL,
+             NULL, '{{}}', '{{}}', '{{}}', 0,
+             '2026-07-24T00:00:00Z', '2026-07-24T00:00:00Z', 1, 'task');"
+    );
+
+    let migrated = migrated_from_v50(&path, &seed);
+
+    assert_eq!(
+        source_project_of(migrated.connection(), "oversize"),
+        None,
+        "an unstorable slug leaves the item unattributed rather than failing the migration"
+    );
+    assert_eq!(
+        migrated.schema_version().expect("schema version"),
+        crate::daemon::db::SCHEMA_VERSION
+    );
+}
+
 fn source_project_of(connection: &Connection, item_id: &str) -> Option<String> {
     connection
         .query_row(

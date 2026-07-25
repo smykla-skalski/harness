@@ -6,6 +6,11 @@ use super::runtime_config::normalize_repository_slug;
 
 const PROJECT_ID_PREFIX: &str = "project-";
 const PROJECT_ID_BODY_LEN: usize = 32;
+/// Mirrors the column's CHECK, which measures bytes rather than characters.
+/// Normalizing has to agree with it: an oversize slug that reaches the insert
+/// comes back as a store failure for what is really a caller mistake, and the
+/// v51 backfill would fail the whole migration on it.
+const PROJECT_SLUG_MAX_BYTES: usize = 256;
 
 /// Where a project's identity comes from. The source scopes the slug, because
 /// two providers may hand out the same slug for unrelated projects.
@@ -26,7 +31,7 @@ impl TaskBoardProjectSource {
     /// cannot name a project.
     #[must_use]
     pub fn normalize_slug(self, raw: &str) -> Option<String> {
-        match self {
+        let normalized = match self {
             Self::GitHub => normalize_repository_slug(Some(raw)),
             // The provider owns these, so case is significant and the only
             // reshaping that is safe is trimming transport whitespace.
@@ -34,7 +39,8 @@ impl TaskBoardProjectSource {
                 let trimmed = raw.trim();
                 (!trimmed.is_empty()).then(|| trimmed.to_owned())
             }
-        }
+        };
+        normalized.filter(|slug| slug.len() <= PROJECT_SLUG_MAX_BYTES)
     }
 
     #[must_use]
