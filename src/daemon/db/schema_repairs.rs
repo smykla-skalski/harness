@@ -38,6 +38,7 @@ const CURRENT_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] = &[
     ("task_board_items", "parent_item_id"),
     ("task_board_items", "child_order"),
     ("task_board_items", "kind"),
+    ("task_board_projects", "color"),
 ];
 
 const CURRENT_SCHEMA_CODEX_RUN_COLUMNS: &[(&str, &str)] = &[
@@ -290,6 +291,7 @@ pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError>
     super::schema_v49::run(&db.conn)?;
     super::schema_v50::run(&db.conn)?;
     super::schema_v51::run(&db.conn)?;
+    super::schema_v52::run(&db.conn)?;
     super::schema_repairs_external_creates::require_complete_shape(&db.conn)?;
     super::schema_repairs_wake_events::require_complete_shape(&db.conn)?;
     super::schema_repairs_admission::require_complete_shape(&db.conn)?;

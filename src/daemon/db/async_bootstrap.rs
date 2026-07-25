@@ -110,6 +110,7 @@ const fn migration_effect_column(migration_version: i64) -> Option<(&'static str
         40 => Some(("task_board_items", "tombstone_cause")),
         41 => Some(("task_board_items", "triage_override_verdict")),
         46 => Some(("task_board_items", "source_project_id")),
+        48 => Some(("task_board_projects", "color")),
         _ => None,
     }
 }
@@ -166,6 +167,9 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         // attribution that references it, and the index kept separate so it
         // can be rebuilt on its own.
         45 | 46 | 47 => 51,
+        // Schema v52 splits the same way: the one-shot ALTER, then the
+        // replayable backfill that carries the stamp.
+        48 | 49 => 52,
         _ => u64::MAX,
     }
 }
