@@ -57,13 +57,27 @@ reset_tmp_root() {
   TEST_TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/clean-build-caches-test.XXXXXX")"
 }
 
-assert_output_contains() {
-  local haystack="$1"
-  local needle="$2"
-  grep -Fq -- "$needle" <<<"$haystack" || {
-    fail "expected output to contain: $needle"
+assert_output_line_contains() {
+  local haystack="$1" path_needle="$2" marker="$3" line
+  line="$(grep -F -- "$path_needle" <<<"$haystack")" || {
+    fail "expected output to contain a line for: $path_needle"
     return 1
   }
+  grep -Fq -- "$marker" <<<"$line" || {
+    fail "expected line for $path_needle to contain '$marker', got: $line"
+    return 1
+  }
+}
+
+# A PID no process holds, found by probing upward from a value past any
+# realistic pid_max rather than spawning and reaping a real process, since
+# a just-freed PID can be reassigned before the lease file is read.
+unused_pid() {
+  local candidate=999999
+  while kill -0 "$candidate" 2>/dev/null; do
+    candidate=$((candidate + 1))
+  done
+  printf '%s\n' "$candidate"
 }
 
 # Builds a fixture repo whose target/ mirrors the shared cargo-local.sh
@@ -95,9 +109,7 @@ make_shared_target_fixture() {
   printf '%s\n' "$live_pid" > "$repo/target/.cargo-local/leases/live-$live_pid"
 
   local dead_pid
-  (exit 0) &
-  dead_pid=$!
-  wait "$dead_pid" 2>/dev/null || true
+  dead_pid="$(unused_pid)"
   printf '%s\n' "$dead_pid" > "$repo/target/.cargo-local/leases/dead-$dead_pid"
 }
 
@@ -110,12 +122,11 @@ scenario_dry_run_keeps_leased_segment() {
   make_shared_target_fixture "$repo"
   output="$(cd "$repo" && ./scripts/clean-build-caches.sh --dry-run)"
 
-  assert_output_contains "$output" "target/dev/agent-live"
-  assert_output_contains "$output" "(active build, kept)"
-  assert_output_contains "$output" "target/dev/agent-dead"
-  assert_output_contains "$output" "target/dev/agent-nolease"
-  assert_output_contains "$output" "target/stray-legacy-artifact"
-  assert_output_contains "$output" "target/dev/.rustc_info.json"
+  assert_output_line_contains "$output" "target/dev/agent-live" "(active build, kept)"
+  assert_output_line_contains "$output" "target/dev/agent-dead" "(dry-run)"
+  assert_output_line_contains "$output" "target/dev/agent-nolease" "(dry-run)"
+  assert_output_line_contains "$output" "target/stray-legacy-artifact" "(dry-run)"
+  assert_output_line_contains "$output" "target/dev/.rustc_info.json" "(dry-run)"
   pass
 }
 
