@@ -2,7 +2,9 @@ use serde_json::{Value, json};
 
 use crate::daemon::protocol::ws_methods;
 use crate::mcp::tool::ToolRegistry;
-use crate::task_board::{TASK_BOARD_LIST_MAX_LIMIT, TASK_BOARD_LIST_MAX_QUERY_CHARS};
+use crate::task_board::{
+    TASK_BOARD_LIST_MAX_LIMIT, TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS,
+};
 
 use super::support::{TaskBoardToolDescriptor, register_descriptors};
 
@@ -125,6 +127,17 @@ fn string_array_schema() -> Value {
     })
 }
 
+/// The daemon refuses a whitespace-only tag and caps how many one read may
+/// carry, so the tool advertises both rather than leaving a caller to find
+/// them through a failed call.
+fn tag_filter_schema() -> Value {
+    json!({
+        "type": "array",
+        "maxItems": TASK_BOARD_LIST_MAX_TAGS,
+        "items": { "type": "string", "pattern": "\\S" }
+    })
+}
+
 fn external_refs_schema() -> Value {
     json!({
         "type": "array",
@@ -159,7 +172,7 @@ fn list_schema() -> Value {
             "priority": { "type": "string" },
             "agent_mode": { "type": "string" },
             "project_id": { "type": "string" },
-            "tags": string_array_schema(),
+            "tags": tag_filter_schema(),
             "query": { "type": "string", "maxLength": TASK_BOARD_LIST_MAX_QUERY_CHARS },
             "limit": {
                 "type": "integer", "minimum": 1, "maximum": TASK_BOARD_LIST_MAX_LIMIT
@@ -300,7 +313,9 @@ mod tests {
     use serde_json::json;
 
     use super::{create_schema, list_schema, update_schema};
-    use crate::task_board::{TASK_BOARD_LIST_MAX_LIMIT, TASK_BOARD_LIST_MAX_QUERY_CHARS};
+    use crate::task_board::{
+    TASK_BOARD_LIST_MAX_LIMIT, TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS,
+};
 
     /// A `minLength` of 1 would still advertise a whitespace-only title as
     /// valid, and the daemon trims before refusing one, so the schema has to
@@ -338,6 +353,8 @@ mod tests {
             assert_eq!(properties[facet]["type"], json!("string"), "{facet}");
         }
         assert_eq!(properties["tags"]["type"], json!("array"));
+        assert_eq!(properties["tags"]["maxItems"], json!(TASK_BOARD_LIST_MAX_TAGS));
+        assert_eq!(properties["tags"]["items"]["pattern"], json!("\\S"));
         assert_eq!(
             properties["query"]["maxLength"],
             json!(TASK_BOARD_LIST_MAX_QUERY_CHARS)

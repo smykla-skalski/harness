@@ -10521,7 +10521,8 @@
             "description": "Case-insensitive substring over title, body, and tags.",
             "required": false,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 512
             }
           },
           {
@@ -10532,7 +10533,8 @@
             "schema": {
               "type": "integer",
               "format": "int32",
-              "minimum": 0
+              "maximum": 500,
+              "minimum": 1
             }
           },
           {

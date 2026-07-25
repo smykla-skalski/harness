@@ -14,7 +14,10 @@ use crate::daemon::protocol::{
 };
 use crate::daemon::remote_task_board::project_task_board_item;
 use crate::daemon::remote_viewer::is_remote_viewer;
-use crate::task_board::{AgentMode, TaskBoardPriority, TaskBoardStatus};
+use crate::task_board::{
+    AgentMode, TASK_BOARD_LIST_MAX_LIMIT, TASK_BOARD_LIST_MAX_QUERY_CHARS, TaskBoardPriority,
+    TaskBoardStatus,
+};
 
 use super::super::DaemonHttpState;
 use super::super::auth::{authenticated_remote_client, authorize_control_request, require_auth};
@@ -48,12 +51,19 @@ pub(super) struct TaskBoardListQuery {
     pub agent_mode: Option<AgentMode>,
     pub project_id: Option<String>,
     /// Case-insensitive substring over title, body, and tags.
+    #[param(max_length = 512)]
     pub query: Option<String>,
     /// Page size, `1..=500`; defaults to 200.
+    #[param(minimum = 1, maximum = 500)]
     pub limit: Option<u32>,
     /// `next_cursor` from the previous page.
     pub cursor: Option<String>,
 }
+
+// `utoipa` takes only literals for these bounds, so the schema would silently
+// stop describing what the daemon enforces if either constant moved.
+const _: () = assert!(TASK_BOARD_LIST_MAX_LIMIT == 500);
+const _: () = assert!(TASK_BOARD_LIST_MAX_QUERY_CHARS == 512);
 
 #[derive(Debug, Clone, Deserialize)]
 #[derive(utoipa::ToSchema)]

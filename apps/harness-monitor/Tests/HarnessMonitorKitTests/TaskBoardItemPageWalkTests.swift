@@ -29,8 +29,8 @@ struct TaskBoardItemPageWalkTests {
   @Test("folds every page into one response and keeps the first change sequence")
   func foldsEveryPage() async throws {
     let source = StubTaskBoardPageSource(pages: [
-      page(ids: ["task-1", "task-2"], changeSeq: 41, nextCursor: "cursor-2"),
-      page(ids: ["task-3"], changeSeq: 42, nextCursor: nil),
+      page(ids: ["task-1", "task-2"], totalMatched: 3, changeSeq: 41, nextCursor: "cursor-2"),
+      page(ids: ["task-3"], totalMatched: 3, changeSeq: 42, nextCursor: nil),
     ])
 
     let merged = try await source.mergedTaskBoardItemPages(status: nil)
@@ -46,8 +46,8 @@ struct TaskBoardItemPageWalkTests {
   @Test("stops on a page that returns no items even when a cursor comes back")
   func stopsOnAnEmptyPage() async throws {
     let source = StubTaskBoardPageSource(pages: [
-      page(ids: ["task-1"], changeSeq: 7, nextCursor: "cursor-2"),
-      page(ids: [], changeSeq: 7, nextCursor: "cursor-3"),
+      page(ids: ["task-1"], totalMatched: 1, changeSeq: 7, nextCursor: "cursor-2"),
+      page(ids: [], totalMatched: 1, changeSeq: 7, nextCursor: "cursor-3"),
     ])
 
     let merged = try await source.mergedTaskBoardItemPages(status: nil)
@@ -58,8 +58,11 @@ struct TaskBoardItemPageWalkTests {
   }
 }
 
+/// `totalMatched` counts the whole matched selection, not the page, so every
+/// page of one scenario reports the same total.
 private func page(
   ids: [String],
+  totalMatched: UInt,
   changeSeq: Int64,
   nextCursor: String?
 ) -> TaskBoardListItemsResponseWire {
@@ -67,7 +70,7 @@ private func page(
     items: ids.map(item(id:)),
     itemsChangeSeq: changeSeq,
     itemRevisions: Dictionary(uniqueKeysWithValues: ids.map { ($0, Int64(1)) }),
-    totalMatched: UInt(ids.count),
+    totalMatched: totalMatched,
     nextCursor: nextCursor
   )
 }
