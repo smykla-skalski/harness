@@ -76,15 +76,11 @@ impl AsyncDaemonDb {
                 "source upload authority belongs to an abandoned generation",
             ));
         }
-        let assignment =
-            require_assignment(&mut transaction, &request.offer.binding.assignment_id).await?;
-        require_upload_assignment(&assignment, request, authenticated_principal)?;
-        claim_controller_operation_trust_in_tx(
+        claim_upload_operation_trust_in_tx(
             &mut transaction,
-            &assignment,
-            TaskBoardRemoteOperationKind::UploadSourceBundle,
-            &request.request_sha256,
-            Some(trust),
+            request,
+            authenticated_principal,
+            trust,
         )
         .await?;
         transaction
@@ -110,11 +106,7 @@ impl AsyncDaemonDb {
         let collisions =
             load_source_bundle_collisions_in_tx(&mut transaction, &request.offer).await?;
         if let Some(existing) = exact_receipt(&collisions, request, authenticated_principal)? {
-            if existing.response != *response {
-                return Err(concurrent(
-                    "source upload response changed after immutable receipt storage",
-                ));
-            }
+            require_unchanged_upload_response(&existing, response)?;
             transaction.commit().await.map_err(|error| {
                 db_error(format!("commit replayed source upload response: {error}"))
             })?;
@@ -130,31 +122,76 @@ impl AsyncDaemonDb {
                 "source upload response belongs to an abandoned generation",
             ));
         }
-        let assignment =
-            require_assignment(&mut transaction, &request.offer.binding.assignment_id).await?;
-        require_upload_assignment(&assignment, request, authenticated_principal)?;
-        consume_controller_operation_trust_in_tx(
+        let stored = store_source_bundle_receipt_in_tx(
             &mut transaction,
-            &assignment,
-            TaskBoardRemoteOperationKind::UploadSourceBundle,
-            &request.request_sha256,
+            request,
+            response,
+            authenticated_principal,
         )
         .await?;
-        insert_source_bundle_in_tx(&mut transaction, request, authenticated_principal, response)
-            .await?;
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-        let stored = load_source_bundle_in_tx(
-            &mut transaction,
-            &request.offer.binding.assignment_id,
-            request.offer.binding.fencing_epoch,
-        )
-        .await?
-        .ok_or_else(|| db_error("persisted controller source upload receipt disappeared"))?;
         transaction
             .commit()
             .await
             .map_err(|error| db_error(format!("commit source upload response: {error}")))?;
         Ok(stored)
+    }
+}
+
+async fn claim_upload_operation_trust_in_tx(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    request: &RemoteSourceBundleUploadRequest,
+    principal: &str,
+    trust: &TaskBoardRemoteOperationTrustFence,
+) -> Result<(), CliError> {
+    let assignment = require_assignment(transaction, &request.offer.binding.assignment_id).await?;
+    require_upload_assignment(&assignment, request, principal)?;
+    claim_controller_operation_trust_in_tx(
+        transaction,
+        &assignment,
+        TaskBoardRemoteOperationKind::UploadSourceBundle,
+        &request.request_sha256,
+        Some(trust),
+    )
+    .await?;
+    Ok(())
+}
+
+async fn store_source_bundle_receipt_in_tx(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    request: &RemoteSourceBundleUploadRequest,
+    response: &RemoteSourceBundleUploadResponse,
+    principal: &str,
+) -> Result<TaskBoardRemoteSourceBundle, CliError> {
+    let assignment = require_assignment(transaction, &request.offer.binding.assignment_id).await?;
+    require_upload_assignment(&assignment, request, principal)?;
+    consume_controller_operation_trust_in_tx(
+        transaction,
+        &assignment,
+        TaskBoardRemoteOperationKind::UploadSourceBundle,
+        &request.request_sha256,
+    )
+    .await?;
+    insert_source_bundle_in_tx(transaction, request, principal, response).await?;
+    bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    load_source_bundle_in_tx(
+        transaction,
+        &request.offer.binding.assignment_id,
+        request.offer.binding.fencing_epoch,
+    )
+    .await?
+    .ok_or_else(|| db_error("persisted controller source upload receipt disappeared"))
+}
+
+fn require_unchanged_upload_response(
+    existing: &TaskBoardRemoteSourceBundle,
+    response: &RemoteSourceBundleUploadResponse,
+) -> Result<(), CliError> {
+    if existing.response == *response {
+        Ok(())
+    } else {
+        Err(concurrent(
+            "source upload response changed after immutable receipt storage",
+        ))
     }
 }
 

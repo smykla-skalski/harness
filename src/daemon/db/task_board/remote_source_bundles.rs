@@ -69,87 +69,24 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board remote source bundle upload")
             .await?;
-        if !super::remote_source_bundle_abandonment::load_abandonment_collisions_in_tx(
-            &mut transaction,
-            &request.offer,
-            &request.request_sha256,
-        )
-        .await?
-        .is_empty()
-        {
-            return Err(concurrent(
-                "remote source bundle generation was durably abandoned",
-            ));
-        }
-        let collisions =
-            load_source_bundle_collisions_in_tx(&mut transaction, &request.offer).await?;
-        if let [existing] = collisions.as_slice()
-            && existing.is_exact_replay(request, authenticated_principal)
+        if let Some(existing) =
+            exact_source_bundle_replay_in_tx(&mut transaction, request, authenticated_principal)
+                .await?
         {
             transaction.commit().await.map_err(|error| {
                 db_error(format!("commit replayed remote source bundle: {error}"))
             })?;
-            return Ok(existing.clone());
+            return Ok(existing);
         }
-        if !collisions.is_empty() {
-            return Err(concurrent(
-                "remote source bundle conflicts with immutable generation evidence",
-            ));
-        }
-        // A source upload introduces immutable bytes before any assignment row
-        // exists, so it must fence its offer identity against archived legacy
-        // assignments too - past the exact source replay, before host and insert.
-        require_no_archival_collision_in_tx(
-            &mut transaction,
-            &request.offer.binding.assignment_id,
-            &request.offer.binding.idempotency_key,
-            Some(&request.offer.request_sha256),
-            &request.offer.binding.execution_id,
-            request.offer.binding.fencing_epoch,
-        )
-        .await?;
-        // A pre-offer upload may not alias any live remote assignment or offer
-        // receipt on assignment id, idempotency key, request digest, exact
-        // attempt, or (execution_id, fencing_epoch) generation. Any live collision
-        // is a hard conflict here - no replay resolution - so the bytes can never
-        // be stranded by a later offer rejection that carries no reclaimable
-        // receipt. SELECT_COLLISION now covers execution+epoch so an Offered
-        // controller row with no receipt yet is caught on the assignment side.
-        if !load_offer_collision_in_tx(&mut transaction, &request.offer)
-            .await?
-            .is_empty()
-            || !load_offer_receipt_collisions_in_tx(&mut transaction, &request.offer)
-                .await?
-                .is_empty()
-        {
-            return Err(concurrent(
-                "remote source bundle offer identity conflicts with a live assignment or receipt",
-            ));
-        }
-        if request.offer.binding.host_instance_id != host_instance_id {
-            return Err(concurrent(
-                "remote source bundle targets a different executor process",
-            ));
-        }
-        require_no_offer_in_tx(&mut transaction, &request.offer).await?;
-        require_eligible_local_host_in_tx(&mut transaction, request, host_instance_id).await?;
-        let response = RemoteSourceBundleUploadResponse::seal(request, stored_at.to_owned())
-            .map_err(|error| db_error(format!("seal remote source bundle receipt: {error}")))?;
-        insert_source_bundle_in_tx(
+        require_fresh_upload_identity_in_tx(&mut transaction, request, host_instance_id).await?;
+        let stored = seal_and_store_source_bundle_in_tx(
             &mut transaction,
             request,
             authenticated_principal,
-            &response,
+            host_instance_id,
+            stored_at,
         )
         .await?;
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-        let stored = load_source_bundle_in_tx(
-            &mut transaction,
-            &request.offer.binding.assignment_id,
-            request.offer.binding.fencing_epoch,
-        )
-        .await?
-        .ok_or_else(|| db_error("persisted remote source bundle disappeared"))?;
         transaction
             .commit()
             .await
@@ -188,6 +125,104 @@ impl AsyncDaemonDb {
             .await
             .map_err(|error| db_error(format!("commit remote source bundle load: {error}")))?;
         Ok(stored)
+    }
+}
+
+async fn seal_and_store_source_bundle_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    request: &RemoteSourceBundleUploadRequest,
+    authenticated_principal: &str,
+    host_instance_id: &str,
+    stored_at: &str,
+) -> Result<TaskBoardRemoteSourceBundle, CliError> {
+    require_no_offer_in_tx(transaction, &request.offer).await?;
+    require_eligible_local_host_in_tx(transaction, request, host_instance_id).await?;
+    let response = RemoteSourceBundleUploadResponse::seal(request, stored_at.to_owned())
+        .map_err(|error| db_error(format!("seal remote source bundle receipt: {error}")))?;
+    insert_source_bundle_in_tx(transaction, request, authenticated_principal, &response).await?;
+    bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    load_source_bundle_in_tx(
+        transaction,
+        &request.offer.binding.assignment_id,
+        request.offer.binding.fencing_epoch,
+    )
+    .await?
+    .ok_or_else(|| db_error("persisted remote source bundle disappeared"))
+}
+
+async fn exact_source_bundle_replay_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    request: &RemoteSourceBundleUploadRequest,
+    authenticated_principal: &str,
+) -> Result<Option<TaskBoardRemoteSourceBundle>, CliError> {
+    if !super::remote_source_bundle_abandonment::load_abandonment_collisions_in_tx(
+        transaction,
+        &request.offer,
+        &request.request_sha256,
+    )
+    .await?
+    .is_empty()
+    {
+        return Err(concurrent(
+            "remote source bundle generation was durably abandoned",
+        ));
+    }
+    let collisions = load_source_bundle_collisions_in_tx(transaction, &request.offer).await?;
+    if let [existing] = collisions.as_slice()
+        && existing.is_exact_replay(request, authenticated_principal)
+    {
+        return Ok(Some(existing.clone()));
+    }
+    if collisions.is_empty() {
+        Ok(None)
+    } else {
+        Err(concurrent(
+            "remote source bundle conflicts with immutable generation evidence",
+        ))
+    }
+}
+
+async fn require_fresh_upload_identity_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    request: &RemoteSourceBundleUploadRequest,
+    host_instance_id: &str,
+) -> Result<(), CliError> {
+    // A source upload introduces immutable bytes before any assignment row
+    // exists, so it must fence its offer identity against archived legacy
+    // assignments too - past the exact source replay, before host and insert.
+    require_no_archival_collision_in_tx(
+        transaction,
+        &request.offer.binding.assignment_id,
+        &request.offer.binding.idempotency_key,
+        Some(&request.offer.request_sha256),
+        &request.offer.binding.execution_id,
+        request.offer.binding.fencing_epoch,
+    )
+    .await?;
+    // A pre-offer upload may not alias any live remote assignment or offer
+    // receipt on assignment id, idempotency key, request digest, exact
+    // attempt, or (execution_id, fencing_epoch) generation. Any live collision
+    // is a hard conflict here - no replay resolution - so the bytes can never
+    // be stranded by a later offer rejection that carries no reclaimable
+    // receipt. SELECT_COLLISION now covers execution+epoch so an Offered
+    // controller row with no receipt yet is caught on the assignment side.
+    if !load_offer_collision_in_tx(transaction, &request.offer)
+        .await?
+        .is_empty()
+        || !load_offer_receipt_collisions_in_tx(transaction, &request.offer)
+            .await?
+            .is_empty()
+    {
+        return Err(concurrent(
+            "remote source bundle offer identity conflicts with a live assignment or receipt",
+        ));
+    }
+    if request.offer.binding.host_instance_id == host_instance_id {
+        Ok(())
+    } else {
+        Err(concurrent(
+            "remote source bundle targets a different executor process",
+        ))
     }
 }
 

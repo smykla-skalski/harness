@@ -19,7 +19,7 @@ use crate::daemon::db::{AsyncDaemonDb, CliError, TaskBoardRemoteOfferOutcome, db
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteOfferRequest, RemoteOfferResponse, RemoteSourceBundleAbandonRequest,
     RemoteSourceBundleAbandonResponse, RemoteSourceBundleReceiptVerificationResponse,
-    RemoteSourceBundleUploadRequest,
+    RemoteSourceBundleUploadRequest, RemoteSourceBundleUploadResponse,
 };
 impl AsyncDaemonDb {
     pub(crate) async fn adopt_verified_task_board_remote_source_bundle_receipt(
@@ -41,56 +41,43 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board verified source upload receipt")
             .await?;
-        require_source_recovery_operation_fence_in_tx(&mut transaction, trust).await?;
-        let collisions =
-            load_source_bundle_collisions_in_tx(&mut transaction, &request.offer).await?;
-        if let Some(existing) = exact_source_receipt(&collisions, request, authenticated_principal)?
+        if let Some(existing) = settled_replayed_source_receipt_in_tx(
+            &mut transaction,
+            request,
+            verification,
+            authenticated_principal,
+            trust,
+        )
+        .await?
         {
-            if verification.receipt.as_ref() != Some(&existing.response) {
-                return Err(concurrent(
-                    "verified source receipt changed from controller evidence",
-                ));
-            }
-            let operation_settled = settle_upload_operation_if_present(
-                &mut transaction,
-                request,
-                authenticated_principal,
-                trust,
-            )
-            .await?;
-            if operation_settled {
-                bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-            }
             transaction.commit().await.map_err(|error| {
                 db_error(format!("commit replayed verified source receipt: {error}"))
             })?;
             return Ok(Some(existing));
         }
-        let assignment =
-            require_assignment(&mut transaction, &request.offer.binding.assignment_id).await?;
-        super::remote_source_bundle_controller::require_upload_assignment(
-            &assignment,
+        let assignment = require_adoptable_upload_assignment_in_tx(
+            &mut transaction,
             request,
             authenticated_principal,
-        )?;
-        require_upload_operation(&assignment, request)?;
+        )
+        .await?;
         let Some(response) = verification.receipt.as_ref() else {
             transaction.commit().await.map_err(|error| {
                 db_error(format!("commit verified source receipt absence: {error}"))
             })?;
             return Ok(None);
         };
-        consume_upload_operation(&mut transaction, &assignment, request, trust).await?;
-        insert_source_bundle_in_tx(&mut transaction, request, authenticated_principal, response)
-            .await?;
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-        let stored = load_source_bundle_in_tx(
+        let stored = store_adopted_source_receipt_in_tx(
             &mut transaction,
-            &request.offer.binding.assignment_id,
-            request.offer.binding.fencing_epoch,
+            AdoptedSourceReceipt {
+                assignment: &assignment,
+                request,
+                response,
+                authenticated_principal,
+                trust,
+            },
         )
-        .await?
-        .ok_or_else(|| db_error("adopted verified source receipt disappeared"))?;
+        .await?;
         transaction.commit().await.map_err(|error| {
             db_error(format!("commit verified source receipt adoption: {error}"))
         })?;
@@ -111,29 +98,15 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board source abandonment response")
             .await?;
-        require_source_recovery_operation_fence_in_tx(&mut transaction, trust).await?;
-        let collisions = load_abandonment_collisions_in_tx(
+        if let Some(existing) = settled_replayed_abandonment_in_tx(
             &mut transaction,
-            &request.offer,
-            &request.upload_request_sha256,
+            request,
+            response,
+            authenticated_principal,
+            trust,
         )
-        .await?;
-        if let Some(existing) = exact_abandonment(&collisions, request, authenticated_principal)? {
-            if existing.response != *response {
-                return Err(concurrent(
-                    "source abandonment response changed after immutable storage",
-                ));
-            }
-            let operation_settled = settle_abandonment_operation_if_present(
-                &mut transaction,
-                request,
-                authenticated_principal,
-                trust,
-            )
-            .await?;
-            if operation_settled {
-                bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-            }
+        .await?
+        {
             transaction.commit().await.map_err(|error| {
                 db_error(format!(
                     "commit replayed source abandonment response: {error}"
@@ -149,25 +122,14 @@ impl AsyncDaemonDb {
                 "source abandonment conflicts with an immutable upload receipt",
             ));
         }
-        let assignment =
-            require_assignment(&mut transaction, &request.offer.binding.assignment_id).await?;
-        super::remote_source_bundle_controller::require_upload_assignment_without_content(
-            &assignment,
-            &request.offer,
-            authenticated_principal,
-        )?;
-        require_upload_operation_for_abandonment(&assignment, request)?;
-        consume_abandonment_operation(&mut transaction, &assignment, request, trust).await?;
-        insert_abandonment_in_tx(&mut transaction, request, authenticated_principal, response)
-            .await?;
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-        let stored = load_abandonment_in_tx(
+        let stored = store_source_abandonment_in_tx(
             &mut transaction,
-            &request.offer.binding.assignment_id,
-            request.offer.binding.fencing_epoch,
+            request,
+            response,
+            authenticated_principal,
+            trust,
         )
-        .await?
-        .ok_or_else(|| db_error("persisted controller source abandonment disappeared"))?;
+        .await?;
         transaction
             .commit()
             .await
@@ -193,6 +155,162 @@ impl AsyncDaemonDb {
         ))
         .await
     }
+}
+
+async fn settled_replayed_source_receipt_in_tx(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    request: &RemoteSourceBundleUploadRequest,
+    verification: &RemoteSourceBundleReceiptVerificationResponse,
+    principal: &str,
+    trust: &TaskBoardRemoteOperationTrustFence,
+) -> Result<Option<TaskBoardRemoteSourceBundle>, CliError> {
+    require_source_recovery_operation_fence_in_tx(transaction, trust).await?;
+    let collisions = load_source_bundle_collisions_in_tx(transaction, &request.offer).await?;
+    let Some(existing) = exact_source_receipt(&collisions, request, principal)? else {
+        return Ok(None);
+    };
+    settle_replayed_source_receipt_in_tx(
+        transaction,
+        request,
+        verification,
+        principal,
+        trust,
+        &existing,
+    )
+    .await?;
+    Ok(Some(existing))
+}
+
+async fn require_adoptable_upload_assignment_in_tx(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    request: &RemoteSourceBundleUploadRequest,
+    principal: &str,
+) -> Result<super::TaskBoardRemoteAssignmentRecord, CliError> {
+    let assignment = require_assignment(transaction, &request.offer.binding.assignment_id).await?;
+    super::remote_source_bundle_controller::require_upload_assignment(
+        &assignment,
+        request,
+        principal,
+    )?;
+    require_upload_operation(&assignment, request)?;
+    Ok(assignment)
+}
+
+async fn settled_replayed_abandonment_in_tx(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    request: &RemoteSourceBundleAbandonRequest,
+    response: &RemoteSourceBundleAbandonResponse,
+    principal: &str,
+    trust: &TaskBoardRemoteOperationTrustFence,
+) -> Result<Option<TaskBoardRemoteSourceBundleAbandonment>, CliError> {
+    require_source_recovery_operation_fence_in_tx(transaction, trust).await?;
+    let collisions = load_abandonment_collisions_in_tx(
+        transaction,
+        &request.offer,
+        &request.upload_request_sha256,
+    )
+    .await?;
+    let Some(existing) = exact_abandonment(&collisions, request, principal)? else {
+        return Ok(None);
+    };
+    settle_replayed_abandonment_in_tx(transaction, request, response, principal, trust, &existing)
+        .await?;
+    Ok(Some(existing))
+}
+
+async fn settle_replayed_source_receipt_in_tx(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    request: &RemoteSourceBundleUploadRequest,
+    verification: &RemoteSourceBundleReceiptVerificationResponse,
+    principal: &str,
+    trust: &TaskBoardRemoteOperationTrustFence,
+    existing: &TaskBoardRemoteSourceBundle,
+) -> Result<(), CliError> {
+    if verification.receipt.as_ref() != Some(&existing.response) {
+        return Err(concurrent(
+            "verified source receipt changed from controller evidence",
+        ));
+    }
+    if settle_upload_operation_if_present(transaction, request, principal, trust).await? {
+        bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    }
+    Ok(())
+}
+
+struct AdoptedSourceReceipt<'a> {
+    assignment: &'a super::TaskBoardRemoteAssignmentRecord,
+    request: &'a RemoteSourceBundleUploadRequest,
+    response: &'a RemoteSourceBundleUploadResponse,
+    authenticated_principal: &'a str,
+    trust: &'a TaskBoardRemoteOperationTrustFence,
+}
+
+async fn store_adopted_source_receipt_in_tx(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    adopted: AdoptedSourceReceipt<'_>,
+) -> Result<TaskBoardRemoteSourceBundle, CliError> {
+    let AdoptedSourceReceipt {
+        assignment,
+        request,
+        response,
+        authenticated_principal,
+        trust,
+    } = adopted;
+    consume_upload_operation(transaction, assignment, request, trust).await?;
+    insert_source_bundle_in_tx(transaction, request, authenticated_principal, response).await?;
+    bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    load_source_bundle_in_tx(
+        transaction,
+        &request.offer.binding.assignment_id,
+        request.offer.binding.fencing_epoch,
+    )
+    .await?
+    .ok_or_else(|| db_error("adopted verified source receipt disappeared"))
+}
+
+async fn settle_replayed_abandonment_in_tx(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    request: &RemoteSourceBundleAbandonRequest,
+    response: &RemoteSourceBundleAbandonResponse,
+    principal: &str,
+    trust: &TaskBoardRemoteOperationTrustFence,
+    existing: &TaskBoardRemoteSourceBundleAbandonment,
+) -> Result<(), CliError> {
+    if existing.response != *response {
+        return Err(concurrent(
+            "source abandonment response changed after immutable storage",
+        ));
+    }
+    if settle_abandonment_operation_if_present(transaction, request, principal, trust).await? {
+        bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    }
+    Ok(())
+}
+
+async fn store_source_abandonment_in_tx(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    request: &RemoteSourceBundleAbandonRequest,
+    response: &RemoteSourceBundleAbandonResponse,
+    principal: &str,
+    trust: &TaskBoardRemoteOperationTrustFence,
+) -> Result<TaskBoardRemoteSourceBundleAbandonment, CliError> {
+    let assignment = require_assignment(transaction, &request.offer.binding.assignment_id).await?;
+    super::remote_source_bundle_controller::require_upload_assignment_without_content(
+        &assignment,
+        &request.offer,
+        principal,
+    )?;
+    require_upload_operation_for_abandonment(&assignment, request)?;
+    consume_abandonment_operation(transaction, &assignment, request, trust).await?;
+    insert_abandonment_in_tx(transaction, request, principal, response).await?;
+    bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    load_abandonment_in_tx(
+        transaction,
+        &request.offer.binding.assignment_id,
+        request.offer.binding.fencing_epoch,
+    )
+    .await?
+    .ok_or_else(|| db_error("persisted controller source abandonment disappeared"))
 }
 
 fn exact_source_receipt(

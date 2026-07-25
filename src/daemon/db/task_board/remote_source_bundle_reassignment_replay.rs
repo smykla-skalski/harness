@@ -22,30 +22,42 @@ pub(super) async fn replayed_replacement_in_tx(
     match existing {
         None => Ok(None),
         Some(existing) if exact_offer_replay(&existing, replacement, principal) => {
-            let predecessor =
-                load_assignment_in_tx(transaction, &evidence.offer().binding.assignment_id)
-                    .await?
-                    .ok_or_else(|| concurrent("replayed source predecessor disappeared"))?;
-            require_reassignment_evidence_in_tx(
+            require_replayed_replacement_evidence_in_tx(
                 transaction,
-                &predecessor,
                 evidence,
+                replacement,
+                &existing,
                 principal,
                 trust,
             )
             .await?;
-            let source_content =
-                exact_outbound_source_content_in_tx(transaction, replacement).await?;
-            require_reassignment_handoff_in_tx(transaction, &predecessor, &existing).await?;
-            if source_content.is_empty() {
-                return Err(concurrent("replayed source bundle is empty"));
-            }
             Ok(Some(existing))
         }
         Some(_) => Err(concurrent(
             "replacement source assignment identity conflicts",
         )),
     }
+}
+
+async fn require_replayed_replacement_evidence_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    evidence: SourceReassignmentEvidence<'_>,
+    replacement: &RemoteOfferRequest,
+    existing: &TaskBoardRemoteAssignmentRecord,
+    principal: &str,
+    trust: &TaskBoardRemoteOperationTrustFence,
+) -> Result<(), CliError> {
+    let predecessor = load_assignment_in_tx(transaction, &evidence.offer().binding.assignment_id)
+        .await?
+        .ok_or_else(|| concurrent("replayed source predecessor disappeared"))?;
+    require_reassignment_evidence_in_tx(transaction, &predecessor, evidence, principal, trust)
+        .await?;
+    let source_content = exact_outbound_source_content_in_tx(transaction, replacement).await?;
+    require_reassignment_handoff_in_tx(transaction, &predecessor, existing).await?;
+    if source_content.is_empty() {
+        return Err(concurrent("replayed source bundle is empty"));
+    }
+    Ok(())
 }
 
 async fn require_reassignment_handoff_in_tx(
