@@ -7,6 +7,8 @@
 
 use std::fs::File;
 use std::path::Path;
+#[cfg(target_os = "macos")]
+use std::process::Command;
 use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
@@ -250,7 +252,7 @@ fn platform_machine_id() -> Option<String> {
     // macOS keeps no machine-id file; IOPlatformUUID is its equivalent. A
     // sandboxed daemon cannot spawn ioreg, and then this host simply has no
     // fingerprint and keeps whatever identity its directory carries.
-    let output = std::process::Command::new("ioreg")
+    let output = Command::new("ioreg")
         .args(["-rd1", "-c", "IOPlatformExpertDevice"])
         .output()
         .ok()?;
@@ -268,7 +270,7 @@ fn platform_machine_id() -> Option<String> {
 fn host_display_name() -> Option<String> {
     // ComputerName is what the person named the Mac; the hostname is a
     // network-derived approximation of it.
-    let output = std::process::Command::new("scutil")
+    let output = Command::new("scutil")
         .args(["--get", "ComputerName"])
         .output()
         .ok()?;

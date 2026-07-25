@@ -38,6 +38,7 @@ CARGO_LOCK="$ROOT/Cargo.lock"
 MONITOR_APP_ROOT="$ROOT/apps/harness-monitor"
 MONITOR_BUILD_SETTINGS="$ROOT/apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift"
 MONITOR_DAEMON_INFO_PLIST="$ROOT/apps/harness-monitor/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist"
+OPENAPI_DOCUMENT="$ROOT/docs/api/openapi.json"
 MONITOR_GENERATED_PBXPROJ="$MONITOR_APP_ROOT/HarnessMonitor.xcodeproj/project.pbxproj"
 MONITOR_TUIST_PATCHER="$MONITOR_APP_ROOT/Scripts/patch-tuist-pbxproj.py"
 MONITOR_DEFAULT_LAST_UPGRADE_CHECK="$(harness_monitor_default_xcode_upgrade_check)"
@@ -159,6 +160,72 @@ build_settings_current_version() {
 
 daemon_plist_version() {
   /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$MONITOR_DAEMON_INFO_PLIST"
+}
+
+# Only the `info` block's version, never a `version` property inside a schema.
+# Parsed rather than matched: the document carries several `version` keys, and
+# a pattern that walks past `info` would report one of those instead. An
+# unreadable field says so rather than blaming the version it could not find.
+openapi_document_version() {
+  python3 - "$OPENAPI_DOCUMENT" <<'PY'
+import json
+import sys
+
+try:
+    version = json.load(open(sys.argv[1], encoding="utf-8"))["info"]["version"]
+except (OSError, ValueError, KeyError, TypeError):
+    version = None
+print(version if isinstance(version, str) and version else "<unreadable info.version>", end="")
+PY
+}
+
+# The document is generated, so this exists to keep it in step with a version
+# bump rather than to edit it. A bump changes nothing else in the output, so
+# stamping the field matches what `openapi:generate` would produce; any other
+# drift is still the generator's business and `openapi:check` still catches it.
+set_openapi_document_version() {
+  local version="$1"
+  NEW_VERSION="$version" python3 - "$OPENAPI_DOCUMENT" <<'PY'
+import json
+import os
+import re
+import sys
+
+path = sys.argv[1]
+with open(path, encoding="utf-8") as handle:
+    raw = handle.read()
+json.loads(raw)["info"]["version"]
+
+# Bound the edit to the `info` object. Several schema properties are also
+# called `version`, and an unbounded search would stamp one of those the
+# moment `info` stopped carrying the field.
+start = raw.index('"info"')
+depth = 0
+end = None
+for index in range(start, len(raw)):
+    if raw[index] == "{":
+        depth += 1
+    elif raw[index] == "}":
+        depth -= 1
+        if depth == 0:
+            end = index
+            break
+if end is None:
+    raise SystemExit(f"failed to bound the info object in {path}")
+
+# Rewritten in place rather than re-dumped, so the generator's formatting
+# survives and `openapi:check` does not read the bump as drift.
+block, count = re.subn(
+    r'("version"\s*:\s*")[^"]*(")',
+    lambda match: match.group(1) + os.environ["NEW_VERSION"] + match.group(2),
+    raw[start:end],
+    count=1,
+)
+if count != 1:
+    raise SystemExit(f"failed to update the info version in {path}")
+with open(path, "w", encoding="utf-8") as handle:
+    handle.write(raw[:start] + block + raw[end:])
+PY
 }
 
 daemon_plist_build_version() {
@@ -294,6 +361,7 @@ check_sync() {
   local version testkit_version aff_version
   local lock_harness_version lock_testkit_version lock_aff_version
   local marketing_version current_version daemon_version daemon_build_version
+  local openapi_version
   local generated_marketing_version generated_current_version
   local -a generated_marketing_versions=()
   local -a generated_current_versions=()
@@ -307,6 +375,7 @@ check_sync() {
   lock_harness_version="$(lock_package_version "$CARGO_LOCK" "harness")"
   lock_testkit_version="$(lock_package_version "$CARGO_LOCK" "harness-testkit")"
   lock_aff_version="$(lock_package_version "$CARGO_LOCK" "aff")"
+  openapi_version="$(openapi_document_version)"
   marketing_version="$(build_settings_marketing_version)"
   current_version="$(build_settings_current_version)"
   if [ "$(uname -s)" = "Darwin" ]; then
@@ -321,6 +390,7 @@ check_sync() {
   [ "$lock_harness_version" = "$version" ] || errors+=("Cargo.lock harness version $lock_harness_version != Cargo.toml version $version")
   [ "$lock_testkit_version" = "$version" ] || errors+=("Cargo.lock harness-testkit version $lock_testkit_version != Cargo.toml version $version")
   [ "$lock_aff_version" = "$version" ] || errors+=("Cargo.lock aff version $lock_aff_version != Cargo.toml version $version")
+  [ "$openapi_version" = "$version" ] || errors+=("docs/api/openapi.json version $openapi_version != Cargo.toml version $version")
   for index in "${!CORE_PACKAGE_MANIFESTS[@]}"; do
     package_name="${CORE_PACKAGE_NAMES[$index]}"
     package_version="$(manifest_package_version "${CORE_PACKAGE_MANIFESTS[$index]}" "$package_name")"
@@ -402,6 +472,7 @@ sync_all() {
   set_lock_package_version "harness-testkit" "$version"
   set_lock_package_version "aff" "$version"
   sync_monitor "$version"
+  set_openapi_document_version "$version"
 }
 
 command="${1:-}"
