@@ -1,3 +1,11 @@
 [build]
 rustc-wrapper = "scripts/rustc-cache-wrapper.sh"
 rustflags = ["--cfg", "tokio_unstable"]
+
+# Cargo does not merge these two tables. Once any `[target.*]` rustflags entry
+# matches, `[build] rustflags` is dropped rather than appended to, so every flag
+# the Linux build needs is repeated here. macOS matches nothing and keeps
+# reading `[build]`, which the Monitor daemon build phase depends on as its only
+# source of rustflags.
+[target.'cfg(target_os = "linux")']
+rustflags = ["--cfg", "tokio_unstable", "-C", "link-arg=-fuse-ld=mold"]
