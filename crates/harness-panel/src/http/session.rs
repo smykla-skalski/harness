@@ -36,11 +36,39 @@ pub async fn current_viewer(
         return Ok(None);
     };
 
-    let is_owner = state.config.is_owner(&session.account.login);
+    let is_owner = resolve_ownership(state, &session.account).await?;
     Ok(Some(Viewer {
         account: session.account,
         is_owner,
     }))
+}
+
+/// Decide whether `account` owns this panel, claiming it on first use.
+///
+/// `--owner-login` only chooses who the panel is claimed for. Once claimed, the
+/// answer is the immutable `(provider, subject_id)` pair, so renaming the login
+/// and letting someone else register the freed name does not hand them the
+/// panel. The re-read after the claim is what settles a race: `bind_owner`
+/// ignores a second insert, so the loser of the race must ask again rather than
+/// assume its own write won.
+///
+/// # Errors
+/// Returns [`ApiError::Internal`] when the owner binding cannot be read or
+/// written.
+async fn resolve_ownership(state: &PanelState, account: &Account) -> Result<bool, ApiError> {
+    if let Some(binding) = state.store.owner_binding().await? {
+        return Ok(binding.matches(account));
+    }
+    if !state.config.matches_owner_login(&account.login) {
+        return Ok(false);
+    }
+
+    state.store.bind_owner(account, Utc::now()).await?;
+    Ok(state
+        .store
+        .owner_binding()
+        .await?
+        .is_some_and(|binding| binding.matches(account)))
 }
 
 /// Like [`current_viewer`], but treats being signed out as a failure.
@@ -58,9 +86,33 @@ pub fn session_token(headers: &HeaderMap) -> Option<String> {
     cookie_value(headers, SESSION_COOKIE)
 }
 
+/// Every sign-in this browser has started and not yet finished.
+///
+/// One cookie holds them all, newest first, because a person with the panel
+/// open in two tabs starts two sign-ins and both have to be able to finish.
+/// A single-valued cookie meant the second tab overwrote the first, and the
+/// first tab was then refused with a message nobody could act on.
 #[must_use]
-pub fn sign_in_state(headers: &HeaderMap) -> Option<String> {
+pub fn sign_in_states(headers: &HeaderMap) -> Vec<String> {
     cookie_value(headers, SIGN_IN_COOKIE)
+        .map(|value| pending_states(&value))
+        .unwrap_or_default()
+}
+
+/// The state values are URL-safe base64, whose alphabet excludes `.`, so the
+/// separator can never appear inside one.
+const PENDING_SEPARATOR: char = '.';
+
+/// Enough for the tabs a person actually keeps open, and small enough that the
+/// cookie cannot be grown without bound by repeatedly hitting the start route.
+pub const MAX_PENDING_SIGN_INS: usize = 4;
+
+fn pending_states(value: &str) -> Vec<String> {
+    value
+        .split(PENDING_SEPARATOR)
+        .filter(|candidate| !candidate.is_empty())
+        .map(str::to_owned)
+        .collect()
 }
 
 fn cookie_value(headers: &HeaderMap, name: &str) -> Option<String> {
@@ -109,15 +161,52 @@ pub fn without_cookie(jar: CookieJar, state: &PanelState, name: &'static str) ->
     ))
 }
 
-pub fn with_sign_in_cookie(
+/// Record one more sign-in this browser has started.
+///
+/// Newest first, and capped, so a browser that keeps opening the start route
+/// drops its oldest pending sign-in rather than growing the cookie forever.
+pub fn with_pending_sign_in(
     jar: CookieJar,
     state: &PanelState,
+    headers: &HeaderMap,
     value: String,
+    ttl_seconds: i64,
+) -> CookieJar {
+    let mut pending = sign_in_states(headers);
+    pending.retain(|candidate| candidate != &value);
+    pending.insert(0, value);
+    pending.truncate(MAX_PENDING_SIGN_INS);
+    set_pending(jar, state, &pending, ttl_seconds)
+}
+
+/// Spend one pending sign-in, leaving any other tab's alone.
+///
+/// Clearing the whole cookie here would refuse the other tab when it came back,
+/// which is the failure this list exists to prevent.
+pub fn without_pending_sign_in(
+    jar: CookieJar,
+    state: &PanelState,
+    headers: &HeaderMap,
+    value: &str,
+    ttl_seconds: i64,
+) -> CookieJar {
+    let mut pending = sign_in_states(headers);
+    pending.retain(|candidate| candidate != value);
+    if pending.is_empty() {
+        return without_cookie(jar, state, SIGN_IN_COOKIE);
+    }
+    set_pending(jar, state, &pending, ttl_seconds)
+}
+
+fn set_pending(
+    jar: CookieJar,
+    state: &PanelState,
+    pending: &[String],
     ttl_seconds: i64,
 ) -> CookieJar {
     jar.add(panel_cookie(
         SIGN_IN_COOKIE,
-        value,
+        pending.join(&PENDING_SEPARATOR.to_string()),
         state,
         time::Duration::seconds(ttl_seconds),
     ))

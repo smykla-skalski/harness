@@ -9,8 +9,8 @@ use serde::Deserialize;
 
 use super::PanelState;
 use super::session::{
-    SIGN_IN_COOKIE, session_token, sign_in_state, with_session_cookie, with_sign_in_cookie,
-    without_cookie,
+    session_token, sign_in_states, with_pending_sign_in, with_session_cookie, without_cookie,
+    without_pending_sign_in,
 };
 use crate::config::OAUTH_STATE_TTL_MINUTES;
 use crate::error::ApiError;
@@ -36,17 +36,25 @@ pub struct CallbackQuery {
 /// obtain a valid `state` from the panel and hand a victim's browser a finished
 /// callback URL, signing them into the attacker's account.
 ///
+/// The cookie holds every sign-in still in flight rather than only the latest,
+/// so a second tab starting one does not strand the first.
+///
 /// # Errors
 /// Returns [`ApiError::Internal`] when the sign-in cannot be recorded.
-pub async fn start(State(state): State<PanelState>, jar: CookieJar) -> Result<Response, ApiError> {
+pub async fn start(
+    State(state): State<PanelState>,
+    jar: CookieJar,
+    headers: HeaderMap,
+) -> Result<Response, ApiError> {
     let issued = state
         .store
         .create_oauth_state(Duration::minutes(OAUTH_STATE_TTL_MINUTES), Utc::now())
         .await?;
     let redirect = state.github.authorize_url(issued.expose());
-    let jar = with_sign_in_cookie(
+    let jar = with_pending_sign_in(
         jar,
         &state,
+        &headers,
         issued.expose().to_owned(),
         OAUTH_STATE_TTL_MINUTES * 60,
     );
@@ -65,9 +73,21 @@ pub async fn callback(
     headers: HeaderMap,
     Query(query): Query<CallbackQuery>,
 ) -> Response {
-    // Whatever happens next, this browser is done with the value it was
-    // holding: a failed sign-in must not leave a reusable one behind.
-    let jar = without_cookie(jar, &state, SIGN_IN_COOKIE);
+    // Whatever happens next, this browser is done with the value this callback
+    // is answering for: a failed sign-in must not leave a reusable one behind.
+    // Only that one is dropped, because another tab may still be waiting on
+    // its own. A callback carrying no state answers for nothing, so it spends
+    // nothing.
+    let jar = match query.state.as_deref() {
+        Some(presented) => without_pending_sign_in(
+            jar,
+            &state,
+            &headers,
+            presented,
+            OAUTH_STATE_TTL_MINUTES * 60,
+        ),
+        None => jar,
+    };
 
     match complete_sign_in(&state, &headers, query).await {
         Ok(token) => (
@@ -127,14 +147,15 @@ async fn finish_sign_in(
         .state
         .as_deref()
         .ok_or_else(|| ApiError::SignInFailed("the callback carried no state".to_owned()))?;
-    let expected = sign_in_state(headers).ok_or_else(|| {
-        ApiError::SignInFailed(
-            "this browser did not start a sign-in, or took longer than ten minutes".to_owned(),
-        )
-    })?;
-    if presented != expected {
+    let pending = sign_in_states(headers);
+    if pending.is_empty() {
         return Err(ApiError::SignInFailed(
-            "the callback state does not match the one this browser started with".to_owned(),
+            "this browser did not start a sign-in, or took longer than ten minutes".to_owned(),
+        ));
+    }
+    if !pending.iter().any(|candidate| candidate == presented) {
+        return Err(ApiError::SignInFailed(
+            "the callback state does not match any sign-in this browser started".to_owned(),
         ));
     }
     if !state

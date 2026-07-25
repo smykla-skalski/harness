@@ -76,7 +76,23 @@ curl -fsS http://127.0.0.1:8787/panel/healthz
 
 `"assets":"bundled"` means the binary carries the real web app. `"assets":"placeholder"` means it was built with `HARNESS_PANEL_SKIP_FRONTEND_BUILD=1` and serves a stand-in page; rebuild it with Node available.
 
-Then open `https://harness.example.com/panel/` and sign in. The owner named by `--owner-login` also sees everyone else who has signed in; nobody else does. Logins are matched without regard to case, because GitHub treats them that way.
+Then open `https://harness.example.com/panel/` and sign in. The owner also sees everyone else who has signed in; nobody else does.
+
+## Who owns the panel
+
+`--owner-login` names a GitHub login, and a login is not a person: renaming one frees the old name for anyone to register. So the flag decides only who the panel is claimed for, once. The first time somebody whose login matches it signs in, the panel records their immutable GitHub account id and answers "is this the owner" from that pair from then on. Renaming the owner's login does not cost them the panel, and picking up their old name does not gain it.
+
+The flag is matched without regard to case, because GitHub treats logins that way and the flag is typed by hand.
+
+Re-pointing a panel at a different owner therefore means changing `--owner-login` *and* deleting the recorded claim:
+
+```bash
+sudo systemctl stop harness-panel
+sudo sqlite3 /var/lib/harness-panel/panel.sqlite3 'DELETE FROM owner_binding'
+sudo systemctl start harness-panel
+```
+
+The next sign-in by someone matching the new `--owner-login` claims it. Changing the flag alone does nothing, which is the point: it is not what ownership rests on.
 
 ## Upgrading
 

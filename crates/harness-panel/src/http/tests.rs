@@ -2,6 +2,9 @@
 //!
 //! The sign-in round trip needs a stub GitHub and lives in
 //! `tests/sign_in.rs`; these cover what the panel decides on its own.
+//!
+//! Starting, finishing, and ending a sign-in live in [`auth`]; this file
+//! keeps the shared harness and the reading routes.
 
 use std::fs;
 use std::path::Path;
@@ -18,6 +21,8 @@ use crate::config::{
 };
 use crate::store::Store;
 use crate::store::accounts::AccountIdentity;
+
+mod auth;
 
 const BODY_LIMIT: usize = 1024 * 1024;
 
@@ -51,12 +56,34 @@ struct Harness {
     _directory: tempfile::TempDir,
 }
 
+/// What a browser holds after one tab has started a sign-in.
+struct StartedSignIn {
+    state: String,
+    /// The whole `name=value` pair, as the browser would send it back.
+    cookie: String,
+}
+
 impl Harness {
     async fn new(owner_login: &str) -> Self {
+        Self::build(owner_login, None).await
+    }
+
+    /// A panel whose token endpoint refuses connections at once.
+    ///
+    /// Lets a test drive a callback past state validation without reaching
+    /// github.com: the sign-in then fails at the code exchange, which is a
+    /// different failure from the one under test and arrives immediately.
+    async fn with_unreachable_github(owner_login: &str) -> Self {
+        Self::build(owner_login, Some("http://127.0.0.1:1/token")).await
+    }
+
+    async fn build(owner_login: &str, token_url: Option<&str>) -> Self {
         let directory = tempfile::tempdir().expect("temp dir");
-        let config = args(directory.path(), owner_login)
-            .resolve()
-            .expect("valid configuration");
+        let mut raw = args(directory.path(), owner_login);
+        if let Some(url) = token_url {
+            raw.github_token_url = url.to_owned();
+        }
+        let config = raw.resolve().expect("valid configuration");
         let store = Store::open_in_memory().await.expect("store");
         let state = PanelState::new(config, store).expect("panel state");
         Self {
@@ -66,9 +93,15 @@ impl Harness {
     }
 
     async fn sign_in(&self, login: &str) -> String {
+        self.sign_in_as(login, login).await
+    }
+
+    /// Sign in a login and a subject id independently, so a test can replay the
+    /// case GitHub allows: a login freed by a rename and taken by someone else.
+    async fn sign_in_as(&self, login: &str, subject_id: &str) -> String {
         let identity = AccountIdentity {
             provider: "github".to_owned(),
-            subject_id: login.to_owned(),
+            subject_id: subject_id.to_owned(),
             login: login.to_owned(),
             display_name: login.to_owned(),
             avatar_url: None,
@@ -103,6 +136,55 @@ impl Harness {
             .expect("body");
         (status, String::from_utf8_lossy(&bytes).into_owned())
     }
+
+    /// Open the start route as a browser would, optionally already holding the
+    /// sign-in cookie an earlier tab was issued.
+    async fn start_sign_in(&self, cookie: Option<&str>) -> StartedSignIn {
+        let mut request = Request::builder().uri("/panel/auth/github/start");
+        if let Some(cookie) = cookie {
+            request = request.header(header::COOKIE, cookie);
+        }
+        let response = router(self.state.clone())
+            .oneshot(request.body(Body::empty()).expect("request"))
+            .await
+            .expect("response");
+
+        let location = response
+            .headers()
+            .get(header::LOCATION)
+            .and_then(|value| value.to_str().ok())
+            .expect("a redirect to github")
+            .to_owned();
+        let state = url::Url::parse(&location)
+            .expect("an authorize url")
+            .query_pairs()
+            .find(|(key, _)| key == "state")
+            .map(|(_, value)| value.into_owned())
+            .expect("the authorize url carries a state");
+        let cookie = response
+            .headers()
+            .get_all(header::SET_COOKIE)
+            .iter()
+            .filter_map(|value| value.to_str().ok())
+            .find(|value| value.starts_with("harness_panel_signin="))
+            .and_then(|value| value.split(';').next())
+            .expect("a sign-in cookie")
+            .to_owned();
+
+        StartedSignIn { state, cookie }
+    }
+}
+
+/// The pending sign-ins a `name=value` cookie pair carries.
+fn pending_states(cookie: &str) -> Vec<String> {
+    cookie
+        .split_once('=')
+        .map(|(_, value)| value)
+        .unwrap_or_default()
+        .split('.')
+        .filter(|candidate| !candidate.is_empty())
+        .map(str::to_owned)
+        .collect()
 }
 
 /// The point of the field is that a deploy which skipped the frontend build is
@@ -121,7 +203,10 @@ async fn healthz_reports_the_embedded_bundle() {
 
     assert_eq!(status, StatusCode::OK);
     assert!(body.contains("\"status\":\"ok\""), "{body}");
-    assert!(body.contains(&format!("\"assets\":\"{expected}\"")), "{body}");
+    assert!(
+        body.contains(&format!("\"assets\":\"{expected}\"")),
+        "{body}"
+    );
 }
 
 /// The single-page app treats 401 as "not signed in yet" rather than an error,
@@ -159,6 +244,47 @@ async fn the_owner_is_recognised_whatever_the_case() {
 
     assert_eq!(status, StatusCode::OK);
     assert!(body.contains("\"is_owner\":true"), "{body}");
+}
+
+/// GitHub frees a login when its owner renames, and anyone may then register
+/// it. Ownership is pinned to the immutable subject id on first sign-in
+/// precisely so that picking up the old name does not pick up the panel with
+/// it, along with the roster of everyone who has ever signed in.
+#[tokio::test]
+async fn a_stranger_who_takes_the_freed_owner_login_is_not_the_owner() {
+    let harness = Harness::new("ada").await;
+
+    // The real owner signs in, which claims the panel for subject 4242.
+    let owner = harness.sign_in_as("ada", "4242").await;
+    assert!(
+        harness
+            .get("/panel/api/me", Some(&owner))
+            .await
+            .1
+            .contains("\"is_owner\":true")
+    );
+
+    // They rename, freeing "ada", and a stranger registers it.
+    harness.sign_in_as("ada-lovelace", "4242").await;
+    let stranger = harness.sign_in_as("ada", "7777").await;
+
+    let (status, body) = harness.get("/panel/api/me", Some(&stranger)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body.contains("\"is_owner\":false"), "{body}");
+    assert_eq!(
+        harness.get("/panel/api/accounts", Some(&stranger)).await.0,
+        StatusCode::FORBIDDEN
+    );
+
+    // The rename does not cost the real owner the panel either.
+    let renamed = harness.sign_in_as("ada-lovelace", "4242").await;
+    assert!(
+        harness
+            .get("/panel/api/me", Some(&renamed))
+            .await
+            .1
+            .contains("\"is_owner\":true")
+    );
 }
 
 /// Knowing who else has signed in is the owner's view of the panel; anyone
@@ -234,168 +360,6 @@ async fn nothing_is_served_outside_the_mount_point() {
     }
 }
 
-#[tokio::test]
-async fn signing_out_clears_the_session_on_the_server() {
-    let harness = Harness::new("ada").await;
-    let token = harness.sign_in("ada").await;
-
-    let response = router(harness.state.clone())
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/panel/auth/signout")
-                .header(header::COOKIE, format!("{SESSION_COOKIE}={token}"))
-                .body(Body::empty())
-                .expect("request"),
-        )
-        .await
-        .expect("response");
-
-    assert_eq!(response.status(), StatusCode::NO_CONTENT);
-    let expiry = response
-        .headers()
-        .get_all(header::SET_COOKIE)
-        .iter()
-        .filter_map(|value| value.to_str().ok())
-        .find(|value| value.starts_with(SESSION_COOKIE))
-        .expect("the session cookie is expired");
-    assert!(expiry.contains("Max-Age=0"), "{expiry}");
-    // The cookie only asks the browser to cooperate; the session has to be gone.
-    assert_eq!(
-        harness.get("/panel/api/me", Some(&token)).await.0,
-        StatusCode::UNAUTHORIZED
-    );
-}
-
-/// Signing out is a state change, so a plain link or an image tag must not be
-/// able to trigger it.
-#[tokio::test]
-async fn signing_out_is_not_a_get() {
-    let harness = Harness::new("ada").await;
-
-    let (status, _) = harness.get("/panel/auth/signout", None).await;
-
-    assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
-}
-
-/// A `Secure` cookie is dropped by the browser over plain HTTP, so the flag has
-/// to follow the public origin rather than be pinned on.
-#[tokio::test]
-async fn the_sign_in_cookie_is_scoped_to_the_panel() {
-    let harness = Harness::new("ada").await;
-
-    let response = router(harness.state.clone())
-        .oneshot(
-            Request::builder()
-                .uri("/panel/auth/github/start")
-                .body(Body::empty())
-                .expect("request"),
-        )
-        .await
-        .expect("response");
-
-    assert_eq!(response.status(), StatusCode::SEE_OTHER);
-    let cookie = response
-        .headers()
-        .get(header::SET_COOKIE)
-        .and_then(|value| value.to_str().ok())
-        .expect("a sign-in cookie");
-
-    assert!(cookie.contains("HttpOnly"), "{cookie}");
-    assert!(cookie.contains("SameSite=Lax"), "{cookie}");
-    assert!(cookie.contains("Path=/panel"), "{cookie}");
-    assert!(cookie.contains("Secure"), "{cookie}");
-}
-
-/// The browser has to be sent to GitHub carrying the same state the panel just
-/// recorded, or the callback can never match it.
-#[tokio::test]
-async fn starting_a_sign_in_redirects_to_github_with_the_recorded_state() {
-    let harness = Harness::new("ada").await;
-
-    let response = router(harness.state.clone())
-        .oneshot(
-            Request::builder()
-                .uri("/panel/auth/github/start")
-                .body(Body::empty())
-                .expect("request"),
-        )
-        .await
-        .expect("response");
-
-    let location = response
-        .headers()
-        .get(header::LOCATION)
-        .and_then(|value| value.to_str().ok())
-        .expect("a redirect")
-        .to_owned();
-    let cookie = response
-        .headers()
-        .get(header::SET_COOKIE)
-        .and_then(|value| value.to_str().ok())
-        .expect("a sign-in cookie")
-        .to_owned();
-    let state = cookie
-        .split(';')
-        .next()
-        .and_then(|pair| pair.split_once('='))
-        .map(|(_, value)| value.to_owned())
-        .expect("the cookie carries the state");
-
-    assert!(
-        location.starts_with(DEFAULT_GITHUB_AUTHORIZE_URL),
-        "{location}"
-    );
-    assert!(location.contains(&format!("state={state}")), "{location}");
-    assert!(
-        location.contains("redirect_uri=https%3A%2F%2Fharness.example.com%2Fpanel%2Fauth"),
-        "{location}"
-    );
-}
-
-/// A callback that arrives without the cookie is one this browser never
-/// started, which is what a login-CSRF attempt looks like.
-#[tokio::test]
-async fn a_callback_without_the_sign_in_cookie_is_refused() {
-    let harness = Harness::new("ada").await;
-
-    let (status, body) = harness
-        .get("/panel/auth/github/callback?code=abc&state=whatever", None)
-        .await;
-
-    assert_eq!(status, StatusCode::BAD_REQUEST);
-    assert!(body.contains("\"code\":\"sign_in\""), "{body}");
-}
-
-/// A refused callback must not leave the browser holding the state value it
-/// just refused. The cleared cookie only reaches the browser if the failure
-/// response carries it, which an early return would silently skip.
-#[tokio::test]
-async fn a_refused_callback_still_clears_the_sign_in_cookie() {
-    let harness = Harness::new("ada").await;
-
-    let response = router(harness.state.clone())
-        .oneshot(
-            Request::builder()
-                .uri("/panel/auth/github/callback?code=abc&state=whatever")
-                .header(header::COOKIE, "harness_panel_signin=whatever")
-                .body(Body::empty())
-                .expect("request"),
-        )
-        .await
-        .expect("response");
-
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    let cleared = response
-        .headers()
-        .get_all(header::SET_COOKIE)
-        .iter()
-        .filter_map(|value| value.to_str().ok())
-        .find(|value| value.starts_with("harness_panel_signin"))
-        .expect("the sign-in cookie is expired on the failure response");
-    assert!(cleared.contains("Max-Age=0"), "{cleared}");
-}
-
 /// These bodies belong to one session, and a 200 is heuristically cacheable, so
 /// a proxy between the daemon and the browser would otherwise be free to hand
 /// one person's answer to the next request.
@@ -426,19 +390,4 @@ async fn session_derived_responses_are_never_cached() {
             "{path} must not be cacheable"
         );
     }
-}
-
-#[tokio::test]
-async fn a_callback_github_refused_reports_the_reason() {
-    let harness = Harness::new("ada").await;
-
-    let (status, body) = harness
-        .get(
-            "/panel/auth/github/callback?error=access_denied&error_description=The+user+said+no",
-            None,
-        )
-        .await;
-
-    assert_eq!(status, StatusCode::BAD_REQUEST);
-    assert!(body.contains("The user said no"), "{body}");
 }

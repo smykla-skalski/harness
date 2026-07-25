@@ -196,10 +196,19 @@ impl PanelConfig {
         self.state_dir.join("panel.sqlite3")
     }
 
-    /// GitHub logins differ only in case for the same account, so the owner
-    /// check must not depend on how the flag was typed.
+    /// Whether `login` is the one `--owner-login` names.
+    ///
+    /// This decides who the owner binding is taken from the first time somebody
+    /// signs in, and nothing after that. It is not the answer to "is this the
+    /// owner", because a GitHub login can be renamed and the freed name
+    /// registered by someone else; that answer lives in the owner binding,
+    /// keyed on the immutable subject id. Conflating the two would hand the
+    /// panel to whoever picked up the old name.
+    ///
+    /// Matched without regard to case, because GitHub treats logins that way
+    /// and the flag is typed by hand.
     #[must_use]
-    pub fn is_owner(&self, login: &str) -> bool {
+    pub fn matches_owner_login(&self, login: &str) -> bool {
         login.eq_ignore_ascii_case(&self.owner_login)
     }
 }

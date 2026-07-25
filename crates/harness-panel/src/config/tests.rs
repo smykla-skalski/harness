@@ -69,19 +69,20 @@ fn every_url_is_built_from_the_origin_and_the_mount_point() {
     assert_eq!(config.cookie_path(), "/panel");
 }
 
-/// GitHub treats a login case-insensitively, so an owner who typed their login
-/// with different capitalisation than GitHub reports must still be the owner.
+/// GitHub treats a login case-insensitively, so the flag must match however it
+/// was typed. This only decides who the panel is claimed for the first time;
+/// ownership itself is pinned to the subject id in the owner binding.
 #[test]
-fn owner_matching_ignores_case() {
+fn the_owner_login_flag_matches_without_regard_to_case() {
     let directory = tempfile::tempdir().expect("temp dir");
 
     let config = args(directory.path())
         .resolve()
         .expect("valid configuration");
 
-    assert!(config.is_owner("ada"));
-    assert!(config.is_owner("ADA"));
-    assert!(!config.is_owner("adam"));
+    assert!(config.matches_owner_login("ada"));
+    assert!(config.matches_owner_login("ADA"));
+    assert!(!config.matches_owner_login("adam"));
 }
 
 #[test]
@@ -117,7 +118,9 @@ fn refuses_a_session_longer_than_the_calendar() {
     let mut args = args(directory.path());
     args.session_ttl_hours = u32::MAX;
 
-    let error = args.resolve().expect_err("an unbounded TTL must be refused");
+    let error = args
+        .resolve()
+        .expect_err("an unbounded TTL must be refused");
 
     assert!(error.to_string().contains("--session-ttl-hours"), "{error}");
 
