@@ -166,7 +166,8 @@ run_compile_profile() {
     -p harness-daemon -p harness-bridge -p harness-mcp --timings || return
   copy_cargo_timing integration-workers || return
 
-  "$ROOT/scripts/cargo-local.sh" test --quiet -p harness --test integration \
+  "$ROOT/scripts/cargo-local.sh" test --quiet -p harness \
+    --test integration --test integration_daemon \
     --features full-runtime --no-run --timings || return
   copy_cargo_timing integration
 }
@@ -187,7 +188,7 @@ run_unit_profile() {
 run_integration_profile() {
   "$ROOT/scripts/cargo-local.sh" build --quiet \
     -p harness-daemon -p harness-bridge -p harness-mcp || return
-  run_nextest -p harness --test integration \
+  run_nextest -p harness --test integration --test integration_daemon \
     --features full-runtime
 }
 
