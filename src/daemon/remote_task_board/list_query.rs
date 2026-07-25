@@ -90,8 +90,10 @@ fn select_matching_page<T: TaskBoardQueryTarget>(
     let matched = items
         .iter()
         .enumerate()
-        .filter(|(_, item)| query.matches(&item.query_fields()))
-        .map(|(index, item)| (index, item.query_fields().id))
+        .filter_map(|(index, item)| {
+            let fields = item.query_fields();
+            query.matches(&fields).then_some((index, fields.id))
+        })
         .collect::<Vec<_>>();
     let matched_ids = matched.iter().map(|(_, id)| *id).collect::<Vec<_>>();
     let page = select_page(&matched_ids, selection.cursor.as_ref(), selection.limit);
