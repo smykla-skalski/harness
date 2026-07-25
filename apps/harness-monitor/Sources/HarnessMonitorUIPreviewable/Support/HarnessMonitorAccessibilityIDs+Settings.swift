@@ -399,6 +399,10 @@ extension HarnessMonitorAccessibility {
     "harness.settings.authorized-folders.row.\(id)"
   }
 
+  public static func settingsOtherWorkingCopyRow(_ repoKeySegment: String) -> String {
+    "harness.settings.repositories.other-working-copy.row.\(repoKeySegment)"
+  }
+
   public static func segmentedOption(_ controlID: String, option: String) -> String {
     "\(controlID).option.\(slug(option))"
   }

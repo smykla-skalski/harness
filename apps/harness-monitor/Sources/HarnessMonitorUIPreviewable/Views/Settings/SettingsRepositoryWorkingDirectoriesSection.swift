@@ -14,7 +14,9 @@ struct SettingsRepositoryWorkingDirectoriesSection: View {
   @State private var paths: [String: String] = [:]
   @State private var associated: Set<String> = []
   @State private var workingCopies: [String: WorkingCopyListEntry] = [:]
+  @State private var otherCopies: [WorkingCopyListEntry] = []
   @State private var obtaining: Set<String> = []
+  @State private var reclaiming: Set<String> = []
   @State private var importingRepository: String?
   /// Live obtain progress per repository, fed by the catch-all
   /// `observeAllWorkingCopyProgress()` subscription. Terminal events drop the
@@ -22,6 +24,17 @@ struct SettingsRepositoryWorkingDirectoriesSection: View {
   @State private var progress = TaskBoardWorkingCopyProgressTracker()
 
   var body: some View {
+    directoriesSection
+    if !otherCopies.isEmpty {
+      SettingsOtherWorkingCopiesSection(
+        copies: otherCopies,
+        reclaiming: reclaiming,
+        reclaim: reclaim
+      )
+    }
+  }
+
+  private var directoriesSection: some View {
     Section {
       if repositories.isEmpty {
         Text("Add a repository above to choose its working directory")
@@ -105,6 +118,7 @@ struct SettingsRepositoryWorkingDirectoriesSection: View {
         }
       } else if let managedCopy {
         Button("Reclaim", role: .destructive) { reclaim(managedCopy.repoKeySegment) }
+          .disabled(reclaiming.contains(managedCopy.repoKeySegment))
       } else {
         Button("Obtain a Copy") { obtain(repository) }
       }
@@ -161,8 +175,10 @@ struct SettingsRepositoryWorkingDirectoriesSection: View {
   }
 
   private func reclaim(_ repoKeySegment: String) {
-    Task {
+    reclaiming.insert(repoKeySegment)
+    Task { @MainActor in
       await store.deleteRepositoryWorkingCopy(repoKeySegment: repoKeySegment)
+      reclaiming.remove(repoKeySegment)
       await reload()
     }
   }
@@ -171,11 +187,13 @@ struct SettingsRepositoryWorkingDirectoriesSection: View {
   private func reload() async {
     paths = await store.repositoryWorkingDirectoryPaths()
     associated = await store.repositoryDirectoryAssociations()
-    let copies = await store.listRepositoryWorkingCopies()
-    workingCopies = Dictionary(
-      copies.map { (RepositoryDirectoryStore.normalizedRepository($0.repoFullName), $0) },
-      uniquingKeysWith: { first, _ in first }
+    let inventory = RepositoryWorkingCopyInventory(
+      copies: await store.listRepositoryWorkingCopies(),
+      monitoredRepositories: repositories,
+      associatedRepositories: associated
     )
+    workingCopies = inventory.byRepository
+    otherCopies = inventory.unlisted
   }
 
   private func abbreviatedPath(_ path: String) -> String {
