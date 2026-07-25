@@ -84,6 +84,7 @@ tracing-subscriber = { version = "0.3.23", features = ["chrono", "env-filter", "
 fs2 = "0.4.3"
 fs-err = "3.3.0"
 gix = { version = "0.86.0", features = [
+    "progress-tree",
     "status",
     "worktree-mutation",
     "index",

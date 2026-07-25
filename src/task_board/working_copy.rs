@@ -19,6 +19,7 @@
 //! The git operations live in [`runtime`]; the progress-to-WebSocket bridge
 //! lives in [`progress`].
 
+mod clone_progress;
 pub mod progress;
 pub mod runtime;
 
