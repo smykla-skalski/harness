@@ -21,6 +21,8 @@ CHECKOUT_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 readonly CHECKOUT_ROOT
 # shellcheck source=scripts/lib/common-repo-root.sh
 source "$CHECKOUT_ROOT/scripts/lib/common-repo-root.sh"
+# shellcheck source=scripts/lib/build-lease.sh
+source "$CHECKOUT_ROOT/scripts/lib/build-lease.sh"
 
 COMMON_ROOT="${_HARNESS_INTERNAL_TEST_ONLY_CLEAN_LANES_COMMON_ROOT:-$(resolve_common_repo_root "$CHECKOUT_ROOT")}"
 readonly COMMON_ROOT
@@ -29,6 +31,8 @@ readonly CURRENT_WORKTREE_ROOT
 MAIN_WORKTREE_ROOT="$(git -C "$COMMON_ROOT" rev-parse --show-toplevel 2>/dev/null || printf '%s\n' "$COMMON_ROOT")"
 readonly MAIN_WORKTREE_ROOT
 LANE_ROOT="$COMMON_ROOT/xcode-derived-lanes"
+DEV_ROOT="$COMMON_ROOT/target/dev"
+LEASE_DIR="$COMMON_ROOT/target/.cargo-local/leases"
 SPECIAL_LANE_NAMES=("e2e" "instruments")
 SPECIAL_LANE_PATHS=("$COMMON_ROOT/xcode-derived-e2e" "$COMMON_ROOT/xcode-derived-instruments")
 STALENESS_HOURS=3
@@ -41,10 +45,14 @@ total_dropped=0
 total_dropped_kb=0
 lane_drops=0
 worktree_drops=0
+dev_drops=0
 lane_keeps=0
 worktree_keeps=0
+dev_keeps=0
 lanes_touched=0
 worktrees_touched=0
+dev_segments_touched=0
+declare -A live_dev_segments=()
 
 usage() {
   cat <<EOF
@@ -166,11 +174,11 @@ record_keep() {
   local path="$4"
   printf '  · keep (%-7s) %-32s %8s\n' "$reason" "$name" "$(human_size "$path")"
   total_kept=$((total_kept + 1))
-  if [[ "$kind" == "lane" ]]; then
-    lane_keeps=$((lane_keeps + 1))
-  else
-    worktree_keeps=$((worktree_keeps + 1))
-  fi
+  case "$kind" in
+    lane) lane_keeps=$((lane_keeps + 1)) ;;
+    dev) dev_keeps=$((dev_keeps + 1)) ;;
+    *) worktree_keeps=$((worktree_keeps + 1)) ;;
+  esac
 }
 
 record_drop() {
@@ -180,11 +188,11 @@ record_drop() {
   local size_kb="$4"
   total_dropped=$((total_dropped + 1))
   total_dropped_kb=$((total_dropped_kb + size_kb))
-  if [[ "$kind" == "lane" ]]; then
-    lane_drops=$((lane_drops + 1))
-  else
-    worktree_drops=$((worktree_drops + 1))
-  fi
+  case "$kind" in
+    lane) lane_drops=$((lane_drops + 1)) ;;
+    dev) dev_drops=$((dev_drops + 1)) ;;
+    *) worktree_drops=$((worktree_drops + 1)) ;;
+  esac
   if (( DRY_RUN )); then
     printf '  · drop (dry-run) %-32s %8s\n' "$name" "$(bytes_to_human "$size_kb")"
   else
@@ -193,14 +201,15 @@ record_drop() {
 }
 
 drop_lane() {
-  local lane="$1"
-  local path="$2"
+  local kind="$1"
+  local lane="$2"
+  local path="$3"
   local size_kb
   size_kb="$(path_size_kb "$path")"
   if (( ! DRY_RUN )); then
     rm -rf -- "$path"
   fi
-  record_drop "lane" "$lane" "$path" "$size_kb"
+  record_drop "$kind" "$lane" "$path" "$size_kb"
 }
 
 drop_worktree() {
@@ -230,7 +239,53 @@ process_lane() {
     record_keep "lane" "active" "$lane" "$path"
     return 0
   fi
-  drop_lane "$lane" "$path"
+  drop_lane "lane" "$lane" "$path"
+}
+
+# Mirrors cargo-local.sh's target_segment. A test pins this against
+# `cargo-local.sh --print-target-dir`, because a derivation that drifts stops
+# matching live lanes and starts reclaiming them out from under their worktree.
+dev_segment_for_worktree() {
+  local path="$1" resolved name digest
+  resolved="$(CDPATH='' cd -- "$path" 2>/dev/null && pwd -P)" || return 1
+  [[ "$resolved" == "$MAIN_WORKTREE_ROOT" ]] && { printf 'local\n'; return 0; }
+  name="$(printf '%s' "$(basename -- "$resolved")" | tr -cs '[:alnum:]._-' '-')"
+  if command -v shasum >/dev/null 2>&1; then
+    digest="$(printf '%s' "$resolved" | shasum -a 256)"
+    digest="${digest%% *}"
+  elif command -v cksum >/dev/null 2>&1; then
+    digest="$(printf '%s' "$resolved" | cksum)"
+    digest="${digest//[^[:alnum:]]/}"
+  else
+    digest="$(printf '%s' "$resolved" | tr -cs '[:alnum:]._-' '-')"
+  fi
+  printf 'wt-%s-%s\n' "$name" "${digest:0:16}"
+}
+
+# A cargo lane outlives the worktree that owns it: `git worktree remove` takes
+# the only name that maps one back, so nothing else ever reclaims it. Fate
+# follows the worktree, and a live build lease always wins.
+process_dev_segment() {
+  local segment="$1" path="$2"
+  [[ -d "$path" ]] || return 0
+  dev_segments_touched=$((dev_segments_touched + 1))
+  if [[ "$segment" == "local" ]]; then
+    record_keep "dev" "main" "$segment" "$path"
+    return 0
+  fi
+  if is_kept_lane "$segment"; then
+    record_keep "dev" "forced" "$segment" "$path"
+    return 0
+  fi
+  if build_lease_segment_is_leased "$LEASE_DIR" "$segment"; then
+    record_keep "dev" "active" "$segment" "$path"
+    return 0
+  fi
+  if [[ -n "${live_dev_segments[$segment]:-}" ]]; then
+    record_keep "dev" "worktree" "$segment" "$path"
+    return 0
+  fi
+  drop_lane "dev" "$segment" "$path"
 }
 
 process_worktree() {
@@ -304,15 +359,34 @@ if (( ! DRY_RUN )); then
   git -C "$COMMON_ROOT" worktree prune >/dev/null 2>&1 || true
 fi
 
+# Runs after the worktree pass so a worktree dropped in this same run leaves an
+# orphaned lane behind that this pass reclaims, rather than stranding it until
+# somebody notices the disk.
+printf '\n[cargo lanes]\n'
+while IFS= read -r worktree_path; do
+  [[ -n "$worktree_path" ]] || continue
+  segment="$(dev_segment_for_worktree "$worktree_path")" || continue
+  live_dev_segments["$segment"]=1
+done < <(git -C "$COMMON_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree /{ print substr($0, 10) }')
+
+if [[ -d "$DEV_ROOT" ]]; then
+  while IFS= read -r -d '' dev_dir; do
+    process_dev_segment "$(basename "$dev_dir")" "$dev_dir"
+  done < <(find "$DEV_ROOT" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null)
+fi
+
 printf '\n== summary ==\n'
 if (( DRY_RUN )); then
-  printf 'Would drop %d lane(s) and %d worktree(s), %s total. Kept %d lane(s) and %d worktree(s).\n' \
-    "$lane_drops" "$worktree_drops" "$(bytes_to_human "$total_dropped_kb")" "$lane_keeps" "$worktree_keeps"
+  printf 'Would drop %d lane(s), %d cargo lane(s) and %d worktree(s), %s total. Kept %d lane(s), %d cargo lane(s) and %d worktree(s).\n' \
+    "$lane_drops" "$dev_drops" "$worktree_drops" "$(bytes_to_human "$total_dropped_kb")" \
+    "$lane_keeps" "$dev_keeps" "$worktree_keeps"
 else
-  printf 'Dropped %d lane(s) and %d worktree(s), %s reclaimed. Kept %d lane(s) and %d worktree(s).\n' \
-    "$lane_drops" "$worktree_drops" "$(bytes_to_human "$total_dropped_kb")" "$lane_keeps" "$worktree_keeps"
+  printf 'Dropped %d lane(s), %d cargo lane(s) and %d worktree(s), %s reclaimed. Kept %d lane(s), %d cargo lane(s) and %d worktree(s).\n' \
+    "$lane_drops" "$dev_drops" "$worktree_drops" "$(bytes_to_human "$total_dropped_kb")" \
+    "$lane_keeps" "$dev_keeps" "$worktree_keeps"
 fi
-printf 'Scanned %d lane(s) and %d worktree(s).\n' "$lanes_touched" "$worktrees_touched"
+printf 'Scanned %d lane(s), %d cargo lane(s) and %d worktree(s).\n' \
+  "$lanes_touched" "$dev_segments_touched" "$worktrees_touched"
 
 # Dropped lanes take their built app bundles with them, leaving dead Launch
 # Services registrations behind. Purge them so the io.harnessmonitor.app

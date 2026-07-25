@@ -103,6 +103,94 @@ run_cleanup() {
   )
 }
 
+# Mirrors cargo-local.sh's target_segment. scenario_dev_segment_derivation_
+# matches_cargo_local pins it against the real script so a drift in either
+# shows up as a failure instead of a lane nobody reclaims.
+dev_segment_for_path() {
+  local path="$1" name digest
+  name="$(printf '%s' "$(basename -- "$path")" | tr -cs '[:alnum:]._-' '-')"
+  digest="$(printf '%s' "$path" | shasum -a 256)"
+  printf 'wt-%s-%s\n' "$name" "${digest:0:16}"
+}
+
+scenario_dev_lanes_follow_their_worktree() {
+  start_test "cargo lanes are kept while their worktree lives and dropped once it does not"
+  reset_tmp_root
+  local repo="$TEST_TMP_ROOT/repo"
+  local live_worktree="$TEST_TMP_ROOT/live"
+  local output="" live_seg orphan_seg
+
+  make_repo "$repo"
+  git -C "$repo" worktree add -b live "$live_worktree" >/dev/null
+  live_seg="$(dev_segment_for_path "$(cd "$live_worktree" && pwd -P)")"
+  orphan_seg="wt-long-gone-0123456789abcdef"
+
+  mkdir -p "$repo/target/dev/local/debug" \
+    "$repo/target/dev/$live_seg/debug" \
+    "$repo/target/dev/$orphan_seg/debug"
+  echo x > "$repo/target/dev/local/debug/a"
+  echo x > "$repo/target/dev/$live_seg/debug/a"
+  echo x > "$repo/target/dev/$orphan_seg/debug/a"
+
+  output="$(run_cleanup "$live_worktree" "$repo" --dry-run)"
+
+  assert_contains "$output" "keep (main   ) local"
+  assert_contains "$output" "$live_seg"
+  assert_contains "$output" "drop (dry-run) $orphan_seg"
+  assert_exists "$repo/target/dev/$orphan_seg"
+
+  output="$(run_cleanup "$live_worktree" "$repo")"
+  assert_absent "$repo/target/dev/$orphan_seg"
+  assert_exists "$repo/target/dev/$live_seg"
+  assert_exists "$repo/target/dev/local"
+  pass
+}
+
+scenario_leased_dev_lane_survives_even_when_orphaned() {
+  start_test "a cargo lane with a live build lease is kept even with no worktree left"
+  reset_tmp_root
+  local repo="$TEST_TMP_ROOT/repo"
+  local seg="wt-leased-fedcba9876543210"
+  local holder_pid=""
+
+  make_repo "$repo"
+  mkdir -p "$repo/target/dev/$seg/debug" "$repo/target/.cargo-local/leases"
+  echo x > "$repo/target/dev/$seg/debug/a"
+
+  sleep 120 &
+  holder_pid=$!
+  printf '%s\n' "$holder_pid" > "$repo/target/.cargo-local/leases/$seg-$holder_pid"
+
+  run_cleanup "$repo" "$repo" >/dev/null
+  assert_exists "$repo/target/dev/$seg"
+
+  kill "$holder_pid" 2>/dev/null || true
+  wait "$holder_pid" 2>/dev/null || true
+  rm -f "$repo/target/.cargo-local/leases/$seg-$holder_pid"
+
+  run_cleanup "$repo" "$repo" >/dev/null
+  assert_absent "$repo/target/dev/$seg"
+  pass
+}
+
+scenario_dev_segment_derivation_matches_cargo_local() {
+  start_test "the lane segment this script derives matches cargo-local.sh"
+  local printed derived
+  printed="$(basename -- "$(env -u CARGO_TARGET_DIR -u HARNESS_CARGO_TARGET_DIR \
+    "$ROOT/scripts/cargo-local.sh" --print-target-dir)")"
+  derived="$(dev_segment_for_path "$(cd "$ROOT" && pwd -P)")"
+
+  if [[ "$printed" == "local" ]]; then
+    pass
+    return 0
+  fi
+  if [[ "$printed" == "$derived" ]]; then
+    pass
+  else
+    fail "segment derivation drifted: cargo-local=$printed test=$derived"
+  fi
+}
+
 scenario_dry_run_reports_lane_and_worktree_status() {
   start_test "dry-run classifies special lanes, named lanes, and stale worktrees"
   reset_tmp_root
@@ -212,6 +300,9 @@ scenario_worktrees_default_to_longer_window_than_lanes() {
 scenario_dry_run_reports_lane_and_worktree_status
 scenario_apply_cleans_stale_lane_and_worktree
 scenario_worktrees_default_to_longer_window_than_lanes
+scenario_dev_lanes_follow_their_worktree
+scenario_leased_dev_lane_survives_even_when_orphaned
+scenario_dev_segment_derivation_matches_cargo_local
 
 log "clean-stale-lanes tests: $PASS_COUNT passed, $FAIL_COUNT failed"
 if (( FAIL_COUNT > 0 )); then

@@ -39,6 +39,11 @@ if ! source "$ROOT/scripts/lib/common-repo-root.sh"; then
   printf 'clean-build-caches: failed to source scripts/lib/common-repo-root.sh\n' >&2
   exit 1
 fi
+# shellcheck source=scripts/lib/build-lease.sh
+if ! source "$ROOT/scripts/lib/build-lease.sh"; then
+  printf 'clean-build-caches: failed to source scripts/lib/build-lease.sh\n' >&2
+  exit 1
+fi
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$ROOT")"
 if [[ -z "$COMMON_REPO_ROOT" ]]; then
   printf 'clean-build-caches: resolve_common_repo_root returned an empty path\n' >&2
@@ -142,34 +147,10 @@ section() {
   printf '\n[%s]\n' "$1"
 }
 
-# kill -0 fails both when a PID is gone and when it belongs to another user
-# we can't signal, so it alone can't tell "dead" from "alive but foreign".
-# ps -p reports existence without needing signal permission, so a PID that
-# fails kill -0 but shows up in ps is still treated as alive.
-pid_is_alive() {
-  local pid="$1"
-  kill -0 "$pid" 2>/dev/null && return 0
-  ps -p "$pid" >/dev/null 2>&1
-}
-
 # A segment (target/dev/local or target/dev/wt-<worktree>-<hash>) is leased
 # when a cargo-local.sh lease file names it with a PID that's still alive.
-# cargo-local.sh names the lease file after the same target_segment value it
-# uses for the directory, so the match is a direct string compare, not a
-# reconstruction. The PID comes from the lease file's content (the source of
-# truth), not parsed out of the filename, so a segment name containing
-# dashes or digits (every wt-* segment does) can't confuse the match.
 segment_is_leased() {
-  local segment="$1" lease_file base pid
-  [[ -d "$LEASE_DIR" ]] || return 1
-  for lease_file in "$LEASE_DIR"/*; do
-    [[ -f "$lease_file" ]] || continue
-    pid="$(cat "$lease_file" 2>/dev/null || true)"
-    [[ "$pid" =~ ^[0-9]+$ ]] || continue
-    base="$(basename -- "$lease_file")"
-    [[ "$base" == "$segment-$pid" ]] && pid_is_alive "$pid" && return 0
-  done
-  return 1
+  build_lease_segment_is_leased "$LEASE_DIR" "$1"
 }
 
 # Sweeps the shared target/ tree at the common repo root: each entry
