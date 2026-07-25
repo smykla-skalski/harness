@@ -104,6 +104,9 @@ extension DaemonController {
       _ = bsdFlock(fd, LOCK_UN)
       return false
     }
+    // Contention is the only errno that means held. Darwin defines
+    // EWOULDBLOCK as EAGAIN, so this covers both spellings even though
+    // `withManagedLaunchAgentLock` above tests them as if they differed.
     return errno == EWOULDBLOCK
   }
 }
