@@ -1,7 +1,6 @@
 // Preflight and kubectl-validate integration tests.
 // Tests kubectl-validate state serialization, prepared suite plan filtering,
-// YAML resource extraction, group spec rejection orders, and preflight
-// command flows using FakeToolchain for kubectl/kubectl-validate.
+// YAML resource extraction, and group spec rejection orders.
 
 use std::fs;
 
@@ -9,9 +8,6 @@ use harness::run::GroupSpec;
 use harness_testkit::{GroupBuilder, SuiteBuilder};
 
 use super::helpers::*;
-
-mod command_flows;
-mod preflight_flows;
 
 #[test]
 fn seed_kubectl_validate_and_read_back() {

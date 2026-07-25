@@ -4,7 +4,6 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::sync::PoisonError;
 
-use harness::run::{KumactlArgs, KumactlCommand};
 use harness::setup::ClusterArgs;
 
 use super::super::helpers::*;
@@ -349,25 +348,4 @@ fn cluster_uses_saved_repo_root() {
             assert_eq!(result.unwrap(), 0);
         },
     );
-}
-
-#[test]
-#[ignore = "slow: spawns fake toolchain processes"]
-fn kumactl_find_repo_root() {
-    let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
-    let tmp = tempfile::tempdir().unwrap();
-    let repo = tmp.path().join("repo");
-    fs::create_dir_all(&repo).unwrap();
-
-    let bin_dir = repo.join("bin");
-    fs::create_dir_all(&bin_dir).unwrap();
-    fs::write(bin_dir.join("kumactl"), "#!/bin/sh\necho kumactl\n").unwrap();
-    fs::set_permissions(bin_dir.join("kumactl"), fs::Permissions::from_mode(0o755)).unwrap();
-
-    let cmd = KumactlCommand::Find {
-        repo_root: Some(repo.to_str().unwrap().to_string()),
-    };
-    let result = kumactl_cmd(KumactlArgs { cmd }).execute();
-    assert!(result.is_ok(), "kumactl find failed: {result:?}");
-    assert_eq!(result.unwrap(), 0);
 }

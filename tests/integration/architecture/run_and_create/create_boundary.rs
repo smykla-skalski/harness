@@ -94,7 +94,6 @@ fn create_exposes_a_facade_instead_of_public_internal_modules() {
             "src/hooks/guard_question.rs",
             "src/hooks/guard_stop.rs",
             "src/hooks/guard_write.rs",
-            "tests/integration/commands/record.rs",
         ],
         &[
             "crate::create::workflow::",
