@@ -131,13 +131,20 @@ fn sample_until_stopped(
 ///
 /// gix nests its phases, so the deepest task carrying a count is the specific
 /// one ("Receiving objects") while its ancestors are organizational headings
-/// with no count of their own. Ties break on the larger count so a finished
-/// sibling never masks the phase still running.
+/// with no count of their own.
+///
+/// Unfinished tasks outrank finished ones. gix leaves a completed phase in the
+/// tree at its full count, and ranking by count alone would pin the report to
+/// "Receiving objects 500/500" for the entire delta resolution that follows -
+/// reporting a stall during the exact work this event exists to show moving.
+///
+/// `max_by_key` returns the last of equal maxima and the snapshot is key-sorted,
+/// so an unresolved tie lands on the latest sibling, which is the later phase.
 fn advanced_event(tasks: &[(Key, Task)], repo_full_name: &str) -> Option<WorkingCopyProgress> {
     let (_, task) = tasks
         .iter()
         .filter(|(_, task)| task.progress.is_some())
-        .max_by_key(|(key, task)| (key.level(), task_done(task)))?;
+        .max_by_key(|(key, task)| (is_unfinished(task), key.level()))?;
     let progress = task.progress.as_ref()?;
     Some(WorkingCopyProgress::Advanced {
         repo_full_name: repo_full_name.to_owned(),
@@ -148,6 +155,17 @@ fn advanced_event(tasks: &[(Key, Task)], repo_full_name: &str) -> Option<Working
         // promise of health: an ordinary network stall leaves the state
         // `Running` and only shows up as counts that stop moving.
         blocked: matches!(progress.state, State::Blocked(..) | State::Halted(..)),
+    })
+}
+
+/// Whether the phase still has work left. An unbounded phase counts as
+/// unfinished: gix leaves the max unset until it learns the total, and treating
+/// that as done would skip the phase entirely.
+fn is_unfinished(task: &Task) -> bool {
+    task.progress.as_ref().is_some_and(|progress| {
+        progress
+            .done_at
+            .is_none_or(|total| progress.step.load(Ordering::Relaxed) < total)
     })
 }
 

@@ -85,16 +85,52 @@ fn reports_the_deepest_counted_task_not_its_heading() {
 
 #[test]
 fn a_finished_sibling_does_not_mask_the_running_phase() {
+    // The order gix leaves behind mid-clone: receiving is done and sits at its
+    // full count, while delta resolution has barely started. Reporting the
+    // finished one would show 500/500 for the whole of the work still to come.
     let tasks = vec![
-        (key_at(&[1, 1]), task("Resolving deltas", 12, Some(500))),
-        (key_at(&[1, 2]), task("Receiving objects", 500, Some(500))),
+        (key_at(&[1, 1]), task("Receiving objects", 500, Some(500))),
+        (key_at(&[1, 2]), task("Resolving deltas", 12, Some(500))),
     ];
 
     let event = advanced_event(&tasks, "owner/repo").expect("event");
 
     match event {
         WorkingCopyProgress::Advanced { phase, done, .. } => {
-            assert_eq!(phase, "Receiving objects");
+            assert_eq!(phase, "Resolving deltas");
+            assert_eq!(done, 12);
+        }
+        other => panic!("expected Advanced, got {other:?}"),
+    }
+}
+
+#[test]
+fn an_unbounded_phase_outranks_a_finished_one() {
+    let tasks = vec![
+        (key_at(&[1, 1]), task("Receiving objects", 500, Some(500))),
+        (key_at(&[1, 2]), task("Checking out files", 0, None)),
+    ];
+
+    let event = advanced_event(&tasks, "owner/repo").expect("event");
+
+    match event {
+        WorkingCopyProgress::Advanced { phase, .. } => assert_eq!(phase, "Checking out files"),
+        other => panic!("expected Advanced, got {other:?}"),
+    }
+}
+
+#[test]
+fn the_last_phase_still_reports_once_every_sibling_is_finished() {
+    let tasks = vec![
+        (key_at(&[1, 1]), task("Receiving objects", 500, Some(500))),
+        (key_at(&[1, 2]), task("Resolving deltas", 500, Some(500))),
+    ];
+
+    let event = advanced_event(&tasks, "owner/repo").expect("event");
+
+    match event {
+        WorkingCopyProgress::Advanced { phase, done, .. } => {
+            assert_eq!(phase, "Resolving deltas");
             assert_eq!(done, 500);
         }
         other => panic!("expected Advanced, got {other:?}"),
