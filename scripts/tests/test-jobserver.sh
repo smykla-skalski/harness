@@ -299,6 +299,72 @@ scenario_lock_file_holds_only_the_current_pid() {
   pass "$name"
 }
 
+scenario_pool_location_ignores_the_user_variable() {
+  local name="the pool location is the same whatever USER says"
+  local root; root="$(fake_root userenv)"
+  local named unnamed absent
+  named="$(USER=alpha pool_dir_for "$root")"
+  unnamed="$(USER=beta pool_dir_for "$root")"
+  # A daemon-spawned build inherits no USER at all, and a second pool for the
+  # same uid would hand out the whole budget twice.
+  absent="$(unset USER; pool_dir_for "$root")"
+
+  if [[ "$named" != "$unnamed" ]]; then
+    fail "$name (USER=alpha gave $named, USER=beta gave $unnamed)"
+    return
+  fi
+  if [[ "$named" != "$absent" ]]; then
+    fail "$name (USER set gave $named, USER unset gave $absent)"
+    return
+  fi
+  if [[ "$named" != *"/harness-jobserver-$(id -u)/"* ]]; then
+    fail "$name (expected the uid in the path, got $named)"
+    return
+  fi
+  pass "$name"
+}
+
+scenario_a_non_fifo_at_the_pool_path_is_replaced() {
+  local name="a stale non-FIFO at the pool path is replaced, not opened"
+  local out
+  out="$(python3 - "$JOBSERVER" 2>&1 <<'PY'
+import importlib.util, os, stat, sys, tempfile
+
+spec = importlib.util.spec_from_file_location("js", sys.argv[1])
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+results = []
+with tempfile.TemporaryDirectory() as directory:
+    # A leftover regular file opens cleanly and then reports an empty pool.
+    fifo = os.path.join(directory, "fifo")
+    with open(fifo, "wb") as handle:
+        handle.write(b"junk")
+    pool = mod.Pool(directory, 3)
+    results.append("file->%s/%d" % (stat.S_ISFIFO(os.lstat(fifo).st_mode), pool._drain()))
+
+with tempfile.TemporaryDirectory() as directory:
+    # A symlink is the dangerous one: the refill writes tokens into the target.
+    victim = os.path.join(directory, "victim")
+    with open(victim, "wb") as handle:
+        handle.write(b"precious")
+    fifo = os.path.join(directory, "fifo")
+    os.symlink(victim, fifo)
+    pool = mod.Pool(directory, 3)
+    with open(victim, "rb") as handle:
+        intact = handle.read() == b"precious"
+    results.append("link->%s/%d/%s" % (stat.S_ISFIFO(os.lstat(fifo).st_mode), pool._drain(), intact))
+
+print(" ".join(results))
+PY
+)"
+  if [[ "$out" != "file->True/3 link->True/3/True" ]]; then
+    fail "$name (expected a real FIFO with 3 tokens and an untouched target, got: $out)"
+    return
+  fi
+  pass "$name"
+}
+
 scenario_acquire_surfaces_a_real_read_error() {
   local name="acquire raises a real read error instead of reporting an empty pool"
   local out
@@ -543,6 +609,8 @@ scenario_foreign_owned_pool_dir_is_refused
 scenario_missing_pool_still_runs_the_command
 scenario_run_preserves_argument_separators
 scenario_lock_file_holds_only_the_current_pid
+scenario_pool_location_ignores_the_user_variable
+scenario_a_non_fifo_at_the_pool_path_is_replaced
 scenario_acquire_surfaces_a_real_read_error
 scenario_idle_exit_leaves_no_tokens_behind
 scenario_partial_pool_keeps_its_tokens

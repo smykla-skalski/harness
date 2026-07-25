@@ -46,9 +46,12 @@ HANDSHAKE_TIMEOUT = 5.0
 
 
 def pool_dir(repo_root: str) -> str:
-    user = "".join(c if c.isalnum() or c in "._-" else "-" for c in os.environ.get("USER", "user"))
+    # Keyed on the uid rather than $USER, because that is what the ownership
+    # check enforces and because $USER is caller-controlled: a daemon-spawned
+    # build that inherits no $USER would otherwise get a second pool of its own
+    # and the same machine would hand out the budget twice.
     digest = hashlib.sha256(repo_root.encode()).hexdigest()[:16]
-    return f"/tmp/harness-jobserver-{user}/{digest}"
+    return f"/tmp/harness-jobserver-{os.getuid()}/{digest}"
 
 
 def prepare_private_dir(path: str) -> None:
@@ -72,7 +75,7 @@ def prepare_pool_dir(directory: str) -> None:
     """Validate every level we own, not just the leaf.
 
     Checking only the leaf left the parent unguarded, and os.path.isdir follows
-    symlinks, so a pre-planted `/tmp/harness-jobserver-<user>` was adopted
+    symlinks, so a pre-planted `/tmp/harness-jobserver-<uid>` was adopted
     silently and the whole pool landed inside someone else's directory.
     """
     prepare_private_dir(os.path.dirname(directory))
@@ -91,13 +94,25 @@ class Pool:
         self.granted = 0
         self.last_activity = time.monotonic()
 
-        if not os.path.exists(self.fifo_path):
-            with contextlib.suppress(FileExistsError):
-                os.mkfifo(self.fifo_path, 0o600)
+        self._ensure_fifo()
         # O_RDWR keeps a permanent writer attached, without which the FIFO would
         # report EOF and discard its buffered tokens the moment cargo detaches.
         self.fifo_fd = os.open(self.fifo_path, os.O_RDWR | os.O_NONBLOCK)
         self._refill_to(budget)
+
+    def _ensure_fifo(self) -> None:
+        """Replace whatever sits at the FIFO path if it is not a FIFO.
+
+        os.open succeeds on a regular file, and a file has one shared offset, so
+        the refill lands past the read position and every later acquire sees an
+        empty pool - the silent floor-width failure again. A symlink is worse:
+        the tokens get written into whatever it points at.
+        """
+        with contextlib.suppress(FileNotFoundError):
+            if not stat.S_ISFIFO(os.lstat(self.fifo_path).st_mode):
+                os.unlink(self.fifo_path)
+        with contextlib.suppress(FileExistsError):
+            os.mkfifo(self.fifo_path, 0o600)
 
     def _read_tokens(self, limit: int | None) -> int:
         """Take up to `limit` tokens, or every one present when None.
