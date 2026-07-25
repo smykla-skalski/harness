@@ -49,10 +49,11 @@ GitHub's issue type field is separate from the `kind/*` label and sits alongside
 - An umbrella whose children are new work gets type `Feature`.
 - Any issue labeled `kind/bug` gets type `Bug`.
 
-`gh issue create` and `gh issue edit` have no flag for it, so set it through the GraphQL API. Look up the repo's type ids rather than hardcoding them, since they differ per repo:
+`gh issue create` and `gh issue edit` have no flag for it, so set it through the GraphQL API. Look up the repo's type ids rather than hardcoding them, since they differ per repo. The mutation takes the issue's GraphQL node id, not the REST database id used earlier for sub-issue attachment:
 
 ```bash
 gh api graphql -f query='{ repository(owner: "<owner>", name: "<repo>") { issueTypes(first: 20) { nodes { id name } } } }'
+gh api "repos/<owner>/<repo>/issues/<issue-number>" --jq '.node_id'
 gh api graphql -f query='mutation { updateIssue(input: {id: "<issue-node-id>", issueTypeId: "<type-node-id>"}) { issue { issueType { name } } } }'
 ```
 
