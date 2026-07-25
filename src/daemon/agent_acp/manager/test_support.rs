@@ -32,19 +32,20 @@ pub(super) fn waits_for_stream_event(
     name: &str,
 ) -> bool {
     let deadline = std::time::Instant::now() + ACP_CONDITION_DEADLINE;
-    loop {
+    // The deadline is checked every iteration, not only when the receiver runs
+    // dry: a steady stream of unrelated events, or repeated lag, would
+    // otherwise keep the loop fed and let it outlive its own bound.
+    while std::time::Instant::now() < deadline {
         match events.try_recv() {
             Ok(event) if event.event == name => return true,
             Ok(_) | Err(broadcast::error::TryRecvError::Lagged(_)) => {}
             Err(broadcast::error::TryRecvError::Closed) => return false,
             Err(broadcast::error::TryRecvError::Empty) => {
-                if std::time::Instant::now() >= deadline {
-                    return false;
-                }
                 std::thread::sleep(Duration::from_millis(50));
             }
         }
     }
+    false
 }
 
 #[track_caller]

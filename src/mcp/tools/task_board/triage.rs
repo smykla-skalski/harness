@@ -87,7 +87,9 @@ fn id_only_schema() -> Value {
 // `before_generation` is a u64 the wire format also accepts as a decimal
 // string, which is how a cursor past the JSON-safe integer range survives a
 // client that cannot hold it as a number. Advertising integer only would make
-// this validator reject that form before the request ever leaves.
+// this validator reject that form before the request ever leaves. The string
+// variant carries no `pattern`, because this validator implements no regex and
+// advertising a constraint it cannot enforce reads as a guarantee it is not.
 //
 // The upper bound on `limit` lives with the page validation in the daemon's
 // protocol crate, which this shared MCP source cannot reach. Advertising only
@@ -100,7 +102,7 @@ fn triage_history_schema() -> Value {
             "before_generation": {
                 "anyOf": [
                     { "type": "integer", "minimum": 1 },
-                    { "type": "string", "pattern": "^[1-9][0-9]*$" }
+                    { "type": "string" }
                 ]
             },
             "limit": { "type": "integer", "minimum": 1 }
