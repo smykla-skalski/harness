@@ -78,6 +78,7 @@ Validation should match risk:
 - Docs-only edits: `git diff --check`.
 - Narrow Rust logic: the focused unit/integration test first, then the smallest relevant `mise` gate.
 - Shared CLI, hook, runtime, or storage behavior: run the focused test and the owning package gate before `mise run check`.
+- Any `src/` file a facade crate pulls in with `#[path]` (`harness-daemon`, `harness-bridge`, `harness-hook`, `harness-mcp`, `harness-protocol`, `harness-telemetry`; see `docs/agent-guides/root-reference.md`): the owning package gate only lints the copy inside its home crate, so a clean run there does not predict the repository check. Run `mise run harness:check:rust`, or the full `mise run check`, before publishing.
 - `aff` code or aff-owned runtime hooks: include `mise run aff:check`.
 
 A package gate does not approximate the full one, so a clean focused run is evidence about the code you changed and nothing else. Only the Rust step resembles what an author runs directly; stale state, version consistency, script lint, binary contracts, source size, and feature isolation have no package-level equivalent and fail on work that every targeted command accepted. Read the gate's own exit status too, rather than whatever the shell reported last.

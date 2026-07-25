@@ -34,6 +34,14 @@ Repo-policy/manual-task enforcement belongs to `aff`. Use harness setup tasks fo
 - `task_board/` - cross-project board state, planning gates, dispatch/evaluate reconciliation, orchestrator state, external sync, and policy pipeline graph evaluation. See `docs/agent-guides/task-board-workflow.md` for operator behavior.
 - `agents/runtime/` - runtime adapters, conversation events, signal protocol, and liveness detection.
 
+## Facade-crate src includes
+
+Several `src/` files compile into more than one crate. `crates/harness-daemon`, `crates/harness-bridge`, `crates/harness-hook`, `crates/harness-mcp`, `crates/harness-protocol`, and `crates/harness-telemetry` each pull selected root-crate sources in with `#[path = "../../../src/..."]` (some deeper), so those files compile once per crate that includes them, and every copy resolves `crate::` against that crate's own module tree rather than the root crate's.
+
+Find every crate that pulls in a given file with `grep -rFn "src/<file>" crates/`, replacing `<file>` with the file's path under `src/` (for example `workspace/adopter.rs`); `-F` matches the substring literally, so a filename's own dots never widen the match. A file reached only through an included `mod.rs` - for example anything under `src/agents/acp/`, reached via `src/agents/acp/mod.rs` - does not show up on a direct grep for itself, so also check whether an ancestor module is included.
+
+Because each include resolves against a different module tree, a change that compiles cleanly in the root crate can still fail, or expose a different symbol set, inside a facade crate that a package-scoped gate never builds. `mise run harness:check:rust` (part of `mise run check`) runs Clippy on every crate in the list above and is the run that predicts whether the repository check passes; `cargo clippy -p <owning-crate>` alone does not.
+
 ## Managed ACP agents
 
 Harness speaks the Agent Client Protocol (ACP, wire protocol v1) to agents it manages for a session. The client half lives in `src/agents/acp/` (connection, streaming events, permission bridge, supervision); the daemon half in `src/daemon/agent_acp/` (protocol loop, session lifecycle, per-agent state, and the HTTP routes the CLI and Monitor call). Wire types shared with the Monitor live in `crates/harness-protocol/src/managed_agents/acp/`.
