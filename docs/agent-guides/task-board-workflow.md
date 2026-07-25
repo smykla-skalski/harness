@@ -90,6 +90,8 @@ Standard GitHub issue sync imports new open repo-scoped items into `backlog` wit
      --tag backend
    ```
 
+   Without `--status` the item starts in `todo` and automatic triage owns its placement. Passing `--status <lane>` creates it in that lane instead, and triage then records its decision without moving the item.
+
 2. Move it into planning.
 
    ```bash
