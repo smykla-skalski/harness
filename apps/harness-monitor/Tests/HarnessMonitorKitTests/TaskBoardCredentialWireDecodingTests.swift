@@ -20,14 +20,8 @@ struct TaskBoardCredentialWireDecodingTests {
     #expect(response.repositoryTokenCount == 3)
   }
 
-  @Test("todoist and openrouter responses map the configured flag")
+  @Test("the openrouter response maps the configured flag")
   func tokenConfiguredResponses() throws {
-    let todoistData = Data(#"{"token_configured": true}"#.utf8)
-    let todoist = TaskBoardTodoistTokenSyncResponse(
-      wire: try decoder.decode(TaskBoardTodoistTokenSyncResponseWire.self, from: todoistData)
-    )
-    #expect(todoist.tokenConfigured == true)
-
     let openRouterData = Data(#"{"token_configured": false}"#.utf8)
     let openRouter = TaskBoardOpenRouterTokenSyncResponse(
       wire: try decoder.decode(TaskBoardOpenRouterTokenSyncResponseWire.self, from: openRouterData)

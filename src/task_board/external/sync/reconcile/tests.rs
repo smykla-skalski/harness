@@ -25,12 +25,12 @@ async fn prefer_remote_concurrent_edit_never_claims_unapplied_remote_intent() {
         &store,
         ExternalSyncOptions {
             status: None,
-            provider: Some(ExternalProvider::Todoist),
+            provider: Some(ExternalProvider::GitHub),
             direction: ExternalSyncDirection::Pull,
             conflict_policy: ExternalSyncConflictPolicy::PreferRemote,
             dry_run: false,
         },
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         &expected,
         0,
         task,
@@ -140,7 +140,7 @@ fn locally_edited_item() -> TaskBoardItem {
         "Body".into(),
         "2026-07-15T10:00:00Z".into(),
     );
-    let mut reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1").into_core_ref();
+    let mut reference = ExternalTaskRef::new(ExternalProvider::GitHub, "remote-1").into_core_ref();
     reference.sync_state = Some(ExternalRefSyncState {
         title: Some("Old title".into()),
         body: Some("Body".into()),
@@ -156,7 +156,7 @@ fn locally_edited_item() -> TaskBoardItem {
 
 fn remote_task() -> ExternalTask {
     ExternalTask {
-        reference: ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1"),
+        reference: ExternalTaskRef::new(ExternalProvider::GitHub, "remote-1"),
         title: "Remote edit".into(),
         body: "Body".into(),
         status: TaskBoardStatus::Backlog,

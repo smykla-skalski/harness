@@ -211,9 +211,9 @@ async fn non_durable_store_rejects_external_create_admission() {
     let error = TaskBoardExternalCreateStore::begin_external_create_intent(
         &board,
         "task-create",
-        ExternalProvider::Todoist,
-        "todoist:scope",
-        "todoist-project",
+        ExternalProvider::GitHub,
+        "acme/widgets",
+        "acme/widgets",
     )
     .await
     .expect_err("non-durable create admission must fail closed");

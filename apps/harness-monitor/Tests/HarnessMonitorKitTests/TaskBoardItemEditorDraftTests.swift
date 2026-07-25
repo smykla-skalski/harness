@@ -17,7 +17,7 @@ struct TaskBoardItemEditorDraftTests {
     draft.agentMode = .planning
     draft.planningSummary = " Write the plan "
     draft.externalRefs = [
-      TaskBoardExternalRefDraft(ref: TaskBoardExternalRef(provider: .todoist, externalId: "T-1"))
+      TaskBoardExternalRefDraft(ref: TaskBoardExternalRef(provider: .gitHub, externalId: "T-1"))
     ]
 
     let request = draft.createRequest
@@ -29,7 +29,7 @@ struct TaskBoardItemEditorDraftTests {
     #expect(request.projectId == "project-1")
     #expect(request.agentMode == .planning)
     #expect(request.planning.summary == "Write the plan")
-    #expect(request.externalRefs.first?.provider == .todoist)
+    #expect(request.externalRefs.first?.provider == .gitHub)
     #expect(request.externalRefs.first?.externalId == "T-1")
   }
 
@@ -54,10 +54,11 @@ struct TaskBoardItemEditorDraftTests {
     #expect(request.targetProjectTypes == ["mobile"])
   }
 
-  @Test("Monitor public UI hides Todoist provider choices")
-  func monitorPublicUIHidesTodoistProviderChoices() {
+  @Test("Provider pickers offer GitHub as the only external provider")
+  func providerPickersOfferGitHubAsTheOnlyExternalProvider() {
     #expect(TaskBoardExternalProviderChoice.monitorVisibleChoice == .gitHub)
     #expect(TaskBoardExternalRefProvider.taskBoardCases == [.gitHub])
+    #expect(TaskBoardExternalProviderChoice.allCases == [.all, .gitHub])
   }
 
   @Test("Status menus expose only current task board lanes")
@@ -124,50 +125,6 @@ struct TaskBoardItemEditorDraftTests {
     #expect(DispatchStatusFilterChoice(status: .blocked) == .failed)
   }
 
-  @Test("Monitor public UI hides Todoist sync summaries")
-  func monitorPublicUIHidesTodoistSyncSummaries() {
-    let summary = TaskBoardSyncSummary(
-      total: 2,
-      providers: [
-        TaskBoardProviderSyncSummary(
-          provider: .gitHub,
-          configured: true,
-          linked: 1,
-          pushable: 1,
-          blocked: 0,
-          tokenEnv: []
-        ),
-        TaskBoardProviderSyncSummary(
-          provider: .todoist,
-          configured: true,
-          linked: 1,
-          pushable: 0,
-          blocked: 0,
-          tokenEnv: []
-        ),
-      ],
-      operations: [
-        TaskBoardExternalSyncOperation(
-          provider: .gitHub,
-          action: .pull,
-          boardItemId: "board-1",
-          dryRun: true,
-          applied: false
-        ),
-        TaskBoardExternalSyncOperation(
-          provider: .todoist,
-          action: .push,
-          externalId: "todo-1",
-          dryRun: true,
-          applied: false
-        ),
-      ]
-    )
-
-    #expect(summary.monitorVisibleProviders.map(\.provider) == [.gitHub])
-    #expect(summary.monitorVisibleOperations.map(\.provider) == [.gitHub])
-  }
-
   @Test("Draft seeds target project types from item")
   func draftSeedsTargetProjectTypesFromItem() {
     let item = sampleTaskBoardItem(targetProjectTypes: ["web"])
@@ -195,14 +152,14 @@ struct TaskBoardItemEditorDraftTests {
     #expect(request.planning?.approvedAt == "2026-05-14T10:00:00Z")
   }
 
-  @Test("Monitor hides Todoist refs while unchanged update preserves server refs")
-  func monitorHidesTodoistRefsWhileUnchangedUpdatePreservesServerRefs() {
+  @Test("An untouched draft sends no external ref vector so server refs survive")
+  func untouchedDraftSendsNoExternalRefVector() {
     let item = sampleTaskBoardItem(
       externalRefs: [
         TaskBoardExternalRef(
-          provider: .todoist,
-          externalId: "todo-1",
-          url: "https://todoist.com/showTask?id=todo-1"
+          provider: .gitHub,
+          externalId: "41",
+          url: "https://github.com/example/project/issues/41"
         ),
         TaskBoardExternalRef(
           provider: .gitHub,
@@ -215,8 +172,8 @@ struct TaskBoardItemEditorDraftTests {
 
     let draft = TaskBoardItemEditorDraft(item: item)
 
-    #expect(draft.monitorVisibleExternalRefIDs == [draft.externalRefs[1].id])
-    #expect(draft.monitorVisibleExternalRefs.map(\.provider) == [.gitHub])
+    #expect(draft.externalRefs.count == 2)
+    #expect(draft.materializedExternalRefs.map(\.externalId) == ["41", "42"])
     #expect(draft.updateRequest.externalRefs == nil)
   }
 

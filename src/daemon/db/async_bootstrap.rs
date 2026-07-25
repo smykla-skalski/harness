@@ -173,6 +173,10 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         48..=49 => 52,
         // v53 adds the second half of the mark the same way round.
         50..=51 => 53,
+        // Schema v54 ships as two files: the Todoist row cleanup and the
+        // task_board_projects rebuild that drops 'todoist' from its source
+        // check.
+        52..=53 => 54,
         _ => u64::MAX,
     }
 }
@@ -314,9 +318,88 @@ fn baseline_migration() -> Result<&'static Migration, CliError> {
         .ok_or_else(|| db_error("missing daemon async baseline migration"))
 }
 
+/// Migrations that rebuild a referenced table have to rename it, and SQLite
+/// rewrites every REFERENCES clause pointing at a renamed table while
+/// enforcement is on - which turns the rename into a dangling foreign key once
+/// the temp table is dropped. The pragma is ignored inside a transaction and
+/// sqlx wraps each migration in one, so enforcement is suspended around the
+/// whole run on a single connection instead.
 async fn run_daemon_migrator(pool: &SqlitePool) -> Result<(), CliError> {
-    DAEMON_DB_MIGRATOR
-        .run(pool)
+    let mut conn = pool
+        .acquire()
         .await
-        .map_err(|error| db_error(format!("run async daemon migrations: {error}")))
+        .map_err(|error| db_error(format!("acquire async migration connection: {error}")))?;
+    query("PRAGMA foreign_keys = OFF")
+        .execute(&mut *conn)
+        .await
+        .map_err(|error| db_error(format!("suspend foreign keys for async migrations: {error}")))?;
+    query("PRAGMA legacy_alter_table = ON")
+        .execute(&mut *conn)
+        .await
+        .map_err(|error| db_error(format!("suspend alter-table fixups: {error}")))?;
+    let migrated = DAEMON_DB_MIGRATOR
+        .run_direct(None, &mut *conn, false)
+        .await
+        .map_err(|error| db_error(format!("run async daemon migrations: {error}")));
+    let restored = restore_migration_pragmas(&mut conn).await;
+    migrated.and(restored)
+}
+
+/// The connection goes back to the pool afterwards, so a restore that misses a
+/// statement leaves that one connection with enforcement off while every other
+/// connection in the pool has it on. Each pragma is its own statement because
+/// SQLite prepares one statement at a time.
+async fn restore_migration_pragmas(
+    conn: &mut sqlx::SqliteConnection,
+) -> Result<(), CliError> {
+    for pragma in ["PRAGMA legacy_alter_table = OFF", "PRAGMA foreign_keys = ON"] {
+        query(pragma).execute(&mut *conn).await.map_err(|error| {
+            db_error(format!("restore pragmas after async migrations: {error}"))
+        })?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod pragma_tests {
+    use super::{query, restore_migration_pragmas};
+    use crate::daemon::db::AsyncDaemonDb;
+
+    /// Reading the pragma back through the pool proves nothing: the pool opens
+    /// connections with `foreign_keys(true)`, so it can answer from a connection
+    /// that was never suspended. This asserts on the same connection the restore
+    /// ran against, which is the one handed back to the pool.
+    #[tokio::test]
+    async fn restoring_pragmas_applies_every_statement_on_that_connection() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+            .await
+            .expect("open async db");
+        let mut conn = db.pool().acquire().await.expect("acquire connection");
+        for pragma in ["PRAGMA foreign_keys = OFF", "PRAGMA legacy_alter_table = ON"] {
+            query(pragma)
+                .execute(&mut *conn)
+                .await
+                .expect("suspend pragma");
+        }
+
+        restore_migration_pragmas(&mut conn)
+            .await
+            .expect("restore pragmas");
+
+        let foreign_keys: i64 = sqlx::query_scalar("PRAGMA foreign_keys")
+            .fetch_one(&mut *conn)
+            .await
+            .expect("foreign_keys pragma");
+        let legacy_alter_table: i64 = sqlx::query_scalar("PRAGMA legacy_alter_table")
+            .fetch_one(&mut *conn)
+            .await
+            .expect("legacy_alter_table pragma");
+
+        assert_eq!(
+            (foreign_keys, legacy_alter_table),
+            (1, 0),
+            "a statement in the restore never reached the migrator's connection"
+        );
+    }
 }

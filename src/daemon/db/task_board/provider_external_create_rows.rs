@@ -168,16 +168,11 @@ pub(super) fn create_snapshot(
         ExternalProvider::GitHub => {
             normalize_optional_repository(item.execution_repository.as_deref(), &item.id)?
         }
-        ExternalProvider::Todoist => item.execution_repository.clone(),
     };
     let target_matches = match provider {
         ExternalProvider::GitHub => execution_repository
             .as_ref()
             .is_none_or(|repository| repository == &provider_target),
-        ExternalProvider::Todoist => item
-            .project_id
-            .as_ref()
-            .is_none_or(|project| project == &provider_target),
     };
     if !target_matches {
         return Err(create_conflict_for(
@@ -257,7 +252,6 @@ pub(super) fn next_timestamp(previous: &str) -> Result<String, CliError> {
 pub(super) fn provider_label(provider: ExternalProvider) -> &'static str {
     match provider {
         ExternalProvider::GitHub => "github",
-        ExternalProvider::Todoist => "todoist",
     }
 }
 
@@ -283,14 +277,6 @@ pub(super) fn normalize_provider_target(
     match provider {
         ExternalProvider::GitHub => normalize_repository_slug(Some(target))
             .ok_or_else(|| db_error(format!("invalid GitHub create target '{target}'"))),
-        ExternalProvider::Todoist => {
-            let target = target.trim();
-            if target.is_empty() {
-                Err(db_error("Todoist create target cannot be empty"))
-            } else {
-                Ok(target.to_owned())
-            }
-        }
     }
 }
 

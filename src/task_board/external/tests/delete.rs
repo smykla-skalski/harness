@@ -20,20 +20,20 @@ async fn sync_external_tasks_closes_remote_tasks_for_local_tombstones_when_provi
     );
     local.status = TaskBoardStatus::Todo;
     local.external_refs =
-        vec![ExternalTaskRef::new(ExternalProvider::Todoist, "remote-9").into_core_ref()];
+        vec![ExternalTaskRef::new(ExternalProvider::GitHub, "remote-9").into_core_ref()];
     board
         .create("Local task", "", local)
         .expect("create local task");
     board.delete("local-1").expect("tombstone local task");
 
-    let client = FakeSyncClient::new(ExternalProvider::Todoist, Vec::new()).with_delete();
+    let client = FakeSyncClient::new(ExternalProvider::GitHub, Vec::new()).with_delete();
     let deleted = client.deleted_handle();
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(client)];
 
     let operations = sync_external_tasks(
         &board,
         ExternalSyncOptions {
-            provider: Some(ExternalProvider::Todoist),
+            provider: Some(ExternalProvider::GitHub),
             direction: ExternalSyncDirection::Push,
             conflict_policy: ExternalSyncConflictPolicy::Report,
             dry_run: false,
@@ -64,21 +64,21 @@ async fn sync_external_tasks_skips_remote_delete_when_provider_default_disallows
         "2026-05-14T00:00:00Z".to_owned(),
     );
     local.external_refs =
-        vec![ExternalTaskRef::new(ExternalProvider::Todoist, "remote-12").into_core_ref()];
+        vec![ExternalTaskRef::new(ExternalProvider::GitHub, "remote-12").into_core_ref()];
     board
         .create("Local task", "", local)
         .expect("create local task");
     board.delete("local-2").expect("tombstone local task");
 
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient::new(
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         Vec::new(),
     ))];
 
     let operations = sync_external_tasks(
         &board,
         ExternalSyncOptions {
-            provider: Some(ExternalProvider::Todoist),
+            provider: Some(ExternalProvider::GitHub),
             direction: ExternalSyncDirection::Push,
             conflict_policy: ExternalSyncConflictPolicy::Report,
             dry_run: false,
@@ -107,19 +107,19 @@ async fn sync_external_tasks_records_remote_delete_dry_run_without_calling_provi
         "2026-05-14T00:00:00Z".to_owned(),
     );
     local.external_refs =
-        vec![ExternalTaskRef::new(ExternalProvider::Todoist, "remote-13").into_core_ref()];
+        vec![ExternalTaskRef::new(ExternalProvider::GitHub, "remote-13").into_core_ref()];
     board
         .create("Local task", "", local)
         .expect("create local task");
     board.delete("local-3").expect("tombstone local task");
 
-    let client = FakeSyncClient::new(ExternalProvider::Todoist, Vec::new()).with_delete();
+    let client = FakeSyncClient::new(ExternalProvider::GitHub, Vec::new()).with_delete();
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(client)];
 
     let operations = sync_external_tasks(
         &board,
         ExternalSyncOptions {
-            provider: Some(ExternalProvider::Todoist),
+            provider: Some(ExternalProvider::GitHub),
             direction: ExternalSyncDirection::Push,
             conflict_policy: ExternalSyncConflictPolicy::Report,
             dry_run: true,

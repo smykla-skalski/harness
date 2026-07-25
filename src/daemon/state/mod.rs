@@ -28,8 +28,7 @@ pub use config::{
     DaemonRuntimeConfig, VALID_LOG_LEVELS, load_persisted_log_level, load_runtime_config,
     parse_log_level, persist_log_level, replace_task_board_git_runtime_secrets,
     replace_task_board_github_tokens, replace_task_board_openrouter_token,
-    replace_task_board_todoist_token, task_board_github_repository_token, task_board_github_token,
-    task_board_openrouter_token, task_board_todoist_token,
+    task_board_github_repository_token, task_board_github_token, task_board_openrouter_token,
 };
 #[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use config::{

@@ -14,7 +14,6 @@ use super::types::TaskBoardOrchestratorSettings;
 use super::types::{
     TaskBoardGitHubInboxConfig, TaskBoardOrchestratorDispatchInput,
     TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
-    TaskBoardTodoistInboxConfig,
 };
 
 /// Rewrite legacy persisted settings entries on disk so strict enum
@@ -141,9 +140,6 @@ pub(super) fn apply_settings_update(
     if let Some(github_inbox) = &update.github_inbox {
         settings.github_inbox.clone_from(github_inbox);
     }
-    if let Some(todoist_inbox) = &update.todoist_inbox {
-        settings.todoist_inbox.clone_from(todoist_inbox);
-    }
     if let Some(scheduling) = &update.scheduling {
         settings.scheduling.clone_from(scheduling);
     }
@@ -192,15 +188,6 @@ pub(super) fn normalize_github_inbox(
         repositories,
         label_filter: normalize_trimmed_unique(&inbox.label_filter),
     })
-}
-
-#[cfg(test)]
-pub(super) fn normalize_todoist_inbox(
-    inbox: &TaskBoardTodoistInboxConfig,
-) -> TaskBoardTodoistInboxConfig {
-    TaskBoardTodoistInboxConfig {
-        project_filter: normalize_trimmed_unique(&inbox.project_filter),
-    }
 }
 
 #[cfg(test)]

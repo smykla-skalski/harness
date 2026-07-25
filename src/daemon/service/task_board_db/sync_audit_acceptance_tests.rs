@@ -60,7 +60,7 @@ async fn requested_partial_batch_records_scope_and_operation_evidence() {
                 "acme/worker".into(),
                 &provider_error,
             ),
-            ExternalSyncScopeOutcome::backing_off(ExternalProvider::Todoist, "project-42".into()),
+            ExternalSyncScopeOutcome::backing_off(ExternalProvider::GitHub, "acme/backoff".into()),
         ],
         Some(provider_error),
     );
@@ -168,7 +168,7 @@ async fn terminal_local_error_keeps_captured_batch_evidence() {
         )],
         external_create_follow_ups: Vec::new(),
         scope_outcomes: vec![ExternalSyncScopeOutcome::failed(
-            ExternalProvider::Todoist,
+            ExternalProvider::GitHub,
             "scope/primary".into(),
             &scope_error,
         )],

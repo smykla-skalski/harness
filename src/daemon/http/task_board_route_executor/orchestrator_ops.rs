@@ -10,8 +10,7 @@ use crate::daemon::protocol::{
     TaskBoardGitSigningVerifyRequest, TaskBoardGitSigningVerifyResponse,
     TaskBoardOpenRouterTokenSyncRequest, TaskBoardOpenRouterTokenSyncResponse,
     TaskBoardOrchestratorSettingsResponse, TaskBoardOrchestratorSettingsUpdateRequest,
-    TaskBoardOrchestratorStatusResponse, TaskBoardTodoistTokenSyncRequest,
-    TaskBoardTodoistTokenSyncResponse,
+    TaskBoardOrchestratorStatusResponse,
 };
 use crate::daemon::service;
 use crate::errors::{CliError, CliErrorKind};
@@ -135,16 +134,6 @@ pub(crate) async fn sync_github_tokens(
     let request = request.clone();
     run_blocking("github tokens sync", move || {
         service::sync_task_board_github_tokens(&request)
-    })
-    .await
-}
-
-pub(crate) async fn sync_todoist_token(
-    request: &TaskBoardTodoistTokenSyncRequest,
-) -> Result<TaskBoardTodoistTokenSyncResponse, CliError> {
-    let request = request.clone();
-    run_blocking("todoist token sync", move || {
-        service::sync_task_board_todoist_token(&request)
     })
     .await
 }

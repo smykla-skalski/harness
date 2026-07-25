@@ -26,8 +26,6 @@ use crate::errors::{CliError, CliErrorKind};
 #[cfg(any(target_os = "macos", test))]
 const SERVICE_GITHUB: &str = "io.harnessmonitor.task-board.github-credentials";
 #[cfg(any(target_os = "macos", test))]
-const SERVICE_TODOIST: &str = "io.harnessmonitor.task-board.todoist-credentials";
-#[cfg(any(target_os = "macos", test))]
 const SERVICE_SSH: &str = "io.harnessmonitor.task-board.ssh-key";
 #[cfg(any(target_os = "macos", test))]
 const SERVICE_SIGNING_SSH: &str = "io.harnessmonitor.task-board.signing-ssh-key";
@@ -85,8 +83,6 @@ pub enum SecretsCommand {
 pub enum SecretKindArg {
     /// GitHub personal access token.
     Github,
-    /// Todoist API token.
-    Todoist,
     /// SSH private key used for git transport authentication.
     Ssh,
     /// SSH private key used for commit/tag signing.
@@ -126,7 +122,6 @@ pub struct SecretMutateArgs {
 fn run_list() -> i32 {
     let entries = [
         ("GitHub token", SERVICE_GITHUB, "default"),
-        ("Todoist token", SERVICE_TODOIST, "default"),
         ("SSH key (global)", SERVICE_SSH, "global"),
         ("Signing SSH key (global)", SERVICE_SIGNING_SSH, "global"),
         ("GPG key (global)", SERVICE_GPG, "global"),
@@ -207,7 +202,6 @@ fn is_not_found(error: SecError) -> bool {
 fn resolve_service_account(args: &SecretScopeArgs) -> Result<(&'static str, String), CliError> {
     let (service, global_account) = match args.kind {
         SecretKindArg::Github => (SERVICE_GITHUB, "default"),
-        SecretKindArg::Todoist => (SERVICE_TODOIST, "default"),
         SecretKindArg::Ssh => (SERVICE_SSH, "global"),
         SecretKindArg::SigningSsh => (SERVICE_SIGNING_SSH, "global"),
         SecretKindArg::Gpg => (SERVICE_GPG, "global"),

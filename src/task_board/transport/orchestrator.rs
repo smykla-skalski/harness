@@ -14,9 +14,7 @@ use crate::task_board::{
     TaskBoardOrchestratorStatus, normalize_repository_slug, validate_task_board_policy,
 };
 
-use super::orchestrator_tokens::{
-    TaskBoardOrchestratorGithubTokensArgs, TaskBoardOrchestratorTodoistTokenArgs,
-};
+use super::orchestrator_tokens::TaskBoardOrchestratorGithubTokensArgs;
 use super::{daemon_client, print_json};
 
 #[derive(Debug, Clone, Subcommand)]
@@ -36,8 +34,6 @@ pub enum TaskBoardOrchestratorCommand {
     RuntimeConfig(Box<TaskBoardOrchestratorRuntimeConfigArgs>),
     /// Sync process-local GitHub tokens from environment variables.
     GithubTokens(TaskBoardOrchestratorGithubTokensArgs),
-    /// Sync the process-local Todoist token from an environment variable.
-    TodoistToken(TaskBoardOrchestratorTodoistTokenArgs),
 }
 
 #[derive(Debug, Clone, Args)]
@@ -157,7 +153,6 @@ impl Execute for TaskBoardOrchestratorCommand {
             Self::Settings(args) => args.execute(context),
             Self::RuntimeConfig(args) => args.execute(context),
             Self::GithubTokens(args) => args.execute(context),
-            Self::TodoistToken(args) => args.execute(context),
         }
     }
 }

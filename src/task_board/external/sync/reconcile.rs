@@ -310,7 +310,7 @@ fn conflicts_are_resolved(
 }
 
 fn converged_pull_fields(item: &TaskBoardItem, task: &ExternalTask) -> Vec<ExternalSyncField> {
-    pull_resolution_fields(task)
+    pull_resolution_fields()
         .into_iter()
         .filter(|field| match field {
             ExternalSyncField::Title => item.title == task.title,

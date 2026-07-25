@@ -69,8 +69,8 @@ pub use external::{
     ExternalSyncDirection, ExternalSyncField, ExternalSyncOperation, ExternalSyncOptions,
     ExternalTask, ExternalTaskRef, ExternalTaskUpdate, ExternalUpdateOutcome, GH_TOKEN_ENV,
     GITHUB_REPOSITORY_ENV, GitHubInboxSyncClient, GitHubSyncClient, HARNESS_GITHUB_REPOSITORY_ENV,
-    HARNESS_GITHUB_TOKEN_ENV, HARNESS_TODOIST_TOKEN_ENV, ProviderExclusionAuditContext,
-    ProviderExclusionRestoreOutcome, TodoistSyncClient, configured_sync_clients,
+    HARNESS_GITHUB_TOKEN_ENV, ProviderExclusionAuditContext, ProviderExclusionRestoreOutcome,
+    configured_sync_clients,
 };
 #[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use external::{
@@ -105,7 +105,7 @@ pub use orchestrator::{
     TaskBoardOrchestratorRunSummary, TaskBoardOrchestratorSettings,
     TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorState,
     TaskBoardOrchestratorStatus, TaskBoardOrchestratorTickInfo, TaskBoardOrchestratorTickPhase,
-    TaskBoardOrchestratorWorkflow, TaskBoardTodoistInboxConfig, TaskBoardWorkflowExecutionCount,
+    TaskBoardOrchestratorWorkflow, TaskBoardWorkflowExecutionCount,
 };
 pub use planning::{
     PlanApprovalBlockReason, PlanApprovalGate, PlanningTransition, approval_gate, approve_plan,
@@ -138,7 +138,7 @@ pub use runtime_config::{
     TaskBoardGitHubTokensSyncResponse, TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig,
     TaskBoardGitRuntimeProfile, TaskBoardGitSigningConfig, TaskBoardGitSigningMode,
     TaskBoardOpenRouterTokenSyncRequest, TaskBoardOpenRouterTokenSyncResponse,
-    TaskBoardTodoistTokenSyncRequest, TaskBoardTodoistTokenSyncResponse, normalize_repository_slug,
+    normalize_repository_slug,
 };
 #[cfg(test)]
 pub use store::TaskBoardStore;

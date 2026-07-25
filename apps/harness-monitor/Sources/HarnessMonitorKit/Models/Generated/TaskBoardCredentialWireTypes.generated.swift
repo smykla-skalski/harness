@@ -19,18 +19,6 @@ public struct TaskBoardGitHubTokensSyncResponseWire: Codable, Equatable, Sendabl
   }
 }
 
-public struct TaskBoardTodoistTokenSyncResponseWire: Codable, Equatable, Sendable {
-  public var tokenConfigured: Bool
-
-  public init(tokenConfigured: Bool) {
-    self.tokenConfigured = tokenConfigured
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case tokenConfigured = "token_configured"
-  }
-}
-
 public struct TaskBoardOpenRouterTokenSyncResponseWire: Codable, Equatable, Sendable {
   public var tokenConfigured: Bool
 

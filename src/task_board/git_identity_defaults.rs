@@ -55,7 +55,6 @@ pub struct TaskBoardSshKeyDiscovery {
 #[derive(utoipa::ToSchema)]
 pub struct TaskBoardEnvDefaults {
     pub harness_github_token_present: bool,
-    pub harness_todoist_token_present: bool,
 }
 
 pub fn discover() -> TaskBoardGitIdentityDefaults {
@@ -206,7 +205,6 @@ fn render_home_relative(path: &Path, home: &Path) -> String {
 fn discover_env_vars(env: &HashMap<String, String>) -> TaskBoardEnvDefaults {
     TaskBoardEnvDefaults {
         harness_github_token_present: env_value_present(env, "HARNESS_GITHUB_TOKEN"),
-        harness_todoist_token_present: env_value_present(env, "HARNESS_TODOIST_TOKEN"),
     }
 }
 
@@ -248,10 +246,10 @@ mod tests {
     fn env_var_present_treats_blank_as_absent() {
         let mut env = HashMap::new();
         env.insert("HARNESS_GITHUB_TOKEN".to_owned(), "  ".to_owned());
-        env.insert("HARNESS_TODOIST_TOKEN".to_owned(), "abc".to_owned());
-        let defaults = discover_env_vars(&env);
-        assert!(!defaults.harness_github_token_present);
-        assert!(defaults.harness_todoist_token_present);
+        assert!(!discover_env_vars(&env).harness_github_token_present);
+
+        env.insert("HARNESS_GITHUB_TOKEN".to_owned(), "abc".to_owned());
+        assert!(discover_env_vars(&env).harness_github_token_present);
     }
 
     #[test]

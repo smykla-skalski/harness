@@ -114,7 +114,6 @@ extension HarnessMonitorUITestAccessibility {
     "harness.settings.task-board.github-inbox.label-filter.add"
   static let settingsTaskBoardGlobalTokenField = "harness.settings.task-board.global-token"
   static let settingsTaskBoardSSHKeyPathField = "harness.settings.task-board.ssh-key-path"
-  static let settingsTaskBoardTodoistTokenField = "harness.settings.task-board.todoist-token"
   static let settingsTaskBoardAddOverrideButton = "harness.settings.task-board.override.add"
   static let settingsMCPSection = "harness.settings.mcp"
   static let settingsMCPRegistryHostToggle = "harness.settings.mcp.registry-host"

@@ -214,7 +214,6 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       globalTokenConfigured: Bool,
       repositoryTokenCount: Int
     )
-    case syncTaskBoardTodoistToken(tokenConfigured: Bool)
     case syncTaskBoardOpenRouterToken(tokenConfigured: Bool)
     case taskBoardGitIdentityDefaults
     case verifyTaskBoardGitSigning(repository: String?)
@@ -335,7 +334,6 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   let orchestratorSettingsMutationGate =
     RecordingTaskBoardOrchestratorSettingsMutationGate()
   var taskBoardGitHubTokensSyncError: (any Error)?
-  var taskBoardTodoistTokenSyncError: (any Error)?
   var taskBoardGitIdentityDefaultsValue = TaskBoardGitIdentityDefaults()
   var taskBoardGitSigningVerifyValue: TaskBoardGitSigningVerifyResponse = .skipped
   var taskBoardSecretHandoffStub = RecordingTaskBoardSecretHandoffStub()

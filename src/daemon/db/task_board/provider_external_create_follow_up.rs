@@ -236,7 +236,6 @@ fn compare_intents(
 const fn provider_label(provider: ExternalProvider) -> &'static str {
     match provider {
         ExternalProvider::GitHub => "github",
-        ExternalProvider::Todoist => "todoist",
     }
 }
 

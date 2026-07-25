@@ -1,4 +1,5 @@
 use super::*;
+use crate::task_board::ExternalRefProvider;
 
 #[test]
 fn github_slug_is_normalized_to_lowercase_owner_and_repository() {
@@ -19,9 +20,9 @@ fn github_slug_requires_exactly_one_separator() {
 }
 
 #[test]
-fn provider_slugs_keep_their_case_because_the_provider_owns_them() {
+fn a_manual_slug_keeps_its_case_because_the_user_typed_it() {
     assert_eq!(
-        TaskBoardProjectSource::Todoist.normalize_slug("  2334Ab  "),
+        TaskBoardProjectSource::Manual.normalize_slug("  2334Ab  "),
         Some("2334Ab".into())
     );
     assert_eq!(
@@ -38,7 +39,6 @@ fn provider_slugs_keep_their_case_because_the_provider_owns_them() {
 fn a_source_spells_itself_the_same_way_everywhere() {
     for source in [
         TaskBoardProjectSource::GitHub,
-        TaskBoardProjectSource::Todoist,
         TaskBoardProjectSource::Manual,
     ] {
         let stored = source.as_str();
@@ -62,7 +62,7 @@ fn generated_identifiers_are_unique_and_recognizable() {
 
 #[test]
 fn provider_project_values_are_not_mistaken_for_identifiers() {
-    // What `project_id` carries: Todoist project ids and repository slugs.
+    // What `project_id` carries: repository slugs and hand-entered names.
     // Telling them apart is what keeps a raw value off the card.
     for legacy in ["acme/widgets", "2334Ab", "project-17", "", "project-xyz"] {
         assert!(!is_project_id(legacy), "{legacy} is not a project id");
@@ -81,7 +81,6 @@ fn a_slug_past_the_column_limit_does_not_normalize() {
         TaskBoardProjectSource::Manual.normalize_slug(&fits),
         Some(fits.clone())
     );
-    assert_eq!(TaskBoardProjectSource::Todoist.normalize_slug(&long), None);
 
     // Bytes, not characters: 129 two-byte characters overflow 256 bytes.
     let multibyte = "é".repeat(129);
@@ -148,18 +147,6 @@ fn a_repository_slug_in_the_provider_column_reads_as_a_github_project() {
     assert_eq!(
         item_attribution(&item),
         ItemProjectAttribution::Register(TaskBoardProjectSource::GitHub, "acme/widgets".into())
-    );
-}
-
-#[test]
-fn a_provider_project_keeps_its_provider_as_the_source() {
-    let mut item = item();
-    item.project_id = Some("2334Ab".into());
-    item.imported_from_provider = Some(ExternalRefProvider::Todoist);
-
-    assert_eq!(
-        item_attribution(&item),
-        ItemProjectAttribution::Register(TaskBoardProjectSource::Todoist, "2334Ab".into())
     );
 }
 

@@ -370,8 +370,5 @@ fn blocked_batch(
 }
 
 fn requested_providers(provider: Option<ExternalProvider>) -> Vec<ExternalProvider> {
-    provider.map_or_else(
-        || vec![ExternalProvider::GitHub, ExternalProvider::Todoist],
-        |provider| vec![provider],
-    )
+    provider.map_or_else(|| vec![ExternalProvider::GitHub], |provider| vec![provider])
 }

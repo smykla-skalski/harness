@@ -190,9 +190,9 @@ fn pull_options(dry_run: bool) -> ExternalSyncOptions {
     }
 }
 
-fn todoist_pull_options(dry_run: bool) -> ExternalSyncOptions {
+fn scoped_pull_options(dry_run: bool) -> ExternalSyncOptions {
     ExternalSyncOptions {
-        provider: Some(ExternalProvider::Todoist),
+        provider: Some(ExternalProvider::GitHub),
         ..pull_options(dry_run)
     }
 }
@@ -458,12 +458,12 @@ async fn hide_reports_only_fields_the_pull_applied() {
     let store = FakeStore::default();
     *store.hide_result.lock().expect("lock") = Some(Some(item("item-1")));
     let mut matched = item_with_ref("item-1");
-    matched.external_refs[0].provider = ExternalRefProvider::Todoist;
+    matched.external_refs[0].provider = ExternalRefProvider::GitHub;
     matched.title = "Local title".into();
     matched.body = "Local body".into();
     matched.project_id = Some("local/project".into());
     let mut incoming = excluded_task("42");
-    incoming.reference = ExternalTaskRef::new(ExternalProvider::Todoist, "42");
+    incoming.reference = ExternalTaskRef::new(ExternalProvider::GitHub, "42");
     incoming.title = "Provider title".into();
     incoming.body = "Provider body".into();
     incoming.project_id = Some("provider/project".into());
@@ -471,8 +471,8 @@ async fn hide_reports_only_fields_the_pull_applied() {
 
     hide_existing_item_for_exclusion(
         &store,
-        todoist_pull_options(false),
-        ExternalProvider::Todoist,
+        scoped_pull_options(false),
+        ExternalProvider::GitHub,
         &matched,
         3,
         incoming,
@@ -489,7 +489,6 @@ async fn hide_reports_only_fields_the_pull_applied() {
             ExternalSyncField::Title,
             ExternalSyncField::Body,
             ExternalSyncField::Status,
-            ExternalSyncField::Project,
         ]
     );
 }

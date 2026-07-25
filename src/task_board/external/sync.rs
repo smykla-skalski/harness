@@ -10,12 +10,12 @@ use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::types::{TaskBoardItem, TaskBoardItemKind, TaskBoardStatus};
 use crate::workspace::utc_now;
 
-use super::targeting::{board_project_id_for_task, execution_repository_for_task};
+use super::targeting::execution_repository_for_task;
 use super::{
     ExternalProvider, ExternalRevisionUpdate, ExternalSyncClient, ExternalSyncConfig,
     ExternalSyncConflictPolicy, ExternalSyncField, ExternalTask, ExternalTaskRef,
     ExternalTaskUpdate, ExternalUpdateOutcome, GitHubInboxSyncClient, GitHubSyncClient,
-    TodoistSyncClient, canonical_external_status,
+    canonical_external_status,
 };
 
 mod batch;
@@ -152,9 +152,6 @@ fn configured_sync_clients_with_review_source(
             ExternalProvider::GitHub if config.token_for(provider).is_some() => {
                 add_github_clients(config, &mut clients, include_review_requests)?;
             }
-            ExternalProvider::Todoist if config.token_for(provider).is_some() => {
-                add_todoist_clients(config, &mut clients)?;
-            }
             _ if provider_was_requested => {
                 config.require_token(provider)?;
             }
@@ -164,27 +161,10 @@ fn configured_sync_clients_with_review_source(
     Ok(clients)
 }
 
-fn add_todoist_clients(
-    config: &ExternalSyncConfig,
-    clients: &mut Vec<Box<dyn ExternalSyncClient>>,
-) -> Result<(), CliError> {
-    if config.todoist_import_project_ids().is_empty() {
-        clients.push(Box::new(TodoistSyncClient::from_config(config)?));
-        return Ok(());
-    }
-    for project_id in config.todoist_import_project_ids() {
-        let scoped_config = config
-            .clone()
-            .with_todoist_import_project_ids_override(slice::from_ref(project_id));
-        clients.push(Box::new(TodoistSyncClient::from_config(&scoped_config)?));
-    }
-    Ok(())
-}
-
 fn requested_providers(provider: Option<ExternalProvider>) -> Vec<ExternalProvider> {
     match provider {
         Some(provider) => vec![provider],
-        None => vec![ExternalProvider::GitHub, ExternalProvider::Todoist],
+        None => vec![ExternalProvider::GitHub],
     }
 }
 
@@ -393,7 +373,8 @@ fn create_item_from_external(task: &ExternalTask) -> TaskBoardItem {
         now,
     );
     item.status = canonical_external_status(task.status);
-    item.project_id = board_project_id_for_task(task);
+    // A GitHub task's project is its repository, which belongs in
+    // `execution_repository`; the board project stays unset for imports.
     item.execution_repository = execution_repository_for_task(task);
     item.tags.clone_from(&task.labels);
     if task_signals_umbrella(task) {

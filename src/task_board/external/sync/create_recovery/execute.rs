@@ -74,7 +74,7 @@ pub(crate) async fn create_item_durably(
     follow_ups: &mut Vec<TaskBoardExternalCreateIntent>,
 ) -> Result<DurableCreateResult, SyncClientError> {
     let capability = require_recovery_capability(client, item).map_err(SyncClientError::Local)?;
-    let provider_target = create_target(client, item);
+    let provider_target = client.scope_for_item(item);
     let scope = ExternalProviderScopeIdentity::for_client(client);
     let decision = board
         .begin_external_create_intent(
@@ -391,7 +391,7 @@ fn require_recovery_capability<'a>(
     client: &'a dyn ExternalSyncClient,
     item: &TaskBoardItem,
 ) -> Result<&'a dyn ExternalCreateRecoveryClient, CliError> {
-    let target = create_target(client, item);
+    let target = client.scope_for_item(item);
     let capability = client.external_create_recovery().ok_or_else(|| {
         CliErrorKind::workflow_io("provider does not support durable create recovery")
     })?;
@@ -402,15 +402,6 @@ fn require_recovery_capability<'a>(
         .into());
     }
     Ok(capability)
-}
-
-fn create_target(client: &dyn ExternalSyncClient, item: &TaskBoardItem) -> String {
-    if client.provider() == ExternalProvider::Todoist
-        && let Some(project_id) = &item.project_id
-    {
-        return project_id.clone();
-    }
-    client.scope_for_item(item)
 }
 
 fn require_intent_capability<'a>(

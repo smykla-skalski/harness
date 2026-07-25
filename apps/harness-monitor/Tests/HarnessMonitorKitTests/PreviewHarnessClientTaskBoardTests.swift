@@ -428,14 +428,11 @@ struct PreviewHarnessClientTaskBoardTests {
     )
     let clientSyncState = TaskBoardExternalRefSyncState(status: .todo)
 
+    // Identity is (provider, externalId), so with one provider left the only way
+    // to be a new identity is a differing externalId - casing included.
     let updated = item.applyingPreviewUpdate(
       TaskBoardUpdateItemRequest(
         externalRefs: [
-          TaskBoardExternalRef(
-            provider: .todoist,
-            externalId: "example/project#42",
-            syncState: clientSyncState
-          ),
           TaskBoardExternalRef(
             provider: .gitHub,
             externalId: "EXAMPLE/PROJECT#42",
@@ -450,7 +447,7 @@ struct PreviewHarnessClientTaskBoardTests {
       )
     )
 
-    #expect(updated.externalRefs.count == 3)
+    #expect(updated.externalRefs.count == 2)
     #expect(updated.externalRefs.allSatisfy { $0.syncState == nil })
   }
 

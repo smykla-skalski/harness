@@ -6,7 +6,7 @@ use tempfile::tempdir;
 use super::*;
 use crate::task_board::{
     ExternalSyncAction, ExternalSyncOperation, GH_TOKEN_ENV, GITHUB_REPOSITORY_ENV,
-    HARNESS_GITHUB_REPOSITORY_ENV, HARNESS_GITHUB_TOKEN_ENV, HARNESS_TODOIST_TOKEN_ENV,
+    HARNESS_GITHUB_REPOSITORY_ENV, HARNESS_GITHUB_TOKEN_ENV,
     TaskBoardGitHubProjectConfig, TaskBoardItem, TaskBoardStore, TaskBoardSyncSummary,
     TaskBoardWorkflowStatus,
 };
@@ -20,7 +20,6 @@ fn sync_github_tasks_uses_settings_repository_fallback_before_dispatch() {
             (GH_TOKEN_ENV, None::<&str>),
             (HARNESS_GITHUB_REPOSITORY_ENV, None::<&str>),
             (GITHUB_REPOSITORY_ENV, None::<&str>),
-            (HARNESS_TODOIST_TOKEN_ENV, None::<&str>),
         ],
         || {
             let root = temp.path().join("board");
@@ -96,7 +95,6 @@ fn sync_github_tasks_skips_item_scoped_runs() {
             (GH_TOKEN_ENV, None::<&str>),
             (HARNESS_GITHUB_REPOSITORY_ENV, Some("owner/repo")),
             (GITHUB_REPOSITORY_ENV, None::<&str>),
-            (HARNESS_TODOIST_TOKEN_ENV, None::<&str>),
         ],
         || {
             let root = temp.path().join("board");

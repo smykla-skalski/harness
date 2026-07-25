@@ -189,7 +189,6 @@ fn render_external_refs(references: &[ExternalRef]) -> Option<String> {
             .map(|reference| {
                 let provider = match reference.provider {
                     ExternalRefProvider::GitHub => "github",
-                    ExternalRefProvider::Todoist => "todoist",
                 };
                 reference.url.as_ref().map_or_else(
                     || format!("{provider}:{}", reference.external_id),

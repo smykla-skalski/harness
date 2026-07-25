@@ -89,17 +89,6 @@ extension RecordingHarnessClient {
     )
   }
 
-  func syncTaskBoardTodoistToken(
-    request: TaskBoardTodoistTokenSyncRequest
-  ) async throws -> TaskBoardTodoistTokenSyncResponse {
-    record(.syncTaskBoardTodoistToken(tokenConfigured: request.token != nil))
-    let error = lock.withLock { taskBoardTodoistTokenSyncError }
-    if let error {
-      throw error
-    }
-    return TaskBoardTodoistTokenSyncResponse(tokenConfigured: request.token != nil)
-  }
-
   func syncTaskBoardOpenRouterToken(
     request: TaskBoardOpenRouterTokenSyncRequest
   ) async throws -> TaskBoardOpenRouterTokenSyncResponse {

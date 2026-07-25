@@ -45,7 +45,6 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
   public let projectDir: String?
   public let githubProject: TaskBoardGitHubProjectConfig
   public let githubInbox: TaskBoardGitHubInboxConfig
-  public let todoistInbox: TaskBoardTodoistInboxConfig
   public let scheduling: TaskBoardAutomationSchedulingSettings
   public let retry: TaskBoardAutomationRetrySettings
   public let reviewers: TaskBoardReviewerSettings
@@ -59,7 +58,6 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
     projectDir: String? = nil,
     githubProject: TaskBoardGitHubProjectConfig = TaskBoardGitHubProjectConfig(),
     githubInbox: TaskBoardGitHubInboxConfig = TaskBoardGitHubInboxConfig(),
-    todoistInbox: TaskBoardTodoistInboxConfig = TaskBoardTodoistInboxConfig(),
     scheduling: TaskBoardAutomationSchedulingSettings? = nil,
     retry: TaskBoardAutomationRetrySettings? = nil,
     reviewers: TaskBoardReviewerSettings? = nil,
@@ -72,7 +70,6 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
     self.projectDir = projectDir
     self.githubProject = githubProject
     self.githubInbox = githubInbox
-    self.todoistInbox = todoistInbox
     self.scheduling = scheduling ?? Self.defaultScheduling
     self.retry = retry ?? Self.defaultRetry
     self.reviewers = reviewers ?? Self.defaultReviewers
@@ -87,7 +84,6 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
     case projectDir
     case githubProject
     case githubInbox
-    case todoistInbox
     case scheduling
     case retry
     case reviewers
@@ -116,10 +112,6 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
         TaskBoardGitHubInboxConfig.self,
         forKey: .githubInbox
       ) ?? TaskBoardGitHubInboxConfig(),
-      todoistInbox: try container.decodeIfPresent(
-        TaskBoardTodoistInboxConfig.self,
-        forKey: .todoistInbox
-      ) ?? TaskBoardTodoistInboxConfig(),
       scheduling: try container.decodeIfPresent(
         TaskBoardAutomationSchedulingSettings.self,
         forKey: .scheduling
@@ -175,7 +167,6 @@ public struct TaskBoardOrchestratorSettingsUpdateRequest: Codable, Equatable, Se
   public let clearProjectDir: Bool
   public let githubProject: TaskBoardGitHubProjectConfig?
   public let githubInbox: TaskBoardGitHubInboxConfig?
-  public let todoistInbox: TaskBoardTodoistInboxConfig?
   public let policyVersion: String?
 
   public init(
@@ -188,7 +179,6 @@ public struct TaskBoardOrchestratorSettingsUpdateRequest: Codable, Equatable, Se
     clearProjectDir: Bool = false,
     githubProject: TaskBoardGitHubProjectConfig? = nil,
     githubInbox: TaskBoardGitHubInboxConfig? = nil,
-    todoistInbox: TaskBoardTodoistInboxConfig? = nil,
     policyVersion: String? = nil
   ) {
     self.stepMode = stepMode
@@ -200,7 +190,6 @@ public struct TaskBoardOrchestratorSettingsUpdateRequest: Codable, Equatable, Se
     self.clearProjectDir = clearProjectDir
     self.githubProject = githubProject
     self.githubInbox = githubInbox
-    self.todoistInbox = todoistInbox
     self.policyVersion = policyVersion
   }
 }

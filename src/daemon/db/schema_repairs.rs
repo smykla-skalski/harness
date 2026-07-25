@@ -231,6 +231,9 @@ fn current_schema_objects_missing(conn: &super::Connection) -> Result<bool, CliE
     if !table_sql_contains(conn, "task_board_dispatch_intents", "'held'")? {
         return Ok(true);
     }
+    if table_sql_contains(conn, "task_board_projects", "'todoist'")? {
+        return Ok(true);
+    }
     for (table, column) in CURRENT_SCHEMA_REMOTE_ACME_COLUMNS {
         if !column_exists(conn, table, column)? {
             return Ok(true);
@@ -294,6 +297,10 @@ pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError>
     super::schema_v51::run(&db.conn)?;
     super::schema_v52::run(&db.conn)?;
     super::schema_v53::run(&db.conn)?;
+    // v51 recreates task_board_projects from its original DDL, which still
+    // names 'todoist' in the source check. Replaying v54 behind it is what
+    // keeps a repaired database from being stamped current with the old shape.
+    super::schema_v54::run(&db.conn)?;
     super::schema_repairs_external_creates::require_complete_shape(&db.conn)?;
     super::schema_repairs_wake_events::require_complete_shape(&db.conn)?;
     super::schema_repairs_admission::require_complete_shape(&db.conn)?;

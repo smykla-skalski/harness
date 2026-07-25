@@ -40,7 +40,12 @@ extension HarnessMonitorStore {
   /// Minimum daemon wire version this build of the app is compatible with.
   /// Bumped in lockstep with the daemon's `DAEMON_WIRE_VERSION` when a
   /// breaking schema change ships.
-  nonisolated public static let minimumDaemonWireVersion: Int = 3
+  ///
+  /// v4 dropped `todoist` from the external-provider values, and
+  /// `ExternalRefProviderWire` throws on a provider it does not know, so a
+  /// daemon still serving one out of an unmigrated database has to be reported
+  /// as skewed instead of failing every board decode.
+  nonisolated public static let minimumDaemonWireVersion: Int = 4
 
   /// True when the connected daemon's `wire_version` predates the
   /// [`Self.minimumDaemonWireVersion`] this app expects.

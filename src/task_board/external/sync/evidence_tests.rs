@@ -108,7 +108,7 @@ async fn applied_pull_evidence_survives_conflict_cleanup_failure() {
             dry_run: false,
             ..ExternalSyncOptions::default()
         },
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         &item,
         0,
         task,
@@ -143,7 +143,7 @@ async fn converged_concurrent_pull_emits_no_applied_evidence() {
             dry_run: false,
             ..ExternalSyncOptions::default()
         },
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         &expected,
         0,
         task,
@@ -203,7 +203,7 @@ impl PullClient {
 #[async_trait]
 impl ExternalSyncClient for PullClient {
     fn provider(&self) -> ExternalProvider {
-        ExternalProvider::Todoist
+        ExternalProvider::GitHub
     }
 
     fn scope_id(&self) -> String {
@@ -259,7 +259,7 @@ fn pull_options() -> ExternalSyncOptions {
 
 fn pulled_task(external_id: &str, title: &str) -> ExternalTask {
     ExternalTask {
-        reference: ExternalTaskRef::new(ExternalProvider::Todoist, external_id),
+        reference: ExternalTaskRef::new(ExternalProvider::GitHub, external_id),
         title: title.into(),
         body: String::new(),
         status: TaskBoardStatus::Backlog,
@@ -277,7 +277,7 @@ fn linked_item(id: &str, title: &str) -> TaskBoardItem {
         "2026-07-16T10:00:00Z".into(),
     );
     let mut reference =
-        ExternalTaskRef::new(ExternalProvider::Todoist, "remote-linked").into_core_ref();
+        ExternalTaskRef::new(ExternalProvider::GitHub, "remote-linked").into_core_ref();
     reference.sync_state = Some(ExternalRefSyncState {
         title: Some("Base title".into()),
         body: Some("Body".into()),
@@ -293,7 +293,7 @@ fn linked_item(id: &str, title: &str) -> TaskBoardItem {
 
 fn remote_task(title: &str) -> ExternalTask {
     ExternalTask {
-        reference: ExternalTaskRef::new(ExternalProvider::Todoist, "remote-linked"),
+        reference: ExternalTaskRef::new(ExternalProvider::GitHub, "remote-linked"),
         title: title.into(),
         body: "Body".into(),
         status: TaskBoardStatus::Backlog,

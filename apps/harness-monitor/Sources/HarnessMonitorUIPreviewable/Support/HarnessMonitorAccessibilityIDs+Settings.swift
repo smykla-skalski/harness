@@ -232,8 +232,6 @@ extension HarnessMonitorAccessibility {
     "harness.settings.task-board.github-inbox.repositories.repo"
   public static let settingsTBInboxLabelAddButton =
     "harness.settings.task-board.github-inbox.label-filter.add"
-  public static let settingsTaskBoardTodoistProjectField =
-    "harness.settings.task-board.todoist-inbox.project-filter"
   public static let settingsTaskBoardHostStatus = "harness.settings.task-board.host.status"
   public static let settingsTaskBoardHostLocalIdField =
     "harness.settings.task-board.host.local-id"
@@ -271,8 +269,6 @@ extension HarnessMonitorAccessibility {
   public static let settingsTaskBoardGPGPassphraseField =
     "harness.settings.task-board.gpg-private-key-passphrase"
   public static let settingsTaskBoardGlobalTokenField = "harness.settings.task-board.global-token"
-  public static let settingsTaskBoardTodoistTokenField =
-    "harness.settings.task-board.todoist-token"
   public static let settingsTaskBoardAddOverrideButton = "harness.settings.task-board.override.add"
 
   public static func settingsSectionButton(_ key: String) -> String {

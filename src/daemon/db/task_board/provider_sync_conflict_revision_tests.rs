@@ -83,7 +83,7 @@ async fn conflict_payload_revision_must_match_replacement_revision() {
 }
 
 #[tokio::test]
-async fn conflict_payload_must_match_the_declared_provider_scope() {
+async fn conflict_payload_must_match_the_declared_external_ref() {
     let dir = tempdir().expect("tempdir");
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
@@ -110,19 +110,8 @@ async fn conflict_payload_must_match_the_declared_provider_scope() {
         )
         .await
         .expect_err("mismatched external ref must be rejected");
-    let wrong_provider_error = db
-        .replace_open_task_board_sync_conflicts(
-            "task-revision-fence",
-            ExternalProvider::Todoist,
-            "acme/widgets#17",
-            1,
-            &[conflict],
-        )
-        .await
-        .expect_err("mismatched provider must be rejected");
 
     assert_eq!(wrong_ref_error.code(), "WORKFLOW_CONCURRENT");
-    assert_eq!(wrong_provider_error.code(), "WORKFLOW_CONCURRENT");
     assert!(
         db.open_task_board_sync_conflicts()
             .await

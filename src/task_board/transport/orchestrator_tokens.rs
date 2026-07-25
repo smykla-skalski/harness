@@ -5,8 +5,7 @@ use clap::Args;
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::{
-    TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
-    TaskBoardTodoistTokenSyncRequest, normalize_repository_slug,
+    TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest, normalize_repository_slug,
 };
 
 use super::{daemon_client, print_json};
@@ -21,16 +20,6 @@ pub struct TaskBoardOrchestratorGithubTokensArgs {
     pub global_token_env: Option<String>,
     #[arg(long)]
     pub repository_token_env: Vec<String>,
-}
-
-#[derive(Debug, Clone, Args)]
-pub struct TaskBoardOrchestratorTodoistTokenArgs {
-    #[arg(long)]
-    pub json: bool,
-    #[arg(long)]
-    pub clear: bool,
-    #[arg(long)]
-    pub token_env: Option<String>,
 }
 
 impl Execute for TaskBoardOrchestratorGithubTokensArgs {
@@ -75,36 +64,6 @@ impl TaskBoardOrchestratorGithubTokensArgs {
     }
 }
 
-impl Execute for TaskBoardOrchestratorTodoistTokenArgs {
-    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        if !self.clear && self.token_env.is_none() {
-            return Err(CliErrorKind::workflow_parse("provide --clear or --token-env").into());
-        }
-        let request = self.sync_request()?;
-        let response = daemon_client()?.sync_task_board_todoist_token(&request)?;
-        if self.json {
-            print_json(&response)?;
-        } else {
-            println!(
-                "task-board todoist token: configured={}",
-                response.token_configured
-            );
-        }
-        Ok(0)
-    }
-}
-
-impl TaskBoardOrchestratorTodoistTokenArgs {
-    fn sync_request(&self) -> Result<TaskBoardTodoistTokenSyncRequest, CliError> {
-        if self.clear {
-            return Ok(TaskBoardTodoistTokenSyncRequest::default());
-        }
-        Ok(TaskBoardTodoistTokenSyncRequest {
-            token: self.token_env.as_deref().map(read_secret_env).transpose()?,
-        })
-    }
-}
-
 fn read_secret_env(name: &str) -> Result<String, CliError> {
     let value = env::var(name).map_err(|_| {
         CliErrorKind::workflow_parse(format!("environment variable '{name}' is not set"))
@@ -140,38 +99,45 @@ mod tests {
     use super::*;
 
     #[test]
-    fn todoist_token_sync_request_reads_env_and_clear_has_no_token() {
-        temp_env::with_var("HARNESS_TEST_TODOIST_TOKEN", Some("todoist-token"), || {
-            let request = TaskBoardOrchestratorTodoistTokenArgs {
+    fn github_token_sync_request_reads_env_and_clear_has_no_token() {
+        temp_env::with_var("HARNESS_TEST_GITHUB_TOKEN", Some("github-token"), || {
+            let request = TaskBoardOrchestratorGithubTokensArgs {
                 json: true,
                 clear: false,
-                token_env: Some("HARNESS_TEST_TODOIST_TOKEN".into()),
+                global_token_env: Some("HARNESS_TEST_GITHUB_TOKEN".into()),
+                repository_token_env: Vec::new(),
             }
             .sync_request()
             .expect("sync request");
-            assert_eq!(request.token.as_deref(), Some("todoist-token"));
+            assert_eq!(request.global_token.as_deref(), Some("github-token"));
         });
 
-        let request = TaskBoardOrchestratorTodoistTokenArgs {
+        let request = TaskBoardOrchestratorGithubTokensArgs {
             json: true,
             clear: true,
-            token_env: None,
+            global_token_env: None,
+            repository_token_env: Vec::new(),
         }
         .sync_request()
         .expect("clear request");
-        assert!(request.token.is_none());
+        assert!(request.global_token.is_none());
     }
 
     #[test]
-    fn todoist_token_sync_requires_env_or_clear() {
-        let error = TaskBoardOrchestratorTodoistTokenArgs {
+    fn github_token_sync_requires_env_or_clear() {
+        let error = TaskBoardOrchestratorGithubTokensArgs {
             json: false,
             clear: false,
-            token_env: None,
+            global_token_env: None,
+            repository_token_env: Vec::new(),
         }
         .execute(&AppContext)
         .expect_err("missing token source should fail");
 
-        assert!(error.to_string().contains("provide --clear or --token-env"));
+        assert!(
+            error
+                .to_string()
+                .contains("provide --clear, --global-token-env, or --repository-token-env")
+        );
     }
 }

@@ -108,7 +108,7 @@ pub fn build_sync_summary(
     items: &[TaskBoardItem],
     config: &ExternalSyncConfig,
 ) -> TaskBoardSyncSummary {
-    let providers = [ExternalProvider::GitHub, ExternalProvider::Todoist]
+    let providers = [ExternalProvider::GitHub]
         .into_iter()
         .map(|provider| provider_sync_summary(items, config, provider))
         .collect();
@@ -264,7 +264,6 @@ fn can_push_to_provider(
             item.project_id.as_deref().is_some_and(is_github_repo)
                 || config.github_repository().is_some()
         }
-        ExternalProvider::Todoist => true,
     }
 }
 

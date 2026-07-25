@@ -276,16 +276,6 @@ extension HarnessMonitorAPIClient {
     return TaskBoardGitHubTokensSyncResponse(wire: wire)
   }
 
-  public func syncTaskBoardTodoistToken(
-    request: TaskBoardTodoistTokenSyncRequest
-  ) async throws -> TaskBoardTodoistTokenSyncResponse {
-    let wire: TaskBoardTodoistTokenSyncResponseWire = try await put(
-      "/v1/task-board/orchestrator/todoist-token", body: request,
-      decoder: PolicyWireCoding.decoder
-    )
-    return TaskBoardTodoistTokenSyncResponse(wire: wire)
-  }
-
   public func syncTaskBoardOpenRouterToken(
     request: TaskBoardOpenRouterTokenSyncRequest
   ) async throws -> TaskBoardOpenRouterTokenSyncResponse {

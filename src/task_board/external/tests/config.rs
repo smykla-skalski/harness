@@ -3,8 +3,7 @@ use temp_env::with_vars;
 use crate::task_board::{
     ExternalProvider, ExternalRefProvider, ExternalSyncClient, ExternalSyncConfig, ExternalTaskRef,
     GH_TOKEN_ENV, GITHUB_REPOSITORY_ENV, GitHubInboxSyncClient, GitHubSyncClient,
-    HARNESS_GITHUB_REPOSITORY_ENV, HARNESS_GITHUB_TOKEN_ENV, HARNESS_TODOIST_TOKEN_ENV,
-    TodoistSyncClient, configured_sync_clients,
+    HARNESS_GITHUB_REPOSITORY_ENV, HARNESS_GITHUB_TOKEN_ENV, configured_sync_clients,
 };
 
 #[test]
@@ -15,7 +14,6 @@ fn env_config_prefers_harness_github_token() {
             (HARNESS_GITHUB_REPOSITORY_ENV, Some(" owner/repo ")),
             (GITHUB_REPOSITORY_ENV, Some("fallback/repo")),
             (GH_TOKEN_ENV, Some("gh-token")),
-            (HARNESS_TODOIST_TOKEN_ENV, Some("todoist-token")),
         ],
         ExternalSyncConfig::from_env,
     );
@@ -23,10 +21,6 @@ fn env_config_prefers_harness_github_token() {
     assert_eq!(
         config.token_for(ExternalProvider::GitHub),
         Some("harness-token")
-    );
-    assert_eq!(
-        config.token_for(ExternalProvider::Todoist),
-        Some("todoist-token")
     );
     assert_eq!(config.github_repository.as_deref(), Some("owner/repo"));
 }
@@ -39,13 +33,11 @@ fn env_config_falls_back_to_gh_token() {
             (HARNESS_GITHUB_REPOSITORY_ENV, None::<&str>),
             (GITHUB_REPOSITORY_ENV, None::<&str>),
             (GH_TOKEN_ENV, Some("gh-token")),
-            (HARNESS_TODOIST_TOKEN_ENV, None::<&str>),
         ],
         ExternalSyncConfig::from_env,
     );
 
     assert_eq!(config.token_for(ExternalProvider::GitHub), Some("gh-token"));
-    assert_eq!(config.token_for(ExternalProvider::Todoist), None);
 }
 
 #[test]
@@ -55,15 +47,21 @@ fn config_debug_redacts_tokens() {
         github_repository: Some("owner/repo".to_owned()),
         github_inbox_repositories: Vec::new(),
         github_import_labels: Vec::new(),
-        todoist_token: None,
-        todoist_import_project_ids: Vec::new(),
     };
 
     let debug = format!("{config:?}");
     assert!(debug.contains("<redacted>"));
-    assert!(debug.contains("<unset>"));
     assert!(debug.contains("owner/repo"));
     assert!(!debug.contains("secret"));
+
+    // A missing token has to read as absent rather than as an empty redaction,
+    // so the two states stay distinguishable in a log.
+    let unset = ExternalSyncConfig {
+        github_token: None,
+        ..config
+    };
+
+    assert!(format!("{unset:?}").contains("<unset>"));
 }
 
 #[test]
@@ -95,13 +93,9 @@ fn provider_constructors_require_tokens_without_network() {
     let github_error = GitHubSyncClient::from_config(&config)
         .expect_err("missing github token should fail")
         .message();
-    let todoist_error = TodoistSyncClient::from_config(&config)
-        .expect_err("missing todoist token should fail")
-        .message();
 
     assert!(github_error.contains(HARNESS_GITHUB_TOKEN_ENV));
     assert!(github_error.contains(GH_TOKEN_ENV));
-    assert!(todoist_error.contains(HARNESS_TODOIST_TOKEN_ENV));
 }
 
 #[test]
@@ -113,8 +107,6 @@ fn github_repository_fallback_is_used_only_when_env_is_missing() {
         github_repository: Some("env/repo".to_string()),
         github_inbox_repositories: Vec::new(),
         github_import_labels: Vec::new(),
-        todoist_token: None,
-        todoist_import_project_ids: Vec::new(),
     }
     .with_github_repository_fallback(Some("owner/repo"));
 
@@ -149,24 +141,16 @@ async fn github_sync_client_can_disable_pull_for_inbox_overlap() {
 }
 
 #[test]
-fn configured_clients_split_provider_filters_into_independent_scopes() {
+fn configured_clients_split_inbox_filters_into_independent_scopes() {
     let config = ExternalSyncConfig::default()
         .with_github_token_override(Some("token"))
-        .with_github_inbox_repositories_override(&["Acme/Widgets".into(), "acme/tools".into()])
-        .with_todoist_token_override(Some("token"))
-        .with_todoist_import_project_ids_override(&["project-1".into(), "project-2".into()]);
+        .with_github_inbox_repositories_override(&["Acme/Widgets".into(), "acme/tools".into()]);
 
     let github = configured_sync_clients(&config, Some(ExternalProvider::GitHub))
         .expect("GitHub clients")
         .into_iter()
         .map(|client| client.scope_id())
         .collect::<Vec<_>>();
-    let todoist = configured_sync_clients(&config, Some(ExternalProvider::Todoist))
-        .expect("Todoist clients")
-        .into_iter()
-        .map(|client| client.scope_id())
-        .collect::<Vec<_>>();
 
     assert_eq!(github, vec!["linked", "acme/widgets", "acme/tools"]);
-    assert_eq!(todoist, vec!["project-1", "project-2"]);
 }

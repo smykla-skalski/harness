@@ -75,7 +75,7 @@ Dispatch readiness requires:
 
 The CLI sets `approved_at` when `--approved-by` is provided.
 
-Standard GitHub issue sync imports new open repo-scoped items into `backlog` with a synthesized planning summary. The separate GitHub inbox flow for selected repos imports new issues assigned to you and pull requests requesting your review into `backlog`. Todoist imports also enter `backlog`. Backlog items are not dispatchable; take an item through planning and approval, which moves the approved prioritized item to `todo`. Existing synced Todo items are not moved automatically. Closed external items map to `done`, and review-request inbox items that GitHub no longer reports for you are automatically resolved on the next pull sync.
+Standard GitHub issue sync imports new open repo-scoped items into `backlog` with a synthesized planning summary. The separate GitHub inbox flow for selected repos imports new issues assigned to you and pull requests requesting your review into `backlog`. Backlog items are not dispatchable; take an item through planning and approval, which moves the approved prioritized item to `todo`. Existing synced Todo items are not moved automatically. Closed external items map to `done`, and review-request inbox items that GitHub no longer reports for you are automatically resolved on the next pull sync.
 
 ## Intake And Planning
 

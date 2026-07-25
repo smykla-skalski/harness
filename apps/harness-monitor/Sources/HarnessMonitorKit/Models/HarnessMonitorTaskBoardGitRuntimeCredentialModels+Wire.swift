@@ -1,6 +1,6 @@
 import Foundation
 
-// Wire maps for the orchestrator token-sync response bodies (GitHub/Todoist/OpenRouter). Thin
+// Wire maps for the orchestrator token-sync response bodies (GitHub/OpenRouter). Thin
 // mirrors; the GitHub repository count narrows UInt -> Int.
 
 extension TaskBoardGitHubTokensSyncResponse {
@@ -9,12 +9,6 @@ extension TaskBoardGitHubTokensSyncResponse {
       globalTokenConfigured: wire.globalTokenConfigured,
       repositoryTokenCount: Int(wire.repositoryTokenCount)
     )
-  }
-}
-
-extension TaskBoardTodoistTokenSyncResponse {
-  init(wire: TaskBoardTodoistTokenSyncResponseWire) {
-    self.init(tokenConfigured: wire.tokenConfigured)
   }
 }
 

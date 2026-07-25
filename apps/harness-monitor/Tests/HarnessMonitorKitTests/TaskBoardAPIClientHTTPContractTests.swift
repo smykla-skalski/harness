@@ -13,7 +13,6 @@ extension TaskBoardAPIClientTests {
     let orchestrator = try await performHTTPOrchestratorCalls(client)
     let settings = try await performHTTPSettingsCalls(client)
     let tokenSync = try await performHTTPGitHubTokenCalls(client)
-    let todoistTokenSync = try await performHTTPTodoistTokenCalls(client)
     try await performHTTPDiscoveryCalls(client)
     let planning = try await performHTTPPlanningCalls(client)
     try await performHTTPSecretHandoffCalls(client)
@@ -28,8 +27,7 @@ extension TaskBoardAPIClientTests {
       updatedSettings: settings.updatedSettings,
       runtimeConfig: settings.runtimeConfig,
       updatedRuntimeConfig: settings.updatedRuntimeConfig,
-      tokenSync: tokenSync,
-      todoistTokenSync: todoistTokenSync
+      tokenSync: tokenSync
     )
   }
 
@@ -127,14 +125,6 @@ extension TaskBoardAPIClientTests {
     )
   }
 
-  private func performHTTPTodoistTokenCalls(
-    _ client: HarnessMonitorAPIClient
-  ) async throws -> TaskBoardTodoistTokenSyncResponse {
-    try await client.syncTaskBoardTodoistToken(
-      request: TaskBoardTodoistTokenSyncRequest(token: "todoist-token")
-    )
-  }
-
   private func performHTTPDiscoveryCalls(_ client: HarnessMonitorAPIClient) async throws {
     _ = try await client.taskBoardProjects(status: .todo)
     _ = try await client.taskBoardMachines(status: .todo)
@@ -204,7 +194,7 @@ extension TaskBoardAPIClientTests {
       records.map(\.method)
         == [
           "GET", "GET", "POST", "PUT", "DELETE", "POST", "POST", "POST", "GET", "GET", "POST",
-          "POST", "POST", "GET", "PUT", "GET", "PUT", "PUT", "PUT", "GET", "GET", "POST",
+          "POST", "POST", "GET", "PUT", "GET", "PUT", "PUT", "GET", "GET", "POST",
           "POST", "POST", "POST", "POST", "GET", "PUT",
         ]
     )
@@ -229,7 +219,6 @@ extension TaskBoardAPIClientTests {
           "/v1/task-board/orchestrator/runtime-config",
           "/v1/task-board/orchestrator/runtime-config",
           "/v1/task-board/orchestrator/github-tokens",
-          "/v1/task-board/orchestrator/todoist-token",
           "/v1/task-board/projects",
           "/v1/task-board/machines",
           "/v1/task-board/items/board-1/planning/begin",
@@ -298,18 +287,17 @@ extension TaskBoardAPIClientTests {
     let repositoryTokens = records[17].body?["repository_tokens"] as? [[String: Any]]
     #expect(repositoryTokens?.first?["repository"] as? String == "example/harness")
     #expect(repositoryTokens?.first?["token"] as? String == "ghu_repo")
-    #expect(records[18].body?["token"] as? String == "todoist-token")
+    #expect(records[18].query == "status=todo")
     #expect(records[19].query == "status=todo")
-    #expect(records[20].query == "status=todo")
-    #expect(records[21].body?.isEmpty == true)
-    #expect(records[22].body?["summary"] as? String == "Use the semantic plan.")
-    #expect(records[23].body?["approved_by"] as? String == "lead")
-    #expect(records[23].body?["approved_at"] as? String == "2026-05-14T02:00:00Z")
-    #expect(records[24].body?.isEmpty == true)
-    #expect(records[25].body?["migration_id"] as? String == "migration-1")
-    #expect(records[25].body?["digest"] as? String == "digest-1")
-    #expect(records[26].body == nil)
-    #expect((records[27].body?["runtime"] as? [String: Any]) != nil)
+    #expect(records[20].body?.isEmpty == true)
+    #expect(records[21].body?["summary"] as? String == "Use the semantic plan.")
+    #expect(records[22].body?["approved_by"] as? String == "lead")
+    #expect(records[22].body?["approved_at"] as? String == "2026-05-14T02:00:00Z")
+    #expect(records[23].body?.isEmpty == true)
+    #expect(records[24].body?["migration_id"] as? String == "migration-1")
+    #expect(records[24].body?["digest"] as? String == "digest-1")
+    #expect(records[25].body == nil)
+    #expect((records[26].body?["runtime"] as? [String: Any]) != nil)
   }
 
 }
@@ -325,7 +313,6 @@ struct TaskBoardHTTPContractResult {
   let runtimeConfig: TaskBoardGitRuntimeConfig
   let updatedRuntimeConfig: TaskBoardGitRuntimeConfig
   let tokenSync: TaskBoardGitHubTokensSyncResponse
-  let todoistTokenSync: TaskBoardTodoistTokenSyncResponse
 }
 
 private struct TaskBoardHTTPWorkflowResult {

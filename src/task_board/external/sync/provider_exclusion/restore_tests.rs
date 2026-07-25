@@ -311,7 +311,7 @@ async fn restore_reports_only_fields_the_pull_applied() {
     stored.tombstone_cause = Some(crate::task_board::TaskBoardTombstoneCause::ProviderExclusion);
     stored.tags = vec!["duplicate".into()];
     stored.external_refs = vec![crate::task_board::types::ExternalRef {
-        provider: ExternalRefProvider::Todoist,
+        provider: ExternalRefProvider::GitHub,
         external_id: "42".into(),
         url: None,
         sync_state: Some(crate::task_board::types::ExternalRefSyncState {
@@ -328,7 +328,7 @@ async fn restore_reports_only_fields_the_pull_applied() {
         Box::new(item("stored-legacy-id")),
     ));
     let mut incoming = task("42");
-    incoming.reference = ExternalTaskRef::new(ExternalProvider::Todoist, "42");
+    incoming.reference = ExternalTaskRef::new(ExternalProvider::GitHub, "42");
     incoming.title = "Provider title".into();
     incoming.body = "Provider body".into();
     incoming.project_id = Some("provider/project".into());
@@ -338,8 +338,8 @@ async fn restore_reports_only_fields_the_pull_applied() {
     try_restore_provider_exclusion_tombstone(
         &store,
         &index,
-        todoist_pull_options(false),
-        ExternalProvider::Todoist,
+        scoped_pull_options(false),
+        ExternalProvider::GitHub,
         &incoming,
         None,
         &mut operations,
@@ -354,7 +354,6 @@ async fn restore_reports_only_fields_the_pull_applied() {
             ExternalSyncField::Title,
             ExternalSyncField::Body,
             ExternalSyncField::Status,
-            ExternalSyncField::Project,
         ]
     );
 }

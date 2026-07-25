@@ -152,7 +152,7 @@ fn websocket_task_board_crud_sync_audit_and_orchestrator_routes_use_real_state()
                     id: "req-crud-sync-error".to_string(),
                     method: ws_methods::TASK_BOARD_SYNC.to_string(),
                     params: json!({
-                        "provider": "todoist",
+                        "provider": "github",
                         "direction": "pull",
                         "dry_run": true,
                     }),
@@ -294,17 +294,6 @@ fn websocket_task_board_crud_sync_audit_and_orchestrator_routes_use_real_state()
             .await;
             assert_eq!(tokens["global_token_configured"].as_bool(), Some(true));
             assert_eq!(tokens["repository_token_count"].as_u64(), Some(1));
-            let todoist = call(
-                &state,
-                &connection,
-                "req-orch-todoist-token",
-                ws_methods::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN_SYNC,
-                json!({
-                    "token": "todoist-token",
-                }),
-            )
-            .await;
-            assert_eq!(todoist["token_configured"].as_bool(), Some(true));
             let defaults = call(
                 &state,
                 &connection,

@@ -334,9 +334,9 @@ mod tests {
             <AsyncDaemonDb as TaskBoardExternalCreateStore>::begin_external_create_intent(
                 &db,
                 "task-create-store",
-                ExternalProvider::Todoist,
-                "todoist:scope",
-                "todoist-project",
+                ExternalProvider::GitHub,
+                "acme/widgets",
+                "acme/widgets",
             )
             .await
             .expect("begin create");
@@ -345,7 +345,7 @@ mod tests {
         };
         assert_eq!(
             <AsyncDaemonDb as TaskBoardExternalCreateStore>::
-                list_in_flight_external_create_intents(&db, ExternalProvider::Todoist)
+                list_in_flight_external_create_intents(&db, ExternalProvider::GitHub)
                 .await
                 .expect("list in-flight"),
             vec![intent.clone()]
@@ -353,7 +353,7 @@ mod tests {
         assert_eq!(
             <AsyncDaemonDb as TaskBoardExternalCreateStore>::external_create_intent_by_create_key(
                 &db,
-                ExternalProvider::Todoist,
+                ExternalProvider::GitHub,
                 &intent.create_key,
             )
             .await
@@ -390,7 +390,7 @@ mod tests {
         assert_eq!(
             <AsyncDaemonDb as TaskBoardExternalCreateStore>::external_create_intent_by_create_key(
                 &db,
-                ExternalProvider::Todoist,
+                ExternalProvider::GitHub,
                 &intent.create_key,
             )
             .await
@@ -400,7 +400,7 @@ mod tests {
         assert_eq!(
             <AsyncDaemonDb as TaskBoardExternalCreateStore>::list_pending_external_create_follow_ups(
                 &db,
-                Some(ExternalProvider::Todoist),
+                Some(ExternalProvider::GitHub),
             )
             .await
             .expect("list pending attached receipts"),
@@ -424,8 +424,8 @@ mod tests {
         .expect("create item");
         db.replace_open_task_board_sync_conflicts(
             "task-conflict-store",
-            ExternalProvider::Todoist,
-            "todoist-task",
+            ExternalProvider::GitHub,
+            "acme/widgets#17",
             1,
             &[
                 conflict("conflict-title", "title"),
@@ -438,8 +438,8 @@ mod tests {
         <AsyncDaemonDb as TaskBoardSyncStore>::supersede_open_sync_conflicts(
             &db,
             "task-conflict-store",
-            ExternalProvider::Todoist,
-            "todoist-task",
+            ExternalProvider::GitHub,
+            "acme/widgets#17",
             1,
             &[ExternalSyncField::Title],
         )
@@ -457,19 +457,19 @@ mod tests {
     fn create_evidence(
         intent: &TaskBoardExternalCreateIntent,
     ) -> (ExternalCreateOutcome, crate::task_board::ExternalRef) {
-        let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "todoist-task")
-            .with_url("https://example.invalid/tasks/todoist-task");
+        let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "acme/widgets#17")
+            .with_url("https://example.invalid/acme/widgets/issues/17");
         let outcome = ExternalCreateOutcome {
             reference: reference.clone(),
             provider_revision: Some("provider-revision".into()),
-            provider_project_id: Some("todoist-project".into()),
+            provider_project_id: Some("acme/widgets".into()),
         };
         let mut baseline = reference.into_core_ref();
         baseline.sync_state = Some(ExternalRefSyncState {
             title: Some(intent.snapshot.title.clone()),
             body: Some(intent.snapshot.body.clone()),
             status: Some(TaskBoardStatus::Backlog),
-            project_id: Some("todoist-project".into()),
+            project_id: Some("acme/widgets".into()),
             updated_at: Some("provider-revision".into()),
             synced_at: Some("2026-07-16T15:01:00Z".into()),
             labels: Vec::new(),
@@ -481,8 +481,8 @@ mod tests {
         TaskBoardSyncConflict {
             conflict_id: conflict_id.into(),
             item_id: "task-conflict-store".into(),
-            provider: ExternalRefProvider::Todoist,
-            external_ref: "todoist-task".into(),
+            provider: ExternalRefProvider::GitHub,
+            external_ref: "acme/widgets#17".into(),
             field: field.into(),
             base_value: serde_json::json!("base"),
             local_value: serde_json::json!("local"),

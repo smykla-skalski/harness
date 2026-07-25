@@ -5,7 +5,7 @@ use crate::errors::CliError;
 
 use super::{
     ExternalProvider, GH_TOKEN_ENV, GITHUB_REPOSITORY_ENV, HARNESS_GITHUB_REPOSITORY_ENV,
-    HARNESS_GITHUB_TOKEN_ENV, HARNESS_TODOIST_TOKEN_ENV, missing_token_error,
+    HARNESS_GITHUB_TOKEN_ENV, missing_token_error,
 };
 
 #[derive(Clone, Default, PartialEq, Eq)]
@@ -14,8 +14,6 @@ pub struct ExternalSyncConfig {
     pub github_repository: Option<String>,
     pub github_inbox_repositories: Vec<String>,
     pub github_import_labels: Vec<String>,
-    pub todoist_token: Option<String>,
-    pub todoist_import_project_ids: Vec<String>,
 }
 
 impl ExternalSyncConfig {
@@ -29,8 +27,6 @@ impl ExternalSyncConfig {
             ]),
             github_inbox_repositories: Vec::new(),
             github_import_labels: Vec::new(),
-            todoist_token: first_present_env(&[HARNESS_TODOIST_TOKEN_ENV]),
-            todoist_import_project_ids: Vec::new(),
         }
     }
 
@@ -38,7 +34,6 @@ impl ExternalSyncConfig {
     pub fn token_for(&self, provider: ExternalProvider) -> Option<&str> {
         match provider {
             ExternalProvider::GitHub => self.github_token.as_deref(),
-            ExternalProvider::Todoist => self.todoist_token.as_deref(),
         }
     }
 
@@ -61,22 +56,8 @@ impl ExternalSyncConfig {
     }
 
     #[must_use]
-    pub fn todoist_import_project_ids(&self) -> &[String] {
-        &self.todoist_import_project_ids
-    }
-
-    #[must_use]
     pub fn with_github_token_override(mut self, token: Option<&str>) -> Self {
         self.github_token = token
-            .map(str::trim)
-            .filter(|token| !token.is_empty())
-            .map(ToOwned::to_owned);
-        self
-    }
-
-    #[must_use]
-    pub fn with_todoist_token_override(mut self, token: Option<&str>) -> Self {
-        self.todoist_token = token
             .map(str::trim)
             .filter(|token| !token.is_empty())
             .map(ToOwned::to_owned);
@@ -122,11 +103,6 @@ impl ExternalSyncConfig {
     }
 
     #[must_use]
-    pub fn with_todoist_import_project_ids_override(mut self, project_ids: &[String]) -> Self {
-        self.todoist_import_project_ids = normalize_string_list(project_ids);
-        self
-    }
-
     /// Return the configured token for a provider.
     ///
     /// # Errors
@@ -147,11 +123,6 @@ impl fmt::Debug for ExternalSyncConfig {
             .field("github_repository", &self.github_repository)
             .field("github_inbox_repositories", &self.github_inbox_repositories)
             .field("github_import_labels", &self.github_import_labels)
-            .field("todoist_token", &redacted(self.todoist_token.as_deref()))
-            .field(
-                "todoist_import_project_ids",
-                &self.todoist_import_project_ids,
-            )
             .finish()
     }
 }

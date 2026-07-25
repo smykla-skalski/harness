@@ -23,7 +23,6 @@ extension TaskBoardAPIClientTests {
     let orchestrator = try await performWebSocketOrchestratorCalls(transport)
     let settings = try await performWebSocketSettingsCalls(transport)
     let tokenSync = try await performWebSocketGitHubTokenCalls(transport)
-    let todoistTokenSync = try await performWebSocketTodoistTokenCalls(transport)
     try await performWebSocketDiscoveryCalls(transport)
     let planning = try await performWebSocketPlanningCalls(transport)
     try await performWebSocketSecretHandoffCalls(transport)
@@ -39,8 +38,7 @@ extension TaskBoardAPIClientTests {
       runOnce: orchestrator.runOnce,
       runtimeConfig: settings.runtimeConfig,
       updatedRuntimeConfig: settings.updatedRuntimeConfig,
-      tokenSync: tokenSync,
-      todoistTokenSync: todoistTokenSync
+      tokenSync: tokenSync
     )
   }
 
@@ -144,14 +142,6 @@ extension TaskBoardAPIClientTests {
     )
   }
 
-  private func performWebSocketTodoistTokenCalls(
-    _ transport: WebSocketTransport
-  ) async throws -> TaskBoardTodoistTokenSyncResponse {
-    try await transport.syncTaskBoardTodoistToken(
-      request: TaskBoardTodoistTokenSyncRequest(token: "todoist-token")
-    )
-  }
-
   private func performWebSocketDiscoveryCalls(_ transport: WebSocketTransport) async throws {
     _ = try await transport.taskBoardProjects(status: .todo)
     _ = try await transport.taskBoardMachines(status: .todo)
@@ -214,7 +204,6 @@ extension TaskBoardAPIClientTests {
           .taskBoardOrchestratorRuntimeConfigGet,
           .taskBoardOrchestratorRuntimeConfigUpdate,
           .taskBoardOrchestratorGitHubTokensSync,
-          .taskBoardOrchestratorTodoistTokenSync,
           .taskBoardProjects,
           .taskBoardMachines,
           .taskBoardPlanBegin,
@@ -296,20 +285,19 @@ extension TaskBoardAPIClientTests {
     } else {
       Issue.record("Expected repository_tokens array in websocket token sync payload")
     }
-    #expect(objectValue(calls[18].params, key: "token") == .string("todoist-token"))
+    #expect(objectValue(calls[18].params, key: "status") == .string("todo"))
     #expect(objectValue(calls[19].params, key: "status") == .string("todo"))
-    #expect(objectValue(calls[20].params, key: "status") == .string("todo"))
+    #expect(objectValue(calls[20].params, key: "id") == .string("board-1"))
     #expect(objectValue(calls[21].params, key: "id") == .string("board-1"))
+    #expect(objectValue(calls[21].params, key: "summary") == .string("Use the semantic plan."))
     #expect(objectValue(calls[22].params, key: "id") == .string("board-1"))
-    #expect(objectValue(calls[22].params, key: "summary") == .string("Use the semantic plan."))
-    #expect(objectValue(calls[23].params, key: "id") == .string("board-1"))
-    #expect(objectValue(calls[23].params, key: "approved_by") == .string("lead"))
-    #expect(objectValue(calls[23].params, key: "approved_at") == .string("2026-05-14T02:00:00Z"))
-    #expect(calls[24].params == nil)
-    #expect(objectValue(calls[25].params, key: "migration_id") == .string("migration-1"))
-    #expect(objectValue(calls[25].params, key: "digest") == .string("digest-1"))
-    #expect(calls[26].params == nil)
-    #expect(objectValue(calls[27].params, key: "runtime") != nil)
+    #expect(objectValue(calls[22].params, key: "approved_by") == .string("lead"))
+    #expect(objectValue(calls[22].params, key: "approved_at") == .string("2026-05-14T02:00:00Z"))
+    #expect(calls[23].params == nil)
+    #expect(objectValue(calls[24].params, key: "migration_id") == .string("migration-1"))
+    #expect(objectValue(calls[24].params, key: "digest") == .string("digest-1"))
+    #expect(calls[25].params == nil)
+    #expect(objectValue(calls[26].params, key: "runtime") != nil)
   }
 
   func assertWebSocketResults(_ result: TaskBoardWebSocketContractResult) {
@@ -331,7 +319,6 @@ extension TaskBoardAPIClientTests {
     #expect(result.runtimeConfig.global.authorEmail == "bot@example.com")
     #expect(result.updatedRuntimeConfig.repositoryOverrides.first?.profile.signing.mode == .gpg)
     #expect(result.tokenSync.repositoryTokenCount == 1)
-    #expect(result.todoistTokenSync.tokenConfigured == true)
   }
 
   private func objectValue(_ value: JSONValue?, key: String) -> JSONValue? {
@@ -353,7 +340,6 @@ struct TaskBoardWebSocketContractResult {
   let runtimeConfig: TaskBoardGitRuntimeConfig
   let updatedRuntimeConfig: TaskBoardGitRuntimeConfig
   let tokenSync: TaskBoardGitHubTokensSyncResponse
-  let todoistTokenSync: TaskBoardTodoistTokenSyncResponse
 }
 
 private struct TaskBoardWebSocketWorkflowResult {

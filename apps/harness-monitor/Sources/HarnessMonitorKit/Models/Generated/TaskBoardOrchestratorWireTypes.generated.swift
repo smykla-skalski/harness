@@ -25,23 +25,6 @@ public struct TaskBoardGitHubInboxConfigWire: Codable, Equatable, Sendable {
   }
 }
 
-public struct TaskBoardTodoistInboxConfigWire: Codable, Equatable, Sendable {
-  public var projectFilter: [String]
-
-  public init(projectFilter: [String] = []) {
-    self.projectFilter = projectFilter
-  }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    projectFilter = try container.decodeIfPresent([String].self, forKey: .projectFilter) ?? []
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case projectFilter = "project_filter"
-  }
-}
-
 public struct TaskBoardOrchestratorSettingsWire: Codable, Equatable, Sendable {
   public var stepMode: Bool
   public var enabledWorkflows: [TaskBoardOrchestratorWorkflow]
@@ -50,13 +33,12 @@ public struct TaskBoardOrchestratorSettingsWire: Codable, Equatable, Sendable {
   public var projectDir: String?
   public var githubProject: GitHubProjectConfigWire
   public var githubInbox: TaskBoardGitHubInboxConfigWire
-  public var todoistInbox: TaskBoardTodoistInboxConfigWire
   public var scheduling: TaskBoardAutomationSchedulingSettings?
   public var retry: TaskBoardAutomationRetrySettings?
   public var reviewers: TaskBoardReviewerSettings?
   public var policyVersion: String
 
-  public init(stepMode: Bool = false, enabledWorkflows: [TaskBoardOrchestratorWorkflow] = [], dryRunDefault: Bool = true, dispatchStatusFilter: TaskBoardStatus? = nil, projectDir: String? = nil, githubProject: GitHubProjectConfigWire, githubInbox: TaskBoardGitHubInboxConfigWire = TaskBoardGitHubInboxConfigWire(), todoistInbox: TaskBoardTodoistInboxConfigWire = TaskBoardTodoistInboxConfigWire(), scheduling: TaskBoardAutomationSchedulingSettings? = nil, retry: TaskBoardAutomationRetrySettings? = nil, reviewers: TaskBoardReviewerSettings? = nil, policyVersion: String = "task-board-policy-v1") {
+  public init(stepMode: Bool = false, enabledWorkflows: [TaskBoardOrchestratorWorkflow] = [], dryRunDefault: Bool = true, dispatchStatusFilter: TaskBoardStatus? = nil, projectDir: String? = nil, githubProject: GitHubProjectConfigWire, githubInbox: TaskBoardGitHubInboxConfigWire = TaskBoardGitHubInboxConfigWire(), scheduling: TaskBoardAutomationSchedulingSettings? = nil, retry: TaskBoardAutomationRetrySettings? = nil, reviewers: TaskBoardReviewerSettings? = nil, policyVersion: String = "task-board-policy-v1") {
     self.stepMode = stepMode
     self.enabledWorkflows = enabledWorkflows
     self.dryRunDefault = dryRunDefault
@@ -64,7 +46,6 @@ public struct TaskBoardOrchestratorSettingsWire: Codable, Equatable, Sendable {
     self.projectDir = projectDir
     self.githubProject = githubProject
     self.githubInbox = githubInbox
-    self.todoistInbox = todoistInbox
     self.scheduling = scheduling
     self.retry = retry
     self.reviewers = reviewers
@@ -80,7 +61,6 @@ public struct TaskBoardOrchestratorSettingsWire: Codable, Equatable, Sendable {
     projectDir = try container.decodeIfPresent(String.self, forKey: .projectDir)
     githubProject = try container.decode(GitHubProjectConfigWire.self, forKey: .githubProject)
     githubInbox = try container.decodeIfPresent(TaskBoardGitHubInboxConfigWire.self, forKey: .githubInbox) ?? TaskBoardGitHubInboxConfigWire()
-    todoistInbox = try container.decodeIfPresent(TaskBoardTodoistInboxConfigWire.self, forKey: .todoistInbox) ?? TaskBoardTodoistInboxConfigWire()
     scheduling = try container.decodeIfPresent(TaskBoardAutomationSchedulingSettings.self, forKey: .scheduling)
     retry = try container.decodeIfPresent(TaskBoardAutomationRetrySettings.self, forKey: .retry)
     reviewers = try container.decodeIfPresent(TaskBoardReviewerSettings.self, forKey: .reviewers)
@@ -95,7 +75,6 @@ public struct TaskBoardOrchestratorSettingsWire: Codable, Equatable, Sendable {
     case projectDir = "project_dir"
     case githubProject = "github_project"
     case githubInbox = "github_inbox"
-    case todoistInbox = "todoist_inbox"
     case scheduling
     case retry
     case reviewers

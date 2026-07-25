@@ -1,19 +1,13 @@
 import Foundation
 
 // Wire maps for the orchestrator settings + status tree. The settings reuse the GitHubProjectConfig
-// sub-tree map and the two inbox configs; the status reuses the sync/audit/dispatch/evaluation
+// sub-tree map and the inbox config; the status reuses the sync/audit/dispatch/evaluation
 // summary maps. enabledWorkflows/dispatchStatusFilter and the tick-phase/run-status enums ride bare
 // (decoder-agnostic), so they carry across without a per-value map.
 
 extension TaskBoardGitHubInboxConfig {
   init(wire: TaskBoardGitHubInboxConfigWire) {
     self.init(repositories: wire.repositories, labelFilter: wire.labelFilter)
-  }
-}
-
-extension TaskBoardTodoistInboxConfig {
-  init(wire: TaskBoardTodoistInboxConfigWire) {
-    self.init(projectFilter: wire.projectFilter)
   }
 }
 
@@ -27,7 +21,6 @@ extension TaskBoardOrchestratorSettings {
       projectDir: wire.projectDir,
       githubProject: TaskBoardGitHubProjectConfig(wire: wire.githubProject),
       githubInbox: TaskBoardGitHubInboxConfig(wire: wire.githubInbox),
-      todoistInbox: TaskBoardTodoistInboxConfig(wire: wire.todoistInbox),
       scheduling: wire.scheduling,
       retry: wire.retry,
       reviewers: wire.reviewers,

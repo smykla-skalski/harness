@@ -95,8 +95,6 @@ pub const TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_UPDATE: &str =
     "task_board.orchestrator_runtime_config_update";
 pub const TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS_SYNC: &str =
     "task_board.orchestrator_github_tokens_sync";
-pub const TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN_SYNC: &str =
-    "task_board.orchestrator_todoist_token_sync";
 pub const TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN_SYNC: &str =
     "task_board.orchestrator_openrouter_token_sync";
 pub const TASK_BOARD_GIT_IDENTITY_DEFAULTS: &str = "task_board.git_identity_defaults";
@@ -297,7 +295,6 @@ pub const ALL: &[&str] = &[
     TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_GET,
     TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_UPDATE,
     TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS_SYNC,
-    TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN_SYNC,
     TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN_SYNC,
     TASK_BOARD_GIT_IDENTITY_DEFAULTS,
     TASK_BOARD_GIT_SIGNING_VERIFY,

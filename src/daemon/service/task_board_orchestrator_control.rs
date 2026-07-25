@@ -15,9 +15,7 @@ use crate::task_board::{
 };
 
 use super::task_board_db::task_board_host_local_db;
-use super::task_board_orchestrator_settings::{
-    apply_settings_update, normalize_github_inbox, normalize_todoist_inbox,
-};
+use super::task_board_orchestrator_settings::{apply_settings_update, normalize_github_inbox};
 
 pub(crate) async fn task_board_orchestrator_status_db(
     db: &AsyncDaemonDb,
@@ -92,7 +90,6 @@ pub(crate) async fn update_task_board_orchestrator_settings_db(
     let mut settings = db.task_board_orchestrator_settings().await?;
     apply_settings_update(&mut settings, request);
     settings.github_inbox = normalize_github_inbox(&settings.github_inbox)?;
-    settings.todoist_inbox = normalize_todoist_inbox(&settings.todoist_inbox);
     replace_orchestrator_settings_with_durable(
         db,
         &settings,

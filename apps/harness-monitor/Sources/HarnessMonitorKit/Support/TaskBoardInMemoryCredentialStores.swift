@@ -49,44 +49,6 @@ final class InMemoryTaskBoardGitHubCredentialStore:
   }
 }
 
-final class InMemoryTaskBoardTodoistCredentialStore:
-  TaskBoardTodoistCredentialPersisting, @unchecked Sendable
-{
-  private let lock = NSLock()
-  private var snapshotsValue: [TaskBoardCredentialScope: TaskBoardTodoistCredentialSnapshot] = [:]
-
-  var snapshot: TaskBoardTodoistCredentialSnapshot {
-    (try? load(scope: .legacy)) ?? TaskBoardTodoistCredentialSnapshot()
-  }
-
-  func load(
-    scope: TaskBoardCredentialScope = .legacy
-  ) throws -> TaskBoardTodoistCredentialSnapshot {
-    lock.lock()
-    defer { lock.unlock() }
-    return snapshotsValue[scope] ?? TaskBoardTodoistCredentialSnapshot()
-  }
-
-  func save(
-    _ snapshot: TaskBoardTodoistCredentialSnapshot,
-    scope: TaskBoardCredentialScope = .legacy
-  ) throws {
-    lock.lock()
-    defer { lock.unlock() }
-    if snapshot.isEmpty {
-      snapshotsValue.removeValue(forKey: scope)
-    } else {
-      snapshotsValue[scope] = snapshot
-    }
-  }
-
-  func delete(scope: TaskBoardCredentialScope = .legacy) throws {
-    lock.lock()
-    defer { lock.unlock() }
-    snapshotsValue.removeValue(forKey: scope)
-  }
-}
-
 final class InMemoryTaskBoardOpenRouterCredentialStore:
   TaskBoardOpenRouterCredentialPersisting, @unchecked Sendable
 {
@@ -170,8 +132,8 @@ extension TaskBoardCredentialPersistence {
   static var inMemory: Self {
     Self(
       github: InMemoryTaskBoardGitHubCredentialStore(),
-      todoist: InMemoryTaskBoardTodoistCredentialStore(),
-      openRouter: InMemoryTaskBoardOpenRouterCredentialStore()
+      openRouter: InMemoryTaskBoardOpenRouterCredentialStore(),
+      retiredTodoistPurge: RecordingTaskBoardTodoistCredentialPurge().purge
     )
   }
 }

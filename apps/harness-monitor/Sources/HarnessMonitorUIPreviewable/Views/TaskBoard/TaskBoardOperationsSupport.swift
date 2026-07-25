@@ -73,7 +73,6 @@ enum TaskBoardStatusFilterChoice: String, CaseIterable, Identifiable, Hashable {
 enum TaskBoardExternalProviderChoice: String, CaseIterable, Identifiable, Hashable {
   case all
   case gitHub
-  case todoist
 
   static let monitorVisibleChoice: Self = .gitHub
 
@@ -83,8 +82,6 @@ enum TaskBoardExternalProviderChoice: String, CaseIterable, Identifiable, Hashab
       self = .all
     case .gitHub:
       self = .gitHub
-    case .todoist:
-      self = .todoist
     }
   }
 
@@ -100,8 +97,6 @@ enum TaskBoardExternalProviderChoice: String, CaseIterable, Identifiable, Hashab
       nil
     case .gitHub:
       .gitHub
-    case .todoist:
-      .todoist
     }
   }
 }
@@ -111,17 +106,6 @@ extension TaskBoardExternalProvider {
     switch self {
     case .gitHub:
       "GitHub"
-    case .todoist:
-      "Todoist"
-    }
-  }
-
-  var isVisibleInMonitorUI: Bool {
-    switch self {
-    case .gitHub:
-      true
-    case .todoist:
-      false
     }
   }
 }
@@ -136,16 +120,6 @@ extension TaskBoardExternalSyncDirection {
     case .both:
       "Bidirectional"
     }
-  }
-}
-
-extension TaskBoardSyncSummary {
-  var monitorVisibleProviders: [TaskBoardProviderSyncSummary] {
-    providers.filter { $0.provider.isVisibleInMonitorUI }
-  }
-
-  var monitorVisibleOperations: [TaskBoardExternalSyncOperation] {
-    operations.filter { $0.provider.isVisibleInMonitorUI }
   }
 }
 

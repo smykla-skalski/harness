@@ -6,32 +6,32 @@ import Testing
 
 @Suite("Settings task-board draft")
 struct SettingsTaskBoardDraftTests {
-  @Test("Todoist token round trips through secure credentials snapshot")
-  func todoistTokenRoundTripsThroughSnapshot() {
+  @Test("OpenRouter token round trips through secure credentials snapshot")
+  func openRouterTokenRoundTripsThroughSnapshot() {
     let source = TaskBoardGitSettingsSnapshot(
       orchestratorSettings: TaskBoardOrchestratorSettings(policyVersion: "task-board-policy-v1"),
       runtimeConfig: TaskBoardGitRuntimeConfig(),
       githubCredentials: TaskBoardGitHubCredentialSnapshot(globalToken: "ghu_global"),
-      todoistCredentials: TaskBoardTodoistCredentialSnapshot(token: "todoist-token")
+      openRouterCredentials: TaskBoardOpenRouterCredentialSnapshot(token: "sk-or-token")
     )
 
     var draft = TaskBoardGitSettingsDraft(snapshot: source)
-    draft.todoistToken = .editing(" next-todoist-token ")
+    draft.openRouterToken = .editing(" sk-or-next ")
 
     let snapshot = draft.snapshot
 
     #expect(snapshot.githubCredentials.globalToken == "ghu_global")
-    #expect(snapshot.todoistCredentials.token == "next-todoist-token")
-    #expect(snapshot.todoistCredentials.syncRequest.token == "next-todoist-token")
+    #expect(snapshot.openRouterCredentials.token == "sk-or-next")
+    #expect(snapshot.openRouterCredentials.syncRequest.token == "sk-or-next")
   }
 
-  @Test("Blank Todoist token clears secure credential")
-  func blankTodoistTokenClearsCredential() {
+  @Test("Blank OpenRouter token clears secure credential")
+  func blankOpenRouterTokenClearsCredential() {
     var draft = TaskBoardGitSettingsDraft()
-    draft.todoistToken = .editing("   ")
+    draft.openRouterToken = .editing("   ")
 
-    #expect(draft.snapshot.todoistCredentials.token == nil)
-    #expect(draft.snapshot.todoistCredentials.isEmpty)
+    #expect(draft.snapshot.openRouterCredentials.token == nil)
+    #expect(draft.snapshot.openRouterCredentials.isEmpty)
   }
 
   @Test("Global direct signing key fields round trip through runtime snapshot")
@@ -198,16 +198,6 @@ struct SettingsTaskBoardDraftTests {
     draft.removeGitHubInboxLabel("BUG")
     #expect(draft.githubInboxLabelEntries.isEmpty)
     #expect(draft.snapshot.orchestratorSettings.githubInbox.labelFilter.isEmpty)
-  }
-
-  @Test("Todoist inbox project filter trims and dedupes through orchestrator snapshot")
-  func todoistInboxProjectFilterRoundTrip() {
-    var draft = TaskBoardGitSettingsDraft()
-    draft.todoistInboxProjectFilterText = " 1234567890 \n 1234567890 \n 9876543210 \n "
-
-    let projects = draft.snapshot.orchestratorSettings.todoistInbox.projectFilter
-
-    #expect(projects == ["1234567890", "9876543210"])
   }
 }
 

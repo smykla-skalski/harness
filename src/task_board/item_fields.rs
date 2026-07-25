@@ -22,7 +22,6 @@ pub enum ExternalRefProvider {
     #[value(name = "github", alias = "git_hub")]
     #[serde(rename = "github", alias = "git_hub")]
     GitHub,
-    Todoist,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]

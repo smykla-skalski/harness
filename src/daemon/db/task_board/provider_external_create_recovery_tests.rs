@@ -33,36 +33,11 @@ async fn begin_derives_create_fields_from_the_atomic_snapshot() {
             vec![ExternalSyncField::Title, ExternalSyncField::Body],
         ),
         (
-            "todoist-todo-project",
-            ExternalProvider::Todoist,
-            TaskBoardStatus::Todo,
-            Some("todoist-project"),
-            "todoist-project",
-            vec![
-                ExternalSyncField::Title,
-                ExternalSyncField::Body,
-                ExternalSyncField::Status,
-                ExternalSyncField::Project,
-            ],
-        ),
-        (
-            "todoist-done-project",
-            ExternalProvider::Todoist,
-            TaskBoardStatus::Done,
-            Some("todoist-project"),
-            "todoist-project",
-            vec![
-                ExternalSyncField::Title,
-                ExternalSyncField::Body,
-                ExternalSyncField::Project,
-            ],
-        ),
-        (
-            "todoist-todo-no-project",
-            ExternalProvider::Todoist,
+            "github-todo-no-project",
+            ExternalProvider::GitHub,
             TaskBoardStatus::Todo,
             None,
-            "todoist-project",
+            "example/repository",
             vec![
                 ExternalSyncField::Title,
                 ExternalSyncField::Body,
@@ -127,26 +102,14 @@ async fn create_key_lookup_tracks_every_durable_state() {
 }
 
 #[tokio::test]
-async fn create_key_identity_is_unique_within_provider_and_isolated_across_providers() {
+async fn create_key_identity_is_unique_within_a_provider() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
     create_item(&db, item("task-key-github-owner")).await;
     create_item(&db, item("task-key-github-other")).await;
-    let mut todoist = item("task-key-todoist");
-    todoist.project_id = Some("todoist-project".into());
-    create_item(&db, todoist).await;
     let github = begin(&db, "task-key-github-owner", ExternalProvider::GitHub).await;
     let github_other = begin(&db, "task-key-github-other", ExternalProvider::GitHub).await;
-    let todoist = begin(&db, "task-key-todoist", ExternalProvider::Todoist).await;
 
-    sqlx::query(
-        "UPDATE task_board_external_create_intents SET create_key = ?1 WHERE intent_id = ?2",
-    )
-    .bind(&github.create_key)
-    .bind(&todoist.intent_id)
-    .execute(db.pool())
-    .await
-    .expect("reuse key for a different provider");
     let collision = sqlx::query(
         "UPDATE task_board_external_create_intents SET create_key = ?1 WHERE intent_id = ?2",
     )
@@ -168,17 +131,6 @@ async fn create_key_identity_is_unique_within_provider_and_isolated_across_provi
         .item_id,
         github.item_id
     );
-    assert_eq!(
-        db.task_board_external_create_intent_by_create_key(
-            ExternalProvider::Todoist,
-            &github.create_key,
-        )
-        .await
-        .expect("lookup Todoist key")
-        .expect("Todoist intent")
-        .item_id,
-        todoist.item_id
-    );
 }
 
 #[tokio::test]
@@ -188,9 +140,6 @@ async fn provider_wide_in_flight_recovery_is_scope_independent_and_deterministic
     for item_id in ["task-inflight-a", "task-inflight-b", "task-inflight-c"] {
         create_item(&db, item(item_id)).await;
     }
-    let mut todoist_item = item("task-inflight-todoist");
-    todoist_item.project_id = Some("todoist-project".into());
-    create_item(&db, todoist_item).await;
     let first = start(
         &db,
         "task-inflight-a",
@@ -215,7 +164,6 @@ async fn provider_wide_in_flight_recovery_is_scope_independent_and_deterministic
         "example/repository",
     )
     .await;
-    let _todoist = begin(&db, "task-inflight-todoist", ExternalProvider::Todoist).await;
     let mut expected = vec![first.clone(), second.clone(), third.clone()];
     expected.sort_by(|left, right| {
         (&left.created_at, &left.intent_id).cmp(&(&right.created_at, &right.intent_id))
@@ -241,15 +189,16 @@ async fn provider_wide_in_flight_recovery_is_scope_independent_and_deterministic
     );
 }
 
+/// Recovery reads whatever the provider currently holds, so an attempt that
+/// was edited and closed remotely between the create and the recovery still
+/// records as the baseline rather than failing the intent.
 #[tokio::test]
-async fn recovery_accepts_edited_closed_and_moved_todoist_evidence() {
+async fn recovery_accepts_edited_and_closed_provider_evidence() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    let mut board_item = item("task-recovery-drift");
-    board_item.project_id = Some("todoist-project".into());
-    create_item(&db, board_item).await;
-    let intent = begin(&db, "task-recovery-drift", ExternalProvider::Todoist).await;
-    let (outcome, baseline) = current_todoist_evidence();
+    create_item(&db, item("task-recovery-drift")).await;
+    let intent = begin(&db, "task-recovery-drift", ExternalProvider::GitHub).await;
+    let (outcome, baseline) = current_provider_evidence();
 
     let created = db
         .record_task_board_external_create_outcome(&intent, &outcome, &baseline)
@@ -268,8 +217,12 @@ async fn recovery_accepts_edited_closed_and_moved_todoist_evidence() {
         baseline
     );
     assert_eq!(
-        finalized.item.expect("linked item").project_id.as_deref(),
-        Some("todoist-project-moved")
+        finalized
+            .item
+            .expect("linked item")
+            .execution_repository
+            .as_deref(),
+        Some("example/repository")
     );
 }
 
@@ -377,27 +330,22 @@ async fn moved_github_recovery_accepts_an_already_converged_local_identity() {
 async fn recovery_rejects_incomplete_or_internally_inconsistent_evidence() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    let mut board_item = item("task-recovery-invalid");
-    board_item.project_id = Some("todoist-project".into());
-    create_item(&db, board_item).await;
-    let intent = begin(&db, "task-recovery-invalid", ExternalProvider::Todoist).await;
-    let (outcome, baseline) = current_todoist_evidence();
+    create_item(&db, item("task-recovery-invalid")).await;
+    let intent = begin(&db, "task-recovery-invalid", ExternalProvider::GitHub).await;
+    let (outcome, baseline) = current_provider_evidence();
     let mut cases = Vec::new();
 
     let mut url = baseline.clone();
     url.url = Some("https://example.invalid/different".into());
     cases.push(("url", outcome.clone(), url));
     let mut project = baseline.clone();
-    project.sync_state.as_mut().unwrap().project_id = Some("other-project".into());
+    project.sync_state.as_mut().unwrap().project_id = Some("other/repository".into());
     cases.push(("project", outcome.clone(), project));
     let mut revision = baseline.clone();
     revision.sync_state.as_mut().unwrap().updated_at = Some("other-revision".into());
     cases.push(("revision", outcome.clone(), revision));
-    let mut provider = baseline.clone();
-    provider.provider = ExternalProvider::GitHub.into();
-    cases.push(("provider", outcome.clone(), provider));
     let mut identity = baseline.clone();
-    identity.external_id = "different-task".into();
+    identity.external_id = "example/repository#99".into();
     cases.push(("identity", outcome.clone(), identity));
     let mut status = baseline.clone();
     status.sync_state.as_mut().unwrap().status = Some(TaskBoardStatus::InProgress);
@@ -471,20 +419,20 @@ async fn start(
     }
 }
 
-fn current_todoist_evidence() -> (ExternalCreateOutcome, ExternalRef) {
-    let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "todoist-task-recovered")
-        .with_url("https://example.invalid/tasks/todoist-task-recovered");
+fn current_provider_evidence() -> (ExternalCreateOutcome, ExternalRef) {
+    let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "example/repository#76")
+        .with_url("https://example.invalid/issues/76");
     let outcome = ExternalCreateOutcome {
         reference: reference.clone(),
         provider_revision: Some("revision-recovered".into()),
-        provider_project_id: Some("todoist-project-moved".into()),
+        provider_project_id: Some("example/repository".into()),
     };
     let mut baseline = reference.into_core_ref();
     baseline.sync_state = Some(ExternalRefSyncState {
         title: Some("Edited provider title".into()),
         body: Some("Edited provider body".into()),
         status: Some(TaskBoardStatus::Done),
-        project_id: Some("todoist-project-moved".into()),
+        project_id: Some("example/repository".into()),
         updated_at: Some("revision-recovered".into()),
         synced_at: Some("2026-07-16T14:55:00Z".into()),
         labels: Vec::new(),

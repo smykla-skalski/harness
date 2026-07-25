@@ -34,7 +34,6 @@ struct TaskBoardOrchestratorWireDecodingTests {
         "project_dir": "/work/proj",
         "github_project": \#(githubProjectJSON),
         "github_inbox": {"repositories": ["acme/widget"], "label_filter": ["bug"]},
-        "todoist_inbox": {"project_filter": ["Inbox"]},
         "policy_version": "task-board-policy-v1"
       }
       """#
@@ -54,7 +53,6 @@ struct TaskBoardOrchestratorWireDecodingTests {
     #expect(settings.githubProject.checkoutPath == "/checkouts/widget")
     #expect(settings.githubInbox.repositories == ["acme/widget"])
     #expect(settings.githubInbox.labelFilter == ["bug"])
-    #expect(settings.todoistInbox.projectFilter == ["Inbox"])
     #expect(settings.policyVersion == "task-board-policy-v1")
     expectAutomationDefaults(settings)
   }

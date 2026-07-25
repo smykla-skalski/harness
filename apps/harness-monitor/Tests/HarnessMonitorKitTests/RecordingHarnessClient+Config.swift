@@ -251,12 +251,6 @@ extension RecordingHarnessClient {
     }
   }
 
-  func configureTaskBoardTodoistTokenSyncError(_ error: (any Error)?) {
-    lock.withLock {
-      taskBoardTodoistTokenSyncError = error
-    }
-  }
-
   func configureDetailDelay(_ delay: Duration?, for sessionID: String) {
     lock.withLock {
       if let delay {

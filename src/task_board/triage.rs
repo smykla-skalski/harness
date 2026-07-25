@@ -308,7 +308,6 @@ const fn priority_tag(priority: TaskBoardPriority) -> &'static [u8] {
 const fn provider_tag_str(provider: ExternalRefProvider) -> &'static str {
     match provider {
         ExternalRefProvider::GitHub => "github",
-        ExternalRefProvider::Todoist => "todoist",
     }
 }
 

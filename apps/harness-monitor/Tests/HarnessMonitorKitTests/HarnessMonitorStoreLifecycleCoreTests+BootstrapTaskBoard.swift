@@ -15,7 +15,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     )
     let liveItem = makeBootstrapTaskBoardItem(
       id: "board-cached-confirmation",
-      provider: .todoist,
+      provider: .gitHub,
       externalId: "345"
     )
     let container = try HarnessMonitorModelContainer.preview()
@@ -39,13 +39,13 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.connectionState == .online)
     #expect(store.globalTaskBoardItems.map(\.id) == ["board-cached-confirmation"])
 
-    for _ in 0..<40 where store.globalTaskBoardItems.first?.externalRefs.first?.provider != .todoist
-    {
+    for _ in 0..<40
+    where store.globalTaskBoardItems.first?.externalRefs.first?.externalId != "345" {
       try await Task.sleep(for: .milliseconds(10))
     }
 
     #expect(store.globalTaskBoardItems.map(\.id) == ["board-cached-confirmation"])
-    #expect(store.globalTaskBoardItems.first?.externalRefs.first?.provider == .todoist)
+    #expect(store.globalTaskBoardItems.first?.externalRefs.first?.externalId == "345")
   }
 
   @Test(

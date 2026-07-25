@@ -19,7 +19,6 @@ extension PreviewHarnessClientState {
       projectDir: request.clearProjectDir ? nil : (request.projectDir ?? current.projectDir),
       githubProject: request.githubProject ?? current.githubProject,
       githubInbox: request.githubInbox ?? current.githubInbox,
-      todoistInbox: request.todoistInbox ?? current.todoistInbox,
       policyVersion: request.policyVersion ?? current.policyVersion
     )
     return taskBoardOrchestratorSettings
@@ -44,13 +43,6 @@ extension PreviewHarnessClientState {
       globalTokenConfigured: request.globalToken?.isEmpty == false,
       repositoryTokenCount: request.repositoryTokens.filter { !$0.token.isEmpty }.count
     )
-  }
-
-  func syncTaskBoardTodoistToken(
-    _ request: TaskBoardTodoistTokenSyncRequest
-  ) -> TaskBoardTodoistTokenSyncResponse {
-    taskBoardTodoistToken = request
-    return TaskBoardTodoistTokenSyncResponse(tokenConfigured: request.token?.isEmpty == false)
   }
 
   func syncTaskBoardOpenRouterToken(

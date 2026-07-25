@@ -190,11 +190,11 @@ struct TaskBoardItemManagementPanel: View {
   }
 
   var visibleExternalRefIDs: [UUID] {
-    draft.monitorVisibleExternalRefIDs
+    draft.externalRefs.map(\.id)
   }
 
   var visibleExternalRefs: [TaskBoardExternalRef] {
-    draft.monitorVisibleExternalRefs
+    draft.materializedExternalRefs
   }
 
   func appendExternalRefDraft() {

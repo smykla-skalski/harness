@@ -2,16 +2,6 @@ use crate::task_board::{ExternalRefProvider, TaskBoardItem, normalize_repository
 
 use super::{ExternalProvider, ExternalTask};
 
-pub(super) fn provider_project_maps_to_board(provider: ExternalProvider) -> bool {
-    provider != ExternalProvider::GitHub
-}
-
-pub(super) fn board_project_id_for_task(task: &ExternalTask) -> Option<String> {
-    provider_project_maps_to_board(task.reference.provider)
-        .then(|| task.project_id.clone())
-        .flatten()
-}
-
 pub(super) fn execution_repository_for_task(task: &ExternalTask) -> Option<String> {
     (task.reference.provider == ExternalProvider::GitHub)
         .then(|| normalize_repository_slug(task.project_id.as_deref()))
@@ -46,8 +36,8 @@ mod tests {
     }
 
     #[test]
-    fn non_repository_provider_project_is_not_an_execution_target() {
-        let task = external_task(ExternalProvider::Todoist, Some("project-17"));
+    fn a_project_value_that_is_not_a_repository_is_not_an_execution_target() {
+        let task = external_task(ExternalProvider::GitHub, Some("project-17"));
 
         assert_eq!(execution_repository_for_task(&task), None);
     }

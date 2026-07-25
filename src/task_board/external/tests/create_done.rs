@@ -38,11 +38,7 @@ async fn newly_created_done_item_is_linked_then_closed() {
     assert_eq!(operations.len(), 2);
     assert_eq!(
         operations[0].changed_fields,
-        vec![
-            ExternalSyncField::Title,
-            ExternalSyncField::Body,
-            ExternalSyncField::Project,
-        ]
+        vec![ExternalSyncField::Title, ExternalSyncField::Body]
     );
     assert_eq!(
         operations[1].changed_fields,
@@ -51,7 +47,7 @@ async fn newly_created_done_item_is_linked_then_closed() {
     let state = stored_sync_state(&board).await;
     assert_eq!(state.status, Some(TaskBoardStatus::Done));
     assert_eq!(state.updated_at.as_deref(), Some("provider-revision-2"));
-    assert_eq!(state.project_id.as_deref(), Some("provider-project"));
+    assert_eq!(state.project_id.as_deref(), Some("acme/widgets"));
 }
 
 #[tokio::test]
@@ -108,11 +104,7 @@ async fn create_only_provider_reports_done_status_as_unsupported() {
     assert_eq!(operations[0].action, ExternalSyncAction::Push);
     assert_eq!(
         operations[0].changed_fields,
-        vec![
-            ExternalSyncField::Title,
-            ExternalSyncField::Body,
-            ExternalSyncField::Project,
-        ]
+        vec![ExternalSyncField::Title, ExternalSyncField::Body]
     );
     assert_eq!(
         operations[1].unsupported_fields,
@@ -122,7 +114,7 @@ async fn create_only_provider_reports_done_status_as_unsupported() {
     let state = stored_sync_state(&board).await;
     assert_eq!(state.status, Some(TaskBoardStatus::Backlog));
     assert_eq!(state.updated_at.as_deref(), Some("provider-revision-1"));
-    assert_eq!(state.project_id.as_deref(), Some("provider-project"));
+    assert_eq!(state.project_id.as_deref(), Some("acme/widgets"));
 }
 
 #[tokio::test]
@@ -151,7 +143,7 @@ async fn done_create_and_close_preserve_exact_unknown_provider_revisions() {
     assert_eq!(state.status, Some(TaskBoardStatus::Done));
     assert_eq!(state.updated_at, None);
     let receipt = board
-        .task_board_external_create_receipt("done-1", ExternalProvider::Todoist)
+        .task_board_external_create_receipt("done-1", ExternalProvider::GitHub)
         .await
         .expect("create receipt")
         .expect("attached create receipt");
@@ -171,7 +163,7 @@ async fn done_create_and_close_preserve_exact_unknown_provider_revisions() {
     );
     assert_eq!(
         board
-            .task_board_provider_scope_state(ExternalProvider::Todoist, &scope_id)
+            .task_board_provider_scope_state(ExternalProvider::GitHub, &scope_id)
             .await
             .expect("scope state")
             .base_revision,
@@ -189,7 +181,7 @@ async fn sync(
 
 fn push_options() -> ExternalSyncOptions {
     ExternalSyncOptions {
-        provider: Some(ExternalProvider::Todoist),
+        provider: Some(ExternalProvider::GitHub),
         direction: ExternalSyncDirection::Push,
         conflict_policy: ExternalSyncConflictPolicy::Report,
         dry_run: false,
@@ -209,7 +201,7 @@ async fn board_with_done_item() -> (tempfile::TempDir, AsyncDaemonDb) {
         "2026-07-16T00:00:00Z".to_owned(),
     );
     item.status = TaskBoardStatus::Done;
-    item.project_id = Some("provider-project".into());
+    item.project_id = Some("acme/widgets".into());
     board
         .create_task_board_item(item)
         .await
@@ -282,7 +274,7 @@ impl CreateDoneClient {
 #[async_trait]
 impl ExternalSyncClient for CreateDoneClient {
     fn provider(&self) -> ExternalProvider {
-        ExternalProvider::Todoist
+        ExternalProvider::GitHub
     }
 
     fn external_create_recovery(&self) -> Option<&dyn ExternalCreateRecoveryClient> {
@@ -290,7 +282,7 @@ impl ExternalSyncClient for CreateDoneClient {
     }
 
     fn scope_id(&self) -> String {
-        "provider-project".into()
+        "acme/widgets".into()
     }
 
     fn capabilities(&self) -> ExternalProviderCapabilities {
@@ -333,11 +325,11 @@ impl ExternalSyncClient for CreateDoneClient {
 #[async_trait]
 impl ExternalCreateRecoveryClient for CreateDoneClient {
     fn provider(&self) -> ExternalProvider {
-        ExternalProvider::Todoist
+        ExternalProvider::GitHub
     }
 
     fn supports_target(&self, provider_target: &str) -> bool {
-        provider_target == "provider-project"
+        provider_target == "acme/widgets"
     }
 
     async fn create_started(
@@ -368,9 +360,11 @@ impl ExternalCreateRecoveryClient for CreateDoneClient {
 
 fn task_from_request(request: &ExternalCreateRequest, updated_at: Option<String>) -> ExternalTask {
     ExternalTask {
+        // A GitHub create outcome is rejected unless its identity is
+        // `owner/repo#number`, so the stub has to mint one from the target.
         reference: ExternalTaskRef::new(
-            ExternalProvider::Todoist,
-            format!("remote-{}", request.item_id()),
+            ExternalProvider::GitHub,
+            format!("{}#1", request.provider_target()),
         ),
         title: request.title().into(),
         body: request.body().into(),

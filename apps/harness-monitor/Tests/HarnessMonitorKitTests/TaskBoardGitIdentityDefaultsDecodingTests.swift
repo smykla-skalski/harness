@@ -40,8 +40,7 @@ struct TaskBoardGitIdentityDefaultsDecodingTests {
         }
       ],
       "env_overrides": {
-        "harness_github_token_present": true,
-        "harness_todoist_token_present": false
+        "harness_github_token_present": true
       }
     }
     """
@@ -74,7 +73,6 @@ struct TaskBoardGitIdentityDefaultsDecodingTests {
     #expect(defaults.discoveredSshKeys.first?.path == "/Users/ada/.ssh/id_ed25519.pub")
     #expect(defaults.discoveredSshKeys.first?.format == "ssh-ed25519")
     #expect(defaults.envOverrides.harnessGithubTokenPresent == true)
-    #expect(defaults.envOverrides.harnessTodoistTokenPresent == false)
   }
 
   @Test("round-trips back to the daemon snake_case wire keys")

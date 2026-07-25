@@ -10,7 +10,6 @@ const UPDATE_FIELDS: &[&str] = &[
     "clear_project_dir",
     "github_project",
     "github_inbox",
-    "todoist_inbox",
     "scheduling",
     "retry",
     "reviewers",
@@ -32,7 +31,6 @@ async fn update_tool_proxies_every_public_field_to_running_daemon() {
         "clear_project_dir": false,
         "github_project": {},
         "github_inbox": {},
-        "todoist_inbox": {},
         "scheduling": {
             "max_dispatches_per_run": 1,
             "max_concurrent_workflows": 1,

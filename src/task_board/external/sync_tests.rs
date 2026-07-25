@@ -24,7 +24,7 @@ async fn push_updates_existing_linked_remote_and_records_changed_fields() {
         )
         .expect("create local task");
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(UpdateFakeSyncClient::new(
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         vec![ExternalSyncField::Title, ExternalSyncField::Body],
         Vec::new(),
     ))];
@@ -32,7 +32,7 @@ async fn push_updates_existing_linked_remote_and_records_changed_fields() {
     let operations = sync_external_tasks(
         &board,
         ExternalSyncOptions {
-            provider: Some(ExternalProvider::Todoist),
+            provider: Some(ExternalProvider::GitHub),
             direction: ExternalSyncDirection::Push,
             conflict_policy: ExternalSyncConflictPolicy::Report,
             dry_run: false,
@@ -69,7 +69,7 @@ async fn both_direction_reports_conflict_by_default_without_writing() {
         )
         .expect("create local task");
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(UpdateFakeSyncClient::new(
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         vec![ExternalSyncField::Title],
         vec![remote_task(
             "remote-1",
@@ -82,7 +82,7 @@ async fn both_direction_reports_conflict_by_default_without_writing() {
     let operations = sync_external_tasks(
         &board,
         ExternalSyncOptions {
-            provider: Some(ExternalProvider::Todoist),
+            provider: Some(ExternalProvider::GitHub),
             direction: ExternalSyncDirection::Both,
             conflict_policy: ExternalSyncConflictPolicy::Report,
             dry_run: false,
@@ -112,7 +112,7 @@ async fn prefer_remote_applies_remote_conflict_side() {
         )
         .expect("create local task");
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(UpdateFakeSyncClient::new(
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         vec![ExternalSyncField::Title],
         vec![remote_task(
             "remote-1",
@@ -125,7 +125,7 @@ async fn prefer_remote_applies_remote_conflict_side() {
     let operations = sync_external_tasks(
         &board,
         ExternalSyncOptions {
-            provider: Some(ExternalProvider::Todoist),
+            provider: Some(ExternalProvider::GitHub),
             direction: ExternalSyncDirection::Both,
             conflict_policy: ExternalSyncConflictPolicy::PreferRemote,
             dry_run: false,
@@ -157,7 +157,7 @@ async fn prefer_local_updates_remote_conflict_side() {
         )
         .expect("create local task");
     let client = UpdateFakeSyncClient::new(
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         vec![ExternalSyncField::Title],
         vec![remote_task(
             "remote-1",
@@ -172,7 +172,7 @@ async fn prefer_local_updates_remote_conflict_side() {
     let operations = sync_external_tasks(
         &board,
         ExternalSyncOptions {
-            provider: Some(ExternalProvider::Todoist),
+            provider: Some(ExternalProvider::GitHub),
             direction: ExternalSyncDirection::Both,
             conflict_policy: ExternalSyncConflictPolicy::PreferLocal,
             dry_run: false,
@@ -204,7 +204,7 @@ async fn linked_push_surfaces_conflict_when_precondition_fails() {
         )
         .expect("create local task");
     let client = UpdateFakeSyncClient::new(
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         vec![ExternalSyncField::Title],
         Vec::new(),
     )
@@ -220,7 +220,7 @@ async fn linked_push_surfaces_conflict_when_precondition_fails() {
     let operations = sync_external_tasks(
         &board,
         ExternalSyncOptions {
-            provider: Some(ExternalProvider::Todoist),
+            provider: Some(ExternalProvider::GitHub),
             direction: ExternalSyncDirection::Push,
             conflict_policy: ExternalSyncConflictPolicy::Report,
             dry_run: false,
@@ -252,7 +252,7 @@ async fn linked_push_reports_provider_unsupported_fields() {
         )
         .expect("create local task");
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(UpdateFakeSyncClient::new(
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         vec![ExternalSyncField::Title],
         Vec::new(),
     ))];
@@ -260,7 +260,7 @@ async fn linked_push_reports_provider_unsupported_fields() {
     let operations = sync_external_tasks(
         &board,
         ExternalSyncOptions {
-            provider: Some(ExternalProvider::Todoist),
+            provider: Some(ExternalProvider::GitHub),
             direction: ExternalSyncDirection::Push,
             conflict_policy: ExternalSyncConflictPolicy::Report,
             dry_run: false,
@@ -453,7 +453,7 @@ fn linked_item(id: &str, title: &str, body: &str, status: TaskBoardStatus) -> Ta
         "2026-05-14T00:00:00Z".to_string(),
     );
     item.status = status;
-    let mut reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1").into_core_ref();
+    let mut reference = ExternalTaskRef::new(ExternalProvider::GitHub, "remote-1").into_core_ref();
     reference.sync_state = Some(ExternalRefSyncState {
         title: Some("Old title".to_string()),
         body: Some("Old body".to_string()),
@@ -474,7 +474,7 @@ fn remote_task(
     status: TaskBoardStatus,
 ) -> ExternalTask {
     ExternalTask {
-        reference: ExternalTaskRef::new(ExternalProvider::Todoist, external_id),
+        reference: ExternalTaskRef::new(ExternalProvider::GitHub, external_id),
         title: title.to_string(),
         body: body.to_string(),
         status,

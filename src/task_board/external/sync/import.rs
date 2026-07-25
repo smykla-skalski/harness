@@ -13,7 +13,6 @@ pub(super) fn external_item_id(reference: &ExternalTaskRef) -> String {
     );
     match reference.provider {
         ExternalProvider::GitHub => format!("{base}-{}", github_id_suffix(&reference.external_id)),
-        ExternalProvider::Todoist => base,
     }
 }
 
@@ -26,7 +25,7 @@ pub(super) fn imported_external_planning(task: &ExternalTask) -> Option<Planning
                 approved_at: None,
             })
         }
-        ExternalProvider::GitHub | ExternalProvider::Todoist => None,
+        ExternalProvider::GitHub => None,
     }
 }
 

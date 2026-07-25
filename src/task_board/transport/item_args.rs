@@ -178,7 +178,6 @@ impl FromStr for ExternalRefArg {
 fn parse_provider(provider: &str) -> Result<ExternalRefProvider, CliError> {
     match provider.trim().to_ascii_lowercase().as_str() {
         "github" => Ok(ExternalRefProvider::GitHub),
-        "todoist" => Ok(ExternalRefProvider::Todoist),
         other => Err(CliErrorKind::workflow_parse(format!(
             "unsupported external ref provider '{other}'"
         ))

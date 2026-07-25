@@ -141,7 +141,7 @@ fn format_sync_request_message(
     client_count: usize,
 ) -> String {
     format!(
-        "task-board sync requested: provider={:?} direction={:?} dry_run={} status={:?} client_count={} github_token_configured={} github_repository_configured={} github_inbox_repositories={} todoist_token_configured={}",
+        "task-board sync requested: provider={:?} direction={:?} dry_run={} status={:?} client_count={} github_token_configured={} github_repository_configured={} github_inbox_repositories={}",
         request.provider,
         request.direction,
         request.dry_run,
@@ -150,7 +150,6 @@ fn format_sync_request_message(
         config.token_for(ExternalProvider::GitHub).is_some(),
         config.github_repository().is_some(),
         config.github_inbox_repositories().len(),
-        config.token_for(ExternalProvider::Todoist).is_some(),
     )
 }
 

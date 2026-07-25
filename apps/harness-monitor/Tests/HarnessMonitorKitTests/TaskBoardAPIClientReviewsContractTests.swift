@@ -128,7 +128,6 @@ extension TaskBoardAPIClientTests {
     #expect(result.updatedRuntimeConfig.repositoryOverrides.first?.repository == "example/harness")
     #expect(result.tokenSync.globalTokenConfigured == true)
     #expect(result.tokenSync.repositoryTokenCount == 1)
-    #expect(result.todoistTokenSync.tokenConfigured == true)
   }
 
   func assertReviewsHTTPClientResults(_ result: ReviewsHTTPContractResult) {

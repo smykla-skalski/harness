@@ -12365,69 +12365,6 @@
         "x-websocket-method": "task_board.orchestrator_stop"
       }
     },
-    "/v1/task-board/orchestrator/todoist-token": {
-      "put": {
-        "tags": [
-          "task-board"
-        ],
-        "description": "Replace the in-memory Todoist API token used by the task-board orchestrator's Todoist inbox sync. The token is held in process memory only; the response reports whether a token is configured, never the token itself",
-        "operationId": "put_task_board_orchestrator_todoist_token",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TaskBoardTodoistTokenSyncRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Outcome of syncing the Todoist token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaskBoardTodoistTokenSyncResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Request error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DaemonErrorBody"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/RemoteAuthRequired"
-          },
-          "414": {
-            "$ref": "#/components/responses/RemoteRequestUriTooLong"
-          },
-          "413": {
-            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
-          },
-          "431": {
-            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
-          },
-          "429": {
-            "$ref": "#/components/responses/RemoteRequestThrottled"
-          },
-          "503": {
-            "$ref": "#/components/responses/RemoteServiceUnavailable"
-          },
-          "504": {
-            "$ref": "#/components/responses/RemoteRequestTimedOut"
-          }
-        },
-        "x-websocket-method": "task_board.orchestrator_todoist_token_sync"
-      }
-    },
     "/v1/task-board/projects": {
       "get": {
         "tags": [
@@ -12559,7 +12496,7 @@
         "tags": [
           "task-board"
         ],
-        "description": "Sync task-board items against configured external providers (GitHub, Todoist) in the requested direction. Runs as a dry-run preview unless the request explicitly disables it",
+        "description": "Sync task-board items against configured external providers (GitHub) in the requested direction. Runs as a dry-run preview unless the request explicitly disables it",
         "operationId": "post_task_board_sync",
         "requestBody": {
           "content": {
@@ -17075,8 +17012,7 @@
       "ExternalProvider": {
         "type": "string",
         "enum": [
-          "github",
-          "todoist"
+          "github"
         ]
       },
       "ExternalRef": {
@@ -17113,8 +17049,7 @@
       "ExternalRefProvider": {
         "type": "string",
         "enum": [
-          "github",
-          "todoist"
+          "github"
         ]
       },
       "ExternalRefSyncState": {
@@ -28808,14 +28743,10 @@
       "TaskBoardEnvDefaults": {
         "type": "object",
         "required": [
-          "harness_github_token_present",
-          "harness_todoist_token_present"
+          "harness_github_token_present"
         ],
         "properties": {
           "harness_github_token_present": {
-            "type": "boolean"
-          },
-          "harness_todoist_token_present": {
             "type": "boolean"
           }
         }
@@ -30261,9 +30192,6 @@
           },
           "step_mode": {
             "type": "boolean"
-          },
-          "todoist_inbox": {
-            "$ref": "#/components/schemas/TaskBoardTodoistInboxConfig"
           }
         }
       },
@@ -30405,16 +30333,6 @@
             "type": [
               "boolean",
               "null"
-            ]
-          },
-          "todoist_inbox": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/TaskBoardTodoistInboxConfig"
-              }
             ]
           }
         }
@@ -31081,7 +30999,6 @@
         "description": "Where a project's identity comes from. The source scopes the slug, because\ntwo providers may hand out the same slug for unrelated projects.",
         "enum": [
           "github",
-          "todoist",
           "manual"
         ]
       },
@@ -31811,39 +31728,6 @@
           "total": {
             "type": "integer",
             "minimum": 0
-          }
-        }
-      },
-      "TaskBoardTodoistInboxConfig": {
-        "type": "object",
-        "properties": {
-          "project_filter": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "TaskBoardTodoistTokenSyncRequest": {
-        "type": "object",
-        "properties": {
-          "token": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        }
-      },
-      "TaskBoardTodoistTokenSyncResponse": {
-        "type": "object",
-        "required": [
-          "token_configured"
-        ],
-        "properties": {
-          "token_configured": {
-            "type": "boolean"
           }
         }
       },

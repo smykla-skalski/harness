@@ -42,11 +42,11 @@ async fn attached_marker_reconciles_provider_edits_once_without_recreating() {
     let mut task = marked_task("task-marker-reconcile", "Provider edit");
     task.reference = task
         .reference
-        .with_url("https://todoist.com/showTask?id=remote-created");
+        .with_url("https://example.invalid/acme/widgets/issues/7");
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(MarkerPullClient::new(task))];
 
     let first =
-        sync_external_tasks_scoped(&store, pull_options(ExternalProvider::Todoist), &clients)
+        sync_external_tasks_scoped(&store, pull_options(ExternalProvider::GitHub), &clients)
             .await
             .expect("reconcile linked attached marker");
 
@@ -59,11 +59,11 @@ async fn attached_marker_reconciles_provider_edits_once_without_recreating() {
     assert_eq!(updated.body, "Provider body");
     assert_eq!(
         updated.external_refs[0].url.as_deref(),
-        Some("https://todoist.com/showTask?id=remote-created")
+        Some("https://example.invalid/acme/widgets/issues/7")
     );
 
     let second =
-        sync_external_tasks_scoped(&store, pull_options(ExternalProvider::Todoist), &clients)
+        sync_external_tasks_scoped(&store, pull_options(ExternalProvider::GitHub), &clients)
             .await
             .expect("repeat linked marker reconciliation");
 
@@ -102,7 +102,7 @@ async fn attached_marker_without_its_local_reference_is_suppressed() {
         marked_task("task-marker-unlinked", "Provider edit"),
     ))];
     let options = ExternalSyncOptions {
-        provider: Some(ExternalProvider::Todoist),
+        provider: Some(ExternalProvider::GitHub),
         direction: ExternalSyncDirection::Both,
         dry_run: false,
         ..ExternalSyncOptions::default()
@@ -180,20 +180,20 @@ async fn attached_marker_with_a_different_remote_identity_fails_closed() {
 async fn marker_preview_suppresses_pending_create_without_durable_writes() {
     let calls = Arc::new(AtomicUsize::new(0));
     let mut item = unlinked_item("task-marker-preview");
-    item.project_id = Some("provider-project".into());
+    item.project_id = Some("acme/widgets".into());
     let store = successful_store(item);
     let client = DurableCreateClient::new(
-        ExternalProvider::Todoist,
-        "provider-project",
+        ExternalProvider::GitHub,
+        "acme/widgets",
         Arc::clone(&calls),
     );
     let scope = ExternalProviderScopeIdentity::for_client(&client);
     let decision = store
         .begin_external_create_intent(
             "task-marker-preview",
-            ExternalProvider::Todoist,
+            ExternalProvider::GitHub,
             scope.scope_id(),
-            "provider-project",
+            "acme/widgets",
         )
         .await
         .expect("begin intent");
@@ -231,19 +231,19 @@ async fn attached_marker_fixture(
     calls: &Arc<AtomicUsize>,
 ) -> (DurableCreateStore, DurableCreateClient) {
     let mut item = unlinked_item(item_id);
-    item.project_id = Some("provider-project".into());
+    item.project_id = Some("acme/widgets".into());
     let store = successful_store(item);
     let client = DurableCreateClient::new(
-        ExternalProvider::Todoist,
-        "provider-project",
+        ExternalProvider::GitHub,
+        "acme/widgets",
         Arc::clone(calls),
     );
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(DurableCreateClient::new(
-        ExternalProvider::Todoist,
-        "provider-project",
+        ExternalProvider::GitHub,
+        "acme/widgets",
         Arc::clone(calls),
     ))];
-    sync_external_tasks(&store, push_options(ExternalProvider::Todoist), &clients)
+    sync_external_tasks(&store, push_options(ExternalProvider::GitHub), &clients)
         .await
         .expect("attach provider create");
     (store, client)
@@ -251,11 +251,11 @@ async fn attached_marker_fixture(
 
 fn marked_task(item_id: &str, title: &str) -> ExternalTask {
     ExternalTask {
-        reference: ExternalTaskRef::new(ExternalProvider::Todoist, "remote-created"),
+        reference: ExternalTaskRef::new(ExternalProvider::GitHub, "acme/widgets#17"),
         title: title.into(),
         body: format!("Provider body\ncreate-key:create-key-{item_id}"),
         status: TaskBoardStatus::Backlog,
-        project_id: Some("provider-project".into()),
+        project_id: Some("acme/widgets".into()),
         updated_at: Some("provider-revision-2".into()),
         ..ExternalTask::default()
     }
@@ -274,7 +274,7 @@ impl MarkerPullClient {
 #[async_trait]
 impl ExternalSyncClient for MarkerPullClient {
     fn provider(&self) -> ExternalProvider {
-        ExternalProvider::Todoist
+        ExternalProvider::GitHub
     }
 
     fn external_create_recovery(&self) -> Option<&dyn ExternalCreateRecoveryClient> {
@@ -282,7 +282,7 @@ impl ExternalSyncClient for MarkerPullClient {
     }
 
     fn scope_id(&self) -> String {
-        "provider-project".into()
+        "acme/widgets".into()
     }
 
     fn scope_for_item(&self, _item: &TaskBoardItem) -> String {
@@ -301,11 +301,11 @@ impl ExternalSyncClient for MarkerPullClient {
 #[async_trait]
 impl ExternalCreateRecoveryClient for MarkerPullClient {
     fn provider(&self) -> ExternalProvider {
-        ExternalProvider::Todoist
+        ExternalProvider::GitHub
     }
 
     fn supports_target(&self, provider_target: &str) -> bool {
-        provider_target == "provider-project"
+        provider_target == "acme/widgets"
     }
 
     async fn create_started(

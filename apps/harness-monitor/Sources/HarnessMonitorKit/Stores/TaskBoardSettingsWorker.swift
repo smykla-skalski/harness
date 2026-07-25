@@ -2,11 +2,10 @@ import Foundation
 
 struct TaskBoardStoredCredentialSnapshot: Equatable, Sendable {
   let githubCredentials: TaskBoardGitHubCredentialSnapshot
-  let todoistCredentials: TaskBoardTodoistCredentialSnapshot
   let openRouterCredentials: TaskBoardOpenRouterCredentialSnapshot
 
   var isEmpty: Bool {
-    githubCredentials.isEmpty && todoistCredentials.isEmpty && openRouterCredentials.isEmpty
+    githubCredentials.isEmpty && openRouterCredentials.isEmpty
   }
 }
 
@@ -18,12 +17,6 @@ public enum TaskBoardSettingsSaveOrigin: String, Sendable {
 protocol TaskBoardGitHubCredentialPersisting: Sendable {
   func load(scope: TaskBoardCredentialScope) throws -> TaskBoardGitHubCredentialSnapshot
   func save(_ snapshot: TaskBoardGitHubCredentialSnapshot, scope: TaskBoardCredentialScope) throws
-  func delete(scope: TaskBoardCredentialScope) throws
-}
-
-protocol TaskBoardTodoistCredentialPersisting: Sendable {
-  func load(scope: TaskBoardCredentialScope) throws -> TaskBoardTodoistCredentialSnapshot
-  func save(_ snapshot: TaskBoardTodoistCredentialSnapshot, scope: TaskBoardCredentialScope) throws
   func delete(scope: TaskBoardCredentialScope) throws
 }
 
@@ -52,8 +45,8 @@ public enum TaskBoardCredentialScope: Hashable, Sendable {
 
 struct TaskBoardCredentialPersistence: Sendable {
   let github: any TaskBoardGitHubCredentialPersisting
-  let todoist: any TaskBoardTodoistCredentialPersisting
   let openRouter: any TaskBoardOpenRouterCredentialPersisting
+  let retiredTodoistPurge: TaskBoardTodoistCredentialPurge
 
   /// Real Keychain in normal runs; in-memory stand-ins under xctest so test
   /// processes never trigger the macOS Keychain access prompt.
@@ -63,8 +56,8 @@ struct TaskBoardCredentialPersistence: Sendable {
     }
     return Self(
       github: TaskBoardGitHubCredentialStore(),
-      todoist: TaskBoardTodoistCredentialStore(),
-      openRouter: TaskBoardOpenRouterCredentialStore()
+      openRouter: TaskBoardOpenRouterCredentialStore(),
+      retiredTodoistPurge: .keychain
     )
   }
 }
@@ -97,6 +90,9 @@ actor TaskBoardSettingsWorker {
     instanceID: String,
     ownership: DaemonOwnership
   ) throws -> TaskBoardStoredCredentialSnapshot {
+    if credentialPersistence.retiredTodoistPurge.run() {
+      HarnessMonitorLogger.store.info("removed the retired Todoist Keychain credential")
+    }
     let context = TaskBoardCredentialLoadContext(
       scope: .database(instanceID),
       migratesLegacy: ownership == .managed
@@ -108,13 +104,6 @@ actor TaskBoardSettingsWorker {
         load: credentialPersistence.github.load,
         save: credentialPersistence.github.save,
         delete: credentialPersistence.github.delete
-      ),
-      todoistCredentials: loadScopedCredential(
-        context: context,
-        empty: TaskBoardTodoistCredentialSnapshot(),
-        load: credentialPersistence.todoist.load,
-        save: credentialPersistence.todoist.save,
-        delete: credentialPersistence.todoist.delete
       ),
       openRouterCredentials: loadScopedCredential(
         context: context,
@@ -155,11 +144,9 @@ actor TaskBoardSettingsWorker {
     }
     let scope = TaskBoardCredentialScope.database(instanceID)
     try credentialPersistence.github.save(snapshot.githubCredentials, scope: scope)
-    try credentialPersistence.todoist.save(snapshot.todoistCredentials, scope: scope)
     try credentialPersistence.openRouter.save(snapshot.openRouterCredentials, scope: scope)
     if ownership == .managed {
       try credentialPersistence.github.delete(scope: .legacy)
-      try credentialPersistence.todoist.delete(scope: .legacy)
       try credentialPersistence.openRouter.delete(scope: .legacy)
     }
     try HarnessMonitorStore.persistKeyMaterial(

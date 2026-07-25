@@ -38,7 +38,6 @@ pub(crate) use self::settings::parse_persisted_settings_read_only;
 #[cfg(test)]
 use self::settings::{
     apply_settings_update, dispatch_input, migrate_persisted_settings, normalize_github_inbox,
-    normalize_todoist_inbox,
 };
 pub use self::types::*;
 
@@ -89,7 +88,6 @@ impl TaskBoardOrchestrator {
         let mut settings = self.settings()?;
         apply_settings_update(&mut settings, update);
         settings.github_inbox = normalize_github_inbox(&settings.github_inbox)?;
-        settings.todoist_inbox = normalize_todoist_inbox(&settings.todoist_inbox);
         write_json_pretty(&self.settings_path(), &settings)?;
         Ok(settings)
     }

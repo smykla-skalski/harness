@@ -3,8 +3,7 @@ use std::collections::BTreeSet;
 use crate::daemon::protocol::TaskBoardOrchestratorSettingsUpdateRequest;
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::{
-    TaskBoardGitHubInboxConfig, TaskBoardOrchestratorSettings, TaskBoardTodoistInboxConfig,
-    normalize_repository_slug,
+    TaskBoardGitHubInboxConfig, TaskBoardOrchestratorSettings, normalize_repository_slug,
 };
 
 pub(super) fn apply_settings_update(
@@ -43,9 +42,6 @@ fn apply_optional_fields(
     }
     if let Some(github_inbox) = &update.github_inbox {
         settings.github_inbox.clone_from(github_inbox);
-    }
-    if let Some(todoist_inbox) = &update.todoist_inbox {
-        settings.todoist_inbox.clone_from(todoist_inbox);
     }
     if let Some(policy_version) = &update.policy_version {
         settings.policy_version.clone_from(policy_version);
@@ -100,14 +96,6 @@ pub(super) fn normalize_github_inbox(
         repositories,
         label_filter: normalize_strings(&inbox.label_filter),
     })
-}
-
-pub(super) fn normalize_todoist_inbox(
-    inbox: &TaskBoardTodoistInboxConfig,
-) -> TaskBoardTodoistInboxConfig {
-    TaskBoardTodoistInboxConfig {
-        project_filter: normalize_strings(&inbox.project_filter),
-    }
 }
 
 fn normalize_strings(values: &[String]) -> Vec<String> {
