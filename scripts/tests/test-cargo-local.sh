@@ -92,6 +92,483 @@ agent_build_share() {
   printf '%s\n' "$share"
 }
 
+# Key the pool by an arbitrary string so a scenario never shares a supervisor
+# with the developer's real repository pool.
+# The pool is only offered to a make that can parse a fifo endpoint, so a
+# scenario meaning to exercise pool mode has to pin one. Without it these tests
+# assert on the runner's make version - green on a macOS box with 4.4, falling
+# back to the reserve on Ubuntu 24.04, and never the code they were written for.
+fifo_capable_make_path() {
+  local shim="$SANDBOX/make-shim"
+  mkdir -p "$shim"
+  printf '#!/usr/bin/env bash\nprintf "GNU Make 4.4.1\\n"\n' >"$shim/make"
+  chmod +x "$shim/make"
+  printf '%s\n' "$shim"
+}
+
+print_cargo_env_with_pool_key() {
+  local pool_key="$1"
+  shift
+  # Hand over an explicit TMPDIR. Without one these runs create the shared
+  # in-repo TMPDIR base, and the scenarios below need to own that path.
+  local scratch="$SANDBOX/pool-tmp"
+  mkdir -p "$scratch"
+  # Whether the pool may be used at all now depends on the host's make, so
+  # without this every pool assertion below would test the runner rather than
+  # the code - passing on a macOS box with make 4.4 and falling back on Ubuntu
+  # 24.04. The scenario that owns that decision sets its own make instead.
+  # Passed as a per-command assignment rather than set inside the subshell, so
+  # the shim reaches cargo-local.sh without shellcheck reading it as a lost edit.
+  local run_path="$PATH"
+  [[ -n "${HARNESS_TEST_MAKE_ON_PATH:-}" ]] || run_path="$(fifo_capable_make_path):$PATH"
+  # Start the supervisor up front so the run under test only has to attach to a
+  # pool that already answers. Folding daemon startup into the assertion made
+  # this flaky on a loaded host, where spawning it can outrun the wait.
+  local cpu budget
+  cpu="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.logicalcpu)"
+  budget=$((cpu - 1))
+  (( budget < 1 )) && budget=1
+  python3 "$ROOT/scripts/harness-jobserver.py" ensure \
+    --repo-root "$pool_key" --budget "$budget" >/dev/null 2>&1 || true
+  (
+    unset SCCACHE_SERVER_UDS SCCACHE_SERVER_PORT SCCACHE_NO_DAEMON
+    unset SCCACHE_BASEDIRS SCCACHE_IDLE_TIMEOUT SCCACHE_CACHE_SIZE SCCACHE_VERSION
+    unset HARNESS_SCCACHE_TMPDIR
+    unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR
+    unset CARGO_BUILD_JOBS HARNESS_CARGO_JOBS MAKEFLAGS MFLAGS CARGO_MAKEFLAGS
+    TMPDIR="$scratch/" \
+      PATH="$run_path" \
+      RUSTC_WRAPPER='' \
+      SCCACHE_BIN='' \
+      CODEX_SESSION_ID="cargo-local-pool-$$" \
+      HARNESS_CARGO_SKIP_LEASE=1 \
+      HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+      HARNESS_JOBSERVER_POOL_KEY="$pool_key" \
+      "$@" \
+      "$ROOT/scripts/cargo-local.sh" --print-env
+  )
+}
+
+stop_pool_for_key() {
+  local key="$1" dir pid
+  dir="$(python3 - "$ROOT/scripts/harness-jobserver.py" "$key" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("js", sys.argv[1])
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+print(mod.pool_dir(sys.argv[2]))
+PY
+)" || return 0
+  pid="$(head -1 "$dir/lock" 2>/dev/null || true)"
+  # The lock file outlives the process that wrote it, and a dead supervisor's
+  # pid gets recycled - on a box also running other agents' builds, signalling
+  # it blind can kill something unrelated to this suite.
+  if [[ "$pid" =~ ^[0-9]+$ ]]; then
+    case "$(ps -p "$pid" -o command= 2>/dev/null)" in
+      *harness-jobserver.py*supervise*) kill "$pid" 2>/dev/null || true ;;
+    esac
+  fi
+  rm -rf "$dir" 2>/dev/null || true
+}
+
+# Stand in for cargo and record, per invocation, how many tokens were sitting in
+# the pool FIFO when it started.
+write_token_counting_cargo() {
+  local path="$1" log="$2"
+  cat >"$path" <<'EOF'
+#!/usr/bin/env bash
+fifo="${CARGO_MAKEFLAGS##*fifo:}"
+count=0
+if [[ -p "$fifo" ]]; then
+  count="$(python3 - "$fifo" <<'PY'
+import os, sys
+fd = os.open(sys.argv[1], os.O_RDWR | os.O_NONBLOCK)
+total = 0
+while True:
+    try:
+        chunk = os.read(fd, 4096)
+    except BlockingIOError:
+        break
+    if not chunk:
+        break
+    total += len(chunk)
+if total:
+    os.write(fd, b"+" * total)
+print(total)
+PY
+)"
+fi
+printf '%s %s\n' "$count" "$*" >> "$TOKEN_LOG"
+EOF
+  chmod +x "$path"
+  : >"$log"
+}
+
+scenario_nextest_build_phase_keeps_the_whole_pool() {
+  local key="pool-buildphase-$$"
+  local fake="$SANDBOX/token-cargo"
+  local log="$SANDBOX/token-log"
+  local scratch="$SANDBOX/buildphase-tmp"
+  mkdir -p "$fake" "$scratch"
+  write_token_counting_cargo "$fake/cargo" "$log"
+
+  local cpu budget
+  cpu="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.logicalcpu)"
+  budget=$((cpu - 1)); (( budget < 1 )) && budget=1
+  python3 "$ROOT/scripts/harness-jobserver.py" ensure \
+    --repo-root "$key" --budget "$budget" >/dev/null 2>&1 || true
+
+  (
+    unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR MAKEFLAGS MFLAGS CARGO_MAKEFLAGS
+    unset NEXTEST_TEST_THREADS HARNESS_NEXTEST_JOBS
+    TMPDIR="$scratch/" \
+      PATH="$(fifo_capable_make_path):$PATH" \
+      TOKEN_LOG="$log" \
+      SCCACHE_BIN='' RUSTC_WRAPPER='' \
+      CODEX_SESSION_ID="cargo-local-buildphase-$$" \
+      HARNESS_CARGO_SKIP_LEASE=1 \
+      HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+      HARNESS_JOBSERVER_POOL_KEY="$key" \
+      HARNESS_CARGO_BIN="$fake/cargo" \
+      "$ROOT/scripts/cargo-local.sh" nextest run --lib >/dev/null 2>&1
+  )
+  stop_pool_for_key "$key"
+
+  # cargo-local probes the binary with `cargo -V` before doing anything, so
+  # count only the invocations that carry the subcommand.
+  local build_tokens run_tokens
+  build_tokens="$(awk '/nextest/ {print $1; exit}' "$log")"
+  run_tokens="$(awk '/nextest/ {n++; if (n == 2) {print $1; exit}}' "$log")"
+
+  if [[ ! "$build_tokens" =~ ^[0-9]+$ ]] || [[ ! "$run_tokens" =~ ^[0-9]+$ ]]; then
+    fail "nextest was not split into a build and a run phase: $(tr '\n' '|' <"$log")"
+    return
+  fi
+  # The build must see the full pool. Holding the block across it starved the
+  # compile that produces the very binaries the block is reserved for.
+  if (( build_tokens < budget )); then
+    fail "nextest build phase was starved: saw $build_tokens of $budget tokens"
+    return
+  fi
+  if (( run_tokens != 0 )); then
+    fail "nextest run phase did not hold the block: $run_tokens tokens still free"
+    return
+  fi
+  pass "the nextest build phase keeps the whole pool, the run phase holds it"
+}
+
+scenario_build_only_flag_precedes_a_separator() {
+  local key="pool-sep-$$"
+  local fake="$SANDBOX/sep-cargo"
+  local log="$SANDBOX/sep-log"
+  local scratch="$SANDBOX/sep-tmp"
+  mkdir -p "$fake" "$scratch"
+  write_token_counting_cargo "$fake/cargo" "$log"
+
+  local cpu budget
+  cpu="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.logicalcpu)"
+  budget=$((cpu - 1)); (( budget < 1 )) && budget=1
+  python3 "$ROOT/scripts/harness-jobserver.py" ensure \
+    --repo-root "$key" --budget "$budget" >/dev/null 2>&1 || true
+
+  (
+    unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR MAKEFLAGS MFLAGS CARGO_MAKEFLAGS
+    unset NEXTEST_TEST_THREADS HARNESS_NEXTEST_JOBS
+    TMPDIR="$scratch/" \
+      PATH="$(fifo_capable_make_path):$PATH" \
+      TOKEN_LOG="$log" \
+      SCCACHE_BIN='' RUSTC_WRAPPER='' \
+      CODEX_SESSION_ID="cargo-local-sep-$$" \
+      HARNESS_CARGO_SKIP_LEASE=1 \
+      HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+      HARNESS_JOBSERVER_POOL_KEY="$key" \
+      HARNESS_CARGO_BIN="$fake/cargo" \
+      "$ROOT/scripts/cargo-local.sh" nextest run --lib -- --exact >/dev/null 2>&1
+  )
+  stop_pool_for_key "$key"
+
+  local build_args
+  build_args="$(awk '/nextest/ {sub(/^[0-9]+ /, ""); print; exit}' "$log")"
+  # Appended at the end, --no-run would sit past the caller's separator and
+  # reach the test binary, so the build phase would run the suite instead.
+  if [[ "$build_args" != *"--no-run -- --exact" ]]; then
+    fail "--no-run did not precede the caller's separator: '$build_args'"
+    return
+  fi
+  pass "the build-only flag precedes a caller's argument separator"
+}
+
+scenario_nextest_detection_skips_global_flag_values() {
+  local key="pool-flagvalue-$$"
+  local fake="$SANDBOX/flagvalue-cargo"
+  local log="$SANDBOX/flagvalue-log"
+  local scratch="$SANDBOX/flagvalue-tmp"
+  mkdir -p "$fake" "$scratch"
+  write_token_counting_cargo "$fake/cargo" "$log"
+
+  local cpu budget
+  cpu="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.logicalcpu)"
+  budget=$((cpu - 1)); (( budget < 1 )) && budget=1
+  python3 "$ROOT/scripts/harness-jobserver.py" ensure \
+    --repo-root "$key" --budget "$budget" >/dev/null 2>&1 || true
+
+  run_flagvalue() {
+    (
+      unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR MAKEFLAGS MFLAGS CARGO_MAKEFLAGS
+      unset NEXTEST_TEST_THREADS HARNESS_NEXTEST_JOBS
+      TMPDIR="$scratch/" \
+        PATH="$(fifo_capable_make_path):$PATH" \
+        TOKEN_LOG="$log" \
+        SCCACHE_BIN='' RUSTC_WRAPPER='' \
+        CODEX_SESSION_ID="cargo-local-flagvalue-$$" \
+        HARNESS_CARGO_SKIP_LEASE=1 \
+        HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+        HARNESS_JOBSERVER_POOL_KEY="$key" \
+        HARNESS_CARGO_BIN="$fake/cargo" \
+        "$ROOT/scripts/cargo-local.sh" "$@" >/dev/null 2>&1
+    )
+  }
+
+  # `--color always` puts a bare word before the subcommand, and reading it as
+  # the subcommand dropped the split silently.
+  : >"$log"
+  run_flagvalue --color always nextest run --lib
+  local split_invocations; split_invocations="$(grep -c nextest "$log")"
+
+  # Same shape without nextest, which must still not split. Count only the
+  # forwarded command; cargo-local also probes the binary with a bare -V.
+  : >"$log"
+  run_flagvalue --color always run
+  local plain_invocations; plain_invocations="$(grep -c -- '--color' "$log")"
+  stop_pool_for_key "$key"
+
+  if [[ "$split_invocations" != "2" ]]; then
+    fail "a value-taking global flag broke the split ($split_invocations cargo invocations)"
+    return
+  fi
+  if [[ "$plain_invocations" != "1" ]]; then
+    fail "cargo run after a global flag should not split ($plain_invocations cargo invocations)"
+    return
+  fi
+  pass "nextest detection skips the value of a global flag"
+}
+
+scenario_nextest_detection_handles_toolchain_and_list() {
+  local key="pool-detect-$$"
+  local fake="$SANDBOX/detect-cargo"
+  local log="$SANDBOX/detect-log"
+  local scratch="$SANDBOX/detect-tmp"
+  mkdir -p "$fake" "$scratch"
+  write_token_counting_cargo "$fake/cargo" "$log"
+
+  local cpu budget
+  cpu="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.logicalcpu)"
+  budget=$((cpu - 1)); (( budget < 1 )) && budget=1
+  python3 "$ROOT/scripts/harness-jobserver.py" ensure \
+    --repo-root "$key" --budget "$budget" >/dev/null 2>&1 || true
+
+  run_detect() {
+    (
+      unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR MAKEFLAGS MFLAGS CARGO_MAKEFLAGS
+      unset NEXTEST_TEST_THREADS HARNESS_NEXTEST_JOBS
+      TMPDIR="$scratch/" \
+        PATH="$(fifo_capable_make_path):$PATH" \
+        TOKEN_LOG="$log" \
+        SCCACHE_BIN='' RUSTC_WRAPPER='' \
+        CODEX_SESSION_ID="cargo-local-detect-$$" \
+        HARNESS_CARGO_SKIP_LEASE=1 \
+        HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+        HARNESS_JOBSERVER_POOL_KEY="$key" \
+        HARNESS_CARGO_BIN="$fake/cargo" \
+        "$ROOT/scripts/cargo-local.sh" "$@" >/dev/null 2>&1
+    )
+  }
+
+  # A toolchain selector sits before the subcommand and is not a flag; missing
+  # it silently dropped the split for `cargo +nightly nextest run`.
+  : >"$log"
+  run_detect +nightly nextest run --lib
+  local toolchain_invocations; toolchain_invocations="$(grep -c nextest "$log")"
+
+  # `nextest list` builds but runs nothing, so it wants no test block.
+  : >"$log"
+  run_detect nextest list
+  local list_invocations; list_invocations="$(grep -c nextest "$log")"
+  stop_pool_for_key "$key"
+
+  if [[ "$toolchain_invocations" != "2" ]]; then
+    fail "toolchain-prefixed nextest run was not split ($toolchain_invocations cargo invocations)"
+    return
+  fi
+  if [[ "$list_invocations" != "1" ]]; then
+    fail "nextest list should not be split ($list_invocations cargo invocations)"
+    return
+  fi
+  pass "nextest detection handles a toolchain prefix and skips list"
+}
+
+scenario_jobserver_pool_takes_over_build_sizing() {
+  local key="pool-sizing-$$"
+  local output cpu
+  output="$(print_cargo_env_with_pool_key "$key")"
+  cpu="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.logicalcpu)"
+  stop_pool_for_key "$key"
+
+  if ! assert_line "JOBSERVER=pool" "$output"; then
+    fail "jobserver pool was not used: $(grep '^JOBSERVER=' <<<"$output")"
+    return
+  fi
+  if ! assert_contains "--jobserver-auth=fifo:" "$output"; then
+    fail "CARGO_MAKEFLAGS carried no endpoint: $(grep '^CARGO_MAKEFLAGS=' <<<"$output")"
+    return
+  fi
+  # The pool caps concurrency now, so the per-process reserve must step aside
+  # and let cargo ask for the whole machine.
+  if ! assert_line "CARGO_BUILD_JOBS=$cpu" "$output"; then
+    fail "pool did not widen build jobs to $cpu: $(grep '^CARGO_BUILD_JOBS=' <<<"$output")"
+    return
+  fi
+  pass "an available pool widens build jobs and exports a jobserver"
+}
+
+scenario_old_make_keeps_the_pool_at_arms_length() {
+  local key fake_bin output version expected_mode skipped
+  local -a cases=("4.3:reserve" "3.81:reserve" "4.4.1:pool" "5.0:pool" "bmake-nonsense:reserve")
+  local entry
+
+  for entry in "${cases[@]}"; do
+    version="${entry%%:*}"
+    expected_mode="${entry##*:}"
+    key="pool-make-$version-$$"
+    fake_bin="$SANDBOX/make-$version"
+    mkdir -p "$fake_bin"
+    if [[ "$version" == bmake-nonsense ]]; then
+      printf '#!/usr/bin/env bash\nprintf "not a gnu make\\n"\n' >"$fake_bin/make"
+    else
+      printf '#!/usr/bin/env bash\nprintf "GNU Make %s\\n"\n' "$version" >"$fake_bin/make"
+    fi
+    chmod +x "$fake_bin/make"
+
+    output="$(HARNESS_TEST_MAKE_ON_PATH=1 PATH="$fake_bin:$PATH" \
+      print_cargo_env_with_pool_key "$key")"
+    stop_pool_for_key "$key"
+    skipped="$(awk -F= '$1 == "JOBSERVER_SKIPPED" { print $2 }' <<<"$output")"
+
+    if ! assert_line "JOBSERVER=$expected_mode" "$output"; then
+      fail "make $version should give $expected_mode: $(grep '^JOBSERVER=' <<<"$output")"
+      return
+    fi
+    if [[ "$expected_mode" == reserve && "$skipped" != "old-make" ]]; then
+      fail "make $version fell back without naming why: JOBSERVER_SKIPPED=$skipped"
+      return
+    fi
+    if [[ "$expected_mode" == pool && -n "$skipped" ]]; then
+      fail "make $version attached but claimed a skip: JOBSERVER_SKIPPED=$skipped"
+      return
+    fi
+  done
+  pass "a make too old for a fifo endpoint keeps the static reserve"
+}
+
+scenario_pool_endpoint_never_reaches_make() {
+  local key="pool-make-$$"
+  local output makeflags endpoint probe status=0
+
+  output="$(print_cargo_env_with_pool_key "$key")"
+  stop_pool_for_key "$key"
+  makeflags="$(awk -F= '$1 == "MAKEFLAGS" { print substr($0, index($0, "=") + 1) }' <<<"$output")"
+  endpoint="$(awk -F= '$1 == "CARGO_MAKEFLAGS" { print substr($0, index($0, "=") + 1) }' <<<"$output")"
+
+  if [[ "$endpoint" != *--jobserver-auth=fifo:* ]]; then
+    fail "the pool endpoint never reached CARGO_MAKEFLAGS: $endpoint"
+    return
+  fi
+  # GNU make below 4.4 does not ignore a fifo endpoint, it dies on one: 4.3,
+  # which Ubuntu 24.04 ships, exits 2 with "internal error: invalid
+  # --jobserver-auth string". Anything a build script shells out to inherits
+  # this environment, so the endpoint has to stay out of every name make reads.
+  if [[ -n "$makeflags" ]]; then
+    fail "the pool endpoint reached MAKEFLAGS: $makeflags"
+    return
+  fi
+
+  if command -v make >/dev/null 2>&1; then
+    probe="$SANDBOX/jobserver-probe.mk"
+    printf 'all:\n\t@true\n' >"$probe"
+    MAKEFLAGS="$makeflags" CARGO_MAKEFLAGS="$endpoint" \
+      make -f "$probe" >/dev/null 2>&1 || status=$?
+    if (( status != 0 )); then
+      fail "make died under the exported environment (exit $status)"
+      return
+    fi
+  fi
+  pass "the pool endpoint never reaches make"
+}
+
+scenario_reserve_drops_an_inherited_jobserver() {
+  local key="pool-inherited-$$"
+  local output
+  # A stale endpoint is the reachable case: this script exports exactly this
+  # shape, and a child inheriting one whose pool has died would attach, get no
+  # tokens, and build serially while CARGO_BUILD_JOBS advertised a full share.
+  # Every variable the jobserver crate consults, because it honours the first
+  # one it finds and leaving any behind reinstates the stale pool.
+  output="$(print_cargo_env_with_pool_key "$key" \
+    env HARNESS_JOBSERVER=0 \
+    "MAKEFLAGS=-j9 --jobserver-auth=fifo:$SANDBOX/not-a-pool" \
+    "MFLAGS=-j9 --jobserver-auth=fifo:$SANDBOX/not-a-pool" \
+    "CARGO_MAKEFLAGS=-j9 --jobserver-auth=fifo:$SANDBOX/not-a-pool")"
+  stop_pool_for_key "$key"
+
+  if ! assert_line "JOBSERVER=reserve" "$output"; then
+    fail "inherited jobserver did not fall back: $(grep '^JOBSERVER=' <<<"$output")"
+    return
+  fi
+  if ! assert_line "MAKEFLAGS=" "$output" || ! assert_line "CARGO_MAKEFLAGS=" "$output"; then
+    fail "reserve kept an inherited jobserver: $(grep -E '^(CARGO_)?MAKEFLAGS=' <<<"$output")"
+    return
+  fi
+  pass "the reserve drops an inherited jobserver"
+}
+
+scenario_jobserver_absent_falls_back_to_the_reserve() {
+  local key="pool-absent-$$"
+  local output share cpu expected
+  output="$(print_cargo_env_with_pool_key "$key" env HARNESS_JOBSERVER=0)"
+  stop_pool_for_key "$key"
+
+  share="$(agent_build_share)" || return
+  cpu="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.logicalcpu)"
+  expected=$(((cpu + share - 1) / share))
+
+  if ! assert_line "JOBSERVER=reserve" "$output"; then
+    fail "disabled jobserver did not fall back: $(grep '^JOBSERVER=' <<<"$output")"
+    return
+  fi
+  if ! assert_line "CARGO_MAKEFLAGS=" "$output"; then
+    fail "disabled jobserver still exported an endpoint: $(grep '^CARGO_MAKEFLAGS=' <<<"$output")"
+    return
+  fi
+  if ! assert_line "CARGO_BUILD_JOBS=$expected" "$output"; then
+    fail "fallback lost the static reserve: $(grep '^CARGO_BUILD_JOBS=' <<<"$output")"
+    return
+  fi
+  pass "an unavailable pool falls back to the static reserve"
+}
+
+scenario_explicit_job_override_beats_the_pool() {
+  local key="pool-override-$$"
+  local output
+  output="$(print_cargo_env_with_pool_key "$key" env HARNESS_CARGO_JOBS=3)"
+  stop_pool_for_key "$key"
+
+  if ! assert_line "CARGO_BUILD_JOBS=3" "$output"; then
+    fail "explicit job override was overridden by the pool: $(grep '^CARGO_BUILD_JOBS=' <<<"$output")"
+    return
+  fi
+  pass "an explicit job override still beats the pool"
+}
+
 print_cargo_env_without_tmpdir() {
   local fake_bin="$1" sccache_bin="$2" session="$3"
   (
@@ -125,11 +602,16 @@ print_tmpdir_env() {
     else
       unset TMPDIR
     fi
+    # These scenarios are about TMPDIR, target dirs and sccache, and the pool
+    # key would otherwise fall through to the real repository root - attaching
+    # to, or spawning, a supervisor on the developer's own pool and waiting out
+    # the startup timeout on every call.
     SCCACHE_BIN="$SANDBOX/missing-sccache" \
       RUSTC_WRAPPER='' \
       CODEX_SESSION_ID="$session_id" \
       HARNESS_CARGO_SKIP_LEASE=1 \
       HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+      HARNESS_JOBSERVER=0 \
       "$ROOT/scripts/cargo-local.sh" --print-env
   )
 }
@@ -277,10 +759,13 @@ exit 1
 EOF
   chmod +x "$fake_bin/getconf"
 
+  # Pin the fallback. With a pool reachable the token count governs instead,
+  # and this scenario is about what happens when there is no pool.
   agent_output="$(
     PATH="$fake_bin:$PATH" \
       CARGO_BUILD_JOBS='' \
       HARNESS_CARGO_JOBS='' \
+      HARNESS_JOBSERVER=0 \
       print_tmpdir_env "cargo-local-all-cpus-agent-$$"
   )"
   local_output="$(
@@ -289,6 +774,7 @@ EOF
     PATH="$fake_bin:$PATH" \
       CARGO_BUILD_JOBS='' \
       HARNESS_CARGO_JOBS='' \
+      HARNESS_JOBSERVER=0 \
       HARNESS_CARGO_SKIP_LEASE=1 \
       HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
       SCCACHE_BIN="$SANDBOX/missing-sccache" \
@@ -338,6 +824,7 @@ EOF
         CODEX_SESSION_ID="cargo-local-curve-$$" \
         SCCACHE_BIN="$SANDBOX/missing-sccache" \
         RUSTC_WRAPPER='' \
+        HARNESS_JOBSERVER=0 \
         HARNESS_CARGO_SKIP_LEASE=1 \
         HARNESS_CARGO_ACTIVE_BUILD_COUNT="$n" \
         "$ROOT/scripts/cargo-local.sh" --print-env \
@@ -721,6 +1208,16 @@ EOF
   fi
 }
 
+scenario_jobserver_pool_takes_over_build_sizing
+scenario_jobserver_absent_falls_back_to_the_reserve
+scenario_reserve_drops_an_inherited_jobserver
+scenario_pool_endpoint_never_reaches_make
+scenario_old_make_keeps_the_pool_at_arms_length
+scenario_explicit_job_override_beats_the_pool
+scenario_nextest_build_phase_keeps_the_whole_pool
+scenario_build_only_flag_precedes_a_separator
+scenario_nextest_detection_handles_toolchain_and_list
+scenario_nextest_detection_skips_global_flag_values
 scenario_missing_tmpdir_uses_short_external_fallback
 scenario_concurrent_tmpdir_creation_is_idempotent
 scenario_unusable_tmpdir_uses_short_external_fallback

@@ -73,6 +73,26 @@ A start can replace the descriptor's command with a remote endpoint: `--endpoint
 
 Integration tests live in `tests/integration/` and cover hooks, commands, and workflows end to end. Canonical Rust test tasks use nextest process isolation and parallel scheduling. A test must isolate its environment, filesystem paths, ports, and external resource names instead of requiring runner-wide serialization. Tests that read XDG paths must isolate state with `temp_env::with_vars`, setting both `XDG_DATA_HOME` and `CLAUDE_SESSION_ID`. Avoid mocks; tests use real filesystem state.
 
+## Rust build concurrency
+
+`scripts/cargo-local.sh` sizes `CARGO_BUILD_JOBS` and `NEXTEST_TEST_THREADS` two different ways, and `--print-env` reports which one is live as `JOBSERVER=pool` or `JOBSERVER=reserve`.
+
+Under `pool`, `scripts/harness-jobserver.py` supervises one token pool per repository, holding a GNU make jobserver FIFO plus a Unix socket under `/tmp/harness-jobserver-<uid>/<repo-hash>/`. Cargo attaches through `CARGO_MAKEFLAGS` and renegotiates its own width for as long as it runs, so `CARGO_BUILD_JOBS` stays at the full CPU count and the pool does the limiting. The endpoint goes in `CARGO_MAKEFLAGS` rather than `MAKEFLAGS` because the `jobserver` crate honours the first of `CARGO_MAKEFLAGS`, `MAKEFLAGS`, `MFLAGS` that is set, while `make` reads only the latter two. GNU make before 4.4 does not ignore a `fifo:` endpoint it cannot parse - 4.3, which Ubuntu 24.04 ships, exits 2 with `internal error: invalid --jobserver-auth string` - so publishing one in `MAKEFLAGS` would kill every sub-make a build script runs on Linux while looking fine on a macOS box running make 4.4.
+
+`CARGO_MAKEFLAGS` alone is not quite enough, because `cmake-rs` copies it into `MAKEFLAGS` itself for a Makefile-generator build, and `cmake` reaches this tree through `aws-lc-sys`. So the pool is only offered where the `make` on `PATH` is 4.4 or newer; anything older, or anything that does not answer with a version number, keeps the static reserve and `--print-env` reports `JOBSERVER_SKIPPED=old-make`. Stock cargo is unaffected by any of this because the jobserver it creates for itself is fd-based, which every make understands. The budget is one below the CPU count because every cargo may run a single job without holding a token; two builds sharing a four-token pool therefore peak at six concurrent `rustc`, not four.
+
+nextest cannot speak the protocol and upstream has declined to add it, so its test width has to be fixed before the run starts. Its two halves want opposite things: the build wants the pool, and holding a block across it would starve the compile that produces the binaries the block is for. A `nextest run` is therefore split - `--no-run` builds first against the full pool, then a block comes out of the same budget through the socket and the run itself proceeds with nothing left to compile. The socket exists because a FIFO token is anonymous: a killed client would drain the pool forever, which is why the published system-wide jobservers need CUSE that macOS lacks. A socket grant returns when the kernel closes the dead client's fd.
+
+Under `reserve` the older static split applies: each agent session divides the CPU count by `AGENT_BUILD_SHARE`, assuming that many agents may arrive, because the lease count is sampled once and cannot be renegotiated. This is the fallback whenever the pool cannot be reached, and it is what `HARNESS_JOBSERVER=0` selects. Reaching a pool is never required - a stale or empty FIFO makes cargo build serially through its implicit slot rather than block.
+
+| Variable | Effect |
+| --- | --- |
+| `HARNESS_JOBSERVER=0` | Skip the pool and use the static reserve |
+| `HARNESS_JOBSERVER_POOL_KEY` | Key the pool by this string instead of the repo root; tests use it for isolation |
+| `HARNESS_CARGO_JOBS`, `CARGO_BUILD_JOBS` | Explicit build width, authoritative under either mode |
+| `HARNESS_NEXTEST_JOBS`, `NEXTEST_TEST_THREADS` | Explicit test width; either one also suppresses the pool-backed nextest split |
+| `HARNESS_JOBSERVER_TIMEOUT` | Seconds to wait for a supervisor to come up, default 15 |
+
 ## Build lane and fsmonitor cleanup
 
 The Harness Monitor xcodebuild wrapper at `apps/harness-monitor/Scripts/monitor-xcodebuild.sh` enforces a hardcoded global concurrency cap (currently 8) via a counting semaphore at `.cache/harness-monitor-xcodebuild-semaphore/`. The cap is intentionally not raisable via env var; `HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY` is rejected with a stderr warning.

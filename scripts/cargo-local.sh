@@ -16,6 +16,11 @@ active_build_count=1
 # How many concurrent agent builds a single agent assumes it must leave room
 # for when the lease count cannot tell it yet.
 AGENT_BUILD_SHARE=4
+# "pool" once attached to the shared jobserver, "reserve" on the static fallback.
+jobserver_mode="reserve"
+# Why the pool was passed over, when it was passed over for a reason worth
+# naming rather than simply being unreachable.
+jobserver_skipped=""
 skip_build_lease="${HARNESS_CARGO_SKIP_LEASE:-0}"
 
 first_nonempty_env() {
@@ -354,7 +359,91 @@ concurrency_share() {
   printf '%s\n' "$share"
 }
 
+jobserver_script() {
+  printf '%s\n' "$ROOT/scripts/harness-jobserver.py"
+}
+
+jobserver_pool_key() {
+  printf '%s\n' "${HARNESS_JOBSERVER_POOL_KEY:-$COMMON_REPO_ROOT}"
+}
+
+# One token short of the CPU count: every cargo may run a single unit of work
+# without holding a token, so the pool plus that implicit slot lands on the
+# machine's real width rather than one above it.
+jobserver_budget() {
+  local budget=$(($(detect_cpu_count) - 1))
+  if (( budget < 1 )); then
+    budget=1
+  fi
+  printf '%s\n' "$budget"
+}
+
+# Whether a sub-make could survive being handed this pool. Cargo keeps the fifo
+# endpoint out of MAKEFLAGS, but cmake-rs copies CARGO_MAKEFLAGS into MAKEFLAGS
+# itself whenever the generated project is Makefile based, and make below 4.4
+# does not ignore an endpoint it cannot parse - 4.3 exits 2 on one. A crate like
+# aws-lc-sys would then fail the whole build, so on such a host the pool is not
+# safe to attach to at all and the static reserve stands in.
+make_understands_fifo_jobserver() {
+  local version major minor
+  command -v make >/dev/null 2>&1 || return 0
+  version="$(make --version 2>/dev/null | head -1)"
+  version="${version##* }"
+  IFS=. read -r major minor _ <<<"$version"
+  # Anything that does not answer with a version number - bmake, a wrapper - is
+  # assumed unable to cope, because guessing wrong here breaks builds.
+  [[ "$major" =~ ^[0-9]+$ ]] || return 1
+  [[ "$minor" =~ ^[0-9]+$ ]] || minor=0
+  (( major > 4 || (major == 4 && minor >= 4) ))
+}
+
+# Attach to the shared pool. Cargo speaks the jobserver protocol natively, so
+# once CARGO_MAKEFLAGS points at the pool it renegotiates its own width against
+# every other build for as long as it runs - which the sampled-once reserve
+# cannot do. MAKEFLAGS stays empty on purpose: see the note in configure below.
+configure_jobserver() {
+  local line
+
+  jobserver_mode="reserve"
+  jobserver_skipped=""
+  # Reserve means this script sizes the build, so an inherited jobserver must
+  # not silently govern instead. A stale one - the pool this very script
+  # exported before it died - pins cargo to its implicit slot while
+  # CARGO_BUILD_JOBS still advertises a full share. All three go, because the
+  # jobserver crate honours whichever of them it finds first.
+  unset MAKEFLAGS MFLAGS CARGO_MAKEFLAGS
+  if [[ "${HARNESS_JOBSERVER:-1}" == "0" ]]; then
+    return 0
+  fi
+  command -v python3 >/dev/null 2>&1 || return 0
+  [[ -f "$(jobserver_script)" ]] || return 0
+  # Named so the fallback is visible. Dropping to the reserve without saying why
+  # is the same silent degradation the pool exists to make impossible.
+  if ! make_understands_fifo_jobserver; then
+    jobserver_skipped="old-make"
+    return 0
+  fi
+
+  line="$(python3 "$(jobserver_script)" ensure \
+    --repo-root "$(jobserver_pool_key)" \
+    --budget "$(jobserver_budget)" 2>/dev/null)" || return 0
+  [[ "$line" == CARGO_MAKEFLAGS=* ]] || return 0
+
+  # Deliberately not MAKEFLAGS. Cargo reads CARGO_MAKEFLAGS first, and make
+  # never reads it at all, so a build script that shells out to make cannot
+  # inherit an endpoint its make is too old to parse. GNU make 4.3 - what
+  # Ubuntu 24.04 ships - exits 2 on a fifo endpoint rather than ignoring it.
+  export CARGO_MAKEFLAGS="${line#CARGO_MAKEFLAGS=}"
+  jobserver_mode="pool"
+}
+
 default_jobs() {
+  # Under the pool the cap belongs to the token count, not to this process. A
+  # reserve applied on top would throttle a build twice and strand tokens.
+  if [[ "$jobserver_mode" == "pool" ]]; then
+    detect_cpu_count
+    return 0
+  fi
   concurrency_share "$(detect_cpu_count)"
 }
 
@@ -431,6 +520,14 @@ if [[ -n "${SCCACHE_BIN:-}" ]]; then
 fi
 
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${HARNESS_CARGO_TARGET_DIR:-$COMMON_REPO_ROOT/target/dev/$target_segment}}"
+# An explicit thread count is the caller's decision, so record that before the
+# default lands on top of it - the pool must not renegotiate a chosen width.
+nextest_threads_explicit=0
+if [[ -n "${NEXTEST_TEST_THREADS:-}" ]] || [[ -n "${HARNESS_NEXTEST_JOBS:-}" ]]; then
+  nextest_threads_explicit=1
+fi
+
+configure_jobserver
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-${HARNESS_CARGO_JOBS:-$(default_jobs)}}"
 export NEXTEST_TEST_THREADS="${NEXTEST_TEST_THREADS:-${HARNESS_NEXTEST_JOBS:-$(default_test_jobs)}}"
 if [[ "$NEXTEST_TEST_THREADS" != "num-cpus" ]] \
@@ -445,6 +542,10 @@ if [[ "${1:-}" == "--print-env" ]]; then
   printf 'CARGO_BUILD_JOBS=%s\n' "$CARGO_BUILD_JOBS"
   printf 'NEXTEST_TEST_THREADS=%s\n' "$NEXTEST_TEST_THREADS"
   printf 'CARGO_BUILD_BUILD_DIR=%s\n' "${CARGO_BUILD_BUILD_DIR:-}"
+  printf 'MAKEFLAGS=%s\n' "${MAKEFLAGS:-}"
+  printf 'CARGO_MAKEFLAGS=%s\n' "${CARGO_MAKEFLAGS:-}"
+  printf 'JOBSERVER=%s\n' "$jobserver_mode"
+  printf 'JOBSERVER_SKIPPED=%s\n' "$jobserver_skipped"
   printf 'ACTIVE_BUILD_COUNT=%s\n' "$active_build_count"
   if [[ -n "$session_id" ]]; then
     printf 'SESSION_MODE=agent\n'
@@ -499,6 +600,84 @@ fi
 
 if [[ "${HARNESS_CARGO_GROUP_CHILD:-0}" == "1" ]]; then
   exec "$cargo_bin" "$@"
+fi
+
+# True only for `nextest run`. `nextest list` builds but runs no tests, so it
+# wants the pool for its build and no test block at all.
+command_is_nextest_run() {
+  local arg seen_nextest=0 skip_value=0
+  for arg in "$@"; do
+    if (( skip_value )); then
+      skip_value=0
+      continue
+    fi
+    case "$arg" in
+      # Global flags whose value is a separate bare word, which would otherwise
+      # read as the subcommand and make this look like something else entirely.
+      # The --flag=value spelling needs no help; it already matches -*.
+      --color|--config|-C|-Z) skip_value=1 ;;
+      # A toolchain selector precedes the subcommand and is not a flag.
+      +*) ;;
+      -*) ;;
+      nextest)
+        if (( seen_nextest )); then
+          return 1
+        fi
+        seen_nextest=1
+        ;;
+      run) (( seen_nextest )) && return 0; return 1 ;;
+      *) return 1 ;;
+    esac
+  done
+  return 1
+}
+
+already_no_run() {
+  local arg
+  for arg in "$@"; do
+    [[ "$arg" == "--no-run" ]] && return 0
+  done
+  return 1
+}
+
+# Place --no-run ahead of any separator. Appended at the end it would land past
+# a caller's `--` and reach the test binary as one of its arguments, leaving the
+# build phase to run the whole suite instead of only compiling it.
+build_only_args() {
+  local arg inserted=0
+  build_only_argv=()
+  for arg in "$@"; do
+    if (( ! inserted )) && [[ "$arg" == "--" ]]; then
+      build_only_argv+=(--no-run)
+      inserted=1
+    fi
+    build_only_argv+=("$arg")
+  done
+  if (( ! inserted )); then
+    build_only_argv+=(--no-run)
+  fi
+}
+
+# nextest does not speak the jobserver protocol and has said it will not, so its
+# test width cannot renegotiate mid-run and has to be fixed up front. Its two
+# halves want opposite things, though: the build wants the pool, and holding a
+# block across it would starve the compile that produces the very binaries the
+# block is for. So build first against the full pool, then take the block and
+# run - by then cargo has nothing left to compile.
+if [[ "$jobserver_mode" == "pool" ]] \
+  && (( nextest_threads_explicit == 0 )) \
+  && command_is_nextest_run "$@" \
+  && ! already_no_run "$@"; then
+  build_only_args "$@"
+  harness_run_step "cargo-local test build" "$cargo_bin" "${build_only_argv[@]}" || exit $?
+  harness_run_step "cargo-local command" \
+    python3 "$(jobserver_script)" run \
+    --repo-root "$(jobserver_pool_key)" \
+    --max "$(jobserver_budget)" \
+    --env NEXTEST_TEST_THREADS \
+    --floor 2 \
+    -- "$cargo_bin" "$@"
+  exit $?
 fi
 
 harness_run_step "cargo-local command" "$cargo_bin" "$@"
