@@ -36,7 +36,7 @@ struct TaskBoardLaneHeader: View {
     }
     .harnessPlainButtonStyle()
     .frame(maxWidth: .infinity, alignment: .leading)
-    .taskBoardLaneToggleFeedback(lane: lane, cornerRadius: metrics.cardCornerRadius)
+    .taskBoardLaneHeaderFade(lane: lane, cornerRadius: metrics.cardCornerRadius)
     .help("Collapse \(lane.title) board")
     .accessibilityElement(children: .ignore)
     .accessibilityLabel("Collapse \(lane.title) board")
@@ -86,6 +86,9 @@ struct TaskBoardLaneHeader: View {
   }
 }
 
+/// Collapsed-rail feedback. The rail is a standalone control with its own
+/// bounds, so a bounded fill plus outline reads correctly there; the expanded
+/// header uses `taskBoardLaneHeaderFade` instead.
 private struct TaskBoardLaneToggleFeedback: ViewModifier {
   let lane: TaskBoardInboxLane
   let cornerRadius: CGFloat
@@ -298,7 +301,7 @@ private struct TaskBoardLanePunchedAccentShape: Shape {
   }
 }
 
-private struct TaskBoardLaneTopRoundedShape: Shape {
+struct TaskBoardLaneTopRoundedShape: Shape {
   let cornerRadius: CGFloat
 
   func path(in rect: CGRect) -> Path {
