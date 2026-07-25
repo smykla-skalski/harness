@@ -150,9 +150,15 @@ pub(super) fn current_schema_shape_needs_repair(
         return Ok(true);
     }
     // A missing index answers every query correctly, just slowly, so nothing
-    // else here would ever notice it had gone.
-    if !index_exists(conn, "task_board_items_source_project")? {
-        return Ok(true);
+    // else here would ever notice it had gone. Both v51 indexes belong in the
+    // list: checking only one leaves the other unrepairable.
+    for index in [
+        "task_board_items_source_project",
+        "task_board_projects_source_slug",
+    ] {
+        if !index_exists(conn, index)? {
+            return Ok(true);
+        }
     }
     Ok(false)
 }

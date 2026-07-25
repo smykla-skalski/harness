@@ -7,9 +7,12 @@ use super::runtime_config::normalize_repository_slug;
 const PROJECT_ID_PREFIX: &str = "project-";
 const PROJECT_ID_BODY_LEN: usize = 32;
 /// Mirrors the column's CHECK, which measures bytes rather than characters.
-/// Normalizing has to agree with it: an oversize slug that reaches the insert
-/// comes back as a store failure for what is really a caller mistake, and the
-/// v51 backfill would fail the whole migration on it.
+/// Normalizing has to agree with it: `ensure_project_in_tx` inserts with
+/// `ON CONFLICT DO NOTHING`, which swallows a duplicate but not a CHECK
+/// violation, so an oversize slug reaching it fails the write and reads as a
+/// store error for what is really a caller mistake. The v51 backfill is not
+/// affected - its `INSERT OR IGNORE` skips the row and leaves the item
+/// unattributed.
 const PROJECT_SLUG_MAX_BYTES: usize = 256;
 
 /// Where a project's identity comes from. The source scopes the slug, because

@@ -28,25 +28,31 @@ fn repair_restores_the_newest_schema_objects_before_stamping() {
 }
 
 /// An index is the easiest object to lose and the hardest to notice: queries
-/// still answer, just slowly. Repair has to rebuild it even though the column
+/// still answer, just slowly. Repair has to rebuild one even though the column
 /// it covers is already there, which is the path that only stamps the version.
+/// Every v51 index is covered, because detecting one and not its sibling is
+/// how the second went unrepairable.
 #[test]
-fn repair_rebuilds_a_dropped_attribution_index() {
-    let db = DaemonDb::open_in_memory().expect("open current database");
-    db.conn
-        .execute_batch("DROP INDEX task_board_items_source_project;")
-        .expect("drop the attribution index");
+fn repair_rebuilds_a_dropped_index() {
+    for index in [
+        "task_board_items_source_project",
+        "task_board_projects_source_slug",
+    ] {
+        let db = DaemonDb::open_in_memory().expect("open current database");
+        db.conn
+            .execute_batch(&format!("DROP INDEX {index};"))
+            .unwrap_or_else(|error| panic!("drop {index}: {error}"));
 
-    repair_current_schema_shape(&db).expect("repair schema shape");
+        repair_current_schema_shape(&db).expect("repair schema shape");
 
-    let restored: i64 = db
-        .conn
-        .query_row(
-            "SELECT COUNT(*) FROM sqlite_master \
-             WHERE type = 'index' AND name = 'task_board_items_source_project'",
-            [],
-            |row| row.get(0),
-        )
-        .expect("count the attribution index");
-    assert_eq!(restored, 1, "repair left the attribution index missing");
+        let restored: i64 = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = ?1",
+                [index],
+                |row| row.get(0),
+            )
+            .unwrap_or_else(|error| panic!("count {index}: {error}"));
+        assert_eq!(restored, 1, "repair left {index} missing");
+    }
 }
