@@ -26,7 +26,7 @@ pub use paths::{
     HARNESS_PREFIX, NON_INDEXABLE_MARKER_NAME, dirs_home, ensure_non_indexable, harness_data_root,
     shorten_path, utc_now,
 };
-pub(crate) use paths::{host_home_dir, normalized_env_value};
+pub(crate) use paths::{account_home_dir, host_home_dir, normalized_env_value};
 pub use session::{
     current_run_context_path, current_run_context_path_for_project, data_root, project_context_dir,
     project_context_id, session_context_dir, session_context_dir_for_project, session_scope_key,
