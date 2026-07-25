@@ -122,6 +122,10 @@ mod tests {
             ws_methods::TASK_BOARD_ORCHESTRATOR_RUNS,
             ws_methods::TASK_BOARD_ORCHESTRATOR_RUN_DETAIL,
             ws_methods::TASK_BOARD_ORCHESTRATOR_METRICS,
+            ws_methods::TASK_BOARD_ORCHESTRATOR_FORCE_CANCEL,
+            ws_methods::TASK_BOARD_WORKING_COPIES_LIST,
+            ws_methods::TASK_BOARD_WORKING_COPIES_OBTAIN,
+            ws_methods::TASK_BOARD_WORKING_COPIES_DELETE,
         ] {
             assert!(ws_methods::ALL.contains(&method));
             assert!(!agent_methods.contains(&method));
