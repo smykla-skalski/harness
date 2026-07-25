@@ -21,7 +21,7 @@
 //! This means output sequence numbers may have gaps relative to input. Downstream
 //! consumers must not assume contiguous sequences.
 
-use std::mem::discriminant;
+use std::mem;
 
 use agent_client_protocol::schema::v1::{
     ContentBlock, ContentChunk, SessionUpdate, ToolCallStatus, ToolKind,
@@ -144,7 +144,7 @@ pub fn materialise_one(
 
         unknown => {
             tracing::debug!(
-                update = ?discriminant(unknown),
+                update = ?mem::discriminant(unknown),
                 "skipping unhandled ACP session update variant"
             );
             return None;

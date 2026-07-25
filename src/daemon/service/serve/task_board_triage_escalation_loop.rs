@@ -7,7 +7,7 @@
 //! `CodexRunMode::Report` (no workspace-write capability), the run has zero
 //! repository access, matching what a pure triage judgment call needs.
 
-use std::fs::create_dir_all;
+use std::fs;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -190,7 +190,7 @@ fn ensure_escalation_scratch_dir(
         .parent()
         .map_or_else(|| PathBuf::from(SCRATCH_DIR_NAME), |parent| parent.join(SCRATCH_DIR_NAME));
     let dir = base.join(sanitized_escalation_segment(escalation_id));
-    create_dir_all(&dir).map_err(|error| {
+    fs::create_dir_all(&dir).map_err(|error| {
         CliErrorKind::workflow_io(format!(
             "create triage escalation scratch dir: {error}"
         ))

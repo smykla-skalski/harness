@@ -1,4 +1,4 @@
-use std::env::var;
+use std::env;
 use std::error::Error;
 use std::fmt;
 
@@ -68,7 +68,7 @@ impl RemoteExecutionCredentialResolver {
         match parse_reference(reference)? {
             TaskBoardExecutionCredentialReference::Environment { name } => {
                 let value =
-                    var(&name).map_err(|_| RemoteExecutionCredentialError::MissingCredential)?;
+                    env::var(&name).map_err(|_| RemoteExecutionCredentialError::MissingCredential)?;
                 validated_credential(value)
             }
             TaskBoardExecutionCredentialReference::Keychain { service, account } => {

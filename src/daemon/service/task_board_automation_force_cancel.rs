@@ -1,4 +1,4 @@
-use std::cmp::max;
+use std::cmp;
 
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde_json::json;
@@ -319,7 +319,7 @@ fn cancellation_time(
         .into_iter()
         .filter_map(|value| DateTime::parse_from_rfc3339(value).ok())
         .map(|value| value.with_timezone(&Utc))
-        .fold(now, max)
+        .fold(now, cmp::max)
         .to_rfc3339_opts(SecondsFormat::AutoSi, true)
 }
 
