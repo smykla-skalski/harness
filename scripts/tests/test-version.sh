@@ -80,8 +80,13 @@ openapi_version() {
   perl -0ne 'print $1 if m{"info"\s*:\s*\{.*?"version"\s*:\s*"([^"]+)"}s' "$OPENAPI_DOC"
 }
 
+# A silent no-op here would leave the document in sync and the scenario below
+# would pass for the wrong reason, so a missed match fails the run outright.
 stale_the_openapi_document() {
-  perl -0pi -e 's{("info"\s*:\s*\{.*?"version"\s*:\s*")[^"]+(")}{${1}0.0.0${2}}s' "$OPENAPI_DOC"
+  perl -0pi -e '
+    my $count = s{("info"\s*:\s*\{.*?"version"\s*:\s*")[^"]+(")}{${1}0.0.0${2}}s;
+    die "failed to stale the info version in $ARGV\n" unless $count;
+  ' "$OPENAPI_DOC"
 }
 
 # Without this, a sandbox that is already out of sync would make every
@@ -105,6 +110,20 @@ scenario_check_rejects_a_stale_openapi_document() {
     fail "check passed with a stale openapi version"
   else
     pass
+  fi
+}
+
+scenario_check_names_an_unreadable_openapi_version() {
+  seed_sandbox
+  start_test "check names an unreadable openapi version rather than a mismatch"
+  local output
+  printf '{}' >"$OPENAPI_DOC"
+
+  output="$("$SCRIPT" check 2>&1 || true)"
+  if [[ "$output" == *"<unreadable info.version>"* ]]; then
+    pass
+  else
+    fail "check blamed a version it could not read: $output"
   fi
 }
 
@@ -139,6 +158,7 @@ scenario_set_stamps_the_openapi_document() {
 
 scenario_seeded_sandbox_starts_in_sync
 scenario_check_rejects_a_stale_openapi_document
+scenario_check_names_an_unreadable_openapi_version
 scenario_set_stamps_the_openapi_document
 
 log "version tests: $PASS_COUNT passed, $FAIL_COUNT failed"

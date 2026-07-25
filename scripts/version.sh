@@ -163,8 +163,12 @@ daemon_plist_version() {
 }
 
 # Only the `info` block's version, never a `version` property inside a schema.
+# An empty result would read as a mismatch against every other surface, so an
+# unreadable field says so instead of blaming the version it could not find.
 openapi_document_version() {
-  perl -0ne 'print $1 if m{"info"\s*:\s*\{.*?"version"\s*:\s*"([^"]+)"}s' "$OPENAPI_DOCUMENT"
+  local version
+  version="$(perl -0ne 'print $1 if m{"info"\s*:\s*\{.*?"version"\s*:\s*"([^"]+)"}s' "$OPENAPI_DOCUMENT")"
+  printf '%s' "${version:-<unreadable info.version>}"
 }
 
 # The document is generated, so this exists to keep it in step with a version
