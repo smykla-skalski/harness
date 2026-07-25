@@ -1,5 +1,5 @@
 import { panelUrl } from './base';
-import type { PanelAccount, PanelErrorBody, PanelViewer } from './types';
+import type { PairLink, PanelAccount, PanelErrorBody, PanelViewer } from './types';
 
 /** A panel response the caller cannot treat as data. */
 export class PanelApiError extends Error {
@@ -20,6 +20,10 @@ export interface PanelApi {
   fetchAccounts(): Promise<PanelAccount[]>;
   signOut(): Promise<void>;
   signInUrl(): string;
+  /** Owner only. Grants or withdraws an account's ability to pair. */
+  setCanPair(accountId: string, granted: boolean): Promise<PanelAccount>;
+  /** Mint a link for the signed-in account. The reply is shown once. */
+  createPairLink(): Promise<PairLink>;
 }
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
@@ -67,6 +71,19 @@ export function createPanelApi(base: string, fetchImpl: FetchLike): PanelApi {
 
     signInUrl(): string {
       return panelUrl(base, '/auth/github/start');
+    },
+
+    async setCanPair(accountId: string, granted: boolean): Promise<PanelAccount> {
+      const action = granted ? 'approve' : 'revoke';
+      const response = await request(`/api/accounts/${encodeURIComponent(accountId)}/${action}`, {
+        method: 'POST',
+      });
+      return (await response.json()) as PanelAccount;
+    },
+
+    async createPairLink(): Promise<PairLink> {
+      const response = await request('/api/pair-links', { method: 'POST' });
+      return (await response.json()) as PairLink;
     },
   };
 }

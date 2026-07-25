@@ -1,5 +1,6 @@
 <script lang="ts">
   import AccountsTable from './components/AccountsTable.svelte';
+  import PairLinkPanel from './components/PairLinkPanel.svelte';
   import SignedOut from './components/SignedOut.svelte';
   import ViewerCard from './components/ViewerCard.svelte';
   import type { PanelApi } from './lib/api';
@@ -24,6 +25,17 @@
       failure = error instanceof Error ? error.message : String(error);
     } finally {
       loading = false;
+    }
+  }
+
+  async function setCanPair(accountId: string, granted: boolean): Promise<void> {
+    try {
+      await api.setCanPair(accountId, granted);
+      // Re-read rather than patching in place: the decision may have changed
+      // the viewer's own row, and the server is the authority on both.
+      await load();
+    } catch (error) {
+      failure = error instanceof Error ? error.message : String(error);
     }
   }
 
@@ -62,8 +74,9 @@
     <SignedOut href={api.signInUrl()} />
   {:else}
     <ViewerCard {viewer} onSignOut={signOut} />
+    <PairLinkPanel canPair={viewer.account.can_pair} onGenerate={api.createPairLink} />
     {#if viewer.is_owner}
-      <AccountsTable {accounts} />
+      <AccountsTable {accounts} onSetCanPair={setCanPair} />
     {/if}
   {/if}
 </main>

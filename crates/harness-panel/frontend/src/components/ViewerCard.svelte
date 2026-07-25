@@ -18,8 +18,5 @@
     {#if viewer.is_owner}· panel owner{/if}
   </p>
   <p class="muted">First signed in {formatTimestamp(viewer.account.first_seen_at)}.</p>
-  <p>
-    Pairing is not available from the panel yet. Ask the panel owner for a pairing link until it is.
-  </p>
   <button class="secondary" onclick={onSignOut}>Sign out</button>
 </section>
