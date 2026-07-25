@@ -42,7 +42,10 @@ struct SettingsTaskBoardProjectAppearanceSection: View {
       // Same pairing as the card footer: the mark sits on the name's baseline
       // rather than beside it on a guide of its own.
       HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-        TaskBoardProjectColorMark(color: project.color, alignsWith: .body)
+        TaskBoardProjectMark(
+          style: TaskBoardProjectMarkStyle(color: project.color, shape: project.shape),
+          alignsWith: .body
+        )
 
         Text(project.label)
           .scaledFont(.body.weight(.medium))

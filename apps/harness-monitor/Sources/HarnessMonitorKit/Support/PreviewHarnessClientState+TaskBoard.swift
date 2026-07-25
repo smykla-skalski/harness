@@ -268,6 +268,31 @@ extension PreviewHarnessClientState {
     )
   }
 
+  /// One outline per organization, in the order the organizations first appear,
+  /// which is the rule the daemon's backfill follows.
+  private static func previewShapes(
+    projectIDs: [String],
+    slugs: [String?: [TaskBoardItem]],
+    exceedsPalette: Bool
+  ) -> [String: TaskBoardProjectShape] {
+    guard exceedsPalette else {
+      return [:]
+    }
+    let shapes = TaskBoardProjectShape.allCases
+    var byOrganization: [String: TaskBoardProjectShape] = [:]
+    var assigned: [String: TaskBoardProjectShape] = [:]
+    for projectId in projectIDs {
+      let slug = slugs[projectId]?.first
+        .flatMap(TaskBoardProjectSummary.inferredIdentity(from:))?.slug ?? projectId
+      let organization = slug.split(separator: "/").first.map(String.init) ?? slug
+      let shape = byOrganization[organization]
+        ?? shapes[byOrganization.count % shapes.count]
+      byOrganization[organization] = shape
+      assigned[projectId] = shape
+    }
+    return assigned
+  }
+
   func taskBoardProjects(status: TaskBoardStatus?) -> [TaskBoardProjectSummary] {
     let grouped = Dictionary(
       grouping: currentTaskBoardItems(status: status).filter { $0.sourceProjectId != nil },
@@ -277,9 +302,18 @@ extension PreviewHarnessClientState {
     // the fixture walks the same order over a stable sort. A preview that gave
     // every project one color would hide the thing the mark exists to show.
     let palette = TaskBoardProjectColor.allCases
+    let ordered = grouped.keys.compactMap { $0 }.sorted()
     let colorsByProject = Dictionary(
-      uniqueKeysWithValues: grouped.keys.compactMap { $0 }.sorted().enumerated()
+      uniqueKeysWithValues: ordered.enumerated()
         .map { ($0.element, palette[$0.offset % palette.count]) }
+    )
+    // The daemon leaves every outline at the default until the board outgrows
+    // the palette, so the fixture does too. A preview wearing shapes it has not
+    // earned would make the second channel look like it is always on.
+    let shapesByProject = Self.previewShapes(
+      projectIDs: ordered,
+      slugs: grouped,
+      exceedsPalette: ordered.count > palette.count
     )
     return grouped.compactMap { key, items in
       guard let projectId = key else {
@@ -293,6 +327,7 @@ extension PreviewHarnessClientState {
         slug: edit?.slug ?? identity?.slug ?? "unnamed project",
         displayName: edit?.displayName,
         color: edit?.color ?? colorsByProject[projectId] ?? .blue,
+        shape: shapesByProject[projectId] ?? .circle,
         itemCount: items.count,
         readyCount: items.count { $0.status == .todo }
       )
@@ -353,6 +388,7 @@ extension PreviewHarnessClientState {
       slug: updated.slug,
       displayName: updated.displayName,
       color: updated.color,
+      shape: updated.shape,
       createdAt: "2026-07-25T00:00:00Z",
       updatedAt: "2026-07-25T00:00:00Z"
     )

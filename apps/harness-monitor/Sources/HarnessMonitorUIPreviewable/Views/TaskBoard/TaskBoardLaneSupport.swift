@@ -138,7 +138,7 @@ struct TaskBoardCardTitleTypography {
 
 struct TaskBoardCardFooter<Badges: View>: View {
   let repository: String
-  let projectColor: TaskBoardProjectColor?
+  let projectMark: TaskBoardProjectMarkStyle?
   let updatedAt: Date?
   let badges: Badges
   @Environment(\.fontScale)
@@ -146,12 +146,12 @@ struct TaskBoardCardFooter<Badges: View>: View {
 
   init(
     repository: String,
-    projectColor: TaskBoardProjectColor? = nil,
+    projectMark: TaskBoardProjectMarkStyle? = nil,
     updatedAt: Date?,
     @ViewBuilder badges: () -> Badges
   ) {
     self.repository = repository
-    self.projectColor = projectColor
+    self.projectMark = projectMark
     self.updatedAt = updatedAt
     self.badges = badges()
   }
@@ -171,8 +171,8 @@ struct TaskBoardCardFooter<Badges: View>: View {
       // They align on the name's baseline, not on two centre guides that do not
       // agree, and the pair then meets the rest of the row optically centred.
       HStack(alignment: .firstTextBaseline, spacing: metrics.rowTextSpacing) {
-        if let projectColor {
-          TaskBoardProjectColorMark(color: projectColor, alignsWith: .caption1)
+        if let projectMark {
+          TaskBoardProjectMark(style: projectMark, alignsWith: .caption1)
         }
         Text(repository)
           .font(repositoryFont)

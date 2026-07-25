@@ -49,15 +49,17 @@ public struct TaskBoardProjectSummaryWire: Codable, Equatable, Sendable {
   public var slug: String
   public var displayName: String?
   public var color: TaskBoardProjectColor
+  public var shape: TaskBoardProjectShape
   public var itemCount: UInt
   public var readyCount: UInt
 
-  public init(projectId: String, source: TaskBoardProjectSource, slug: String, displayName: String? = nil, color: TaskBoardProjectColor, itemCount: UInt, readyCount: UInt) {
+  public init(projectId: String, source: TaskBoardProjectSource, slug: String, displayName: String? = nil, color: TaskBoardProjectColor, shape: TaskBoardProjectShape, itemCount: UInt, readyCount: UInt) {
     self.projectId = projectId
     self.source = source
     self.slug = slug
     self.displayName = displayName
     self.color = color
+    self.shape = shape
     self.itemCount = itemCount
     self.readyCount = readyCount
   }
@@ -68,6 +70,7 @@ public struct TaskBoardProjectSummaryWire: Codable, Equatable, Sendable {
     case slug
     case displayName = "display_name"
     case color
+    case shape
     case itemCount = "item_count"
     case readyCount = "ready_count"
   }
@@ -105,15 +108,17 @@ public struct TaskBoardProject: Codable, Equatable, Sendable {
   public var slug: String
   public var displayName: String?
   public var color: TaskBoardProjectColor
+  public var shape: TaskBoardProjectShape
   public var createdAt: String
   public var updatedAt: String
 
-  public init(projectId: String, source: TaskBoardProjectSource, slug: String, displayName: String? = nil, color: TaskBoardProjectColor, createdAt: String, updatedAt: String) {
+  public init(projectId: String, source: TaskBoardProjectSource, slug: String, displayName: String? = nil, color: TaskBoardProjectColor, shape: TaskBoardProjectShape, createdAt: String, updatedAt: String) {
     self.projectId = projectId
     self.source = source
     self.slug = slug
     self.displayName = displayName
     self.color = color
+    self.shape = shape
     self.createdAt = createdAt
     self.updatedAt = updatedAt
   }
@@ -124,6 +129,7 @@ public struct TaskBoardProject: Codable, Equatable, Sendable {
     case slug
     case displayName = "display_name"
     case color
+    case shape
     case createdAt = "created_at"
     case updatedAt = "updated_at"
   }
@@ -136,11 +142,35 @@ public enum TaskBoardProjectColor: String, Codable, Equatable, Sendable, CaseIte
   case amber = "amber"
   case teal = "teal"
   case pink = "pink"
-  case red = "red"
   case mint = "mint"
   case sky = "sky"
   case warm = "warm"
+  case olive = "olive"
   case graphite = "graphite"
+  case red = "red"
+  case blueDeep = "blue_deep"
+  case greenDeep = "green_deep"
+  case purpleDeep = "purple_deep"
+  case amberDeep = "amber_deep"
+  case tealDeep = "teal_deep"
+  case pinkDeep = "pink_deep"
+  case mintDeep = "mint_deep"
+  case skyDeep = "sky_deep"
+  case warmDeep = "warm_deep"
+  case oliveDeep = "olive_deep"
+  case graphiteDeep = "graphite_deep"
+  case redDeep = "red_deep"
+
+  public var id: String { rawValue }
+}
+
+public enum TaskBoardProjectShape: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case circle = "circle"
+  case square = "square"
+  case triangle = "triangle"
+  case diamond = "diamond"
+  case pentagon = "pentagon"
+  case hexagon = "hexagon"
 
   public var id: String { rawValue }
 }

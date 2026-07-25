@@ -39,7 +39,8 @@ struct TaskBoardSummaryWireDecodingTests {
       from: Data(
         #"""
         {"project_id": "project-0123456789abcdef0123456789abcdef", "source": "github",
-         "slug": "owner/repo", "color": "teal", "item_count": 7, "ready_count": 3}
+         "slug": "owner/repo", "color": "teal", "shape": "hexagon",
+         "item_count": 7, "ready_count": 3}
         """#.utf8)
     )
     #expect(wire.projectId == "project-0123456789abcdef0123456789abcdef")
@@ -47,12 +48,14 @@ struct TaskBoardSummaryWireDecodingTests {
     #expect(wire.slug == "owner/repo")
     #expect(wire.displayName == nil)
     #expect(wire.color == .teal)
+    #expect(wire.shape == .hexagon)
     #expect(wire.itemCount == 7)
 
     let summary = TaskBoardProjectSummary(wire: wire)
     #expect(summary.projectId == "project-0123456789abcdef0123456789abcdef")
     #expect(summary.source == .gitHub)
     #expect(summary.color == .teal, "the card's mark comes from the daemon, not the client")
+    #expect(summary.shape == .hexagon, "both halves of the mark come from the daemon")
     #expect(summary.itemCount == 7)
     #expect(summary.readyCount == 3)
     #expect(summary.id == "project-0123456789abcdef0123456789abcdef")
@@ -68,7 +71,7 @@ struct TaskBoardSummaryWireDecodingTests {
         #"""
         {"project_id": "project-0123456789abcdef0123456789abcdef", "source": "github",
          "slug": "owner/repo", "display_name": "Widgets", "color": "amber",
-         "item_count": 1, "ready_count": 0}
+         "shape": "circle", "item_count": 1, "ready_count": 0}
         """#.utf8)
     )
 

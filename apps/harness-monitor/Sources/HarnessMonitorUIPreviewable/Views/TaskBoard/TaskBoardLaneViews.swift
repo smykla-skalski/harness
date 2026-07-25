@@ -73,7 +73,7 @@ struct TaskBoardItemRow: View {
         }
         TaskBoardCardFooter(
           repository: repositoryLabel,
-          projectColor: projectColor,
+          projectMark: projectMark,
           updatedAt: updatedAtDate
         ) {
           badgeContent
@@ -118,13 +118,13 @@ struct TaskBoardItemRow: View {
   }
 
   /// Nil for an item belonging to no project, which is also the case where the
-  /// footer prints the agent mode: a mark there would colour something that is
+  /// footer prints the agent mode: a mark there would name something that is
   /// not a project at all.
-  private var projectColor: TaskBoardProjectColor? {
+  private var projectMark: TaskBoardProjectMarkStyle? {
     if let cardPresentation {
-      return cardPresentation.projectColor
+      return cardPresentation.projectMark
     }
-    return projectLabelResolver.color(for: item)
+    return projectLabelResolver.mark(for: item)
   }
 
   private var cardGlyph: TaskBoardCardGlyph {

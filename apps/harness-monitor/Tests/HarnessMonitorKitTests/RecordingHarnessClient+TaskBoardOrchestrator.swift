@@ -374,6 +374,7 @@ extension RecordingHarnessClient {
           slug: identity?.slug ?? "unnamed project",
           displayName: nil,
           color: colorsByProject[projectId] ?? .blue,
+          shape: .circle,
           itemCount: items.count,
           readyCount: items.count { $0.status == .todo }
         )

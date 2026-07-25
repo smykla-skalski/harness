@@ -30987,6 +30987,7 @@
           "source",
           "slug",
           "color",
+          "shape",
           "created_at",
           "updated_at"
         ],
@@ -31007,6 +31008,10 @@
           "project_id": {
             "type": "string"
           },
+          "shape": {
+            "$ref": "#/components/schemas/TaskBoardProjectShape",
+            "description": "The other half of the mark, resolved the same way. A board the palette\nstill covers stores nothing and every project reads back as the default,\nso a client renders one shape without knowing why."
+          },
           "slug": {
             "type": "string"
           },
@@ -31020,7 +31025,7 @@
       },
       "TaskBoardProjectColor": {
         "type": "string",
-        "description": "The mark a card wears to say which project its work came from. A closed\npalette rather than a free color: the board's guarantee is that two\nprojects look different, and that is only checkable against a known set.\n\nThe names are plain colors rather than the app's theme token names, so the\nwire format does not pin the client to one theme's vocabulary.",
+        "description": "The mark a card wears to say which project its work came from. A closed\npalette rather than a free color: the board's guarantee is that two\nprojects look different, and that is only checkable against a known set.\n\nThe names are plain colors rather than the app's theme token names, so the\nwire format does not pin the client to one theme's vocabulary. Each family\ncarries a `_deep` tier as well, which is what takes the palette past the\ndozen hues a person can still tell apart on their own.",
         "enum": [
           "blue",
           "green",
@@ -31028,11 +31033,36 @@
           "amber",
           "teal",
           "pink",
-          "red",
           "mint",
           "sky",
           "warm",
-          "graphite"
+          "olive",
+          "graphite",
+          "red",
+          "blue_deep",
+          "green_deep",
+          "purple_deep",
+          "amber_deep",
+          "teal_deep",
+          "pink_deep",
+          "mint_deep",
+          "sky_deep",
+          "warm_deep",
+          "olive_deep",
+          "graphite_deep",
+          "red_deep"
+        ]
+      },
+      "TaskBoardProjectShape": {
+        "type": "string",
+        "description": "The outline a project's mark is drawn in. Colour alone runs out: past the\npalette two projects must share one, and a second channel is what keeps the\npair apart. Shape also survives colour blindness and small sizes, which\ncolour on its own does not.",
+        "enum": [
+          "circle",
+          "square",
+          "triangle",
+          "diamond",
+          "pentagon",
+          "hexagon"
         ]
       },
       "TaskBoardProjectSource": {
@@ -31051,6 +31081,7 @@
           "source",
           "slug",
           "color",
+          "shape",
           "item_count",
           "ready_count"
         ],
@@ -31074,6 +31105,9 @@
           "ready_count": {
             "type": "integer",
             "minimum": 0
+          },
+          "shape": {
+            "$ref": "#/components/schemas/TaskBoardProjectShape"
           },
           "slug": {
             "type": "string"
