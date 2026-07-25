@@ -75,6 +75,9 @@ pub(super) fn spawn_background_tasks(
     poll_interval: Duration,
     shutdown_rx: &tokio_watch::Receiver<bool>,
 ) -> BackgroundTaskHandles {
+    // Before any loop or route can render a prompt, so every agent this
+    // process starts runs with the same resolved catalog.
+    crate::task_board::install_prompt_catalog(crate::task_board::resolve_prompt_catalog_from_env());
     let async_db = app_state.async_db.get().cloned();
     let remote_recovery = async_db.as_ref().map(|_| {
         spawn_task_board_remote_recovery_loop(app_state.clone(), poll_interval, shutdown_rx.clone())

@@ -21,6 +21,10 @@ pub mod project_shape;
 #[cfg(feature = "daemon-runtime")]
 pub mod policy_runtime;
 pub mod progress_rollup;
+mod prompt_builtins;
+mod prompt_catalog;
+#[cfg(feature = "daemon-runtime")]
+mod prompt_config;
 mod prompt_template;
 pub(crate) mod remote_spki_pin;
 pub mod runtime_config;
@@ -187,6 +191,10 @@ pub use types::{
     AgentMode, TaskBoardItem, TaskBoardPriority, TaskBoardStatus, TaskBoardTombstoneCause,
     TaskBoardWorkflowState, TaskBoardWorkflowStatus,
 };
+#[cfg(feature = "daemon-runtime")]
+pub(crate) use prompt_catalog::install_prompt_catalog;
+#[cfg(feature = "daemon-runtime")]
+pub(crate) use prompt_config::resolve_prompt_catalog_from_env;
 #[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use triage_escalation_prompt::render_triage_escalation_prompt;
 pub(crate) use worker_prompt::plan_worker_prompt;
