@@ -79,6 +79,26 @@ Exit status zero means the requested operation completed or was a verified no-op
 
 Retain the JSON report with the deployment record. It is the safest source for the generation path and transaction identifier needed during recovery.
 
+## Unit hardening and its measured floor
+
+The installed unit is already at the best rating `systemd-analyze security` can give a public network daemon, so treat a non-zero exposure number as expected rather than as work to do. Score a rendered unit without installing it:
+
+```bash
+systemd-analyze security --offline=true /etc/systemd/system/harness-remote-daemon.service
+```
+
+On systemd 255 the unit scores 1.4 when it binds 443 and 80, and 1.1 when it binds high ports and drops the capability. Every remaining penalty follows from what the service is:
+
+| Penalty | Why it cannot be removed |
+| --- | --- |
+| `PrivateNetwork=`, `RestrictAddressFamilies=~AF_(INET\|INET6)`, `IPAddressDeny=` | The daemon exists to answer public HTTPS traffic |
+| `RestrictAddressFamilies=~AF_UNIX` | `Type=notify` readiness needs a local socket |
+| `AmbientCapabilities=`, `CapabilityBoundingSet=~CAP_NET_BIND_SERVICE`, `PrivateUsers=` | Binding 443 and 80 needs the capability in the host user namespace, which rules out `PrivateUsers=` |
+| `DeviceAllow=` reporting `char-rtc:r` | `ProtectClock=yes` itself adds that read entry |
+| `RootDirectory=`/`RootImage=` | The daemon manages host working copies and spawns agent processes |
+
+Directives that raise the score no further were measured and deliberately left out: `PrivateIPC=`, `RemoveIPC=`, `KeyringMode=`, `RestrictFileSystems=`, `SocketBindDeny=`, and extra `SystemCallFilter=~@…` sets are all unscored here. `NoExecPaths=/` is worse than unscored - it would stop the daemon executing the agent binaries it spawns. `remote_systemd_unit_is_hardened_and_runs_remote_serve` pins the directive set, so removing one fails the build rather than quietly lowering the rating.
+
 ## Autonomous recovery after interruption
 
 Lifecycle transactions are journaled and watched by a per-unit systemd timer. The recovery controller tries the same nonblocking operation lock as the live lifecycle command. A busy lock is a normal defer, so the timer cannot roll back an intentional candidate start. If the lifecycle process exits or is killed, the next timer tick restores the complete previous generation. On reboot the daemon remains disabled until recovery finishes.

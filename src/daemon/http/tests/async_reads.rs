@@ -61,6 +61,7 @@ async fn build_async_http_state(seed_timeline: bool) -> DaemonHttpState {
         auth_mode: crate::daemon::http::DaemonHttpAuthMode::Local,
         remote_domain: None,
         remote_request_limits: None,
+        companion: None,
         remote_pairing_limiter: super::super::default_remote_pairing_limiter(),
         remote_pairing_status_limiter: super::super::default_remote_pairing_status_limiter(),
         sender: sender.clone(),

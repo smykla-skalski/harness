@@ -25,6 +25,7 @@ fn serve_helpers_round_trip_smoke_covers_public_surface() {
             auth_mode: crate::daemon::http::DaemonHttpAuthMode::Local,
             remote_domain: None,
             remote_request_limits: None,
+            companion: None,
             poll_interval: Duration::from_secs(2),
             observe_interval: Duration::from_secs(5),
             sandboxed: false,

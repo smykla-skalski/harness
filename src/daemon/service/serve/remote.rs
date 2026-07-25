@@ -9,7 +9,10 @@ use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
-use crate::daemon::http::{self, AsyncDaemonDbSlot, DaemonHttpAuthMode, DaemonHttpState};
+use crate::daemon::http::{
+    self, AsyncDaemonDbSlot, CompanionRouteConfig, CompanionRouter, DaemonHttpAuthMode,
+    DaemonHttpState,
+};
 use crate::daemon::remote_acme::RemoteAcmeRuntimePlan;
 use crate::daemon::remote_acme_renewal::spawn_remote_acme_renewal_loop;
 use crate::daemon::remote_tls::{RemoteTlsConfigError, RemoteTlsConfigHandle, RemoteTlsListener};
@@ -91,6 +94,7 @@ pub async fn serve_remote_https(
         auth_mode: config.auth_mode,
         remote_domain: config.remote_domain.clone(),
         remote_request_limits: Some(remote_request_limits),
+        companion: companion_router(&config),
         remote_pairing_limiter: http::default_remote_pairing_limiter(),
         remote_pairing_status_limiter: http::default_remote_pairing_status_limiter(),
         sender,
@@ -143,6 +147,24 @@ pub async fn serve_remote_https(
         (Err(error), _, _) | (Ok(()), Err(error), _) | (Ok(()), Ok(()), Err(error)) => Err(error),
         (Ok(()), Ok(()), Ok(())) => Ok(()),
     }
+}
+
+fn companion_router(config: &DaemonServeConfig) -> Option<CompanionRouter> {
+    let companion = config.companion.clone()?;
+    log_companion_route(&companion);
+    Some(CompanionRouter::new(companion))
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_companion_route(companion: &CompanionRouteConfig) {
+    tracing::info!(
+        upstream = companion.upstream_origin(),
+        path_prefix = companion.path_prefix(),
+        "companion routing enabled",
+    );
 }
 
 fn prepare_remote_daemon_environment(config: &DaemonServeConfig) -> Result<(), CliError> {

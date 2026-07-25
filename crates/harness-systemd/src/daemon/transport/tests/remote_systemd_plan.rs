@@ -330,7 +330,7 @@ fn remote_systemd_execstart_escapes_percent_specifiers() {
     assert!(!plan.unit_contents.contains("--domain daemon%h.example.com"));
 }
 
-fn install_args<const N: usize>(args: [&str; N]) -> DaemonRemoteSystemdInstallArgs {
+pub(super) fn install_args<const N: usize>(args: [&str; N]) -> DaemonRemoteSystemdInstallArgs {
     #[derive(Debug, Parser)]
     struct Harness {
         #[command(flatten)]
