@@ -96,9 +96,13 @@ gh api --method POST repos/smykla-skalski/harness/pulls/<PR_NUMBER>/requested_re
 A review arrives in two halves and the loop below needs both. Read them with these, which are read-only and safe to rerun at any point in the loop:
 
 ```bash
-gh api repos/smykla-skalski/harness/pulls/<PR_NUMBER>/reviews --jq '.[] | select(.user.login == "copilot-pull-request-reviewer[bot]") | {commit: .commit_id, body: .body}'
-gh api repos/smykla-skalski/harness/pulls/<PR_NUMBER>/comments --jq '.[] | {path, line, body}'
+gh api --paginate repos/smykla-skalski/harness/pulls/<PR_NUMBER>/reviews --jq '.[] | select(.user.id == 175728472) | {commit: .commit_id, state: .state, body: .body}'
+gh api --paginate repos/smykla-skalski/harness/pulls/<PR_NUMBER>/comments --jq '.[] | {path, line, body}'
 ```
+
+Keep `--paginate` on both. `gh api` returns only the first page otherwise, so a PR that accumulates more than thirty reviews or inline comments over a long loop starts hiding its older ones behind a result that still looks complete.
+
+Select the reviewer by that numeric id rather than by name. The same bot answers to a different login on each endpoint, `Copilot` under `requested_reviewers` and `copilot-pull-request-reviewer[bot]` under `reviews[].user.login`, so a filter written from the name one endpoint showed silently matches nothing on the other and reads as a review that never arrived. The id is `175728472` on both, and it also keeps other bot reviewers, such as `smyklot[bot]`, out of the result.
 
 1. Wait for a Copilot review whose reviewed commit carries the current tree; a review of an older tree does not count. A review still counts when the head SHA moved but the tree did not, as after a rebase or a commit-message or sign-off rewrite; confirm with `git rev-parse <reviewed-sha>^{tree}` against `git rev-parse <head-sha>^{tree}`.
 2. Read the review body as well as the inline comments, because the two carry different findings. Copilot withholds anything it is unsure of from the inline threads and collects it in a collapsed `Comments suppressed due to low confidence (N)` block in the body instead, where each entry is a `**<path>:<line>**` heading followed by the finding. Those entries never appear in the review-comments API, so a run that only counts inline threads reads a review that raised real defects as a clean one.
