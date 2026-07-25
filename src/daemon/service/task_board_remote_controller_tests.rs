@@ -17,6 +17,8 @@ use crate::task_board::{
 mod active_poll;
 #[path = "task_board_remote_controller_tests/foreground_gate.rs"]
 mod foreground_gate;
+#[path = "task_board_remote_controller_tests/offer_render.rs"]
+mod offer_render;
 #[path = "task_board_remote_controller_tests/terminal.rs"]
 mod terminal;
 #[path = "task_board_remote_controller_tests/unknown.rs"]

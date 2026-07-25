@@ -132,7 +132,7 @@ pub(crate) use task_board::remote_assignment_terminal_handoff_tests::{
 pub(crate) use task_board::remote_assignment_test_support::{
     CLAIMED_AT as REMOTE_EXECUTOR_CLAIMED_AT, ControllerFixture as RemoteControllerFixture,
     ExecutorFixture as RemoteExecutorFixture, PRINCIPAL as REMOTE_EXECUTOR_PRINCIPAL,
-    accept_executor as accept_remote_executor,
+    accept_executor as accept_remote_executor, add_review_candidate as add_remote_review_candidate,
     authorize_and_start_executor as authorize_and_start_remote_executor,
     claim_request as remote_executor_claim_request,
     controller_fixture as remote_controller_fixture, executor_fixture as remote_executor_fixture,

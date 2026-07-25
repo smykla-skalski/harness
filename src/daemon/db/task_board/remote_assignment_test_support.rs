@@ -16,7 +16,7 @@ use crate::task_board::{
     TaskBoardExecutionHostConfig, TaskBoardExecutionOwnership, TaskBoardExecutionPhase,
     TaskBoardExecutionState, TaskBoardLocalExecutionHostConfig,
     TaskBoardLocalExecutionRepositoryConfig, TaskBoardOrchestratorWorkflow,
-    TaskBoardPhaseCapabilityProfile, TaskBoardReadOnlyRunContext,
+    TaskBoardPhaseCapabilityProfile, TaskBoardPullRequestIdentity, TaskBoardReadOnlyRunContext,
     TaskBoardRepositoryAutomationConfig, TaskBoardResolvedReviewer, TaskBoardReviewerProfile,
     TaskBoardWorkflowExecutionArtifacts, TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
     TaskBoardWorkflowSnapshot, TaskBoardWorkflowTransitionState,
@@ -262,8 +262,41 @@ async fn configure_controller(db: &AsyncDaemonDb, max_attempts: Option<u32>) {
 }
 
 async fn review_execution(db: &AsyncDaemonDb) -> TaskBoardWorkflowExecutionRecord {
+    seeded_review_execution(db, "remote", None).await
+}
+
+/// Seed a second remote-eligible review candidate beside the fixture's own.
+///
+/// Candidates are ordered by `updated_at` then `execution_id`, and every seed
+/// shares one timestamp, so a label sorting after `remote` runs second. That is
+/// what lets a test tell a skipped candidate apart from a pass that stopped.
+pub(crate) async fn add_review_candidate(
+    db: &AsyncDaemonDb,
+    label: &str,
+    pull_request: Option<TaskBoardPullRequestIdentity>,
+) -> TaskBoardWorkflowExecutionRecord {
+    let execution = seeded_review_execution(db, label, pull_request).await;
+    let mut attempt = review_attempt(&execution.execution_id, 1, NOW);
+    // The fixture's own attempt already holds the unlabelled key.
+    attempt.idempotency_key = format!("review-attempt-{label}-1");
+    db.create_task_board_execution_attempt(&attempt)
+        .await
+        .expect("create extra remote-ready attempt");
+    db.task_board_workflow_execution(&execution.execution_id)
+        .await
+        .expect("load extra remote candidate")
+        .expect("extra remote candidate exists")
+}
+
+async fn seeded_review_execution(
+    db: &AsyncDaemonDb,
+    label: &str,
+    pull_request: Option<TaskBoardPullRequestIdentity>,
+) -> TaskBoardWorkflowExecutionRecord {
+    let item_id = format!("item-{label}");
+    let execution_id = format!("execution-{label}");
     let mut item = crate::task_board::TaskBoardItem::new(
-        "item-remote".into(),
+        item_id.clone(),
         "Remote review".into(),
         "Review exactly one revision".into(),
         NOW.into(),
@@ -277,8 +310,8 @@ async fn review_execution(db: &AsyncDaemonDb) -> TaskBoardWorkflowExecutionRecor
         .expect("settings snapshot");
     let reviewer = reviewers();
     let record = TaskBoardWorkflowExecutionRecord {
-        execution_id: "execution-remote".into(),
-        item_id: "item-remote".into(),
+        execution_id: execution_id.clone(),
+        item_id: item_id.clone(),
         snapshot: TaskBoardWorkflowSnapshot {
             workflow_kind: TaskBoardWorkflowKind::Review,
             execution_repository: Some(REPOSITORY.into()),
@@ -289,7 +322,7 @@ async fn review_execution(db: &AsyncDaemonDb) -> TaskBoardWorkflowExecutionRecor
             reviewer: reviewer.clone(),
             read_only_run_context: Some(TaskBoardReadOnlyRunContext {
                 schema_version: TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
-                session_id: "session-remote".into(),
+                session_id: format!("session-{label}"),
                 title: "Remote review".into(),
                 body: "Review exactly one revision".into(),
                 tags: vec!["security".into()],
@@ -302,17 +335,14 @@ async fn review_execution(db: &AsyncDaemonDb) -> TaskBoardWorkflowExecutionRecor
             workflow_kind: TaskBoardWorkflowKind::Review,
             phase: Some(TaskBoardExecutionPhase::Review),
             execution_state: TaskBoardExecutionState::Preparing,
-            pull_request: None,
+            pull_request,
             exact_head_revision: Some(SOURCE_REVISION.into()),
         },
         artifacts: TaskBoardWorkflowExecutionArtifacts::default(),
         ownership: TaskBoardExecutionOwnership {
             host_id: None,
             fencing_epoch: 0,
-            resources: BTreeMap::from([(
-                "admission_owner".into(),
-                workflow_owner("execution-remote"),
-            )]),
+            resources: BTreeMap::from([("admission_owner".into(), workflow_owner(&execution_id))]),
         },
         available_at: None,
         blocked_reason: None,
