@@ -146,7 +146,7 @@ async fn spawn_escalation_worker(
         &escalation.escalation_id,
         &escalation.verdict_token,
         &escalation.evidence_fingerprint,
-    );
+    )?;
     let request = CodexRunRequest {
         actor: Some(CONTROL_PLANE_ACTOR_ID.to_string()),
         prompt,

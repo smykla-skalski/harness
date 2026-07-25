@@ -32,13 +32,15 @@ pub(super) const TRIAGE_ESCALATION: &str = "A deterministic triage check could n
 
 /// Variables the `triage_escalation` template may reference. `tags` and `body`
 /// are always supplied here: the shipped prompt substitutes `(none)`/`(empty)`
-/// rather than dropping the line.
+/// rather than dropping the line. `project_id` is supplied only for an item
+/// that has one.
 pub(super) const TRIAGE_ESCALATION_VARIABLES: &[&str] = &[
     "body",
     "escalation_id",
     "evidence_fingerprint",
     "kind",
     "priority",
+    "project_id",
     "tags",
     "title",
     "verdict_token",

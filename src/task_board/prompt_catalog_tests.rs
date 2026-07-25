@@ -1,14 +1,9 @@
 use std::collections::BTreeMap;
-use std::sync::Mutex;
 
 use super::{
-    PromptCatalog, PromptId, active_prompt_catalog, render_prompt, scoped_prompt_catalog,
+    PROMPT_CATALOG_TEST_LOCK as CATALOG_TEST_LOCK, PromptCatalog, PromptId, active_prompt_catalog,
+    render_prompt, scoped_prompt_catalog,
 };
-
-/// `cargo test` shares one process across threads, so the process-global
-/// catalog slot needs the same serialization the ACP override tests use.
-/// Under nextest each test already gets its own process.
-static CATALOG_TEST_LOCK: Mutex<()> = Mutex::new(());
 
 fn vars(pairs: &[(&'static str, &str)]) -> BTreeMap<&'static str, String> {
     pairs

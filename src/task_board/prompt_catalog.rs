@@ -187,6 +187,12 @@ fn parse_error(detail: String) -> CliError {
 
 static ACTIVE_PROMPT_CATALOG: Mutex<Option<Arc<PromptCatalog>>> = Mutex::new(None);
 
+/// `cargo test` shares one process across threads, so every test that installs
+/// a scoped catalog holds this first. Under nextest each test already runs in
+/// its own process and the lock is uncontended.
+#[cfg(test)]
+pub(crate) static PROMPT_CATALOG_TEST_LOCK: Mutex<()> = Mutex::new(());
+
 fn active_catalog_slot() -> MutexGuard<'static, Option<Arc<PromptCatalog>>> {
     match ACTIVE_PROMPT_CATALOG.lock() {
         Ok(slot) => slot,
