@@ -146,7 +146,7 @@ segment_is_leased() {
     [[ -f "$lease_file" ]] || continue
     pid="$(cat "$lease_file" 2>/dev/null || true)"
     [[ "$pid" =~ ^[0-9]+$ ]] || continue
-    base="$(basename "$lease_file")"
+    base="$(basename -- "$lease_file")"
     [[ "$base" == "$key-$pid" ]] && pid_is_alive "$pid" && return 0
   done
   return 1
@@ -165,7 +165,7 @@ clean_shared_target() {
   local seg_dir seg entry base
   if [[ -d "$SHARED_TARGET_ROOT/dev" ]]; then
     while IFS= read -r -d '' seg_dir; do
-      seg=$(basename "$seg_dir")
+      seg=$(basename -- "$seg_dir")
       if segment_is_leased "$seg"; then
         printf '  · %-46s %8s  (active build, kept)\n' "target/dev/$seg" "$(bytes_to_human "$(path_size_kb "$seg_dir")")"
       else
@@ -175,7 +175,7 @@ clean_shared_target() {
   fi
 
   while IFS= read -r -d '' entry; do
-    base=$(basename "$entry")
+    base=$(basename -- "$entry")
     [[ "$base" == "dev" || "$base" == ".cargo-local" ]] && continue
     remove_path "target/$base" "$entry"
   done < <(find "$SHARED_TARGET_ROOT" -mindepth 1 -maxdepth 1 -print0 2>/dev/null)
@@ -243,7 +243,7 @@ fi
 if (( AGGRESSIVE )); then
   section 'Xcode UI DerivedData (aggressive)'
   while IFS= read -r -d '' slot; do
-    base=$(basename "$slot")
+    base=$(basename -- "$slot")
     remove_path "$base"                             "$slot"
   done < <(find "$HOME/Library/Developer/Xcode/DerivedData" -mindepth 1 -maxdepth 1 \
             \( -name 'HarnessMonitor-*' -o -name 'HarnessMonitorRegistry-*' -o -name 'HarnessMonitorUIPreviews-*' \) -print0 2>/dev/null)

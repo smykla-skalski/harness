@@ -123,7 +123,7 @@ make_shared_target_fixture() {
 
   mkdir -p "$repo/target/.cargo-local/leases"
   local live_pid
-  sleep 60 &
+  sleep 300 &
   live_pid=$!
   LIVE_LEASE_PIDS+=("$live_pid")
   printf '%s\n' "$live_pid" > "$repo/target/.cargo-local/leases/live-$live_pid"
