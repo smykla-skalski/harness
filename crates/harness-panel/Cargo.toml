@@ -1,0 +1,51 @@
+[package]
+name = "harness-panel"
+version = "51.0.1"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+
+[[bin]]
+name = "harness-panel"
+path = "src/main.rs"
+test = false
+
+[dependencies]
+axum = "0.8.9"
+axum-extra = { version = "0.12.6", features = ["cookie"] }
+base64 = "0.23.0"
+chrono = { version = "0.4.44", features = ["serde"] }
+clap = { version = "4.6.4", features = ["derive", "env"] }
+getrandom = "0.4.3"
+hex = "0.4.3"
+include_dir = "0.7.4"
+mime_guess = "2.0.5"
+reqwest = { version = "0.13.4", features = ["form", "json"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+sha2 = "0.11.0"
+sqlx = { version = "0.9.0", default-features = false, features = ["sqlite", "sqlite-bundled", "runtime-tokio", "tls-rustls-ring", "migrate", "macros"] }
+thiserror = "2.0.19"
+# `axum-extra`'s cookie builder takes durations from `time`, not `std`.
+time = "0.3.54"
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "net", "signal"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+url = "2.5.8"
+uuid = { version = "1.24.0", features = ["v4"] }
+
+[dev-dependencies]
+tempfile = "3.27.0"
+tower = { version = "0.5.3", features = ["util"] }
+
+[lints.clippy]
+pedantic = { level = "deny", priority = 1 }
+absolute_paths = { level = "deny", priority = 2 }
+cognitive_complexity = { level = "deny", priority = 2 }
+needless_pass_by_value = { level = "deny", priority = 2 }
+ptr_arg = { level = "deny", priority = 2 }
+redundant_clone = { level = "deny", priority = 2 }
+unnecessary_to_owned = { level = "deny", priority = 2 }
+
+[lints.rust]
+unused = { level = "deny", priority = 1 }

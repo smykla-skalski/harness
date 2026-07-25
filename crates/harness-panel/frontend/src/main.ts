@@ -1,0 +1,22 @@
+import { mount } from 'svelte';
+
+import App from './App.svelte';
+import './app.css';
+import { createPanelApi } from './lib/api';
+import { readBasePath } from './lib/base';
+
+const target = document.querySelector('#app');
+
+if (target === null) {
+  throw new Error('the panel page is missing its #app mount point');
+}
+
+try {
+  const base = readBasePath(document);
+  const api = createPanelApi(base, (input, init) => fetch(input, init));
+  mount(App, { target, props: { api } });
+} catch (error) {
+  // Reaching here means the page itself was served wrong, so there is no
+  // working app to show the failure inside.
+  target.textContent = error instanceof Error ? error.message : String(error);
+}

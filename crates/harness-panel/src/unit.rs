@@ -1,0 +1,179 @@
+//! Rendering the panel's systemd unit.
+//!
+//! The unit is printed rather than installed, so an operator reviews it before
+//! it lands. Its shape follows the remote daemon's unit: a dynamic user, a
+//! state directory, and no capability to bind a privileged port, because the
+//! panel is reached through the daemon rather than from the network.
+//!
+//! `systemd-analyze security` scores the result 1.1, the best a service that
+//! serves HTTP and calls GitHub can reach. What it still counts against the
+//! unit is inherent to that job: it has host network access, may allocate
+//! Internet and local sockets, and pins no IP allow list, because GitHub's
+//! address ranges rotate and a stale list would take sign-in down silently.
+//! `char-rtc:r` in the device ACL is what `ProtectClock=` itself adds, and
+//! dropping `ProtectClock=` scores worse. [`tests`] holds that score in place.
+
+use std::path::Path;
+
+use crate::config::{PanelArgs, normalize_base_path};
+use crate::error::PanelError;
+
+/// Where the client secret is exposed inside the unit. `LoadCredential` copies
+/// it in as mode 0400 owned by the dynamic user, which is what lets the source
+/// file stay root-only and still satisfy the panel's permission check.
+const CREDENTIAL_NAME: &str = "github-client-secret";
+
+/// Render a unit that starts `binary_path` with these flags.
+///
+/// # Errors
+/// Returns [`PanelError::Config`] when a flag would not survive systemd's
+/// `ExecStart` parsing, or when the mount point is not a usable subtree.
+pub fn render_unit(unit: &str, binary_path: &Path, args: &PanelArgs) -> Result<String, PanelError> {
+    let exec_start = render_exec_start(&serve_command(unit, binary_path, args)?);
+    Ok(format!(
+        "[Unit]\n\
+         Description=Harness panel\n\
+         After=network-online.target\n\
+         Wants=network-online.target\n\
+         \n\
+         [Service]\n\
+         Type=exec\n\
+         ExecStart={exec_start}\n\
+         Restart=on-failure\n\
+         RestartSec=5s\n\
+         LoadCredential={CREDENTIAL_NAME}:{secret_source}\n\
+         Environment=RUST_LOG=harness_panel=info\n\
+         NoNewPrivileges=true\n\
+         DynamicUser=yes\n\
+         PrivateTmp=true\n\
+         PrivateDevices=true\n\
+         PrivateMounts=true\n\
+         PrivateUsers=true\n\
+         ProtectSystem=strict\n\
+         ProtectHome=true\n\
+         ProtectClock=true\n\
+         ProtectControlGroups=true\n\
+         ProtectHostname=true\n\
+         ProtectKernelLogs=true\n\
+         ProtectKernelModules=true\n\
+         ProtectKernelTunables=true\n\
+         ProtectProc=invisible\n\
+         ProcSubset=pid\n\
+         LockPersonality=true\n\
+         MemoryDenyWriteExecute=true\n\
+         RestrictNamespaces=true\n\
+         RestrictRealtime=true\n\
+         RestrictSUIDSGID=true\n\
+         RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX\n\
+         SystemCallArchitectures=native\n\
+         SystemCallFilter=@system-service\n\
+         SystemCallFilter=~@privileged @resources\n\
+         SystemCallErrorNumber=EPERM\n\
+         CapabilityBoundingSet=\n\
+         StateDirectory={unit}\n\
+         StateDirectoryMode=0700\n\
+         UMask=0077\n\
+         \n\
+         [Install]\n\
+         WantedBy=multi-user.target\n",
+        secret_source = args.github_client_secret_file.display()
+    ))
+}
+
+/// One `ExecStart` word.
+///
+/// The distinction matters because `%` introduces a systemd specifier. A path
+/// the panel builds from `%S` or `%d` means that literally, while anything an
+/// operator typed does not, and escaping both the same way would break one of
+/// them.
+enum ExecArgument {
+    /// Emitted exactly as written, specifiers and all.
+    Specifier(String),
+    /// Escaped so systemd sees the value the operator typed.
+    Value(String),
+}
+
+fn serve_command(
+    unit: &str,
+    binary_path: &Path,
+    args: &PanelArgs,
+) -> Result<Vec<ExecArgument>, PanelError> {
+    let base_path = normalize_base_path(&args.base_path)?;
+    let command = vec![
+        ExecArgument::Value(binary_path.display().to_string()),
+        ExecArgument::Value("serve".to_owned()),
+        ExecArgument::Value("--listen".to_owned()),
+        ExecArgument::Value(args.listen.to_string()),
+        ExecArgument::Value("--public-origin".to_owned()),
+        ExecArgument::Value(args.public_origin.clone()),
+        ExecArgument::Value("--base-path".to_owned()),
+        ExecArgument::Value(base_path),
+        ExecArgument::Value("--state-dir".to_owned()),
+        // %S is systemd's state directory root, so the panel writes where
+        // StateDirectory= already granted it access rather than somewhere the
+        // sandbox would refuse.
+        ExecArgument::Specifier(format!("%S/{unit}")),
+        ExecArgument::Value("--github-client-id".to_owned()),
+        ExecArgument::Value(args.github_client_id.clone()),
+        ExecArgument::Value("--github-client-secret-file".to_owned()),
+        // %d is the credentials directory LoadCredential= populated.
+        ExecArgument::Specifier(format!("%d/{CREDENTIAL_NAME}")),
+        ExecArgument::Value("--owner-login".to_owned()),
+        ExecArgument::Value(args.owner_login.clone()),
+        ExecArgument::Value("--session-ttl-hours".to_owned()),
+        ExecArgument::Value(args.session_ttl_hours.to_string()),
+    ];
+
+    for argument in &command {
+        let value = match argument {
+            ExecArgument::Specifier(value) | ExecArgument::Value(value) => value,
+        };
+        // A newline would end the ExecStart line and let the rest of the value
+        // become its own unit directive.
+        if value.chars().any(char::is_control) {
+            return Err(PanelError::config(format!(
+                "a systemd ExecStart argument contains control characters: {value:?}"
+            )));
+        }
+    }
+    Ok(command)
+}
+
+fn render_exec_start(command: &[ExecArgument]) -> String {
+    command
+        .iter()
+        .map(|argument| match argument {
+            ExecArgument::Specifier(value) => value.clone(),
+            ExecArgument::Value(value) => render_exec_value(value),
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Quote an operator-supplied argument the way systemd parses `ExecStart`.
+fn render_exec_value(argument: &str) -> String {
+    if !argument.is_empty() && argument.chars().all(is_bare_exec_char) {
+        return argument.to_owned();
+    }
+    let mut quoted = String::with_capacity(argument.len() + 2);
+    quoted.push('"');
+    for character in argument.chars() {
+        match character {
+            '"' | '\\' => {
+                quoted.push('\\');
+                quoted.push(character);
+            }
+            '%' => quoted.push_str("%%"),
+            _ => quoted.push(character),
+        }
+    }
+    quoted.push('"');
+    quoted
+}
+
+fn is_bare_exec_char(character: char) -> bool {
+    !character.is_whitespace() && !matches!(character, '"' | '%' | '\'' | '\\')
+}
+
+#[cfg(test)]
+mod tests;
