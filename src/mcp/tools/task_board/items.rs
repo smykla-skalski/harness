@@ -89,7 +89,7 @@ fn create_schema() -> Value {
     json!({
         "type": "object",
         "properties": {
-            "title": { "type": "string", "minLength": 1 },
+            "title": { "type": "string", "pattern": "\\S" },
             "body": { "type": "string" },
             "status": { "type": "string" },
             "priority": { "type": "string" },
@@ -289,12 +289,16 @@ mod tests {
 
     use super::{create_schema, update_schema};
 
+    /// A `minLength` of 1 would still advertise a whitespace-only title as
+    /// valid, and the daemon trims before refusing one, so the schema has to
+    /// demand a visible character or the client learns of the mismatch only
+    /// from a failed call.
     #[test]
     fn create_offers_a_starting_status_and_demands_a_title() {
         let schema = create_schema();
 
         assert_eq!(schema["properties"]["status"]["type"], json!("string"));
-        assert_eq!(schema["properties"]["title"]["minLength"], json!(1));
+        assert_eq!(schema["properties"]["title"]["pattern"], json!("\\S"));
         assert_eq!(schema["required"], json!(["title"]));
     }
 
