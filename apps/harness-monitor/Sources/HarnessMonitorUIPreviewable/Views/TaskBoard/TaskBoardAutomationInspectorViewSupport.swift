@@ -18,7 +18,7 @@ enum TaskBoardAutomationAccessibility {
         || (65...90).contains(byte)
         || (97...122).contains(byte)
       {
-        return String(decoding: [byte], as: UTF8.self)
+        return String(bytes: [byte], encoding: .utf8) ?? String(format: "~%02X", byte)
       }
       return String(format: "~%02X", byte)
     }

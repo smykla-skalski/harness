@@ -54,7 +54,7 @@ struct TaskBoardApprovedAtPickerValueTests {
 
   @Test("Sanitizing leaves an empty or valid approvedAt untouched")
   func sanitizingLeavesEmptyOrValidApprovedAtUntouched() {
-    #expect(TaskBoardApprovedAtPickerValue.sanitizedApprovedAt("") == "")
+    #expect(TaskBoardApprovedAtPickerValue.sanitizedApprovedAt("").isEmpty)
     #expect(
       TaskBoardApprovedAtPickerValue.sanitizedApprovedAt("2026-05-14T10:00:00Z")
         == "2026-05-14T10:00:00Z"
@@ -63,6 +63,6 @@ struct TaskBoardApprovedAtPickerValueTests {
 
   @Test("Sanitizing clears a timestamp the old free-text field let through malformed")
   func sanitizingClearsMalformedApprovedAt() {
-    #expect(TaskBoardApprovedAtPickerValue.sanitizedApprovedAt("not a real date") == "")
+    #expect(TaskBoardApprovedAtPickerValue.sanitizedApprovedAt("not a real date").isEmpty)
   }
 }

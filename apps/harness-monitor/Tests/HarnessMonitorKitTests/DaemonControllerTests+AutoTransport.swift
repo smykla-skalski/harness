@@ -3,6 +3,10 @@ import Testing
 
 @testable import HarnessMonitorKit
 
+private typealias BootstrapContinuation = CheckedContinuation<
+  (any HarnessMonitorClientProtocol)?, Never
+>
+
 final class LockedFlag: @unchecked Sendable {
   private let lock = NSLock()
   private var value = false
@@ -66,8 +70,7 @@ struct DaemonControllerAutoTransportTests {
       autoTransportWebSocketGracePeriod: gracePeriod,
       sessionFactory: { _ in httpClient },
       webSocketBootstrapper: { _ in
-        await withCheckedContinuation {
-          (continuation: CheckedContinuation<(any HarnessMonitorClientProtocol)?, Never>) in
+        await withCheckedContinuation { (continuation: BootstrapContinuation) in
           Task.detached {
             try? await Task.sleep(for: hangDuration)
             continuation.resume(returning: webSocketClient)

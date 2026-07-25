@@ -115,7 +115,8 @@ struct TaskBoardItemWireDecodingTests {
     let umbrellaWire = try decoder.decode(
       TaskBoardItemWire.self,
       from: Data(
-        #"{"schema_version": 1, "id": "task-3", "title": "Umbrella", "kind": "umbrella", "created_at": "a", "updated_at": "b"}"#
+        (#"{"schema_version": 1, "id": "task-3", "title": "Umbrella", "kind": "umbrella", "#
+          + #""created_at": "a", "updated_at": "b"}"#)
           .utf8
       )
     )
@@ -136,7 +137,8 @@ struct TaskBoardItemWireDecodingTests {
     let childWire = try decoder.decode(
       TaskBoardItemWire.self,
       from: Data(
-        #"{"schema_version": 1, "id": "task-5", "title": "Child", "parent_item_id": "task-3", "child_order": 2, "created_at": "a", "updated_at": "b"}"#
+        (#"{"schema_version": 1, "id": "task-5", "title": "Child", "parent_item_id": "task-3", "#
+          + #""child_order": 2, "created_at": "a", "updated_at": "b"}"#)
           .utf8
       )
     )
@@ -191,7 +193,9 @@ struct TaskBoardItemWireDecodingTests {
     let wire = try decoder.decode(
       TaskBoardItemWire.self,
       from: Data(
-        #"{"schema_version":1,"id":"placed","title":"Placed","lane_position":2,"lane_origin":{"kind":"manual","actor":"control"},"lane_set_at":"now","created_at":"a","updated_at":"b"}"#
+        (#"{"schema_version":1,"id":"placed","title":"Placed","lane_position":2,"#
+          + #""lane_origin":{"kind":"manual","actor":"control"},"lane_set_at":"now","#
+          + #""created_at":"a","updated_at":"b"}"#)
           .utf8)
     )
     let item = TaskBoardItem(wire: wire)
