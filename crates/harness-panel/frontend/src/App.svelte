@@ -14,7 +14,10 @@
   let failure = $state<string | null>(null);
 
   async function load(): Promise<void> {
-    loading = true;
+    // Only the first load blanks the page. A later refresh keeps what is on
+    // screen, because tearing the tree down would destroy the shown-once
+    // pairing link that nothing else holds a copy of.
+    loading = viewer === null;
     failure = null;
     try {
       viewer = await api.fetchViewer();
@@ -32,7 +35,8 @@
     try {
       await api.setCanPair(accountId, granted);
       // Re-read rather than patching in place: the decision may have changed
-      // the viewer's own row, and the server is the authority on both.
+      // the viewer's own row, and the server is the authority on both. `load`
+      // leaves the page standing, so a link already on screen survives.
       await load();
     } catch (error) {
       failure = error instanceof Error ? error.message : String(error);

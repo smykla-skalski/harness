@@ -56,6 +56,12 @@
       onfocus={(event) => event.currentTarget.select()}
     />
     <p class="muted">Grants the {link.role} role.</p>
+    <!-- A link that lapsed before it was used has to be replaceable here. The
+         alternative is a dead link and no control at all, recoverable only by
+         reloading a page that says nothing about needing it. -->
+    <button class="secondary" onclick={generate} disabled={working}>
+      {working ? 'Generating…' : 'Generate another'}
+    </button>
   {/if}
 
   {#if failure !== null}
