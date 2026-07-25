@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::{
     AgentAdapter, HookRegistration, ProcessHookPayload, RenderedHookResponse, payload_context,
 };
@@ -12,7 +12,7 @@ use crate::hooks::protocol::context::{
     AgentContext, NormalizedEvent, NormalizedHookContext, RawPayload, SessionContext, SkillContext,
 };
 use crate::hooks::protocol::result::NormalizedHookResult;
-use crate::kernel::tooling::{ToolCategory, ToolContext, ToolInput};
+use harness_kernel::kernel::tooling::{ToolCategory, ToolContext, ToolInput};
 
 pub struct CodexAdapter;
 

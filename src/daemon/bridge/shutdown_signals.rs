@@ -18,7 +18,7 @@ use std::thread;
 use signal_hook::consts::{SIGHUP, SIGINT, SIGTERM};
 use signal_hook::iterator::Signals;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::bridge_state::clear_bridge_state;
 use super::server::BridgeServer;

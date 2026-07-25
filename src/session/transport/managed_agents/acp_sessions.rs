@@ -6,7 +6,7 @@
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::session::transport::support::{daemon_client, print_json};
 
 #[derive(Debug, Clone, Args)]

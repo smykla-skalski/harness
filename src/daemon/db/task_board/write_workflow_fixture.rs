@@ -1,5 +1,5 @@
 use crate::daemon::db::{AsyncDaemonDb, ClaimedTaskBoardDispatchPreparation};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::{
     AgentMode, DispatchAppliedTask, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardItem,
     TaskBoardReadOnlyRunContext, TaskBoardWorkflowKind, TaskBoardWorkflowSnapshot,

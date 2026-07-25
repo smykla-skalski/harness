@@ -1,8 +1,8 @@
-use crate::errors::HookMessage;
+use harness_kernel::errors::HookMessage;
 use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
 use crate::hooks::runner_policy::{MakeTargetPrefix, SuiteMutationBinary, TaskOutputPattern};
-use crate::kernel::command_intent::{command_heads, normalized_binary_name, path_like_words};
+use harness_kernel::kernel::command_intent::{command_heads, normalized_binary_name, path_like_words};
 
 use super::predicates::{
     deny_python, deny_runner_flow, has_denied_runner_binary, has_python_inline,

@@ -14,7 +14,7 @@ use super::wire_cleanup::{RemoteCleanupObservationRequest, RemoteCleanupObservat
 use crate::daemon::db::TaskBoardRemoteAssignmentRecord;
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::http::openapi::DaemonErrorBody;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 pub(crate) const CLEANUP_OBSERVATION_PATH: &str = "/v1/task-board-execution/cleanup/observe";
 

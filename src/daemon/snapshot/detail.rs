@@ -8,7 +8,7 @@ use super::summaries::summary_from_resolved;
 use tokio::task::spawn_blocking;
 
 use crate::daemon::db::DaemonDb;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::types::{AgentRegistration, SessionSignalRecord, SessionState, WorkItem};
 
 /// Build a rich session detail snapshot, then persist it into the daemon cache.

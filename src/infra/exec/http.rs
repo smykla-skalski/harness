@@ -2,7 +2,7 @@ use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 use std::{cmp, thread};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::RUNTIME;
 

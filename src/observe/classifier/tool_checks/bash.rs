@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use crate::kernel::command_intent::ObservedCommand;
-use crate::kernel::tooling::ToolInput;
+use harness_kernel::kernel::command_intent::ObservedCommand;
+use harness_kernel::kernel::tooling::ToolInput;
 use crate::observe::patterns;
 use crate::observe::types::{
     Confidence, FixSafety, Issue, IssueCode, MessageRole, ScanState, SourceTool,

@@ -5,6 +5,7 @@ use tokio::sync::Barrier;
 
 use super::test_support::{database, instant};
 use crate::daemon::db::AsyncDaemonDb;
+use harness_kernel::errors::CliError;
 use crate::task_board::{
     TaskBoardAutomationWakeEntityKind, TaskBoardAutomationWakePayload,
     TaskBoardAutomationWakeRecoveryReason, TaskBoardAutomationWakeRequest,
@@ -222,7 +223,7 @@ async fn enqueue_after_barrier(
     db: AsyncDaemonDb,
     request: TaskBoardAutomationWakeRequest,
     barrier: Arc<Barrier>,
-) -> Result<crate::task_board::TaskBoardAutomationWakeEvent, crate::errors::CliError> {
+) -> Result<crate::task_board::TaskBoardAutomationWakeEvent, CliError> {
     barrier.wait().await;
     db.enqueue_task_board_automation_wake_event(&request, instant("2026-07-15T11:00:00Z"))
         .await

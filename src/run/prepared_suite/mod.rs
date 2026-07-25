@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use builders::{build_baseline_plan, build_group_plan, copy_prepared_file};
 use digest::source_digest;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty, write_text};
 use crate::run::SuiteSpec;
 use crate::run::context::RunLayout;

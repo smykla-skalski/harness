@@ -1,6 +1,6 @@
 use serde_json::{Value, json};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::types::SessionMetrics;
 
 pub(super) fn migrate_v1_to_v2(mut value: Value) -> Result<Value, CliError> {

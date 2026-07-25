@@ -14,7 +14,7 @@
 //! If the process crashes between the jsonl append and `task_reviews` mirror
 //! insert, `rebuild_task_reviews` on next start replays the jsonl into `SQLite`.
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::session::service::{apply_submit_review, generate_review_id, validate_submit_review};
 use crate::session::storage as session_storage;
 use crate::session::types::{Review, ReviewPoint, ReviewVerdict, SessionState, TaskStatus};

@@ -1,7 +1,7 @@
 use std::env;
 use std::sync::Arc;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::ProcessExecutor;
 
 #[cfg(feature = "kubernetes")]

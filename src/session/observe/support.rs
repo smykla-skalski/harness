@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::observe::types::{Issue, IssueCode, IssueSeverity, ObserverState, OpenIssue};
 use crate::observe::{is_observer_conflict, load_observer_state, save_observer_state};
 use crate::session::service::{self, TaskSpec};

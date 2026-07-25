@@ -6,9 +6,9 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use crate::create::workflow::{
     ApprovalMode, CreateDraftState, CreateReviewState, CreateSessionInfo, CreateWorkflowState,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_text, write_json_pretty};
-use crate::kernel::skills::dirs as skill_dirs;
+use harness_kernel::kernel::skills::dirs as skill_dirs;
 
 use super::CreatePhase;
 

@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io;
 
 use super::frontmatter::{SuiteFrontmatter, SuiteFrontmatterUnchecked};

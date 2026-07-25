@@ -3,7 +3,7 @@ use std::path::Path;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 const STABLE_POLLS_REQUIRED: u32 = 2;
 

@@ -3,7 +3,7 @@ use std::path::Path;
 use std::slice::from_ref;
 
 use crate::daemon::db::AsyncDaemonDb;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 #[cfg(test)]
 use crate::reviews::policy::authored_reviews_policy_plan;
 use crate::reviews::policy::{ReviewsPolicyPlan, authored_reviews_policy_plan_from_document};

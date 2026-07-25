@@ -1,7 +1,7 @@
 use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::guard_bash::predicates::{deny_runner_flow, is_run_scope_flag};
 use crate::hooks::protocol::hook_result::HookResult;
-use crate::kernel::command_intent::{
+use harness_kernel::kernel::command_intent::{
     semantic_harness_subcommand, semantic_harness_tail, significant_words,
 };
 use crate::run::workflow::{RunnerPhase, RunnerWorkflowState};

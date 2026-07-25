@@ -1,4 +1,4 @@
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 use crate::task_board::external::{
     ExternalCreateProbe, ExternalCreateRecoveryClient, ExternalSyncOperation,
 };

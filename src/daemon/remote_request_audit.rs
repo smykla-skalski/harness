@@ -7,7 +7,7 @@ use uuid::Uuid;
 use super::db::AsyncDaemonDb;
 use super::remote::RemoteAccessScope;
 use super::remote_identity::{RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 const DEFAULT_MAX_TRACKED_UNAUTHENTICATED_ADDRESSES: usize = 4096;

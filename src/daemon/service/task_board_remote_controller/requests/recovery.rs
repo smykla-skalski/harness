@@ -2,7 +2,7 @@ use chrono::Duration;
 
 use crate::daemon::db::TaskBoardRemoteOperationTrustFence;
 use crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::{
     TaskBoardExecutionAttemptRecord, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionRecord,

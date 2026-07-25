@@ -1,6 +1,6 @@
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{TaskBoardListItemsRequest, TaskBoardListItemsResponse};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::build_progress_rollups;
 use std::collections::HashMap;
 

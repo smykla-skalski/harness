@@ -6,7 +6,7 @@ use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_identity::{
     RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteStoredClient,
 };
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::workspace::utc_now;
 
 use super::control::{adopt_daemon_root_for_transport_command, print_json};

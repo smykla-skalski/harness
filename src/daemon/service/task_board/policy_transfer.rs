@@ -8,7 +8,7 @@ use crate::daemon::protocol::{
     PolicyTransferBundle, PolicyTransferDumpRequest, PolicyTransferImportRequest,
     PolicyTransferWorkspaceMetadata,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::policy_graph::{
     POLICY_CANVAS_WORKSPACE_VERSION, PolicyCanvasRecord, PolicyCanvasWorkspace, PolicyGraph,
     PolicyGraphMode, PolicyScenario,

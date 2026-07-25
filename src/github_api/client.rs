@@ -6,7 +6,7 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tokio::sync::broadcast;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::budget::{parse_graphql_reset_at, parse_retry_after};
 use super::response::{

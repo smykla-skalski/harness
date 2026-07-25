@@ -1,6 +1,6 @@
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::{ManagedAgentSnapshot, WsRequest, WsResponse};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 #[expect(
     clippy::cognitive_complexity,

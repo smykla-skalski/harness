@@ -26,7 +26,7 @@ pub(crate) use crate::daemon::protocol::{
     CodexRunMode, CodexRunSnapshot, CodexRunStatus, TimelineCursor, TimelineEntry,
     TimelineWindowRequest, TimelineWindowResponse,
 };
-pub(crate) use crate::errors::{CliError, CliErrorKind};
+pub(crate) use harness_kernel::errors::{CliError, CliErrorKind};
 pub(crate) use crate::session::types::{
     AgentRegistration, SessionLogEntry, SessionSignalRecord, SessionSignalStatus, SessionState,
     SessionStatus, TaskCheckpoint, WorkItem,

@@ -2,7 +2,7 @@ use std::process::Command;
 
 use uzers::get_current_uid;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct CommandOutput {

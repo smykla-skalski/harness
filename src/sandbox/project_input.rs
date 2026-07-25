@@ -11,7 +11,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 #[cfg(target_os = "macos")]
 use crate::workspace::harness_data_root;
 #[cfg(target_os = "macos")]

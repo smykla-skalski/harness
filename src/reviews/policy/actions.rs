@@ -4,7 +4,7 @@ use std::path::Path;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::ReviewTarget;
 use crate::task_board::github::GitHubMergeMethod;
 use crate::task_board::policy::{

@@ -1,6 +1,6 @@
 use clap::{Args, Subcommand};
 
-use crate::kernel::skills::SKILL_NAMES;
+use harness_kernel::kernel::skills::SKILL_NAMES;
 
 use super::adapters::HookAgent;
 use super::catalog::{

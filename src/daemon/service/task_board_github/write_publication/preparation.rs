@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::github::{GitHubAutomation, GitHubProjectConfig};
 use crate::task_board::{
     TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowKind, TaskBoardWorkflowState,

@@ -1,7 +1,7 @@
 use tokio::sync::watch;
 
 use crate::daemon::db::TaskBoardRemoteAssignmentRecord;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(super) fn shutdown_observed(shutdown_rx: Option<&watch::Receiver<bool>>) -> bool {
     shutdown_rx.is_some_and(|receiver| *receiver.borrow())

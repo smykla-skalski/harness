@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::{AcpAgentInspectResponse, AcpAgentManagerHandle, AcpAgentSnapshot};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::workspace::utc_now;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

@@ -2,14 +2,14 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::OnceLock;
 
-use crate::errors::HookMessage;
+use harness_kernel::errors::HookMessage;
 use crate::hooks::protocol::hook_result::HookResult;
 use crate::hooks::runner_policy::managed_cluster_binaries;
 use crate::hooks::runner_policy::{
     AdminEndpointHint, LegacyScript, PythonBinary, RunnerBinary, TaskOutputPattern,
     TrackedHarnessSubcommand,
 };
-use crate::kernel::command_intent::{
+use harness_kernel::kernel::command_intent::{
     contains_subshell_pattern, is_env_assignment, is_shell_control_op, normalized_binary_name,
     semantic_harness_subcommand, semantic_harness_tail, significant_words,
 };

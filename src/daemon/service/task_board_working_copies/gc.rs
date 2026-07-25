@@ -9,7 +9,7 @@
 
 use std::fs;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::working_copy::{
     WORKING_COPY_DISK_BUDGET_MB, WORKING_COPY_MAX_AGE_DAYS, WorkingCopyKey, WorkingCopyRegistry,
     WorkingCopyRegistryEntry,

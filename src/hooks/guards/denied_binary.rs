@@ -1,4 +1,4 @@
-use crate::errors::HookMessage;
+use harness_kernel::errors::HookMessage;
 use crate::hooks::application::GuardContext;
 use crate::hooks::guard_bash::predicates::{
     deny_python, has_denied_cluster_binary, has_denied_cluster_binary_anywhere,

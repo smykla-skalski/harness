@@ -32,7 +32,7 @@ use super::policy_runtime::task_creation::{
 };
 use super::store::{apply_canonical_persisted_status, read_path, validate_loaded_id};
 use super::types::{CURRENT_TASK_BOARD_ITEM_VERSION, TaskBoardItem};
-use crate::errors::{CliError, CliErrorKind, io_for};
+use harness_kernel::errors::{CliError, CliErrorKind, io_for};
 use crate::infra::io::read_json_typed;
 
 mod status_compat;

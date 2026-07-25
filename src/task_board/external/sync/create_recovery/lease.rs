@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use async_trait::async_trait;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::external::{ExternalCreateLease, ExternalProviderScopeAttempt};
 use crate::workspace::utc_now;
 

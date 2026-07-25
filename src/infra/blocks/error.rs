@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 /// Error type for block operations.
 ///

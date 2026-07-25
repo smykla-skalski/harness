@@ -2,7 +2,7 @@ use std::path::Path;
 
 use crate::daemon::service::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::state;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 pub(crate) fn open_daemon_db(path: &Path) -> Result<DaemonDb, CliError> {
     DaemonDb::open(path).inspect_err(|error| {

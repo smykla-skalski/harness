@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use crate::kernel::skills::{SKILL_CREATE, SKILL_OBSERVE, SKILL_RUN};
-use crate::kernel::tooling::ToolContext;
+use harness_kernel::kernel::skills::{SKILL_CREATE, SKILL_OBSERVE, SKILL_RUN};
+use harness_kernel::kernel::tooling::ToolContext;
 use serde_json::Value;
 
 /// Opaque raw agent payload preserved for adapter-specific features.

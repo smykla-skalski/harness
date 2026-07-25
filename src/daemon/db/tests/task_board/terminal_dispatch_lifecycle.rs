@@ -8,6 +8,7 @@ use crate::daemon::db::task_board::write_workflow_fixture::{
     approved_write_item, complete_write_preparation,
 };
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, NewApprovalGrant, ReservedTaskBoardDispatch};
+use harness_kernel::errors::CliError;
 use crate::task_board::{
     PolicyAction, PolicyReasonCode, SpawnGateSwitches, TaskBoardAutomationPolicy, TaskBoardItem,
     TaskBoardPolicyLimit, TaskBoardPolicyScope, TaskBoardStatus, build_dispatch_plans_with_policy,
@@ -120,7 +121,7 @@ async fn apply_action(
     db: &AsyncDaemonDb,
     item_id: &str,
     action: TerminalAction,
-) -> Result<(), crate::errors::CliError> {
+) -> Result<(), CliError> {
     match action {
         TerminalAction::Complete => db
             .update_task_board_item(item_id, |item| {

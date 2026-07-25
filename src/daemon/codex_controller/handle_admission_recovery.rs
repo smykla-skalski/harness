@@ -3,7 +3,7 @@ use crate::daemon::db::{
 };
 use crate::daemon::protocol::{CodexRunSnapshot, TaskBoardEvaluateRequest};
 use crate::daemon::service as daemon_service;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::handle::CodexControllerHandle;
 

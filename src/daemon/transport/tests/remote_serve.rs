@@ -17,7 +17,7 @@ use crate::daemon::remote_acme::{
     RemoteCertificateBundle,
 };
 use crate::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::super::remote::DaemonRemoteServeArgs;
 use super::super::remote_serve::{

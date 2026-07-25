@@ -3,7 +3,7 @@
 //! Split from `handle.rs` to keep the file under the repo source-length limit.
 
 use crate::agents::runtime::models;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 /// Validate a codex effort level against the requested model's catalog entry.
 /// Falls back to the codex default model when no model was specified.

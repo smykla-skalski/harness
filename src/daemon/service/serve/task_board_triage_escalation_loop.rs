@@ -19,7 +19,7 @@ use tracing::warn;
 use crate::daemon::db::{AsyncDaemonDb, ClaimedTaskBoardTriageEscalation};
 use crate::daemon::http::{DaemonHttpState, run_codex_agent_blocking};
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole};
 use crate::task_board::{TaskBoardTriageEscalationConfig, render_triage_escalation_prompt};
 

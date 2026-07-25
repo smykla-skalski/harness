@@ -9,7 +9,7 @@ use crate::daemon::protocol::{
     TaskBoardDispatchPickResponse, TaskBoardDispatchPickSelection, TaskBoardDispatchRequest,
     TaskBoardDispatchResponse,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 #[cfg(test)]
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::policy_graph::PolicyGraph;

@@ -21,7 +21,7 @@ use crate::daemon::remote_diagnostics::project_diagnostics_report;
 use crate::daemon::remote_viewer::is_remote_viewer;
 use crate::daemon::service;
 use crate::daemon::websocket::{build_config_payload, ws_upgrade_handler};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::openapi::DaemonErrorBody;
 use crate::agents::acp::probe::AcpRuntimeProbeResponse;

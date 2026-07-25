@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use fs_err as fs;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{VOICE_SESSION_TTL_SECS, VoiceSessionRecord, read_record_from_path, voice_root};
 

@@ -17,7 +17,7 @@ use crate::daemon::protocol::{
     PolicyTransferDumpRequest, PolicyTransferImportRequest,
 };
 use crate::daemon::service;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 pub(crate) async fn policy_canvas_workspace(
     db: &AsyncDaemonDb,

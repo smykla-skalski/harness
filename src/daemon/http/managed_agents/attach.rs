@@ -15,7 +15,7 @@ use tokio::task::spawn_blocking;
 use crate::daemon::agent_tui::AgentTuiProcess;
 use crate::daemon::bridge::{BridgeCapability, BridgeClient};
 use crate::daemon::http::DaemonHttpState;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::auth::require_auth;
 use super::super::response::{extract_request_id, timed_json};

@@ -11,7 +11,7 @@ use crate::daemon::protocol::{
     PolicyPipelineSimulateRequest, PolicyPipelineSimulationResponse, PolicyScenarioCreateRequest,
     PolicyScenarioDeleteRequest, PolicyScenarioUpdateRequest,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::policy_graph::{self, PolicyCanvasWorkspace};
 
 use super::policy_canvas_response::policy_canvas_workspace_response;

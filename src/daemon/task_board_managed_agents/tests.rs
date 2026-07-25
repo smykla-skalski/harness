@@ -4,7 +4,7 @@ use tokio::time::timeout;
 
 use crate::daemon::agent_tui::AgentTuiStatus;
 use crate::daemon::protocol::{CodexRunStatus, ManagedAgentSnapshot};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::types::SessionRole;
 use crate::task_board::{
     AgentMode, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardAttemptResultArtifact,

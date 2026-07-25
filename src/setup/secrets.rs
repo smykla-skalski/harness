@@ -21,7 +21,7 @@ use security_framework::passwords::{
 use sha1::{Digest, Sha1};
 
 use crate::app::command_context::AppContext;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[cfg(any(target_os = "macos", test))]
 const SERVICE_GITHUB: &str = "io.harnessmonitor.task-board.github-credentials";

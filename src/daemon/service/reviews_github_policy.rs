@@ -1,5 +1,5 @@
 use crate::daemon::{db::DaemonDb, state};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::policy::review_target_policy_evidence;
 use crate::reviews::{
     ReviewTarget, ReviewsApproveRequest, ReviewsApproveRequestSource, ReviewsFileCommentRequest,

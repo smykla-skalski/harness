@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 #[cfg(test)]
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::github_api::GitHubPullRequestSnapshot;
 use crate::task_board::store::TaskBoardItemPatch;
 #[cfg(test)]

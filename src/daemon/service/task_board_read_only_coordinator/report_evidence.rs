@@ -1,6 +1,6 @@
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::CodexRunSnapshot;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionAttemptRecord, TaskBoardFailureClass,
     TaskBoardLocalAttemptResult, TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionRecord,

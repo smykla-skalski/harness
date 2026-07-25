@@ -1,4 +1,5 @@
 use super::*;
+use harness_kernel::errors::CliError;
 
 #[test]
 fn claim_waiting_run_transitions_once_under_contention() {
@@ -247,7 +248,7 @@ impl PolicyActionProvider for DomainProbeProvider {
         &self,
         action: &PolicyActionDescriptor,
         _ctx: &PolicyExecutionContext,
-    ) -> Result<PolicyActionExecution, crate::errors::CliError> {
+    ) -> Result<PolicyActionExecution, CliError> {
         self.recorded
             .lock()
             .expect("lock recorded")

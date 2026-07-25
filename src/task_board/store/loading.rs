@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use fs_err as fs;
 use rayon::prelude::*;
 
-use crate::errors::{CliError, io_for};
+use harness_kernel::errors::{CliError, io_for};
 
 use super::parse_cache::{BOARD_PARSE_CACHE, Resolve};
 use super::{

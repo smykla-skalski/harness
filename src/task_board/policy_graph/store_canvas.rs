@@ -1,6 +1,6 @@
 use uuid::Uuid;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{
     PolicyAction, PolicyCanvasRecord, PolicyCanvasWorkspace, PolicyGraph, PolicyGraphMode,

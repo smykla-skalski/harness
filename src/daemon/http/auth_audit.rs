@@ -14,7 +14,7 @@ use crate::daemon::remote_auth::{
 use crate::daemon::remote_request_audit::{
     RemoteAuthorizationAudit, RemoteAuthorizationAuditReceipt, RemoteUnauthenticatedAuditAdmission,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{DaemonConnectInfo, DaemonHttpState};
 

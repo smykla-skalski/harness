@@ -4,7 +4,7 @@ use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::agent_tui::{
     AgentTuiInput, AgentTuiInputRequest, AgentTuiKey, AgentTuiResizeRequest,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use crate::session::transport::support::{daemon_client, print_json};
 

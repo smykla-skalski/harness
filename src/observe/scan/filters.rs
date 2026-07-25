@@ -1,6 +1,6 @@
 use std::fs;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::application::ObserveFilter;
 use super::super::types::{FocusPreset, Issue, IssueCategory, IssueCode, IssueSeverity};

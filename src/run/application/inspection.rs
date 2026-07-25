@@ -2,9 +2,9 @@ use std::thread;
 
 use rayon::prelude::*;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::infra::exec;
-use crate::kernel::topology::Platform;
+use harness_kernel::kernel::topology::Platform;
 use crate::run::services::{
     ClusterHealthReport, ClusterMemberHealthRecord, ClusterMemberStatusRecord, ClusterStatusReport,
 };

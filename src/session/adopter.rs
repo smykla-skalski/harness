@@ -8,7 +8,7 @@ use serde_json::Value;
 use thiserror::Error;
 use tracing::info;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_json_typed;
 use crate::session::storage;
 use crate::session::storage::ActiveRegistry;

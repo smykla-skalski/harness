@@ -26,9 +26,10 @@ use crate::session::types::{
 
 use super::super::response::map_json;
 use super::DaemonHttpState;
+use harness_kernel::errors::CliError;
 
 pub(in crate::daemon::http) async fn response_body(
-    result: Result<Value, crate::errors::CliError>,
+    result: Result<Value, CliError>,
 ) -> (StatusCode, Value) {
     let response = map_json(result);
     let status = response.status();

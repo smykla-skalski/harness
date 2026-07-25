@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use chrono::SecondsFormat;
 
 use crate::daemon::db::AsyncDaemonDb;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::github_api::stable_data_revision_guard;
 use crate::github_api::{GitHubProtectedClient, GitHubPullRequestSnapshot};
 use crate::reviews::{

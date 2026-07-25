@@ -1,5 +1,5 @@
 use super::*;
-use crate::kernel::topology::{ClusterProvider, Platform};
+use harness_kernel::kernel::topology::{ClusterProvider, Platform};
 use crate::setup::cluster::{ClusterArgs, RemoteClusterTarget};
 use fs_err as fs;
 

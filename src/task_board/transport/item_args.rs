@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use clap::Args;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::types::{
     ExternalRef, ExternalRefProvider, MAX_TASK_BOARD_ESTIMATE, PlanningState,
     TaskBoardWorkflowState, TaskBoardWorkflowStatus,

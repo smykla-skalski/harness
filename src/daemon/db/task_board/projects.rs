@@ -2,7 +2,7 @@ use sqlx::error::DatabaseError;
 use sqlx::{FromRow, Sqlite, Transaction, query, query_as};
 
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 use crate::task_board::project::{
     ItemProjectAttribution, TaskBoardProject, TaskBoardProjectSource, item_attribution,
 };

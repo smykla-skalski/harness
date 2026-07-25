@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::daemon::db::AsyncDaemonDb;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::reviews::{
     ReviewActionKind, ReviewActionOutcome, ReviewActionPreviewTarget, ReviewActionResult,
     ReviewTarget, ReviewsActionPreviewRequest, ReviewsActionPreviewResponse, ReviewsActionResponse,

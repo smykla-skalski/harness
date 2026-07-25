@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::slice;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::github_api::{
     GitHubProtectedClient, GitHubPullRequestSnapshot, retry_stable_read, stable_data_revision_guard,
 };

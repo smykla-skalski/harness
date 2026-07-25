@@ -5,7 +5,7 @@ use std::fmt::Display;
 use chrono::{DateTime, SecondsFormat, Utc};
 
 use crate::daemon::db::AsyncDaemonDb;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::{
     TaskBoardAttemptResultArtifact, TaskBoardAttemptState, TaskBoardExecutionAttemptCas,
     TaskBoardExecutionAttemptCasOutcome, TaskBoardExecutionAttemptCreateOutcome,

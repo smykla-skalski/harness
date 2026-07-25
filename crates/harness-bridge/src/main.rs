@@ -5,7 +5,7 @@ use std::time::Duration;
 use clap::Parser;
 use harness_bridge::app::{AppContext, Execute};
 use harness_bridge::daemon::bridge::BridgeCommand;
-use harness_bridge::errors;
+use harness_kernel::errors;
 use harness_telemetry::{RuntimeService, init_tracing_subscriber_for};
 
 #[derive(Debug, Parser)]

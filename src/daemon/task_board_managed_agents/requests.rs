@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::daemon::agent_tui::AgentTuiStartRequest;
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole};
 use crate::task_board::prompt_catalog::{PromptId, render_prompt};
 use crate::task_board::{

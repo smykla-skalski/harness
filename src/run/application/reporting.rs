@@ -1,7 +1,7 @@
 use std::fmt::Write as _;
 use std::path::PathBuf;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::run::audit::write_run_status_with_audit;
 use crate::run::report_policy::{REPORT_CODE_BLOCK_LIMIT, REPORT_LINE_LIMIT};
 use crate::run::services::reporting::apply_group_report_result;

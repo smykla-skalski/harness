@@ -2,7 +2,7 @@ use std::fmt;
 
 use async_trait::async_trait;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::github_api::GitHubProtectedClient;
 use crate::task_board::external::targeting::github_repository_for_item;
 use crate::task_board::external::{

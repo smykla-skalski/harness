@@ -23,7 +23,7 @@ use crate::daemon::protocol::StreamEvent;
 use crate::daemon::sandboxed_from_env;
 #[cfg(feature = "daemon-runtime")]
 use crate::daemon::state::task_board_openrouter_token;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::feature_flags;
 #[cfg(all(test, feature = "daemon-runtime"))]
 use crate::session::types::AgentStatus;

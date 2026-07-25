@@ -13,7 +13,7 @@ use crate::daemon::protocol::{SessionStartRequest, TaskBoardDispatchRequest, Tas
 use crate::daemon::service::{
     build_log_entry, create_task_with_id_async, session_service, start_session_direct_async,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::sandbox;
 use crate::session::storage as session_storage;
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionState};

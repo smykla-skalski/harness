@@ -11,7 +11,7 @@ use tokio::task::spawn_blocking;
 mod cleanup;
 use uuid::Uuid;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 use super::protocol::{

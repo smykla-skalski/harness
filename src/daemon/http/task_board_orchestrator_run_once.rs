@@ -1,7 +1,7 @@
 use crate::daemon::protocol::{
     TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorRunOnceResponse,
 };
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::DaemonHttpState;
 

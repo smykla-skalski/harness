@@ -6,7 +6,7 @@ use tokio::sync::broadcast::Sender;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::protocol::{SessionSummary, StreamEvent, TaskBoardUpdatedPayload};
 use crate::daemon::{service, snapshot, timeline};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::feature_flags::task_board_automation_v2_enabled_from_env;
 use crate::task_board::TaskBoardAutomationSnapshot;
 use crate::workspace::utc_now;

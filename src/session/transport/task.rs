@@ -6,7 +6,7 @@ use crate::daemon::protocol::{
     SessionDetail, TaskArbitrateRequest, TaskCheckpointRequest, TaskClaimReviewRequest,
     TaskRespondReviewRequest, TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::service;
 use crate::session::types::{
     ReviewPoint, ReviewVerdict, TaskCheckpoint, TaskSeverity, TaskSource, TaskStatus,

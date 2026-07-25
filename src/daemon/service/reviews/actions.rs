@@ -1,4 +1,4 @@
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::reviews::timeline;
 use crate::reviews::{
     ReviewsActionResponse, ReviewsApproveRequest, ReviewsCommentRequest, ReviewsFileCommentRequest,

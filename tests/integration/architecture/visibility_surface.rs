@@ -181,7 +181,7 @@ fn helper_modules_do_not_leak_publicly() {
 #[test]
 fn errors_root_stays_a_transport_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let errors_mod = read_repo_file(root, "src/errors/mod.rs");
+    let errors_mod = read_repo_file(root, "crates/harness-kernel/src/errors/mod.rs");
 
     for needle in [
         "impl CliErrorKind {",
@@ -191,24 +191,24 @@ fn errors_root_stays_a_transport_facade() {
     ] {
         assert!(
             !errors_mod.contains(needle),
-            "src/errors/mod.rs should stay a thin facade instead of owning `{needle}`"
+            "crates/harness-kernel/src/errors/mod.rs should stay a thin facade instead of owning `{needle}`"
         );
     }
 
     for path in [
-        "src/errors/cli_kind/mod.rs",
-        "src/errors/cli_kind/common.rs",
-        "src/errors/cli_kind/run_setup.rs",
-        "src/errors/cli_kind/create_observe.rs",
-        "src/errors/cli_kind/workflow.rs",
-        "src/errors/hook_message/mod.rs",
-        "src/errors/hook_message/constructors.rs",
-        "src/errors/hook_message/mapping.rs",
-        "src/errors/run_setup/mod.rs",
-        "src/errors/run_setup/constructors.rs",
-        "src/errors/run_setup/hints.rs",
-        "src/errors/cli_error.rs",
-        "src/errors/tests.rs",
+        "crates/harness-kernel/src/errors/cli_kind/mod.rs",
+        "crates/harness-kernel/src/errors/cli_kind/common.rs",
+        "crates/harness-kernel/src/errors/cli_kind/run_setup.rs",
+        "crates/harness-kernel/src/errors/cli_kind/create_observe.rs",
+        "crates/harness-kernel/src/errors/cli_kind/workflow.rs",
+        "crates/harness-kernel/src/errors/hook_message/mod.rs",
+        "crates/harness-kernel/src/errors/hook_message/constructors.rs",
+        "crates/harness-kernel/src/errors/hook_message/mapping.rs",
+        "crates/harness-kernel/src/errors/run_setup/mod.rs",
+        "crates/harness-kernel/src/errors/run_setup/constructors.rs",
+        "crates/harness-kernel/src/errors/run_setup/hints.rs",
+        "crates/harness-kernel/src/errors/cli_error.rs",
+        "crates/harness-kernel/src/errors/tests.rs",
     ] {
         assert!(
             repo_path_exists(root, path),
@@ -220,7 +220,7 @@ fn errors_root_stays_a_transport_facade() {
 #[test]
 fn errors_cli_kind_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let cli_kind = read_repo_file(root, "src/errors/cli_kind/mod.rs");
+    let cli_kind = read_repo_file(root, "crates/harness-kernel/src/errors/cli_kind/mod.rs");
 
     for needle in [
         "pub fn missing_tools(",
@@ -230,7 +230,7 @@ fn errors_cli_kind_root_stays_a_facade() {
     ] {
         assert!(
             !cli_kind.contains(needle),
-            "src/errors/cli_kind/mod.rs should stay a thin facade instead of owning `{needle}`"
+            "crates/harness-kernel/src/errors/cli_kind/mod.rs should stay a thin facade instead of owning `{needle}`"
         );
     }
 }
@@ -238,7 +238,7 @@ fn errors_cli_kind_root_stays_a_facade() {
 #[test]
 fn errors_run_setup_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let run_setup = read_repo_file(root, "src/errors/run_setup/mod.rs");
+    let run_setup = read_repo_file(root, "crates/harness-kernel/src/errors/run_setup/mod.rs");
 
     for needle in [
         "pub fn missing_closeout_artifact(",
@@ -247,7 +247,7 @@ fn errors_run_setup_root_stays_a_facade() {
     ] {
         assert!(
             !run_setup.contains(needle),
-            "src/errors/run_setup/mod.rs should stay a thin facade instead of owning `{needle}`"
+            "crates/harness-kernel/src/errors/run_setup/mod.rs should stay a thin facade instead of owning `{needle}`"
         );
     }
 }
@@ -255,7 +255,7 @@ fn errors_run_setup_root_stays_a_facade() {
 #[test]
 fn errors_hook_message_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let hook_message = read_repo_file(root, "src/errors/hook_message/mod.rs");
+    let hook_message = read_repo_file(root, "crates/harness-kernel/src/errors/hook_message/mod.rs");
 
     for needle in [
         "pub fn write_outside_run(",
@@ -264,7 +264,7 @@ fn errors_hook_message_root_stays_a_facade() {
     ] {
         assert!(
             !hook_message.contains(needle),
-            "src/errors/hook_message/mod.rs should stay a thin facade instead of owning `{needle}`"
+            "crates/harness-kernel/src/errors/hook_message/mod.rs should stay a thin facade instead of owning `{needle}`"
         );
     }
 }
@@ -273,10 +273,10 @@ fn errors_hook_message_root_stays_a_facade() {
 fn kernel_command_intent_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     assert!(
-        !root.join("src/kernel/command_intent.rs").exists(),
+        !root.join("crates/harness-kernel/src/kernel/command_intent.rs").exists(),
         "legacy flat kernel command-intent module should not exist"
     );
-    let command_intent_mod = read_repo_file(root, "src/kernel/command_intent/mod.rs");
+    let command_intent_mod = read_repo_file(root, "crates/harness-kernel/src/kernel/command_intent/mod.rs");
 
     for needle in [
         "pub struct ParsedCommand {",
@@ -287,17 +287,17 @@ fn kernel_command_intent_root_stays_a_facade() {
     ] {
         assert!(
             !command_intent_mod.contains(needle),
-            "src/kernel/command_intent/mod.rs should stay a thin facade instead of owning `{needle}`"
+            "crates/harness-kernel/src/kernel/command_intent/mod.rs should stay a thin facade instead of owning `{needle}`"
         );
     }
 
     for path in [
-        "src/kernel/command_intent/shell.rs",
-        "src/kernel/command_intent/harness.rs",
-        "src/kernel/command_intent/parsed.rs",
-        "src/kernel/command_intent/observed.rs",
-        "src/kernel/command_intent/fallback.rs",
-        "src/kernel/command_intent/tests.rs",
+        "crates/harness-kernel/src/kernel/command_intent/shell.rs",
+        "crates/harness-kernel/src/kernel/command_intent/harness.rs",
+        "crates/harness-kernel/src/kernel/command_intent/parsed.rs",
+        "crates/harness-kernel/src/kernel/command_intent/observed.rs",
+        "crates/harness-kernel/src/kernel/command_intent/fallback.rs",
+        "crates/harness-kernel/src/kernel/command_intent/tests.rs",
     ] {
         assert!(
             repo_path_exists(root, path),

@@ -5,7 +5,7 @@
 
 use async_trait::async_trait;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::{ExternalProvider, ExternalTask};
 

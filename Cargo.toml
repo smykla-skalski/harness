@@ -7,6 +7,7 @@ members = [
   "crates/harness-daemon-client",
   "crates/harness-daemon",
   "crates/harness-hook",
+  "crates/harness-kernel",
   "crates/harness-mcp",
   "crates/harness-protocol",
   "crates/harness-systemd",
@@ -40,6 +41,7 @@ include = [
 
 [dependencies]
 harness-command = { path = "crates/harness-command", version = "51.0.1" }
+harness-kernel = { path = "crates/harness-kernel", version = "51.0.1" }
 harness-mcp = { path = "crates/harness-mcp", version = "51.0.1", optional = true }
 harness-protocol = { path = "crates/harness-protocol", version = "51.0.1" }
 harness-systemd-protocol = { path = "crates/harness-systemd-protocol", version = "51.0.1", optional = true }
@@ -177,7 +179,7 @@ daemon-runtime = [
   "dep:x509-parser",
 ]
 standalone-daemon = []
-standalone-worker = []
+standalone-worker = ["harness-kernel/standalone-worker"]
 full-runtime = ["daemon-runtime", "mcp-runtime"]
 mcp-runtime = ["dep:harness-mcp"]
 compose = ["dep:compose_spec"]

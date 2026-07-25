@@ -26,7 +26,7 @@ use crate::daemon::remote_pairing::{
     RemotePairingCode, RemotePairingCreateParams, RemotePairingSubject, create_remote_pairing,
     pairing_expires_at,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 use super::super::DaemonHttpState;

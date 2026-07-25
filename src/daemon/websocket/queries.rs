@@ -15,7 +15,7 @@ use crate::daemon::protocol::{
 };
 use crate::daemon::remote_diagnostics::{project_audit_events, project_diagnostics_report};
 use crate::daemon::service;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::config::build_config_payload;
 use super::connection::ConnectionState;

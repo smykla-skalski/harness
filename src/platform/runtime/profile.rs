@@ -1,5 +1,5 @@
 #[cfg(test)]
-use crate::kernel::topology::Platform;
+use harness_kernel::kernel::topology::Platform;
 
 /// Resolve a run profile to a runtime platform when no cluster spec exists yet.
 #[must_use]

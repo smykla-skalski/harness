@@ -8,7 +8,7 @@ use super::{
     CliError, Path, SessionState, agents_service, build_log_entry, record_signal_ack,
     resolve_hook_agent, session_not_found, session_service, sync_file_state_from_async_db, utc_now,
 };
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 use crate::session::types::ManagedAgentRef;
 
 /// Start a new session, writing directly to `SQLite` when a DB is available.

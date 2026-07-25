@@ -1,6 +1,6 @@
 use crate::daemon::db::db_error;
 use crate::daemon::protocol::TaskBoardUpdateItemRequest;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::types::MAX_TASK_BOARD_ESTIMATE;
 
 pub(super) fn validate_update_estimates(

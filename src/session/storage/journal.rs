@@ -2,7 +2,7 @@ use std::path::Path;
 
 use fs_err as fs;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::session::types::{Review, SessionLogEntry, SessionTransition, TaskCheckpoint};
 use crate::workspace::layout::SessionLayout;
 use crate::workspace::utc_now;

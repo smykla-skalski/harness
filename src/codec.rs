@@ -2,7 +2,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 /// Maximum iterations when probing for missing fields.
 /// Each real missing field needs at most 2 iterations (discover + type-fix),

@@ -7,7 +7,7 @@ use serde::Deserialize;
 
 use crate::daemon::protocol::http_paths;
 use crate::daemon::protocol::CodexTranscriptResponse;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::DaemonHttpState;
 use super::super::auth::require_auth;

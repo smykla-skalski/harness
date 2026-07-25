@@ -1,6 +1,6 @@
-use crate::errors::{CliError, HookMessage};
+use harness_kernel::errors::{CliError, HookMessage};
 use crate::hooks::application::GuardContext as HookContext;
-use crate::kernel::command_intent::HarnessCommandInvocationRef;
+use harness_kernel::kernel::command_intent::HarnessCommandInvocationRef;
 use crate::run::workflow::{FailureKind, RunnerPhase, RunnerWorkflowState};
 
 use super::effects::{self, HookOutcome};

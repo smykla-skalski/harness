@@ -7,7 +7,7 @@ use serde::Deserialize;
 
 use crate::daemon::agent_acp::AcpAgentInspectResponse;
 use crate::daemon::protocol::http_paths;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::super::DaemonHttpState;
 use super::super::auth::require_auth;

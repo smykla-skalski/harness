@@ -8,7 +8,7 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{ImproverApplyRequest, http_paths};
 use crate::daemon::service;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::session::service::ImproverApplyOutcome;
 
 use super::DaemonHttpState;

@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use rayon::prelude::*;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::ensure_dir;
 use crate::run::context::RunLayout;
 use crate::run::{GroupSpec, SuiteSpec};

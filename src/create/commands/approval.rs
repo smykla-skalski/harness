@@ -2,7 +2,7 @@ use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::create::application::CreateApplication;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 impl Execute for ApprovalBeginArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {

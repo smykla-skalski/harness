@@ -8,7 +8,7 @@ use gix::objs::WriteTo;
 use gix::{ObjectId, objs};
 use tokio::task::spawn_blocking;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::github_api::begin_external_mutation;
 use crate::sandbox;
 use crate::task_board::github::GitHubProjectConfig;

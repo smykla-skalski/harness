@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 
 use crate::daemon::db::AsyncDaemonDb;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::{
     TaskBoardAttemptRetryDecision, TaskBoardAttemptState, TaskBoardExecutionAttemptRecord,
     TaskBoardExecutionDiagnostic, TaskBoardExecutionPhase, TaskBoardExecutionState,

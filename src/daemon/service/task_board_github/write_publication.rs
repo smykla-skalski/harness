@@ -3,7 +3,7 @@ use std::slice;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::state::overlay_task_board_git_runtime_secrets;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::github::{
     GitHubApiAutomationClient, GitHubAutomationClient, GitHubProjectConfig,
 };

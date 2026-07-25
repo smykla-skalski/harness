@@ -1,5 +1,5 @@
 use crate::daemon::db::AsyncDaemonDb;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::external::TaskBoardSyncItemSnapshot;
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::{

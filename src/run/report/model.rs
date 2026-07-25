@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::infra::io;
 
 use super::markdown;

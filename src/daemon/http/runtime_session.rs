@@ -9,7 +9,7 @@ use crate::daemon::protocol::{
     AgentRuntimeSessionRegistrationRequest, AgentRuntimeSessionRegistrationResponse, http_paths,
 };
 use crate::daemon::service;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::auth::require_auth;
 use super::response::{extract_request_id, timed_json};

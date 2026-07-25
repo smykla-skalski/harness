@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 
 use super::*;
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 use crate::task_board::external::{
     ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision, ExternalProviderScopeState,
     TaskBoardSyncItemSnapshot,

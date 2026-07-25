@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use temp_env::with_vars;
 
-use crate::kernel::topology::{ClusterProvider, Platform};
+use harness_kernel::kernel::topology::{ClusterProvider, Platform};
 
 use super::capabilities;
 use super::data::{features, platforms};

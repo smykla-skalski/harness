@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::external::TaskBoardSyncItemSnapshot;
 use crate::task_board::types::{ExternalRefProvider, TaskBoardItem, TaskBoardTombstoneCause};
 

@@ -2,7 +2,7 @@ use std::env;
 use std::sync::Arc;
 
 use super::{AcpAgentManagerHandle, ActiveAcpProcess, ActiveAcpSession};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 const ACP_DISABLE_POOLING_ENV: &str = "HARNESS_ACP_DISABLE_POOLING";
 

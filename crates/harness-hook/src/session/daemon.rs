@@ -5,7 +5,7 @@ use harness_protocol::agent::AckResult;
 use harness_protocol::session::AgentRegistration;
 use serde::{Deserialize, Serialize};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::service::ResolvedRuntimeSessionAgent;
 

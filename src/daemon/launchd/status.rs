@@ -6,7 +6,7 @@ use super::support::{
     launchd_service_target_for,
 };
 use super::{LAUNCH_AGENT_LABEL, LEGACY_LAUNCH_AGENT_LABEL, LaunchAgentStatus};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(super) struct LaunchctlPrintStatus {

@@ -8,7 +8,7 @@ use tokio::sync::mpsc;
 
 use crate::agents::acp::supervision::AcpSessionSupervisor;
 use crate::agents::kind::DisconnectReason;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::super::active::{
     ActiveAcpProcess, ActiveAcpSession, spawn_protocol_disconnect_forwarder,

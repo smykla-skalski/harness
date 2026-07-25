@@ -9,7 +9,11 @@ mod codec;
 pub mod create;
 #[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
 pub mod daemon;
-pub mod errors;
+// Deliberate public API facade, not scaffolding: `harness::errors` and
+// `harness::kernel` stay stable paths for consumers of this crate. Code inside
+// the workspace names `harness_kernel::` directly, so do not add uses of
+// `crate::errors` or `crate::kernel` on the strength of these.
+pub use harness_kernel::errors;
 #[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
 pub mod feature_flags;
 pub(crate) mod git;
@@ -17,7 +21,7 @@ pub(crate) mod git;
 pub(crate) mod github_api;
 pub mod hooks;
 pub mod infra;
-pub mod kernel;
+pub use harness_kernel::kernel;
 pub(crate) mod manifests;
 #[cfg(feature = "mcp-runtime")]
 pub use harness_mcp::mcp;

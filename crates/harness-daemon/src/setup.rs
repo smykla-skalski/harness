@@ -3,7 +3,7 @@ pub mod wrapper {
 
     use harness_protocol::agent::HookAgent;
 
-    use crate::errors::{CliError, CliErrorKind};
+    use harness_kernel::errors::{CliError, CliErrorKind};
     use crate::feature_flags::RuntimeHookFlags;
 
     /// Run the standalone hook setup wrapper with an explicit home directory.
@@ -45,7 +45,7 @@ pub mod wrapper {
         .map_err(|error| map_hook_error(&error))
     }
 
-    fn map_hook_error(error: &harness_hook::errors::CliError) -> CliError {
+    fn map_hook_error(error: &harness_kernel::errors::CliError) -> CliError {
         CliErrorKind::workflow_io(format!("standalone hook setup failed: {error}")).into()
     }
 }

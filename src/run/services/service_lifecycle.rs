@@ -1,13 +1,13 @@
 use std::thread;
 use std::time::Duration;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::kuma::defaults;
 use crate::infra::blocks::kuma::service::{KumaService, KumaServiceSpec};
 use crate::infra::blocks::kuma::token::parse_token_response;
 use crate::infra::blocks::{ContainerConfig, ContainerPort, ContainerRuntime};
 use crate::infra::exec::{self, CommandResult};
-use crate::kernel::topology::UNIVERSAL_PUBLISHED_HOST;
+use harness_kernel::kernel::topology::UNIVERSAL_PUBLISHED_HOST;
 use crate::platform::runtime::ControlPlaneAccess;
 use crate::platform::runtime::XdsAccess;
 

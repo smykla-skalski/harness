@@ -4,7 +4,7 @@ use super::*;
 use crate::daemon::protocol::{
     HarnessMonitorAuditEvent, HarnessMonitorAuditEventsRequest, TaskBoardSyncRequest,
 };
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 use crate::task_board::external::{ExternalSyncBatch, ExternalSyncScopeOutcome};
 use crate::task_board::{ExternalProvider, TaskBoardSyncSummary};
 

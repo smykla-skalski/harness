@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Deserializer, Serialize};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 /// A single helm value entry (key=value).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

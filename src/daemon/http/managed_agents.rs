@@ -8,7 +8,7 @@ use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::protocol::{AcpTranscriptResponse, http_paths};
 use crate::daemon::service::session_acp_transcript_async;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::feature_flags::acp_enabled_from_env;
 
 use super::{DaemonHttpState, require_async_db};

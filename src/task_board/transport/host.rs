@@ -2,7 +2,7 @@ use clap::{Args, Subcommand};
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::protocol::TaskBoardHostSetProjectTypesRequest;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::{daemon_client, print_json};
 

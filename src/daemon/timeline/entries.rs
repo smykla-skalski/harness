@@ -15,7 +15,7 @@
 //! mapper-level test before the producer ships.
 
 use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::session::types::{SessionLogEntry, TaskCheckpoint};
 
 use super::super::protocol::TimelineEntry;

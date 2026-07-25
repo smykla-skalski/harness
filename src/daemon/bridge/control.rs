@@ -7,7 +7,7 @@ use tokio::task::{JoinHandle, spawn_blocking};
 use tokio::time::{Interval, interval, sleep};
 
 use crate::daemon::state;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::bridge_state::{
     LivenessMode, ResolvedRunningBridge, clear_bridge_state, host_bridge_manifest_with_discovery,

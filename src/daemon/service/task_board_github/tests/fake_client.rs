@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::sync::Mutex;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::github::{
     GitHubAutomationClient, GitHubBranchState, GitHubCreatePullRequest, GitHubMergeEvidence,
     GitHubMergeMethod, GitHubProjectConfig, GitHubPullRequestHandle,

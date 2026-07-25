@@ -1,7 +1,7 @@
 use clap::Subcommand;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 mod improver;
 mod managed_agents;

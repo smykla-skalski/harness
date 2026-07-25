@@ -12,7 +12,7 @@ use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
 
 use crate::daemon::state;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::bridge_state::bridge_socket_path;
 use super::core::ResolvedBridgeConfig;

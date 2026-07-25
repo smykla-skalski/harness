@@ -16,7 +16,7 @@ use crate::daemon::remote_request_audit::{
     RemoteAuthorizationAudit, RemoteAuthorizationAuditReceipt,
 };
 use crate::daemon::remote_viewer::is_remote_viewer;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::telemetry::{
     TelemetryBaggage, apply_parent_context_from_text_map, current_trace_id, with_active_baggage,
 };

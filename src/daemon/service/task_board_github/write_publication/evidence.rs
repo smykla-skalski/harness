@@ -2,7 +2,7 @@ use std::path::Path;
 
 use tokio::task::spawn_blocking;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::git::GitRepository;
 use crate::task_board::github::{
     GitHubAutomationClient, GitHubBranchState, GitHubProjectConfig, GitHubPullRequestHandle,

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::ReviewAuthorAssociation;
 use crate::reviews::backports::BackportDetector;
 use crate::task_board::github::GitHubProjectConfig;

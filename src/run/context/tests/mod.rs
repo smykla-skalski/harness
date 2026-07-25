@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, PoisonError};
 
-use crate::kernel::topology::{ClusterSpec, Platform};
+use harness_kernel::kernel::topology::{ClusterSpec, Platform};
 use crate::run::{RunCounts, RunStatus, Verdict};
 
 use super::{

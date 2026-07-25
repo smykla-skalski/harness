@@ -1,4 +1,4 @@
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::infra::exec::{CommandResult, HttpMethod};
 use crate::run::services::service_lifecycle;
 use crate::run::services::{ServiceStatusRecord, StartServiceRequest};

@@ -3,7 +3,7 @@ use std::path::Path;
 
 use uuid::Uuid;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::infra::io::read_json_typed;
 use crate::workspace::utc_now;
 

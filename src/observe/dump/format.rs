@@ -1,4 +1,4 @@
-use crate::kernel::tooling::{ToolInput, legacy_tool_context};
+use harness_kernel::kernel::tooling::{ToolInput, legacy_tool_context};
 
 use super::super::truncate_at;
 

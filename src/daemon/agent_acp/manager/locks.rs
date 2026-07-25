@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use tokio::time::Instant;
 
 use super::{AcpAgentManagerHandle, ActiveAcpProcess, ActiveAcpSession};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 type SessionRegistry = BTreeMap<String, Arc<ActiveAcpSession>>;
 type ProcessRegistry = BTreeMap<String, Arc<ActiveAcpProcess>>;

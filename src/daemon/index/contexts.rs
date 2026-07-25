@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use fs_err as fs;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::session::storage;
 use crate::session::types::SessionState;

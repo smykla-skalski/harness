@@ -34,7 +34,7 @@ use crate::daemon::service::{
 };
 use crate::daemon::state::DaemonManifest;
 use crate::daemon::websocket::{PreparedBroadcast, ReplayBuffer};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::telemetry::{apply_parent_context_from_headers, current_trace_id, with_active_baggage};
 
 mod agents;

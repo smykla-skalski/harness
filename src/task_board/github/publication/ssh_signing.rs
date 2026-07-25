@@ -6,7 +6,7 @@ use gix::objs::WriteTo;
 use gix::{ObjectId, objs};
 use ssh_key::{HashAlg, LineEnding, PrivateKey};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::sandbox;
 use crate::task_board::TaskBoardGitRuntimeProfile;
 

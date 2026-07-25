@@ -10,7 +10,7 @@ use tokio::time::interval as tokio_interval;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::service::observe_async_db;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::reviews::policy::REVIEWS_CHECKS_PASSED_EVENT;
 #[cfg(test)]
 use crate::reviews::policy::ReviewsPolicyActionExecutor;

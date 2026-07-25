@@ -5,7 +5,7 @@ use crate::daemon::protocol::{
     TaskBoardTriageRulesAuditResponse, TaskBoardTriageRulesDraftResponse,
     TaskBoardTriageRulesRevisionsResponse,
 };
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::{TriageRuleSetActivationResult, TriageRuleSetDraftSaveResult, TriageRuleSetPreviewResult};
 
 pub(crate) async fn get_task_board_triage_rules_draft_db(

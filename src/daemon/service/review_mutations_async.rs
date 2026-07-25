@@ -10,7 +10,7 @@ use crate::daemon::protocol::{
     SessionDetail, TaskArbitrateRequest, TaskClaimReviewRequest, TaskRespondReviewRequest,
     TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
 };
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::session::service::{
     self as session_service, apply_arbitrate, apply_claim_review, apply_respond_review,
     apply_submit_for_review, maybe_emit_spawn_reviewer, validate_submit_review,

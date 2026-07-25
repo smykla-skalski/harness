@@ -1,9 +1,9 @@
 use std::path::Path;
 use std::path::PathBuf;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::infra::io::write_json_pretty;
-use crate::kernel::topology::ClusterSpec;
+use harness_kernel::kernel::topology::ClusterSpec;
 use crate::run::context::{CurrentRunPointer, RunContext, RunRepository};
 
 use super::RunApplication;

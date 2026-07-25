@@ -9,7 +9,7 @@ use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteRecoveryBatch, utc_now};
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::service::task_board_remote_controller::drive_task_board_remote_controller;
 use crate::daemon::service::task_board_remote_controller::drive_task_board_remote_controller_before_local_work;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 const MINIMUM_RETRY: Duration = Duration::from_secs(1);
 const MAXIMUM_RETRY: Duration = Duration::from_mins(1);

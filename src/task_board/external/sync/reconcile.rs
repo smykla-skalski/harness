@@ -1,4 +1,4 @@
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::external::{
     ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncField, ExternalTask,
 };

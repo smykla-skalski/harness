@@ -13,7 +13,7 @@ use crate::daemon::protocol::{
     http_paths,
 };
 use crate::daemon::protocol::ManagedAgentSnapshotSchema;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::super::DaemonHttpState;
 use super::super::auth::{authorize_control_request, require_auth};

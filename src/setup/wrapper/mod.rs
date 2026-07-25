@@ -4,7 +4,7 @@ use fs_err;
 
 use tracing::info;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::feature_flags::{RuntimeHookFlags, SUITE_HOOKS_ENV};
 use crate::hooks::adapters::{HookAgent, adapter_for};
 use crate::infra::io::write_text;

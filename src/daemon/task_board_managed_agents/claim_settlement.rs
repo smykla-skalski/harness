@@ -1,7 +1,7 @@
 use crate::daemon::db::{AsyncDaemonDb, ClaimedTaskBoardDispatch};
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::ManagedAgentSnapshot;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{
     TaskBoardWorkerStartError, ensure_spawn_kill_switch_clear, launch_capability,

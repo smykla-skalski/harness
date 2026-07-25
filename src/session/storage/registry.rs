@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::workspace::layout::{SessionLayout, sessions_root as workspace_sessions_root};
 use crate::workspace::project_context_dir;

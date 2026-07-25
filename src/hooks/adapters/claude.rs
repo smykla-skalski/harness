@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use serde::Serialize;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::hooks::HookType;
 use crate::hooks::adapters::{
     AgentAdapter, HookRegistration, RenderedHookResponse, parse_process_payload, payload_context,
@@ -10,7 +10,7 @@ use crate::hooks::adapters::{
 use crate::hooks::protocol::context::{NormalizedEvent, NormalizedHookContext};
 use crate::hooks::protocol::output;
 use crate::hooks::protocol::result::NormalizedHookResult;
-use crate::kernel::tooling::ToolCategory;
+use harness_kernel::kernel::tooling::ToolCategory;
 
 pub struct ClaudeAdapter;
 

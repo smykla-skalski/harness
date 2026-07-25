@@ -6,7 +6,7 @@ use tracing::field::{Empty, display};
 use uuid::Uuid;
 
 use super::{DaemonClient, MUTATION_TIMEOUT, SESSION_START_TIMEOUT, TASK_BOARD_OPERATION_TIMEOUT};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::exec::RUNTIME;
 use crate::telemetry::{current_trace_headers, current_trace_id, record_daemon_client_metrics};
 

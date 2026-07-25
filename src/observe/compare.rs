@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use serde::Serialize;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::hooks::adapters::HookAgent;
 
 use super::scan::scan_range;

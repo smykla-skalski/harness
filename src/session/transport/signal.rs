@@ -1,7 +1,7 @@
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::session::service;
 
 use super::support::{print_json, resolve_project_dir};

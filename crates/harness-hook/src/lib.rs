@@ -1,11 +1,8 @@
 #![deny(unsafe_code)]
 
-#[path = "../../../src/errors/mod.rs"]
-pub mod errors;
+
 #[path = "../../../src/hooks/mod.rs"]
 pub mod hooks;
-#[path = "../../../src/kernel/mod.rs"]
-pub mod kernel;
 
 #[path = "../../../src/create/rules.rs"]
 mod create_rules;

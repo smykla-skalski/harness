@@ -1,6 +1,6 @@
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::infra::io::write_json_pretty;
-use crate::kernel::topology::Platform;
+use harness_kernel::kernel::topology::Platform;
 use crate::run::audit::write_run_status_with_audit;
 use crate::run::state_capture::{
     DockerContainerSnapshot, KubernetesCaptureSnapshot, KubernetesPodSnapshot,

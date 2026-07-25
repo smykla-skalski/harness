@@ -1,7 +1,7 @@
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::GitHubBudgetError;
 use super::budget::GitHubRateLimitSnapshot;

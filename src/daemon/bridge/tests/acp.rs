@@ -18,7 +18,7 @@ use crate::daemon::bridge::server::BridgeServer;
 use crate::daemon::bridge::types::{BRIDGE_CAPABILITY_ACP, PersistedBridgeConfig};
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::state::HostBridgeCapabilityManifest;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 fn stream_event(event: &str, session_id: &str) -> StreamEvent {
     StreamEvent {

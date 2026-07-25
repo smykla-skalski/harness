@@ -5,7 +5,7 @@ use chrono::Utc;
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::{validate_safe_segment, write_json_pretty};
 use crate::run::audit::write_run_status_with_audit;
 use crate::run::context::{CurrentRunPointer, RunLayout, RunMetadata, RunRepository};

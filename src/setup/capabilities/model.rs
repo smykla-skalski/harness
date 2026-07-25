@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::kernel::topology::{ClusterProvider, Platform};
+use harness_kernel::kernel::topology::{ClusterProvider, Platform};
 
 /// Cluster topology mode (single-zone vs multi-zone).
 ///

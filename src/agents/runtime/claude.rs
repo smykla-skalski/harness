@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::workspace::project_context_dir;
 
 use super::event::{ConversationEvent, ConversationEventKind};

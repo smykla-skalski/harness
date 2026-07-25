@@ -3660,6 +3660,7 @@ dependencies = [
  "gix",
  "gray_matter",
  "harness-command",
+ "harness-kernel",
  "harness-mcp",
  "harness-protocol",
  "harness-systemd-protocol",
@@ -3743,6 +3744,7 @@ dependencies = [
  "fs-err",
  "fs2",
  "harness-hook",
+ "harness-kernel",
  "harness-protocol",
  "harness-telemetry",
  "hex",
@@ -3801,6 +3803,7 @@ dependencies = [
  "gray_matter",
  "harness-command",
  "harness-hook",
+ "harness-kernel",
  "harness-protocol",
  "harness-systemd-protocol",
  "harness-telemetry",
@@ -3884,6 +3887,7 @@ dependencies = [
  "gix",
  "gray_matter",
  "harness-daemon-client",
+ "harness-kernel",
  "harness-protocol",
  "harness-telemetry",
  "hex",
@@ -3904,6 +3908,18 @@ dependencies = [
  "uuid",
  "uzers",
  "walkdir",
+]
+
+[[package]]
+name = "harness-kernel"
+version = "51.0.1"
+dependencies = [
+ "insta",
+ "regex",
+ "serde",
+ "serde_json",
+ "shell-words",
+ "thiserror 2.0.19",
 ]
 
 [[package]]

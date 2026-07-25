@@ -3,7 +3,7 @@ use std::future::Future;
 use reqwest::Method;
 use serde_json::Value;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::client::GitHubProtectedClient;
 use super::response::GitHubApiResponse;

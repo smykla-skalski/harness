@@ -18,8 +18,8 @@ use crate::daemon::task_board_remote_transport::controller::{
     RemoteExecutionControllerClient, RemoteExecutionControllerError,
 };
 use crate::daemon::task_board_remote_transport::wire::RemoteStatusRequest;
-use crate::errors::CliError;
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliError;
+use harness_kernel::errors::CliErrorKind;
 use crate::git::bundle_contract::MAX_REMOTE_GIT_BUNDLE_BYTES;
 use crate::git::source_bundle_export::GitSourceBundleExportPlan;
 use crate::task_board::{

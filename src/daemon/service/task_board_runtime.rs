@@ -8,7 +8,7 @@ use crate::daemon::protocol::{
     TaskBoardGitSigningVerifyResponse,
 };
 use crate::daemon::state;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::github::{SigningVerifyOutcome, verify_signing_for_profile};
 use crate::task_board::{
     ExternalProvider, ExternalSyncConfig, TaskBoardGitHubRepositoryToken,

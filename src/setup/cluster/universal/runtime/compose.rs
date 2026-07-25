@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::kuma::defaults;
 use crate::infra::blocks::kuma::token;
 use crate::infra::blocks::{ComposeOrchestrator, ContainerRuntime};
 use crate::infra::exec::wait_for_http;
-use crate::kernel::topology::UNIVERSAL_PUBLISHED_HOST;
+use harness_kernel::kernel::topology::UNIVERSAL_PUBLISHED_HOST;
 use crate::platform::compose::{self, ComposeFile};
 
 use super::{UNIVERSAL_SUBNET, UniversalMemberRuntime, UniversalUpResult};

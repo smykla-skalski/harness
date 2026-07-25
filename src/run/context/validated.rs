@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::RunLayout;
 

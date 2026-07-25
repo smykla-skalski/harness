@@ -8,7 +8,7 @@ use serde_json::json;
 use crate::daemon::audit_events::{AuditEventDraft, record_audit_result};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::service::reviews::token::{github_token, missing_token_error};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::reviews::policy::{ReviewsPolicyActionExecutor, ReviewsPolicyProvider};
 use crate::reviews::{ReviewTarget, ReviewsGitHubClient};
 use crate::task_board::github::GitHubMergeMethod;

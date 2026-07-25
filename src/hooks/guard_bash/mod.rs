@@ -1,7 +1,7 @@
 pub(crate) mod predicates;
 pub(crate) mod runner_guards;
 
-use crate::errors::{CliError, HookMessage};
+use harness_kernel::errors::{CliError, HookMessage};
 use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
 

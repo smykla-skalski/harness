@@ -8,6 +8,7 @@ use crate::daemon::db::task_board::{TaskBoardRemoteOfferOutcome, TaskBoardRemote
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteAssignmentWireState, RemoteOfferRequest,
 };
+use harness_kernel::errors::CliError;
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TASK_BOARD_REMOTE_PROTOCOL_VERSION,
     TaskBoardExecutionHostAdvertisement, TaskBoardFailureClass, TaskBoardPhaseCapabilityProfile,
@@ -376,7 +377,7 @@ pub(super) async fn offer_remote(
     prepared: &PreparedRemoteOffer,
     offered_at: &str,
     lease_expires_at: &str,
-) -> Result<TaskBoardRemoteOfferOutcome, crate::errors::CliError> {
+) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
     prepared
         .db
         .offer_task_board_remote_assignment(

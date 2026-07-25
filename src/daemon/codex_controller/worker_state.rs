@@ -5,7 +5,7 @@ use serde_json::Value;
 
 use crate::daemon::protocol::CodexRunStatus;
 use crate::daemon::state;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 use super::handle::record_snapshot_event;

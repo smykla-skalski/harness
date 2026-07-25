@@ -3,7 +3,7 @@ use std::env;
 #[cfg(not(feature = "standalone-daemon"))]
 use std::path::PathBuf;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 #[cfg(not(feature = "standalone-daemon"))]
 use crate::workspace::canonical_checkout_root;
 

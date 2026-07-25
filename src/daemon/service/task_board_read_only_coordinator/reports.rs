@@ -2,7 +2,7 @@ use chrono::{DateTime, Duration, Utc};
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest, CodexRunSnapshot, CodexRunStatus};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::{
     TASK_BOARD_SIDE_EFFECT_CLAIM_GRACE_SECONDS, TaskBoardAttemptResultArtifact,
     TaskBoardAttemptRetryDecision, TaskBoardAttemptState, TaskBoardExecutionAttemptCas,

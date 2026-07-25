@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use crate::errors::{CliError, CliErrorKind, io_for};
+use harness_kernel::errors::{CliError, CliErrorKind, io_for};
 use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use crate::workspace::{normalized_env_value, utc_now};

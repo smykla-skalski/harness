@@ -4,7 +4,7 @@ use crate::daemon::http::{
     ensure_acp_enabled, ensure_terminal_agent_async, run_acp_agent_blocking,
     run_codex_agent_blocking, run_terminal_agent_blocking,
 };
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::{
     AcpAgentStartRequest, AcpPermissionDecision, CodexApprovalDecisionRequest, CodexRunRequest,

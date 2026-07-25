@@ -13,7 +13,7 @@ use crate::daemon::protocol::{
     TaskBoardOrchestratorStatusResponse,
 };
 use crate::daemon::service;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::{DaemonHttpState, require_async_db};
 use super::run_blocking;

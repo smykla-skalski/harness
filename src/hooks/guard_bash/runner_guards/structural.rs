@@ -7,12 +7,12 @@ use crate::hooks::runner_policy::{
     ControlFileMutationBinary, ControlFileReadBinary, ScriptInterpreter, SuiteMutationBinary,
     TrackedHarnessSubcommand,
 };
-use crate::kernel::command_intent::{
+use harness_kernel::kernel::command_intent::{
     command_heads, is_shell_chain_op, is_shell_flow_word, is_shell_redirect_op,
     normalized_binary_name, path_like_words, semantic_harness_subcommand, semantic_harness_tail,
     significant_words,
 };
-use crate::kernel::run_surface::RunFile;
+use harness_kernel::kernel::run_surface::RunFile;
 
 use super::{DELETE_FLAGS_WITH_VALUE, KUMA_DELETE_RESOURCE_KINDS};
 

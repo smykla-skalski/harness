@@ -10,7 +10,7 @@ use crate::agents::acp::supervision::{AcpSessionSupervisor, watchdog_loop};
 use crate::agents::kind::DisconnectReason;
 use crate::agents::runtime::event::ConversationEvent;
 use crate::daemon::protocol::StreamEvent;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::session::types::{AgentStatus, ManagedAgentKind};
 use crate::workspace::utc_now;
 

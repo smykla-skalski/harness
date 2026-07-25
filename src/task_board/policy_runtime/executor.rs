@@ -5,7 +5,7 @@ use chrono::Utc;
 use tracing::{info, warn};
 
 use crate::daemon::db::AsyncDaemonDb;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::models::{
     PolicyActionDescriptor, PolicyRunRequest, PolicyRunStep, PolicyRunTrigger, PolicyWorkflowRun,

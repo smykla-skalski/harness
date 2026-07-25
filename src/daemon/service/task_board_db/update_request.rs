@@ -1,5 +1,5 @@
 use crate::daemon::protocol::TaskBoardUpdateItemRequest;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::{ExternalRef, PlanningState, TaskBoardItem, TaskBoardWorkflowState};
 
 use super::request_validation::validate_update_estimates;

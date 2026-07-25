@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use super::super::index::{self, DiscoveredProject, ResolvedSession};
 use super::super::protocol::{ProjectSummary, SessionSummary, WorktreeSummary};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::session::types::SessionStatus;
 
 type SessionCounts = (usize, usize);

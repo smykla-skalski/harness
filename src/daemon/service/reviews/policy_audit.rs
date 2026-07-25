@@ -4,7 +4,7 @@ use serde_json::json;
 
 use crate::daemon::audit_events::{AuditEventRecordDraft, record_audit_event};
 use crate::daemon::db::AsyncDaemonDb;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::reviews::{
     ReviewsPolicyRunResponse, ReviewsPolicyRunStartRequest, ReviewsPolicyRunStatus,
 };

@@ -17,6 +17,7 @@ mod request_validation;
 mod task_lifecycle;
 mod test_support;
 
+use harness_kernel::errors::CliError;
 use self::test_support::{
     codex_approval_request, codex_run_snapshot, controller_with_db, controller_with_session_state,
     sample_session_state_with_codex_agent,
@@ -439,7 +440,7 @@ fn durable_run_request() -> CodexRunRequest {
 }
 
 fn assert_cross_session_conflict(
-    error: &crate::errors::CliError,
+    error: &CliError,
     snapshot: &crate::daemon::protocol::CodexRunSnapshot,
 ) {
     assert_eq!(error.code(), "KSRCLI092");

@@ -13,7 +13,7 @@ use crate::daemon::protocol::{
     TaskBoardProjectsResponse, TaskBoardSyncRequest,
     TaskBoardSyncResponse, TaskBoardUpdateItemRequest,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::planning::PlanningTransition;
 use crate::task_board::{
     ExternalSyncConfig, Machine, SpawnGateSwitches, TaskBoardItem, approve_plan, begin_planning,

@@ -368,7 +368,7 @@ fn spawn_cancel(
 ) -> tokio::task::JoinHandle<
     Result<
         crate::daemon::protocol::TaskBoardAutomationForceCancelResponse,
-        crate::errors::CliError,
+        CliError,
     >,
 > {
     tokio::spawn(async move {
@@ -435,3 +435,4 @@ use std::sync::Arc;
 
 use sqlx::query;
 use tokio::sync::Barrier;
+use harness_kernel::errors::CliError;

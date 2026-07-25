@@ -6,7 +6,7 @@ use clap::{Args, Subcommand};
 use tokio::runtime::Runtime;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::feature_flags;
 use crate::workspace::{host_home_dir, normalized_env_value};
 

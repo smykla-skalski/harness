@@ -16,6 +16,7 @@ use super::providers::{
 };
 use super::repository::{BeginRunOutcome, PolicyRuntimeRepository};
 use crate::task_board::policy_graph::PolicyWaitCondition;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[path = "tests_hardening.rs"]
 mod hardening;
@@ -472,13 +473,13 @@ impl PolicyActionProvider for TestActionProvider {
         &self,
         action: &PolicyActionDescriptor,
         _ctx: &PolicyExecutionContext,
-    ) -> Result<PolicyActionExecution, crate::errors::CliError> {
+    ) -> Result<PolicyActionExecution, CliError> {
         if self
             .fail_action
             .as_ref()
             .is_some_and(|fail_action| fail_action == &action.action_key)
         {
-            return Err(crate::errors::CliErrorKind::workflow_parse(
+            return Err(CliErrorKind::workflow_parse(
                 "simulated action failure".to_owned(),
             )
             .into());

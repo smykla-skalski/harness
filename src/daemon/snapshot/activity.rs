@@ -3,7 +3,7 @@ use serde_json::Value;
 use super::super::index::{self, DiscoveredProject};
 use super::super::protocol::{AgentPendingUserPrompt, AgentToolActivitySummary};
 use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::hooks::protocol::payloads::AskUserQuestionPrompt;
 use crate::session::types::SessionState;
 

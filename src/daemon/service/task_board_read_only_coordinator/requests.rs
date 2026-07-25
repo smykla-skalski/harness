@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole};
 use crate::task_board::prompt_catalog::{PromptId, render_prompt};
 use crate::task_board::{

@@ -6,7 +6,7 @@ use tokio::sync::mpsc;
 
 use crate::daemon::codex_transport::CodexTransport;
 use crate::daemon::protocol::{CodexRunMode, CodexRunSnapshot, CodexRunStatus};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::active_runs::CodexControlMessage;
 use super::approvals::{

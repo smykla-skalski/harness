@@ -2,7 +2,7 @@ use rusqlite::OptionalExtension as _;
 
 use super::{DaemonDb, db_error, pairing_is_expired};
 use crate::daemon::remote_pairing::RemotePairingStatus;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 const SELECT_REMOTE_PAIRING_STATUS_SQL: &str = "
 SELECT expires_at, claimed_at

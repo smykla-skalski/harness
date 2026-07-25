@@ -1,7 +1,7 @@
 use std::env;
 use std::path::{Path, PathBuf};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::run::application::RunApplication;
 use crate::run::args::RunDirArgs;
 use crate::run::context::{RunAggregate, RunRepository};

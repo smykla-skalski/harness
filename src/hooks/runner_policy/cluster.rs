@@ -3,7 +3,7 @@ use std::fmt;
 use std::str::FromStr;
 
 use crate::infra::blocks::BlockRequirement;
-use crate::kernel::gate::Gate;
+use harness_kernel::kernel::gate::Gate;
 
 pub const PREFLIGHT_REPLY_HEAD: &str = "suite:run/preflight:";
 

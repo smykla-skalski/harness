@@ -4,7 +4,7 @@ use crate::daemon::protocol::{
     TaskBoardUpdateEstimateClears, TaskBoardUpdateIdentityClears, TaskBoardUpdateItemRequest,
     TaskBoardUpdateStateClears,
 };
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::TaskBoardWorkflowKind;
 use crate::task_board::types::{ExternalRef, TaskBoardItem};
 

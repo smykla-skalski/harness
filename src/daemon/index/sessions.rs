@@ -7,7 +7,7 @@ use serde_json::Value;
 use crate::agents::runtime::{
     AgentRuntime, event::ConversationEvent, parse_canonical_conversation_line, runtime_for_name,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_json_typed;
 use crate::session::service::canonicalize_persisted_session_state;
 use crate::session::storage;

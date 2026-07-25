@@ -3,7 +3,7 @@ use std::path::Path;
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::{drill, read_text};
 
 impl Execute for DiffArgs {

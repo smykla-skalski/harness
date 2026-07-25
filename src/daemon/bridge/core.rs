@@ -12,7 +12,7 @@ use crate::daemon::agent_tui::{
     AgentTuiSnapshotContext, AgentTuiStatus,
 };
 use crate::daemon::protocol::StreamEvent;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 use super::types::{AgentTuiStartSpec, BridgeCapability, PersistedBridgeConfig};

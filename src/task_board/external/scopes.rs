@@ -1,6 +1,6 @@
 use chrono::DateTime;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{ExternalProvider, ExternalSyncClient, ExternalSyncOperation};
 use crate::task_board::TaskBoardExternalCreateIntent;

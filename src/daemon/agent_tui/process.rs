@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 use portable_pty::{Child, ExitStatus, MasterPty, native_pty_system};
 use tokio::sync::broadcast;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 use super::input::AgentTuiInput;

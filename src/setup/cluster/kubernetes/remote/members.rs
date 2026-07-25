@@ -3,11 +3,11 @@ use std::path::Path;
 use std::thread;
 use std::time::Duration;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::KubernetesRuntime;
 use crate::infra::blocks::kuma::repo::helm_chart_path;
 use crate::infra::exec::{run_command, run_command_streaming};
-use crate::kernel::topology::HelmSetting;
+use harness_kernel::kernel::topology::HelmSetting;
 use crate::setup::gateway::gateway;
 use crate::workspace::{RemoteKubernetesInstallMemberState, RemoteKubernetesInstallState};
 

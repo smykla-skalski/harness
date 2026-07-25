@@ -9,8 +9,8 @@ use crate::daemon::task_board_remote_transport::wire::RemoteAssignmentWireState;
 use crate::daemon::task_board_remote_transport::wire::RemoteCancelRequest;
 use crate::daemon::task_board_remote_transport::wire::RemoteLeaseRenewRequest;
 use crate::daemon::task_board_remote_transport::wire::RemoteStatusRequest;
-use crate::errors::CliError;
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliError;
+use harness_kernel::errors::CliErrorKind;
 use crate::task_board::TaskBoardRemoteAssignmentState;
 
 pub(super) async fn poll_active_assignment(

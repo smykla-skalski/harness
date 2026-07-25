@@ -1,5 +1,5 @@
 use super::*;
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 use crate::task_board::policy_graph::apply_duplicate;
 use tempfile::{TempDir, tempdir};
 

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 const SERVICE_SUFFIX: &str = ".service";
 const RECOVERY_UNIT_SUFFIX: &str = "-harness-recovery";

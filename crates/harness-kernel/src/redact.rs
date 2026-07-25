@@ -48,7 +48,7 @@ static COMPILED_PATTERNS: LazyLock<Vec<(Regex, &'static str)>> = LazyLock::new(|
 ///
 /// Applied before audit artifacts and JSONL summaries are persisted.
 #[must_use]
-pub fn scrub(text: &str) -> String {
+pub fn secrets(text: &str) -> String {
     let mut result = text.to_string();
     for (pattern, replacement) in COMPILED_PATTERNS.iter() {
         result = pattern.replace_all(&result, *replacement).into_owned();
@@ -57,5 +57,5 @@ pub fn scrub(text: &str) -> String {
 }
 
 #[cfg(test)]
-#[path = "scrub/tests.rs"]
+#[path = "redact/tests.rs"]
 mod tests;

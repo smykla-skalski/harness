@@ -17,7 +17,7 @@ use super::lane_order::{
 };
 use crate::daemon::db::policy::consume_approval_grant_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 use crate::infra::io;
 use crate::task_board::{
     DispatchAppliedTask, DispatchPlan, SessionIntent, TaskBoardItem,

@@ -19,7 +19,7 @@ use crate::daemon::remote_pairing::{
 };
 use crate::daemon::service::DaemonServeConfig;
 use crate::daemon::state;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::ReviewsQueryRequest;
 use crate::workspace::utc_now;
 

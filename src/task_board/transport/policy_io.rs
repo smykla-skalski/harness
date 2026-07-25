@@ -11,7 +11,7 @@ use crate::daemon::protocol::{
     POLICY_TRANSFER_FORMAT, POLICY_TRANSFER_VERSION, PolicyTransferBundle,
     PolicyTransferDumpRequest, PolicyTransferImportRequest, PolicyTransferWorkspaceMetadata,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::policy_graph::PolicyCanvasRecord;
 
 use super::{daemon_client, print_json};

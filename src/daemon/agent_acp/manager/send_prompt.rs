@@ -5,7 +5,7 @@ use std::thread;
 use super::super::active::ActiveAcpSession;
 use super::{AcpAgentManagerHandle, AcpAgentSnapshot};
 use crate::daemon::sandboxed_from_env;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 impl AcpAgentManagerHandle {
     /// Send a user-initiated follow-up prompt to an existing ACP session.

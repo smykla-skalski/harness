@@ -1,7 +1,7 @@
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::run::args::RunDirArgs;
 
 use super::shared::resolve_run_application;

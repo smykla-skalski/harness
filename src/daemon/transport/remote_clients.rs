@@ -8,7 +8,7 @@ use crate::daemon::remote_identity::{
     RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteBearerToken,
     RemoteStoredClient, remote_token_hint,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 use super::control::{adopt_daemon_root_for_transport_command, print_json};

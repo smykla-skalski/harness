@@ -1,6 +1,6 @@
 //! Image-preview blob fetch endpoint.
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::files::blob::BlobTextProjection;
 use crate::reviews::{
     ReviewImageMime, ReviewsFilesBlobRequest, ReviewsFilesBlobResponse, ReviewsGitHubClient,

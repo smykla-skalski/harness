@@ -3,7 +3,7 @@
 use std::fs;
 
 use crate::daemon::state::daemon_root;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::working_copy::runtime::is_reusable_checkout;
 use crate::task_board::working_copy::{
     WorkingCopyKey, WorkingCopyListEntry, WorkingCopyRegistry, WorkingCopyRegistryEntry,

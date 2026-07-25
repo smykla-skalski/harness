@@ -1,5 +1,5 @@
 use crate::daemon::db::AsyncDaemonDb;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::TaskBoardResolvedReviewer;
 use crate::task_board::{
     AgentMode, DispatchAppliedTask, PlanApprovalGate, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,

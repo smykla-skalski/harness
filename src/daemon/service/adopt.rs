@@ -1,4 +1,4 @@
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::session::{service as session_service, storage as session_storage};
 use crate::session::adopter::AdoptionOutcome;
 

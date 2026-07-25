@@ -4,13 +4,13 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::{
     AgentAdapter, HookRegistration, ProcessHookPayload, RenderedHookResponse, payload_context,
 };
 use crate::hooks::protocol::context::{NormalizedEvent, NormalizedHookContext};
 use crate::hooks::protocol::result::NormalizedHookResult;
-use crate::kernel::tooling::ToolCategory;
+use harness_kernel::kernel::tooling::ToolCategory;
 
 pub struct CopilotAdapter;
 

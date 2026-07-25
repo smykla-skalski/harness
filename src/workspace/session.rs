@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use sha2::{Digest, Sha256};
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::canonical_checkout_root;
 #[cfg(target_os = "macos")]

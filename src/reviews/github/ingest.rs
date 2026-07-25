@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::reviews::backports::BackportDetector;
 
 use super::mapping::{NodeContinuation, RepositoryLabelBundle, convert_node};

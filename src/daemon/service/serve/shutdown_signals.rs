@@ -10,7 +10,7 @@ use signal_hook::iterator::{Handle as SignalHandle, Signals};
 use tokio::sync::watch as tokio_watch;
 
 use crate::daemon::state;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 static IGNORED_SIGPIPE: OnceLock<Result<Arc<AtomicBool>, String>> = OnceLock::new();
 

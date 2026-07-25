@@ -1,8 +1,8 @@
 use std::path::Path;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::exec::run_command;
-use crate::kernel::topology::ClusterSpec;
+use harness_kernel::kernel::topology::ClusterSpec;
 use crate::run::application::RunApplication;
 
 /// Docker filter patterns for finding kuma-cp images. The glob `*kuma-cp`

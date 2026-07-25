@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use serde_json::{Value, json};
 
 use crate::daemon::codex_transport::CodexTransport;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(super) struct CodexJsonRpc {
     transport: Box<dyn CodexTransport>,

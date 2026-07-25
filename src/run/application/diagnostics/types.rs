@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use serde::Serialize;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::infra::io::read_json_typed;
 use crate::run::RunStatus;
 use crate::run::args::RunDirArgs;
@@ -11,7 +11,7 @@ use crate::run::workflow::RunnerWorkflowState;
 use crate::workspace::current_run_context_path;
 
 use super::helpers::explicit_run_dir;
-use crate::kernel::topology::ClusterSpec;
+use harness_kernel::kernel::topology::ClusterSpec;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct RunDiagnosticTarget {

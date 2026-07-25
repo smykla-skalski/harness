@@ -2,7 +2,7 @@ use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 use crate::daemon::db::policy::restore_consumed_approval_grant_in_tx_at;
 use crate::daemon::db::{CliError, db_error, utc_now};
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 use crate::task_board::{TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowStatus};
 
 use super::super::admission_lifecycle::{

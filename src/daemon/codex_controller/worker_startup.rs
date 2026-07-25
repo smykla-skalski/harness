@@ -4,7 +4,7 @@ use std::time::Duration;
 use serde_json::Value;
 use tokio::time::timeout;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::rpc::CodexJsonRpc;
 

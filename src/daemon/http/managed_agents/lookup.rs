@@ -1,4 +1,4 @@
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::DaemonHttpState;
 use super::run_terminal_agent_blocking;

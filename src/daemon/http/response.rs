@@ -7,7 +7,7 @@ use tracing::field::display;
 use uuid::Uuid;
 
 use crate::daemon::remote_identity::bounded_remote_request_id;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::telemetry::record_daemon_http_metrics;
 
 pub(crate) fn error_status_and_body(error: &CliError) -> (StatusCode, serde_json::Value) {

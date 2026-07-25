@@ -10,7 +10,7 @@ use super::rows::{ExternalRefRow, ItemRow};
 use crate::daemon::db::audit::upsert_audit_event_in_tx;
 use crate::daemon::db::{CliError, db_error, utc_now};
 use crate::daemon::protocol::HarnessMonitorAuditEvent;
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 use crate::task_board::{
     TaskBoardItem, TaskBoardLaneOrigin, TaskBoardStatus, sort_task_board_items,
 };

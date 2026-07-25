@@ -3,7 +3,7 @@ use std::mem;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::paths::orchestration_context_root;
 

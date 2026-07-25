@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::agents::storage::project_context_root_from_session_path;
 use crate::app::command_context::resolve_project_dir;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
 use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};

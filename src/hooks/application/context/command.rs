@@ -1,5 +1,5 @@
-use crate::errors::CliError;
-use crate::kernel::command_intent::ParsedCommand;
+use harness_kernel::errors::CliError;
+use harness_kernel::kernel::command_intent::ParsedCommand;
 
 use super::GuardContext;
 

@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use tokio::task::spawn_blocking;
 
 use crate::daemon::db::AsyncDaemonDb;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::git::GitRepository;
 use crate::reviews::ReviewPullRequestState;
 use crate::task_board::TaskBoardResolvedReviewer;

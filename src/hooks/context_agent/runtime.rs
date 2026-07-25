@@ -1,4 +1,4 @@
-use crate::errors::{CliError, HookMessage};
+use harness_kernel::errors::{CliError, HookMessage};
 use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::effects::{HookEffect, HookOutcome};
 use crate::run::workflow::{PreflightStatus, RunnerPhase, RunnerWorkflowState};

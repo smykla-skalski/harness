@@ -3,7 +3,7 @@ use std::env;
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute, resolve_project_dir};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::feature_flags::RuntimeHookFlags;
 use crate::hooks::adapters::HookAgent;
 use crate::setup::wrapper;

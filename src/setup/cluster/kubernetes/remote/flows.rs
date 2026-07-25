@@ -1,8 +1,8 @@
 use std::path::Path;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::KubernetesRuntime;
-use crate::kernel::topology::{ClusterMode, ClusterSpec, HelmSetting};
+use harness_kernel::kernel::topology::{ClusterMode, ClusterSpec, HelmSetting};
 use crate::workspace::RemoteKubernetesInstallState;
 
 use super::InstallMemberPlan;

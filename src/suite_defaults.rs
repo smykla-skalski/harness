@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 #[cfg(test)]
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 use crate::infra::io;
 
 pub const DEFAULTS_FILE: &str = ".harness.json";

@@ -1,6 +1,6 @@
 use chrono::{DateTime, Duration, Utc};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::policy_graph::PolicyWaitCondition;
 
 use super::models::{PolicyRunStatus, PolicyWorkflowRun};

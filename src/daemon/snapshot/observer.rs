@@ -2,7 +2,7 @@ use super::super::index::{self, DiscoveredProject};
 use super::super::protocol::{
     ObserverActiveWorker, ObserverAgentSessionSummary, ObserverOpenIssue, ObserverSummary,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_json_typed;
 use crate::observe::types::ObserverState;
 use crate::session::types::SessionState;

@@ -4,7 +4,7 @@ use crate::daemon::task_board_remote_transport::wire::{
     RemoteStatusRequest, RemoteStatusResponse, RemoteWireError,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(super) fn mutation_record(
     outcome: TaskBoardRemoteMutationOutcome,

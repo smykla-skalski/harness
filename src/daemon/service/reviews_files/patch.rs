@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::files::local_clone::{Sensitive, pat_clone_url};
 use crate::reviews::files::local_clone_diff::compute_unified_patches;
 use crate::reviews::files::local_clone_runtime::diff::LocalCloneFetchRef;

@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::kuma::defaults;
 use crate::infra::blocks::kuma::service::XdsAccess;
-use crate::kernel::topology::{ClusterSpec, UNIVERSAL_PUBLISHED_HOST};
+use harness_kernel::kernel::topology::{ClusterSpec, UNIVERSAL_PUBLISHED_HOST};
 
 use super::access::ControlPlaneAccess;
 

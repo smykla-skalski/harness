@@ -1,6 +1,6 @@
 //! GraphQL metadata fetch for the inline-PR Files section.
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::{ReviewsFilesListRequest, ReviewsFilesListResponse, ReviewsGitHubClient};
 
 use super::token::{github_token, missing_token_error};

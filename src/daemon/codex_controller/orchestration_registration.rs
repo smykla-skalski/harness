@@ -2,7 +2,7 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::DaemonDb;
 use crate::daemon::protocol::CodexRunRequest;
 use crate::daemon::service as daemon_service;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::service as session_service;
 use crate::session::types::{
     AgentRegistration, CONTROL_PLANE_ACTOR_ID, ManagedAgentRef, SessionRole, SessionState,

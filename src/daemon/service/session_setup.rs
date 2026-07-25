@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use tokio::task::spawn_blocking;
 
 use crate::daemon::index::{self, DiscoveredProject};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::sandbox;
 use crate::session::types::SessionState;
 use crate::workspace::ids;

@@ -1,7 +1,7 @@
 use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 use crate::task_board::{
     TriageRuleSetAuditEntry, TriageRuleSetAuditKind, TriageRuleSetDraft,
     TriageRuleSetDraftSaveResult, TriageRuleSetRevisionStatus, TriageRuleSetRevisionSummary,

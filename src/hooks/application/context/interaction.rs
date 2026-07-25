@@ -1,12 +1,12 @@
 use serde_json::Value;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::hooks::protocol::context::{
     AgentContext, NormalizedEvent, NormalizedHookContext, RawPayload, SessionContext, SkillContext,
 };
 use crate::hooks::protocol::payloads::HookEnvelopePayload;
-use crate::kernel::command_intent::{ObservedCommand, ParsedCommand};
-use crate::kernel::tooling::legacy_tool_context;
+use harness_kernel::kernel::command_intent::{ObservedCommand, ParsedCommand};
+use harness_kernel::kernel::tooling::legacy_tool_context;
 
 #[derive(Debug, Clone)]
 enum ParsedCommandState {

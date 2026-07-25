@@ -1,7 +1,7 @@
 use crate::daemon::http::{DaemonHttpState, require_async_db};
 use crate::daemon::protocol::ManagedAgentSnapshot;
 use crate::daemon::service::{validate_read_only_workflow_launch, validate_write_workflow_launch};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::{DispatchAppliedTask, validate_task_board_read_only_run_context};
 
 use super::requests::{codex_worker_identity, codex_worker_request};

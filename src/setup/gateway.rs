@@ -8,7 +8,7 @@ use clap::Args;
 use regex::Regex;
 
 use crate::app::command_context::{AppContext, Execute, resolve_repo_root};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::{StdProcessExecutor, kubernetes_runtime_from_env};
 use crate::infra::exec::run_command;
 use crate::infra::io::ensure_dir;

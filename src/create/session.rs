@@ -2,9 +2,9 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty};
-use crate::kernel::skills::dirs as skill_dirs;
+use harness_kernel::kernel::skills::dirs as skill_dirs;
 use crate::workspace::{session_context_dir, utc_now};
 
 /// Active create session state.

@@ -3,7 +3,7 @@
 
 use crate::agents::runtime::models;
 use crate::agents::runtime::runtime_for_name;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::model::AgentTuiLaunchProfile;
 

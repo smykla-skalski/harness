@@ -9,7 +9,7 @@ use std::path::Path;
 
 use crate::daemon::index as daemon_index;
 use crate::daemon::protocol::ImproverApplyRequest;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::session::roles::SessionAction;
 use crate::session::service::{self as session_service, ImproverApplyOutcome};
 use crate::workspace::utc_now;

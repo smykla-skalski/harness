@@ -5,7 +5,7 @@ use super::{
 };
 use super::{Sqlite, Transaction};
 use crate::daemon::db::StoredTimelineEntry;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 pub(super) async fn next_log_sequence(
     transaction: &mut Transaction<'_, Sqlite>,

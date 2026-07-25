@@ -6,7 +6,7 @@ use axum::response::Response;
 use serde::Deserialize;
 
 use crate::daemon::protocol::{ManagedAgentSnapshot, http_paths};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use crate::daemon::protocol::ManagedAgentSnapshotSchema;
 

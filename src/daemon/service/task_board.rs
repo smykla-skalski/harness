@@ -18,9 +18,9 @@ use crate::daemon::protocol::{
 use crate::daemon::protocol::{
     TaskBoardDispatchPickResponse, TaskBoardDispatchRequest, TaskBoardDispatchResponse,
 };
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 #[cfg(test)]
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 #[cfg(test)]
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 #[cfg(test)]

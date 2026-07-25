@@ -6,7 +6,7 @@ use sha2::{Digest, Sha256};
 
 use super::config::{DaemonRuntimeConfig, load_runtime_config_raw};
 use super::config_path;
-use crate::errors::{CliError, CliErrorKind, io_for};
+use harness_kernel::errors::{CliError, CliErrorKind, io_for};
 use crate::infra::io::write_json_pretty;
 use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use crate::task_board::TaskBoardGitRuntimeConfig;

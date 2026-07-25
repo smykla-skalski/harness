@@ -7,7 +7,7 @@ use sqlx::{query, query_as};
 use tempfile::tempdir;
 
 use crate::daemon::db::AsyncDaemonDb;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{
     ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
     ExternalProviderScopeHealth, ExternalProviderScopeIdentity,

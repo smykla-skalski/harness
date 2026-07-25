@@ -5,7 +5,7 @@ use std::string::ToString;
 
 use serde::de::DeserializeOwned;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::{validate_safe_segment, write_text};
 
 #[cfg(test)]

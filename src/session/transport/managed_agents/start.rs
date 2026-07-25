@@ -6,7 +6,7 @@ use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::agent_acp::{AcpAgentStartRequest, AcpEndpoint};
 use crate::daemon::agent_tui::AgentTuiStartRequest;
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
 use crate::session::types::SessionRole;
 

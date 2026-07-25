@@ -7,7 +7,7 @@ use crate::create::{
     create_validation_repo_root, create_workspace_dir, load_create_session, require_create_session,
     validate_suite_create_paths, write_create_state,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::{ensure_dir, is_safe_name, read_text, write_text};
 use crate::workspace::utc_now;
 

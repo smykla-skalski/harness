@@ -5,7 +5,7 @@ use std::sync::Arc;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::service::observe_async_db;
 use crate::daemon::service::reviews::policy_mapping::map_run_response;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::reviews::{
     ReviewsPolicyHistoryRequest, ReviewsPolicyHistoryResponse, ReviewsPolicyRunMetrics,
     ReviewsPolicyTimelineEntry,

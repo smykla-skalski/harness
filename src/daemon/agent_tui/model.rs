@@ -13,7 +13,7 @@ pub use harness_protocol::managed_agents::tui::{
 use crate::agents::runtime::InitialPromptDelivery;
 #[cfg(feature = "daemon-runtime")]
 use crate::agents::runtime::{models, runtime_for_name};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[cfg(feature = "daemon-runtime")]
 use super::effort::apply_effort_to_profile;

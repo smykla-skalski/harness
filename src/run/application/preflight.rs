@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::infra::io::write_json_pretty;
-use crate::kernel::topology::Platform;
+use harness_kernel::kernel::topology::Platform;
 use crate::platform::kubectl_validate::resolve_kubectl_validate_binary;
 use crate::run::SuiteSpec;
 use crate::run::context::{

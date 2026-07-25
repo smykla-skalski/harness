@@ -2,7 +2,7 @@ use crate::daemon::agent_acp::{
     AcpAgentInspectResponse, AcpAgentReconcileResponse, AcpAgentSnapshot, AcpAgentStartRequest,
     AcpPermissionDecision,
 };
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use harness_protocol::managed_agents::acp::AcpRuntimeProbeResponse;
 
 use super::acp_rpc::{

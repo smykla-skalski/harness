@@ -5,7 +5,7 @@ use crate::daemon::protocol::{
     TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest,
     TaskBoardPlanSubmitRequest,
 };
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::{daemon_client, print_json};
 
