@@ -80,7 +80,7 @@ Validation should match risk:
 - Shared CLI, hook, runtime, or storage behavior: run the focused test and the owning package gate before `mise run check`.
 - `aff` code or aff-owned runtime hooks: include `mise run aff:check`.
 
-A package gate does not approximate `mise run check`, so a clean focused run is evidence about the code you changed and nothing else. Only the Rust step resembles what an author runs directly; stale state, version consistency, script lint, binary contracts, source size, and feature isolation have no package-level equivalent and fail on work that every targeted command accepted. Run the full gate before publishing, and read the gate's own exit status rather than whatever the shell reported last.
+A package gate does not approximate the full one, so a clean focused run is evidence about the code you changed and nothing else. Only the Rust step resembles what an author runs directly; stale state, version consistency, script lint, binary contracts, source size, and feature isolation have no package-level equivalent and fail on work that every targeted command accepted. Read the gate's own exit status too, rather than whatever the shell reported last.
 
 ## OpenAPI schema
 
