@@ -7,6 +7,7 @@ pub mod git_identity_defaults;
 pub mod github;
 pub mod item_fields;
 pub mod item_query;
+pub mod item_query_bounds;
 pub mod lane;
 #[allow(dead_code)]
 #[cfg(feature = "daemon-runtime")]

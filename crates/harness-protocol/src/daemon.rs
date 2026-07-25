@@ -13,6 +13,16 @@ pub mod http_paths {
 #[path = "../../../src/daemon/protocol/api_contract/ws_methods.rs"]
 pub mod ws_methods;
 
+/// Bounds the daemon holds every task-board list read to. Shared as one source
+/// file so a standalone client advertises the same numbers the daemon enforces.
+#[path = "../../../src/task_board/item_query_bounds.rs"]
+pub mod task_board_list_bounds;
+
+pub use task_board_list_bounds::{
+    TASK_BOARD_LIST_DEFAULT_LIMIT, TASK_BOARD_LIST_MAX_LIMIT, TASK_BOARD_LIST_MAX_QUERY_CHARS,
+    TASK_BOARD_LIST_MAX_TAGS,
+};
+
 // Kept in sync by hand with `src/daemon/protocol/api_contract.rs`'s
 // route-table-derived `task_board_mcp_methods()`, which never chains in
 // `routes_task_board_orchestrator` or `routes_task_board_working_copies` --

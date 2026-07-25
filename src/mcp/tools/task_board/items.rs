@@ -1,14 +1,21 @@
 use serde_json::{Value, json};
 
-use crate::daemon::protocol::ws_methods;
-use crate::mcp::tool::ToolRegistry;
-use crate::task_board::{
+// These bounds come through `daemon::protocol` rather than `crate::task_board`
+// because this file also compiles into the standalone `harness-mcp` crate,
+// which has no `task_board` module.
+use crate::daemon::protocol::{
     TASK_BOARD_LIST_MAX_LIMIT, TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS,
+    ws_methods,
 };
+use crate::mcp::tool::ToolRegistry;
 
+use super::list_walk::TaskBoardListTool;
 use super::support::{TaskBoardToolDescriptor, register_descriptors};
 
 pub(super) fn register(registry: &mut ToolRegistry) {
+    // The list endpoint is bounded, so this one tool folds the daemon's pages
+    // instead of proxying a single round trip like every descriptor below.
+    registry.register(Box::new(TaskBoardListTool::new(list_schema)));
     register_descriptors(
         registry,
         &[
@@ -16,13 +23,6 @@ pub(super) fn register(registry: &mut ToolRegistry) {
                 name: ws_methods::TASK_BOARD_CREATE,
                 description: "Create a task-board item through the running daemon.",
                 input_schema: create_schema,
-            },
-            TaskBoardToolDescriptor {
-                name: ws_methods::TASK_BOARD_LIST,
-                description: "List one page of task-board items from the running daemon, \
-                    filtered by field values and by text in the title, body, or tags. \
-                    Pass the response's next_cursor back as cursor to read the next page.",
-                input_schema: list_schema,
             },
             TaskBoardToolDescriptor {
                 name: ws_methods::TASK_BOARD_GET,
@@ -312,10 +312,10 @@ fn plan_approve_schema() -> Value {
 mod tests {
     use serde_json::json;
 
-    use super::{create_schema, list_schema, update_schema};
-    use crate::task_board::{
-    TASK_BOARD_LIST_MAX_LIMIT, TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS,
-};
+    use super::{
+        TASK_BOARD_LIST_MAX_LIMIT, TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS,
+        create_schema, list_schema, update_schema,
+    };
 
     /// A `minLength` of 1 would still advertise a whitespace-only title as
     /// valid, and the daemon trims before refusing one, so the schema has to

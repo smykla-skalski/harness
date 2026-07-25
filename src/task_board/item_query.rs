@@ -3,14 +3,10 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 
 use super::types::{AgentMode, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
 
-/// Page size used when a caller names none.
-pub const TASK_BOARD_LIST_DEFAULT_LIMIT: u32 = 200;
-/// Largest page a caller may ask for.
-pub const TASK_BOARD_LIST_MAX_LIMIT: u32 = 500;
-/// Longest accepted `query` text, in characters.
-pub const TASK_BOARD_LIST_MAX_QUERY_CHARS: usize = 512;
-/// Most facet tags one request may carry.
-pub const TASK_BOARD_LIST_MAX_TAGS: usize = 16;
+pub use super::item_query_bounds::{
+    TASK_BOARD_LIST_DEFAULT_LIMIT, TASK_BOARD_LIST_MAX_LIMIT, TASK_BOARD_LIST_MAX_QUERY_CHARS,
+    TASK_BOARD_LIST_MAX_TAGS,
+};
 
 /// The one view of an item a list query is allowed to read.
 ///
