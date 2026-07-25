@@ -19,7 +19,9 @@ pub use paths::{
     HARNESS_PREFIX, NON_INDEXABLE_MARKER_NAME, dirs_home, ensure_non_indexable, harness_data_root,
     shorten_path, utc_now,
 };
-pub(crate) use paths::{account_home_dir, host_home_dir, normalized_env_value};
+#[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
+pub(crate) use paths::account_home_dir;
+pub(crate) use paths::{host_home_dir, normalized_env_value};
 pub(crate) use remote_kubernetes::{
     RemoteKubernetesInstallMemberState, RemoteKubernetesInstallState, cleanup_remote_install_state,
     load_remote_install_state_for_spec, persist_remote_install_state,
