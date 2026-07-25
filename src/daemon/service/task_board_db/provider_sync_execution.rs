@@ -17,6 +17,24 @@ use super::TaskBoardSyncRunContext;
 use super::provider_sync_context_store::ProviderSyncRunStore;
 use super::sync_audit::{SyncExecutionMetrics, TaskBoardSyncAuditTrigger};
 
+/// How an assembly step gives up. The two kinds must stay apart: `Failed` is
+/// the sync erroring out, while `Blocked` carries a terminal batch the caller
+/// still has to capture into its run metrics before returning it.
+enum SyncAbort {
+    Failed(CliError),
+    Blocked(Box<ExternalSyncBatch>),
+}
+
+impl SyncAbort {
+    fn blocked(batch: ExternalSyncBatch) -> Self {
+        Self::Blocked(Box::new(batch))
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "sequential sync assembly whose every step aborts either hard or as a terminal batch"
+)]
 pub(super) async fn execute(
     db: &AsyncDaemonDb,
     request: &TaskBoardSyncRequest,
@@ -24,26 +42,11 @@ pub(super) async fn execute(
     metrics: &mut SyncExecutionMetrics,
 ) -> Result<TaskBoardSyncResponse, CliError> {
     let options = super::super::task_board::sync_options(request);
-    let follow_ups = db
-        .list_pending_external_create_follow_ups(request.provider)
-        .await?;
-    if options.dry_run && !follow_ups.is_empty() {
-        let error =
-            CliErrorKind::workflow_io("pending provider create follow-up blocks dry-run sync")
-                .into();
-        return finish_blocked(
-            metrics,
-            blocked_external_create_follow_ups(follow_ups, error),
-        );
-    }
-    if !options.dry_run
-        && let Err(error) =
-            super::sync_audit::record_external_create_follow_ups(db, &follow_ups).await
-    {
-        return finish_blocked(
-            metrics,
-            blocked_external_create_follow_ups(follow_ups, error),
-        );
+    if let Err(abort) = guard_pending_follow_ups(db, request, options).await {
+        return match abort {
+            SyncAbort::Failed(error) => Err(error),
+            SyncAbort::Blocked(batch) => finish_blocked(metrics, *batch),
+        };
     }
     let work = load_external_create_recovery_work(db, request.provider).await?;
     let mut prepared = match prepare_external_create_recovery(db, options, work).await {
@@ -121,6 +124,35 @@ pub(super) async fn execute(
         super::super::task_board::build_sync_response_from_items(&items, &config, batch.operations);
     super::super::task_board::log_sync_completion(&summary);
     Ok(summary)
+}
+
+/// Pending provider create follow-ups block a sync before any provider I/O.
+async fn guard_pending_follow_ups(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardSyncRequest,
+    options: ExternalSyncOptions,
+) -> Result<(), SyncAbort> {
+    let follow_ups = db
+        .list_pending_external_create_follow_ups(request.provider)
+        .await
+        .map_err(SyncAbort::Failed)?;
+    if options.dry_run && !follow_ups.is_empty() {
+        let error =
+            CliErrorKind::workflow_io("pending provider create follow-up blocks dry-run sync")
+                .into();
+        return Err(SyncAbort::blocked(blocked_external_create_follow_ups(
+            follow_ups, error,
+        )));
+    }
+    if !options.dry_run
+        && let Err(error) =
+            super::sync_audit::record_external_create_follow_ups(db, &follow_ups).await
+    {
+        return Err(SyncAbort::blocked(blocked_external_create_follow_ups(
+            follow_ups, error,
+        )));
+    }
+    Ok(())
 }
 
 fn requested_github_read(

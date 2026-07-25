@@ -47,6 +47,10 @@ pub(super) async fn finish_terminal_assignment(
     .await
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "sequential settlement-handoff guards sharing one settle-current-assignment tail"
+)]
 pub(super) async fn finish_terminal_assignment_with<
     FetchManifest,
     FetchFuture,
@@ -89,13 +93,7 @@ where
         return observe_cleanup(request).await;
     }
     if handoff_ready {
-        let current = db
-            .task_board_remote_assignment(&assignment.assignment_id)
-            .await?
-            .ok_or_else(missing_assignment)?;
-        let request = requests::settlement_request(&current)?;
-        settle(request).await?;
-        return Ok(true);
+        return settle_current_assignment(db, &assignment.assignment_id, settle).await;
     }
     let parent = db
         .task_board_workflow_execution(&assignment.execution_id)
@@ -111,8 +109,23 @@ where
         }
         TerminalHandoff::Reject => return Ok(false),
     }
+    settle_current_assignment(db, &assignment.assignment_id, settle).await
+}
+
+/// Settles against a freshly read record rather than the caller's copy: the
+/// handoff checks above can advance the assignment, and the settlement request
+/// has to carry that later state.
+async fn settle_current_assignment<Settle, SettleFuture>(
+    db: &AsyncDaemonDb,
+    assignment_id: &str,
+    settle: Settle,
+) -> Result<bool, CliError>
+where
+    Settle: FnOnce(RemoteSettledRequest) -> SettleFuture,
+    SettleFuture: Future<Output = Result<(), CliError>>,
+{
     let current = db
-        .task_board_remote_assignment(&assignment.assignment_id)
+        .task_board_remote_assignment(assignment_id)
         .await?
         .ok_or_else(missing_assignment)?;
     let request = requests::settlement_request(&current)?;

@@ -1,5 +1,5 @@
 use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteOfferOutcome, TaskBoardRemoteOfferWindow};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::{
     TaskBoardExecutionAttemptCas, TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
 };
