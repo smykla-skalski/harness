@@ -1,18 +1,7 @@
 use super::{
     TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig, TaskBoardGitRuntimeProfile,
-    TaskBoardGitSigningConfig, TaskBoardGitSigningMode, normalize_repository_slug,
+    TaskBoardGitSigningConfig, TaskBoardGitSigningMode,
 };
-
-#[test]
-fn normalize_repository_slug_rejects_invalid_values() {
-    assert_eq!(
-        normalize_repository_slug(Some(" owner/repo ")),
-        Some("owner/repo".into())
-    );
-    assert_eq!(normalize_repository_slug(Some("owner/repo/extra")), None);
-    assert_eq!(normalize_repository_slug(Some("owner")), None);
-    assert_eq!(normalize_repository_slug(Some(" ")), None);
-}
 
 #[test]
 fn resolved_profile_merges_repository_override() {

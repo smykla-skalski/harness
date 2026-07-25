@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use super::command::{GitCommandRunner, stdout};
 use crate::git::{GitError, GitRepository, GitResult};
-use crate::task_board::normalize_repository_slug;
+use harness_kernel::kernel::naming::normalize_repository_slug;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum GitSourceRepositoryProof {

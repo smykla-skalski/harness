@@ -1,5 +1,11 @@
 use serde::{Deserialize, Serialize};
 
+// Both live in harness-kernel so `git` can canonicalize a slug without
+// depending on `task_board`, which depends on `git` in turn. Re-exported here
+// because `task_board::normalize_repository_slug` is the path every caller
+// already names.
+pub use harness_kernel::kernel::naming::{normalize_optional_value, normalize_repository_slug};
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[derive(utoipa::ToSchema)]
 pub struct TaskBoardGitRuntimeConfig {
@@ -401,30 +407,6 @@ pub struct TaskBoardOpenRouterTokenSyncRequest {
 #[derive(utoipa::ToSchema)]
 pub struct TaskBoardOpenRouterTokenSyncResponse {
     pub token_configured: bool,
-}
-
-#[must_use]
-pub fn normalize_repository_slug(repository: Option<&str>) -> Option<String> {
-    let repository = normalize_optional_value(repository)?;
-    let mut parts = repository.split('/');
-    let owner = parts.next()?.trim();
-    let repo = parts.next()?.trim();
-    if owner.is_empty() || repo.is_empty() || parts.next().is_some() {
-        return None;
-    }
-    Some(format!(
-        "{}/{}",
-        owner.to_ascii_lowercase(),
-        repo.to_ascii_lowercase()
-    ))
-}
-
-#[must_use]
-pub fn normalize_optional_value(value: Option<&str>) -> Option<String> {
-    value
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToOwned::to_owned)
 }
 
 #[cfg(test)]
