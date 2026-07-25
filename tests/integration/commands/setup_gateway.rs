@@ -1,9 +1,12 @@
-// Coverage for `harness setup gateway`, lifted out of the retired record
-// command tests so removing those did not take this adapter's only test with
-// them.
+// Coverage for `harness setup gateway`. This test lived among the retired
+// record command tests, which were its only home; it moved here so deleting
+// that directory would not silently delete the adapter's only coverage. The
+// name is unchanged from that directory on purpose, so the removal and the
+// re-addition line up as one relocation in the test-name diff.
 
 use std::env;
 use std::fs;
+use std::sync::PoisonError;
 
 use harness::setup::GatewayArgs;
 use harness_testkit::FakeToolchain;
@@ -13,6 +16,7 @@ use super::super::helpers::*;
 #[test]
 #[ignore = "slow: spawns fake toolchain processes"]
 fn bootstrap_command_runs_gateway_api_crd_install() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let tmp = tempfile::tempdir().unwrap();
     let repo_root = tmp.path().join("repo");
     fs::create_dir_all(&repo_root).unwrap();
