@@ -28,11 +28,7 @@ extension HarnessMonitorStore {
     if let settings = taskBoardRuntimeState.stepModeMutation.lastAuthoritativeSettings,
       settings.stepMode == enabled
     {
-      finishTaskBoardStepModeSuccess(
-        settings: settings,
-        enabled: enabled,
-        generation: generation
-      )
+      finishTaskBoardStepModeSuccess(settings: settings, generation: generation)
       return true
     }
 
@@ -45,11 +41,7 @@ extension HarnessMonitorStore {
       guard generation == taskBoardRuntimeState.stepModeMutation.latestGeneration else {
         return true
       }
-      finishTaskBoardStepModeSuccess(
-        settings: settings,
-        enabled: enabled,
-        generation: generation
-      )
+      finishTaskBoardStepModeSuccess(settings: settings, generation: generation)
       return true
     } catch {
       guard generation == taskBoardRuntimeState.stepModeMutation.latestGeneration else {
@@ -96,16 +88,15 @@ extension HarnessMonitorStore {
     taskBoardRuntimeState.stepModeMutation.requestWaiters.removeFirst().resume()
   }
 
+  /// No success toast: the toggle itself, the paused orchestrator status, and
+  /// the manual-steps panel already show which way step mode went. A failed
+  /// toggle still toasts, because nothing else carries the reason.
   private func finishTaskBoardStepModeSuccess(
     settings: TaskBoardOrchestratorSettings,
-    enabled: Bool,
     generation: UInt64
   ) {
     guard generation == taskBoardRuntimeState.stepModeMutation.latestGeneration else { return }
     recordRequestSuccess()
-    presentSuccessFeedback(
-      enabled ? "Enabled task-board step mode" : "Disabled task-board step mode"
-    )
     finishTaskBoardStepModeMutation(settings: settings)
   }
 
