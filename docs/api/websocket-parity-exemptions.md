@@ -13,7 +13,7 @@ A route that merely lacks a WebSocket method because no client has needed one is
 
 ## Current exemptions
 
-Twelve routes are exempt. All were reviewed and judged sound.
+Thirteen routes are exempt. All were reviewed and judged sound.
 
 ### Structural (5)
 

@@ -48,8 +48,8 @@ impl RemotePairingSubject {
     /// from stored metadata or a request body.
     ///
     /// # Errors
-    /// Returns [`RemotePairingError::InvalidSubject`] when a field is blank or
-    /// too long.
+    /// Returns [`RemotePairingError::InvalidSubject`] when a field is blank,
+    /// too long, or carries a control character.
     pub fn validate(&self) -> Result<(), RemotePairingError> {
         for (label, value) in [
             ("provider", self.provider.as_str()),
@@ -64,6 +64,14 @@ impl RemotePairingSubject {
             if value.chars().count() > MAX_SUBJECT_FIELD_CHARS {
                 return Err(RemotePairingError::InvalidSubject(format!(
                     "pairing subject {label} exceeds {MAX_SUBJECT_FIELD_CHARS} characters"
+                )));
+            }
+            // These fields are rendered verbatim into audit detail, which an
+            // operator reads as one line per event. A newline here would let
+            // the caller forge additional lines in that record.
+            if value.chars().any(char::is_control) {
+                return Err(RemotePairingError::InvalidSubject(format!(
+                    "pairing subject {label} must not contain control characters"
                 )));
             }
         }
@@ -109,6 +117,40 @@ mod tests {
                 "error should name {expected}, got {error}"
             );
         }
+    }
+
+    /// A newline in any field would otherwise forge extra lines in the audit
+    /// record the subject is rendered into.
+    #[test]
+    fn rejects_control_characters_that_would_forge_audit_lines() {
+        for (provider, subject_id, display_name, expected) in [
+            ("git\nhub", "4242", "Ada", "provider"),
+            ("github", "42\r42", "Ada", "subject_id"),
+            (
+                "github",
+                "4242",
+                "Ada\nminted for github:9 (Root)",
+                "display_name",
+            ),
+            ("github", "4242", "Ada\u{7f}", "display_name"),
+        ] {
+            let error = RemotePairingSubject::new(provider, subject_id, display_name)
+                .expect_err("a control character must be refused");
+
+            assert!(error.to_string().contains(expected), "{error}");
+            assert!(
+                error.to_string().contains("control characters"),
+                "rejection should name the cause, got {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn audit_detail_stays_on_one_line() {
+        let subject =
+            RemotePairingSubject::new("github", "4242", "Ada Lovelace").expect("valid subject");
+
+        assert!(!subject.audit_detail().contains('\n'));
     }
 
     #[test]

@@ -55,7 +55,12 @@ pub(crate) struct RemotePairMintHttpRequest {
     /// role's own scopes.
     #[serde(default)]
     scopes: Option<Vec<String>>,
+    /// How long the link stays claimable. Omit to take the same ten minutes
+    /// the CLI defaults to.
     #[serde(default)]
+    // utoipa takes literals only, so `schema_bounds_match_the_enforced_ttl`
+    // guards these against drifting from the constants above.
+    #[schema(minimum = 1, maximum = 86400, default = 600)]
     ttl_seconds: Option<u64>,
     /// The external identity this link is for.
     subject: RemotePairingSubject,
@@ -342,4 +347,24 @@ impl IntoResponse for RemotePairMintHttpError {
 )]
 fn log_mint_failure(error: &CliError) {
     tracing::error!(%error, "remote pairing mint failed");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{DEFAULT_MINT_TTL_SECONDS, MAX_MINT_TTL_SECONDS, RemotePairMintHttpRequest};
+    use utoipa::PartialSchema as _;
+
+    /// The published bounds are literals because utoipa accepts nothing else,
+    /// so nothing but this test stops them drifting from what the handler
+    /// enforces and telling callers a TTL the route would reject.
+    #[test]
+    fn schema_bounds_match_the_enforced_ttl() {
+        let schema = serde_json::to_value(RemotePairMintHttpRequest::schema())
+            .expect("serialize request schema");
+        let ttl = &schema["properties"]["ttl_seconds"];
+
+        assert_eq!(ttl["minimum"], 1, "{schema}");
+        assert_eq!(ttl["maximum"], MAX_MINT_TTL_SECONDS, "{schema}");
+        assert_eq!(ttl["default"], DEFAULT_MINT_TTL_SECONDS, "{schema}");
+    }
 }

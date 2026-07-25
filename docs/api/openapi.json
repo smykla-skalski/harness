@@ -22872,7 +22872,10 @@
               "null"
             ],
             "format": "int64",
-            "minimum": 0
+            "description": "How long the link stays claimable. Omit to take the same ten minutes\nthe CLI defaults to.",
+            "default": 600,
+            "maximum": 86400,
+            "minimum": 1
           }
         }
       },
