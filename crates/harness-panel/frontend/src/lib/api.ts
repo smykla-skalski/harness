@@ -26,9 +26,12 @@ type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 export function createPanelApi(base: string, fetchImpl: FetchLike): PanelApi {
   const request = async (path: string, init?: RequestInit): Promise<Response> => {
+    // `credentials` goes last so a caller's init cannot displace it. Every
+    // route behind this helper is session-authenticated, and dropping the
+    // cookie would read as being signed out rather than as a mistake.
     const response = await fetchImpl(panelUrl(base, path), {
-      credentials: 'same-origin',
       ...init,
+      credentials: 'same-origin',
     });
     if (!response.ok) {
       throw await readError(response);

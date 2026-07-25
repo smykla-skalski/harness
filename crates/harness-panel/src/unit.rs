@@ -5,13 +5,19 @@
 //! state directory, and no capability to bind a privileged port, because the
 //! panel is reached through the daemon rather than from the network.
 //!
-//! `systemd-analyze security` scores the result 1.1, the best a service that
-//! serves HTTP and calls GitHub can reach. What it still counts against the
-//! unit is inherent to that job: it has host network access, may allocate
-//! Internet and local sockets, and pins no IP allow list, because GitHub's
-//! address ranges rotate and a stale list would take sign-in down silently.
-//! `char-rtc:r` in the device ACL is what `ProtectClock=` itself adds, and
-//! dropping `ProtectClock=` scores worse. [`tests`] holds that score in place.
+//! `systemd-analyze security` scored the result 1.1 when this was written, the
+//! best a service that serves HTTP and calls GitHub can reach. What it still
+//! counts against the unit is inherent to that job: it has host network access,
+//! may allocate Internet and local sockets, and pins no IP allow list, because
+//! GitHub's address ranges rotate and a stale list would take sign-in down
+//! silently. `char-rtc:r` in the device ACL is what `ProtectClock=` itself
+//! adds, and dropping `ProtectClock=` scores worse.
+//!
+//! [`tests`] keeps the exposure at or below 1.5 rather than pinning it to the
+//! measured figure, so a systemd release that reweights a check does not fail
+//! the build; it is a guard against a directive being dropped, not a record of
+//! the score. It measures nothing where `systemd-analyze` is absent, which is
+//! macOS and any Linux host without systemd.
 
 use std::path::Path;
 

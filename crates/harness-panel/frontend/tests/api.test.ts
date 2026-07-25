@@ -113,6 +113,29 @@ describe('signOut', () => {
   });
 });
 
+// Every route behind the client is session-authenticated, so a request that
+// went out without the cookie would read as being signed out rather than as a
+// mistake.
+describe('credentials', () => {
+  it('are sent on every request the client makes', async () => {
+    const stub = stubFetch([
+      jsonResponse(200, VIEWER),
+      jsonResponse(200, { accounts: [] }),
+      new Response(null, { status: 204 }),
+    ]);
+    const api = createPanelApi('/panel', stub.fetch);
+
+    await api.fetchViewer();
+    await api.fetchAccounts();
+    await api.signOut();
+
+    expect(stub.calls).toHaveLength(3);
+    for (const call of stub.calls) {
+      expect(call.init?.credentials).toBe('same-origin');
+    }
+  });
+});
+
 describe('signInUrl', () => {
   it('points at the start route under the mount point', () => {
     expect(createPanelApi('/pairing', stubFetch([]).fetch).signInUrl()).toBe(
