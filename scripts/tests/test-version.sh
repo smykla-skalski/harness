@@ -76,17 +76,31 @@ seed_sandbox() {
   OPENAPI_DOC="$SANDBOX/docs/api/openapi.json"
 }
 
+# Parsed, not matched: the document has several `version` keys, and reading it
+# by pattern could report a schema property when `info` is the field at stake.
 openapi_version() {
-  perl -0ne 'print $1 if m{"info"\s*:\s*\{.*?"version"\s*:\s*"([^"]+)"}s' "$OPENAPI_DOC"
+  python3 - "$OPENAPI_DOC" <<'PY'
+import json
+import sys
+
+print(json.load(open(sys.argv[1], encoding="utf-8"))["info"]["version"], end="")
+PY
 }
 
-# A silent no-op here would leave the document in sync and the scenario below
-# would pass for the wrong reason, so a missed match fails the run outright.
+# Sets the field outright so the scenario below cannot pass because the edit
+# quietly missed. Formatting is irrelevant here; only the version is read back.
 stale_the_openapi_document() {
-  perl -0pi -e '
-    my $count = s{("info"\s*:\s*\{.*?"version"\s*:\s*")[^"]+(")}{${1}0.0.0${2}}s;
-    die "failed to stale the info version in $ARGV\n" unless $count;
-  ' "$OPENAPI_DOC"
+  python3 - "$OPENAPI_DOC" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, encoding="utf-8") as handle:
+    document = json.load(handle)
+document["info"]["version"] = "0.0.0"
+with open(path, "w", encoding="utf-8") as handle:
+    json.dump(document, handle)
+PY
 }
 
 # Without this, a sandbox that is already out of sync would make every

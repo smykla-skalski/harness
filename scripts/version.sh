@@ -163,12 +163,20 @@ daemon_plist_version() {
 }
 
 # Only the `info` block's version, never a `version` property inside a schema.
-# An empty result would read as a mismatch against every other surface, so an
-# unreadable field says so instead of blaming the version it could not find.
+# Parsed rather than matched: the document carries several `version` keys, and
+# a pattern that walks past `info` would report one of those instead. An
+# unreadable field says so rather than blaming the version it could not find.
 openapi_document_version() {
-  local version
-  version="$(perl -0ne 'print $1 if m{"info"\s*:\s*\{.*?"version"\s*:\s*"([^"]+)"}s' "$OPENAPI_DOCUMENT")"
-  printf '%s' "${version:-<unreadable info.version>}"
+  python3 - "$OPENAPI_DOCUMENT" <<'PY'
+import json
+import sys
+
+try:
+    version = json.load(open(sys.argv[1], encoding="utf-8"))["info"]["version"]
+except (OSError, ValueError, KeyError, TypeError):
+    version = None
+print(version if isinstance(version, str) and version else "<unreadable info.version>", end="")
+PY
 }
 
 # The document is generated, so this exists to keep it in step with a version
@@ -177,10 +185,47 @@ openapi_document_version() {
 # drift is still the generator's business and `openapi:check` still catches it.
 set_openapi_document_version() {
   local version="$1"
-  NEW_VERSION="$version" perl -0pi -e '
-    my $count = s{("info"\s*:\s*\{.*?"version"\s*:\s*")[^"]+(")}{$1.$ENV{NEW_VERSION}.$2}se;
-    die "failed to update the info version in $ARGV\n" unless $count;
-  ' "$OPENAPI_DOCUMENT"
+  NEW_VERSION="$version" python3 - "$OPENAPI_DOCUMENT" <<'PY'
+import json
+import os
+import re
+import sys
+
+path = sys.argv[1]
+with open(path, encoding="utf-8") as handle:
+    raw = handle.read()
+json.loads(raw)["info"]["version"]
+
+# Bound the edit to the `info` object. Several schema properties are also
+# called `version`, and an unbounded search would stamp one of those the
+# moment `info` stopped carrying the field.
+start = raw.index('"info"')
+depth = 0
+end = None
+for index in range(start, len(raw)):
+    if raw[index] == "{":
+        depth += 1
+    elif raw[index] == "}":
+        depth -= 1
+        if depth == 0:
+            end = index
+            break
+if end is None:
+    raise SystemExit(f"failed to bound the info object in {path}")
+
+# Rewritten in place rather than re-dumped, so the generator's formatting
+# survives and `openapi:check` does not read the bump as drift.
+block, count = re.subn(
+    r'("version"\s*:\s*")[^"]*(")',
+    lambda match: match.group(1) + os.environ["NEW_VERSION"] + match.group(2),
+    raw[start:end],
+    count=1,
+)
+if count != 1:
+    raise SystemExit(f"failed to update the info version in {path}")
+with open(path, "w", encoding="utf-8") as handle:
+    handle.write(raw[:start] + block + raw[end:])
+PY
 }
 
 daemon_plist_build_version() {
