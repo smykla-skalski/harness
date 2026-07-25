@@ -11,6 +11,9 @@ COMMON_REPO_ROOT="$(resolve_common_repo_root "$ROOT")"
 lease_dir="$COMMON_REPO_ROOT/target/.cargo-local/leases"
 lease_path=""
 active_build_count=1
+# How many concurrent agent builds a single agent assumes it must leave room
+# for when the lease count cannot tell it yet.
+AGENT_BUILD_SHARE=4
 skip_build_lease="${HARNESS_CARGO_SKIP_LEASE:-0}"
 
 first_nonempty_env() {
@@ -310,29 +313,26 @@ detect_cpu_count() {
 }
 
 default_jobs() {
-  local cpu_count base_jobs staggered_cap
+  local cpu_count base_jobs divisor
   cpu_count="$(detect_cpu_count)"
 
-  # Start from the full logical CPU budget; the caps below narrow it.
-  base_jobs=$cpu_count
+  divisor=$active_build_count
 
   # The lease count is sampled once, before this build starts compiling, so a
-  # build that arrives alone keeps the whole machine even after other agents
-  # join. Agents arrive independently and cannot renegotiate, so cap their
-  # share up front; otherwise staggered arrivals sum well past the CPU count.
-  if [[ -n "$session_id" ]]; then
-    staggered_cap=$(((cpu_count + 3) / 4))
-    if (( staggered_cap < 2 )); then
-      staggered_cap=2
-    fi
-    if (( base_jobs > staggered_cap )); then
-      base_jobs=$staggered_cap
-    fi
+  # build that arrives alone would otherwise keep the whole machine even after
+  # other agents join, and agents cannot renegotiate afterwards. Assume a full
+  # field of them until the observed count is larger. Widening the divisor is
+  # what reserves that room - dividing a second time would starve every late
+  # arrival instead.
+  if [[ -n "$session_id" ]] && (( divisor < AGENT_BUILD_SHARE )); then
+    divisor=$AGENT_BUILD_SHARE
   fi
 
-  if (( active_build_count > 1 )); then
-    base_jobs=$(((base_jobs + active_build_count - 1) / active_build_count))
+  if (( divisor < 1 )); then
+    divisor=1
   fi
+
+  base_jobs=$(((cpu_count + divisor - 1) / divisor))
 
   if (( base_jobs < 1 )); then
     base_jobs=1

@@ -272,6 +272,50 @@ EOF
   fi
 }
 
+scenario_agent_jobs_hold_their_reserved_share() {
+  local fake_bin="$SANDBOX/curve-bin"
+  local cpu_count=24 share=4 reserved n jobs observed="" expected=""
+  reserved=$(((cpu_count + share - 1) / share))
+  mkdir -p "$fake_bin"
+  cat >"$fake_bin/getconf" <<EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == "_NPROCESSORS_ONLN" ]]; then
+  printf '$cpu_count\n'
+  exit 0
+fi
+exit 1
+EOF
+  chmod +x "$fake_bin/getconf"
+
+  # The reserve already assumes a full field of agents, so up to that many
+  # concurrent builds the share must stay flat. Dividing by the lease count on
+  # top of the reserve starved every late arrival instead.
+  for n in $(seq 1 "$share"); do
+    jobs="$(
+      unset CODEX_THREAD_ID CLAUDE_SESSION_ID CLAUDE_CODE_SESSION_ID
+      unset GEMINI_SESSION_ID COPILOT_SESSION_ID OPENCODE_SESSION_ID
+      PATH="$fake_bin:$PATH" \
+        CARGO_BUILD_JOBS='' \
+        HARNESS_CARGO_JOBS='' \
+        CODEX_SESSION_ID="cargo-local-curve-$$" \
+        SCCACHE_BIN="$SANDBOX/missing-sccache" \
+        RUSTC_WRAPPER='' \
+        HARNESS_CARGO_SKIP_LEASE=1 \
+        HARNESS_CARGO_ACTIVE_BUILD_COUNT="$n" \
+        "$ROOT/scripts/cargo-local.sh" --print-env \
+        | awk -F= '$1 == "CARGO_BUILD_JOBS" { print substr($0, index($0, "=") + 1) }'
+    )"
+    observed="$observed $n:$jobs"
+    expected="$expected $n:$reserved"
+  done
+
+  if [[ "$observed" == "$expected" ]]; then
+    pass "agent job share stays flat up to the reserved concurrency"
+  else
+    fail "agent jobs were throttled twice: observed=$observed expected=$expected"
+  fi
+}
+
 scenario_target_dir_is_shared_across_sessions() {
   local first second first_dir second_dir first_tmp second_tmp
 
@@ -462,6 +506,7 @@ scenario_concurrent_tmpdir_creation_is_idempotent
 scenario_unusable_tmpdir_uses_short_external_fallback
 scenario_usable_tmpdir_is_preserved
 scenario_agent_build_jobs_leave_room_for_later_arrivals
+scenario_agent_jobs_hold_their_reserved_share
 scenario_target_dir_is_shared_across_sessions
 scenario_sccache_socket_survives_session_scoped_tmpdir
 scenario_single_thread_nextest_override_is_rejected
