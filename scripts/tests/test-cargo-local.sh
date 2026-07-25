@@ -574,6 +574,50 @@ scenario_sccache_socket_is_shared_across_checkouts() {
   rm -rf "$base"
 }
 
+scenario_symlinked_repo_tmpdir_base_is_rejected() {
+  local fake_bin="$SANDBOX/symbase-bin"
+  local base="$COMMON_REPO_ROOT/target/.cargo-local/tmp"
+  local stash="$COMMON_REPO_ROOT/target/.cargo-local/tmp-stashed-$$"
+  local real_touch output status moved=0
+  real_touch="$(command -v touch)"
+  mkdir -p "$fake_bin" "$COMMON_REPO_ROOT/target/.cargo-local"
+  cat >"$fake_bin/touch" <<'EOF'
+#!/usr/bin/env bash
+for arg in "$@"; do
+  if [[ "$arg" == /tmp/* ]]; then
+    exit 1
+  fi
+done
+exec "$HARNESS_TEST_REAL_TOUCH" "$@"
+EOF
+  chmod +x "$fake_bin/touch"
+
+  if [[ -e "$base" || -L "$base" ]]; then
+    mv "$base" "$stash"
+    moved=1
+  fi
+  # mkdir -p would adopt this happily; only the base check catches it.
+  ln -sfn "$SANDBOX" "$base"
+
+  set +e
+  output="$(PATH="$fake_bin:$PATH" HARNESS_TEST_REAL_TOUCH="$real_touch" \
+    print_tmpdir_env "cargo-local-symbase-$$" 2>&1)"
+  status=$?
+  set -e
+
+  rm -f "$base"
+  if (( moved == 1 )); then
+    mv "$stash" "$base"
+  fi
+
+  if (( status != 0 )) \
+    && assert_contains "failed to prepare private TMPDIR base" "$output"; then
+    pass "a symlinked in-repo TMPDIR base is rejected"
+  else
+    fail "symlinked in-repo TMPDIR base was accepted (status=$status): $output"
+  fi
+}
+
 scenario_unsafe_socket_dir_disables_sccache() {
   local fake_bin="$SANDBOX/unsafe-sock-bin"
   local short_tmp="/tmp/hs-$$"
@@ -687,6 +731,7 @@ scenario_target_dir_is_shared_across_sessions
 scenario_sccache_socket_survives_session_scoped_tmpdir
 scenario_sccache_socket_is_shared_across_checkouts
 scenario_repo_tmpdir_fallback_is_session_scoped
+scenario_symlinked_repo_tmpdir_base_is_rejected
 scenario_unsafe_socket_dir_disables_sccache
 scenario_single_thread_nextest_override_is_rejected
 scenario_noncanonical_nextest_override_is_rejected

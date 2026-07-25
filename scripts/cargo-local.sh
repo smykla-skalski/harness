@@ -257,9 +257,16 @@ configure_tmpdir() {
   # Same ownership and symlink guarantees the /tmp fallback gets. A plain
   # mkdir -p would adopt a pre-existing directory, or follow a symlink out of
   # the repository, and the per-session isolation above would mean nothing.
+  # The base has to be checked too, not just the session directory inside it.
+  # A symlinked or foreign-owned base is accepted by mkdir -p, and the session
+  # directory created underneath it would look perfectly private while sitting
+  # somewhere another user controls.
   repo_fallback="$COMMON_REPO_ROOT/target/.cargo-local/tmp"
-  if ! mkdir -p "$repo_fallback" \
-    || ! prepare_private_tmpdir "$repo_fallback/$tmpdir_id"; then
+  if ! mkdir -p "${repo_fallback%/*}" || ! prepare_private_tmpdir "$repo_fallback"; then
+    printf 'failed to prepare private TMPDIR base at %s\n' "$repo_fallback" >&2
+    return 1
+  fi
+  if ! prepare_private_tmpdir "$repo_fallback/$tmpdir_id"; then
     printf 'failed to prepare writable TMPDIR at %s\n' "$repo_fallback/$tmpdir_id" >&2
     return 1
   fi
