@@ -56,8 +56,15 @@ impl Execute for TaskBoardListArgs {
             } else {
                 print_item_lines(&page.items);
                 if let Some(cursor) = &page.next_cursor {
+                    // The hint has to carry the page size back, or following
+                    // it silently reads the default page instead of the one
+                    // the caller asked for.
+                    let limit = self
+                        .limit
+                        .map(|limit| format!("--limit {limit} "))
+                        .unwrap_or_default();
                     println!(
-                        "-- {} of {} shown; next page: --cursor {cursor}",
+                        "-- {} of {} shown; next page: {limit}--cursor {cursor}",
                         page.items.len(),
                         page.total_matched
                     );

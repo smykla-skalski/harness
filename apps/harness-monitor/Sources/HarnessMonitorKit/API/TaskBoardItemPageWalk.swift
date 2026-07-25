@@ -26,17 +26,10 @@ extension TaskBoardItemPageSource {
   /// `nextCursor` comes back `nil` only when the walk actually drained the
   /// selection. A walk that stopped early still carries the cursor it never
   /// consumed, so a truncated read is distinguishable from a complete one.
-  ///
-  /// A cursor whose anchor left the selection between two reads resumes at the
-  /// slot that anchor held, so a page can re-serve a row an earlier page
-  /// already returned. Ids are tracked and a repeat is dropped: these items
-  /// reach `ForEach(..., id: \.id)`, which breaks on a duplicate identity.
   func mergedTaskBoardItemPages(
     status: TaskBoardStatus?
   ) async throws -> TaskBoardListItemsResponseWire {
     var merged = try await taskBoardItemPage(status: status, cursor: nil)
-    merged.items = deduplicated(merged.items)
-    var seen = Set(merged.items.map(\.id))
     var cursor = merged.nextCursor
     var pages = 1
     while let next = cursor {
@@ -49,22 +42,17 @@ extension TaskBoardItemPageSource {
       if page.items.isEmpty {
         break
       }
-      merged.items.append(contentsOf: page.items.filter { seen.insert($0.id).inserted })
+      merged.items.append(contentsOf: page.items)
       merged.itemRevisions.merge(page.itemRevisions) { _, latest in latest }
       cursor = page.nextCursor
       pages += 1
+      // A cursor naming the resume point it was just given would re-fetch this
+      // same page and append it again, so stop rather than collect duplicates.
+      if page.nextCursor == next {
+        break
+      }
     }
     merged.nextCursor = cursor
     return merged
   }
-}
-
-/// Keep the first item carrying each id, in order.
-///
-/// The first page is trusted no less than the rest: a daemon that repeated a row
-/// inside one page would otherwise put a duplicate identity straight into the
-/// merged result.
-private func deduplicated(_ items: [TaskBoardItemWire]) -> [TaskBoardItemWire] {
-  var seen = Set<String>()
-  return items.filter { seen.insert($0.id).inserted }
 }
