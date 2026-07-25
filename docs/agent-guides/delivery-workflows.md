@@ -156,14 +156,15 @@ Reclaim this session's two build caches first, because `git worktree remove` del
 - `<worktree>/target` - direct `cargo` and `cargo nextest` output.
 - `<main-checkout>/target/dev/wt-<worktree-name>-<hash>` - everything from `scripts/cargo-local.sh`, which every `mise run test:*` task uses. Sits outside the worktree and is usually the larger.
 
-Every other session holds its own `target/dev/wt-*` lane and may be building in it, so derive this session's lane instead of globbing a prefix that can select theirs. Confirm the derived directory exists before deleting: `cargo-local.sh` hashes with `cksum` where `shasum` is missing, and a derivation that names nothing has to be resolved by hand rather than skipped.
+Every other session holds its own `target/dev/wt-*` lane, so derive this session's segment rather than globbing a prefix that can select theirs, and confirm the derived directory exists, because `cargo-local.sh` hashes with `cksum` where `shasum` is missing. A build that owns a segment holds a lease under `target/.cargo-local/leases/`, the same signal `clean-build-caches.sh` trusts, so the delete stands down while one is present.
 
 ```bash
 # assumes: PR merged, <worktree> clean, <worktree> spelled as its physical path, as `pwd -P` prints it
-lane="<main-checkout>/target/dev/wt-$(printf '%s' "$(basename -- "<worktree>")" | tr -cs '[:alnum:]._-' '-')-$(printf '%s' "<worktree>" | shasum -a 256 | cut -c1-16)"
+seg="wt-$(printf '%s' "$(basename -- "<worktree>")" | tr -cs '[:alnum:]._-' '-')-$(printf '%s' "<worktree>" | shasum -a 256 | cut -c1-16)"
+lane="<main-checkout>/target/dev/$seg"
 [ -d "$lane" ] || ls -d "<main-checkout>"/target/dev/wt-*  # no match: set lane= by hand, then rerun
-command -v lsof >/dev/null && [ -d "$lane" ] && [ -z "$(lsof -t +D "$lane")" ] \
-  && rm -rf "<worktree>/target" "$lane"                    # every guard holds, or nothing is deleted
+[ -d "$lane" ] && ! ls "<main-checkout>"/target/.cargo-local/leases/"$seg"-* >/dev/null 2>&1 \
+  && rm -rf "<worktree>/target" "$lane"                    # a live lease means a build owns it; nothing is deleted
 ```
 
 Then remove the worktree and the branch:
