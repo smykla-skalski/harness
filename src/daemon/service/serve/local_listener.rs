@@ -13,7 +13,24 @@ pub(super) fn prepare_local_daemon_environment(config: &DaemonServeConfig) -> Re
     let legacy_migration_report = state::migrate_legacy_daemon_root_for_current_process()?;
     log_legacy_daemon_root_migration(&legacy_migration_report);
     state::ensure_daemon_dirs()?;
+    resolve_daemon_identity()?;
     cleanup_abandoned_sessions()?;
+    Ok(())
+}
+
+/// Resolve the identity at startup rather than on the first client read, so a
+/// host that cannot mint one fails while the operator is still watching.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+pub(super) fn resolve_daemon_identity() -> Result<(), CliError> {
+    let identity = state::ensure_daemon_identity()?;
+    tracing::info!(
+        daemon_id = identity.daemon_id,
+        daemon_name = identity.name,
+        "daemon identity resolved",
+    );
     Ok(())
 }
 

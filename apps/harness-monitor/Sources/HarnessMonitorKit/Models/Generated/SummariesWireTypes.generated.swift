@@ -15,8 +15,10 @@ public struct HealthResponseWire: Codable, Equatable, Sendable {
   public var worktreeCount: UInt
   public var sessionCount: UInt
   public var wireVersion: UInt32
+  public var daemonId: String
+  public var daemonName: String
 
-  public init(status: String, version: String, pid: UInt32, endpoint: String, startedAt: String, logLevel: String, projectCount: UInt, worktreeCount: UInt, sessionCount: UInt, wireVersion: UInt32 = 1) {
+  public init(status: String, version: String, pid: UInt32, endpoint: String, startedAt: String, logLevel: String, projectCount: UInt, worktreeCount: UInt, sessionCount: UInt, wireVersion: UInt32 = 1, daemonId: String = "", daemonName: String = "") {
     self.status = status
     self.version = version
     self.pid = pid
@@ -27,6 +29,8 @@ public struct HealthResponseWire: Codable, Equatable, Sendable {
     self.worktreeCount = worktreeCount
     self.sessionCount = sessionCount
     self.wireVersion = wireVersion
+    self.daemonId = daemonId
+    self.daemonName = daemonName
   }
 
   public init(from decoder: Decoder) throws {
@@ -41,6 +45,8 @@ public struct HealthResponseWire: Codable, Equatable, Sendable {
     worktreeCount = try container.decode(UInt.self, forKey: .worktreeCount)
     sessionCount = try container.decode(UInt.self, forKey: .sessionCount)
     wireVersion = try container.decodeIfPresent(UInt32.self, forKey: .wireVersion) ?? 1
+    daemonId = try container.decodeIfPresent(String.self, forKey: .daemonId) ?? ""
+    daemonName = try container.decodeIfPresent(String.self, forKey: .daemonName) ?? ""
   }
 
   enum CodingKeys: String, CodingKey {
@@ -54,6 +60,8 @@ public struct HealthResponseWire: Codable, Equatable, Sendable {
     case worktreeCount = "worktree_count"
     case sessionCount = "session_count"
     case wireVersion = "wire_version"
+    case daemonId = "daemon_id"
+    case daemonName = "daemon_name"
   }
 }
 

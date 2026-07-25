@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 mod audit;
 mod config;
 mod config_migration;
+mod identity;
 mod locks;
 mod manifest;
 mod migration;
@@ -46,6 +47,10 @@ pub(crate) use config_migration::{
     remove_migrated_task_board_config_after_ack, remove_migrated_task_board_config_if_safe,
     task_board_git_runtime_secret_handoff_digest,
 };
+pub use identity::{
+    DAEMON_HOST_FINGERPRINT_ENV, DAEMON_NAME_ENV, DaemonIdentity, ensure_daemon_identity,
+    reported_daemon_identity, set_daemon_name,
+};
 pub use locks::{acquire_singleton_lock, daemon_lock_is_held, daemon_lock_is_held_at};
 pub use manifest::{clear_manifest_for_pid, load_manifest, load_running_manifest, write_manifest};
 pub use migration::{
@@ -55,7 +60,7 @@ pub use migration::{
 pub use ownership::{DaemonOwnership, ScopedOwnershipOverride};
 pub use paths::{
     ScopedDaemonRootOverride, auth_token_path, base_daemon_dir, config_path, daemon_root,
-    daemon_root_for_ownership, default_daemon_root, ensure_daemon_dirs, events_path,
+    daemon_root_for_ownership, default_daemon_root, ensure_daemon_dirs, events_path, identity_path,
     launch_agent_path, legacy_launch_agent_path, lock_path, log_path, manifest_path,
     set_daemon_root_override,
 };

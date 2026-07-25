@@ -23,6 +23,18 @@ fn parse_daemon_stop_arguments_for_worker() {
 }
 
 #[test]
+fn parse_daemon_identity_arguments_for_worker() {
+    let cli =
+        Cli::try_parse_from(["harness", "daemon", "identity", "--set-name", "lab-01"]).unwrap();
+    match cli.command {
+        Command::Daemon {
+            command: DaemonRoute::Identity(args),
+        } => assert_eq!(rendered(args.args), ["--set-name", "lab-01"]),
+        _ => panic!("expected daemon identity route"),
+    }
+}
+
+#[test]
 fn parse_bridge_control_arguments_for_worker() {
     let cli = Cli::try_parse_from([
         "harness",

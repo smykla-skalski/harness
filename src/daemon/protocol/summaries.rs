@@ -40,6 +40,13 @@ pub struct HealthResponse {
     pub session_count: usize,
     #[serde(default = "default_wire_version")]
     pub wire_version: u32,
+    /// Stable identity of the daemon answering, unchanged by restarts,
+    /// upgrades, and endpoint changes. Empty from daemons predating the field.
+    #[serde(default)]
+    pub daemon_id: String,
+    /// Operator-facing name for the same daemon. Not unique.
+    #[serde(default)]
+    pub daemon_name: String,
 }
 
 fn default_wire_version() -> u32 {

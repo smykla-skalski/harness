@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use crate::daemon::protocol::{ObserveSessionRequest, SessionEndRequest};
+use crate::daemon::state::{ScopedDaemonRootOverride, ensure_daemon_identity};
 use crate::errors::CliErrorKind;
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use axum::Json;
@@ -344,6 +345,20 @@ async fn get_health_requires_auth() {
     let response = get_health(HeaderMap::new(), State(test_http_state_with_db())).await;
 
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn get_health_reports_the_daemon_identity() {
+    let daemon_root = tempfile::tempdir().expect("tempdir");
+    let _root = ScopedDaemonRootOverride::set(Some(daemon_root.path().to_path_buf()));
+    let identity = ensure_daemon_identity().expect("mint identity");
+
+    let response = get_health(auth_headers(), State(test_http_state_with_db())).await;
+
+    let (status, body) = response_json(response).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["daemon_id"], identity.daemon_id);
+    assert_eq!(body["daemon_name"], identity.name);
 }
 
 #[tokio::test]

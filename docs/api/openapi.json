@@ -17677,6 +17677,14 @@
           "session_count"
         ],
         "properties": {
+          "daemon_id": {
+            "type": "string",
+            "description": "Stable identity of the daemon answering, unchanged by restarts,\nupgrades, and endpoint changes. Empty from daemons predating the field."
+          },
+          "daemon_name": {
+            "type": "string",
+            "description": "Operator-facing name for the same daemon. Not unique."
+          },
           "endpoint": {
             "type": "string"
           },
