@@ -19,7 +19,12 @@ use harness_protocol::managed_agents::acp::AcpRuntimeProbeResponse;
 
 /// Daemon HTTP/WS wire-protocol version. Increment on a breaking schema
 /// change so the Mac app can detect version skew on connect.
-pub const DAEMON_WIRE_VERSION: u32 = 3;
+///
+/// v4 dropped `todoist` from the external-provider values. A daemon that
+/// predates the removal still serves it out of an unmigrated database, and the
+/// app's decoder rejects an unknown provider outright, so the skew has to be
+/// caught at connect rather than surfacing as a failed decode.
+pub const DAEMON_WIRE_VERSION: u32 = 4;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[derive(utoipa::ToSchema)]
