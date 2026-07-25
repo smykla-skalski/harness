@@ -31,13 +31,13 @@ pub(crate) fn host_home_dir() -> PathBuf {
 }
 
 #[cfg(unix)]
-fn account_home_dir() -> Option<PathBuf> {
+pub(crate) fn account_home_dir() -> Option<PathBuf> {
     use uzers::os::unix::UserExt as _;
 
     uzers::get_user_by_uid(uzers::get_current_uid()).map(|user| user.home_dir().to_path_buf())
 }
 
 #[cfg(not(unix))]
-fn account_home_dir() -> Option<PathBuf> {
+pub(crate) fn account_home_dir() -> Option<PathBuf> {
     None
 }
