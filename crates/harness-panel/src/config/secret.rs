@@ -44,10 +44,14 @@ impl fmt::Debug for ClientSecret {
 /// Returns [`PanelError::Io`] when the file cannot be read and
 /// [`PanelError::Config`] when it is blank or too widely readable.
 pub fn read_client_secret(path: &Path) -> Result<ClientSecret, PanelError> {
+    // Checked before the read, not after: a secret this widely readable is
+    // already suspect, and there is no reason to pull it into the panel's
+    // memory, where a later panic or core dump could carry it further, only to
+    // refuse it a line afterwards.
+    refuse_shared_permissions(path)?;
+
     let contents = fs::read_to_string(path)
         .map_err(|error| PanelError::io("reading the GitHub client secret from", path, error))?;
-
-    refuse_shared_permissions(path)?;
 
     // Operators create this file with an editor or a heredoc, both of which
     // leave a trailing newline that GitHub would reject as part of the secret.
@@ -133,10 +137,12 @@ mod tests {
     }
 
     /// A world-readable secret is a working secret, so nothing else in the
-    /// panel would ever notice it had leaked.
+    /// panel would ever notice it had leaked. The refusal also comes before the
+    /// read, so a secret this exposed never reaches the panel's memory, where a
+    /// later panic or core dump could carry it further.
     #[cfg(unix)]
     #[test]
-    fn refuses_a_secret_anyone_can_read() {
+    fn refuses_a_secret_anyone_can_read_before_reading_it() {
         let directory = tempfile::tempdir().expect("temp dir");
         let path = directory.path().join("secret");
         fs::write(&path, "s3cret\n").expect("writing the secret");
@@ -146,6 +152,12 @@ mod tests {
 
         assert!(error.to_string().contains("0644"), "{error}");
         assert!(error.to_string().contains("LoadCredential"), "{error}");
+        assert!(
+            !error
+                .to_string()
+                .contains("reading the GitHub client secret"),
+            "the file must not have been read: {error}"
+        );
     }
 
     /// The redacted `Debug` is the only thing keeping the secret out of the

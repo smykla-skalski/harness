@@ -242,6 +242,19 @@ pub fn normalize_base_path(raw: &str) -> Result<String, PanelError> {
             "--base-path must not contain an empty segment, got {trimmed:?}"
         )));
     }
+    // A browser resolves `.` and `..` before it sends the request and before it
+    // matches a cookie's `Path`, so a mount point containing them names one
+    // subtree in the router and a different one in every request. The cookie
+    // would then never be offered back and sign-in would never take, with
+    // nothing to show for it.
+    if normalized
+        .split('/')
+        .any(|segment| matches!(segment, "." | ".."))
+    {
+        return Err(PanelError::config(format!(
+            "--base-path must not contain a '.' or '..' segment, got {trimmed:?}"
+        )));
+    }
     Ok(normalized.to_owned())
 }
 

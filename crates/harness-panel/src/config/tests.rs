@@ -163,6 +163,37 @@ fn refuses_a_mount_point_that_is_not_a_plain_path() {
     }
 }
 
+/// A browser resolves `.` and `..` before it sends the request and before it
+/// matches a cookie `Path`, so such a mount point would name one subtree in the
+/// router and another in every request, and the session cookie would never come
+/// back.
+#[test]
+fn refuses_a_dot_segment_inside_the_mount_point() {
+    for raw in [
+        "/panel/../api",
+        "/panel/./api",
+        "/./panel",
+        "/panel/..",
+        "/..",
+    ] {
+        let error = normalize_base_path(raw).expect_err(&format!("{raw} should be refused"));
+        assert!(
+            error.to_string().contains("'.'") || error.to_string().contains("subtree"),
+            "{raw}: {error}"
+        );
+    }
+}
+
+/// A dot inside a segment is an ordinary character; only a whole segment of
+/// dots redirects the path.
+#[test]
+fn accepts_a_dot_inside_a_segment() {
+    assert_eq!(
+        normalize_base_path("/panel.v2").expect("valid mount"),
+        "/panel.v2"
+    );
+}
+
 #[test]
 fn refuses_an_empty_segment_inside_the_mount_point() {
     let error = normalize_base_path("/harness//panel").expect_err("an empty segment is refused");
