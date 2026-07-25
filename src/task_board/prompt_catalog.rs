@@ -229,6 +229,7 @@ pub(crate) fn install_prompt_catalog(catalog: PromptCatalog) {
 
 /// Install a catalog for the lifetime of the returned guard. Tests use this to
 /// exercise a customized prompt without leaking it into sibling tests.
+#[cfg(test)]
 #[must_use]
 pub(crate) fn scoped_prompt_catalog(catalog: PromptCatalog) -> PromptCatalogGuard {
     let mut slot = active_catalog_slot();
@@ -238,10 +239,12 @@ pub(crate) fn scoped_prompt_catalog(catalog: PromptCatalog) -> PromptCatalogGuar
     PromptCatalogGuard { previous }
 }
 
+#[cfg(test)]
 pub(crate) struct PromptCatalogGuard {
     previous: Option<Arc<PromptCatalog>>,
 }
 
+#[cfg(test)]
 impl Drop for PromptCatalogGuard {
     fn drop(&mut self) {
         *active_catalog_slot() = self.previous.take();

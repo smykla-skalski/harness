@@ -41,12 +41,7 @@ pub(crate) fn resolve_prompt_catalog_from_env() -> PromptCatalog {
     };
     match PromptCatalog::from_json(&bytes) {
         Ok(catalog) => {
-            info!(
-                target: "harness::task_board",
-                %path,
-                customized = ?catalog.customized_prompts(),
-                "loaded prompt configuration",
-            );
+            report_loaded_catalog(&path, &catalog);
             catalog
         }
         Err(error) => {
@@ -58,6 +53,31 @@ pub(crate) fn resolve_prompt_catalog_from_env() -> PromptCatalog {
             PromptCatalog::builtin()
         }
     }
+}
+
+/// A file that parsed but customized nothing is worth saying out loud: it
+/// looks like a working configuration and behaves like no configuration at
+/// all. Anything it did customize is named, because a daemon not running the
+/// shipped prompts is the first thing to know when its agents behave oddly.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macros expand into chains clippy reads as branchy"
+)]
+fn report_loaded_catalog(path: &str, catalog: &PromptCatalog) {
+    if catalog.is_builtin() {
+        warn!(
+            target: "harness::task_board",
+            %path,
+            "prompt configuration customizes no prompt; using builtin prompts",
+        );
+        return;
+    }
+    info!(
+        target: "harness::task_board",
+        %path,
+        customized = ?catalog.customized_prompts(),
+        "loaded prompt configuration",
+    );
 }
 
 #[cfg(test)]
