@@ -258,6 +258,12 @@ impl RemoteSystemdInstallPlan {
         validate_systemd_exec_value("domain", &serve_config.domain)?;
         validate_systemd_exec_value("host", &serve_config.host)?;
         validate_systemd_exec_value("acme email", &serve_config.acme_email)?;
+        // Every value that reaches ExecStart needs this guard, not only the ones
+        // that predate the companion flags.
+        if let Some(companion) = serve_config.companion.as_ref() {
+            validate_systemd_exec_value("companion upstream", &companion.upstream)?;
+            validate_systemd_exec_value("companion path prefix", &companion.path_prefix)?;
+        }
         let needs_bind_capability = serve_config.https_port < 1024 || serve_config.http_port < 1024;
         let unit_contents = render_unit(
             &unit,

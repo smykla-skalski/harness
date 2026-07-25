@@ -423,6 +423,11 @@ fn remote_systemd_plan_refuses_a_companion_the_daemon_would_reject() {
         ("http://127.0.0.1:8787/panel", "/panel"),
         ("http://user:pass@127.0.0.1:8787", "/panel"),
         ("http://user@localhost:8787", "/panel"),
+        // A raw newline would end the ExecStart directive and turn the rest
+        // into a unit directive of its own.
+        ("http://127.0.0.1:\n8787", "/panel"),
+        ("http://127.0.0.1:8787\nExecStartPost=/bin/sh", "/panel"),
+        ("http://127.0.0.1 :8787", "/panel"),
         ("http://127.0.0.1:8787", "/v1"),
         ("http://127.0.0.1:8787", "/v1/remote"),
         ("http://127.0.0.1:8787", "/"),
@@ -455,6 +460,50 @@ fn remote_systemd_plan_refuses_a_companion_the_daemon_would_reject() {
             PathBuf::from("/etc/harness/harness-remote-daemon.env"),
         )
         .expect_err(&format!("{upstream} with {prefix} must be refused"));
+    }
+}
+
+/// No rendered unit may contain a value that ends the ExecStart line early,
+/// whatever earlier validation let through.
+#[test]
+fn remote_systemd_plan_never_renders_a_companion_value_with_a_control_character() {
+    for (label, upstream, prefix) in [
+        (
+            "companion upstream",
+            "http://127.0.0.1:\u{7f}8787",
+            "/panel",
+        ),
+        (
+            "companion path prefix",
+            "http://127.0.0.1:8787",
+            "/pa\u{7f}nel",
+        ),
+    ] {
+        let args = install_args([
+            "test",
+            "--domain",
+            "daemon.example.com",
+            "--acme-email",
+            "ops@example.com",
+            "--companion-upstream",
+            upstream,
+            "--companion-path-prefix",
+            prefix,
+        ]);
+
+        let error = RemoteSystemdInstallPlan::for_tests(
+            &args,
+            PathBuf::from("/usr/local/bin/harness"),
+            PathBuf::from("/etc/systemd/system/harness-remote-daemon.service"),
+            PathBuf::from("/etc/harness/harness-remote-daemon.env"),
+        )
+        .expect_err(&format!("{label} with a control character must be refused"))
+        .to_string();
+
+        assert!(
+            error.contains("control characters") || error.contains(label),
+            "{label} rejection should name the cause, got {error}"
+        );
     }
 }
 

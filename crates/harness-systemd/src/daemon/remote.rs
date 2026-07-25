@@ -191,7 +191,17 @@ fn is_loopback_http_origin(upstream: &str) -> bool {
         return false;
     };
     let authority = authority.strip_suffix('/').unwrap_or(authority);
-    if authority.is_empty() || authority.contains(['/', '?', '#']) {
+    // The daemon parses the upstream as a URI, which refuses control characters
+    // and lets userinfo be spotted; this hand-rolled split would otherwise read
+    // `http://127.0.0.1:\n8787` as loopback and render the newline straight into
+    // ExecStart, where it ends the directive and whatever follows becomes one of
+    // its own.
+    if authority.is_empty()
+        || authority.contains(['/', '?', '#', '@'])
+        || authority
+            .chars()
+            .any(|character| character.is_whitespace() || character.is_control())
+    {
         return false;
     }
     companion_host(authority).is_some_and(is_loopback_host)
