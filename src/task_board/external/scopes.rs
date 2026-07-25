@@ -212,6 +212,10 @@ pub(crate) struct ExternalSyncBatch {
     pub(crate) operations: Vec<ExternalSyncOperation>,
     pub(crate) external_create_follow_ups: Vec<TaskBoardExternalCreateIntent>,
     pub(crate) scope_outcomes: Vec<ExternalSyncScopeOutcome>,
+    /// Provider references the run left alone because more than one board item
+    /// claims them, so a duplicated claim is reported rather than silently
+    /// skipped or allowed to fail its whole scope.
+    pub(crate) ambiguous_references: Vec<String>,
     pub(crate) first_provider_failure: Option<CliError>,
     pub(crate) terminal_error: Option<CliError>,
 }

@@ -80,6 +80,7 @@ pub(crate) async fn sync_external_tasks_scoped_with_recovery(
         operations: batch.operations,
         external_create_follow_ups: batch.external_create_follow_ups,
         scope_outcomes: batch.scope_outcomes,
+        ambiguous_references: batch.ambiguous_references,
         first_provider_failure: batch.first_provider_failure,
         terminal_error: batch.terminal_error,
     })
@@ -87,6 +88,7 @@ pub(crate) async fn sync_external_tasks_scoped_with_recovery(
 
 #[derive(Default)]
 struct BatchAccumulator {
+    ambiguous_references: Vec<String>,
     operations: Vec<ExternalSyncOperation>,
     external_create_follow_ups: Vec<TaskBoardExternalCreateIntent>,
     scope_outcomes: Vec<ExternalSyncScopeOutcome>,
@@ -210,6 +212,9 @@ async fn finish_scope_work(
 ) -> Result<(), CliError> {
     match sync_result {
         Ok(result) => {
+            batch
+                .ambiguous_references
+                .extend(result.ambiguous_references);
             let base_revision = (!recovery_touched && !result.durable_create)
                 .then_some(result.base_revision)
                 .flatten();
@@ -415,17 +420,23 @@ async fn sync_client(
     Ok(SyncClientResult {
         base_revision: pull.base_revision,
         durable_create: pull.recovered_create || pushed_create,
+        ambiguous_references: pull.ambiguous_references,
     })
 }
 
 struct SyncClientResult {
     base_revision: Option<String>,
     durable_create: bool,
+    ambiguous_references: Vec<String>,
 }
 
 struct PullClientResult {
     base_revision: Option<String>,
     recovered_create: bool,
+    /// References this scope left alone because more than one board item
+    /// claims them. Carried up so the run reports them instead of losing them
+    /// with the scope that skipped them.
+    ambiguous_references: Vec<String>,
 }
 
 async fn pull_client_tasks(
@@ -440,6 +451,7 @@ async fn pull_client_tasks(
         return Ok(PullClientResult {
             base_revision: None,
             recovered_create: false,
+            ambiguous_references: Vec::new(),
         });
     }
     super::scope::renew_scope_attempt(board, attempt).await?;
@@ -453,13 +465,22 @@ async fn pull_client_tasks(
         .filter_map(|task| task.updated_at.as_ref())
         .max()
         .cloned();
-    let recovered_create =
-        pull_provider_tasks(board, options, client, tasks, operations, follow_ups)
-            .await
-            .map_err(SyncClientError::Local)?;
+    let mut ambiguous_references = Vec::new();
+    let recovered_create = pull_provider_tasks(
+        board,
+        options,
+        client,
+        tasks,
+        operations,
+        follow_ups,
+        &mut ambiguous_references,
+    )
+    .await
+    .map_err(SyncClientError::Local)?;
     Ok(PullClientResult {
         base_revision,
         recovered_create,
+        ambiguous_references,
     })
 }
 

@@ -364,6 +364,9 @@ fn blocked_batch(
         operations,
         external_create_follow_ups: follow_ups,
         scope_outcomes,
+        // This batch is a recovery abort, so no scope reached the point of
+        // resolving references.
+        ambiguous_references: Vec::new(),
         first_provider_failure: None,
         terminal_error: Some(error),
     }

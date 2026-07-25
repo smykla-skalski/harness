@@ -47,7 +47,10 @@ pub(crate) use create_recovery::{
     prepare_external_create_recovery,
 };
 use import::{external_item_id, imported_external_planning};
-use lookup::{OperationDraft, ProviderItemIndex, operation, provider_ref, resolve_parent_item_id};
+use lookup::{
+    OperationDraft, ProviderItemIndex, SnapshotMatch, operation, provider_ref,
+    resolve_parent_item_id,
+};
 use merge::{matching_ref, pull_create_fields, sync_state_from_task, task_signals_umbrella};
 use provider_exclusion::try_restore_provider_exclusion_tombstone;
 use push::push_board_tasks;
@@ -208,6 +211,7 @@ async fn pull_provider_tasks(
     tasks: Vec<ExternalTask>,
     operations: &mut Vec<ExternalSyncOperation>,
     follow_ups: &mut Vec<TaskBoardExternalCreateIntent>,
+    ambiguous_references: &mut Vec<String>,
 ) -> Result<bool, CliError> {
     let (tasks, recovered_create) = create_recovery::suppress_known_create_markers(
         board,
@@ -227,9 +231,20 @@ async fn pull_provider_tasks(
     let provider_item_index = ProviderItemIndex::build(snapshots);
     for task in tasks.iter().cloned() {
         let resolved_parent_item_id = resolve_parent_item_id(&provider_item_index, &task);
-        if let Some(snapshot) =
-            provider_item_index.active_snapshot(&task.reference, task.project_id.as_deref())?
-        {
+        let matched =
+            provider_item_index.active_snapshot(&task.reference, task.project_id.as_deref());
+        if matches!(matched, SnapshotMatch::Ambiguous) {
+            // Two board items claim this reference, so there is no single item
+            // to update. Leaving the rest of the repository unsynced over one
+            // duplicated claim costs far more than skipping the claim.
+            tracing::warn!(
+                external_id = %task.reference.external_id,
+                "skipping a provider reference more than one board item claims"
+            );
+            ambiguous_references.push(task.reference.external_id.clone());
+            continue;
+        }
+        if let SnapshotMatch::Found(snapshot) = matched {
             let item = &snapshot.item;
             if !existing_pull_matches_status_filter(options.status, item, &task) {
                 continue;
@@ -320,7 +335,10 @@ async fn handle_matching_provider_exclusion(
     resolved_parent_item_id: Option<String>,
     operations: &mut Vec<ExternalSyncOperation>,
 ) -> Result<bool, CliError> {
-    let Some(excluded) = index.excluded_snapshot(&task.reference, task.project_id.as_deref())?
+    // An exclusion this ambiguous cannot be attributed to one item either, so
+    // it is left alone with the rest of the reference.
+    let SnapshotMatch::Found(excluded) =
+        index.excluded_snapshot(&task.reference, task.project_id.as_deref())
     else {
         return Ok(false);
     };

@@ -78,6 +78,7 @@ mod tests {
                 "scope-neutral".into(),
                 &error,
             )],
+            ambiguous_references: Vec::new(),
             first_provider_failure: Some(error),
             terminal_error: None,
         };

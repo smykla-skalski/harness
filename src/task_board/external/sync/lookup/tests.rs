@@ -63,7 +63,7 @@ fn legacy_alias_uses_the_first_project_candidate_only() {
     assert!(
         index
             .active_snapshot(&primary, Some("primary-owner/primary-repo"))
-            .expect("lookup succeeds")
+            .found()
             .is_some(),
         "the first-present sync-state project must resolve the alias"
     );
@@ -73,7 +73,7 @@ fn legacy_alias_uses_the_first_project_candidate_only() {
     assert!(
         index
             .active_snapshot(&fallback, Some("fallback-owner/fallback-repo"))
-            .expect("lookup succeeds")
+            .found()
             .is_none(),
         "item project must not be indexed once a higher-precedence project is present"
     );
@@ -91,13 +91,13 @@ fn qualified_project_resolves_before_an_ambiguous_bare_legacy_id() {
     let bare = ExternalTaskRef::new(ExternalProvider::GitHub, "42");
     let resolved_a = index
         .active_snapshot(&bare, Some("owner-a/repo-a"))
-        .expect("project-qualified lookup succeeds")
+        .found()
         .expect("resolves to item-a");
     assert_eq!(resolved_a.item.id, "item-a");
 
     let resolved_b = index
         .active_snapshot(&bare, Some("owner-b/repo-b"))
-        .expect("project-qualified lookup succeeds")
+        .found()
         .expect("resolves to item-b");
     assert_eq!(resolved_b.item.id, "item-b");
 }
@@ -110,14 +110,14 @@ fn qualified_github_refs_match_repository_names_case_insensitively() {
 
     let resolved = index
         .active_snapshot(&reference, Some("owner/repo"))
-        .expect("qualified lookup succeeds")
+        .found()
         .expect("qualified ref resolves");
 
     assert_eq!(resolved.item.id, "item-1");
 }
 
 #[test]
-fn a_bare_ambiguous_legacy_id_fails_closed_without_mutation() {
+fn a_bare_ambiguous_legacy_id_reports_ambiguous_without_mutation() {
     let item_a = item_with_ref("item-a", Some("owner-a/repo-a"), "42");
     let item_b = item_with_ref("item-b", Some("owner-b/repo-b"), "42");
     let index = ProviderItemIndex::build(vec![
@@ -126,10 +126,13 @@ fn a_bare_ambiguous_legacy_id_fails_closed_without_mutation() {
     ]);
 
     let bare = ExternalTaskRef::new(ExternalProvider::GitHub, "42");
-    let error = index
-        .active_snapshot(&bare, None)
-        .expect_err("an ambiguous bare id must fail closed");
-    assert_eq!(error.code(), "WORKFLOW_IO");
+
+    // Still resolves to nothing, so no item is touched; the caller now decides
+    // what to do about it rather than the whole scope unwinding.
+    assert!(matches!(
+        index.active_snapshot(&bare, None),
+        SnapshotMatch::Ambiguous
+    ));
 }
 
 #[test]
@@ -144,16 +147,14 @@ fn an_active_and_excluded_collision_is_ambiguous_for_both_classes() {
     ]);
     let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "42");
 
-    assert!(
-        index
-            .active_snapshot(&reference, Some("owner/repo"))
-            .is_err()
-    );
-    assert!(
-        index
-            .excluded_snapshot(&reference, Some("owner/repo"))
-            .is_err()
-    );
+    assert!(matches!(
+        index.active_snapshot(&reference, Some("owner/repo")),
+        SnapshotMatch::Ambiguous
+    ));
+    assert!(matches!(
+        index.excluded_snapshot(&reference, Some("owner/repo")),
+        SnapshotMatch::Ambiguous
+    ));
 }
 
 #[test]
@@ -168,16 +169,14 @@ fn a_qualified_tombstone_cannot_mask_a_different_exact_bare_item() {
     ]);
     let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "42");
 
-    assert!(
-        index
-            .active_snapshot(&reference, Some("owner/repo"))
-            .is_err()
-    );
-    assert!(
-        index
-            .excluded_snapshot(&reference, Some("owner/repo"))
-            .is_err()
-    );
+    assert!(matches!(
+        index.active_snapshot(&reference, Some("owner/repo")),
+        SnapshotMatch::Ambiguous
+    ));
+    assert!(matches!(
+        index.excluded_snapshot(&reference, Some("owner/repo")),
+        SnapshotMatch::Ambiguous
+    ));
 }
 
 #[test]
@@ -218,9 +217,63 @@ fn a_bounded_large_batch_resolves_a_qualified_alias_without_scanning() {
 
     let resolved = index
         .active_snapshot(&reference, Some(&project))
-        .expect("lookup succeeds")
+        .found()
         .expect("resolves the last qualified alias");
 
     assert_eq!(index.snapshots.len(), 2_000);
     assert_eq!(resolved.item.id, format!("item-{last_offset}"));
+}
+
+/// The shape a case-varying import left behind: one board item claiming
+/// `kong/owner#1` and another claiming `Kong/owner#1`, which canonicalise to
+/// the same key.
+fn duplicate_case_index() -> ProviderItemIndex {
+    ProviderItemIndex::build(vec![
+        TaskBoardSyncItemSnapshot::new(item_with_ref("legacy", None, "kong/team-mesh#689"), 1),
+        TaskBoardSyncItemSnapshot::new(item_with_ref("current", None, "Kong/team-mesh#689"), 2),
+    ])
+}
+
+#[test]
+fn a_reference_two_items_claim_reports_ambiguous_rather_than_failing() {
+    let index = duplicate_case_index();
+    let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "Kong/team-mesh#689");
+
+    let matched = index.active_snapshot(&reference, Some("kong/team-mesh"));
+
+    assert!(
+        matches!(matched, SnapshotMatch::Ambiguous),
+        "a duplicated claim is reported to the caller, not raised as a sync failure"
+    );
+}
+
+#[test]
+fn an_unambiguous_reference_still_resolves_beside_a_duplicated_one() {
+    let mut snapshots = vec![
+        TaskBoardSyncItemSnapshot::new(item_with_ref("legacy", None, "kong/team-mesh#689"), 1),
+        TaskBoardSyncItemSnapshot::new(item_with_ref("current", None, "Kong/team-mesh#689"), 2),
+    ];
+    snapshots.push(TaskBoardSyncItemSnapshot::new(
+        item_with_ref("healthy", None, "kong/team-mesh#700"),
+        3,
+    ));
+    let index = ProviderItemIndex::build(snapshots);
+    let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "kong/team-mesh#700");
+
+    let matched = index.active_snapshot(&reference, Some("kong/team-mesh"));
+
+    let SnapshotMatch::Found(snapshot) = matched else {
+        panic!("the healthy reference still resolves");
+    };
+    assert_eq!(snapshot.item.id, "healthy");
+}
+
+#[test]
+fn a_reference_no_item_claims_is_missing_not_ambiguous() {
+    let index = duplicate_case_index();
+    let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "kong/team-mesh#999");
+
+    let matched = index.active_snapshot(&reference, Some("kong/team-mesh"));
+
+    assert!(matches!(matched, SnapshotMatch::Missing));
 }

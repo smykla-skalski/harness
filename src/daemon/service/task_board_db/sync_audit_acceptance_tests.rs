@@ -172,6 +172,7 @@ async fn terminal_local_error_keeps_captured_batch_evidence() {
             "scope/primary".into(),
             &scope_error,
         )],
+        ambiguous_references: Vec::new(),
         first_provider_failure: None,
         terminal_error: Some(terminal_error),
     };
@@ -463,6 +464,7 @@ fn batch(
         operations,
         external_create_follow_ups: Vec::new(),
         scope_outcomes,
+        ambiguous_references: Vec::new(),
         first_provider_failure,
         terminal_error: None,
     }

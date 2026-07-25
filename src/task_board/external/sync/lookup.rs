@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::external::TaskBoardSyncItemSnapshot;
 use crate::task_board::types::{ExternalRefProvider, TaskBoardItem, TaskBoardTombstoneCause};
 
@@ -25,6 +24,27 @@ enum KeyClaim {
 enum SnapshotClass {
     Active,
     Excluded,
+}
+
+/// What a reference resolved to. `Ambiguous` is a value rather than an error
+/// because the caller can carry on: a reference two items claim is one the
+/// sync must leave alone, not a reason to abandon the rest of the repository.
+pub(super) enum SnapshotMatch<'a> {
+    Found(&'a TaskBoardSyncItemSnapshot),
+    Missing,
+    Ambiguous,
+}
+
+impl<'a> SnapshotMatch<'a> {
+    /// The snapshot when exactly one item claimed the reference. A reference
+    /// nothing claims and one several items claim both resolve to `None`;
+    /// callers that must tell those apart match the variants instead.
+    fn found(self) -> Option<&'a TaskBoardSyncItemSnapshot> {
+        match self {
+            Self::Found(snapshot) => Some(snapshot),
+            Self::Missing | Self::Ambiguous => None,
+        }
+    }
 }
 
 /// Built once per pull from the batch-loaded snapshot list. Keys map into
@@ -70,7 +90,7 @@ impl ProviderItemIndex {
         &self,
         reference: &ExternalTaskRef,
         project_id: Option<&str>,
-    ) -> Result<Option<&TaskBoardSyncItemSnapshot>, CliError> {
+    ) -> SnapshotMatch<'_> {
         self.lookup(SnapshotClass::Active, reference, project_id)
     }
 
@@ -78,7 +98,7 @@ impl ProviderItemIndex {
         &self,
         reference: &ExternalTaskRef,
         project_id: Option<&str>,
-    ) -> Result<Option<&TaskBoardSyncItemSnapshot>, CliError> {
+    ) -> SnapshotMatch<'_> {
         self.lookup(SnapshotClass::Excluded, reference, project_id)
     }
 
@@ -87,7 +107,7 @@ impl ProviderItemIndex {
         class: SnapshotClass,
         reference: &ExternalTaskRef,
         project_id: Option<&str>,
-    ) -> Result<Option<&TaskBoardSyncItemSnapshot>, CliError> {
+    ) -> SnapshotMatch<'_> {
         let provider = reference.provider.into();
         let canonical_key = canonical_reference_key(provider, &reference.external_id);
         let canonical_claim = self.claims.get(&(provider, canonical_key.clone()));
@@ -98,12 +118,12 @@ impl ProviderItemIndex {
             if alias != canonical_key
                 && let Some(alias_claim) = self.claims.get(&(provider, alias.clone()))
             {
-                return self.resolve_preferred_claim(alias_claim, canonical_claim, class, &alias);
+                return self.resolve_preferred_claim(alias_claim, canonical_claim, class);
             }
         }
         match canonical_claim {
-            Some(claim) => self.resolve_claim(claim, class, &reference.external_id),
-            None => Ok(None),
+            Some(claim) => self.resolve_claim(claim, class),
+            None => SnapshotMatch::Missing,
         }
     }
 
@@ -112,45 +132,38 @@ impl ProviderItemIndex {
         preferred: &KeyClaim,
         fallback: Option<&KeyClaim>,
         class: SnapshotClass,
-        key_label: &str,
-    ) -> Result<Option<&TaskBoardSyncItemSnapshot>, CliError> {
+    ) -> SnapshotMatch<'_> {
         let KeyClaim::Unique {
             snapshot_index: preferred_index,
             ..
         } = preferred
         else {
-            return self.resolve_claim(preferred, class, key_label);
+            return self.resolve_claim(preferred, class);
         };
+        // The exact key and the project-qualified alias each resolved, but to
+        // different items, so neither is safely the one to update.
         if let Some(KeyClaim::Unique {
             snapshot_index: fallback_index,
             ..
         }) = fallback
             && fallback_index != preferred_index
         {
-            return Err(CliErrorKind::workflow_io(format!(
-                "ambiguous provider reference '{key_label}': exact and project-qualified claims disagree"
-            ))
-            .into());
+            return SnapshotMatch::Ambiguous;
         }
-        self.resolve_claim(preferred, class, key_label)
+        self.resolve_claim(preferred, class)
     }
 
-    fn resolve_claim(
-        &self,
-        claim: &KeyClaim,
-        class: SnapshotClass,
-        key_label: &str,
-    ) -> Result<Option<&TaskBoardSyncItemSnapshot>, CliError> {
+    fn resolve_claim(&self, claim: &KeyClaim, class: SnapshotClass) -> SnapshotMatch<'_> {
         match claim {
             KeyClaim::Unique {
                 snapshot_index,
                 class: claim_class,
-            } if *claim_class == class => Ok(self.snapshots.get(*snapshot_index)),
-            KeyClaim::Unique { .. } => Ok(None),
-            KeyClaim::Ambiguous => Err(CliErrorKind::workflow_io(format!(
-                "ambiguous provider reference '{key_label}': more than one item claims it"
-            ))
-            .into()),
+            } if *claim_class == class => self
+                .snapshots
+                .get(*snapshot_index)
+                .map_or(SnapshotMatch::Missing, SnapshotMatch::Found),
+            KeyClaim::Unique { .. } => SnapshotMatch::Missing,
+            KeyClaim::Ambiguous => SnapshotMatch::Ambiguous,
         }
     }
 }
@@ -262,8 +275,7 @@ pub(super) fn resolve_parent_item_id(
         .or(task.project_id.as_deref());
     index
         .active_snapshot(reference, parent_project_id)
-        .ok()
-        .flatten()
+        .found()
         .map(|snapshot| snapshot.item.id.clone())
 }
 
