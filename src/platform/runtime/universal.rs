@@ -2,9 +2,10 @@ use std::borrow::Cow;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::kuma::defaults;
+use crate::infra::blocks::kuma::service::XdsAccess;
 use crate::kernel::topology::{ClusterSpec, UNIVERSAL_PUBLISHED_HOST};
 
-use super::access::{ControlPlaneAccess, XdsAccess};
+use super::access::ControlPlaneAccess;
 
 /// Borrowed universal runtime details for a tracked run.
 #[derive(Debug, Clone, Copy, PartialEq)]

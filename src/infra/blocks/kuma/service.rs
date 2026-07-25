@@ -1,7 +1,17 @@
 use std::borrow::Cow;
 
 use crate::infra::blocks::BlockError;
-use crate::platform::runtime::XdsAccess;
+
+/// Borrowed access details for the universal XDS endpoint.
+///
+/// This lives with the block that consumes it so `infra` does not have to reach
+/// up into `platform`; `platform::runtime` re-exports it for its own callers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct XdsAccess<'a> {
+    pub container_ip: &'a str,
+    pub container_port: u16,
+    pub host_port: u16,
+}
 
 /// Parameters required to render and start a universal service dataplane.
 #[derive(Debug, Clone, PartialEq, Eq)]

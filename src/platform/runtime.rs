@@ -13,7 +13,8 @@ mod profile;
 #[path = "runtime/universal.rs"]
 mod universal;
 
-pub(crate) use access::{ControlPlaneAccess, XdsAccess};
+pub(crate) use access::ControlPlaneAccess;
+pub(crate) use crate::infra::blocks::kuma::service::XdsAccess;
 use kubernetes::KubernetesRuntime;
 #[cfg(test)]
 pub(crate) use profile::profile_platform;
