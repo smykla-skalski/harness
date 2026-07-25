@@ -183,7 +183,7 @@ fn validate_companion(
 }
 
 fn is_loopback_http_origin(upstream: &str) -> bool {
-    let Some(authority) = upstream.strip_prefix("http://") else {
+    let Some(authority) = strip_http_scheme(upstream) else {
         return false;
     };
     let authority = authority.strip_suffix('/').unwrap_or(authority);
@@ -191,6 +191,14 @@ fn is_loopback_http_origin(upstream: &str) -> bool {
         return false;
     }
     companion_host(authority).is_some_and(is_loopback_host)
+}
+
+/// The daemon parses the URL and compares the scheme case-insensitively, so
+/// `HTTP://` has to be accepted here too. Matching only the lowercase literal
+/// would make `install` refuse an upstream the daemon would have taken.
+fn strip_http_scheme(upstream: &str) -> Option<&str> {
+    let (scheme, authority) = upstream.split_once("://")?;
+    scheme.eq_ignore_ascii_case("http").then_some(authority)
 }
 
 /// Split `host:port`, keeping a bracketed IPv6 literal in one piece.

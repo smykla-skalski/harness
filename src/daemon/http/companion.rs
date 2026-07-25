@@ -146,23 +146,26 @@ impl CompanionRouteConfig {
         &self.path_prefix
     }
 
-    /// Route pattern matching the prefix itself, for example `/panel`.
+    /// Every route pattern the companion owns.
+    ///
+    /// Three are needed, not two: axum's `{*rest}` capture requires a non-empty
+    /// remainder, so `/panel/{*companion_path}` does not match `/panel/` - the
+    /// very URL a browser lands on. Without the bare trailing-slash pattern the
+    /// companion's own root would fall through to the daemon's 404.
     #[must_use]
-    pub(crate) fn exact_route(&self) -> String {
-        self.path_prefix.clone()
-    }
-
-    /// Route pattern matching everything under the prefix.
-    #[must_use]
-    pub(crate) fn wildcard_route(&self) -> String {
-        format!("{}/{{*companion_path}}", self.path_prefix)
+    pub(crate) fn routes(&self) -> [String; 3] {
+        [
+            self.path_prefix.clone(),
+            format!("{}/", self.path_prefix),
+            format!("{}/{{*companion_path}}", self.path_prefix),
+        ]
     }
 
     /// Whether a matched route path belongs to the companion rather than the
     /// daemon's own API.
     #[must_use]
     pub(crate) fn owns_route(&self, route_path: &str) -> bool {
-        route_path == self.path_prefix || route_path == self.wildcard_route()
+        self.routes().iter().any(|route| route == route_path)
     }
 }
 
@@ -298,9 +301,14 @@ impl CompanionRouter {
 /// companion authenticates its own users, and its paths carry no entry in
 /// `HTTP_API_CONTRACT` for the daemon's scope table to authorize against.
 pub(super) fn companion_routes(router: &CompanionRouter) -> Router<DaemonHttpState> {
-    Router::new()
-        .route(&router.inner.config.exact_route(), any(proxy_request))
-        .route(&router.inner.config.wildcard_route(), any(proxy_request))
+    router
+        .inner
+        .config
+        .routes()
+        .into_iter()
+        .fold(Router::new(), |router, route| {
+            router.route(&route, any(proxy_request))
+        })
 }
 
 async fn proxy_request(

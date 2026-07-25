@@ -364,6 +364,37 @@ fn remote_systemd_plan_renders_companion_routing_flags() {
 }
 
 #[test]
+fn remote_systemd_plan_accepts_the_upstream_schemes_the_daemon_accepts() {
+    for upstream in [
+        "http://127.0.0.1:8787",
+        "HTTP://127.0.0.1:8787",
+        "http://localhost:8787",
+        "http://[::1]:8787",
+        "http://127.0.0.1:8787/",
+    ] {
+        let args = install_args([
+            "test",
+            "--domain",
+            "daemon.example.com",
+            "--acme-email",
+            "ops@example.com",
+            "--companion-upstream",
+            upstream,
+        ]);
+
+        RemoteSystemdInstallPlan::for_tests(
+            &args,
+            PathBuf::from("/usr/local/bin/harness"),
+            PathBuf::from("/etc/systemd/system/harness-remote-daemon.service"),
+            PathBuf::from("/etc/harness/harness-remote-daemon.env"),
+        )
+        .unwrap_or_else(|error| {
+            panic!("{upstream} must be accepted like the daemon does: {error}")
+        });
+    }
+}
+
+#[test]
 fn remote_systemd_plan_omits_companion_flags_when_none_is_configured() {
     let args = install_args([
         "test",

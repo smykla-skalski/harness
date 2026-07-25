@@ -130,6 +130,28 @@ async fn forwarded_headers_describe_the_public_hop_and_replace_caller_values() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn daemon_credentials_do_not_cross_the_proxy() {
+    let (upstream, upstream_server) = spawn_companion_upstream().await;
+    let (base_url, server) = serve_remote(state_with_companion(&upstream)).await;
+
+    let response = reqwest::Client::new()
+        .get(format!("{base_url}/panel/api/me"))
+        .header("authorization", "Bearer daemon-token")
+        .header("x-harness-remote-client-id", "viewer")
+        .header("forwarded", "for=10.0.0.1;proto=http")
+        .send()
+        .await
+        .expect("companion request");
+
+    let body: Value = response.json().await.expect("companion echo body");
+    assert!(header(&body, "authorization").is_none());
+    assert!(header(&body, "x-harness-remote-client-id").is_none());
+    assert!(header(&body, "forwarded").is_none());
+    server.abort();
+    upstream_server.abort();
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn hop_by_hop_headers_do_not_cross_the_proxy() {
     let (upstream, upstream_server) = spawn_companion_upstream().await;
     let (base_url, server) = serve_remote(state_with_companion(&upstream)).await;

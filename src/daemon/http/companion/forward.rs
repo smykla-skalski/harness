@@ -12,8 +12,8 @@ use std::net::SocketAddr;
 use axum::Json;
 use axum::body::Body;
 use axum::http::header::{
-    CONNECTION, HOST, PROXY_AUTHENTICATE, PROXY_AUTHORIZATION, TE, TRAILER, TRANSFER_ENCODING,
-    UPGRADE,
+    AUTHORIZATION, CONNECTION, HOST, PROXY_AUTHENTICATE, PROXY_AUTHORIZATION, TE, TRAILER,
+    TRANSFER_ENCODING, UPGRADE,
 };
 use axum::http::{
     HeaderMap, HeaderName, HeaderValue, Request, Response as HttpResponse, StatusCode, Uri,
@@ -22,6 +22,8 @@ use axum::response::{IntoResponse, Response};
 use hyper::body::Incoming;
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::client::legacy::{Client, Error as ClientError};
+
+use crate::daemon::remote_auth::REMOTE_CLIENT_ID_HEADER;
 
 use super::CompanionRouteConfig;
 
@@ -40,6 +42,10 @@ const HOP_BY_HOP_HEADERS: &[HeaderName] = &[
 ];
 
 const KEEP_ALIVE: HeaderName = HeaderName::from_static("keep-alive");
+/// RFC 7239's header. The daemon states the hop in `X-Forwarded-*` instead, so
+/// a caller-supplied `Forwarded` would be an unverified claim the companion
+/// might believe.
+const FORWARDED: HeaderName = HeaderName::from_static("forwarded");
 const X_FORWARDED_FOR: HeaderName = HeaderName::from_static("x-forwarded-for");
 const X_FORWARDED_PROTO: HeaderName = HeaderName::from_static("x-forwarded-proto");
 const X_FORWARDED_HOST: HeaderName = HeaderName::from_static("x-forwarded-host");
@@ -55,7 +61,7 @@ pub(super) async fn forward_to_companion(
     }
     let upstream_request = match build_upstream_request(config, peer_addr, request) {
         Ok(request) => request,
-        Err(response) => return response,
+        Err(response) => return *response,
     };
     match client.request(upstream_request).await {
         Ok(response) => upstream_response(response),
@@ -70,16 +76,28 @@ fn build_upstream_request(
     config: &CompanionRouteConfig,
     peer_addr: SocketAddr,
     request: Request<Body>,
-) -> Result<Request<Body>, Response> {
+) -> Result<Request<Body>, Box<Response>> {
     let (mut parts, body) = request.into_parts();
     let forwarded_host = parts.headers.get(HOST).cloned();
-    parts.uri = upstream_uri(config, &parts.uri).ok_or_else(upstream_uri_invalid_response)?;
+    parts.uri = upstream_uri(config, &parts.uri)
+        .ok_or_else(|| Box::new(upstream_uri_invalid_response()))?;
     strip_hop_by_hop_headers(&mut parts.headers);
+    strip_daemon_credentials(&mut parts.headers);
     // hyper derives Host from the upstream authority; leaving the public Host
     // here would make the companion answer for an origin it is not bound to.
     parts.headers.remove(HOST);
     apply_forwarded_headers(&mut parts.headers, peer_addr, forwarded_host.as_ref());
     Ok(Request::from_parts(parts, body))
+}
+
+/// The companion authenticates its own users and never speaks the daemon's
+/// remote-auth protocol, so a daemon credential that happens to ride a request
+/// under the prefix - a reused token, a cached browser header - must stop here
+/// rather than reach a separate service that has no business holding it.
+fn strip_daemon_credentials(headers: &mut HeaderMap) {
+    headers.remove(AUTHORIZATION);
+    headers.remove(REMOTE_CLIENT_ID_HEADER);
+    headers.remove(FORWARDED);
 }
 
 /// Rebuild the request URI against the upstream origin, keeping the path and
@@ -212,7 +230,8 @@ mod tests {
     use super::{
         HeaderMap, HeaderName, HeaderValue, SocketAddr, X_FORWARDED_FOR, X_FORWARDED_HOST,
         X_FORWARDED_PROTO, apply_forwarded_headers, connection_listed_headers,
-        requests_protocol_upgrade, strip_hop_by_hop_headers, upstream_uri,
+        requests_protocol_upgrade, strip_daemon_credentials, strip_hop_by_hop_headers,
+        upstream_uri,
     };
     use crate::daemon::http::companion::CompanionRouteConfig;
 
@@ -296,6 +315,28 @@ mod tests {
         apply_forwarded_headers(&mut headers, peer(), None);
 
         assert!(!headers.contains_key(X_FORWARDED_HOST));
+    }
+
+    #[test]
+    fn daemon_credentials_never_reach_the_companion() {
+        let mut headers = HeaderMap::new();
+        headers.insert("authorization", HeaderValue::from_static("Bearer secret"));
+        headers.insert(
+            "x-harness-remote-client-id",
+            HeaderValue::from_static("viewer"),
+        );
+        headers.insert("forwarded", HeaderValue::from_static("for=10.0.0.1"));
+        headers.insert("cookie", HeaderValue::from_static("panel_session=abc"));
+
+        strip_daemon_credentials(&mut headers);
+
+        assert!(!headers.contains_key("authorization"));
+        assert!(!headers.contains_key("x-harness-remote-client-id"));
+        assert!(!headers.contains_key("forwarded"));
+        assert!(
+            headers.contains_key("cookie"),
+            "the companion's own session cookie must survive"
+        );
     }
 
     #[test]

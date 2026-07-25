@@ -23,6 +23,14 @@ fn accepts_localhost_and_ipv6_loopback() {
 }
 
 #[test]
+fn accepts_an_uppercase_scheme() {
+    let route =
+        config("HTTP://127.0.0.1:8787", "/panel").expect("scheme compares case-insensitively");
+
+    assert_eq!(route.upstream_origin(), "http://127.0.0.1:8787");
+}
+
+#[test]
 fn accepts_a_trailing_root_path_on_the_upstream() {
     let route = config("http://127.0.0.1:8787/", "/panel").expect("root path is accepted");
 
@@ -125,12 +133,17 @@ fn rejects_a_prefix_with_an_empty_segment() {
 
 #[test]
 fn rejects_prefix_characters_that_would_change_routing_or_parsing() {
+    // Kept in step with the systemd installer's own list, so a prefix accepted
+    // at install time cannot be one the daemon refuses at startup.
     for prefix in [
         "/pa nel",
+        "/panel\tapi",
+        "/panel\u{7f}",
         "/panel?x=1",
         "/panel#top",
         "/{panel}",
         "/panel/*",
+        "/panel\\x",
     ] {
         let Err(error) = config("http://127.0.0.1:8787", prefix) else {
             panic!("{prefix} should be refused for its characters");
@@ -147,10 +160,18 @@ fn rejects_prefix_characters_that_would_change_routing_or_parsing() {
 fn route_patterns_cover_the_prefix_and_its_subtree() {
     let route = config("http://127.0.0.1:8787", "/panel").expect("valid companion config");
 
-    assert_eq!(route.exact_route(), "/panel");
-    assert_eq!(route.wildcard_route(), "/panel/{*companion_path}");
-    assert!(route.owns_route("/panel"));
-    assert!(route.owns_route("/panel/{*companion_path}"));
+    assert_eq!(
+        route.routes(),
+        [
+            "/panel".to_owned(),
+            "/panel/".to_owned(),
+            "/panel/{*companion_path}".to_owned(),
+        ],
+        "the bare trailing slash needs its own pattern; {{*rest}} never matches an empty remainder"
+    );
+    for owned in route.routes() {
+        assert!(route.owns_route(&owned), "{owned} must be recognised");
+    }
     assert!(!route.owns_route("/v1/ready"));
     assert!(!route.owns_route("/panelling"));
 }
