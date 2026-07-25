@@ -22,13 +22,20 @@ extension TaskBoardItemPageSource {
   /// It is the oldest observation of the board, so a board that changed under
   /// the walk fails the next position CAS instead of letting it apply against
   /// a sequence that never described the items beside it.
+  ///
+  /// `nextCursor` comes back `nil` only when the walk actually drained the
+  /// selection. A walk that stopped early still carries the cursor it never
+  /// consumed, so a truncated read is distinguishable from a complete one.
   func mergedTaskBoardItemPages(
     status: TaskBoardStatus?
   ) async throws -> TaskBoardListItemsResponseWire {
     var merged = try await taskBoardItemPage(status: status, cursor: nil)
     var cursor = merged.nextCursor
     var pages = 1
-    while let next = cursor, pages < taskBoardItemPageLimit {
+    while let next = cursor {
+      if pages >= taskBoardItemPageLimit {
+        break
+      }
       let page = try await taskBoardItemPage(status: status, cursor: next)
       // A page that returned nothing advances nothing, whatever cursor came
       // back with it.
@@ -40,7 +47,7 @@ extension TaskBoardItemPageSource {
       cursor = page.nextCursor
       pages += 1
     }
-    merged.nextCursor = nil
+    merged.nextCursor = cursor
     return merged
   }
 }

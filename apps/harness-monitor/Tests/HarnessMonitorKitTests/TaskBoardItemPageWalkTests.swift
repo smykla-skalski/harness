@@ -43,7 +43,9 @@ struct TaskBoardItemPageWalkTests {
     #expect(merged.nextCursor == nil)
   }
 
-  @Test("stops on a page that returns no items even when a cursor comes back")
+  /// A walk that stops early has to say so: `nextCursor` survives, so a
+  /// truncated read never reads as a complete board.
+  @Test("stops on a page that returns no items and keeps the unconsumed cursor")
   func stopsOnAnEmptyPage() async throws {
     let source = StubTaskBoardPageSource(pages: [
       page(ids: ["task-1"], totalMatched: 1, changeSeq: 7, nextCursor: "cursor-2"),
@@ -55,6 +57,7 @@ struct TaskBoardItemPageWalkTests {
     let requested = await source.requestedCursors
     #expect(requested == [nil, "cursor-2"])
     #expect(merged.items.map(\.id) == ["task-1"])
+    #expect(merged.nextCursor == "cursor-2")
   }
 }
 

@@ -76,27 +76,46 @@ struct MatchedPage<T> {
     next_cursor: Option<String>,
 }
 
+/// Match, then keep only the page's items.
+///
+/// The board read that feeds this already holds every live item, because both
+/// the roll-ups and the canonical lane order need the whole set. Selection
+/// therefore walks that set by index and moves out only the items the page
+/// returns, rather than materializing the matched selection a second time.
 fn select_matching_page<T: TaskBoardQueryTarget>(
     items: Vec<T>,
     selection: &TaskBoardListItemsSelection,
 ) -> MatchedPage<T> {
     let matched = items
-        .into_iter()
-        .filter(|item| selection.query.matches(&item.query_fields()))
-        .collect::<Vec<_>>();
-    let matched_ids = matched
         .iter()
-        .map(|item| item.query_fields().id)
+        .enumerate()
+        .filter(|(_, item)| selection.query.matches(&item.query_fields()))
+        .map(|(index, item)| (index, item.query_fields().id))
         .collect::<Vec<_>>();
+    let matched_ids = matched.iter().map(|(_, id)| *id).collect::<Vec<_>>();
     let page = select_page(&matched_ids, selection.cursor.as_ref(), selection.limit);
-    let (start, end) = (page.start, page.end);
-    let next_cursor = page.next_cursor.map(|cursor| cursor.encode());
     let total_matched = matched.len();
+    let window = matched[page.start..page.end]
+        .iter()
+        .map(|(index, _)| *index)
+        .collect::<Vec<_>>();
     MatchedPage {
-        items: matched.into_iter().take(end).skip(start).collect(),
+        items: page_items(items, &window),
         total_matched,
-        next_cursor,
+        next_cursor: page.next_cursor.map(|cursor| cursor.encode()),
     }
+}
+
+/// Move out the items at `window`, which is ascending, and drop the rest.
+fn page_items<T>(items: Vec<T>, window: &[usize]) -> Vec<T> {
+    let mut wanted = window.iter().copied().peekable();
+    items
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, item)| {
+            (wanted.next_if(|next| *next == index).is_some()).then_some(item)
+        })
+        .collect()
 }
 
 fn revisions_for_page<T: TaskBoardQueryTarget>(
