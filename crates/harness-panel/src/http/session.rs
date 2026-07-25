@@ -101,7 +101,11 @@ pub fn sign_in_states(headers: &HeaderMap) -> Vec<String> {
 
 /// The state values are URL-safe base64, whose alphabet excludes `.`, so the
 /// separator can never appear inside one.
-const PENDING_SEPARATOR: char = '.';
+///
+/// A `&str` rather than a `char` so splitting and joining can both name this
+/// constant. Joining needs a string, and building one per call from a `char`
+/// both allocates and leaves the separator defined in two places.
+const PENDING_SEPARATOR: &str = ".";
 
 /// Enough for the tabs a person actually keeps open, and small enough that the
 /// cookie cannot be grown without bound by repeatedly hitting the start route.
@@ -213,7 +217,7 @@ fn set_pending(
 ) -> CookieJar {
     jar.add(panel_cookie(
         SIGN_IN_COOKIE,
-        pending.join(&PENDING_SEPARATOR.to_string()),
+        pending.join(PENDING_SEPARATOR),
         state,
         time::Duration::seconds(ttl_seconds),
     ))
