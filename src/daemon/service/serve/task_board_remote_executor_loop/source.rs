@@ -1,6 +1,6 @@
 #[cfg(test)]
 use std::collections::HashMap;
-use std::io::Error;
+use std::io;
 use std::path::{Path, PathBuf};
 #[cfg(test)]
 use std::sync::{Arc, Mutex, OnceLock};
@@ -318,6 +318,6 @@ fn git_error(error: &GitError) -> CliError {
     CliErrorKind::workflow_io(format!("verify remote executor Git source: {error}")).into()
 }
 
-fn io_error(error: &Error) -> CliError {
+fn io_error(error: &io::Error) -> CliError {
     CliErrorKind::workflow_io(format!("verify remote executor path: {error}")).into()
 }

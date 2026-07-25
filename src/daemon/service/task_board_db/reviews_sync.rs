@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::slice::from_ref;
+use std::slice;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -77,7 +77,7 @@ impl ExternalSyncClient for SharedReviewRequestClient {
         self.hold_github_revision(source.github_data_revision)
             .await?;
         let tasks = review_external_tasks(
-            from_ref(&self.repository),
+            slice::from_ref(&self.repository),
             &query.labels,
             &source.response.items,
         );
@@ -181,7 +181,7 @@ fn shared_review_request_clients_from_settings(
     normalized_repositories(repositories)
         .into_iter()
         .map(|repository| SharedReviewRequestClient {
-            tasks: Some(review_external_tasks(from_ref(&repository), labels, items)),
+            tasks: Some(review_external_tasks(slice::from_ref(&repository), labels, items)),
             query: None,
             repository,
             authoritative_review_inbox,

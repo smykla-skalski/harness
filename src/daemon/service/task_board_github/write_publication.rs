@@ -1,5 +1,5 @@
 use std::path::Path;
-use std::slice::from_ref;
+use std::slice;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::state::overlay_task_board_git_runtime_secrets;
@@ -240,7 +240,7 @@ async fn publish_default_task(
         &publication.repository,
         worktree_path(execution)?,
     )?;
-    let session_worktrees = load_session_worktrees_async(from_ref(&item), db).await?;
+    let session_worktrees = load_session_worktrees_async(slice::from_ref(&item), db).await?;
     let workspace = db.load_policy_workspace().await?;
     let policy = workspace.as_ref().and_then(|workspace| {
         workspace
