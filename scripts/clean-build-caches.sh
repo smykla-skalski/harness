@@ -61,6 +61,11 @@ TOTAL_RECLAIMED_KB=0
 # Exported because the batched freshness check below runs find through sh.
 STALE_TMP_MINUTES=180
 export STALE_TMP_MINUTES
+# Spelling the six characters as alnum classes rather than `?` is what makes the
+# line-oriented set arithmetic in the sweep safe: `?` matches any byte including
+# a newline, which would split one directory into two bogus lines.
+STALE_TMP_GLOB='.tmp[[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]]'
+readonly STALE_TMP_GLOB
 
 usage() {
   cat <<EOF
@@ -214,12 +219,12 @@ clean_stale_test_temp_dirs() {
   local work
   work="$(mktemp -d "${TMPDIR:-/tmp}/clean-build-caches-sweep.XXXXXX")" || return
 
-  # Names are always `.tmp` plus six alphanumerics, so a candidate path cannot
-  # contain a newline and the line-oriented set arithmetic below is safe.
-  find "$tmp_root" -maxdepth 1 -mindepth 1 -type d -name '.tmp??????' \
+  # STALE_TMP_GLOB admits only alphanumerics, so a candidate path cannot contain
+  # a newline and the line-oriented set arithmetic below is safe.
+  find "$tmp_root" -maxdepth 1 -mindepth 1 -type d -name "$STALE_TMP_GLOB" \
     -mmin "+$STALE_TMP_MINUTES" -print 2>/dev/null | sort > "$work/candidates"
   local recent_count
-  recent_count=$(find "$tmp_root" -maxdepth 1 -mindepth 1 -type d -name '.tmp??????' \
+  recent_count=$(find "$tmp_root" -maxdepth 1 -mindepth 1 -type d -name "$STALE_TMP_GLOB" \
     ! -mmin "+$STALE_TMP_MINUTES" -print 2>/dev/null | wc -l | tr -d ' ')
 
   # One batched find across every candidate spots the trees with live writes.
@@ -259,7 +264,12 @@ clean_stale_test_temp_dirs() {
   else
     printf '  · %-46s %8s  removing...\n' "stale .tmp dirs ($stale_count)" "$human"
     if (( stale_count > 0 )); then
-      tr '\n' '\0' < "$work/stale" | xargs -0 -n 50 rm -rf 2>/dev/null
+      # A silent failure here would report reclaimed bytes that are still on
+      # disk, so surface it the way remove_path does.
+      if ! tr '\n' '\0' < "$work/stale" | xargs -0 -n 50 rm -rf 2>"$work/rm.err"; then
+        printf '    (warning: some stale temp dirs survived: %s)\n' \
+          "$(tr '\n' ' ' < "$work/rm.err")"
+      fi
     fi
   fi
   printf '  · %-46s %8s\n' "recent .tmp dirs kept ($kept_count)" '-'
