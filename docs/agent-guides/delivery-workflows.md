@@ -156,12 +156,13 @@ Reclaim this session's two build caches first, because `git worktree remove` del
 - `<worktree>/target` - direct `cargo` and `cargo nextest` output.
 - `<main-checkout>/target/dev/wt-<worktree-name>-<hash>` - everything from `scripts/cargo-local.sh`, which every `mise run test:*` task uses. Sits outside the worktree and is usually the larger.
 
-Every other session holds its own `target/dev/wt-*` lane, so ask `cargo-local.sh` for this one rather than matching a name by eye. A lease file names the segment it covers, so an entry matching that lane means a build still owns it: leave the lane and stop there, because removing the worktree while a build holds its lane strands exactly the cache this step exists to reclaim.
+Every other session holds its own `target/dev/wt-*` lane, so ask `cargo-local.sh` for this one rather than matching a name by eye, and clear any target-dir override first, since the script honours one and would otherwise answer with the redirect. A lease is named for the segment it covers and the PID holding it, so an entry for this lane means a build still owns it: stop there rather than delete, because removing the worktree mid-build strands exactly the cache this step exists to reclaim. Confirm that PID is really gone before dismissing a leftover entry as stale.
 
 ```bash
 # assumes: PR merged, <worktree> clean, no build running in this session's lane
-lane=$("<worktree>/scripts/cargo-local.sh" --print-target-dir)
-ls -A "<main-checkout>"/target/.cargo-local/leases/  # an entry naming that lane means stop, not delete
+lane=$(env -u CARGO_TARGET_DIR -u HARNESS_CARGO_TARGET_DIR \
+  "<worktree>/scripts/cargo-local.sh" --print-target-dir)
+ls "<main-checkout>"/target/.cargo-local/leases/"$(basename "$lane")"-*  # a hit names the live PID: stop
 rm -rf "<worktree>/target" "$lane"
 ```
 
