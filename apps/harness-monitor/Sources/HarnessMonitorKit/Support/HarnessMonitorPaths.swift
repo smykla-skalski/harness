@@ -339,6 +339,15 @@ public enum HarnessMonitorPaths {
       .appendingPathComponent("managed-launch-agent.lock")
   }
 
+  /// The daemon's singleton lock. It is held for the whole daemon process
+  /// lifetime, taken before the daemon binds a port or writes a manifest, so
+  /// it is the only signal that says "a daemon is starting" before one exists.
+  public static func daemonSingletonLockURL(
+    using environment: HarnessMonitorEnvironment = .current
+  ) -> URL {
+    Self.daemonRoot(using: environment).appendingPathComponent("daemon.lock")
+  }
+
   public static func thumbnailCacheRoot(
     using environment: HarnessMonitorEnvironment = .current
   ) -> URL {
