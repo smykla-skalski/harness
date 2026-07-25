@@ -86,9 +86,11 @@ fn both_repositories_of_one_owner_derive_the_same_shape() {
 
 #[test]
 fn derived_shapes_spread_across_the_set() {
-    let spread: std::collections::BTreeSet<_> = (0..200)
+    let mut spread: Vec<TaskBoardProjectShape> = (0..200)
         .map(|index| TaskBoardProjectShape::derived(&format!("org-{index:04x}")))
         .collect();
+    spread.sort_unstable_by_key(|shape| shape.as_str());
+    spread.dedup();
 
     assert_eq!(
         spread.len(),
