@@ -243,7 +243,21 @@ impl AsyncDaemonDb {
         .bind(utc_now())
         .execute(self.pool())
         .await
-        .map_err(|error| db_error(format!("update task board project '{project_id}': {error}")))?;
+        .map_err(|error| {
+            // The UNIQUE(source, slug) violation is the caller asking for a
+            // name another project of the same source already holds. Retrying
+            // it, which is what an IO code invites, can never succeed.
+            if error
+                .as_database_error()
+                .is_some_and(|database_error| database_error.is_unique_violation())
+            {
+                return CliError::from(CliErrorKind::usage_error(format!(
+                    "another {} project already uses the slug '{slug}'",
+                    existing.source.as_str()
+                )));
+            }
+            db_error(format!("update task board project '{project_id}': {error}"))
+        })?;
         self.get_task_board_project(project_id)
             .await?
             .ok_or_else(|| db_error(format!("task board project '{project_id}' vanished")))

@@ -148,12 +148,13 @@ async fn renaming_onto_an_existing_slug_is_refused() {
         .await
         .expect("register second project");
 
-    assert!(
-        db.update_task_board_project(&widgets, Some("acme/gadgets"), DisplayNameEdit::Keep)
-            .await
-            .is_err(),
-        "two projects of one source cannot share a slug"
-    );
+    // The collision is a naming conflict, not a store failure, so retrying is
+    // pointless and the code has to say so.
+    let error = db
+        .update_task_board_project(&widgets, Some("acme/gadgets"), DisplayNameEdit::Keep)
+        .await
+        .expect_err("two projects of one source cannot share a slug");
+    assert_eq!(error.code(), "USAGE", "{error}");
 }
 
 #[tokio::test]
