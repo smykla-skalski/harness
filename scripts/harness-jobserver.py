@@ -33,6 +33,9 @@ import threading
 import time
 
 TOKEN = b"+"
+# Written only by a supervisor that verified the whole budget was back in the
+# pipe before leaving, which is the one state a successor may safely refill.
+CLEAN_MARKER = "clean"
 IDLE_EXIT_SECONDS = 3600
 POLL_SECONDS = 5.0
 # AF_UNIX paths are capped near 104 bytes on macOS, so the pool directory has to
@@ -98,13 +101,40 @@ class Pool:
         self.granted = 0
         self.last_activity = time.monotonic()
 
-        self._ensure_fifo()
+        created = self._ensure_fifo()
         # O_RDWR keeps a permanent writer attached, without which the FIFO would
         # report EOF and discard its buffered tokens the moment cargo detaches.
         self.fifo_fd = os.open(self.fifo_path, os.O_RDWR | os.O_NONBLOCK)
-        self._refill_to(budget)
+        # Only a pipe this process just made, or one a predecessor left with
+        # every token verified back inside it, is safe to fill. Any other pipe
+        # already here may have tokens out with a build that is still running,
+        # and topping it up regardless mints a second machine's worth.
+        if created or self._take_clean_marker():
+            self._refill_to(budget)
+        else:
+            self._adopt()
 
-    def _ensure_fifo(self) -> None:
+    def _take_clean_marker(self) -> bool:
+        """True when the previous supervisor left with the budget all present."""
+        try:
+            os.unlink(os.path.join(self.dir, CLEAN_MARKER))
+        except OSError:
+            return False
+        return True
+
+    def mark_clean(self) -> None:
+        """Record that this pool is being left empty with nothing outstanding."""
+        with contextlib.suppress(OSError):
+            with open(os.path.join(self.dir, CLEAN_MARKER), "w", encoding="utf-8") as handle:
+                handle.write("\n")
+
+    def _adopt(self) -> None:
+        """Keep what the pipe already holds, never adding to it."""
+        keep = min(self._drain(), self.budget)
+        if keep:
+            os.write(self.fifo_fd, TOKEN * keep)
+
+    def _ensure_fifo(self) -> bool:
         """Replace whatever sits at the FIFO path if it is not a FIFO.
 
         os.open succeeds on a regular file, and a file has one shared offset, so
@@ -113,6 +143,8 @@ class Pool:
         the tokens get written into whatever it points at. A directory takes a
         different route to the same place: unlink refuses it, so every spawned
         supervisor dies here and each ensure pays the startup timeout forever.
+
+        Returns True when this call is the one that created the FIFO.
         """
         with contextlib.suppress(FileNotFoundError):
             mode = os.lstat(self.fifo_path).st_mode
@@ -120,8 +152,11 @@ class Pool:
                 shutil.rmtree(self.fifo_path)
             elif not stat.S_ISFIFO(mode):
                 os.unlink(self.fifo_path)
-        with contextlib.suppress(FileExistsError):
+        try:
             os.mkfifo(self.fifo_path, 0o600)
+        except FileExistsError:
+            return False
+        return True
 
     def _read_tokens(self, limit: int | None) -> int:
         """Take up to `limit` tokens, or every one present when None.
@@ -300,6 +335,7 @@ def serve(pool: Pool, stop: threading.Event) -> None:
         # that every poll would briefly hold every token outside the pipe for no
         # reason. Only pay it once the supervisor is already a candidate to exit.
         if time.monotonic() - pool.last_activity > IDLE_EXIT_SECONDS and pool.idle_and_whole():
+            pool.mark_clean()
             break
 
     for conn in list(holdings):

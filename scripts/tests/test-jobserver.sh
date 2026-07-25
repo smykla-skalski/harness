@@ -553,6 +553,51 @@ PY
   pass "$name"
 }
 
+scenario_restart_does_not_mint_a_second_budget() {
+  local name="a restart adopts the pipe instead of refilling it"
+  local out
+  out="$(python3 - "$JOBSERVER" 2>&1 <<'PY'
+import importlib.util, os, sys, tempfile
+
+spec = importlib.util.spec_from_file_location("js", sys.argv[1])
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+results = []
+
+with tempfile.TemporaryDirectory() as directory:
+    results.append("fresh=%d" % mod.Pool(directory, 3)._drain())
+
+with tempfile.TemporaryDirectory() as directory:
+    # What a killed supervisor leaves behind: one token in the pipe and two
+    # still out with a build that is running. Refilling to a full budget here
+    # is what put five tokens on a three-token machine.
+    fifo = os.path.join(directory, "fifo")
+    os.mkfifo(fifo, 0o600)
+    fd = os.open(fifo, os.O_RDWR | os.O_NONBLOCK)
+    os.write(fd, mod.TOKEN)
+    results.append("killed=%d" % mod.Pool(directory, 3)._drain())
+    os.close(fd)
+
+with tempfile.TemporaryDirectory() as directory:
+    # A supervisor that left through the idle path drained the pipe only after
+    # verifying nothing was outstanding, so its successor may fill again.
+    fifo = os.path.join(directory, "fifo")
+    os.mkfifo(fifo, 0o600)
+    with open(os.path.join(directory, mod.CLEAN_MARKER), "w", encoding="utf-8") as handle:
+        handle.write("\n")
+    results.append("clean=%d" % mod.Pool(directory, 3)._drain())
+
+print(" ".join(results))
+PY
+)"
+  if [[ "$out" != "fresh=3 killed=1 clean=3" ]]; then
+    fail "$name (expected 'fresh=3 killed=1 clean=3', got: $out)"
+    return
+  fi
+  pass "$name"
+}
+
 scenario_oversized_request_cannot_kill_the_pool() {
   local name="an out-of-range request cannot take the pool down"
   local root; root="$(fake_root oversized)"
@@ -880,6 +925,7 @@ scenario_partial_pool_keeps_its_tokens
 scenario_signal_death_reports_a_shell_signal_status
 scenario_split_request_is_still_granted
 scenario_a_wiped_pool_does_not_wedge_its_successor
+scenario_restart_does_not_mint_a_second_budget
 scenario_oversized_request_cannot_kill_the_pool
 scenario_nonsense_widths_are_refused
 scenario_cleanup_only_signals_a_supervisor
