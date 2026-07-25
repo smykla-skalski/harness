@@ -77,7 +77,7 @@ configure_sccache_socket() {
     return 0
   fi
 
-  socket_root="${TMPDIR:-/tmp}"
+  socket_root="${sccache_socket_root:-${TMPDIR:-/tmp}}"
   socket_root="${socket_root%/}/harness-sccache"
   if (( ${#socket_root} > 70 )); then
     safe_user="$(sanitize_segment "${USER:-user}")"
@@ -391,6 +391,15 @@ fi
 target_segment="local"
 if [[ "$ROOT" != "$COMMON_REPO_ROOT" ]]; then
   target_segment="wt-$(sanitize_segment "$(basename -- "$ROOT")")-$(short_hash "$ROOT")"
+fi
+
+# Capture the socket root before configure_tmpdir can install a session-scoped
+# TMPDIR. Letting the socket follow that TMPDIR would hand every session its own
+# server again, however repo-scoped the socket id is.
+if tmpdir_is_usable "${TMPDIR:-}"; then
+  sccache_socket_root="${TMPDIR%/}"
+else
+  sccache_socket_root="/tmp"
 fi
 
 configure_tmpdir

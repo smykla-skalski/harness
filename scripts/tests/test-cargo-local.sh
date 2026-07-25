@@ -66,6 +66,24 @@ print_cargo_env() {
   )
 }
 
+print_cargo_env_without_tmpdir() {
+  local fake_bin="$1" sccache_bin="$2" session="$3"
+  (
+    unset SCCACHE_SERVER_UDS SCCACHE_SERVER_PORT SCCACHE_NO_DAEMON
+    unset SCCACHE_BASEDIRS SCCACHE_IDLE_TIMEOUT SCCACHE_CACHE_SIZE SCCACHE_VERSION
+    unset HARNESS_SCCACHE_TMPDIR TMPDIR
+    unset CODEX_THREAD_ID CLAUDE_SESSION_ID CLAUDE_CODE_SESSION_ID
+    unset GEMINI_SESSION_ID COPILOT_SESSION_ID OPENCODE_SESSION_ID
+    PATH="$fake_bin:$PATH" \
+      SCCACHE_BIN="$sccache_bin" \
+      RUSTC_WRAPPER='' \
+      CODEX_SESSION_ID="$session" \
+      HARNESS_CARGO_SKIP_LEASE=1 \
+      HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+      "$ROOT/scripts/cargo-local.sh" --print-env
+  )
+}
+
 print_tmpdir_env() {
   local session_id="$1" configured_tmpdir="${2:-}"
   (
@@ -280,6 +298,36 @@ scenario_target_dir_is_shared_across_sessions() {
   rm -rf "${first_tmp%/}" "${second_tmp%/}"
 }
 
+scenario_sccache_socket_survives_session_scoped_tmpdir() {
+  local fake_bin="$SANDBOX/socket-share-bin"
+  local first second first_sock second_sock first_tmp second_tmp
+  mkdir -p "$fake_bin"
+  write_fake_sccache "$fake_bin/sccache" "0.16.0"
+
+  first="$(print_cargo_env_without_tmpdir "$fake_bin" "$fake_bin/sccache" "sock-a-$$")"
+  second="$(print_cargo_env_without_tmpdir "$fake_bin" "$fake_bin/sccache" "sock-b-$$")"
+  first_sock="$(
+    awk -F= '$1 == "SCCACHE_SERVER_UDS" { print substr($0, index($0, "=") + 1) }' <<<"$first"
+  )"
+  second_sock="$(
+    awk -F= '$1 == "SCCACHE_SERVER_UDS" { print substr($0, index($0, "=") + 1) }' <<<"$second"
+  )"
+  first_tmp="$(awk -F= '$1 == "TMPDIR" { print substr($0, index($0, "=") + 1) }' <<<"$first")"
+  second_tmp="$(awk -F= '$1 == "TMPDIR" { print substr($0, index($0, "=") + 1) }' <<<"$second")"
+
+  # Distinct session TMPDIRs must not drag the socket along with them, or each
+  # session quietly gets its own sccache server over the same on-disk cache.
+  if [[ -n "$first_sock" ]] \
+    && [[ "$first_tmp" != "$second_tmp" ]] \
+    && [[ "$first_sock" == "$second_sock" ]]; then
+    pass "one sccache socket per repo despite session-scoped TMPDIRs"
+  else
+    fail "sccache socket followed the session TMPDIR: a=$first_sock b=$second_sock"
+  fi
+
+  rm -rf "${first_tmp%/}" "${second_tmp%/}"
+}
+
 scenario_single_thread_nextest_override_is_rejected() {
   local output single_thread status
   single_thread="$((2 - 1))"
@@ -415,6 +463,7 @@ scenario_unusable_tmpdir_uses_short_external_fallback
 scenario_usable_tmpdir_is_preserved
 scenario_agent_build_jobs_leave_room_for_later_arrivals
 scenario_target_dir_is_shared_across_sessions
+scenario_sccache_socket_survives_session_scoped_tmpdir
 scenario_single_thread_nextest_override_is_rejected
 scenario_noncanonical_nextest_override_is_rejected
 scenario_supported_sccache_is_resolved_once
