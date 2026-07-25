@@ -13,8 +13,9 @@
 #                            (ms-playwright is reported but NOT removed; pass --force/-f to remove it)
 #
 # target/ is shared across every worktree via cargo-local.sh's
-# CARGO_TARGET_DIR (one target/dev/agent-<session> segment per concurrent
-# agent build, rooted at the common repo). Segments with a live
+# CARGO_TARGET_DIR: one target/dev/agent-<session> segment per concurrent
+# agent build, or target/dev/local for a build with no session id, all
+# rooted at the common repo. Segments with a live
 # target/.cargo-local/leases/ entry are actively building and are kept,
 # not deleted, so this script never rips a build out from under a running
 # session; everything else under target/ is swept as usual.
@@ -139,9 +140,10 @@ segment_is_leased() {
   return 1
 }
 
-# Sweeps the shared target/ tree at the common repo root: per-agent build
-# segments with a live lease are kept (not counted as reclaimed), every
-# other segment and any other top-level entry under target/ is removed.
+# Sweeps the shared target/ tree at the common repo root: each entry
+# directly under target/dev/ (segment directory, or a stray file/symlink)
+# with a live lease is kept and not counted as reclaimed; everything else
+# under target/dev/ and any other top-level entry under target/ is removed.
 clean_shared_target() {
   if [[ ! -d "$SHARED_TARGET_ROOT" ]]; then
     printf '  · %-46s %8s  (absent, skip)\n' 'repo target/' '-'
@@ -157,7 +159,7 @@ clean_shared_target() {
       else
         remove_path "target/dev/$seg" "$seg_dir"
       fi
-    done < <(find "$SHARED_TARGET_ROOT/dev" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null)
+    done < <(find "$SHARED_TARGET_ROOT/dev" -mindepth 1 -maxdepth 1 -print0 2>/dev/null)
   fi
 
   while IFS= read -r -d '' entry; do

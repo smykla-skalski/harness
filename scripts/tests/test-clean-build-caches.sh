@@ -66,8 +66,9 @@ assert_output_contains() {
 # Builds a fixture repo whose target/ mirrors the shared cargo-local.sh
 # layout: target/dev/agent-live (a genuinely running background process
 # holds its lease), target/dev/agent-dead (lease PID has already exited),
-# target/dev/agent-nolease (no lease file at all), plus a stray top-level
-# entry directly under target/ that predates the per-agent scheme.
+# target/dev/agent-nolease (no lease file at all), a stray top-level entry
+# directly under target/ that predates the per-agent scheme, and a stray
+# file directly under target/dev/ (not a segment directory).
 make_shared_target_fixture() {
   local repo="$1"
   mkdir -p "$repo/scripts/lib"
@@ -81,6 +82,7 @@ make_shared_target_fixture() {
   echo "obj" > "$repo/target/dev/agent-dead/debug/harness"
   echo "obj" > "$repo/target/dev/agent-nolease/debug/harness"
   echo "stray" > "$repo/target/stray-legacy-artifact"
+  echo "stray" > "$repo/target/dev/.rustc_info.json"
 
   mkdir -p "$repo/target/.cargo-local/leases"
   local live_pid
@@ -110,6 +112,7 @@ scenario_dry_run_keeps_leased_segment() {
   assert_output_contains "$output" "target/dev/agent-dead"
   assert_output_contains "$output" "target/dev/agent-nolease"
   assert_output_contains "$output" "target/stray-legacy-artifact"
+  assert_output_contains "$output" "target/dev/.rustc_info.json"
   pass
 }
 
