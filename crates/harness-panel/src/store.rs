@@ -5,6 +5,7 @@
 //! agreeing about fractional digits and zone spelling.
 
 pub mod accounts;
+pub mod approvals;
 pub mod oauth;
 pub mod owner;
 pub mod sessions;

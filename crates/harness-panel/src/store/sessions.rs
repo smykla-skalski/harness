@@ -11,6 +11,7 @@ use super::accounts::{Account, AccountIdentity, account_from_row, upsert_account
 use super::token::{OpaqueToken, hash_token};
 use super::{Store, from_unix_seconds, to_unix_seconds};
 use crate::error::PanelError;
+use sqlx::Row;
 
 /// A live session and the account behind it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -109,25 +110,34 @@ impl Store {
         // Expiry is filtered here rather than trusted to a background sweep, so
         // an expired row is unusable the moment it expires even if nothing has
         // pruned it yet.
-        let row = sqlx::query(
-            "SELECT s.created_at AS session_created_at, s.expires_at AS session_expires_at, \
-                    a.id, a.provider, a.subject_id, a.login, a.display_name, a.avatar_url, \
-                    a.first_seen_at, a.last_seen_at \
-             FROM sessions s JOIN accounts a ON a.id = s.account_id \
-             WHERE s.token_hash = ?1 AND s.expires_at > ?2",
+        //
+        // The account is fetched separately rather than joined in. A join has to
+        // restate every account column, and a column added later that this
+        // projection missed would leave the shared row reader looking for a
+        // field that is not there, failing at runtime on a query nobody edited.
+        // One extra primary-key lookup is a fair price for that being
+        // impossible.
+        let Some(row) = sqlx::query(
+            "SELECT account_id, created_at, expires_at FROM sessions \
+             WHERE token_hash = ?1 AND expires_at > ?2",
         )
         .bind(hash_token(token))
         .bind(to_unix_seconds(now))
         .fetch_optional(self.pool())
-        .await?;
+        .await?
+        else {
+            return Ok(None);
+        };
 
-        Ok(row.as_ref().map(|row| {
-            use sqlx::Row;
-            SessionRecord {
-                account: account_from_row(row),
-                created_at: from_unix_seconds(row.get("session_created_at")),
-                expires_at: from_unix_seconds(row.get("session_expires_at")),
-            }
+        let account_id: String = row.get("account_id");
+        let Some(account) = self.account_by_id(&account_id).await? else {
+            return Ok(None);
+        };
+
+        Ok(Some(SessionRecord {
+            account,
+            created_at: from_unix_seconds(row.get("created_at")),
+            expires_at: from_unix_seconds(row.get("expires_at")),
         }))
     }
 
