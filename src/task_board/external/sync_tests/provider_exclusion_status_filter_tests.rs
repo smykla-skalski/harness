@@ -6,7 +6,7 @@ use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::{ExternalRefProvider, ProviderExclusionAuditContext};
 
 #[tokio::test]
-async fn todo_filtered_pull_restores_an_open_provider_exclusion_tombstone() {
+async fn todo_status_filtered_pull_restores_an_open_provider_exclusion_tombstone() {
     let temp = tempdir().expect("tempdir");
     let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
         .await

@@ -8,7 +8,7 @@ use crate::task_board::{
 };
 
 #[tokio::test]
-async fn todo_filtered_sync_does_not_import_new_backlog_tasks() {
+async fn todo_status_filtered_sync_does_not_import_new_backlog_tasks() {
     let temp = tempdir().expect("tempdir");
     let board = TaskBoardStore::new(temp.path().join("board"));
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient::new(
@@ -35,7 +35,7 @@ async fn todo_filtered_sync_does_not_import_new_backlog_tasks() {
 }
 
 #[tokio::test]
-async fn todo_filtered_bidirectional_sync_preserves_legacy_todo_without_stale_churn() {
+async fn todo_status_filtered_bidirectional_sync_preserves_legacy_todo_without_stale_churn() {
     let temp = tempdir().expect("tempdir");
     let board = TaskBoardStore::new(temp.path().join("board"));
     let mut item = github_review_request_item(
@@ -96,7 +96,7 @@ async fn todo_filtered_bidirectional_sync_preserves_legacy_todo_without_stale_ch
 }
 
 #[tokio::test]
-async fn todo_filtered_bidirectional_sync_preserves_open_workflow_lane_without_churn() {
+async fn todo_status_filtered_bidirectional_sync_preserves_open_workflow_lane_without_churn() {
     let temp = tempdir().expect("tempdir");
     let board = TaskBoardStore::new(temp.path().join("board"));
     let item = github_review_request_item(
@@ -147,7 +147,7 @@ async fn todo_filtered_bidirectional_sync_preserves_open_workflow_lane_without_c
 }
 
 #[tokio::test]
-async fn todo_filtered_sync_reconciles_terminal_truth_for_every_existing_item() {
+async fn todo_status_filtered_sync_reconciles_terminal_truth_for_every_existing_item() {
     let temp = tempdir().expect("tempdir");
     let board = TaskBoardStore::new(temp.path().join("board"));
     for (id, external_id, status) in [

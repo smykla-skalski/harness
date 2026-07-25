@@ -341,14 +341,65 @@ async fn run_daemon_migrator(pool: &SqlitePool) -> Result<(), CliError> {
         .run_direct(None, &mut *conn, false)
         .await
         .map_err(|error| db_error(format!("run async daemon migrations: {error}")));
-    let restored = query("PRAGMA legacy_alter_table = OFF; PRAGMA foreign_keys = ON")
-        .execute(&mut *conn)
-        .await
-        .map(|_| ())
-        .map_err(|error| {
-            db_error(format!(
-                "restore foreign keys after async migrations: {error}"
-            ))
-        });
+    let restored = restore_migration_pragmas(&mut conn).await;
     migrated.and(restored)
+}
+
+/// The connection goes back to the pool afterwards, so a restore that misses a
+/// statement leaves that one connection with enforcement off while every other
+/// connection in the pool has it on. Each pragma is its own statement because
+/// SQLite prepares one statement at a time.
+async fn restore_migration_pragmas(
+    conn: &mut sqlx::SqliteConnection,
+) -> Result<(), CliError> {
+    for pragma in ["PRAGMA legacy_alter_table = OFF", "PRAGMA foreign_keys = ON"] {
+        query(pragma).execute(&mut *conn).await.map_err(|error| {
+            db_error(format!("restore pragmas after async migrations: {error}"))
+        })?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod pragma_tests {
+    use super::{query, restore_migration_pragmas};
+    use crate::daemon::db::AsyncDaemonDb;
+
+    /// Reading the pragma back through the pool proves nothing: the pool opens
+    /// connections with `foreign_keys(true)`, so it can answer from a connection
+    /// that was never suspended. This asserts on the same connection the restore
+    /// ran against, which is the one handed back to the pool.
+    #[tokio::test]
+    async fn restoring_pragmas_applies_every_statement_on_that_connection() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+            .await
+            .expect("open async db");
+        let mut conn = db.pool().acquire().await.expect("acquire connection");
+        for pragma in ["PRAGMA foreign_keys = OFF", "PRAGMA legacy_alter_table = ON"] {
+            query(pragma)
+                .execute(&mut *conn)
+                .await
+                .expect("suspend pragma");
+        }
+
+        restore_migration_pragmas(&mut conn)
+            .await
+            .expect("restore pragmas");
+
+        let foreign_keys: i64 = sqlx::query_scalar("PRAGMA foreign_keys")
+            .fetch_one(&mut *conn)
+            .await
+            .expect("foreign_keys pragma");
+        let legacy_alter_table: i64 = sqlx::query_scalar("PRAGMA legacy_alter_table")
+            .fetch_one(&mut *conn)
+            .await
+            .expect("legacy_alter_table pragma");
+
+        assert_eq!(
+            (foreign_keys, legacy_alter_table),
+            (1, 0),
+            "a statement in the restore never reached the migrator's connection"
+        );
+    }
 }
