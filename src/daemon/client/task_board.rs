@@ -35,6 +35,7 @@ use crate::task_board::{
 };
 
 use super::DaemonClient;
+use super::task_board_list::{enum_label, task_board_list_query, unusable_task_board_page};
 
 #[expect(
     clippy::missing_errors_doc,
@@ -80,6 +81,12 @@ impl DaemonClient {
     /// The daemon bounds each response, so a caller that wants the whole
     /// selection has to ask for the rest; this keeps that loop in one place
     /// rather than in every command that reads the board.
+    ///
+    /// A walk that cannot advance fails instead of returning what it has. The
+    /// daemon only ever pairs a cursor with a non-empty page, and never
+    /// repeats the resume point it was handed, so either shape means the
+    /// daemon is not the one this client is built against - and a `Vec` has
+    /// nowhere to say the board was read only in part.
     pub fn list_task_board_items(
         &self,
         request: &TaskBoardListItemsRequest,
@@ -93,14 +100,17 @@ impl DaemonClient {
             let Some(cursor) = page.next_cursor else {
                 return Ok(items);
             };
-            // Neither an empty page nor a cursor that names the same resume
-            // point advances the walk, and following either forever would hang
-            // the caller with no way to tell why.
             if drained {
-                return Ok(items);
+                return Err(unusable_task_board_page(
+                    &cursor,
+                    "handed back a cursor with no items",
+                ));
             }
             if request.cursor.as_deref() == Some(cursor.as_str()) {
-                return Err(stalled_task_board_page(&cursor));
+                return Err(unusable_task_board_page(
+                    &cursor,
+                    "repeated the cursor it was given",
+                ));
             }
             request.cursor = Some(cursor);
         }
@@ -433,77 +443,6 @@ fn triage_escalation_verdict_path(escalation_id: &str) -> String {
 
 fn item_action_path(item_id: &str, action: &str) -> String {
     format!("{}/{action}", item_path(item_id))
-}
-
-/// Render a list request as the daemon's query string, in a stable order.
-fn task_board_list_query(
-    request: &TaskBoardListItemsRequest,
-) -> Result<Vec<(&'static str, String)>, CliError> {
-    let mut query = enum_facet_query(request)?;
-    append_text_query(request, &mut query);
-    append_page_query(request, &mut query);
-    Ok(query)
-}
-
-fn enum_facet_query(
-    request: &TaskBoardListItemsRequest,
-) -> Result<Vec<(&'static str, String)>, CliError> {
-    let mut query = Vec::new();
-    if let Some(status) = request.status {
-        query.push(("status", enum_label(status, "status")?));
-    }
-    if let Some(priority) = request.priority {
-        query.push(("priority", enum_label(priority, "priority")?));
-    }
-    if let Some(agent_mode) = request.agent_mode {
-        query.push(("agent_mode", enum_label(agent_mode, "agent mode")?));
-    }
-    Ok(query)
-}
-
-fn append_text_query(
-    request: &TaskBoardListItemsRequest,
-    query: &mut Vec<(&'static str, String)>,
-) {
-    if let Some(project_id) = &request.project_id {
-        query.push(("project_id", project_id.clone()));
-    }
-    for tag in &request.tags {
-        query.push(("tag", tag.clone()));
-    }
-    if let Some(text) = &request.query {
-        query.push(("query", text.clone()));
-    }
-}
-
-fn append_page_query(
-    request: &TaskBoardListItemsRequest,
-    query: &mut Vec<(&'static str, String)>,
-) {
-    if let Some(limit) = request.limit {
-        query.push(("limit", limit.to_string()));
-    }
-    if let Some(cursor) = &request.cursor {
-        query.push(("cursor", cursor.clone()));
-    }
-}
-
-fn enum_label<T: serde::Serialize>(value: T, label: &str) -> Result<String, CliError> {
-    serde_json::to_value(value)
-        .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?
-        .as_str()
-        .map(ToOwned::to_owned)
-        .ok_or_else(|| {
-            CliErrorKind::workflow_serialize(format!("task-board {label} is not a string")).into()
-        })
-}
-
-fn stalled_task_board_page(cursor: &str) -> CliError {
-    CliErrorKind::workflow_io(format!(
-        "the daemon returned the same task-board page cursor '{cursor}' twice; \
-         the board read cannot advance"
-    ))
-    .into()
 }
 
 fn task_board_upgrade_required() -> CliError {
