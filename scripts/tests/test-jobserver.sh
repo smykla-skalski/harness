@@ -75,6 +75,10 @@ kill_supervisor() {
   return 0
 }
 
+stop_pool_at_dir() {
+  kill_supervisor "$(head -1 "$1/lock" 2>/dev/null || true)"
+}
+
 cleanup() {
   local dir pid
   for dir in "${started_pools[@]:-}"; do
@@ -553,6 +557,33 @@ PY
   pass "$name"
 }
 
+scenario_junk_at_either_runtime_path_is_cleared() {
+  local name="a directory at the fifo or the socket path does not wedge startup"
+  local entry status dir
+  # Both paths reach the same trap: unlink refuses a directory, the supervisor
+  # dies before serving, and every ensure then pays the startup timeout.
+  for entry in fifo sock; do
+    local root; root="$(fake_root "junk-$entry")"
+    track_pool "$root"
+    dir="$(pool_dir_for "$root")"
+    mkdir -p "$dir/$entry"
+    : >"$dir/$entry/leftover"
+
+    status=0
+    python3 "$JOBSERVER" ensure --repo-root "$root" --budget 3 >/dev/null 2>&1 || status=$?
+    if (( status != 0 )); then
+      fail "$name (a directory at '$entry' left the pool unreachable, status=$status)"
+      return
+    fi
+    if [[ ! -p "$dir/fifo" || ! -S "$dir/sock" ]]; then
+      fail "$name (after clearing '$entry' the pool is not usable)"
+      return
+    fi
+    stop_pool_at_dir "$dir"
+  done
+  pass "$name"
+}
+
 scenario_restart_does_not_mint_a_second_budget() {
   local name="a restart adopts the pipe instead of refilling it"
   local out
@@ -925,6 +956,7 @@ scenario_partial_pool_keeps_its_tokens
 scenario_signal_death_reports_a_shell_signal_status
 scenario_split_request_is_still_granted
 scenario_a_wiped_pool_does_not_wedge_its_successor
+scenario_junk_at_either_runtime_path_is_cleared
 scenario_restart_does_not_mint_a_second_budget
 scenario_oversized_request_cannot_kill_the_pool
 scenario_nonsense_widths_are_refused

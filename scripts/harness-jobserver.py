@@ -89,6 +89,20 @@ def prepare_pool_dir(directory: str) -> None:
     prepare_private_dir(directory)
 
 
+def clear_path(path: str) -> None:
+    """Remove whatever sits at `path`, whatever type it turned out to be.
+
+    unlink refuses a directory, and letting that escape kills the supervisor
+    before it can serve, so every later ensure pays the startup timeout and
+    falls back to the static reserve until someone clears the path by hand.
+    """
+    with contextlib.suppress(FileNotFoundError):
+        if stat.S_ISDIR(os.lstat(path).st_mode):
+            shutil.rmtree(path)
+        else:
+            os.unlink(path)
+
+
 class Pool:
     """Owns the token budget behind both the FIFO and the socket."""
 
@@ -147,11 +161,8 @@ class Pool:
         Returns True when this call is the one that created the FIFO.
         """
         with contextlib.suppress(FileNotFoundError):
-            mode = os.lstat(self.fifo_path).st_mode
-            if stat.S_ISDIR(mode):
-                shutil.rmtree(self.fifo_path)
-            elif not stat.S_ISFIFO(mode):
-                os.unlink(self.fifo_path)
+            if not stat.S_ISFIFO(os.lstat(self.fifo_path).st_mode):
+                clear_path(self.fifo_path)
         try:
             os.mkfifo(self.fifo_path, 0o600)
         except FileExistsError:
@@ -183,11 +194,10 @@ class Pool:
         return self._read_tokens(None)
 
     def _refill_to(self, target: int) -> None:
-        present = self._drain()
+        self._drain()
         write = max(0, min(target, self.budget))
         if write:
             os.write(self.fifo_fd, TOKEN * write)
-        del present
 
     def acquire(self, want: int) -> int:
         """Take up to `want` tokens out of the FIFO for a socket client.
@@ -240,8 +250,9 @@ def _is_same_file(path: str, marker: os.stat_result) -> bool:
 
 
 def serve(pool: Pool, stop: threading.Event) -> None:
-    if os.path.exists(pool.sock_path):
-        os.unlink(pool.sock_path)
+    # Same trap as the FIFO path, and os.path.exists would additionally miss a
+    # dangling symlink, leaving bind to fail on a name that looks absent.
+    clear_path(pool.sock_path)
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     server.bind(pool.sock_path)
     os.chmod(pool.sock_path, 0o600)
