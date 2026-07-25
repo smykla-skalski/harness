@@ -254,6 +254,14 @@ extension PreviewHarnessClientState {
       grouping: currentTaskBoardItems(status: status).filter { $0.sourceProjectId != nil },
       by: \.sourceProjectId
     )
+    // The daemon hands out colors in palette order as projects register, so
+    // the fixture walks the same order over a stable sort. A preview that gave
+    // every project one color would hide the thing the mark exists to show.
+    let palette = TaskBoardProjectColor.allCases
+    let colorsByProject = Dictionary(
+      uniqueKeysWithValues: grouped.keys.compactMap { $0 }.sorted().enumerated()
+        .map { ($0.element, palette[$0.offset % palette.count]) }
+    )
     return grouped.compactMap { key, items in
       guard let projectId = key else {
         return nil
@@ -264,6 +272,7 @@ extension PreviewHarnessClientState {
         source: identity?.source ?? .manual,
         slug: identity?.slug ?? "unnamed project",
         displayName: nil,
+        color: colorsByProject[projectId] ?? .blue,
         itemCount: items.count,
         readyCount: items.count { $0.status == .todo }
       )

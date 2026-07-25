@@ -31,6 +31,7 @@ extension TaskBoardProjectSummary {
       source: wire.source,
       slug: wire.slug,
       displayName: wire.displayName,
+      color: wire.color,
       itemCount: Int(wire.itemCount),
       readyCount: Int(wire.readyCount)
     )

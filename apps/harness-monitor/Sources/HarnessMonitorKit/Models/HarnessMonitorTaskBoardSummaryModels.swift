@@ -119,6 +119,7 @@ public struct TaskBoardProjectSummary: Codable, Equatable, Identifiable, Sendabl
   public let source: TaskBoardProjectSource
   public let slug: String
   public let displayName: String?
+  public let color: TaskBoardProjectColor
   public let itemCount: Int
   public let readyCount: Int
 
@@ -127,6 +128,7 @@ public struct TaskBoardProjectSummary: Codable, Equatable, Identifiable, Sendabl
     source: TaskBoardProjectSource,
     slug: String,
     displayName: String? = nil,
+    color: TaskBoardProjectColor = .blue,
     itemCount: Int,
     readyCount: Int
   ) {
@@ -134,6 +136,7 @@ public struct TaskBoardProjectSummary: Codable, Equatable, Identifiable, Sendabl
     self.source = source
     self.slug = slug
     self.displayName = displayName
+    self.color = color
     self.itemCount = itemCount
     self.readyCount = readyCount
   }

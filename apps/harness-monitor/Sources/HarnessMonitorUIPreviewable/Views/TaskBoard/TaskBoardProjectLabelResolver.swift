@@ -29,9 +29,21 @@ struct TaskBoardProjectLabelResolver: Equatable, Sendable {
       }
     )
     projectsByID = Dictionary(
-      projects.map { ($0.projectId, RegisteredProject(slug: $0.slug, displayName: $0.displayName)) },
+      projects.map {
+        (
+          $0.projectId,
+          RegisteredProject(slug: $0.slug, displayName: $0.displayName, color: $0.color)
+        )
+      },
       uniquingKeysWith: { first, _ in first }
     )
+  }
+
+  /// The color of the project an item belongs to, or nil when it belongs to
+  /// none. Only a registered project has one: an item naming a repository the
+  /// registry has not seen yet gets no mark rather than an invented color.
+  func color(for item: TaskBoardItem) -> TaskBoardProjectColor? {
+    item.sourceProjectId.flatMap { projectsByID[$0]?.color }
   }
 
   /// The project an item belongs to, or nil when it belongs to none. Prefers
@@ -92,6 +104,7 @@ struct TaskBoardProjectLabelResolver: Equatable, Sendable {
 private struct RegisteredProject: Equatable, Sendable {
   let slug: String
   let displayName: String?
+  let color: TaskBoardProjectColor
 }
 
 private struct ProjectComponents {

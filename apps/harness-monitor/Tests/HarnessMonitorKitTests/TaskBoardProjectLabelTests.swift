@@ -122,16 +122,39 @@ struct TaskBoardProjectLabelTests {
     #expect(resolver.label(for: item(sourceProjectId: "project-b")) == "beta/console")
   }
 
+  /// The mark is only honest for a project the registry actually knows. An
+  /// item pointing at nothing, or at a project missing from this catalog, has
+  /// no color to show and must not be given one.
+  @Test("Only a registered project carries a color")
+  func onlyARegisteredProjectCarriesAColor() {
+    let resolver = TaskBoardProjectLabelResolver(
+      projects: [project(id: "project-a", slug: "alpha/console", color: .amber)],
+      projectIDs: []
+    )
+
+    #expect(resolver.color(for: item(sourceProjectId: "project-a")) == .amber)
+    #expect(resolver.color(for: item(sourceProjectId: nil)) == nil)
+    #expect(
+      resolver.color(
+        for: item(sourceProjectId: nil, executionRepository: "alpha/console")
+      ) == nil,
+      "a repository the registry has not seen yet is named but not colored"
+    )
+    #expect(resolver.color(for: item(sourceProjectId: "project-unknown")) == nil)
+  }
+
   private func project(
     id: String,
     slug: String,
-    displayName: String? = nil
+    displayName: String? = nil,
+    color: TaskBoardProjectColor = .blue
   ) -> TaskBoardProjectSummary {
     TaskBoardProjectSummary(
       projectId: id,
       source: .gitHub,
       slug: slug,
       displayName: displayName,
+      color: color,
       itemCount: 0,
       readyCount: 0
     )
