@@ -1,4 +1,3 @@
-use harness_daemon::feature_flags::RuntimeHookFlags;
 use harness_daemon::hooks::adapters::HookAgent;
 
 #[test]
@@ -8,7 +7,6 @@ fn daemon_setup_writes_the_real_agent_bootstrap_without_shelling_out() {
         temporary.path(),
         HookAgent::Claude,
         &[],
-        RuntimeHookFlags::all_enabled(),
     )
     .expect("write Claude bootstrap");
     let settings = temporary.path().join(".claude/settings.json");
@@ -16,7 +14,8 @@ fn daemon_setup_writes_the_real_agent_bootstrap_without_shelling_out() {
     assert_eq!(written, vec![settings.clone()]);
     let contents = fs_err::read_to_string(settings).expect("read Claude settings");
     assert!(contents.contains("harness-hook session-start"));
-    assert!(contents.contains("harness-hook guard-stop"));
+    assert!(contents.contains("harness-hook tool-guard"));
+    assert!(contents.contains("harness-hook tool-result"));
 }
 
 #[test]

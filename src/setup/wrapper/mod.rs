@@ -2,13 +2,10 @@ use std::path::{Path, PathBuf};
 
 use fs_err;
 
-use tracing::info;
-
-use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::feature_flags::{RuntimeHookFlags, SUITE_HOOKS_ENV};
 use crate::hooks::adapters::{HookAgent, adapter_for};
 use crate::infra::io::write_text;
 use crate::workspace::dirs_home;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 mod install;
 mod registrations;
@@ -135,9 +132,8 @@ pub fn write_agent_bootstrap(
     project_dir: &Path,
     agent: HookAgent,
     skip_runtime_hooks: &[HookAgent],
-    flags: RuntimeHookFlags,
 ) -> Result<Vec<PathBuf>, CliError> {
-    write_process_agent_bootstrap(project_dir, agent, skip_runtime_hooks, flags)
+    write_process_agent_bootstrap(project_dir, agent, skip_runtime_hooks)
 }
 
 /// Returns whether `harness` resolves from the provided PATH.
@@ -168,11 +164,10 @@ fn write_process_agent_bootstrap(
     project_dir: &Path,
     agent: HookAgent,
     skip_runtime_hooks: &[HookAgent],
-    flags: RuntimeHookFlags,
 ) -> Result<Vec<PathBuf>, CliError> {
     let mut written = Vec::new();
     remove_skipped_runtime_hook_config(project_dir, agent, skip_runtime_hooks)?;
-    let planned = planned_agent_bootstrap_files(project_dir, agent, skip_runtime_hooks, flags);
+    let planned = planned_agent_bootstrap_files(project_dir, agent, skip_runtime_hooks);
     for (path, content) in planned {
         write_text(&path, &content)?;
         written.push(path);
@@ -199,37 +194,17 @@ fn remove_skipped_runtime_hook_config(
     Ok(())
 }
 
-fn log_omitted_hook_families(path: &Path, flags: RuntimeHookFlags) {
-    log_suite_hook_omission(path, flags.suite_hooks);
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-)]
-fn log_suite_hook_omission(path: &Path, enabled: bool) {
-    if enabled {
-        return;
-    }
-    info!(
-        config = %path.display(),
-        "regenerated runtime config: suite-lifecycle hooks omitted (guard-stop / context-agent / validate-agent / tool-failure); set {SUITE_HOOKS_ENV}=1 or pass --enable-suite-hooks to restore",
-    );
-}
-
 pub(crate) fn planned_agent_bootstrap_files(
     project_dir: &Path,
     agent: HookAgent,
     skip_runtime_hooks: &[HookAgent],
-    flags: RuntimeHookFlags,
 ) -> Vec<(PathBuf, String)> {
     let mut planned = Vec::new();
     if !skip_runtime_hooks.contains(&agent) {
         let path = runtime_config_path(project_dir, agent);
         if let Some(path) = path {
-            let registrations = process_agent_registrations(agent, flags);
+            let registrations = process_agent_registrations(agent);
             let config = adapter_for(agent).generate_config(&registrations);
-            log_omitted_hook_families(&path, flags);
             planned.push((path, config));
         }
     }

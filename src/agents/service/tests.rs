@@ -234,7 +234,7 @@ fn record_hook_event_registers_late_managed_runtime_session() {
                 record_hook_event(
                     HookAgent::Gemini,
                     "suite:run",
-                    "guard-stop",
+                    "tool-result",
                     &context,
                     &NormalizedHookResult::allow(),
                 )
@@ -316,7 +316,7 @@ fn record_hook_event_session_end_disconnects_managed_agent() {
                 record_hook_event(
                     HookAgent::Claude,
                     "suite:run",
-                    "guard-stop",
+                    "tool-result",
                     &context,
                     &NormalizedHookResult::allow(),
                 )

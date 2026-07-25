@@ -4,7 +4,6 @@ pub mod wrapper {
     use harness_protocol::agent::HookAgent;
 
     use harness_kernel::errors::{CliError, CliErrorKind};
-    use crate::feature_flags::RuntimeHookFlags;
 
     /// Run the standalone hook setup wrapper with an explicit home directory.
     ///
@@ -29,20 +28,9 @@ pub mod wrapper {
         project_dir: &Path,
         agent: HookAgent,
         skip_runtime_hooks: &[HookAgent],
-        flags: RuntimeHookFlags,
     ) -> Result<Vec<PathBuf>, CliError> {
-        let hook_flags = if flags.suite_hooks {
-            harness_hook::feature_flags::RuntimeHookFlags::all_enabled()
-        } else {
-            harness_hook::feature_flags::RuntimeHookFlags::all_disabled()
-        };
-        harness_hook::setup::wrapper::write_agent_bootstrap(
-            project_dir,
-            agent,
-            skip_runtime_hooks,
-            hook_flags,
-        )
-        .map_err(|error| map_hook_error(&error))
+        harness_hook::setup::wrapper::write_agent_bootstrap(project_dir, agent, skip_runtime_hooks)
+            .map_err(|error| map_hook_error(&error))
     }
 
     fn map_hook_error(error: &harness_kernel::errors::CliError) -> CliError {

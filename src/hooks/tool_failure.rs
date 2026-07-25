@@ -1,5 +1,5 @@
-use harness_kernel::errors::CliError;
 use crate::hooks::application::GuardContext as HookContext;
+use harness_kernel::errors::CliError;
 
 use super::effects::HookOutcome;
 
@@ -8,8 +8,5 @@ use super::effects::HookOutcome;
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn execute(ctx: &HookContext) -> Result<HookOutcome, CliError> {
-    let outcome = super::enrich_failure::execute(ctx)?;
-    let audit = super::audit::execute(ctx)?;
-
-    Ok(outcome.append_non_decision_effects(audit.effects()))
+    super::audit::execute(ctx)
 }

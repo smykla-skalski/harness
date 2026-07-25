@@ -122,7 +122,7 @@ A copy-paste command block must state what it assumes - branch, cleanliness, pri
 
 ## Hooks
 
-The active unified tool lifecycle is `tool-guard`, `tool-result`, and optional `tool-failure`. Suite-lifecycle hooks (`guard-stop`, `context-agent`, `validate-agent`, `tool-failure`) are off by default unless enabled with `HARNESS_FEATURE_SUITE_HOOKS=1` or the matching setup flag.
+The hook binary exposes only the tool lifecycle: `tool-guard`, `tool-result`, and `tool-failure`. The suite-lifecycle hooks and their `HARNESS_FEATURE_SUITE_HOOKS` flag are gone.
 
 Repo-policy/manual-task enforcement is owned by the standalone `aff` CLI. Keep harness-owned setup (`setup:bootstrap`) separate from the manual `aff:*` tasks.
 

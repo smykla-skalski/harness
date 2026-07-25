@@ -268,9 +268,8 @@ fn operational_features() -> BTreeMap<Feature, FeatureInfo> {
         (
             Feature::HookSystem,
             FeatureInfo::new(
-                "7 hook commands intercepting tool and agent lifecycle: tool-guard, \
-                 tool-result, tool-failure, guard-stop, audit-turn, context-agent, \
-                 validate-agent",
+                "4 hook commands intercepting the tool lifecycle: tool-guard, \
+                 tool-result, tool-failure, audit-turn",
             )
             .command("harness-hook"),
         ),

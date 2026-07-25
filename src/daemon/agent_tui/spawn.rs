@@ -9,12 +9,11 @@ use portable_pty::CommandBuilder;
 use crate::agents::runtime::{
     AgentRuntime, InitialPromptDelivery, hook_agent_for_runtime_name, runtime_for_name,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::feature_flags::RuntimeHookFlags;
 #[cfg(feature = "daemon-runtime")]
 use crate::session::types::SessionRole;
 use crate::setup::wrapper;
 use crate::workspace::{dirs_home, host_home_dir};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::READINESS_TIMEOUT;
 use super::input::{AgentTuiInput, AgentTuiKey};
@@ -73,7 +72,7 @@ pub(crate) fn ensure_runtime_bootstrap(runtime: &str, project_dir: &Path) -> Res
     let agent = hook_agent_for_runtime_name(runtime).ok_or_else(|| {
         CliErrorKind::workflow_parse(format!("unsupported terminal agent runtime '{runtime}'"))
     })?;
-    let _ = wrapper::write_agent_bootstrap(project_dir, agent, &[], RuntimeHookFlags::from_env())?;
+    let _ = wrapper::write_agent_bootstrap(project_dir, agent, &[])?;
     Ok(())
 }
 

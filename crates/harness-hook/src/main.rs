@@ -6,14 +6,14 @@ use std::time::Duration;
 use clap::{Args, Parser, Subcommand};
 use harness_hook::agents::service;
 use harness_hook::app::resolve_project_dir;
-use harness_kernel::errors::{self, CliError, CliErrorKind};
 use harness_hook::hooks::{
     AuditTurnArgs, HookAgent, HookCommand, SessionStartHookOutput, run_hook_command,
 };
 use harness_hook::infra::exec::RUNTIME;
-use harness_kernel::kernel::skills::SKILL_NAMES;
 use harness_hook::setup::PreCompactArgs;
 use harness_hook::telemetry::{RuntimeService, TelemetryGuard, init_tracing_subscriber_for};
+use harness_kernel::errors::{self, CliError, CliErrorKind};
+use harness_kernel::kernel::skills::SKILL_NAMES;
 
 #[derive(Debug, Parser)]
 #[command(name = "harness-hook", version, about = "Harness lifecycle hooks")]
@@ -28,12 +28,9 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum Command {
     ToolGuard(HookInvocationArgs),
-    GuardStop(HookInvocationArgs),
     ToolResult(HookInvocationArgs),
     AuditTurn(AuditTurnInvocationArgs),
     ToolFailure(HookInvocationArgs),
-    ContextAgent(HookInvocationArgs),
-    ValidateAgent(HookInvocationArgs),
     SessionStart(AgentSessionArgs),
     SessionStop(AgentSessionArgs),
     PromptSubmit(AgentSessionArgs),
@@ -92,7 +89,6 @@ fn main() -> ExitCode {
 fn execute(command: Command) -> Result<i32, errors::CliError> {
     match command {
         Command::ToolGuard(args) => Ok(run_hook(&args, &HookCommand::ToolGuard)),
-        Command::GuardStop(args) => Ok(run_hook(&args, &HookCommand::GuardStop)),
         Command::ToolResult(args) => Ok(run_hook(&args, &HookCommand::ToolResult)),
         Command::AuditTurn(args) => Ok(run_hook(
             &args.hook,
@@ -101,8 +97,6 @@ fn execute(command: Command) -> Result<i32, errors::CliError> {
             }),
         )),
         Command::ToolFailure(args) => Ok(run_hook(&args, &HookCommand::ToolFailure)),
-        Command::ContextAgent(args) => Ok(run_hook(&args, &HookCommand::ContextAgent)),
-        Command::ValidateAgent(args) => Ok(run_hook(&args, &HookCommand::ValidateAgent)),
         Command::SessionStart(args) => session_start(args),
         Command::SessionStop(args) => session_stop(args),
         Command::PromptSubmit(args) => prompt_submit(args),

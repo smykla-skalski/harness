@@ -56,7 +56,7 @@ fn gemini_lifecycle_transcript_uses_assistant_response_not_prompt_body() {
         record_hook_event(
             hook_agent_for_runtime_name("gemini").expect("gemini hook agent"),
             "suite:run",
-            "guard-stop",
+            "tool-result",
             &context,
             &NormalizedHookResult::allow(),
         )

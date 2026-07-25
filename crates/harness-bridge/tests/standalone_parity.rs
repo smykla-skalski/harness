@@ -1,8 +1,7 @@
 use std::path::Path;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
-use harness_bridge::feature_flags::RuntimeHookFlags;
 use harness_bridge::hooks::adapters::HookAgent;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[test]
 fn bridge_uses_canonical_runner_state_name() {
@@ -62,7 +61,6 @@ fn bridge_setup_writes_the_real_agent_bootstrap() {
         temporary.path(),
         HookAgent::Claude,
         &[],
-        RuntimeHookFlags::all_enabled(),
     )
     .expect("write Claude bootstrap");
     let settings = temporary.path().join(".claude/settings.json");
@@ -70,7 +68,8 @@ fn bridge_setup_writes_the_real_agent_bootstrap() {
     assert_eq!(written, vec![settings.clone()]);
     let contents = fs_err::read_to_string(settings).expect("read Claude settings");
     assert!(contents.contains("harness-hook session-start"));
-    assert!(contents.contains("harness-hook guard-stop"));
+    assert!(contents.contains("harness-hook tool-guard"));
+    assert!(contents.contains("harness-hook tool-result"));
 }
 
 #[test]

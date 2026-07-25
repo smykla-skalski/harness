@@ -2,9 +2,9 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use crate::agents::runtime;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::service as session_service;
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 use tracing::callsite::Identifier as CallsiteIdentifier;
 use tracing::field::Empty;
 
@@ -84,9 +84,6 @@ fn default_event_for_hook(hook_type: HookType) -> NormalizedEvent {
         HookType::PreToolUse => NormalizedEvent::BeforeToolUse,
         HookType::PostToolUse => NormalizedEvent::AfterToolUse,
         HookType::PostToolUseFailure => NormalizedEvent::AfterToolUseFailure,
-        HookType::SubagentStart => NormalizedEvent::SubagentStart,
-        HookType::SubagentStop => NormalizedEvent::SubagentStop,
-        HookType::Blocking => NormalizedEvent::AgentStop,
     }
 }
 
@@ -101,12 +98,9 @@ fn should_record_hook_event(hook: &HookCommand) -> bool {
     matches!(
         hook,
         HookCommand::ToolGuard
-            | HookCommand::GuardStop
             | HookCommand::ToolResult
             | HookCommand::AuditTurn(_)
             | HookCommand::ToolFailure
-            | HookCommand::ContextAgent
-            | HookCommand::ValidateAgent
     )
 }
 

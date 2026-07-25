@@ -51,35 +51,6 @@ fn hooks_application_context_root_stays_prod_only() {
 }
 
 #[test]
-fn context_agent_root_stays_a_facade() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let context_agent = fs::read_to_string(root.join("src/hooks/context_agent.rs")).unwrap();
-
-    for needle in [
-        "use crate::errors::{CliError, HookMessage};",
-        "use crate::hooks::application::GuardContext as HookContext;",
-        "use crate::run::workflow::{PreflightStatus, RunnerPhase, RunnerWorkflowState};",
-        "use super::effects::{HookEffect, HookOutcome};",
-        "fn can_start_preflight_worker(",
-        "mod tests {",
-    ] {
-        assert!(
-            !context_agent.contains(needle),
-            "src/hooks/context_agent.rs should stay a thin facade instead of owning `{needle}`"
-        );
-    }
-
-    assert_split_modules_exist(
-        root,
-        &[
-            "src/hooks/context_agent/runtime.rs",
-            "src/hooks/context_agent/tests.rs",
-        ],
-        "context-agent split module should exist",
-    );
-}
-
-#[test]
 fn create_workflow_root_stays_focused_on_runtime_state() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let workflow = fs::read_to_string(root.join("src/create/workflow.rs")).unwrap();
@@ -129,10 +100,6 @@ fn question_and_stop_hooks_root_stay_prod_only() {
             ][..],
         ),
         (
-            "src/hooks/guard_stop.rs",
-            &["fn inactive_skill_allows()", "mod tests {"][..],
-        ),
-        (
             "src/hooks/verify_question.rs",
             &["fn inactive_skill_allows()", "mod tests {"][..],
         ),
@@ -148,7 +115,6 @@ fn question_and_stop_hooks_root_stay_prod_only() {
 
     for path in [
         "src/hooks/guard_question/tests.rs",
-        "src/hooks/guard_stop/tests.rs",
         "src/hooks/verify_question/tests.rs",
     ] {
         assert!(
@@ -156,21 +122,6 @@ fn question_and_stop_hooks_root_stay_prod_only() {
             "question/stop hook split test module should exist: {path}"
         );
     }
-}
-
-#[test]
-fn validate_agent_root_stays_prod_only() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let validate_agent = fs::read_to_string(root.join("src/hooks/validate_agent.rs")).unwrap();
-
-    assert!(
-        !validate_agent.contains("mod tests {"),
-        "src/hooks/validate_agent.rs should stay focused on production hook logic instead of owning embedded tests"
-    );
-    assert!(
-        root.join("src/hooks/validate_agent/tests.rs").exists(),
-        "validate_agent split test module should exist"
-    );
 }
 
 #[test]
@@ -255,15 +206,6 @@ fn hook_misc_roots_stay_prod_only() {
                 "mod tests {",
             ][..],
             "src/hooks/audit/tests.rs",
-        ),
-        (
-            "src/hooks/enrich_failure.rs",
-            &[
-                "fn request_failure_triage_sets_phase_and_failure()",
-                "fn request_preflight_failed_resets_status()",
-                "mod tests {",
-            ][..],
-            "src/hooks/enrich_failure/tests.rs",
         ),
         (
             "src/hooks/verify_write.rs",
