@@ -262,7 +262,9 @@ extension PreviewHarnessClientState {
       return canonicalizeLabels(needles).contains { targetTypes.contains($0) }
     case .targetProjectTypesHasNone(let needles):
       return !canonicalizeLabels(needles).contains { targetTypes.contains($0) }
-    default:
+    case .priorityEquals, .executionRepositoryEquals, .executionRepositoryIsPresent,
+      .executionRepositoryIsMissing, .projectIdEquals, .projectIdIsPresent,
+      .projectIdIsMissing, .importedFromProviderEquals, .importedFromProviderIsMissing:
       return nil
     }
   }
@@ -286,7 +288,8 @@ extension PreviewHarnessClientState {
       return item.projectId != nil
     case .projectIdIsMissing:
       return item.projectId == nil
-    default:
+    case .labelsHasAny, .labelsHasAll, .labelsHasNone, .targetProjectTypesHasAny,
+      .targetProjectTypesHasNone, .importedFromProviderEquals, .importedFromProviderIsMissing:
       return nil
     }
   }
@@ -300,7 +303,10 @@ extension PreviewHarnessClientState {
       return item.importedFromProvider?.rawValue == provider.rawValue
     case .importedFromProviderIsMissing:
       return item.importedFromProvider == nil
-    default:
+    case .labelsHasAny, .labelsHasAll, .labelsHasNone, .priorityEquals,
+      .executionRepositoryEquals, .executionRepositoryIsPresent, .executionRepositoryIsMissing,
+      .projectIdEquals, .projectIdIsPresent, .projectIdIsMissing, .targetProjectTypesHasAny,
+      .targetProjectTypesHasNone:
       return nil
     }
   }

@@ -101,13 +101,13 @@ extension HarnessMonitorStore {
 
   /// Recomputes the relative drop against one canonical server snapshot per
   /// attempt, so a bounded retry cannot replay an obsolete absolute slot.
-  struct PositionPlacement {
+  fileprivate struct PositionPlacement {
     let status: TaskBoardStatus
     let placement: TaskBoardRelativeLanePlacement
     let actor: String
   }
 
-  nonisolated static func setTaskBoardItemPositionWithRetry(
+  nonisolated fileprivate static func setTaskBoardItemPositionWithRetry(
     using client: any HarnessMonitorClientProtocol,
     id: String,
     _ target: PositionPlacement,
