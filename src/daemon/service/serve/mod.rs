@@ -97,6 +97,12 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     }
     task_board_automation_startup::initialize_control_before_serving(&async_db).await?;
     let manifest = persist_manifest(&manifest)?;
+    // Only once the endpoint is discoverable. Reconciliation walks every
+    // project, so awaiting it here would put that walk between the daemon
+    // binding its port and the Monitor being able to find it.
+    if let Some(db) = db.get() {
+        spawn_background_reconciliation(db);
+    }
     audit::record_daemon_started(async_db.get(), &endpoint, config.sandboxed).await;
     schedule_probe_cache_refresh();
     let codex_controller = CodexControllerHandle::new_with_async_db(
@@ -203,7 +209,6 @@ pub(crate) async fn initialize_startup_state(
             task_board_migration::migrate_task_board(async_db).await?;
             policy_bootstrap::bootstrap_policy_storage(async_db).await?;
         }
-        spawn_background_reconciliation(&db);
         spawn_startup_background_tasks(
             Arc::clone(&db),
             Arc::clone(async_db_slot),
