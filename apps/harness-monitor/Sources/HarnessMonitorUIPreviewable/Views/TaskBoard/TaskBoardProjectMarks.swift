@@ -214,6 +214,8 @@ struct TaskBoardProjectMark: View {
   var alignsWith: NSFont.TextStyle = .body
   @Environment(\.fontScale)
   private var fontScale
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
 
   private var diameter: CGFloat { 7 * fontScale }
 
@@ -224,11 +226,17 @@ struct TaskBoardProjectMark: View {
     let baseline = diameter / 2
       + TaskBoardProjectMarkCapHeights.capHeight(for: alignsWith) * fontScale / 2
     let outline = TaskBoardProjectMarkOutline(shape: style.shape)
+    // The border keeps a light mark from vanishing on the card's own light
+    // fill, and past the palette it is also what makes the shape readable, so
+    // Increased Contrast gets a border that can carry that on its own.
+    let increased = colorSchemeContrast == .increased
     return outline
       .fill(style.color.color)
       .overlay {
-        // Keeps a light mark from vanishing on the card's own light fill.
-        outline.strokeBorder(HarnessMonitorTheme.ink.opacity(0.18), lineWidth: 0.5)
+        outline.strokeBorder(
+          HarnessMonitorTheme.ink.opacity(increased ? 0.65 : 0.18),
+          lineWidth: increased ? 1 : 0.5
+        )
       }
       .frame(width: diameter, height: diameter)
       .alignmentGuide(.firstTextBaseline) { _ in baseline }
