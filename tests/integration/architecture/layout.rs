@@ -14,7 +14,7 @@ fn new_domain_roots_exist() {
         "src/observe",
         "src/setup",
         "src/workspace",
-        "src/kernel",
+        "crates/harness-kernel/src/kernel",
         "src/platform",
         "src/infra",
         "src/hooks",
@@ -57,7 +57,7 @@ fn legacy_scatter_roots_are_gone() {
 fn cluster_topology_is_owned_by_kernel() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     assert!(
-        root.join("src/kernel/topology.rs").exists(),
+        root.join("crates/harness-kernel/src/kernel/topology.rs").exists(),
         "kernel topology module should exist"
     );
 

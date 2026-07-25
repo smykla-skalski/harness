@@ -104,10 +104,10 @@ fn tool_fact_model_is_owned_by_kernel() {
         ],
     );
 
-    let kernel_tooling = read_repo_file(root, "src/kernel/tooling.rs");
+    let kernel_tooling = read_repo_file(root, "crates/harness-kernel/src/kernel/tooling.rs");
     assert!(
         kernel_tooling.contains("pub struct ToolContext"),
-        "src/kernel/tooling.rs should own the shared tool fact model"
+        "crates/harness-kernel/src/kernel/tooling.rs should own the shared tool fact model"
     );
 }
 

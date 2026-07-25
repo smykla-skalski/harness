@@ -12,8 +12,7 @@ pub mod app;
 #[allow(dead_code, unused_imports)]
 #[path = "../../../src/daemon/mod.rs"]
 pub mod daemon;
-#[path = "../../../src/errors/mod.rs"]
-pub mod errors;
+pub use harness_kernel::errors;
 #[path = "../../../src/feature_flags.rs"]
 pub mod feature_flags;
 pub(crate) mod git;

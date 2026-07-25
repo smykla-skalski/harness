@@ -32,6 +32,7 @@ gix = { version = "0.86.0", features = ["progress-tree", "status", "worktree-mut
 gray_matter = { version = "0.3.2", default-features = false, features = ["yaml"] }
 harness-command = { path = "../harness-command", version = "51.0.1" }
 harness-hook = { path = "../harness-hook", version = "51.0.1" }
+harness-kernel = { path = "../harness-kernel", version = "51.0.1" }
 harness-protocol = { path = "../harness-protocol", version = "51.0.1" }
 harness-systemd-protocol = { path = "../harness-systemd-protocol", version = "51.0.1", optional = true }
 harness-telemetry = { path = "../harness-telemetry", version = "51.0.1" }

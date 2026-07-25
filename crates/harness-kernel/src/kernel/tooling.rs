@@ -19,7 +19,6 @@ pub enum ToolCategory {
 
 /// Agent-agnostic representation of tool input.
 #[derive(Debug, Clone, PartialEq)]
-#[non_exhaustive]
 pub enum ToolInput {
     Shell {
         command: String,

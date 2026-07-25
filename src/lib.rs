@@ -9,7 +9,10 @@ mod codec;
 pub mod create;
 #[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
 pub mod daemon;
-pub mod errors;
+// `errors` and `kernel` live in harness-kernel. Re-exporting them keeps
+// `crate::errors` and `crate::kernel` resolving for the rest of this crate
+// while there is only one definition of their types in the build graph.
+pub use harness_kernel::errors;
 #[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
 pub mod feature_flags;
 pub(crate) mod git;
@@ -17,7 +20,7 @@ pub(crate) mod git;
 pub(crate) mod github_api;
 pub mod hooks;
 pub mod infra;
-pub mod kernel;
+pub use harness_kernel::kernel;
 pub(crate) mod manifests;
 #[cfg(feature = "mcp-runtime")]
 pub use harness_mcp::mcp;

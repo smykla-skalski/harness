@@ -8,7 +8,6 @@ use super::parsing;
 /// Deployment platform for a cluster: Kubernetes or Universal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "kebab-case")]
-#[non_exhaustive]
 pub enum Platform {
     #[default]
     Kubernetes,
@@ -46,7 +45,6 @@ impl FromStr for Platform {
 /// Concrete runtime/provider used for a tracked cluster.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "kebab-case")]
-#[non_exhaustive]
 pub enum ClusterProvider {
     #[default]
     K3d,
@@ -95,7 +93,6 @@ impl FromStr for ClusterProvider {
 /// Cluster deployment mode describing the topology and lifecycle direction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-#[non_exhaustive]
 pub enum ClusterMode {
     SingleUp,
     SingleDown,

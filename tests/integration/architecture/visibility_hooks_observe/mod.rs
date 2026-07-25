@@ -275,13 +275,13 @@ fn hook_misc_roots_stay_prod_only() {
             "src/hooks/verify_write/tests.rs",
         ),
         (
-            "src/errors/hook_result.rs",
+            "crates/harness-kernel/src/errors/hook_result.rs",
             &[
                 "fn allow_has_empty_code_and_message()",
                 "fn clone_is_equal()",
                 "mod tests {",
             ][..],
-            "src/errors/hook_result/tests.rs",
+            "crates/harness-kernel/src/errors/hook_result/tests.rs",
         ),
     ] {
         let contents = fs::read_to_string(root.join(path)).unwrap();
