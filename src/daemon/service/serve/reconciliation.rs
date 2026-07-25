@@ -85,7 +85,16 @@ pub(crate) fn sync_background_projects_and_collect_candidates(
     result: &mut db::ReconcileResult,
 ) -> Result<Vec<index::ResolvedSession>, CliError> {
     sync_background_projects(db, projects, result)?;
-    Ok(collect_background_session_candidates(db, sessions, result))
+    collect_background_session_candidates(db, sessions, result)
+}
+
+/// A poisoned db lock means another thread panicked holding it. Reporting that
+/// as success let reconciliation skip its work and still log the normal
+/// completion line, which is indistinguishable from a clean run.
+fn locked_db_error() -> CliError {
+    CliError::from(CliErrorKind::workflow_io(
+        "daemon db lock poisoned during background reconciliation",
+    ))
 }
 
 enum BackgroundSessionImportOutcome {
@@ -123,7 +132,7 @@ pub(crate) fn sync_background_projects(
 ) -> Result<(), CliError> {
     for project in projects {
         let Ok(db_guard) = db.lock() else {
-            return Ok(());
+            return Err(locked_db_error());
         };
         let synced = db_guard.sync_project(project).map_err(|error| {
             CliError::from(CliErrorKind::workflow_io(format!(
@@ -142,11 +151,11 @@ pub(crate) fn collect_background_session_candidates(
     db: &Arc<Mutex<db::DaemonDb>>,
     sessions: &[index::ResolvedSession],
     result: &mut db::ReconcileResult,
-) -> Vec<index::ResolvedSession> {
+) -> Result<Vec<index::ResolvedSession>, CliError> {
     let mut sessions_to_prepare = Vec::new();
     for resolved in sessions {
         let Ok(db_guard) = db.lock() else {
-            break;
+            return Err(locked_db_error());
         };
         let candidate = background_session_candidate(&db_guard, resolved);
         drop(db_guard);
@@ -157,7 +166,7 @@ pub(crate) fn collect_background_session_candidates(
             }
         }
     }
-    sessions_to_prepare
+    Ok(sessions_to_prepare)
 }
 
 pub(crate) fn prepare_background_session_import(
