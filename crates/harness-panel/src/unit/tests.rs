@@ -24,7 +24,6 @@ fn args() -> PanelArgs {
         session_ttl_hours: 12,
         daemon_endpoint: "https://harness.example.com".to_owned(),
         daemon_spki_pin: "sha256/AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=".to_owned(),
-        daemon_pair_code: None,
         pair_link_role: "operator".to_owned(),
         pair_link_ttl_seconds: 600,
     }
@@ -284,6 +283,39 @@ fn a_control_character_in_the_companion_auth_path_is_refused() {
     .expect_err("a newline in the token path must be refused");
 
     assert!(error.to_string().contains("control characters"), "{error}");
+}
+
+/// The unit is what actually starts the panel, so every flag `serve` requires
+/// has to appear in it. Reading the requirement off `PanelArgs` rather than
+/// listing it here is what keeps the two from drifting: a required flag added
+/// to the arguments and not to the renderer produced a unit that clap rejected
+/// at once, which under `Restart=on-failure` is a boot loop rather than a
+/// visible error.
+#[test]
+fn every_required_serve_flag_is_rendered() {
+    // `PanelArgs` derives `Args`, not `Parser`, so the command has to be built
+    // by augmenting an empty one.
+    use clap::{Args, Command};
+
+    let command = PanelArgs::augment_args(Command::new("serve"));
+    let unit = rendered();
+    let mut missing = Vec::new();
+    for argument in command.get_arguments() {
+        if !argument.is_required_set() {
+            continue;
+        }
+        let Some(long) = argument.get_long() else {
+            continue;
+        };
+        if !unit.contains(&format!("--{long} ")) {
+            missing.push(long.to_owned());
+        }
+    }
+
+    assert!(
+        missing.is_empty(),
+        "the rendered unit omits required serve flags: {missing:?}"
+    );
 }
 
 /// `StateDirectory=` is a space-separated list and `%S/{unit}` is emitted as a

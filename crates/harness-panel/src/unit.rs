@@ -293,6 +293,19 @@ fn serve_command(
         ExecArgument::Value(args.owner_login.clone()),
         ExecArgument::Value("--session-ttl-hours".to_owned()),
         ExecArgument::Value(args.session_ttl_hours.to_string()),
+        // Every flag `serve` requires has to appear here. A required flag added
+        // to the arguments and not to this list renders a unit that clap
+        // rejects at once, which under Restart=on-failure is a boot loop rather
+        // than a visible error. `every_required_serve_flag_is_rendered` holds
+        // the two lists together.
+        ExecArgument::Value("--daemon-endpoint".to_owned()),
+        ExecArgument::Value(args.daemon_endpoint.clone()),
+        ExecArgument::Value("--daemon-spki-pin".to_owned()),
+        ExecArgument::Value(args.daemon_spki_pin.clone()),
+        ExecArgument::Value("--pair-link-role".to_owned()),
+        ExecArgument::Value(args.pair_link_role.clone()),
+        ExecArgument::Value("--pair-link-ttl-seconds".to_owned()),
+        ExecArgument::Value(args.pair_link_ttl_seconds.to_string()),
     ];
 
     for argument in &command {

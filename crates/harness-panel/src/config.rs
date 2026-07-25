@@ -100,11 +100,6 @@ pub struct PanelArgs {
     #[arg(long, env = "HARNESS_PANEL_DAEMON_SPKI_PIN")]
     pub daemon_spki_pin: String,
 
-    /// A one-time pairing code for a `pairing_broker` credential, needed only
-    /// until the panel has claimed one of its own.
-    #[arg(long, env = "HARNESS_PANEL_DAEMON_PAIR_CODE")]
-    pub daemon_pair_code: Option<String>,
-
     /// The role every link the panel mints grants.
     #[arg(long, default_value = daemon::DEFAULT_PAIR_LINK_ROLE, env = "HARNESS_PANEL_PAIR_LINK_ROLE")]
     pub pair_link_role: String,
@@ -217,7 +212,6 @@ impl PanelArgs {
             daemon: daemon::resolve(
                 &self.daemon_endpoint,
                 &self.daemon_spki_pin,
-                self.daemon_pair_code.as_deref(),
                 &self.pair_link_role,
                 self.pair_link_ttl_seconds,
             )?,

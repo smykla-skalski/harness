@@ -38,6 +38,25 @@ impl Store {
         Ok(())
     }
 
+    /// How many of this account's links have not yet expired.
+    ///
+    /// # Errors
+    /// Returns [`sqlx::Error`] when the query fails.
+    pub async fn live_pair_link_count(
+        &self,
+        account_id: &str,
+        now: DateTime<Utc>,
+    ) -> Result<i64, sqlx::Error> {
+        let row = sqlx::query(
+            "SELECT COUNT(*) AS live FROM pair_links WHERE account_id = ?1 AND expires_at > ?2",
+        )
+        .bind(account_id)
+        .bind(to_unix_seconds(now))
+        .fetch_one(self.pool())
+        .await?;
+        Ok(row.get("live"))
+    }
+
     /// Links this account has been issued, most recent first.
     ///
     /// # Errors
@@ -138,6 +157,41 @@ mod tests {
         assert_eq!(
             names,
             vec!["id", "account_id", "role", "created_at", "expires_at"]
+        );
+    }
+
+    /// A revoke cannot reach a link already minted, so the only defence
+    /// against one approved account holding a pile of live credentials is a cap
+    /// on how many it can have at once.
+    #[tokio::test]
+    async fn only_unexpired_links_count_towards_the_cap() {
+        let store = Store::open_in_memory().await.expect("store");
+        let ada = account(&store, "ada", "4242").await;
+
+        store
+            .record_pair_link(&record("pair-1", &ada.id, 11))
+            .await
+            .expect("first");
+        store
+            .record_pair_link(&record("pair-2", &ada.id, 20))
+            .await
+            .expect("second");
+
+        // `record` expires a link an hour after it was created.
+        assert_eq!(
+            store
+                .live_pair_link_count(&ada.id, at(13))
+                .await
+                .expect("count"),
+            1,
+            "the first has lapsed"
+        );
+        assert_eq!(
+            store
+                .live_pair_link_count(&ada.id, at(11))
+                .await
+                .expect("count"),
+            2
         );
     }
 

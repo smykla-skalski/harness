@@ -6,8 +6,8 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 use harness_panel::config::{DEFAULT_LISTEN, PanelArgs};
-use harness_panel::{PanelError, serve, unit};
-use tokio::runtime::Builder;
+use harness_panel::{PanelError, pairing, serve, unit};
+use tokio::runtime::{Builder, Runtime};
 use tracing_subscriber::EnvFilter;
 
 /// Default unit name, matching the binary so the unit and its state directory
@@ -29,6 +29,18 @@ struct Cli {
 enum Command {
     /// Serve the panel.
     Serve(Box<PanelArgs>),
+    /// Claim the daemon credential the panel mints with, once.
+    ///
+    /// Separate from `serve` because the code is one-time: left in a unit file
+    /// it would be spent on the first start and refused on every restart.
+    Pair {
+        #[command(flatten)]
+        args: Box<PanelArgs>,
+        /// File holding the one-time pairing code. A file rather than a flag
+        /// value, which any local process can read out of `/proc`.
+        #[arg(long, env = "HARNESS_PANEL_DAEMON_PAIR_CODE_FILE")]
+        code_file: PathBuf,
+    },
     /// Print the hardened systemd service for review before it is installed.
     PrintUnit {
         #[command(flatten)]
@@ -81,6 +93,10 @@ fn report(error: &PanelError) -> ExitCode {
 fn run(cli: Cli) -> Result<(), PanelError> {
     match cli.command {
         Command::Serve(args) => serve_blocking(&args),
+        Command::Pair { args, code_file } => {
+            let config = args.resolve()?;
+            runtime()?.block_on(pairing::claim(&config, &code_file))
+        }
         Command::PrintUnit {
             args,
             unit,
@@ -100,9 +116,12 @@ fn run(cli: Cli) -> Result<(), PanelError> {
 
 fn serve_blocking(args: &PanelArgs) -> Result<(), PanelError> {
     let config = args.resolve()?;
-    let runtime = Builder::new_multi_thread()
+    runtime()?.block_on(serve::run(config))
+}
+
+fn runtime() -> Result<Runtime, PanelError> {
+    Builder::new_multi_thread()
         .enable_all()
         .build()
-        .map_err(PanelError::Runtime)?;
-    runtime.block_on(serve::run(config))
+        .map_err(PanelError::Runtime)
 }

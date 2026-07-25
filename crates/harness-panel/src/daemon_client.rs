@@ -12,7 +12,7 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, HeaderName, USER_AGENT};
-use reqwest::{Client, Response, StatusCode};
+use reqwest::{Client, Response};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -168,9 +168,16 @@ impl DaemonClient {
         })
     }
 
+    /// Append a daemon route to the configured endpoint.
+    ///
+    /// `set_path` would replace the whole path, so an endpoint carrying a
+    /// prefix — a daemon behind a reverse proxy at `/harness`, say — would have
+    /// it silently dropped and every call would 404 with nothing naming the
+    /// cause.
     fn route(&self, path: &str) -> Url {
         let mut url = self.endpoint.clone();
-        url.set_path(path);
+        let base = url.path().trim_end_matches('/').to_owned();
+        url.set_path(&format!("{base}{path}"));
         url
     }
 
@@ -206,11 +213,10 @@ where
 
     let detail = response.text().await.unwrap_or_default();
     let detail = detail.trim();
-    if status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN {
-        return Err(PanelError::daemon(format!(
-            "the daemon refused the panel's credential ({status}); it may need re-pairing: {detail}"
-        )));
-    }
+    // Deliberately no guess at the cause. A 403 answers a claim whose domain
+    // does not match as readily as it answers a stale credential, and naming
+    // the wrong one sends an operator to revoke a client when the endpoint was
+    // the problem. The daemon's own message says which.
     Err(PanelError::daemon(format!(
         "could not {action}: the daemon answered {status}: {detail}"
     )))

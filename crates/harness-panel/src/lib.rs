@@ -12,6 +12,7 @@ pub mod daemon_client;
 pub mod error;
 pub mod github;
 pub mod http;
+pub mod pairing;
 pub mod serve;
 pub mod store;
 pub mod unit;

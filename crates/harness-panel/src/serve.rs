@@ -26,7 +26,6 @@ use crate::config::PanelConfig;
 use crate::error::PanelError;
 use crate::http::{PanelState, router};
 use crate::store::Store;
-use uuid::Uuid;
 
 /// How often expired sessions and unfinished sign-ins are reclaimed. Expiry is
 /// enforced on every read, so this only frees rows and can be lazy.
@@ -224,7 +223,7 @@ pub async fn run(config: PanelConfig) -> Result<(), PanelError> {
     let store = Store::open(&config.state_dir).await?;
     let listen = config.listen;
     let state = PanelState::new(config, store.clone())?;
-    pair_with_daemon(&state).await?;
+    warn_if_unpaired(&state).await?;
 
     if state.assets.is_placeholder() {
         tracing::warn!(
@@ -255,40 +254,23 @@ pub async fn run(config: PanelConfig) -> Result<(), PanelError> {
         })
 }
 
-/// Claim the daemon credential the panel runs as, if it needs one.
+/// Say so at start if the panel cannot mint anything yet.
 ///
-/// A code supplied on the command line always wins: it is how an operator
-/// recovers from a credential the daemon has revoked. Without one, an existing
-/// credential is kept and a panel that has neither says so now rather than on
-/// the first person's attempt to generate a link.
+/// Serving never claims. A one-time code left in a unit file would be spent on
+/// the first start and refused on every restart afterwards, so claiming is its
+/// own command; this only reports what the store already holds.
 ///
 /// # Errors
-/// Returns [`PanelError::Daemon`] when the daemon refuses the code, and
-/// [`PanelError::Storage`] when the credential cannot be stored.
+/// Returns [`PanelError::Storage`] when the credential cannot be read.
 #[expect(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
-async fn pair_with_daemon(state: &PanelState) -> Result<(), PanelError> {
-    if let Some(code) = state.daemon.config.pair_code.as_deref() {
-        let client_id = Uuid::new_v4().to_string();
-        let credential = state.daemon.client.claim(code, &client_id).await?;
-        tracing::info!(
-            client_id = %credential.client_id,
-            role = %credential.role,
-            "panel claimed a daemon credential"
-        );
-        state
-            .store
-            .store_daemon_credential(&credential, Utc::now())
-            .await?;
-        return Ok(());
-    }
-
+async fn warn_if_unpaired(state: &PanelState) -> Result<(), PanelError> {
     if state.store.daemon_credential().await?.is_none() {
         tracing::warn!(
-            "the panel has no daemon credential; pass --daemon-pair-code once to claim one, or \
-             nobody will be able to generate a pairing link"
+            "the panel holds no daemon credential; run `harness-panel pair` once, or nobody will \
+             be able to generate a pairing link"
         );
     }
     Ok(())

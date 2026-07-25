@@ -48,7 +48,6 @@ fn args(directory: &Path) -> PanelArgs {
         session_ttl_hours: 12,
         daemon_endpoint: "https://harness.example.com".to_owned(),
         daemon_spki_pin: "sha256/AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=".to_owned(),
-        daemon_pair_code: None,
         pair_link_role: "operator".to_owned(),
         pair_link_ttl_seconds: 600,
     }

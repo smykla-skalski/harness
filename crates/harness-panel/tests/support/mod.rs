@@ -184,7 +184,6 @@ impl PanelUnderTest {
             // a shape the panel accepts. Nothing here opens a connection.
             daemon_endpoint: "https://harness.example.com".to_owned(),
             daemon_spki_pin: format!("sha256/{}", STANDARD.encode([3_u8; 32])),
-            daemon_pair_code: None,
             pair_link_role: "operator".to_owned(),
             pair_link_ttl_seconds: 600,
         };
