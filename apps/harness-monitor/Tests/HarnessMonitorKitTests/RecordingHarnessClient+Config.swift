@@ -10,9 +10,13 @@ extension RecordingHarnessClient {
   /// Recorded calls without the project-catalog read a board refresh performs
   /// on its own. A test asserting an exact mutation sequence wants what it
   /// asked the store to do, not what the refresh behind it loads.
+  ///
+  /// Only the refresh's unscoped read is dropped. A status-scoped catalog call
+  /// comes from a caller that asked for one, and hiding it would let an
+  /// unexpected fetch pass a mutation assertion.
   func recordedCallsIgnoringProjectCatalogReads() -> [Call] {
     calls.filter {
-      if case .taskBoardProjects = $0 { return false }
+      if case .taskBoardProjects(let status) = $0 { return status != nil }
       return true
     }
   }
