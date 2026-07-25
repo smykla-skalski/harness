@@ -40,6 +40,12 @@ const DAEMON_API_SEGMENT: &str = "v1";
 /// explicit prefix.
 pub const DEFAULT_COMPANION_PATH_PREFIX: &str = "/panel";
 
+/// What each companion route pattern adds after the configured prefix. Kept as
+/// constants so registration and [`CompanionRouteConfig::owns_route`] cannot
+/// describe a different route set.
+const ROUTE_SUFFIX_SLASH: &str = "/";
+const ROUTE_SUFFIX_WILDCARD: &str = "/{*companion_path}";
+
 /// Why a companion routing configuration was rejected.
 ///
 /// Every variant is a startup misconfiguration: the daemon refuses to open its
@@ -156,16 +162,22 @@ impl CompanionRouteConfig {
     pub(crate) fn routes(&self) -> [String; 3] {
         [
             self.path_prefix.clone(),
-            format!("{}/", self.path_prefix),
-            format!("{}/{{*companion_path}}", self.path_prefix),
+            format!("{}{ROUTE_SUFFIX_SLASH}", self.path_prefix),
+            format!("{}{ROUTE_SUFFIX_WILDCARD}", self.path_prefix),
         ]
     }
 
     /// Whether a matched route path belongs to the companion rather than the
     /// daemon's own API.
+    ///
+    /// The limit middleware asks this of every remote request, the daemon's own
+    /// included, so it answers by comparing suffixes rather than rebuilding
+    /// [`Self::routes`] and allocating three strings to say "no".
     #[must_use]
     pub(crate) fn owns_route(&self, route_path: &str) -> bool {
-        self.routes().iter().any(|route| route == route_path)
+        route_path
+            .strip_prefix(self.path_prefix.as_str())
+            .is_some_and(|rest| matches!(rest, "" | ROUTE_SUFFIX_SLASH | ROUTE_SUFFIX_WILDCARD))
     }
 }
 
@@ -295,7 +307,7 @@ impl CompanionRouter {
     }
 }
 
-/// Register the companion's two route patterns on the daemon router.
+/// Register every companion route pattern on the daemon router.
 ///
 /// Merge these *after* the remote authentication layer is applied: the
 /// companion authenticates its own users, and its paths carry no entry in

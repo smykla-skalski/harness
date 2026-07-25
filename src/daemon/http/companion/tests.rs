@@ -169,9 +169,22 @@ fn route_patterns_cover_the_prefix_and_its_subtree() {
         ],
         "the bare trailing slash needs its own pattern; {{*rest}} never matches an empty remainder"
     );
+    // owns_route answers without rebuilding routes(), so the two must agree on
+    // every pattern and disagree on everything else.
     for owned in route.routes() {
         assert!(route.owns_route(&owned), "{owned} must be recognised");
     }
-    assert!(!route.owns_route("/v1/ready"));
-    assert!(!route.owns_route("/panelling"));
+    for foreign in [
+        "/v1/ready",
+        "/panelling",
+        "/pane",
+        "/panel/{*other}",
+        "/panel/api",
+        "",
+    ] {
+        assert!(
+            !route.owns_route(foreign),
+            "{foreign} must not be claimed by the companion"
+        );
+    }
 }
