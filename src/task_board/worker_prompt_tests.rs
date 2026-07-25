@@ -34,6 +34,7 @@ fn bare_context() -> WorkerPromptContext<'static> {
 
 #[test]
 fn plan_prompt_preserves_existing_session_checkout_and_marks_reserved_ids() {
+    let _lock = prompt_catalog_test_lock();
     let mut item = TaskBoardItem::new(
         "board-1".into(),
         "Existing session task".into(),
@@ -53,6 +54,7 @@ fn plan_prompt_preserves_existing_session_checkout_and_marks_reserved_ids() {
 
 #[test]
 fn an_item_without_optional_facts_renders_the_shipped_bytes() {
+    let _lock = prompt_catalog_test_lock();
     let prompt = render_worker_prompt(&bare_item(), &bare_context()).expect("render worker prompt");
 
     assert_eq!(prompt, BARE_GOLDEN);
@@ -64,6 +66,10 @@ fn an_item_without_optional_facts_renders_the_shipped_bytes() {
 /// fixture supplies it, and pin each section's bytes and its place in the order.
 #[test]
 fn every_optional_fact_renders_its_shipped_section_in_order() {
+    // Reads the process-wide catalog, so it has to take the same lock the
+    // installers in this module take or one of their scoped catalogs lands
+    // underneath it.
+    let _lock = prompt_catalog_test_lock();
     let item = populated_item();
     let context = populated_context();
 
