@@ -225,21 +225,21 @@ fn a_bounded_large_batch_resolves_a_qualified_alias_without_scanning() {
 }
 
 /// The shape a case-varying import left behind: one board item claiming
-/// `kong/owner#1` and another claiming `Kong/owner#1`, which canonicalise to
-/// the same key.
+/// `owner/repo#689` and another claiming `Owner/repo#689`, which canonicalise
+/// to the same key.
 fn duplicate_case_index() -> ProviderItemIndex {
     ProviderItemIndex::build(vec![
-        TaskBoardSyncItemSnapshot::new(item_with_ref("legacy", None, "kong/team-mesh#689"), 1),
-        TaskBoardSyncItemSnapshot::new(item_with_ref("current", None, "Kong/team-mesh#689"), 2),
+        TaskBoardSyncItemSnapshot::new(item_with_ref("legacy", None, "owner/repo#689"), 1),
+        TaskBoardSyncItemSnapshot::new(item_with_ref("current", None, "Owner/repo#689"), 2),
     ])
 }
 
 #[test]
 fn a_reference_two_items_claim_reports_ambiguous_rather_than_failing() {
     let index = duplicate_case_index();
-    let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "Kong/team-mesh#689");
+    let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "Owner/repo#689");
 
-    let matched = index.active_snapshot(&reference, Some("kong/team-mesh"));
+    let matched = index.active_snapshot(&reference, Some("owner/repo"));
 
     assert!(
         matches!(matched, SnapshotMatch::Ambiguous),
@@ -250,17 +250,17 @@ fn a_reference_two_items_claim_reports_ambiguous_rather_than_failing() {
 #[test]
 fn an_unambiguous_reference_still_resolves_beside_a_duplicated_one() {
     let mut snapshots = vec![
-        TaskBoardSyncItemSnapshot::new(item_with_ref("legacy", None, "kong/team-mesh#689"), 1),
-        TaskBoardSyncItemSnapshot::new(item_with_ref("current", None, "Kong/team-mesh#689"), 2),
+        TaskBoardSyncItemSnapshot::new(item_with_ref("legacy", None, "owner/repo#689"), 1),
+        TaskBoardSyncItemSnapshot::new(item_with_ref("current", None, "Owner/repo#689"), 2),
     ];
     snapshots.push(TaskBoardSyncItemSnapshot::new(
-        item_with_ref("healthy", None, "kong/team-mesh#700"),
+        item_with_ref("healthy", None, "owner/repo#700"),
         3,
     ));
     let index = ProviderItemIndex::build(snapshots);
-    let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "kong/team-mesh#700");
+    let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "owner/repo#700");
 
-    let matched = index.active_snapshot(&reference, Some("kong/team-mesh"));
+    let matched = index.active_snapshot(&reference, Some("owner/repo"));
 
     let SnapshotMatch::Found(snapshot) = matched else {
         panic!("the healthy reference still resolves");
@@ -271,9 +271,9 @@ fn an_unambiguous_reference_still_resolves_beside_a_duplicated_one() {
 #[test]
 fn a_reference_no_item_claims_is_missing_not_ambiguous() {
     let index = duplicate_case_index();
-    let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "kong/team-mesh#999");
+    let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "owner/repo#999");
 
-    let matched = index.active_snapshot(&reference, Some("kong/team-mesh"));
+    let matched = index.active_snapshot(&reference, Some("owner/repo"));
 
     assert!(matches!(matched, SnapshotMatch::Missing));
 }

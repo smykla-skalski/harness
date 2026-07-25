@@ -76,11 +76,11 @@ fn a_skipped_reference_is_named_in_the_payload() {
 
     add_execution_metrics(
         &mut payload,
-        &metrics_with_ambiguous(&["Kong/team-mesh#689"]),
+        &metrics_with_ambiguous(&["Owner/repo#689"]),
     );
 
     assert_eq!(payload["ambiguous_reference_count"], 1);
-    assert_eq!(payload["ambiguous_references"][0], "Kong/team-mesh#689");
+    assert_eq!(payload["ambiguous_references"][0], "Owner/repo#689");
 }
 
 /// A clean run keeps the payload it always had, so the key showing up at all
