@@ -53,15 +53,10 @@ fn main() {
     }
 }
 
-/// Install exactly what the lockfile pins, and only when the installed tree no
-/// longer matches it.
-///
-/// `npm ci` rather than `npm install`: `install` is free to resolve a different
-/// tree and to rewrite `package-lock.json`, so an ordinary `cargo build` could
-/// leave the working tree dirty and produce a binary nobody can reproduce.
-/// The stamp lives beside `node_modules` so it is invalidated together with the
-/// tree it describes, which keeps the reinstall off the common path where the
-/// build already runs on every source change.
+/// `npm install` is skipped once the tree matches the lockfile, because the
+/// build runs on every source change and a reinstall each time would dominate
+/// it. The stamp lives beside `node_modules` so it is invalidated together with
+/// the tree it describes.
 fn install_dependencies(frontend: &Path) {
     let lockfile = frontend.join("package-lock.json");
     let stamp = frontend.join("node_modules").join(".harness-panel-stamp");
@@ -73,7 +68,7 @@ fn install_dependencies(frontend: &Path) {
         return;
     }
 
-    run_npm(frontend, &["ci", "--no-audit", "--no-fund"]);
+    run_npm(frontend, &["install", "--no-audit", "--no-fund"]);
     if !expected.is_empty() {
         fs::write(&stamp, expected).expect("recording the installed lockfile digest");
     }
@@ -100,22 +95,39 @@ fn npm_binary() -> String {
     env::var("HARNESS_PANEL_NPM").unwrap_or_else(|_| "npm".to_owned())
 }
 
+/// Write a stand-in bundle that answers every route a real one does.
+///
+/// The point of the skip is to build and test the Rust side without Node, so
+/// the placeholder has to satisfy the same expectations the real bundle does:
+/// an entry page carrying the app's mount point, and one asset under the
+/// content-hashed directory. A page that only apologised would make the tests
+/// covering those routes fail for a reason that has nothing to do with them.
 fn write_placeholder(dist: &Path) {
+    // A previous real build leaves its hashed assets here, and Vite's own
+    // `emptyOutDir` is what normally clears them. Without this the embedded
+    // bundle would depend on build history rather than on this run.
+    if dist.exists() {
+        fs::remove_dir_all(dist).expect("clearing the previous bundle");
+    }
     let assets = dist.join("assets");
     fs::create_dir_all(&assets).expect("creating the placeholder bundle directory");
-    // `include_dir!` walks a real directory, and an empty one would compile to
-    // a bundle with no entry point at all, so the placeholder has to be a page.
     fs::write(
         dist.join("index.html"),
         "<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">\
          <meta name=\"harness-panel-base\" content=\"/__harness_panel_base__\">\
          <title>Harness panel</title></head><body>\
-         <p>This binary was built without the panel's web assets.</p>\
+         <div id=\"app\"><p>This binary was built without the panel's web assets.</p></div>\
          </body></html>\n",
     )
     .expect("writing the placeholder page");
     fs::write(dist.join(PLACEHOLDER_MARKER), "").expect("writing the placeholder marker");
-    fs::write(assets.join(".keep"), "").expect("keeping the placeholder assets directory");
+    // Stands in for the content-hashed asset Vite emits, so the immutable cache
+    // path is exercised rather than skipped when the frontend is absent.
+    fs::write(
+        assets.join("placeholder-0000000.js"),
+        "/* built without the panel's web assets */\n",
+    )
+    .expect("writing the placeholder asset");
 }
 
 fn digest(bytes: &[u8]) -> String {

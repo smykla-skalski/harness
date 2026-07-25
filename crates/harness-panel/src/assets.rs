@@ -206,7 +206,7 @@ mod tests {
             .get_dir("assets")
             .and_then(|dir| dir.files().next())
             .map(|file| file.path().to_string_lossy().into_owned())
-            .expect("vite always emits at least one hashed asset");
+            .expect("every bundle carries at least one asset, placeholder included");
 
         let bundled = assets.file(&hashed).expect("the hashed asset is bundled");
 
