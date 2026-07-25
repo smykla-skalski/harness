@@ -73,3 +73,18 @@ pub(super) fn unusable_task_board_page(cursor: &str, fault: &str) -> CliError {
     ))
     .into()
 }
+
+/// Stop the page walk after this many pages.
+///
+/// Refusing a repeated cursor only catches a resume point that stalls on the
+/// very next page. A daemon that keeps offering one more distinct cursor still
+/// grows the walk without bound, so the walk needs a ceiling of its own.
+pub(super) const TASK_BOARD_LIST_MAX_PAGES: usize = 200;
+
+pub(super) fn undrained_task_board_read() -> CliError {
+    CliErrorKind::workflow_io(format!(
+        "the task-board read did not drain within {TASK_BOARD_LIST_MAX_PAGES} pages; \
+         narrow it with a filter, or read one page at a time with --limit and --cursor"
+    ))
+    .into()
+}

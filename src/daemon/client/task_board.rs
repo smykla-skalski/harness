@@ -35,7 +35,10 @@ use crate::task_board::{
 };
 
 use super::DaemonClient;
-use super::task_board_list::{enum_label, task_board_list_query, unusable_task_board_page};
+use super::task_board_list::{
+    TASK_BOARD_LIST_MAX_PAGES, enum_label, task_board_list_query, undrained_task_board_read,
+    unusable_task_board_page,
+};
 
 #[expect(
     clippy::missing_errors_doc,
@@ -87,16 +90,26 @@ impl DaemonClient {
     /// repeats the resume point it was handed, so either shape means the
     /// daemon is not the one this client is built against - and a `Vec` has
     /// nowhere to say the board was read only in part.
+    ///
+    /// A cursor whose anchor left the selection between two reads resumes at
+    /// the slot that anchor held, so a page can re-serve a row an earlier page
+    /// already returned. Ids are tracked and a repeat is dropped, because this
+    /// call promises one whole board and every consumer keys on item id.
     pub fn list_task_board_items(
         &self,
         request: &TaskBoardListItemsRequest,
     ) -> Result<Vec<TaskBoardItem>, CliError> {
         let mut request = request.clone();
         let mut items = Vec::new();
-        loop {
+        let mut seen = std::collections::HashSet::new();
+        for _ in 0..TASK_BOARD_LIST_MAX_PAGES {
             let page = self.list_task_board_items_page(&request)?;
             let drained = page.items.is_empty();
-            items.extend(page.items);
+            items.extend(
+                page.items
+                    .into_iter()
+                    .filter(|item| seen.insert(item.id.clone())),
+            );
             let Some(cursor) = page.next_cursor else {
                 return Ok(items);
             };
@@ -114,6 +127,7 @@ impl DaemonClient {
             }
             request.cursor = Some(cursor);
         }
+        Err(undrained_task_board_read())
     }
 
     pub fn get_task_board_item(&self, item_id: &str) -> Result<TaskBoardItem, CliError> {

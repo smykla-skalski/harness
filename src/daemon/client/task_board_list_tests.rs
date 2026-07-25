@@ -1,6 +1,7 @@
 use crate::daemon::protocol::TaskBoardListItemsRequest;
 use crate::task_board::{AgentMode, TaskBoardPriority, TaskBoardStatus};
 
+use super::task_board_list::TASK_BOARD_LIST_MAX_PAGES;
 use super::task_board_tests::{client_with, item, spawn_mock, spawn_mock_sequence};
 
 #[test]
@@ -131,4 +132,78 @@ fn task_board_list_refuses_a_cursor_with_no_items() {
         error.to_string().contains("cursor with no items"),
         "unexpected: {error}"
     );
+}
+
+/// A cursor whose anchor was deleted between two reads resumes at the slot that
+/// anchor held, so a page can re-serve a row an earlier page already returned.
+/// This call promises one whole board and every consumer keys on item id, so a
+/// repeat has to be dropped rather than handed back twice.
+#[test]
+fn task_board_list_walks_a_re_served_row_only_once() {
+    let (endpoint, _request_lines, handle) = spawn_mock_sequence(vec![
+        page_of(&["task-1", "task-2", "task-3"], Some("cursor-2")),
+        page_of(&["task-2", "task-3", "task-4"], None),
+    ]);
+
+    let items = client_with(endpoint)
+        .list_task_board_items(&TaskBoardListItemsRequest::default())
+        .expect("list items");
+    handle.join().expect("server");
+
+    assert_eq!(
+        items
+            .iter()
+            .map(|item| item.id.as_str())
+            .collect::<Vec<_>>(),
+        ["task-1", "task-2", "task-3", "task-4"]
+    );
+}
+
+/// Refusing a repeated cursor only catches a resume point that stalls on the
+/// very next page. A daemon that keeps offering one more distinct cursor has to
+/// hit a ceiling, or the walk grows without bound.
+#[test]
+fn task_board_list_stops_at_the_page_cap_when_a_read_never_drains() {
+    // Exactly one response per allowed page, so the walk must give up on its
+    // own rather than ask for a page the mock never scripted.
+    let responses = (0..TASK_BOARD_LIST_MAX_PAGES)
+        .map(|index| {
+            page_of(
+                &[&format!("task-{index}")],
+                Some(&format!("cursor-{index}")),
+            )
+        })
+        .collect::<Vec<_>>();
+    let (endpoint, request_lines, handle) = spawn_mock_sequence(responses);
+
+    let error = client_with(endpoint)
+        .list_task_board_items(&TaskBoardListItemsRequest::default())
+        .expect_err("an undrainable read must fail rather than grow forever");
+    handle.join().expect("server");
+
+    assert!(
+        error.to_string().contains("did not drain"),
+        "unexpected: {error}"
+    );
+    assert_eq!(
+        request_lines.lock().expect("request lines").len(),
+        TASK_BOARD_LIST_MAX_PAGES,
+        "the walk asked for a different number of pages than its own cap"
+    );
+}
+
+fn page_of(ids: &[&str], next_cursor: Option<&str>) -> String {
+    let items = ids
+        .iter()
+        .map(|id| {
+            let mut item = item();
+            item.id = (*id).to_string();
+            item
+        })
+        .collect::<Vec<_>>();
+    let mut page = serde_json::json!({ "items": items, "total_matched": ids.len() });
+    if let Some(cursor) = next_cursor {
+        page["next_cursor"] = serde_json::json!(cursor);
+    }
+    page.to_string()
 }
