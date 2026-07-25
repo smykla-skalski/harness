@@ -279,8 +279,8 @@ hide = true
 run = "./scripts/check-toolchain-pin.sh"
 
 [tasks."clean:sccache"]
-description = "Stop sccache servers that no longer own the socket; the live server and every client are left alone"
-run = "./scripts/clean-sccache-servers.sh"
+description = "Stop sccache servers that no longer own the socket; the live server and every client are left alone (Linux only)"
+run = "./scripts/run-linux-only.sh ./scripts/clean-sccache-servers.sh"
 
 [tasks."harness:check:version"]
 hide = true

@@ -35,6 +35,21 @@ if active="$(cd "$ROOT" && rustup show active-toolchain 2>/dev/null)"; then
     "") errors+=("rustup reported no active toolchain") ;;
     *) errors+=("active toolchain $active != pinned $toolchain_pin (run: rustup toolchain install $toolchain_pin)") ;;
   esac
+else
+  # Skipping this quietly would let the environment this gate exists to catch
+  # pass it, since a host with no working rustup is exactly one that resolves
+  # some other toolchain and rebuilds cold.
+  errors+=("rustup could not report an active toolchain, so the pin cannot be proven live")
+fi
+
+# The Linux profile links with mold. A host without it fails deep in the link
+# step with an unknown-linker error from cc, which names neither the flag nor
+# where it came from.
+if [[ "$(uname -s)" == "Linux" ]] \
+  && grep -q 'fuse-ld=mold' "$ROOT/.cargo/config.toml"; then
+  if ! command -v mold >/dev/null 2>&1 && ! command -v ld.mold >/dev/null 2>&1; then
+    errors+=("mold is the configured Linux linker but is not on PATH (install it, for example: apt install mold)")
+  fi
 fi
 
 if ((${#errors[@]})); then
@@ -43,5 +58,5 @@ if ((${#errors[@]})); then
   exit 1
 fi
 
-printf 'toolchain: pin %s agrees across rust-toolchain.toml, .mise.toml, and mise.lock\n' \
+printf 'toolchain: pin %s agrees across rust-toolchain.toml, .mise.toml, and mise.lock, and the configured linker is present\n' \
   "$toolchain_pin"
