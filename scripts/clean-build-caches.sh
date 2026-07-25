@@ -13,14 +13,14 @@
 #                            (ms-playwright is reported but NOT removed; pass --force/-f to remove it)
 #
 # target/ is shared across every worktree via cargo-local.sh's
-# CARGO_TARGET_DIR: one target/dev/agent-<session> segment per concurrent
-# agent build, or target/dev/local for a build with no session id, all
-# rooted at the common repo. Segments with a live
-# target/.cargo-local/leases/ entry are actively building and are kept,
-# not deleted, so this script never rips a build out from under a running
-# session; every other entry under target/dev/ is swept. target/.cargo-local
-# itself (the lease and tmp bookkeeping cargo-local.sh depends on) is never
-# touched.
+# CARGO_TARGET_DIR: target/dev/local for the main checkout, or
+# target/dev/wt-<worktree-name>-<hash> per linked worktree, shared by every
+# session that builds in that checkout, all rooted at the common repo.
+# Segments with a live target/.cargo-local/leases/ entry are actively
+# building and are kept, not deleted, so this script never rips a build out
+# from under a running session; every other entry under target/dev/ is
+# swept. target/.cargo-local itself (the lease and tmp bookkeeping
+# cargo-local.sh depends on) is never touched.
 #
 # --aggressive also wipes Xcode UI HarnessMonitor-* DerivedData (slow regen,
 # loses SourcePackages cache - only use when truly desperate for space).
@@ -139,22 +139,22 @@ pid_is_alive() {
   ps -p "$pid" >/dev/null 2>&1
 }
 
-# A segment (target/dev/local or target/dev/agent-<session>) is leased when
-# a cargo-local.sh lease file names it with a PID that's still alive. The PID
-# comes from the lease file's content (the source of truth), not parsed out
-# of the filename, so session ids containing dashes or digits can't confuse
-# the match.
+# A segment (target/dev/local or target/dev/wt-<worktree>-<hash>) is leased
+# when a cargo-local.sh lease file names it with a PID that's still alive.
+# cargo-local.sh names the lease file after the same target_segment value it
+# uses for the directory, so the match is a direct string compare, not a
+# reconstruction. The PID comes from the lease file's content (the source of
+# truth), not parsed out of the filename, so a segment name containing
+# dashes or digits (every wt-* segment does) can't confuse the match.
 segment_is_leased() {
-  local segment="$1" key lease_file base pid
-  key="$segment"
-  [[ "$key" == agent-* ]] && key="${key#agent-}"
+  local segment="$1" lease_file base pid
   [[ -d "$LEASE_DIR" ]] || return 1
   for lease_file in "$LEASE_DIR"/*; do
     [[ -f "$lease_file" ]] || continue
     pid="$(cat "$lease_file" 2>/dev/null || true)"
     [[ "$pid" =~ ^[0-9]+$ ]] || continue
     base="$(basename -- "$lease_file")"
-    [[ "$base" == "$key-$pid" ]] && pid_is_alive "$pid" && return 0
+    [[ "$base" == "$segment-$pid" ]] && pid_is_alive "$pid" && return 0
   done
   return 1
 }

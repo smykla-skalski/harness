@@ -98,13 +98,16 @@ unused_pid() {
 }
 
 # Builds a fixture repo whose target/ mirrors the shared cargo-local.sh
-# layout: target/dev/agent-live (a genuinely running background process
-# holds its lease), target/dev/agent-dead (lease PID has already exited),
-# target/dev/agent-nolease (no lease file at all), a stray top-level entry
-# directly under target/ that predates the per-agent scheme, a stray file
-# directly under target/dev/ (not a segment directory), and an empty
-# fake-home/ the caller can point HOME at so the script's global-cache
-# section doesn't size the real $HOME/Library/Caches/*.
+# layout: target/dev/local (the main checkout, a genuinely running
+# background process holds its lease), a linked-worktree segment with a live
+# lease, one with a dead lease (PID has already exited), one with no lease
+# file at all, a stray top-level entry directly under target/ that predates
+# the per-checkout scheme, a stray file directly under target/dev/ (not a
+# segment directory), and an empty fake-home/ the caller can point HOME at
+# so the script's global-cache section doesn't size the real
+# $HOME/Library/Caches/*. Worktree segment and lease keys reuse
+# cargo-local.sh's real wt-<worktree>-<hash> shape so the fixture exercises
+# dashes and digits in the match, not just plain words.
 make_shared_target_fixture() {
   local repo="$1"
   mkdir -p "$repo/scripts/lib"
@@ -112,25 +115,35 @@ make_shared_target_fixture() {
   cp "$SCRIPT" "$repo/scripts/clean-build-caches.sh"
   cp "$ROOT/scripts/lib/common-repo-root.sh" "$repo/scripts/lib/common-repo-root.sh"
 
-  mkdir -p "$repo/target/dev/agent-live/debug"
-  mkdir -p "$repo/target/dev/agent-dead/debug"
-  mkdir -p "$repo/target/dev/agent-nolease/debug"
-  echo "obj" > "$repo/target/dev/agent-live/debug/harness"
-  echo "obj" > "$repo/target/dev/agent-dead/debug/harness"
-  echo "obj" > "$repo/target/dev/agent-nolease/debug/harness"
+  mkdir -p "$repo/target/dev/local/debug"
+  mkdir -p "$repo/target/dev/wt-live-0e4eb0f4/debug"
+  mkdir -p "$repo/target/dev/wt-dead-1a2b3c4d/debug"
+  mkdir -p "$repo/target/dev/wt-nolease-3f4e5d6c/debug"
+  echo "obj" > "$repo/target/dev/local/debug/harness"
+  echo "obj" > "$repo/target/dev/wt-live-0e4eb0f4/debug/harness"
+  echo "obj" > "$repo/target/dev/wt-dead-1a2b3c4d/debug/harness"
+  echo "obj" > "$repo/target/dev/wt-nolease-3f4e5d6c/debug/harness"
   echo "stray" > "$repo/target/stray-legacy-artifact"
   echo "stray" > "$repo/target/dev/.rustc_info.json"
 
   mkdir -p "$repo/target/.cargo-local/leases"
-  local live_pid
+  local local_pid
   sleep 300 &
-  live_pid=$!
-  LIVE_LEASE_PIDS+=("$live_pid")
-  printf '%s\n' "$live_pid" > "$repo/target/.cargo-local/leases/live-$live_pid"
+  local_pid=$!
+  LIVE_LEASE_PIDS+=("$local_pid")
+  printf '%s\n' "$local_pid" > "$repo/target/.cargo-local/leases/local-$local_pid"
+
+  local wt_live_pid
+  sleep 300 &
+  wt_live_pid=$!
+  LIVE_LEASE_PIDS+=("$wt_live_pid")
+  printf '%s\n' "$wt_live_pid" \
+    > "$repo/target/.cargo-local/leases/wt-live-0e4eb0f4-$wt_live_pid"
 
   local dead_pid
   dead_pid="$(unused_pid)"
-  printf '%s\n' "$dead_pid" > "$repo/target/.cargo-local/leases/dead-$dead_pid"
+  printf '%s\n' "$dead_pid" \
+    > "$repo/target/.cargo-local/leases/wt-dead-1a2b3c4d-$dead_pid"
 }
 
 scenario_dry_run_keeps_leased_segment() {
@@ -142,9 +155,10 @@ scenario_dry_run_keeps_leased_segment() {
   make_shared_target_fixture "$repo"
   output="$(cd "$repo" && HOME="$repo/fake-home" ./scripts/clean-build-caches.sh --dry-run)"
 
-  assert_output_line_contains "$output" "target/dev/agent-live" "(active build, kept)"
-  assert_output_line_contains "$output" "target/dev/agent-dead" "(dry-run)"
-  assert_output_line_contains "$output" "target/dev/agent-nolease" "(dry-run)"
+  assert_output_line_contains "$output" "target/dev/local" "(active build, kept)"
+  assert_output_line_contains "$output" "target/dev/wt-live-0e4eb0f4" "(active build, kept)"
+  assert_output_line_contains "$output" "target/dev/wt-dead-1a2b3c4d" "(dry-run)"
+  assert_output_line_contains "$output" "target/dev/wt-nolease-3f4e5d6c" "(dry-run)"
   assert_output_line_contains "$output" "target/stray-legacy-artifact" "(dry-run)"
   assert_output_line_contains "$output" "target/dev/.rustc_info.json" "(dry-run)"
   pass
