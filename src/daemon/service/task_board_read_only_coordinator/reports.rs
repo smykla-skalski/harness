@@ -14,7 +14,7 @@ use crate::task_board::{
 
 use super::super::task_board_read_only_runtime::TaskBoardReadOnlyRuntime;
 use super::attempts::{invalid_transition, require_human, set_execution_state};
-use super::requests::codex_attempt_request;
+use super::requests::{attempt_run_identity, codex_attempt_request};
 
 pub(super) async fn reconcile_report_attempt<R>(
     db: &AsyncDaemonDb,
@@ -27,8 +27,11 @@ pub(super) async fn reconcile_report_attempt<R>(
 where
     R: TaskBoardReadOnlyRuntime,
 {
-    let expected_request = codex_attempt_request(execution, attempt)?;
-    let run = load_codex_run(runtime, expected_request.mode, &attempt.idempotency_key).await?;
+    // Only a new run needs the prompt. Finding an existing one and confirming
+    // it are structural, so they must not render: an attempt that has already
+    // finished has to be harvestable no matter what the prompt file says now.
+    let identity = attempt_run_identity(execution, attempt)?;
+    let run = load_codex_run(runtime, identity.mode, &attempt.idempotency_key).await?;
     let run = match run {
         Some(run) => run,
         None if attempt.state == TaskBoardAttemptState::Running => {
@@ -40,18 +43,19 @@ where
         }
         None if !allow_start => return Ok(false),
         None => {
+            // Rendered before the claim so a refusal costs no side effect.
+            let request = match codex_attempt_request(execution, attempt) {
+                Ok(request) => request,
+                Err(error) => {
+                    refuse_unrenderable_request(db, execution, attempt, now, &error).await?;
+                    return Ok(true);
+                }
+            };
             let Some(claimed) = claim_report_side_effect(db, attempt, now).await? else {
                 return Ok(true);
             };
             let session_id = super::requests::run_context(execution)?.session_id.as_str();
-            match start_codex_run(
-                runtime,
-                session_id,
-                &expected_request,
-                &claimed.idempotency_key,
-            )
-            .await
-            {
+            match start_codex_run(runtime, session_id, &request, &claimed.idempotency_key).await {
                 Ok(run) => run,
                 Err(error) => {
                     let Some(run) =
@@ -66,12 +70,9 @@ where
         }
     };
     let durable_attempt = current_attempt(db, attempt).await?;
-    if let Err(error) = super::report_evidence::validate_run_binding(
-        &run,
-        execution,
-        &durable_attempt,
-        &expected_request,
-    ) {
+    if let Err(error) =
+        super::report_evidence::validate_run_binding(&run, execution, &durable_attempt, &identity)
+    {
         mark_unknown(db, execution, &durable_attempt, now, &error.to_string()).await?;
         return Ok(true);
     }
@@ -135,8 +136,8 @@ async fn reconcile_report_start_error<R>(
 where
     R: TaskBoardReadOnlyRuntime,
 {
-    let request = codex_attempt_request(execution, claimed)?;
-    match load_codex_run(runtime, request.mode, &claimed.idempotency_key).await {
+    let identity = attempt_run_identity(execution, claimed)?;
+    match load_codex_run(runtime, identity.mode, &claimed.idempotency_key).await {
         Ok(Some(run)) => Ok(Some(run)),
         Ok(None) => {
             if super::attempts::settlement_is_current(db, &execution.execution_id, now).await? {
@@ -369,6 +370,37 @@ pub(super) async fn record_retry_or_human(
             .await
         }
     }
+}
+
+/// A prompt that cannot render is a configuration mistake, not a transient
+/// fault, and nothing was started. Retrying it on a backoff would only repeat
+/// the same refusal, so the attempt fails permanently and says what to fix.
+async fn refuse_unrenderable_request(
+    db: &AsyncDaemonDb,
+    execution: &TaskBoardWorkflowExecutionRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
+    now: &str,
+    error: &CliError,
+) -> Result<(), CliError> {
+    transition_attempt(
+        db,
+        attempt,
+        TaskBoardAttemptState::Failed,
+        now,
+        Some(TaskBoardFailureClass::Permanent),
+        Some(&error.to_string()),
+        None,
+    )
+    .await?;
+    require_human(
+        db,
+        &execution.execution_id,
+        "attempt_prompt_unrenderable",
+        "the configured prompt for this attempt cannot be rendered",
+        TaskBoardTerminalOutcomeKind::HumanRequired,
+        now,
+    )
+    .await
 }
 
 async fn mark_unknown(

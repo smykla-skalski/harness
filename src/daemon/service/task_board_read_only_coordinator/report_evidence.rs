@@ -1,5 +1,5 @@
 use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::protocol::{CodexRunRequest, CodexRunSnapshot};
+use crate::daemon::protocol::CodexRunSnapshot;
 use crate::errors::CliError;
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionAttemptRecord, TaskBoardFailureClass,
@@ -10,6 +10,7 @@ use crate::task_board::{
 use super::attempts::invalid_transition;
 use super::attempts::require_human;
 use super::reports::transition_attempt;
+use super::requests::AttemptRunIdentity;
 
 pub(super) async fn accept_completed_run(
     db: &AsyncDaemonDb,
@@ -60,7 +61,7 @@ pub(super) fn validate_run_binding(
     run: &CodexRunSnapshot,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
-    expected: &CodexRunRequest,
+    expected: &AttemptRunIdentity,
 ) -> Result<(), CliError> {
     let context = super::requests::run_context(execution)?;
     let session_id = context.session_id.as_str();
@@ -80,7 +81,12 @@ pub(super) fn validate_run_binding(
             "durable Codex run does not match the frozen workflow attempt binding",
         ));
     }
-    if run.prompt != expected.prompt {
+    // Best-effort confirmation only. A prompt that still matches is the
+    // stronger signal, but one that cannot be rendered says nothing either way,
+    // and this attempt's result is already durable.
+    if super::requests::codex_attempt_request(execution, attempt)
+        .is_ok_and(|current| current.prompt != run.prompt)
+    {
         note_attempt_prompt_change(&attempt.idempotency_key);
     }
     Ok(())
