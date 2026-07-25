@@ -243,6 +243,44 @@ scenario_missing_pool_still_runs_the_command() {
   pass "$name"
 }
 
+scenario_run_preserves_argument_separators() {
+  local name="run preserves a separator inside the command"
+  local root; root="$(fake_root separator)"
+  track_pool "$root"
+  python3 "$JOBSERVER" ensure --repo-root "$root" --budget 2 >/dev/null 2>&1
+
+  # Only the separator argparse needs may be stripped. Test runners forward
+  # their own arguments after a second one, and eating it silently rewrites
+  # the command - `nextest run -- --nocapture` would lose the separator.
+  local seen
+  seen="$(python3 "$JOBSERVER" run --repo-root "$root" --max 1 --env PROBE -- \
+    printf '%s|' a -- b)"
+  if [[ "$seen" != "a|--|b|" ]]; then
+    fail "$name (expected 'a|--|b|', got '$seen')"
+    return
+  fi
+  pass "$name"
+}
+
+scenario_lock_file_holds_only_the_current_pid() {
+  local name="the lock file is truncated to the current pid"
+  local root; root="$(fake_root lockfile)"
+  track_pool "$root"
+  local dir; dir="$(pool_dir_for "$root")"
+
+  mkdir -p "$dir"
+  # A longer stale pid from an earlier supervisor must not survive underneath.
+  printf '99999999\n' > "$dir/lock"
+  python3 "$JOBSERVER" ensure --repo-root "$root" --budget 2 >/dev/null 2>&1
+
+  local lines; lines="$(wc -l < "$dir/lock" | tr -d ' ')"
+  if [[ "$lines" != "1" ]]; then
+    fail "$name (lock file has $lines lines: $(tr '\n' ' ' < "$dir/lock"))"
+    return
+  fi
+  pass "$name"
+}
+
 scenario_run_propagates_exit_status() {
   local name="run propagates the command's exit status"
   local root; root="$(fake_root status)"
@@ -266,6 +304,8 @@ scenario_second_client_gets_the_remainder
 scenario_sigkilled_client_returns_its_tokens
 scenario_foreign_owned_pool_dir_is_refused
 scenario_missing_pool_still_runs_the_command
+scenario_run_preserves_argument_separators
+scenario_lock_file_holds_only_the_current_pid
 scenario_run_propagates_exit_status
 
 printf 'jobserver tests: %d passed, %d failed\n' "$passed" "$failed"

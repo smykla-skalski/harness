@@ -216,6 +216,9 @@ def supervise(repo_root: str, budget: int) -> int:
     except OSError:
         return 0  # another supervisor owns this pool
 
+    # Truncate first: a longer pid from the previous supervisor would otherwise
+    # leave its tail behind this one and the file would read as two pids.
+    os.ftruncate(lock_fd, 0)
     os.write(lock_fd, f"{os.getpid()}\n".encode())
     pool = Pool(directory, budget)
     stop = threading.Event()
@@ -339,7 +342,12 @@ def main() -> int:
         fifo_path, budget = result
         print(f"MAKEFLAGS=-j{budget} --jobserver-auth=fifo:{fifo_path}")
         return 0
-    command = [a for a in args.command if a != "--"]
+    # Strip only the separator argparse needs to end REMAINDER. Any further one
+    # belongs to the command being wrapped - `nextest run -- --nocapture` has to
+    # reach the runner intact.
+    command = list(args.command)
+    if command and command[0] == "--":
+        command = command[1:]
     if not command:
         parser.error("run requires a command")
     return run_with_tokens(args.repo_root, args.max, args.env, args.floor, command)
