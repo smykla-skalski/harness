@@ -214,9 +214,12 @@ fn validate_upstream(upstream: &str) -> Result<String, CompanionConfigError> {
             upstream.to_owned(),
         ));
     }
+    // Report what the operator configured, not the fragment that tripped the
+    // rule; a message reading "got /panel" sends them looking for the wrong
+    // setting.
     if !authority.as_str().is_empty() && !uri.path().is_empty() && uri.path() != "/" {
         return Err(CompanionConfigError::UpstreamHasPathOrQuery(
-            uri.path().to_owned(),
+            upstream.to_owned(),
         ));
     }
     if uri.query().is_some() {

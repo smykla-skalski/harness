@@ -85,6 +85,10 @@ fn rejects_an_upstream_carrying_a_path_or_query() {
             error.to_string().contains("no path or query"),
             "the message must name both, got {error}"
         );
+        assert!(
+            error.to_string().contains(upstream),
+            "the message must echo what was configured, got {error}"
+        );
     }
 }
 
