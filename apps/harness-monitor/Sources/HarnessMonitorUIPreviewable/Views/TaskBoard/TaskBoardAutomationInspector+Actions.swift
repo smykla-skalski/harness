@@ -195,13 +195,11 @@ struct TaskBoardAutomationInspectorActions: Equatable {
     )
   }
 
-  @MainActor
-  private var isOnline: Bool {
+  @MainActor private var isOnline: Bool {
     store.contentUI.dashboard.connectionState == .online
   }
 
-  @MainActor
-  private var isWriteAuthorized: Bool {
+  @MainActor private var isWriteAuthorized: Bool {
     guard let profile = store.remoteDaemonProfile else { return true }
     return profile.status == .active
       && profile.role != .viewer

@@ -148,8 +148,7 @@ extension HarnessMonitorApp {
     }
   }
 
-  @ViewBuilder
-  private var pairingConfirmationSheetContent: some View {
+  @ViewBuilder private var pairingConfirmationSheetContent: some View {
     if let url = pendingPairingURLValue,
       let invitation = pendingPairingInvitationValue
     {
