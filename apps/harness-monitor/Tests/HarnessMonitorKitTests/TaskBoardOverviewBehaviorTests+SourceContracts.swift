@@ -157,6 +157,26 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(laneChrome.contains("value: isDropCandidate"))
   }
 
+  @Test("Only the collapsed rail keeps the bounded toggle highlight")
+  func onlyCollapsedRailKeepsBoundedToggleHighlight() throws {
+    let collapsedLane = try taskBoardSourceFile(named: "TaskBoardCollapsedLane.swift")
+    let laneChrome = try taskBoardSourceFile(named: "TaskBoardLaneChrome.swift")
+    let headerFade = try taskBoardSourceFile(named: "TaskBoardLaneHeaderFade.swift")
+
+    #expect(collapsedLane.contains(".taskBoardLaneToggleFeedback(lane: lane"))
+    #expect(laneChrome.contains(".taskBoardLaneHeaderFade(lane: lane"))
+    #expect(!laneChrome.contains(".taskBoardLaneToggleFeedback(lane: lane"))
+    // The fade replaces the outline rather than joining it; an outline would
+    // put back the bounded shape that read as a card on top of the lane.
+    #expect(!headerFade.contains("strokeBorder"))
+    #expect(!headerFade.contains(".stroke("))
+    // Direction and shape carry the effect. Falling weights alone would still
+    // let the wash run bottom-up, or run square across the lane's top corners.
+    #expect(headerFade.contains("startPoint: .top"))
+    #expect(headerFade.contains("endPoint: .bottom"))
+    #expect(headerFade.contains("TaskBoardLaneTopRoundedShape(cornerRadius: cornerRadius)"))
+  }
+
   private func taskBoardSourceFile(named relativePath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
