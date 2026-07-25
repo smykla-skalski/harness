@@ -12,7 +12,7 @@ struct DaemonWireVersionSkewTests {
     )
     store.health = HealthResponse(
       status: "ok",
-      version: "50.1.0",
+      version: "51.0.0",
       pid: 1,
       endpoint: "http://127.0.0.1:1",
       startedAt: "2026-07-25T10:00:00Z",
