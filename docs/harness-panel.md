@@ -6,7 +6,7 @@ The panel never links against the `harness` crate. It reaches the daemon the sam
 
 ## What this version does
 
-Sign-in, and the owner's view of who has signed in. Generating a pairing link from the panel is not part of it yet; the personal page says so. Until it lands, links still come from `harness-daemon remote pair create` on the host.
+Sign-in, the owner's view of who has signed in, approval, and self-service pairing links. Someone signs in, the owner approves them, and they generate their own link.
 
 ## Daemon-to-panel credential
 
@@ -111,6 +111,8 @@ elif "$panel_candidate" print-unit \
     --github-client-secret-file /etc/harness-panel/github-client-secret \
     --companion-auth-token-file /etc/harness-panel/companion-auth-token \
     --owner-login your-github-login \
+    --daemon-endpoint https://harness.example.com \
+    --daemon-spki-pin sha256/BASE64 \
     >"$panel_service_unit" &&
     "$panel_candidate" print-socket-unit \
       --listen 127.0.0.1:8787 \
@@ -164,6 +166,18 @@ The socket unit owns the loopback listener continuously and passes it to each pa
 
 The rendered service runs under `DynamicUser=yes` with an empty capability bounding set, and takes both credentials through `LoadCredential=`, which exposes protected, read-only copies to the transient user. On ACL-capable hosts the effective ACL mask may appear as a group-read mode bit; the panel accepts that only for a root-owned direct child of its systemd credential directory. `systemd-analyze security` scores it 1.1. What it still counts against the unit is inherent to the job: the panel has host network access, allocates Internet sockets, and pins no IP allow list, because GitHub's address ranges rotate and a stale list would take sign-in down without a word.
 
+## Pairing the panel with the daemon
+
+The panel mints links through the daemon, so it needs a credential of its own. Create a `pairing-broker` link on the daemon host and note both the code and the pin:
+
+```bash
+harness-daemon remote pair create --role pairing-broker
+```
+
+The output carries a `harness://pair?payload=…` link. Its payload holds the one-time code and `server_spki_sha256`; pass the code to the panel once, as `--daemon-pair-code`, and the pin as `--daemon-spki-pin`. The pin is the daemon's certificate, not a secret, and it stays the same until the certificate is renewed with a new key.
+
+The panel claims the code on its next start and stores the credential. Drop `--daemon-pair-code` afterwards: leaving it in the unit makes every restart try to spend a code the daemon has already consumed. Pass it again only to re-pair after revoking the panel's client.
+
 ## Checking it
 
 ```bash
@@ -175,6 +189,21 @@ Probe through the public daemon so the proxy token never enters a non-root shell
 `"assets":"bundled"` means the binary carries the real web app. `"assets":"placeholder"` means it was built with `HARNESS_PANEL_SKIP_FRONTEND_BUILD=1` and serves a stand-in page; rebuild it with Node available.
 
 Then open `https://harness.example.com/panel/` and sign in. The owner also sees everyone else who has signed in; nobody else does.
+
+## Approving someone
+
+Everyone starts unable to pair, including the owner. The owner approves an account from the roster, and that account can then generate its own link from its page. The link is shown once: it carries a one-time code, so the panel keeps only the pairing id, the role, and the timestamps, and never the link itself.
+
+The role and lifetime of every link come from `--pair-link-role` and `--pair-link-ttl-seconds`, never from whoever asked. An approved account cannot choose what its link grants.
+
+### What a revoke reaches
+
+Revoking stops that account generating **new** links. It does not reach backwards:
+
+- a link already generated stays claimable until it expires
+- a device that already paired keeps working
+
+Cut off a paired device with `harness-daemon remote clients revoke` on the daemon host. The panel deliberately has no power to do that: it holds a credential that may only mint links, so it cannot revoke the devices those links produced.
 
 ## Who owns the panel
 
@@ -353,7 +382,7 @@ The outer `remote_was_active` value survives a failed update and makes the rollb
 
 ## Where its state lives
 
-One SQLite database under the state directory, holding accounts, sessions, and sign-ins in flight. The directory is created mode 0700 and the database stores only the SHA-256 of a session token, so a copy of it is not a set of working sessions. Deleting the database signs everyone out and forgets who has signed in; it costs nothing else.
+One SQLite database under the state directory, holding accounts, sessions, sign-ins in flight, approval decisions, the credential the panel authenticates to the daemon with, and a record of which links it minted. The directory is created mode 0700 and the database stores only the SHA-256 of a session token, so a copy of it is not a set of working sessions. The daemon credential is the one secret held in the clear, because the panel has to replay it on every mint; anyone who can read it can already read the sessions beside it. Deleting the database signs everyone out and forgets who has signed in; it costs nothing else.
 
 ## Developing
 
