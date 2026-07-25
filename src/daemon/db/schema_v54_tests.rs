@@ -20,13 +20,49 @@ CREATE TABLE task_board_projects (
     updated_at    TEXT NOT NULL,
     UNIQUE(source, slug)
 ) WITHOUT ROWID;
-INSERT INTO task_board_projects SELECT * FROM task_board_projects_current;
+-- Named rather than `SELECT *`: the live table carries the columns v52 and v53
+-- added, and rewinding past them means moving only the six this shape declares.
+INSERT INTO task_board_projects (
+    project_id, source, slug, display_name, created_at, updated_at
+)
+SELECT project_id, source, slug, display_name, created_at, updated_at
+FROM task_board_projects_current;
 DROP TABLE task_board_projects_current;
 CREATE INDEX IF NOT EXISTS task_board_projects_source_slug
     ON task_board_projects(source, slug);
 PRAGMA legacy_alter_table = OFF;
 PRAGMA foreign_keys = ON;
 UPDATE schema_meta SET value = '51' WHERE key = 'version';";
+
+/// The v51 table plus the two columns v52 and v53 added by `ALTER`, stamped so
+/// the next open replays only v54. The tests above rewind further than that and
+/// so never see a project carrying a mark.
+const RESTORE_V53_SQL: &str = "
+PRAGMA foreign_keys = OFF;
+PRAGMA legacy_alter_table = ON;
+ALTER TABLE task_board_projects RENAME TO task_board_projects_current;
+CREATE TABLE task_board_projects (
+    project_id    TEXT PRIMARY KEY,
+    source        TEXT NOT NULL CHECK (source IN ('github', 'todoist', 'manual')),
+    slug          TEXT NOT NULL,
+    display_name  TEXT,
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL,
+    color         TEXT,
+    shape         TEXT,
+    UNIQUE(source, slug)
+) WITHOUT ROWID;
+INSERT INTO task_board_projects (
+    project_id, source, slug, display_name, created_at, updated_at, color, shape
+)
+SELECT project_id, source, slug, display_name, created_at, updated_at, color, shape
+FROM task_board_projects_current;
+DROP TABLE task_board_projects_current;
+CREATE INDEX IF NOT EXISTS task_board_projects_source_slug
+    ON task_board_projects(source, slug);
+PRAGMA legacy_alter_table = OFF;
+PRAGMA foreign_keys = ON;
+UPDATE schema_meta SET value = '53' WHERE key = 'version';";
 
 const SEED_TODOIST_SQL: &str = "
 INSERT INTO task_board_projects (
@@ -312,6 +348,52 @@ fn migration_is_idempotent_across_restarts() {
     );
     assert_eq!(
         reopened.schema_version().expect("schema version"),
+        crate::daemon::db::SCHEMA_VERSION
+    );
+}
+
+/// A rebuild keeps only the columns its `CREATE TABLE` names. `color` and
+/// `shape` reached the table as v52 and v53 `ALTER`s after this migration was
+/// drafted, so omitting them drops both columns and every value in them while
+/// the migration still reports success and stamps the version current.
+#[test]
+fn the_rebuild_carries_the_marks_added_after_it_was_written() {
+    let directory = tempdir().expect("tempdir");
+    let path = directory.path().join("harness.db");
+
+    let db = DaemonDb::open(&path).expect("open current database");
+    db.connection()
+        .execute_batch(RESTORE_V53_SQL)
+        .expect("restore v53 schema");
+    db.connection()
+        .execute_batch(
+            "INSERT INTO task_board_projects (
+                 project_id, source, slug, display_name, created_at, updated_at, color, shape
+             ) VALUES ('project-0000000000000000000000000000000a', 'github', 'acme/marks', NULL,
+                       '2026-07-25T00:00:00Z', '2026-07-25T00:00:00Z', 'teal', 'hexagon');",
+        )
+        .expect("seed a marked project");
+    drop(db);
+
+    let migrated = DaemonDb::open(&path).expect("migrate v53 database");
+
+    let marks: (Option<String>, Option<String>) = migrated
+        .connection()
+        .query_row(
+            "SELECT color, shape FROM task_board_projects
+             WHERE project_id = 'project-0000000000000000000000000000000a'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .expect("read the migrated project");
+
+    assert_eq!(
+        (marks.0.as_deref(), marks.1.as_deref()),
+        (Some("teal"), Some("hexagon")),
+        "the rebuild dropped a mark the project was carrying"
+    );
+    assert_eq!(
+        migrated.schema_version().expect("schema version"),
         crate::daemon::db::SCHEMA_VERSION
     );
 }
