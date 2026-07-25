@@ -14,7 +14,7 @@ use crate::daemon::protocol::{
 };
 use crate::daemon::remote_task_board::{TaskBoardReadListResponse, project_task_board_item};
 use crate::daemon::remote_viewer::is_remote_viewer;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::{
     AgentMode, TASK_BOARD_LIST_MAX_CURSOR_CHARS, TASK_BOARD_LIST_MAX_LIMIT,
     TASK_BOARD_LIST_MAX_QUERY_CHARS, TaskBoardPriority, TaskBoardStatus,

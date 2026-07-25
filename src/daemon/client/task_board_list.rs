@@ -1,7 +1,7 @@
 //! Query-string rendering and page-walk faults for task-board list reads.
 
 use crate::daemon::protocol::TaskBoardListItemsRequest;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 /// Render a list request as the daemon's query string, in a stable order.
 pub(super) fn task_board_list_query(
