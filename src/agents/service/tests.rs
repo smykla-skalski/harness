@@ -205,7 +205,7 @@ fn record_hook_event_registers_late_managed_runtime_session() {
 
         let escaped = project.to_string_lossy().replace('@', "\\@");
         let context = NormalizedHookContext {
-            event: NormalizedEvent::AgentStop,
+            event: NormalizedEvent::AfterToolUse,
             session: SessionContext {
                 session_id: "gemini-runtime-2152464d".into(),
                 cwd: Some(PathBuf::from(escaped)),
@@ -316,7 +316,7 @@ fn record_hook_event_session_end_disconnects_managed_agent() {
                 record_hook_event(
                     HookAgent::Claude,
                     "suite:run",
-                    "tool-result",
+                    "session-stop",
                     &context,
                     &NormalizedHookResult::allow(),
                 )

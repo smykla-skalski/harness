@@ -104,7 +104,6 @@ fn hook_output_allow_is_always_empty() {
     for hook_type in [
         HookType::PreToolUse,
         HookType::PostToolUse,
-        HookType::PostToolUseFailure,
     ] {
         assert!(
             render_hook_output(hook_type, &HookResult::allow()).is_empty(),

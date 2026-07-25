@@ -122,7 +122,7 @@ A copy-paste command block must state what it assumes - branch, cleanliness, pri
 
 ## Hooks
 
-The hook binary exposes only the tool lifecycle: `tool-guard`, `tool-result`, `tool-failure` and `audit-turn`. Generated runtime configs register `tool-guard` and `tool-result`; `tool-failure` stays a callable command but is not registered, exactly as it was not registered before the removed `HARNESS_FEATURE_SUITE_HOOKS` flag was able to add it. The suite-lifecycle hooks are gone.
+The hook binary exposes only the active tool lifecycle: `tool-guard`, `tool-result`, and the `audit-turn` shim. `tool-failure` was gated with the suite-lifecycle hooks (`guard-stop`, `context-agent`, `validate-agent`) behind `HARNESS_FEATURE_SUITE_HOOKS`, so it went with them; that flag is gone.
 
 Repo-policy/manual-task enforcement is owned by the standalone `aff` CLI. Keep harness-owned setup (`setup:bootstrap`) separate from the manual `aff:*` tasks.
 

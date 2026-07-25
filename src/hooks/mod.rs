@@ -18,7 +18,6 @@ pub(crate) mod session;
 #[cfg(test)]
 mod tests;
 mod tool_dispatch;
-pub mod tool_failure;
 pub mod tool_guard;
 pub mod tool_result;
 mod transport;

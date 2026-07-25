@@ -137,9 +137,6 @@ pub fn render_normalized_hook_output(hook_type: HookType, result: &NormalizedHoo
     match hook_type {
         HookType::PreToolUse => render_pre_tool_use_output_normalized(result),
         HookType::PostToolUse => render_post_tool_use_output_normalized(result, "PostToolUse"),
-        HookType::PostToolUseFailure => {
-            render_post_tool_use_output_normalized(result, "PostToolUseFailure")
-        }
     }
 }
 

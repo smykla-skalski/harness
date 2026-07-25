@@ -83,7 +83,6 @@ fn default_event_for_hook(hook_type: HookType) -> NormalizedEvent {
     match hook_type {
         HookType::PreToolUse => NormalizedEvent::BeforeToolUse,
         HookType::PostToolUse => NormalizedEvent::AfterToolUse,
-        HookType::PostToolUseFailure => NormalizedEvent::AfterToolUseFailure,
     }
 }
 
@@ -97,10 +96,7 @@ fn default_event_for_command(hook: &HookCommand) -> NormalizedEvent {
 fn should_record_hook_event(hook: &HookCommand) -> bool {
     matches!(
         hook,
-        HookCommand::ToolGuard
-            | HookCommand::ToolResult
-            | HookCommand::AuditTurn(_)
-            | HookCommand::ToolFailure
+        HookCommand::ToolGuard | HookCommand::ToolResult | HookCommand::AuditTurn(_)
     )
 }
 

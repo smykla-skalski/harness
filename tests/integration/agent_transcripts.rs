@@ -30,7 +30,7 @@ fn with_agent_storage_env(body: impl FnOnce(&Path)) {
 fn gemini_lifecycle_transcript_uses_assistant_response_not_prompt_body() {
     with_agent_storage_env(|project_dir| {
         let context = NormalizedHookContext {
-            event: NormalizedEvent::AgentStop,
+            event: NormalizedEvent::SessionEnd,
             session: SessionContext {
                 session_id: "gemini-real-session".into(),
                 cwd: Some(project_dir.to_path_buf()),
@@ -56,7 +56,7 @@ fn gemini_lifecycle_transcript_uses_assistant_response_not_prompt_body() {
         record_hook_event(
             hook_agent_for_runtime_name("gemini").expect("gemini hook agent"),
             "suite:run",
-            "tool-result",
+            "session-stop",
             &context,
             &NormalizedHookResult::allow(),
         )

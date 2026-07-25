@@ -3,7 +3,7 @@ use clap::{Args, Subcommand};
 use harness_kernel::kernel::skills::SKILL_NAMES;
 
 use super::adapters::HookAgent;
-use super::catalog::{TOOL_FAILURE_HOOK, TOOL_GUARD_HOOK, TOOL_RESULT_HOOK};
+use super::catalog::{TOOL_GUARD_HOOK, TOOL_RESULT_HOOK};
 use super::registry::Hook;
 
 /// Hook lifecycle categories.
@@ -11,7 +11,6 @@ use super::registry::Hook;
 pub enum HookType {
     PreToolUse,
     PostToolUse,
-    PostToolUseFailure,
 }
 
 impl HookType {
@@ -31,8 +30,6 @@ pub enum HookCommand {
     ToolResult,
     /// Audit a Codex turn-complete notification.
     AuditTurn(AuditTurnArgs),
-    /// Process tool failures after execution errors.
-    ToolFailure,
 }
 
 /// Arguments for the Codex notify-based audit shim.
@@ -49,7 +46,6 @@ impl HookCommand {
         match self {
             Self::ToolGuard => TOOL_GUARD_HOOK,
             Self::ToolResult | Self::AuditTurn(_) => TOOL_RESULT_HOOK,
-            Self::ToolFailure => TOOL_FAILURE_HOOK,
         }
     }
 

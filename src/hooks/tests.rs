@@ -99,12 +99,11 @@ fn hook_command_types_are_exhaustive() {
         HookCommand::ToolGuard,
         HookCommand::ToolResult,
         HookCommand::AuditTurn(AuditTurnArgs { payload: None }),
-        HookCommand::ToolFailure,
     ] {
         assert!(
             matches!(
                 hook.hook_type(),
-                HookType::PreToolUse | HookType::PostToolUse | HookType::PostToolUseFailure
+                HookType::PreToolUse | HookType::PostToolUse
             ),
             "{} had no hook type",
             hook.name()

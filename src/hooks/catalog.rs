@@ -46,13 +46,8 @@ pub(crate) static TOOL_RESULT_HOOK: &dyn Hook = &StaticHook::effect(
     HookType::PostToolUse,
     super::tool_result::execute,
 );
-pub(crate) static TOOL_FAILURE_HOOK: &dyn Hook = &StaticHook::effect(
-    "tool-failure",
-    HookType::PostToolUseFailure,
-    super::tool_failure::execute,
-);
 
 #[cfg(test)]
-pub(crate) fn all_hooks() -> [&'static dyn Hook; 3] {
-    [TOOL_GUARD_HOOK, TOOL_RESULT_HOOK, TOOL_FAILURE_HOOK]
+pub(crate) fn all_hooks() -> [&'static dyn Hook; 2] {
+    [TOOL_GUARD_HOOK, TOOL_RESULT_HOOK]
 }

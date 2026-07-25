@@ -111,7 +111,6 @@ impl AgentAdapter for ClaudeAdapter {
 fn event_to_hook_type(event: &NormalizedEvent) -> HookType {
     match event {
         NormalizedEvent::BeforeToolUse => HookType::PreToolUse,
-        NormalizedEvent::AfterToolUseFailure => HookType::PostToolUseFailure,
         _ => HookType::PostToolUse,
     }
 }
