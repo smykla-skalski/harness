@@ -376,8 +376,9 @@ jobserver_budget() {
 }
 
 # Attach to the shared pool. Cargo speaks the jobserver protocol natively, so
-# once MAKEFLAGS points at the pool it renegotiates its own width against every
-# other build for as long as it runs - which the sampled-once reserve cannot do.
+# once CARGO_MAKEFLAGS points at the pool it renegotiates its own width against
+# every other build for as long as it runs - which the sampled-once reserve
+# cannot do. MAKEFLAGS stays empty on purpose: see the note in configure below.
 configure_jobserver() {
   local line
 
@@ -385,8 +386,9 @@ configure_jobserver() {
   # Reserve means this script sizes the build, so an inherited jobserver must
   # not silently govern instead. A stale one - the pool this very script
   # exported before it died - pins cargo to its implicit slot while
-  # CARGO_BUILD_JOBS still advertises a full share.
-  unset MAKEFLAGS
+  # CARGO_BUILD_JOBS still advertises a full share. All three go, because the
+  # jobserver crate honours whichever of them it finds first.
+  unset MAKEFLAGS MFLAGS CARGO_MAKEFLAGS
   if [[ "${HARNESS_JOBSERVER:-1}" == "0" ]]; then
     return 0
   fi
@@ -396,9 +398,13 @@ configure_jobserver() {
   line="$(python3 "$(jobserver_script)" ensure \
     --repo-root "$(jobserver_pool_key)" \
     --budget "$(jobserver_budget)" 2>/dev/null)" || return 0
-  [[ "$line" == MAKEFLAGS=* ]] || return 0
+  [[ "$line" == CARGO_MAKEFLAGS=* ]] || return 0
 
-  export MAKEFLAGS="${line#MAKEFLAGS=}"
+  # Deliberately not MAKEFLAGS. Cargo reads CARGO_MAKEFLAGS first, and make
+  # never reads it at all, so a build script that shells out to make cannot
+  # inherit an endpoint its make is too old to parse. GNU make 4.3 - what
+  # Ubuntu 24.04 ships - exits 2 on a fifo endpoint rather than ignoring it.
+  export CARGO_MAKEFLAGS="${line#CARGO_MAKEFLAGS=}"
   jobserver_mode="pool"
 }
 
@@ -508,6 +514,7 @@ if [[ "${1:-}" == "--print-env" ]]; then
   printf 'NEXTEST_TEST_THREADS=%s\n' "$NEXTEST_TEST_THREADS"
   printf 'CARGO_BUILD_BUILD_DIR=%s\n' "${CARGO_BUILD_BUILD_DIR:-}"
   printf 'MAKEFLAGS=%s\n' "${MAKEFLAGS:-}"
+  printf 'CARGO_MAKEFLAGS=%s\n' "${CARGO_MAKEFLAGS:-}"
   printf 'JOBSERVER=%s\n' "$jobserver_mode"
   printf 'ACTIVE_BUILD_COUNT=%s\n' "$active_build_count"
   if [[ -n "$session_id" ]]; then

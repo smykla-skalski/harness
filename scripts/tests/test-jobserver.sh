@@ -117,13 +117,13 @@ PY
 }
 
 scenario_ensure_starts_pool_and_prints_makeflags() {
-  local name="ensure starts a pool and prints usable MAKEFLAGS"
+  local name="ensure starts a pool and prints usable CARGO_MAKEFLAGS"
   local root; root="$(fake_root ensure)"
   track_pool "$root"
 
   local out
   out="$(python3 "$JOBSERVER" ensure --repo-root "$root" --budget 6 2>&1)"
-  if [[ ! "$out" =~ ^MAKEFLAGS=-j6\ --jobserver-auth=fifo:/ ]]; then
+  if [[ ! "$out" =~ ^CARGO_MAKEFLAGS=-j6\ --jobserver-auth=fifo:/ ]]; then
     fail "$name (got: $out)"
     return
   fi

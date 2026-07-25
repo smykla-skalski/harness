@@ -572,7 +572,13 @@ def main() -> int:
         if result is None:
             return 1
         fifo_path, budget = result
-        print(f"MAKEFLAGS=-j{budget} --jobserver-auth=fifo:{fifo_path}")
+        # CARGO_MAKEFLAGS, not MAKEFLAGS. The jobserver crate reads the first of
+        # CARGO_MAKEFLAGS, MAKEFLAGS, MFLAGS that is set, so cargo still finds
+        # this, while make - which reads only the latter two - never sees a fifo
+        # endpoint. GNU make below 4.4 does not merely ignore one: 4.3 exits 2
+        # with "internal error: invalid --jobserver-auth string", so publishing
+        # it in MAKEFLAGS kills every sub-make a build script runs.
+        print(f"CARGO_MAKEFLAGS=-j{budget} --jobserver-auth=fifo:{fifo_path}")
         return 0
     # Strip only the separator argparse needs to end REMAINDER. Any further one
     # belongs to the command being wrapped: a runner forwarding its own flags

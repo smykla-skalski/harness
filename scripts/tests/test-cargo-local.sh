@@ -115,7 +115,7 @@ print_cargo_env_with_pool_key() {
     unset SCCACHE_BASEDIRS SCCACHE_IDLE_TIMEOUT SCCACHE_CACHE_SIZE SCCACHE_VERSION
     unset HARNESS_SCCACHE_TMPDIR
     unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR
-    unset CARGO_BUILD_JOBS HARNESS_CARGO_JOBS MAKEFLAGS
+    unset CARGO_BUILD_JOBS HARNESS_CARGO_JOBS MAKEFLAGS MFLAGS CARGO_MAKEFLAGS
     TMPDIR="$scratch/" \
       RUSTC_WRAPPER='' \
       SCCACHE_BIN='' \
@@ -156,7 +156,7 @@ write_token_counting_cargo() {
   local path="$1" log="$2"
   cat >"$path" <<'EOF'
 #!/usr/bin/env bash
-fifo="${MAKEFLAGS##*fifo:}"
+fifo="${CARGO_MAKEFLAGS##*fifo:}"
 count=0
 if [[ -p "$fifo" ]]; then
   count="$(python3 - "$fifo" <<'PY'
@@ -394,7 +394,7 @@ scenario_jobserver_pool_takes_over_build_sizing() {
     return
   fi
   if ! assert_contains "--jobserver-auth=fifo:" "$output"; then
-    fail "MAKEFLAGS carried no jobserver endpoint: $(grep '^MAKEFLAGS=' <<<"$output")"
+    fail "CARGO_MAKEFLAGS carried no endpoint: $(grep '^CARGO_MAKEFLAGS=' <<<"$output")"
     return
   fi
   # The pool caps concurrency now, so the per-process reserve must step aside
@@ -406,22 +406,62 @@ scenario_jobserver_pool_takes_over_build_sizing() {
   pass "an available pool widens build jobs and exports a jobserver"
 }
 
+scenario_pool_endpoint_never_reaches_make() {
+  local key="pool-make-$$"
+  local output makeflags endpoint probe status=0
+
+  output="$(print_cargo_env_with_pool_key "$key")"
+  stop_pool_for_key "$key"
+  makeflags="$(awk -F= '$1 == "MAKEFLAGS" { print substr($0, index($0, "=") + 1) }' <<<"$output")"
+  endpoint="$(awk -F= '$1 == "CARGO_MAKEFLAGS" { print substr($0, index($0, "=") + 1) }' <<<"$output")"
+
+  if [[ "$endpoint" != *--jobserver-auth=fifo:* ]]; then
+    fail "the pool endpoint never reached CARGO_MAKEFLAGS: $endpoint"
+    return
+  fi
+  # GNU make below 4.4 does not ignore a fifo endpoint, it dies on one: 4.3,
+  # which Ubuntu 24.04 ships, exits 2 with "internal error: invalid
+  # --jobserver-auth string". Anything a build script shells out to inherits
+  # this environment, so the endpoint has to stay out of every name make reads.
+  if [[ -n "$makeflags" ]]; then
+    fail "the pool endpoint reached MAKEFLAGS: $makeflags"
+    return
+  fi
+
+  if command -v make >/dev/null 2>&1; then
+    probe="$SANDBOX/jobserver-probe.mk"
+    printf 'all:\n\t@true\n' >"$probe"
+    MAKEFLAGS="$makeflags" CARGO_MAKEFLAGS="$endpoint" \
+      make -f "$probe" >/dev/null 2>&1 || status=$?
+    if (( status != 0 )); then
+      fail "make died under the exported environment (exit $status)"
+      return
+    fi
+  fi
+  pass "the pool endpoint never reaches make"
+}
+
 scenario_reserve_drops_an_inherited_jobserver() {
   local key="pool-inherited-$$"
   local output
   # A stale endpoint is the reachable case: this script exports exactly this
   # shape, and a child inheriting one whose pool has died would attach, get no
   # tokens, and build serially while CARGO_BUILD_JOBS advertised a full share.
+  # Every variable the jobserver crate consults, because it honours the first
+  # one it finds and leaving any behind reinstates the stale pool.
   output="$(print_cargo_env_with_pool_key "$key" \
-    env HARNESS_JOBSERVER=0 "MAKEFLAGS=-j9 --jobserver-auth=fifo:$SANDBOX/not-a-pool")"
+    env HARNESS_JOBSERVER=0 \
+    "MAKEFLAGS=-j9 --jobserver-auth=fifo:$SANDBOX/not-a-pool" \
+    "MFLAGS=-j9 --jobserver-auth=fifo:$SANDBOX/not-a-pool" \
+    "CARGO_MAKEFLAGS=-j9 --jobserver-auth=fifo:$SANDBOX/not-a-pool")"
   stop_pool_for_key "$key"
 
   if ! assert_line "JOBSERVER=reserve" "$output"; then
     fail "inherited jobserver did not fall back: $(grep '^JOBSERVER=' <<<"$output")"
     return
   fi
-  if ! assert_line "MAKEFLAGS=" "$output"; then
-    fail "reserve kept an inherited jobserver: $(grep '^MAKEFLAGS=' <<<"$output")"
+  if ! assert_line "MAKEFLAGS=" "$output" || ! assert_line "CARGO_MAKEFLAGS=" "$output"; then
+    fail "reserve kept an inherited jobserver: $(grep -E '^(CARGO_)?MAKEFLAGS=' <<<"$output")"
     return
   fi
   pass "the reserve drops an inherited jobserver"
@@ -441,8 +481,8 @@ scenario_jobserver_absent_falls_back_to_the_reserve() {
     fail "disabled jobserver did not fall back: $(grep '^JOBSERVER=' <<<"$output")"
     return
   fi
-  if ! assert_line "MAKEFLAGS=" "$output"; then
-    fail "disabled jobserver still exported MAKEFLAGS: $(grep '^MAKEFLAGS=' <<<"$output")"
+  if ! assert_line "CARGO_MAKEFLAGS=" "$output"; then
+    fail "disabled jobserver still exported an endpoint: $(grep '^CARGO_MAKEFLAGS=' <<<"$output")"
     return
   fi
   if ! assert_line "CARGO_BUILD_JOBS=$expected" "$output"; then
@@ -1107,6 +1147,7 @@ EOF
 scenario_jobserver_pool_takes_over_build_sizing
 scenario_jobserver_absent_falls_back_to_the_reserve
 scenario_reserve_drops_an_inherited_jobserver
+scenario_pool_endpoint_never_reaches_make
 scenario_explicit_job_override_beats_the_pool
 scenario_nextest_build_phase_keeps_the_whole_pool
 scenario_build_only_flag_precedes_a_separator
