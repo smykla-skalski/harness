@@ -11,6 +11,10 @@ use crate::task_board::TaskBoardItem;
 use super::remote_viewer_support::{
     connect_remote_ws, get_http_json, register_remote_client, serve_http, ws_rpc,
 };
+use super::remote_viewer_task_board_paging::{
+    assert_viewer_pages_cover_the_selection_once, assert_viewer_pages_stay_projected,
+    seed_paged_items,
+};
 use super::remote_viewer_task_board_triage::{
     TRIAGE_ITEM_ID, assert_full_triage_current, assert_viewer_triage_current,
     assert_viewer_triage_history, assert_viewer_triage_override_mutations_are_denied,
@@ -40,6 +44,7 @@ async fn run_remote_viewer_projection_flow() {
     register_remote_client(&state, OPERATOR_ID, RemoteRole::Operator);
     seed_sensitive_item(&state).await;
     seed_triage_item(&state).await;
+    seed_paged_items(&state).await;
 
     let (base_url, server) = serve_http(state).await;
     let client = reqwest::Client::new();
@@ -47,6 +52,8 @@ async fn run_remote_viewer_projection_flow() {
     assert_http_viewer_reads_and_write_denials(&client, &base_url).await;
     assert_http_operator_reads(&client, &base_url).await;
     assert_viewer_search_cannot_probe_redacted_text(&client, &base_url).await;
+    assert_viewer_pages_cover_the_selection_once(&client, &base_url, VIEWER_ID).await;
+    assert_viewer_pages_stay_projected(&client, &base_url, VIEWER_ID).await;
     assert_ws_viewer_reads_and_write_denials(&base_url).await;
     assert_ws_operator_reads(&base_url).await;
 
