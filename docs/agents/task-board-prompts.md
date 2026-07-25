@@ -66,6 +66,8 @@ The `*_section` variables are the shipped prompt's optional blocks, already wrap
 
 The workflow prompts embed a result contract in `response_json` and the escalation prompt embeds the exact command the agent reports its verdict with. Dropping either leaves the agent with no way to return a result the daemon accepts, and the run fails at its report step rather than at spawn. Keep `{{ response_json }}` in the workflow prompts and the report command in the escalation prompt.
 
+`title`, `tags`, `body`, and `context` are attacker-influenced whenever items are imported from an external tracker. The shipped triage prompt tells the agent to treat them as data rather than instructions; a customization that drops that sentence hands an item author a prompt-injection surface. Nothing checks for it, so keep the warning in any prompt that interpolates item text.
+
 ## Recovery
 
 An interrupted worker used to be identified by comparing its launch prompt byte for byte, which meant no prompt could ever change without stranding running work. Identity now rests on the frozen structural fields — session, worktree, board item, workflow execution, task, mode, model, effort — and a recovered worker whose prompt no longer matches is logged and accepted. A worker whose structural fields disagree is still refused.
