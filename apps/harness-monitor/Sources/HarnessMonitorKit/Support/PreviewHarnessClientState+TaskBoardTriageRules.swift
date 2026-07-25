@@ -219,12 +219,11 @@ extension PreviewHarnessClientState {
   ) -> (verdict: TriageVerdict, matchedRuleId: String?) {
     let labels = canonicalizeLabels(item.tags)
     let targetTypes = canonicalizeLabels(item.targetProjectTypes)
-    for rule in candidate.rules {
-      if rule.when.allSatisfy({ condition in
-        conditionMatches(condition, labels: labels, targetTypes: targetTypes, item: item)
-      }) {
-        return (rule.outcome.verdict, rule.id)
-      }
+    for rule in candidate.rules
+    where rule.when.allSatisfy({ condition in
+      conditionMatches(condition, labels: labels, targetTypes: targetTypes, item: item)
+    }) {
+      return (rule.outcome.verdict, rule.id)
     }
     return (candidate.defaultOutcome.verdict, nil)
   }
@@ -235,6 +234,23 @@ extension PreviewHarnessClientState {
     targetTypes: [String],
     item: TaskBoardItem
   ) -> Bool {
+    if let matched = labelCondition(condition, labels: labels, targetTypes: targetTypes) {
+      return matched
+    }
+    if let matched = itemFieldCondition(condition, item: item) {
+      return matched
+    }
+    return providerCondition(condition, item: item) ?? false
+  }
+
+  /// Returns `nil` for a condition outside this group, so the caller falls
+  /// through to the next group rather than treating "not this kind" as a
+  /// verdict of its own.
+  private static func labelCondition(
+    _ condition: TriageRuleCondition,
+    labels: [String],
+    targetTypes: [String]
+  ) -> Bool? {
     switch condition {
     case .labelsHasAny(let needles):
       return canonicalizeLabels(needles).contains { labels.contains($0) }
@@ -242,6 +258,20 @@ extension PreviewHarnessClientState {
       return canonicalizeLabels(needles).allSatisfy { labels.contains($0) }
     case .labelsHasNone(let needles):
       return !canonicalizeLabels(needles).contains { labels.contains($0) }
+    case .targetProjectTypesHasAny(let needles):
+      return canonicalizeLabels(needles).contains { targetTypes.contains($0) }
+    case .targetProjectTypesHasNone(let needles):
+      return !canonicalizeLabels(needles).contains { targetTypes.contains($0) }
+    default:
+      return nil
+    }
+  }
+
+  private static func itemFieldCondition(
+    _ condition: TriageRuleCondition,
+    item: TaskBoardItem
+  ) -> Bool? {
+    switch condition {
     case .priorityEquals(let priority):
       return item.priority == priority
     case .executionRepositoryEquals(let value):
@@ -256,14 +286,22 @@ extension PreviewHarnessClientState {
       return item.projectId != nil
     case .projectIdIsMissing:
       return item.projectId == nil
-    case .targetProjectTypesHasAny(let needles):
-      return canonicalizeLabels(needles).contains { targetTypes.contains($0) }
-    case .targetProjectTypesHasNone(let needles):
-      return !canonicalizeLabels(needles).contains { targetTypes.contains($0) }
+    default:
+      return nil
+    }
+  }
+
+  private static func providerCondition(
+    _ condition: TriageRuleCondition,
+    item: TaskBoardItem
+  ) -> Bool? {
+    switch condition {
     case .importedFromProviderEquals(let provider):
       return item.importedFromProvider?.rawValue == provider.rawValue
     case .importedFromProviderIsMissing:
       return item.importedFromProvider == nil
+    default:
+      return nil
     }
   }
 

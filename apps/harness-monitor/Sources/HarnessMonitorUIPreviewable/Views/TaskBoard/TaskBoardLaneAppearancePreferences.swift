@@ -371,25 +371,17 @@ enum TaskBoardLaneAppearancePreferences {
     switch lane {
     case .umbrella:
       .purple
-    case .backlog:
+    case .backlog, .planning:
       .warmAccent
     case .todo:
       .secondaryInk
-    case .planning:
-      .warmAccent
     case .inProgress:
       .caution
-    case .agenticReview:
+    case .agenticReview, .toReview:
       .success
-    case .testing:
+    case .testing, .inReview:
       .accent
-    case .inReview:
-      .accent
-    case .toReview:
-      .success
-    case .humanRequired:
-      .danger
-    case .failed:
+    case .humanRequired, .failed:
       .danger
     }
   }
