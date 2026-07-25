@@ -299,6 +299,93 @@ scenario_lock_file_holds_only_the_current_pid() {
   pass "$name"
 }
 
+scenario_acquire_surfaces_a_real_read_error() {
+  local name="acquire raises a real read error instead of reporting an empty pool"
+  local out
+  out="$(python3 - "$JOBSERVER" 2>&1 <<'PY'
+import errno, importlib.util, os, sys, tempfile
+
+spec = importlib.util.spec_from_file_location("js", sys.argv[1])
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+with tempfile.TemporaryDirectory() as directory:
+    pool = mod.Pool(directory, 4)
+    real_read = os.read
+
+    # Scoped to the pool fd so the rest of the interpreter keeps working.
+    def broken_read(fd, size):
+        if fd == pool.fifo_fd:
+            raise OSError(errno.EIO, "simulated device failure")
+        return real_read(fd, size)
+
+    os.read = broken_read
+    try:
+        got = pool.acquire(2)
+    except OSError as exc:
+        print("RAISED", exc.errno)
+    else:
+        print("SWALLOWED", got)
+    finally:
+        os.read = real_read
+PY
+)"
+  if [[ "$out" != "RAISED $(python3 -c 'import errno; print(errno.EIO)')" ]]; then
+    fail "$name (expected the EIO to propagate, got: $out)"
+    return
+  fi
+  pass "$name"
+}
+
+scenario_idle_exit_leaves_no_tokens_behind() {
+  local name="an idle supervisor leaves no tokens in the FIFO for its successor"
+  local out
+  out="$(python3 - "$JOBSERVER" 2>&1 <<'PY'
+import importlib.util, sys, tempfile
+
+spec = importlib.util.spec_from_file_location("js", sys.argv[1])
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+with tempfile.TemporaryDirectory() as directory:
+    pool = mod.Pool(directory, 3)
+    # The supervisor answers a True by exiting, so whatever is still in the pipe
+    # afterwards is what a build could take out from under the next supervisor.
+    print("EXITS", pool.idle_and_whole(), "LEFTOVER", pool._drain())
+PY
+)"
+  if [[ "$out" != "EXITS True LEFTOVER 0" ]]; then
+    fail "$name (expected a whole idle pool to exit empty, got: $out)"
+    return
+  fi
+  pass "$name"
+}
+
+scenario_partial_pool_keeps_its_tokens() {
+  local name="a partly held pool keeps serving the tokens it still has"
+  local out
+  out="$(python3 - "$JOBSERVER" 2>&1 <<'PY'
+import importlib.util, sys, tempfile
+
+spec = importlib.util.spec_from_file_location("js", sys.argv[1])
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+with tempfile.TemporaryDirectory() as directory:
+    pool = mod.Pool(directory, 3)
+    # Stand in for a build holding one token through the FIFO: the supervisor
+    # must not exit, and must not eat the two tokens that are still free.
+    pool._read_tokens(1)
+    print("EXITS", pool.idle_and_whole(), "LEFTOVER", pool._drain())
+PY
+)"
+  if [[ "$out" != "EXITS False LEFTOVER 2" ]]; then
+    fail "$name (expected the pool to stay up with 2 tokens, got: $out)"
+    return
+  fi
+  pass "$name"
+}
+
 scenario_signal_death_reports_a_shell_signal_status() {
   local name="a signal-killed child reports the shell's signal status"
   local root; root="$(fake_root signal)"
@@ -456,6 +543,9 @@ scenario_foreign_owned_pool_dir_is_refused
 scenario_missing_pool_still_runs_the_command
 scenario_run_preserves_argument_separators
 scenario_lock_file_holds_only_the_current_pid
+scenario_acquire_surfaces_a_real_read_error
+scenario_idle_exit_leaves_no_tokens_behind
+scenario_partial_pool_keeps_its_tokens
 scenario_signal_death_reports_a_shell_signal_status
 scenario_split_request_is_still_granted
 scenario_symlinked_pool_parent_is_refused

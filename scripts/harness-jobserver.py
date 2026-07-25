@@ -99,20 +99,29 @@ class Pool:
         self.fifo_fd = os.open(self.fifo_path, os.O_RDWR | os.O_NONBLOCK)
         self._refill_to(budget)
 
-    def _drain(self) -> int:
-        count = 0
-        while True:
+    def _read_tokens(self, limit: int | None) -> int:
+        """Take up to `limit` tokens, or every one present when None.
+
+        Only a would-block means the pipe is empty. Treating any other OSError
+        that way turns a bad fd into a permanent zero-token grant that reports
+        itself as an idle pool, and the sole symptom is every runner silently
+        dropping to its floor width.
+        """
+        got = 0
+        while limit is None or got < limit:
             try:
-                chunk = os.read(self.fifo_fd, 4096)
-            except BlockingIOError:
-                return count
+                chunk = os.read(self.fifo_fd, 4096 if limit is None else limit - got)
             except OSError as exc:
                 if exc.errno in (errno.EAGAIN, errno.EWOULDBLOCK):
-                    return count
+                    return got
                 raise
             if not chunk:
-                return count
-            count += len(chunk)
+                return got
+            got += len(chunk)
+        return got
+
+    def _drain(self) -> int:
+        return self._read_tokens(None)
 
     def _refill_to(self, target: int) -> None:
         present = self._drain()
@@ -124,15 +133,7 @@ class Pool:
     def acquire(self, want: int) -> int:
         """Take up to `want` tokens out of the FIFO for a socket client."""
         with self.lock:
-            got = 0
-            while got < want:
-                try:
-                    chunk = os.read(self.fifo_fd, want - got)
-                except (BlockingIOError, OSError):
-                    break
-                if not chunk:
-                    break
-                got += len(chunk)
+            got = self._read_tokens(want)
             self.granted += got
             self.last_activity = time.monotonic()
             return got
@@ -146,14 +147,24 @@ class Pool:
             self.last_activity = time.monotonic()
 
     def idle_and_whole(self) -> bool:
-        """True when nothing is granted and every token is back in the FIFO."""
+        """True when nothing is granted and every token is back in the FIFO.
+
+        A True keeps the tokens drained, because the caller answers it by
+        exiting. Putting them back first leaves a window where a build attaches,
+        takes some, and is still holding them when the next supervisor refills
+        the FIFO to a full budget - the one way this design can oversubscribe.
+        An empty FIFO only costs that build its tokens, and cargo answers an
+        empty pool by building serially on its implicit slot.
+        """
         with self.lock:
             if self.granted:
                 return False
             held = self._drain()
+            if held >= self.budget:
+                return True
             if held:
                 os.write(self.fifo_fd, TOKEN * held)
-            return held >= self.budget
+            return False
 
 
 def serve(pool: Pool, stop: threading.Event) -> None:
