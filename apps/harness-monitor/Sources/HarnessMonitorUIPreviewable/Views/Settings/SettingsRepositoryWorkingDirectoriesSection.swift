@@ -17,7 +17,7 @@ struct SettingsRepositoryWorkingDirectoriesSection: View {
   @State private var otherCopies: [WorkingCopyListEntry] = []
   @State private var obtaining: Set<String> = []
   @State private var reclaiming: Set<String> = []
-  @State private var importingRepository: String?
+  @State private var folderImport = RepositoryFolderImportRequest()
   /// Live obtain progress per repository, fed by the catch-all
   /// `observeAllWorkingCopyProgress()` subscription. Terminal events drop the
   /// entry, returning the row to its resolved or retry state.
@@ -54,14 +54,10 @@ struct SettingsRepositoryWorkingDirectoriesSection: View {
     .task(id: repositories) { await reload() }
     .task { await observeProgress() }
     .fileImporter(
-      isPresented: Binding(
-        get: { importingRepository != nil },
-        set: { if !$0 { importingRepository = nil } }
-      ),
+      isPresented: $folderImport.isPresented,
       allowedContentTypes: [.folder]
     ) { result in
-      guard let repository = importingRepository else { return }
-      importingRepository = nil
+      guard let repository = folderImport.consume() else { return }
       let folders = result.map { [$0] }
       Task {
         if await store.resolveRepositoryWorkingDirectory(repository: repository, from: folders) {
@@ -123,7 +119,7 @@ struct SettingsRepositoryWorkingDirectoriesSection: View {
         Button("Obtain a Copy") { obtain(repository) }
       }
       Button(bookmarkPath == nil && managedCopy == nil ? "Choose Folder…" : "Change…") {
-        importingRepository = repository
+        folderImport.begin(repository: repository)
       }
     }
   }

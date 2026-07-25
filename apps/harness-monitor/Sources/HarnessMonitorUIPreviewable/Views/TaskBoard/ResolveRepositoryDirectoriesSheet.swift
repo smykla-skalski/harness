@@ -10,7 +10,7 @@ struct ResolveRepositoryDirectoriesSheet: View {
   let repositories: [String]
 
   @State private var resolved: Set<String> = []
-  @State private var importingRepository: String?
+  @State private var folderImport = RepositoryFolderImportRequest()
   @State private var obtaining: Set<String> = []
   @State private var obtainFailed: Set<String> = []
   /// Live obtain progress per repository, fed by the catch-all
@@ -35,14 +35,10 @@ struct ResolveRepositoryDirectoriesSheet: View {
     .padding(20)
     .task { await observeProgress() }
     .fileImporter(
-      isPresented: Binding(
-        get: { importingRepository != nil },
-        set: { if !$0 { importingRepository = nil } }
-      ),
+      isPresented: $folderImport.isPresented,
       allowedContentTypes: [.folder]
     ) { result in
-      guard let repository = importingRepository else { return }
-      importingRepository = nil
+      guard let repository = folderImport.consume() else { return }
       let folders = result.map { [$0] }
       Task { @MainActor in
         if await store.resolveRepositoryWorkingDirectory(repository: repository, from: folders) {
@@ -91,7 +87,7 @@ struct ResolveRepositoryDirectoriesSheet: View {
           .help("Clone this repository into a daemon-managed working copy")
       }
       Button(isResolved ? "Change Folder…" : "Choose Folder…") {
-        importingRepository = repository
+        folderImport.begin(repository: repository)
       }
     }
     .padding(.vertical, 4)
