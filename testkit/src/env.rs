@@ -1,5 +1,9 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+
+/// Mirrors `PROBE_HOME_ENV` in `harness::agents::acp::probe`; testkit cannot
+/// depend on the harness crate, so the name is spelled out in both places.
+const AGENT_PROBE_HOME_ENV: &str = "HARNESS_AGENT_PROBE_HOME";
 
 /// Initialize an empty git repository at `path` with a single seed commit so
 /// downstream callers (notably the daemon's `WorktreeController`) have a
@@ -123,6 +127,27 @@ fn run_git_output(dir: &Path, args: &[&str]) -> String {
     String::from_utf8_lossy(&output.stdout).trim().to_string()
 }
 
+/// Return the one directory tests hand to probed agent binaries as HOME.
+///
+/// Agents bootstrap a package cache the first time they run, and Copilot pulls
+/// roughly 117MB. Handing them a per-test temp home repeats that download on
+/// every test and, because the ACP probe refresh thread is detached, lands it
+/// in a directory the test has already dropped, so nothing ever reclaims it.
+/// One stable reusable path keeps a single copy and keeps the developer's real
+/// home out of the test suite.
+///
+/// # Panics
+///
+/// Panics if the shared home cannot be created.
+#[must_use]
+pub fn shared_agent_probe_home() -> PathBuf {
+    let home = std::env::var_os(AGENT_PROBE_HOME_ENV)
+        .map(PathBuf::from)
+        .unwrap_or_else(|| std::env::temp_dir().join("harness-agent-probe-home"));
+    std::fs::create_dir_all(&home).expect("create shared agent probe home");
+    home
+}
+
 /// Run a closure inside an isolated Harness filesystem scope.
 ///
 /// Tests often set `XDG_DATA_HOME` to a temp dir but still accidentally see a
@@ -137,12 +162,14 @@ fn run_git_output(dir: &Path, args: &[&str]) -> String {
 pub fn with_isolated_harness_env<T>(base: &Path, action: impl FnOnce() -> T) -> T {
     let home = base.join("home");
     std::fs::create_dir_all(&home).expect("create isolated harness home");
+    let probe_home = shared_agent_probe_home();
 
     temp_env::with_vars(
         [
             ("XDG_DATA_HOME", Some(base)),
             ("HOME", Some(home.as_path())),
             ("HARNESS_HOST_HOME", Some(home.as_path())),
+            (AGENT_PROBE_HOME_ENV, Some(probe_home.as_path())),
             ("HARNESS_DAEMON_DATA_HOME", None::<&Path>),
             ("HARNESS_APP_GROUP_ID", None::<&Path>),
             ("HARNESS_SANDBOXED", None::<&Path>),

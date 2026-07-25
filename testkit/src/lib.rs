@@ -13,6 +13,6 @@ pub mod fake_toolchain;
 pub use builders::*;
 pub use env::{
     add_git_worktree, git_branches_matching, git_head_sha, init_git_repo_with_branches,
-    init_git_repo_with_seed, with_isolated_harness_env,
+    init_git_repo_with_seed, shared_agent_probe_home, with_isolated_harness_env,
 };
 pub use fake_toolchain::FakeToolchain;
