@@ -86,12 +86,11 @@ pub(crate) struct RemotePairMintHttpResponse {
     path = "/v1/remote/pair/mint",
     tag = "pairing",
     request_body = RemotePairMintHttpRequest,
-    description = "Mint a pairing link for an external identity the caller has already authenticated. Requires the pair_mint scope. The raw pairing code is not returned separately; it is carried inside pairing_url",
+    description = "Mint a pairing link for an external identity the caller has already authenticated. Requires the pair_mint scope. The raw pairing code is not returned separately; it is carried inside pairing_url. Beyond the shared middleware causes, this route also answers 503 when the pairing store is unavailable or the link could not be minted",
     responses(
         (status = 200, description = "Pairing link minted", body = RemotePairMintHttpResponse),
         (status = 400, description = "Malformed mint request", body = DaemonErrorBody),
         (status = 403, description = "Requested role or scope is not mintable", body = DaemonErrorBody),
-        (status = 503, description = "Pairing store or remote identity unavailable", body = DaemonErrorBody),
     ),
 )]
 async fn post_remote_pair_mint(
