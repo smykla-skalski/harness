@@ -76,11 +76,11 @@ pub(crate) struct RemoteViewerTaskBoardPositionSnapshot {
 
 /// Drops the provider text an external ref cached at its last sync.
 ///
-/// It is the single largest thing a board list carries - just under 1 MB of
-/// the 2.65 MB a 548-item board ships, against 40 KB for the refs themselves -
-/// and nothing on the other end can read it: the client's sync-state model
-/// carries `status` alone, so the text is decoded straight into nothing. Read
-/// a single item when the cached title or body is actually wanted.
+/// It is the largest thing a board list carries, outweighing the refs it hangs
+/// off by orders of magnitude, and nothing on the other end can read it: the
+/// client's sync-state model carries `status` alone, so the text is decoded
+/// straight into nothing. Read a single item when the cached title or body is
+/// wanted.
 fn drop_cached_provider_text(response: &mut TaskBoardListItemsResponse) {
     for reference in response
         .items
