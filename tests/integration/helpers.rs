@@ -27,9 +27,28 @@ mod run;
 
 // Keep lightweight fixtures in testkit and root-coupled fixtures local so
 // integration tests can continue importing everything through `helpers::*`.
+// Both integration targets compile this module and each reaches for a
+// different subset, so a re-export unused by one of them is expected rather
+// than a leftover.
+#[allow(
+    unused_imports,
+    reason = "each integration target uses its own subset of these re-exports"
+)]
 pub use harness_testkit::*;
+#[allow(
+    unused_imports,
+    reason = "each integration target uses its own subset of these re-exports"
+)]
 pub use hook::*;
+#[allow(
+    unused_imports,
+    reason = "each integration target uses its own subset of these re-exports"
+)]
 pub use port_lease::*;
+#[allow(
+    unused_imports,
+    reason = "each integration target uses its own subset of these re-exports"
+)]
 pub use run::*;
 
 /// Deterministically derive a valid UUID from a readable test label.

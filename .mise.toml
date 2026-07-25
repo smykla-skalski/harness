@@ -160,7 +160,7 @@ description = "Run fast integration tests in parallel with process isolation"
 run = [
   "./scripts/cargo-local.sh build -p harness-daemon -p harness-bridge -p harness-mcp",
   "./scripts/run-linux-only.sh ./scripts/cargo-local.sh build -p harness-systemd",
-  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test integration --features full-runtime",
+  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test integration --test integration_daemon --features full-runtime",
 ]
 
 [tasks."test:workers"]
@@ -179,12 +179,12 @@ run = [
   "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime --run-ignored only -E 'test(=agents::acp::throughput_bench::tests::throughput_meets_threshold)'",
   "./scripts/cargo-local.sh build -p harness-daemon -p harness-bridge -p harness-mcp",
   "./scripts/run-linux-only.sh ./scripts/cargo-local.sh build -p harness-systemd",
-  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test integration --features full-runtime --run-ignored only -E 'not test(~integration::daemon_perf::) and not test(=integration::commands::session::swarm_full_flow::swarm_full_flow_mise_lane_passes)'",
+  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test integration --test integration_daemon --features full-runtime --run-ignored only -E 'not test(~integration::daemon_perf::) and not test(=integration::commands::session::swarm_full_flow::swarm_full_flow_mise_lane_passes)'",
 ]
 
 [tasks."test:perf"]
 description = "Run ignored Rust performance budgets in their own parallel process-isolated lane"
-run = "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test integration --features full-runtime --run-ignored only -E 'test(~integration::daemon_perf::)'"
+run = "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test integration_daemon --features full-runtime --run-ignored only -E 'test(~integration::daemon_perf::)'"
 
 [tasks."test:profile:compile"]
 description = "Profile reproducible Rust test compilation and capture Cargo/sccache artifacts"
@@ -688,7 +688,7 @@ run = "./scripts/host-metrics.sh build-darwin-exporter"
 description = "Run harness MCP server unit and integration tests"
 run = [
   "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-mcp --all-targets",
-  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test integration --features full-runtime -E 'test(~mcp::)'",
+  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test integration -E 'test(~mcp::)'",
 ]
 
 [tasks."mcp:test:registry"]
