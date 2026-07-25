@@ -879,6 +879,35 @@ scenario_target_dir_is_shared_across_sessions() {
   rm -rf "${first_tmp%/}" "${second_tmp%/}"
 }
 
+# The Cleanup closeout step reads this to find the lane it has to reclaim, so a
+# path that disagrees with the one builds actually use would send it at the
+# wrong directory, or at nothing.
+scenario_print_target_dir_matches_the_build_dir() {
+  local dumped printed
+
+  dumped="$(
+    print_tmpdir_env "cargo-local-print-dir-$$" \
+      | awk -F= '$1 == "CARGO_TARGET_DIR" { print substr($0, index($0, "=") + 1) }'
+  )"
+  printed="$(
+    (
+      unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR
+      SCCACHE_BIN="$SANDBOX/missing-sccache" \
+        RUSTC_WRAPPER='' \
+        CODEX_SESSION_ID="cargo-local-print-dir-$$" \
+        "$ROOT/scripts/cargo-local.sh" --print-target-dir
+    )
+  )"
+
+  if [[ -n "$printed" ]] \
+    && [[ "$printed" == "$dumped" ]] \
+    && [[ "$(printf '%s' "$printed" | wc -l | tr -d ' ')" == "0" ]]; then
+    pass "--print-target-dir names the dir builds use"
+  else
+    fail "--print-target-dir disagrees: printed=$printed dumped=$dumped"
+  fi
+}
+
 scenario_sccache_socket_survives_session_scoped_tmpdir() {
   local fake_bin="$SANDBOX/socket-share-bin"
   local first second first_sock second_sock first_tmp second_tmp
@@ -1225,6 +1254,7 @@ scenario_usable_tmpdir_is_preserved
 scenario_agent_build_jobs_leave_room_for_later_arrivals
 scenario_agent_jobs_hold_their_reserved_share
 scenario_target_dir_is_shared_across_sessions
+scenario_print_target_dir_matches_the_build_dir
 scenario_sccache_socket_survives_session_scoped_tmpdir
 scenario_sccache_socket_is_shared_across_checkouts
 scenario_repo_tmpdir_fallback_is_session_scoped
