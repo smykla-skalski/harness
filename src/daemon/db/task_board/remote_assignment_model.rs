@@ -286,6 +286,12 @@ pub(super) async fn load_offer_collision_in_tx(
         .collect()
 }
 
+/// Whole-request equality, prompt bytes included, is deliberate here even
+/// though prompts are configurable. `record.offer` is the envelope sealed into
+/// `request_json` when the assignment was inserted, and nothing updates that
+/// column; a reassignment clones the predecessor's launch instead of rendering
+/// a new one. Both sides trace back to one render, so a catalog change cannot
+/// turn a genuine replay into a conflict.
 pub(super) fn exact_offer_replay(
     record: &TaskBoardRemoteAssignmentRecord,
     request: &RemoteOfferRequest,

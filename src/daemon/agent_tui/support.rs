@@ -117,6 +117,11 @@ pub(super) fn agent_id_for_tui(state: &SessionState, tui_id: &str) -> Result<Str
 /// A terminal prompt is typed into a PTY rather than persisted on a run row,
 /// and the raw transcript is replayed as terminal bytes, so it cannot carry
 /// the prompt itself.
+///
+/// The file records the prompt the run was started with, not one the agent is
+/// known to have received. Typing it into the PTY is best effort and reported
+/// separately, so a mismatch between this file and the transcript is a
+/// delivery question, not a bug in the recording.
 #[must_use]
 pub(crate) fn recorded_prompt_path(transcript_path: &Path) -> PathBuf {
     transcript_path.with_file_name("prompt.txt")

@@ -70,6 +70,8 @@ The workflow prompts embed a result contract in `response_json` and the escalati
 
 ## Recovery
 
-An interrupted worker used to be identified by comparing its launch prompt byte for byte, which meant no prompt could ever change without stranding running work. Identity now rests on the frozen structural fields — session, worktree, board item, workflow execution, task, mode, model, effort — and a recovered worker whose prompt no longer matches is logged and accepted. A worker whose structural fields disagree is still refused.
+An interrupted worker used to be identified by comparing its launch prompt byte for byte, which meant no prompt could ever change without stranding running work. At the two recovery sites — the dispatch path's recovered worker and the durable coordinator's attempt binding — identity now rests on the frozen structural fields: session, worktree, board item, workflow execution, task, mode, model, effort. Those fields are read straight off the records, so recovery never renders, and a template nobody can render cannot fence a healthy claim. A recovered worker whose prompt no longer matches is logged and accepted; one whose structural fields disagree is still refused.
 
-The prompt an agent actually ran with stays recoverable: a Codex-backed run keeps it on its run row next to its result, and a terminal agent's prompt is written to `prompt.txt` beside its transcript.
+This does not apply to the remote offer's byte compares. A remote assignment seals its launch envelope into `request_json` when the offer is inserted, and nothing updates that column afterwards; a reassignment clones the predecessor's envelope rather than rendering a new one. Both sides of those compares therefore trace back to a single render, and a prompt change cannot reach them.
+
+The prompt an agent actually ran with stays recoverable: a Codex-backed run keeps it on its run row next to its result. A terminal agent's prompt is written to `prompt.txt` beside its transcript, which records what the run was started with — delivery into the terminal is best effort and logged separately, so the file is not evidence the agent received it.
