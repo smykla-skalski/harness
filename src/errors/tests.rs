@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::hooks::protocol::hook_result::Decision;
+use crate::errors::hook_result::Decision;
 
 use super::*;
 
@@ -276,7 +276,7 @@ fn snapshot_render_error_command_failed() {
 
 #[test]
 fn snapshot_hook_result_deny_json() {
-    use crate::hooks::protocol::hook_result::HookResult;
+    use crate::errors::hook_result::HookResult;
 
     let result = HookResult::deny("KSR005", "Direct cluster binary access is not allowed.");
     let json = serde_json::to_string_pretty(&result).expect("serialize hook result");
@@ -285,7 +285,7 @@ fn snapshot_hook_result_deny_json() {
 
 #[test]
 fn snapshot_hook_result_warn_json() {
-    use crate::hooks::protocol::hook_result::HookResult;
+    use crate::errors::hook_result::HookResult;
 
     let result = HookResult::warn("KSR006", "Artifact missing: preflight.json");
     let json = serde_json::to_string_pretty(&result).expect("serialize hook result");
@@ -294,7 +294,7 @@ fn snapshot_hook_result_warn_json() {
 
 #[test]
 fn snapshot_hook_result_info_json() {
-    use crate::hooks::protocol::hook_result::HookResult;
+    use crate::errors::hook_result::HookResult;
 
     let result = HookResult::info("KSR012", "Run verdict: pass");
     let json = serde_json::to_string_pretty(&result).expect("serialize hook result");

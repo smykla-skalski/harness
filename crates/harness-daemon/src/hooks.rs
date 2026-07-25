@@ -1,5 +1,3 @@
-#[path = "../../../src/hooks/protocol/hook_result.rs"]
-mod hook_result_types;
 #[path = "../../../src/hooks/protocol/payloads.rs"]
 mod payload_types;
 
@@ -8,8 +6,10 @@ pub mod adapters {
 }
 
 pub mod protocol {
+    // Re-exported rather than re-included so this crate has a single
+    // `HookResult` type shared with `crate::errors`.
     pub mod hook_result {
-        pub use super::super::hook_result_types::*;
+        pub use crate::errors::hook_result::*;
     }
 
     pub mod payloads {

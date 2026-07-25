@@ -1,4 +1,4 @@
-use crate::hooks::protocol::hook_result::Decision;
+use crate::errors::hook_result::Decision;
 
 use super::HookMessage;
 
