@@ -156,14 +156,17 @@ Reclaim this session's two build caches first, because `git worktree remove` del
 - `<worktree>/target` - direct `cargo` and `cargo nextest` output.
 - `<main-checkout>/target/dev/wt-<worktree-name>-<hash>` - everything from `scripts/cargo-local.sh`, which every `mise run test:*` task uses. Sits outside the worktree and is usually the larger.
 
-Every other session holds its own `target/dev/wt-*` lane, so ask `cargo-local.sh` for this one rather than matching a name by eye, and clear any target-dir override first, since the script honours one and would otherwise answer with the redirect. A lease is named for the segment it covers and the PID holding it, and a running build's lane must survive, so the delete stands down while one of those PIDs is alive. Match on the PID rather than the file, the way `clean-build-caches.sh` does: a lease left by a crashed build would otherwise block reclamation for good, which strands the lane just as surely as never running this step.
+Every other session holds its own `target/dev/wt-*` lane, so ask `cargo-local.sh` for this one rather than matching a name by eye, and clear any target-dir override first, since the script honours one and would otherwise answer with the redirect. A lease is named `<segment>-<pid>` and holds that PID inside, and a running build's lane must survive, so the delete stands down while one of those PIDs is alive. Mirror `segment_is_leased` in `clean-build-caches.sh`: require the filename to match the PID it carries, and count a PID that fails `kill -0` but still appears in `ps` as alive, since a build owned by another user cannot be signalled. Judging by the file alone instead would let a lease from a crashed build block reclamation for good, stranding the lane just as surely as never running this step.
 
 ```bash
 # assumes: PR merged, <worktree> clean
 lane=$(env -u CARGO_TARGET_DIR -u HARNESS_CARGO_TARGET_DIR \
   "<worktree>/scripts/cargo-local.sh" --print-target-dir)
 held=$(for f in "<main-checkout>"/target/.cargo-local/leases/"$(basename "$lane")"-*; do
-  [ -f "$f" ] && kill -0 "$(cat "$f" 2>/dev/null)" 2>/dev/null && echo held; done)
+  pid=$(cat "$f" 2>/dev/null) || continue
+  [ "${f##*/}" = "$(basename "$lane")-$pid" ] || continue
+  kill -0 "$pid" 2>/dev/null || ps -p "$pid" >/dev/null 2>&1 && echo held
+done)
 [ -z "$held" ] && rm -rf "<worktree>/target" "$lane"   # a running build keeps its lane
 ```
 
