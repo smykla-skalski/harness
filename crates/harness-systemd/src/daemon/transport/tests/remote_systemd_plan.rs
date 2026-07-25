@@ -330,6 +330,89 @@ fn remote_systemd_execstart_escapes_percent_specifiers() {
     assert!(!plan.unit_contents.contains("--domain daemon%h.example.com"));
 }
 
+#[test]
+fn remote_systemd_plan_renders_companion_routing_flags() {
+    let args = install_args([
+        "test",
+        "--domain",
+        "daemon.example.com",
+        "--acme-email",
+        "ops@example.com",
+        "--companion-upstream",
+        "http://127.0.0.1:8787",
+    ]);
+    let plan = RemoteSystemdInstallPlan::for_tests(
+        &args,
+        PathBuf::from("/usr/local/bin/harness"),
+        PathBuf::from("/etc/systemd/system/harness-remote-daemon.service"),
+        PathBuf::from("/etc/harness/harness-remote-daemon.env"),
+    )
+    .expect("systemd install plan");
+
+    assert!(
+        plan.unit_contents
+            .contains("--companion-upstream http://127.0.0.1:8787"),
+        "{}",
+        plan.unit_contents
+    );
+    assert!(
+        plan.unit_contents
+            .contains("--companion-path-prefix /panel"),
+        "{}",
+        plan.unit_contents
+    );
+}
+
+#[test]
+fn remote_systemd_plan_omits_companion_flags_when_none_is_configured() {
+    let args = install_args([
+        "test",
+        "--domain",
+        "daemon.example.com",
+        "--acme-email",
+        "ops@example.com",
+    ]);
+    let plan = RemoteSystemdInstallPlan::for_tests(
+        &args,
+        PathBuf::from("/usr/local/bin/harness"),
+        PathBuf::from("/etc/systemd/system/harness-remote-daemon.service"),
+        PathBuf::from("/etc/harness/harness-remote-daemon.env"),
+    )
+    .expect("systemd install plan");
+
+    assert!(!plan.unit_contents.contains("--companion-"));
+}
+
+#[test]
+fn remote_systemd_plan_refuses_a_companion_the_daemon_would_reject() {
+    for (upstream, prefix) in [
+        ("http://198.51.100.9:8787", "/panel"),
+        ("https://127.0.0.1:8787", "/panel"),
+        ("http://127.0.0.1:8787", "/v1"),
+        ("http://127.0.0.1:8787", "/panel/"),
+    ] {
+        let args = install_args([
+            "test",
+            "--domain",
+            "daemon.example.com",
+            "--acme-email",
+            "ops@example.com",
+            "--companion-upstream",
+            upstream,
+            "--companion-path-prefix",
+            prefix,
+        ]);
+
+        RemoteSystemdInstallPlan::for_tests(
+            &args,
+            PathBuf::from("/usr/local/bin/harness"),
+            PathBuf::from("/etc/systemd/system/harness-remote-daemon.service"),
+            PathBuf::from("/etc/harness/harness-remote-daemon.env"),
+        )
+        .expect_err(&format!("{upstream} with {prefix} must be refused"));
+    }
+}
+
 fn install_args<const N: usize>(args: [&str; N]) -> DaemonRemoteSystemdInstallArgs {
     #[derive(Debug, Parser)]
     struct Harness {

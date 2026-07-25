@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::fmt;
+use std::net::IpAddr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RemoteAcmeChallenge {
@@ -40,6 +41,12 @@ impl RemoteDnsProvider {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemoteCompanionConfig {
+    pub upstream: String,
+    pub path_prefix: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RemoteDaemonServeConfig {
     pub domain: String,
     pub host: String,
@@ -48,6 +55,10 @@ pub struct RemoteDaemonServeConfig {
     pub acme_email: String,
     pub acme_challenge: RemoteAcmeChallenge,
     pub acme_dns_provider: Option<RemoteDnsProvider>,
+    /// Companion web service the daemon forwards a path subtree to. The unit
+    /// renders these as serve flags, so a companion cannot be enabled by hand
+    /// editing an installed unit.
+    pub companion: Option<RemoteCompanionConfig>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,6 +70,8 @@ pub enum RemoteDaemonConfigError {
     MissingHttpPort,
     MissingDnsProvider,
     UnexpectedDnsProvider,
+    CompanionUpstreamNotLoopbackHttp(String),
+    CompanionPathPrefixInvalid(String),
 }
 
 impl fmt::Display for RemoteDaemonConfigError {
@@ -82,6 +95,15 @@ impl fmt::Display for RemoteDaemonConfigError {
             Self::UnexpectedDnsProvider => write!(
                 formatter,
                 "remote daemon DNS provider is only valid with DNS-01 challenge"
+            ),
+            Self::CompanionUpstreamNotLoopbackHttp(upstream) => write!(
+                formatter,
+                "remote daemon companion upstream must be an http loopback origin, got {upstream}"
+            ),
+            Self::CompanionPathPrefixInvalid(prefix) => write!(
+                formatter,
+                "remote daemon companion path prefix {prefix} must be an absolute path below \
+                 /{DAEMON_API_SEGMENT} with no trailing slash"
             ),
         }
     }
@@ -122,7 +144,88 @@ pub fn validate_remote_serve_config(
             Err(RemoteDaemonConfigError::MissingDnsProvider)
         }
         RemoteAcmeChallenge::TlsAlpn | RemoteAcmeChallenge::Http | RemoteAcmeChallenge::Dns => {
-            Ok(())
+            validate_companion(config.companion.as_ref())
         }
     }
+}
+
+/// Path segment the daemon's own API owns; a companion prefix that started here
+/// would shadow routes the daemon must keep answering.
+const DAEMON_API_SEGMENT: &str = "v1";
+
+/// Subtree handed to the companion when one is configured without an explicit
+/// prefix. Must match the daemon's own default.
+pub const DEFAULT_COMPANION_PATH_PREFIX: &str = "/panel";
+
+/// Reject a companion the daemon would refuse at startup, so `install` fails
+/// while the operator is still watching instead of leaving a unit that will not
+/// come up. The daemon re-validates authoritatively; this crate cannot call into
+/// it, so the rule is restated rather than shared.
+fn validate_companion(
+    companion: Option<&RemoteCompanionConfig>,
+) -> Result<(), RemoteDaemonConfigError> {
+    let Some(companion) = companion else {
+        return Ok(());
+    };
+    let upstream = companion.upstream.trim();
+    if !is_loopback_http_origin(upstream) {
+        return Err(RemoteDaemonConfigError::CompanionUpstreamNotLoopbackHttp(
+            upstream.to_owned(),
+        ));
+    }
+    let prefix = companion.path_prefix.trim();
+    if !is_valid_companion_prefix(prefix) {
+        return Err(RemoteDaemonConfigError::CompanionPathPrefixInvalid(
+            prefix.to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+fn is_loopback_http_origin(upstream: &str) -> bool {
+    let Some(authority) = upstream.strip_prefix("http://") else {
+        return false;
+    };
+    let authority = authority.strip_suffix('/').unwrap_or(authority);
+    if authority.is_empty() || authority.contains(['/', '?', '#']) {
+        return false;
+    }
+    companion_host(authority).is_some_and(is_loopback_host)
+}
+
+/// Split `host:port`, keeping a bracketed IPv6 literal in one piece.
+fn companion_host(authority: &str) -> Option<&str> {
+    let Some(rest) = authority.strip_prefix('[') else {
+        return Some(
+            authority
+                .split_once(':')
+                .map_or(authority, |(host, _)| host),
+        );
+    };
+    let (host, tail) = rest.split_once(']')?;
+    (tail.is_empty() || tail.starts_with(':')).then_some(host)
+}
+
+fn is_loopback_host(host: &str) -> bool {
+    host.eq_ignore_ascii_case("localhost")
+        || host
+            .parse::<IpAddr>()
+            .is_ok_and(|address| address.is_loopback())
+}
+
+fn is_valid_companion_prefix(prefix: &str) -> bool {
+    if !prefix.starts_with('/') || prefix == "/" || prefix.ends_with('/') {
+        return false;
+    }
+    if prefix
+        .chars()
+        .any(|c| c.is_whitespace() || c.is_control() || matches!(c, '?' | '#' | '{' | '}' | '*'))
+    {
+        return false;
+    }
+    let mut segments = prefix.split('/').skip(1);
+    let Some(first) = segments.next().filter(|segment| !segment.is_empty()) else {
+        return false;
+    };
+    !first.eq_ignore_ascii_case(DAEMON_API_SEGMENT) && !segments.any(str::is_empty)
 }

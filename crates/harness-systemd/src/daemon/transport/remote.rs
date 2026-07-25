@@ -1,7 +1,8 @@
 use clap::{Args, ValueEnum};
 
 use crate::daemon::remote::{
-    RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider, validate_remote_serve_config,
+    DEFAULT_COMPANION_PATH_PREFIX, RemoteAcmeChallenge, RemoteCompanionConfig,
+    RemoteDaemonServeConfig, RemoteDnsProvider, validate_remote_serve_config,
 };
 use crate::errors::{CliError, CliErrorKind};
 
@@ -28,6 +29,13 @@ pub struct DaemonRemoteServeArgs {
     /// DNS provider used by DNS-01.
     #[arg(long, value_enum)]
     pub acme_dns_provider: Option<DaemonRemoteDnsProvider>,
+    /// Loopback origin of a companion web service to forward part of the public
+    /// traffic to, for example `http://127.0.0.1:8787`.
+    #[arg(long)]
+    pub companion_upstream: Option<String>,
+    /// Path subtree handed to the companion service.
+    #[arg(long, default_value = DEFAULT_COMPANION_PATH_PREFIX)]
+    pub companion_path_prefix: String,
 }
 
 impl DaemonRemoteServeArgs {
@@ -40,6 +48,13 @@ impl DaemonRemoteServeArgs {
             acme_email: self.acme_email.trim().to_string(),
             acme_challenge: self.acme_challenge.into(),
             acme_dns_provider: self.acme_dns_provider.map(Into::into),
+            companion: self
+                .companion_upstream
+                .as_deref()
+                .map(|upstream| RemoteCompanionConfig {
+                    upstream: upstream.trim().to_string(),
+                    path_prefix: self.companion_path_prefix.trim().to_string(),
+                }),
         };
         validate_remote_serve_config(&config)
             .map_err(|error| CliError::from(CliErrorKind::workflow_parse(error.to_string())))?;

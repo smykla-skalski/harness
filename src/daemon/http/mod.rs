@@ -41,6 +41,7 @@ mod agents;
 mod audit;
 mod auth;
 mod auth_audit;
+pub mod companion;
 mod core;
 mod improver;
 mod managed_agents;
@@ -73,6 +74,9 @@ mod voice;
 
 pub use auth::DaemonHttpAuthMode;
 pub(crate) use auth::{authenticated_remote_client, require_execution_remote_client};
+pub use companion::{
+    CompanionConfigError, CompanionRouteConfig, CompanionRouter, DEFAULT_COMPANION_PATH_PREFIX,
+};
 pub(crate) use managed_agents::{
     acp_inspect_response, acp_transcript_response, ensure_acp_agent, ensure_acp_enabled,
     ensure_codex_agent, ensure_terminal_agent_async, managed_agent_list_response_async,
@@ -204,6 +208,10 @@ pub struct DaemonHttpState {
     pub token: String,
     pub auth_mode: DaemonHttpAuthMode,
     pub remote_domain: Option<String>,
+    /// Companion service this daemon forwards a configured path subtree to.
+    /// `None` leaves the router, the auth layer, and every response exactly as
+    /// they are without companion routing.
+    pub companion: Option<CompanionRouter>,
     pub remote_request_limits: Option<RemoteRequestLimits>,
     pub remote_pairing_limiter: Arc<Mutex<RemotePairingRateLimiter>>,
     pub remote_pairing_status_limiter: Arc<Mutex<RemotePairingStatusRateLimiter>>,
@@ -427,11 +435,20 @@ where
 
 fn daemon_http_router(state: DaemonHttpState) -> Router<()> {
     let (router, _openapi) = openapi::daemon_openapi_router().split_for_parts();
+    // `Router::layer` reaches only the routes registered before it, so merging
+    // the companion here is what exempts it from daemon authentication: it
+    // authenticates its own users, and its paths carry no scope contract for
+    // the daemon's authorizer to consult. The limit and tracing layers below
+    // still cover it.
+    let router = router.layer(middleware::from_fn_with_state(
+        state.clone(),
+        auth::authorize_remote_http_request,
+    ));
+    let router = match state.companion.as_ref() {
+        Some(companion) => router.merge(companion::companion_routes(companion)),
+        None => router,
+    };
     router
-        .layer(middleware::from_fn_with_state(
-            state.clone(),
-            auth::authorize_remote_http_request,
-        ))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             remote_limits::limit_remote_http_body,

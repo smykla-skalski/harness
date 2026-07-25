@@ -34,7 +34,9 @@ use super::agent_tui::AgentTuiManagerHandle;
 use super::bridge;
 use super::codex_controller::CodexControllerHandle;
 use super::codex_transport::{self, CodexTransportKind};
-use super::http::{self, DaemonHttpAuthMode, DaemonHttpState, RemoteRequestLimitConfig};
+use super::http::{
+    self, CompanionRouteConfig, DaemonHttpAuthMode, DaemonHttpState, RemoteRequestLimitConfig,
+};
 use super::index::{self, ResolvedSession};
 use super::launchd::{self, LaunchAgentStatus};
 #[cfg(test)]
@@ -151,6 +153,9 @@ pub struct DaemonServeConfig {
     pub auth_mode: DaemonHttpAuthMode,
     pub remote_domain: Option<String>,
     pub remote_request_limits: Option<RemoteRequestLimitConfig>,
+    /// Companion service to forward a configured path subtree to. Remote serve
+    /// only; a loopback daemon serves its own routes and nothing else.
+    pub companion: Option<CompanionRouteConfig>,
     pub poll_interval: Duration,
     pub observe_interval: Duration,
     /// Whether the daemon is running inside the macOS App Sandbox.
@@ -173,6 +178,7 @@ impl Default for DaemonServeConfig {
             auth_mode: DaemonHttpAuthMode::Local,
             remote_domain: None,
             remote_request_limits: None,
+            companion: None,
             poll_interval: Duration::from_secs(2),
             observe_interval: Duration::from_secs(5),
             sandboxed: false,

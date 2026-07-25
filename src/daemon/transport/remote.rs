@@ -7,8 +7,10 @@ use uuid::Uuid;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::db::DaemonDb;
-use crate::daemon::http::DaemonHttpAuthMode;
-use crate::daemon::http::RemoteRequestLimitConfig;
+use crate::daemon::http::{
+    CompanionRouteConfig, DEFAULT_COMPANION_PATH_PREFIX, DaemonHttpAuthMode,
+    RemoteRequestLimitConfig,
+};
 use crate::daemon::remote::{
     RemoteAccessScope, RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider, RemoteRole,
     validate_remote_serve_config,
@@ -84,6 +86,15 @@ pub struct DaemonRemoteServeArgs {
     /// DNS provider used by DNS-01 challenges.
     #[arg(long, value_enum)]
     pub acme_dns_provider: Option<DaemonRemoteDnsProvider>,
+    /// Loopback origin of a companion web service to forward part of the public
+    /// traffic to, for example `http://127.0.0.1:8787`. Omit to serve only the
+    /// daemon's own API.
+    #[arg(long)]
+    pub companion_upstream: Option<String>,
+    /// Path subtree handed to the companion service. Forwarded verbatim, so the
+    /// companion serves its own routes under this prefix.
+    #[arg(long, default_value = DEFAULT_COMPANION_PATH_PREFIX)]
+    pub companion_path_prefix: String,
 }
 
 impl DaemonRemoteServeArgs {
@@ -123,8 +134,23 @@ impl DaemonRemoteServeArgs {
             auth_mode: DaemonHttpAuthMode::Remote,
             remote_domain: Some(remote_config.domain),
             remote_request_limits: Some(RemoteRequestLimitConfig::default()),
+            companion: self.companion_config()?,
             ..DaemonServeConfig::default()
         })
+    }
+
+    /// Validate the companion routing target, if one was configured.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the upstream is not a loopback `http` origin or
+    /// the path prefix would shadow the daemon's own API.
+    fn companion_config(&self) -> Result<Option<CompanionRouteConfig>, CliError> {
+        let Some(upstream) = self.companion_upstream.as_deref() else {
+            return Ok(None);
+        };
+        CompanionRouteConfig::new(upstream, self.companion_path_prefix.as_str())
+            .map(Some)
+            .map_err(|error| CliErrorKind::workflow_parse(error.to_string()).into())
     }
 }
 

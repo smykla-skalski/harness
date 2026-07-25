@@ -1,0 +1,156 @@
+use super::{CompanionConfigError, CompanionRouteConfig, DEFAULT_COMPANION_PATH_PREFIX};
+
+fn config(upstream: &str, prefix: &str) -> Result<CompanionRouteConfig, CompanionConfigError> {
+    CompanionRouteConfig::new(upstream, prefix)
+}
+
+#[test]
+fn accepts_a_loopback_upstream_and_normalizes_nothing() {
+    let route = config("http://127.0.0.1:8787", DEFAULT_COMPANION_PATH_PREFIX)
+        .expect("loopback upstream is accepted");
+
+    assert_eq!(route.upstream_origin(), "http://127.0.0.1:8787");
+    assert_eq!(route.path_prefix(), "/panel");
+}
+
+#[test]
+fn accepts_localhost_and_ipv6_loopback() {
+    for upstream in ["http://localhost:8787", "http://[::1]:8787"] {
+        config(upstream, "/panel").unwrap_or_else(|error| {
+            panic!("{upstream} should be accepted as loopback: {error}");
+        });
+    }
+}
+
+#[test]
+fn accepts_a_trailing_root_path_on_the_upstream() {
+    let route = config("http://127.0.0.1:8787/", "/panel").expect("root path is accepted");
+
+    assert_eq!(route.upstream_origin(), "http://127.0.0.1:8787");
+}
+
+#[test]
+fn rejects_a_non_loopback_upstream() {
+    let error = config("http://198.51.100.9:8787", "/panel")
+        .expect_err("a routable upstream must be refused");
+
+    assert!(matches!(
+        error,
+        CompanionConfigError::UpstreamNotLoopback(_)
+    ));
+}
+
+#[test]
+fn rejects_a_named_upstream_that_is_not_localhost() {
+    let error =
+        config("http://panel.internal:8787", "/panel").expect_err("a named host must be refused");
+
+    assert!(matches!(
+        error,
+        CompanionConfigError::UpstreamNotLoopback(_)
+    ));
+}
+
+#[test]
+fn rejects_a_non_http_upstream() {
+    let error =
+        config("https://127.0.0.1:8787", "/panel").expect_err("https upstream must be refused");
+
+    assert!(matches!(
+        error,
+        CompanionConfigError::UpstreamSchemeUnsupported(_)
+    ));
+}
+
+#[test]
+fn rejects_an_upstream_carrying_a_path() {
+    let error =
+        config("http://127.0.0.1:8787/panel", "/panel").expect_err("upstream path must be refused");
+
+    assert!(matches!(error, CompanionConfigError::UpstreamHasPath(_)));
+}
+
+#[test]
+fn rejects_a_missing_upstream() {
+    let error = config("   ", "/panel").expect_err("blank upstream must be refused");
+
+    assert!(matches!(error, CompanionConfigError::UpstreamMissingHost));
+}
+
+#[test]
+fn rejects_a_prefix_that_shadows_the_daemon_api() {
+    for prefix in ["/v1", "/v1/remote", "/V1"] {
+        let Err(error) = config("http://127.0.0.1:8787", prefix) else {
+            panic!("{prefix} should be refused as shadowing the daemon API");
+        };
+
+        assert!(
+            matches!(error, CompanionConfigError::PrefixShadowsDaemonApi(_)),
+            "{prefix} should be refused as shadowing, got {error}"
+        );
+    }
+}
+
+#[test]
+fn rejects_a_root_prefix() {
+    let error = config("http://127.0.0.1:8787", "/").expect_err("root prefix must be refused");
+
+    assert!(matches!(error, CompanionConfigError::PrefixIsRoot));
+}
+
+#[test]
+fn rejects_a_relative_or_trailing_slash_prefix() {
+    let relative =
+        config("http://127.0.0.1:8787", "panel").expect_err("relative prefix must be refused");
+    let trailing =
+        config("http://127.0.0.1:8787", "/panel/").expect_err("trailing slash must be refused");
+
+    assert!(matches!(
+        relative,
+        CompanionConfigError::PrefixNotAbsolute(_)
+    ));
+    assert!(matches!(
+        trailing,
+        CompanionConfigError::PrefixTrailingSlash(_)
+    ));
+}
+
+#[test]
+fn rejects_a_prefix_with_an_empty_segment() {
+    let error =
+        config("http://127.0.0.1:8787", "/panel//api").expect_err("empty segment must be refused");
+
+    assert!(matches!(error, CompanionConfigError::PrefixEmptySegment(_)));
+}
+
+#[test]
+fn rejects_prefix_characters_that_would_change_routing_or_parsing() {
+    for prefix in [
+        "/pa nel",
+        "/panel?x=1",
+        "/panel#top",
+        "/{panel}",
+        "/panel/*",
+    ] {
+        let Err(error) = config("http://127.0.0.1:8787", prefix) else {
+            panic!("{prefix} should be refused for its characters");
+        };
+
+        assert!(
+            matches!(error, CompanionConfigError::PrefixInvalidCharacter(_)),
+            "{prefix} should be refused for its characters, got {error}"
+        );
+    }
+}
+
+#[test]
+fn route_patterns_cover_the_prefix_and_its_subtree() {
+    let route = config("http://127.0.0.1:8787", "/panel").expect("valid companion config");
+
+    assert_eq!(route.exact_route(), "/panel");
+    assert_eq!(route.wildcard_route(), "/panel/{*companion_path}");
+    assert!(route.owns_route("/panel"));
+    assert!(route.owns_route("/panel/{*companion_path}"));
+    assert!(!route.owns_route("/v1/ready"));
+    assert!(!route.owns_route("/panelling"));
+}

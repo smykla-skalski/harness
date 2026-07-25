@@ -39,6 +39,7 @@ mod async_observe;
 mod async_reads;
 mod async_signal_mutations;
 mod async_stream;
+mod companion_routing;
 mod decode_failure_telemetry;
 mod policy_io_route_parity;
 mod remote_actor;

@@ -121,6 +121,7 @@ fn restarted_state(db_path: &std::path::Path, async_db: Arc<AsyncDaemonDb>) -> D
         auth_mode: DaemonHttpAuthMode::Local,
         remote_domain: None,
         remote_request_limits: None,
+        companion: None,
         remote_pairing_limiter: default_remote_pairing_limiter(),
         remote_pairing_status_limiter: default_remote_pairing_status_limiter(),
         sender: sender.clone(),

@@ -323,6 +323,17 @@ fn http_route_contract(method: &Method, route_path: &str) -> Option<&'static Htt
         .find(|route| route.method.as_str() == method && route.path == route_path)
 }
 
+/// Companion routes are merged after the authorization layer, so no remote
+/// client is ever attached to one. A limit rejection on such a request has no
+/// client to attribute and no scope contract to resolve; auditing it as a
+/// denied daemon call would invent an actor that does not exist.
+fn is_companion_route(state: &DaemonHttpState, route_path: &str) -> bool {
+    state
+        .companion
+        .as_ref()
+        .is_some_and(|companion| companion.owns_route(route_path))
+}
+
 fn is_public_remote_http_route(method: &Method, route_path: &str) -> bool {
     *method == Method::POST
         && matches!(
@@ -346,6 +357,9 @@ fn remote_http_limit_audit_target(
         return Ok(None);
     };
     if is_public_remote_http_route(request.method(), route_path) {
+        return Ok(None);
+    }
+    if is_companion_route(state, route_path) {
         return Ok(None);
     }
     let target =

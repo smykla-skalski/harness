@@ -109,6 +109,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         auth_mode: http_auth_mode(&config),
         remote_domain: config.remote_domain.clone(),
         remote_request_limits: None,
+        companion: None,
         remote_pairing_limiter: http::default_remote_pairing_limiter(),
         remote_pairing_status_limiter: http::default_remote_pairing_status_limiter(),
         sender,

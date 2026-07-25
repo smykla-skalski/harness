@@ -318,6 +318,7 @@ pub(super) fn executor_state(db: &AsyncDaemonDb, daemon_epoch: &str) -> DaemonHt
         auth_mode: DaemonHttpAuthMode::Local,
         remote_domain: None,
         remote_request_limits: None,
+        companion: None,
         remote_pairing_limiter: default_remote_pairing_limiter(),
         remote_pairing_status_limiter: default_remote_pairing_status_limiter(),
         sender: sender.clone(),
