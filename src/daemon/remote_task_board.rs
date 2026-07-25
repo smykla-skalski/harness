@@ -74,9 +74,29 @@ pub(crate) struct RemoteViewerTaskBoardPositionSnapshot {
     items_change_seq: i64,
 }
 
+/// Drops the provider text an external ref cached at its last sync.
+///
+/// It is the largest thing a board list carries, outweighing the refs it hangs
+/// off by orders of magnitude, and nothing on the other end can read it: the
+/// client's sync-state model carries `status` alone, so the text is decoded
+/// straight into nothing. Read a single item when the cached title or body is
+/// wanted.
+fn drop_cached_provider_text(response: &mut TaskBoardListItemsResponse) {
+    for reference in response
+        .items
+        .iter_mut()
+        .flat_map(|item| item.external_refs.iter_mut())
+    {
+        if let Some(state) = reference.sync_state.as_mut() {
+            state.title = None;
+            state.body = None;
+        }
+    }
+}
+
 #[must_use]
 pub(crate) fn project_task_board_list(
-    response: TaskBoardListItemsResponse,
+    mut response: TaskBoardListItemsResponse,
     viewer: bool,
 ) -> TaskBoardReadListResponse {
     if viewer {
@@ -95,6 +115,7 @@ pub(crate) fn project_task_board_list(
             item_revisions,
         })
     } else {
+        drop_cached_provider_text(&mut response);
         TaskBoardReadListResponse::Full(response)
     }
 }
@@ -231,6 +252,10 @@ fn body_preview(body: &str) -> String {
     preview.push_str("...");
     preview
 }
+
+#[cfg(test)]
+#[path = "remote_task_board_sync_state_tests.rs"]
+mod sync_state_tests;
 
 #[cfg(test)]
 mod tests {
