@@ -21,6 +21,7 @@ pub mod project_shape;
 #[cfg(feature = "daemon-runtime")]
 pub mod policy_runtime;
 pub mod progress_rollup;
+mod prompt_template;
 pub(crate) mod remote_spki_pin;
 pub mod runtime_config;
 pub mod store;
