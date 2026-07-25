@@ -9,6 +9,7 @@ members = [
   "crates/harness-hook",
   "crates/harness-kernel",
   "crates/harness-mcp",
+  "crates/harness-panel",
   "crates/harness-protocol",
   "crates/harness-systemd",
   "crates/harness-systemd-protocol",

@@ -27,4 +27,5 @@ cargo_local="$ROOT/scripts/cargo-local.sh"
 "$cargo_local" check -p harness-bridge --bin harness-bridge
 "$cargo_local" check -p harness-mcp --bin harness-mcp
 "$cargo_local" check -p harness-daemon --bin harness-daemon
+"$cargo_local" check -p harness-panel --bin harness-panel
 "$ROOT/scripts/run-linux-only.sh" "$cargo_local" check -p harness-systemd --bin harness-systemd
