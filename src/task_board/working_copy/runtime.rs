@@ -16,11 +16,12 @@ use std::sync::atomic::AtomicBool;
 use std::time::Instant;
 
 use chrono::Utc;
-use gix::progress::Discard;
+use gix::progress::tree;
 use tokio::fs as tokio_fs;
 use tokio::sync::Mutex;
 use tokio::task::spawn_blocking;
 
+use super::clone_progress::CloneProgressReporter;
 use super::progress::{WorkingCopyProgress, WorkingCopyProgressSink};
 use super::{WorkingCopyKey, WorkingCopyRegistry, WorkingCopyRegistryEntry, WorkingCopyRoot};
 
@@ -140,9 +141,15 @@ impl WorkingCopyRuntime {
         });
         let start = Instant::now();
         let task_path = checkout_path.clone();
-        let result = spawn_blocking(move || run_clone_checkout(&clone_url, &task_path))
+        let reporter = CloneProgressReporter::start(Arc::clone(&sink), repo_label.clone());
+        let progress = reporter.progress();
+        let result = spawn_blocking(move || run_clone_checkout(&clone_url, &task_path, progress))
             .await
-            .map_err(|join| WorkingCopyRuntimeError::Join(join.to_string()))?;
+            .map_err(|join| WorkingCopyRuntimeError::Join(join.to_string()));
+        // Stop sampling before the terminal event, so no `Advanced` can arrive
+        // after `Completed`/`Failed` and leave the UI stuck mid-progress.
+        reporter.finish();
+        let result = result?;
 
         match result {
             Ok(()) => {
@@ -351,18 +358,24 @@ fn write_registry_atomically(registry_path: &Path, body: &[u8]) -> Result<(), St
 }
 
 /// Synchronous gix clone + checkout executed inside `spawn_blocking`.
-fn run_clone_checkout(clone_url: &str, checkout_path: &Path) -> Result<(), WorkingCopyRuntimeError> {
+fn run_clone_checkout(
+    clone_url: &str,
+    checkout_path: &Path,
+    mut progress: tree::Item,
+) -> Result<(), WorkingCopyRuntimeError> {
     if let Some(parent) = checkout_path.parent() {
         fs::create_dir_all(parent).map_err(|e| WorkingCopyRuntimeError::Io(e.to_string()))?;
     }
     let interrupted = AtomicBool::new(false);
     let mut prepare = gix::prepare_clone(clone_url, checkout_path)
         .map_err(|e| WorkingCopyRuntimeError::Clone(redact_clone_url_secret(&e.to_string())))?;
+    // Both phases nest under the same item, so the sampler sees one tree
+    // spanning fetch and checkout rather than two unrelated ones.
     let (mut checkout, _fetch) = prepare
-        .fetch_then_checkout(Discard, &interrupted)
+        .fetch_then_checkout(&mut progress, &interrupted)
         .map_err(|e| WorkingCopyRuntimeError::Clone(redact_clone_url_secret(&e.to_string())))?;
     let (_repo, _outcome) = checkout
-        .main_worktree(Discard, &interrupted)
+        .main_worktree(&mut progress, &interrupted)
         .map_err(|e| WorkingCopyRuntimeError::Checkout(redact_clone_url_secret(&e.to_string())))?;
     // gix records the fetch URL (token embedded) as remote.origin.url; scrub the
     // credential so it is not left at rest in the checkout's config.

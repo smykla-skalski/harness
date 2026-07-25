@@ -29,6 +29,21 @@ pub const TASK_BOARD_WORKING_COPY_PROGRESS_EVENT: &str = "task_board_working_cop
 pub enum WorkingCopyProgress {
     /// The clone/checkout is starting.
     Started { repo_full_name: String },
+    /// The clone advanced. Emitted on a fixed interval while the clone runs,
+    /// including when the counts have not moved, so a consumer can tell a
+    /// stalled clone from one still making progress.
+    Advanced {
+        repo_full_name: String,
+        /// gix's name for the phase in flight, such as "Receiving objects".
+        phase: String,
+        done: u64,
+        /// Absent while the phase is unbounded, which gix reports until it
+        /// learns the object count.
+        total: Option<u64>,
+        /// gix reports the phase as unable to advance. False does not promise
+        /// health; a network stall stays `Running` with frozen counts.
+        blocked: bool,
+    },
     /// The obtain finished successfully.
     Completed {
         repo_full_name: String,
@@ -46,6 +61,7 @@ impl WorkingCopyProgress {
     pub fn repo_full_name(&self) -> &str {
         match self {
             Self::Started { repo_full_name }
+            | Self::Advanced { repo_full_name, .. }
             | Self::Completed { repo_full_name, .. }
             | Self::Failed { repo_full_name, .. } => repo_full_name,
         }
@@ -75,6 +91,13 @@ pub enum WorkingCopyProgressEventPayload {
     Started {
         repo_full_name: String,
     },
+    Advanced {
+        repo_full_name: String,
+        phase: String,
+        done: u64,
+        total: Option<u64>,
+        blocked: bool,
+    },
     Completed {
         repo_full_name: String,
         duration_millis: u64,
@@ -89,6 +112,19 @@ impl From<WorkingCopyProgress> for WorkingCopyProgressEventPayload {
     fn from(value: WorkingCopyProgress) -> Self {
         match value {
             WorkingCopyProgress::Started { repo_full_name } => Self::Started { repo_full_name },
+            WorkingCopyProgress::Advanced {
+                repo_full_name,
+                phase,
+                done,
+                total,
+                blocked,
+            } => Self::Advanced {
+                repo_full_name,
+                phase,
+                done,
+                total,
+                blocked,
+            },
             WorkingCopyProgress::Completed {
                 repo_full_name,
                 duration,
