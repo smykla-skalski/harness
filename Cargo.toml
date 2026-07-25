@@ -193,9 +193,19 @@ path = "examples/policy-wire-sample.rs"
 
 [profile.dev]
 debug = "line-tables-only"
+split-debuginfo = "unpacked"
 
 [profile.test]
 debug = "line-tables-only"
+split-debuginfo = "unpacked"
+
+# Dependencies build under the dev profile even when the target above them is a
+# test, so this one table reaches the test binaries too, and those are where it
+# tells: a dependency frame is almost never where the bug is, yet its line tables
+# are carried through every link to say so. Workspace crates keep theirs, so a
+# frame in this repository still resolves to a file and a line.
+[profile.dev.package."*"]
+debug = false
 
 [lints.clippy]
 pedantic = { level = "deny", priority = 1 }
