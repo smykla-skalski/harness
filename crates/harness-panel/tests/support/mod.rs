@@ -4,6 +4,9 @@ use std::fs;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD;
+
 use axum::Json;
 use axum::extract::State;
 use axum::http::HeaderMap;
@@ -177,6 +180,13 @@ impl PanelUnderTest {
             github_token_url: github.token_url(),
             github_api_url: github.api_url(),
             session_ttl_hours: 12,
+            // The sign-in tests never reach the daemon, so this only has to be
+            // a shape the panel accepts. Nothing here opens a connection.
+            daemon_endpoint: "https://harness.example.com".to_owned(),
+            daemon_spki_pin: format!("sha256/{}", STANDARD.encode([3_u8; 32])),
+            daemon_pair_code: None,
+            pair_link_role: "operator".to_owned(),
+            pair_link_ttl_seconds: 600,
         };
         let config = args.resolve().expect("valid configuration");
         let base_url = config.public_origin.clone();

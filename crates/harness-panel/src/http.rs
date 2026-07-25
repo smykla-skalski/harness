@@ -7,6 +7,7 @@
 
 pub mod api;
 pub mod auth;
+pub mod pair_links;
 pub mod session;
 
 use std::sync::Arc;
@@ -19,7 +20,9 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 
 use crate::assets::PanelAssets;
+use crate::config::daemon::DaemonConfig;
 use crate::config::{CompanionAuthDigest, PanelConfig};
+use crate::daemon_client::DaemonClient;
 use crate::error::PanelError;
 use crate::github::GitHubClient;
 use crate::store::Store;
@@ -31,6 +34,15 @@ pub struct PanelState {
     pub store: Store,
     pub github: Arc<GitHubClient>,
     pub assets: Arc<PanelAssets>,
+    pub daemon: Arc<DaemonRuntime>,
+}
+
+/// The daemon connection, kept together so a handler cannot reach for a client
+/// built from one configuration and settings from another.
+#[derive(Debug)]
+pub struct DaemonRuntime {
+    pub client: DaemonClient,
+    pub config: DaemonConfig,
 }
 
 impl PanelState {
@@ -42,11 +54,16 @@ impl PanelState {
     pub fn new(config: PanelConfig, store: Store) -> Result<Self, PanelError> {
         let assets = PanelAssets::new(&config.base_path)?;
         let github = GitHubClient::new(config.github.clone(), config.callback_url())?;
+        let daemon = DaemonRuntime {
+            client: DaemonClient::new(&config.daemon)?,
+            config: config.daemon.clone(),
+        };
         Ok(Self {
             config: Arc::new(config),
             store,
             github: Arc::new(github),
             assets: Arc::new(assets),
+            daemon: Arc::new(daemon),
         })
     }
 }
@@ -76,6 +93,7 @@ pub fn router(state: PanelState) -> Router {
         .route(&format!("{base}/auth/github/start"), get(auth::start))
         .route(&format!("{base}/auth/github/callback"), get(auth::callback))
         .route(&format!("{base}/auth/signout"), post(auth::signout))
+        .route(&format!("{base}/api/pair-links"), post(pair_links::create))
         .route(&base, get(api::index))
         .route(&format!("{base}/"), get(api::index))
         // Anything else under the mount point is either a bundled file or a

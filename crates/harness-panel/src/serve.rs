@@ -26,6 +26,7 @@ use crate::config::PanelConfig;
 use crate::error::PanelError;
 use crate::http::{PanelState, router};
 use crate::store::Store;
+use uuid::Uuid;
 
 /// How often expired sessions and unfinished sign-ins are reclaimed. Expiry is
 /// enforced on every read, so this only frees rows and can be lazy.
@@ -223,6 +224,7 @@ pub async fn run(config: PanelConfig) -> Result<(), PanelError> {
     let store = Store::open(&config.state_dir).await?;
     let listen = config.listen;
     let state = PanelState::new(config, store.clone())?;
+    pair_with_daemon(&state).await?;
 
     if state.assets.is_placeholder() {
         tracing::warn!(
@@ -251,6 +253,45 @@ pub async fn run(config: PanelConfig) -> Result<(), PanelError> {
             address: bound.to_string(),
             source,
         })
+}
+
+/// Claim the daemon credential the panel runs as, if it needs one.
+///
+/// A code supplied on the command line always wins: it is how an operator
+/// recovers from a credential the daemon has revoked. Without one, an existing
+/// credential is kept and a panel that has neither says so now rather than on
+/// the first person's attempt to generate a link.
+///
+/// # Errors
+/// Returns [`PanelError::Daemon`] when the daemon refuses the code, and
+/// [`PanelError::Storage`] when the credential cannot be stored.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+async fn pair_with_daemon(state: &PanelState) -> Result<(), PanelError> {
+    if let Some(code) = state.daemon.config.pair_code.as_deref() {
+        let client_id = Uuid::new_v4().to_string();
+        let credential = state.daemon.client.claim(code, &client_id).await?;
+        tracing::info!(
+            client_id = %credential.client_id,
+            role = %credential.role,
+            "panel claimed a daemon credential"
+        );
+        state
+            .store
+            .store_daemon_credential(&credential, Utc::now())
+            .await?;
+        return Ok(());
+    }
+
+    if state.store.daemon_credential().await?.is_none() {
+        tracing::warn!(
+            "the panel has no daemon credential; pass --daemon-pair-code once to claim one, or \
+             nobody will be able to generate a pairing link"
+        );
+    }
+    Ok(())
 }
 
 #[expect(

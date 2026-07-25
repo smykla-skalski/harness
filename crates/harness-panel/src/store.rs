@@ -9,6 +9,7 @@ pub mod approvals;
 pub mod daemon_credential;
 pub mod oauth;
 pub mod owner;
+pub mod pair_links;
 pub mod sessions;
 pub mod token;
 

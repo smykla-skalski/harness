@@ -25,6 +25,7 @@ use crate::store::accounts::AccountIdentity;
 
 mod approvals;
 mod auth;
+mod pair_links;
 
 const BODY_LIMIT: usize = 1024 * 1024;
 const COMPANION_AUTH_TOKEN: &str = "0123456789abcdef0123456789abcdef";
@@ -60,6 +61,11 @@ fn args(directory: &Path, owner_login: &str) -> PanelArgs {
         github_token_url: DEFAULT_GITHUB_TOKEN_URL.to_owned(),
         github_api_url: DEFAULT_GITHUB_API_URL.to_owned(),
         session_ttl_hours: 12,
+        daemon_endpoint: "https://harness.example.com".to_owned(),
+        daemon_spki_pin: "sha256/AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=".to_owned(),
+        daemon_pair_code: None,
+        pair_link_role: "operator".to_owned(),
+        pair_link_ttl_seconds: 600,
     }
 }
 

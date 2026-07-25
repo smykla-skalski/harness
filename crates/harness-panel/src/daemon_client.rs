@@ -9,6 +9,8 @@ pub mod tls;
 
 use std::time::Duration;
 
+use chrono::{DateTime, Utc};
+
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, HeaderName, USER_AGENT};
 use reqwest::{Client, Response, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -45,7 +47,7 @@ pub struct MintedLink {
     pub pairing_id: String,
     pub role: String,
     pub scopes: Vec<String>,
-    pub expires_at: String,
+    pub expires_at: DateTime<Utc>,
     /// The `harness://pair` link. It carries the one-time code, so the panel
     /// shows it once and stores none of it.
     pub pairing_url: String,
@@ -146,11 +148,22 @@ impl DaemonClient {
             .map_err(|error| PanelError::daemon(format!("minting a pairing link: {error}")))?;
 
         let minted: MintResponse = read_json(response, "mint a pairing link").await?;
+        // Parsed rather than passed through: the panel shows this to the person
+        // who asked and stores it beside the pairing id, so an unreadable value
+        // would surface as a link with no visible deadline.
+        let expires_at = DateTime::parse_from_rfc3339(&minted.expires_at)
+            .map_err(|error| {
+                PanelError::daemon(format!(
+                    "the daemon returned an unreadable expiry {:?}: {error}",
+                    minted.expires_at
+                ))
+            })?
+            .with_timezone(&Utc);
         Ok(MintedLink {
             pairing_id: minted.pairing_id,
             role: minted.role,
             scopes: minted.scopes,
-            expires_at: minted.expires_at,
+            expires_at,
             pairing_url: minted.pairing_url,
         })
     }

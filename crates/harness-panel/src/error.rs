@@ -84,6 +84,7 @@ pub enum ApiError {
     Forbidden(&'static str),
     RateLimited(&'static str),
     NotFound(&'static str),
+    Unavailable(&'static str),
     BadRequest(String),
     SignInFailed(String),
     Internal(PanelError),
@@ -104,6 +105,11 @@ impl ApiError {
                 (*message).to_owned(),
             ),
             Self::NotFound(message) => (StatusCode::NOT_FOUND, "not_found", (*message).to_owned()),
+            Self::Unavailable(message) => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "unavailable",
+                (*message).to_owned(),
+            ),
             Self::BadRequest(message) => (StatusCode::BAD_REQUEST, "bad_request", message.clone()),
             Self::SignInFailed(message) => (StatusCode::BAD_REQUEST, "sign_in", message.clone()),
             Self::Internal(_) => (
