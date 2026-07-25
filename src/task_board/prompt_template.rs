@@ -33,9 +33,11 @@ pub(crate) struct PromptRenderError {
     pub(crate) variable: String,
 }
 
-/// A configured override referenced a variable name that does not exist for
-/// its prompt. Caught when the configuration is read, so a typo is known
-/// before anything tries to use that prompt.
+/// A configured override named something that is not a variable of its prompt,
+/// or wrote a `{{ ... }}` pair that is not a name at all. Detected when the
+/// configuration is read and logged there; the prompt itself keeps the error
+/// and refuses the first agent it is asked to start, since a template nobody
+/// can render is not something to fall back from silently.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct PromptConfigError {
     pub(crate) unknown: Vec<String>,

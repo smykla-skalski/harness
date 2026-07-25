@@ -15,6 +15,31 @@ use crate::feature_flags::{
 
 use super::prompt_catalog::PromptCatalog;
 
+/// Ceiling for the prompt configuration file. Every shipped prompt together is
+/// a few kilobytes, so this leaves room for prompts far longer than any model
+/// usefully accepts while keeping the pre-listener read bounded.
+pub(crate) const MAX_PROMPT_CONFIGURATION_BYTES: usize = 512 * 1024;
+
+/// Read the configuration without trusting the path. This runs before the
+/// daemon binds its listener, so an unbounded read is a way to stop the daemon
+/// starting at all: a FIFO with no writer blocks forever and a character
+/// device like `/dev/zero` never ends. Only an ordinary file within the cap is
+/// read, and the length is checked from its metadata before any bytes are
+/// pulled in.
+fn read_bounded(path: &str) -> Result<Vec<u8>, String> {
+    let metadata = fs_err::metadata(path).map_err(|error| error.to_string())?;
+    if !metadata.is_file() {
+        return Err("not a regular file".to_string());
+    }
+    let length = metadata.len();
+    if length > MAX_PROMPT_CONFIGURATION_BYTES as u64 {
+        return Err(format!(
+            "{length} bytes exceeds the {MAX_PROMPT_CONFIGURATION_BYTES} byte limit"
+        ));
+    }
+    fs_err::read(path).map_err(|error| error.to_string())
+}
+
 /// Resolve the prompt catalog from the feature flag and the configured file.
 #[must_use]
 pub(crate) fn resolve_prompt_catalog_from_env() -> PromptCatalog {
@@ -28,7 +53,7 @@ pub(crate) fn resolve_prompt_catalog_from_env() -> PromptCatalog {
         );
         return PromptCatalog::builtin();
     };
-    let bytes = match fs_err::read(&path) {
+    let bytes = match read_bounded(&path) {
         Ok(bytes) => bytes,
         Err(error) => {
             warn!(
@@ -64,6 +89,13 @@ pub(crate) fn resolve_prompt_catalog_from_env() -> PromptCatalog {
     reason = "tracing macros expand into chains clippy reads as branchy"
 )]
 fn report_loaded_catalog(path: &str, catalog: &PromptCatalog) {
+    for (prompt, error) in catalog.unusable_prompts() {
+        warn!(
+            target: "harness::task_board",
+            %path, %prompt, %error,
+            "configured prompt is unusable and will refuse every agent it starts",
+        );
+    }
     if catalog.is_builtin() {
         warn!(
             target: "harness::task_board",

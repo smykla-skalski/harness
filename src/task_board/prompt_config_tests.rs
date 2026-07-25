@@ -2,7 +2,7 @@ use std::path::Path;
 
 use crate::feature_flags::{TASK_BOARD_PROMPTS_FILE_ENV, TASK_BOARD_PROMPT_OVERRIDES_ENV};
 
-use super::resolve_prompt_catalog_from_env;
+use super::{MAX_PROMPT_CONFIGURATION_BYTES, resolve_prompt_catalog_from_env};
 
 fn write_prompts_file(directory: &Path, body: &str) -> String {
     let path = directory.join("prompts.json");
@@ -55,6 +55,52 @@ fn an_unreadable_or_malformed_file_keeps_the_builtin_prompts() {
             },
         );
     }
+}
+
+/// The read happens before the daemon binds its listener, so a path that is
+/// not an ordinary file, or is absurdly large, must not be able to hang or
+/// exhaust the process before it can serve anything or even log.
+#[test]
+fn a_file_that_is_not_a_bounded_regular_file_keeps_the_builtin_prompts() {
+    let directory = tempfile::tempdir().expect("temp dir");
+    let oversized = directory.path().join("oversized.json");
+    let padding = "x".repeat(MAX_PROMPT_CONFIGURATION_BYTES + 1);
+    fs_err::write(&oversized, format!("{{\"worker\": \"{padding}\"}}")).expect("write oversized");
+
+    for path in [
+        directory.path().to_string_lossy().into_owned(),
+        oversized.to_string_lossy().into_owned(),
+    ] {
+        temp_env::with_vars(
+            [
+                (TASK_BOARD_PROMPT_OVERRIDES_ENV, Some("1")),
+                (TASK_BOARD_PROMPTS_FILE_ENV, Some(path.as_str())),
+            ],
+            || {
+                assert!(
+                    resolve_prompt_catalog_from_env().is_builtin(),
+                    "path {path} must fall back to builtin prompts"
+                );
+            },
+        );
+    }
+}
+
+#[test]
+fn a_file_at_the_size_cap_is_still_read() {
+    let directory = tempfile::tempdir().expect("temp dir");
+    let path = write_prompts_file(
+        directory.path(),
+        r#"{"triage_escalation": "Decide on {{ title }}"}"#,
+    );
+
+    temp_env::with_vars(
+        [
+            (TASK_BOARD_PROMPT_OVERRIDES_ENV, Some("1")),
+            (TASK_BOARD_PROMPTS_FILE_ENV, Some(path.as_str())),
+        ],
+        || assert!(!resolve_prompt_catalog_from_env().is_builtin()),
+    );
 }
 
 #[test]

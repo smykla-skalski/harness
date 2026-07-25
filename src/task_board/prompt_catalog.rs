@@ -159,6 +159,15 @@ impl PromptCatalog {
         self.customized.is_empty()
     }
 
+    /// Every prompt that was customized with a template it cannot use, and
+    /// why. Startup logs these: the file loaded, but each of these prompts
+    /// will refuse the agents it is supposed to start.
+    pub(crate) fn unusable_prompts(&self) -> impl Iterator<Item = (&'static str, String)> {
+        self.errors
+            .iter()
+            .map(|(id, error)| (id.config_key(), error.to_string()))
+    }
+
     /// The configuration keys this catalog customizes, for startup logging.
     #[must_use]
     pub(crate) fn customized_prompts(&self) -> Vec<&'static str> {
