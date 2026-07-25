@@ -3981,6 +3981,7 @@ dependencies = [
  "hex",
  "include_dir",
  "libc",
+ "rcgen",
  "reqwest",
  "rustls",
  "rustls-platform-verifier",

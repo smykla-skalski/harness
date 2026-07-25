@@ -38,6 +38,9 @@ x509-parser = "=0.18.1"
 uuid = { version = "1.24.0", features = ["v4"] }
 
 [dev-dependencies]
+# Generating a certificate is the only way to exercise the pin verifier,
+# which is the control the whole panel-to-daemon coupling rests on.
+rcgen = { version = "0.14.8", default-features = false, features = ["pem", "ring", "x509-parser"] }
 tempfile = "3.27.0"
 tower = { version = "0.5.3", features = ["util"] }
 

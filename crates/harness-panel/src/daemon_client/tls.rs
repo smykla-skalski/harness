@@ -56,6 +56,12 @@ impl SpkiPin {
         Ok(Self { digest })
     }
 
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) fn from_digest(digest: [u8; 32]) -> Self {
+        Self { digest }
+    }
+
     #[must_use]
     pub fn to_pin_string(&self) -> String {
         format!("{PIN_PREFIX}{}", STANDARD.encode(self.digest))
@@ -80,21 +86,21 @@ impl fmt::Debug for SpkiPin {
 /// Returns [`PanelError::Config`] when the platform's own verifier cannot be
 /// built, which leaves the panel unable to check a chain at all.
 pub fn pinned_client_config(pin: SpkiPin) -> Result<ClientConfig, PanelError> {
-    let provider = Arc::new(ring::default_provider());
-    let platform = Verifier::new(Arc::clone(&provider)).map_err(|error| {
-        PanelError::config(format!("the platform TLS verifier is unavailable: {error}"))
-    })?;
-
-    let config = ClientConfig::builder_with_provider(provider)
+    let config = ClientConfig::builder_with_provider(Arc::new(ring::default_provider()))
         .with_safe_default_protocol_versions()
         .map_err(|error| PanelError::config(format!("TLS protocol versions: {error}")))?
         .dangerous()
-        .with_custom_certificate_verifier(Arc::new(PinnedVerifier {
-            inner: Arc::new(platform),
-            expected: pin,
-        }))
+        .with_custom_certificate_verifier(Arc::new(PinnedVerifier::new(pin)?))
         .with_no_client_auth();
     Ok(config)
+}
+
+/// The pin a certificate presents, for tests that need to agree with it.
+#[cfg(test)]
+fn pin_for_der(certificate: &CertificateDer<'_>) -> Result<SpkiPin, Error> {
+    Ok(SpkiPin {
+        digest: spki_sha256(certificate)?,
+    })
 }
 
 /// Ordinary verification plus the pin.
@@ -106,6 +112,19 @@ pub fn pinned_client_config(pin: SpkiPin) -> Result<ClientConfig, PanelError> {
 struct PinnedVerifier {
     inner: Arc<Verifier>,
     expected: SpkiPin,
+}
+
+impl PinnedVerifier {
+    fn new(expected: SpkiPin) -> Result<Self, PanelError> {
+        let provider = Arc::new(ring::default_provider());
+        let platform = Verifier::new(provider).map_err(|error| {
+            PanelError::config(format!("the platform TLS verifier is unavailable: {error}"))
+        })?;
+        Ok(Self {
+            inner: Arc::new(platform),
+            expected,
+        })
+    }
 }
 
 impl ServerCertVerifier for PinnedVerifier {
@@ -209,5 +228,102 @@ mod tests {
             .expect("a valid pin");
 
         assert_ne!(first, second);
+    }
+}
+
+#[cfg(test)]
+mod verifier_tests {
+    use rustls::CertificateError;
+    use rustls::client::danger::ServerCertVerifier;
+    use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
+    use sha2::{Digest, Sha256};
+    use x509_parser::certificate::X509Certificate;
+    use x509_parser::prelude::FromDer;
+
+    use super::{PinnedVerifier, SpkiPin, pin_for_der};
+    use crate::crypto::ensure_crypto_provider;
+
+    /// A self-signed certificate and the pin that matches it.
+    fn certificate() -> (CertificateDer<'static>, SpkiPin) {
+        let issued = rcgen::generate_simple_self_signed(vec!["harness.example.com".to_owned()])
+            .expect("a self-signed certificate");
+        let der = CertificateDer::from(issued.cert.der().to_vec());
+        let pin = pin_for_der(&der).expect("a pin for the certificate");
+        (der, pin)
+    }
+
+    fn verify(der: &CertificateDer<'_>, expected: SpkiPin) -> Result<(), rustls::Error> {
+        ensure_crypto_provider();
+        let verifier = PinnedVerifier::new(expected).expect("a verifier");
+        verifier
+            .verify_server_cert(
+                der,
+                &[],
+                &ServerName::try_from("harness.example.com").expect("a server name"),
+                &[],
+                UnixTime::now(),
+            )
+            .map(|_| ())
+    }
+
+    /// The pin is computed over the certificate's public key, so the digest the
+    /// daemon publishes and the one the panel computes have to agree byte for
+    /// byte or nothing would ever connect.
+    #[test]
+    fn the_pin_is_the_sha256_of_the_subject_public_key() {
+        let (der, pin) = certificate();
+        let (_, parsed) = X509Certificate::from_der(der.as_ref()).expect("parsing");
+        let expected: [u8; 32] = Sha256::digest(parsed.public_key().raw).into();
+
+        assert_eq!(pin, SpkiPin::from_digest(expected));
+    }
+
+    /// The whole point of the pin. Both certificates here are self-signed and
+    /// so both fail the chain check too, which is why this asserts the specific
+    /// error the pin comparison raises: a weaker assertion would pass even if
+    /// the pin were never consulted.
+    #[test]
+    fn a_certificate_whose_key_does_not_match_the_pin_is_refused() {
+        let (der, _) = certificate();
+        let (_, other_pin) = certificate();
+
+        let error = verify(&der, other_pin).expect_err("a mismatched pin must be refused");
+
+        assert!(
+            matches!(
+                error,
+                rustls::Error::InvalidCertificate(CertificateError::ApplicationVerificationFailure)
+            ),
+            "expected the pin comparison to refuse it, got {error:?}"
+        );
+    }
+
+    /// Matching the pin is necessary and not sufficient: the platform's chain
+    /// check still runs, and a self-signed certificate fails it. The assertion
+    /// is that the failure is *not* the pin's, which is what proves the
+    /// delegating tail call still happens. If the verifier ever became
+    /// pin-only, this would pass verification outright and fail here.
+    #[test]
+    fn matching_the_pin_does_not_skip_the_chain_check() {
+        let (der, pin) = certificate();
+
+        let error = verify(&der, pin).expect_err("an untrusted chain must still be refused");
+
+        assert!(
+            !matches!(
+                error,
+                rustls::Error::InvalidCertificate(CertificateError::ApplicationVerificationFailure)
+            ),
+            "the pin matched, so the refusal must have come from the chain: {error:?}"
+        );
+    }
+
+    /// A body that is not a certificate must fail rather than panic.
+    #[test]
+    fn a_malformed_certificate_is_refused() {
+        let (_, pin) = certificate();
+        let der = CertificateDer::from(vec![0_u8; 8]);
+
+        assert!(verify(&der, pin).is_err());
     }
 }
