@@ -170,3 +170,23 @@ async fn obtain_without_allow_clone_returns_none_when_absent() {
         .expect("obtain");
     assert!(outcome.is_none());
 }
+
+#[tokio::test]
+async fn a_panicked_clone_task_becomes_a_reportable_error() {
+    let join_error = tokio::spawn(async { panic!("clone thread died") })
+        .await
+        .expect_err("panicked task yields a JoinError");
+
+    let result = super::flatten_clone_join(Err(join_error));
+
+    let error = result.expect_err("a panicked clone must not read as success");
+    assert!(
+        matches!(error, WorkingCopyRuntimeError::Join(_)),
+        "expected Join, got {error:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_successful_clone_task_stays_successful() {
+    assert!(super::flatten_clone_join(Ok(Ok(()))).is_ok());
+}

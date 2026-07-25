@@ -19,7 +19,7 @@ use chrono::Utc;
 use gix::progress::tree;
 use tokio::fs as tokio_fs;
 use tokio::sync::Mutex;
-use tokio::task::spawn_blocking;
+use tokio::task::{JoinError, spawn_blocking};
 
 use super::clone_progress::CloneProgressReporter;
 use super::progress::{WorkingCopyProgress, WorkingCopyProgressSink};
@@ -143,13 +143,12 @@ impl WorkingCopyRuntime {
         let task_path = checkout_path.clone();
         let reporter = CloneProgressReporter::start(Arc::clone(&sink), repo_label.clone());
         let progress = reporter.progress();
-        let result = spawn_blocking(move || run_clone_checkout(&clone_url, &task_path, progress))
-            .await
-            .map_err(|join| WorkingCopyRuntimeError::Join(join.to_string()));
+        let joined =
+            spawn_blocking(move || run_clone_checkout(&clone_url, &task_path, progress)).await;
         // Stop sampling before the terminal event, so no `Advanced` can arrive
         // after `Completed`/`Failed` and leave the UI stuck mid-progress.
         reporter.finish();
-        let result = result?;
+        let result = flatten_clone_join(joined);
 
         match result {
             Ok(()) => {
@@ -358,6 +357,17 @@ fn write_registry_atomically(registry_path: &Path, body: &[u8]) -> Result<(), St
 }
 
 /// Synchronous gix clone + checkout executed inside `spawn_blocking`.
+/// Fold a panicked or cancelled clone task into an ordinary clone error.
+///
+/// A `JoinError` must not short-circuit past the caller's failure arm: a
+/// consumer that has seen `Started` and a run of `Advanced` events has no way
+/// to learn the clone died, and would render progress that never resolves.
+fn flatten_clone_join(
+    joined: Result<Result<(), WorkingCopyRuntimeError>, JoinError>,
+) -> Result<(), WorkingCopyRuntimeError> {
+    joined.unwrap_or_else(|join| Err(WorkingCopyRuntimeError::Join(join.to_string())))
+}
+
 fn run_clone_checkout(
     clone_url: &str,
     checkout_path: &Path,
