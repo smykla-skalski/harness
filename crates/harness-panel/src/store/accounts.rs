@@ -127,7 +127,7 @@ mod tests {
 
     fn ada() -> AccountIdentity {
         AccountIdentity {
-            provider: "github".to_owned(),
+            provider: "github:https://api.github.com".to_owned(),
             subject_id: "4242".to_owned(),
             login: "ada".to_owned(),
             display_name: "Ada Lovelace".to_owned(),
@@ -212,6 +212,27 @@ mod tests {
         // just signed in without scrolling.
         assert_eq!(accounts[0].login, "grace");
         assert_eq!(accounts[1].login, "ada");
+    }
+
+    /// GitHub's numeric id is unique only within one installation. Reusing a
+    /// state directory against GHES must not turn an equal id into the account
+    /// that signed in through github.com.
+    #[tokio::test]
+    async fn equal_subjects_from_different_installations_get_two_accounts() {
+        let store = Store::open_in_memory().await.expect("store");
+        let enterprise = AccountIdentity {
+            provider: "github:https://ghe.example.com".to_owned(),
+            ..ada()
+        };
+
+        let github = store.upsert_account(&ada(), at(10)).await.expect("github");
+        let ghes = store
+            .upsert_account(&enterprise, at(11))
+            .await
+            .expect("enterprise");
+
+        assert_ne!(github.id, ghes.id);
+        assert_eq!(store.list_accounts().await.expect("list").len(), 2);
     }
 
     #[tokio::test]

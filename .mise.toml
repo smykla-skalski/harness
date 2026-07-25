@@ -155,6 +155,10 @@ run = "HARNESS_CHECK_SCRIPTS_STEP_TIMEOUT_SECONDS=180 ./scripts/check-scripts.sh
 description = "Run the release build coordinator and atomic installer shell tests"
 run = "./scripts/tests/test-release-install.sh"
 
+[tasks."test:scripts:panel-frontend"]
+description = "Run the panel frontend dependency installer regression tests"
+run = "./scripts/tests/test-panel-frontend-install.sh"
+
 [tasks."test:unit"]
 description = "Run unit tests (pass nextest args after -- to forward them to every package group, e.g. -E 'test(=path::to::test)')"
 run = "./scripts/run-unit-tests.sh"
@@ -284,32 +288,27 @@ depends = [
 
 [tasks."panel:frontend:install"]
 description = "Install the panel frontend's pinned dependencies from its lockfile"
-dir = "crates/harness-panel/frontend"
-run = "npm ci --no-audit --no-fund"
+run = "./scripts/install-panel-frontend.sh"
 
 [tasks."panel:frontend:build"]
 description = "Build the panel's web assets into crates/harness-panel/frontend/dist"
+depends = ["panel:frontend:install"]
 dir = "crates/harness-panel/frontend"
 run = "npm run build"
 
 [tasks."panel:frontend:lint"]
 description = "Lint, format-check, and type-check the panel frontend"
+depends = ["panel:frontend:install"]
 dir = "crates/harness-panel/frontend"
-# Self-sufficient on a fresh clone, and on a pull that moved the lockfile:
-# `-nt` is false when node_modules is missing as well as when it predates the
-# lockfile, so both cases reinstall. Checking existence alone would lint a
-# stale tree, because these tasks can run without a cargo build having brought
-# the panel's build script along to notice.
 run = [
-  "[ node_modules -nt package-lock.json ] || npm ci --no-audit --no-fund",
   "npm run lint",
 ]
 
 [tasks."panel:frontend:test"]
 description = "Run the panel frontend unit tests"
+depends = ["panel:frontend:install"]
 dir = "crates/harness-panel/frontend"
 run = [
-  "[ node_modules -nt package-lock.json ] || npm ci --no-audit --no-fund",
   "npm test",
 ]
 

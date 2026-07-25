@@ -1,10 +1,19 @@
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use axum::Router;
+use axum::http::{StatusCode, header};
+use axum::routing::post;
+use tokio::net::TcpListener;
 use url::Url;
 
 use super::{
-    GitHubClient, GitHubUser, MAX_FIELD_CHARS, identity_from_user, join_api_path,
-    parse_token_response,
+    GitHubClient, GitHubUser, MAX_FIELD_CHARS, identity_from_user, installation_provider,
+    join_api_path, parse_token_response,
 };
 use crate::config::{ClientSecret, GitHubConfig};
+use crate::error::PanelError;
+use crate::store::accounts::AccountIdentity;
 
 fn config() -> GitHubConfig {
     GitHubConfig {
@@ -31,6 +40,10 @@ fn user() -> GitHubUser {
         name: Some("Ada Lovelace".to_owned()),
         avatar_url: Some("https://avatars.example.com/ada.png".to_owned()),
     }
+}
+
+fn identity(user: GitHubUser) -> Result<AccountIdentity, PanelError> {
+    identity_from_user(user, "github:https://api.github.com")
 }
 
 #[test]
@@ -107,9 +120,9 @@ fn a_token_response_without_a_token_is_a_failure() {
 
 #[test]
 fn a_profile_becomes_an_account_identity() {
-    let identity = identity_from_user(user()).expect("identity");
+    let identity = identity(user()).expect("identity");
 
-    assert_eq!(identity.provider, "github");
+    assert_eq!(identity.provider, "github:https://api.github.com");
     assert_eq!(identity.subject_id, "4242");
     assert_eq!(identity.login, "ada");
     assert_eq!(identity.display_name, "Ada Lovelace");
@@ -123,7 +136,7 @@ fn a_profile_becomes_an_account_identity() {
 /// be renamed and then claimed by someone else.
 #[test]
 fn the_identity_is_keyed_on_the_immutable_numeric_id() {
-    let identity = identity_from_user(GitHubUser {
+    let identity = identity(GitHubUser {
         login: "ada-renamed".to_owned(),
         ..user()
     })
@@ -137,7 +150,7 @@ fn the_identity_is_keyed_on_the_immutable_numeric_id() {
 #[test]
 fn a_missing_display_name_falls_back_to_the_login() {
     for name in [None, Some(String::new()), Some("   ".to_owned())] {
-        let identity = identity_from_user(GitHubUser { name, ..user() }).expect("identity");
+        let identity = identity(GitHubUser { name, ..user() }).expect("identity");
         assert_eq!(identity.display_name, "ada");
     }
 }
@@ -146,7 +159,7 @@ fn a_missing_display_name_falls_back_to_the_login() {
 /// into the pairing subject the daemon records in its audit trail.
 #[test]
 fn a_profile_field_with_a_control_character_is_refused() {
-    let error = identity_from_user(GitHubUser {
+    let error = identity(GitHubUser {
         name: Some("Ada\nminted for github:9".to_owned()),
         ..user()
     })
@@ -157,7 +170,7 @@ fn a_profile_field_with_a_control_character_is_refused() {
 
 #[test]
 fn a_blank_login_is_refused() {
-    let error = identity_from_user(GitHubUser {
+    let error = identity(GitHubUser {
         login: "  ".to_owned(),
         ..user()
     })
@@ -168,7 +181,7 @@ fn a_blank_login_is_refused() {
 
 #[test]
 fn an_oversized_profile_field_is_refused() {
-    let error = identity_from_user(GitHubUser {
+    let error = identity(GitHubUser {
         name: Some("a".repeat(MAX_FIELD_CHARS + 1)),
         ..user()
     })
@@ -186,7 +199,7 @@ fn an_avatar_url_that_is_not_http_is_refused() {
         "data:text/html;base64,PHNjcmlwdD4=",
         "file:///etc/passwd",
     ] {
-        let error = identity_from_user(GitHubUser {
+        let error = identity(GitHubUser {
             avatar_url: Some(avatar.to_owned()),
             ..user()
         })
@@ -198,13 +211,114 @@ fn an_avatar_url_that_is_not_http_is_refused() {
 #[test]
 fn a_missing_avatar_is_not_a_failure() {
     for avatar in [None, Some(String::new())] {
-        let identity = identity_from_user(GitHubUser {
+        let identity = identity(GitHubUser {
             avatar_url: avatar,
             ..user()
         })
         .expect("identity");
         assert!(identity.avatar_url.is_none());
     }
+}
+
+#[test]
+fn equal_subjects_from_different_installations_have_different_keys() {
+    let github = installation_provider(&Url::parse("https://api.github.com").expect("url"));
+    let enterprise =
+        installation_provider(&Url::parse("https://ghe.example.com/api/v3").expect("url"));
+
+    assert_ne!(github, enterprise);
+    assert_eq!(github, "github:https://api.github.com");
+    assert_eq!(enterprise, "github:https://ghe.example.com/api/v3");
+}
+
+#[test]
+fn equivalent_enterprise_api_paths_have_one_installation_key() {
+    for api_url in [
+        "https://ghe.example.com/api/v3",
+        "https://ghe.example.com/api/v3/",
+    ] {
+        assert_eq!(
+            installation_provider(&Url::parse(api_url).expect("url")),
+            "github:https://ghe.example.com/api/v3"
+        );
+    }
+}
+
+#[test]
+fn installations_beneath_one_gateway_have_distinct_keys() {
+    let first =
+        installation_provider(&Url::parse("https://gateway.example/first/api/v3").expect("url"));
+    let second =
+        installation_provider(&Url::parse("https://gateway.example/second/api/v3").expect("url"));
+
+    assert_ne!(first, second);
+}
+
+#[test]
+fn installation_keys_never_expose_url_credentials_or_queries() {
+    let unsafe_url =
+        Url::parse("https://user:password@gateway.example/api/v3?token=secret#fragment")
+            .expect("url");
+
+    assert_eq!(
+        installation_provider(&unsafe_url),
+        "github:https://gateway.example/api/v3"
+    );
+}
+
+/// Reqwest follows redirects by default, including 307 responses that retain
+/// the POST body. The OAuth client secret must never be replayed to a location
+/// that did not pass configuration validation.
+#[tokio::test]
+async fn token_exchange_refuses_redirects_before_replaying_credentials() {
+    let target_hits = Arc::new(AtomicUsize::new(0));
+    let hits = Arc::clone(&target_hits);
+    let target = spawn(Router::new().route(
+        "/stolen",
+        post(move || {
+            let hits = Arc::clone(&hits);
+            async move {
+                hits.fetch_add(1, Ordering::SeqCst);
+                StatusCode::NO_CONTENT
+            }
+        }),
+    ))
+    .await;
+    let target_url = target.join("stolen").expect("target url").to_string();
+    let redirector = spawn(Router::new().route(
+        "/token",
+        post(move || {
+            let target_url = target_url.clone();
+            async move {
+                (
+                    StatusCode::TEMPORARY_REDIRECT,
+                    [(header::LOCATION, target_url)],
+                )
+            }
+        }),
+    ))
+    .await;
+    let mut config = config();
+    config.token_url = redirector.join("token").expect("token url");
+    let client =
+        GitHubClient::new(config, "https://panel.example/callback".to_owned()).expect("client");
+
+    let error = client
+        .exchange_code("authorization-code")
+        .await
+        .expect_err("a redirect must not be followed");
+
+    assert!(error.to_string().contains("307"), "{error}");
+    assert_eq!(target_hits.load(Ordering::SeqCst), 0);
+}
+
+async fn spawn(app: Router) -> Url {
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+    let address = listener.local_addr().expect("address");
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.ok();
+    });
+    Url::parse(&format!("http://{address}/")).expect("base url")
 }
 
 /// A GitHub Enterprise API base carries a path, and joining onto it must extend

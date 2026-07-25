@@ -7,7 +7,7 @@
 
 use chrono::{DateTime, Duration, Utc};
 
-use super::accounts::{Account, account_from_row};
+use super::accounts::{Account, AccountIdentity, account_from_row};
 use super::token::{OpaqueToken, hash_token};
 use super::{Store, from_unix_seconds, to_unix_seconds};
 use crate::error::PanelError;
@@ -21,6 +21,56 @@ pub struct SessionRecord {
 }
 
 impl Store {
+    /// Record a successful identity, bind the owner when eligible, and issue
+    /// the session returned to the browser.
+    ///
+    /// The owner claim and session insert share one transaction. A failed
+    /// session insert therefore cannot leave the panel claimed by a callback
+    /// that never completed, while `INSERT OR IGNORE` keeps concurrent owner
+    /// callbacks first-writer-wins.
+    ///
+    /// # Errors
+    /// Returns [`PanelError::Config`] when the system random source fails and
+    /// [`PanelError::Storage`] when a database operation fails.
+    pub async fn complete_sign_in(
+        &self,
+        identity: &AccountIdentity,
+        claim_owner: bool,
+        ttl: Duration,
+        now: DateTime<Utc>,
+    ) -> Result<(Account, OpaqueToken), PanelError> {
+        let token = OpaqueToken::generate()?;
+        let account = self.upsert_account(identity, now).await?;
+        let timestamp = to_unix_seconds(now);
+        let mut transaction = self.pool().begin_with("BEGIN IMMEDIATE").await?;
+
+        if claim_owner {
+            sqlx::query(
+                "INSERT OR IGNORE INTO owner_binding \
+                 (id, provider, subject_id, login, bound_at) VALUES (1, ?1, ?2, ?3, ?4)",
+            )
+            .bind(&account.provider)
+            .bind(&account.subject_id)
+            .bind(&account.login)
+            .bind(timestamp)
+            .execute(transaction.as_mut())
+            .await?;
+        }
+        sqlx::query(
+            "INSERT INTO sessions (token_hash, account_id, created_at, expires_at) \
+             VALUES (?1, ?2, ?3, ?4)",
+        )
+        .bind(token.hash())
+        .bind(&account.id)
+        .bind(timestamp)
+        .bind(to_unix_seconds(now + ttl))
+        .execute(transaction.as_mut())
+        .await?;
+        transaction.commit().await?;
+
+        Ok((account, token))
+    }
+
     /// Issue a session for `account_id`, returning the token to hand out once.
     ///
     /// # Errors
@@ -105,7 +155,7 @@ mod tests {
 
     fn ada() -> AccountIdentity {
         AccountIdentity {
-            provider: "github".to_owned(),
+            provider: "github:https://api.github.com".to_owned(),
             subject_id: "4242".to_owned(),
             login: "ada".to_owned(),
             display_name: "Ada Lovelace".to_owned(),
@@ -142,6 +192,56 @@ mod tests {
         assert_eq!(session.account.id, account_id);
         assert_eq!(session.account.login, "ada");
         assert_eq!(session.expires_at, at(22));
+    }
+
+    #[tokio::test]
+    async fn completing_sign_in_claims_the_owner_before_the_session_is_used() {
+        let store = Store::open_in_memory().await.expect("store");
+
+        let (account, token) = store
+            .complete_sign_in(&ada(), true, Duration::hours(12), at(10))
+            .await
+            .expect("complete sign-in");
+        let binding = store
+            .owner_binding()
+            .await
+            .expect("binding")
+            .expect("the callback claimed the panel");
+
+        assert!(binding.matches(&account));
+        assert!(
+            store
+                .session_for_token(token.expose(), at(11))
+                .await
+                .expect("session")
+                .is_some()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_later_owner_candidate_cannot_displace_the_callback_that_won() {
+        let store = Store::open_in_memory().await.expect("store");
+        let stranger = AccountIdentity {
+            subject_id: "7777".to_owned(),
+            ..ada()
+        };
+
+        let (owner, _) = store
+            .complete_sign_in(&ada(), true, Duration::hours(12), at(10))
+            .await
+            .expect("owner sign-in");
+        let (later, _) = store
+            .complete_sign_in(&stranger, true, Duration::hours(12), at(11))
+            .await
+            .expect("later sign-in");
+        let binding = store
+            .owner_binding()
+            .await
+            .expect("binding")
+            .expect("claimed");
+
+        assert!(binding.matches(&owner));
+        assert!(!binding.matches(&later));
     }
 
     /// The token is what the browser holds; the table holds only its hash, so a

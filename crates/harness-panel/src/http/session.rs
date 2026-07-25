@@ -8,11 +8,12 @@ use serde::Serialize;
 use super::PanelState;
 use crate::error::ApiError;
 use crate::store::accounts::Account;
+use crate::store::token::hash_token;
 
 /// Names the panel's own cookies so they cannot collide with anything else the
 /// daemon serves on the same origin.
 pub const SESSION_COOKIE: &str = "harness_panel_session";
-pub const SIGN_IN_COOKIE: &str = "harness_panel_signin";
+pub const SIGN_IN_COOKIE_PREFIX: &str = "harness_panel_signin_";
 
 /// The signed-in person, as the single-page app receives them.
 #[derive(Debug, Clone, Serialize)]
@@ -43,27 +44,15 @@ pub async fn current_viewer(
     }))
 }
 
-/// Decide whether `account` owns this panel, claiming it on first use.
+/// Decide whether `account` owns this panel.
 ///
-/// `--owner-login` only chooses who the panel is claimed for. Once claimed, the
-/// answer is the immutable `(provider, subject_id)` pair, so renaming the login
-/// and letting someone else register the freed name does not hand them the
-/// panel. The re-read after the claim is what settles a race: `bind_owner`
-/// ignores a second insert, so the loser of the race must ask again rather than
-/// assume its own write won.
+/// The successful OAuth callback claims an unowned panel before it returns a
+/// session. Reads stay read-only so ownership does not depend on whether the
+/// redirected browser loads `/api/me` before the configured login changes.
 ///
 /// # Errors
-/// Returns [`ApiError::Internal`] when the owner binding cannot be read or
-/// written.
+/// Returns [`ApiError::Internal`] when the owner binding cannot be read.
 async fn resolve_ownership(state: &PanelState, account: &Account) -> Result<bool, ApiError> {
-    if let Some(binding) = state.store.owner_binding().await? {
-        return Ok(binding.matches(account));
-    }
-    if !state.config.matches_owner_login(&account.login) {
-        return Ok(false);
-    }
-
-    state.store.bind_owner(account, Utc::now()).await?;
     Ok(state
         .store
         .owner_binding()
@@ -86,44 +75,16 @@ pub fn session_token(headers: &HeaderMap) -> Option<String> {
     cookie_value(headers, SESSION_COOKIE)
 }
 
-/// Every sign-in this browser has started and not yet finished.
-///
-/// One cookie holds them all, newest first, because a person with the panel
-/// open in two tabs starts two sign-ins and both have to be able to finish.
-/// A single-valued cookie meant the second tab overwrote the first, and the
-/// first tab was then refused with a message nobody could act on.
 #[must_use]
-pub fn sign_in_states(headers: &HeaderMap) -> Vec<String> {
-    cookie_value(headers, SIGN_IN_COOKIE)
-        .map(|value| pending_states(&value))
-        .unwrap_or_default()
+pub fn has_pending_sign_in(headers: &HeaderMap, state: &str) -> bool {
+    cookie_value(headers, &sign_in_cookie_name(state)).as_deref() == Some(state)
 }
 
-/// The state values are URL-safe base64, whose alphabet excludes `.`, so the
-/// separator can never appear inside one.
-///
-/// A `&str` rather than a `char` so splitting and joining can both name this
-/// constant. Joining needs a string, and building one per call from a `char`
-/// both allocates and leaves the separator defined in two places.
-const PENDING_SEPARATOR: &str = ".";
-
-/// Enough for the tabs a person actually keeps open, and small enough that the
-/// cookie cannot be grown without bound by repeatedly hitting the start route.
-pub const MAX_PENDING_SIGN_INS: usize = 4;
-
-/// Read the pending sign-ins out of a cookie value.
-///
-/// Capped here as well as where the cookie is written, because the browser is
-/// free to send back something the panel never wrote. Without the cap, a
-/// request carrying a cookie full of separators would make every handler that
-/// reads it allocate and scan a list as long as the request headers allow.
-fn pending_states(value: &str) -> Vec<String> {
-    value
-        .split(PENDING_SEPARATOR)
-        .filter(|candidate| !candidate.is_empty())
-        .take(MAX_PENDING_SIGN_INS)
-        .map(str::to_owned)
-        .collect()
+/// Give each OAuth attempt an independent cookie so concurrent start
+/// responses do not overwrite one shared browser value.
+#[must_use]
+pub fn sign_in_cookie_name(state: &str) -> String {
+    format!("{SIGN_IN_COOKIE_PREFIX}{}", hash_token(state))
 }
 
 fn cookie_value(headers: &HeaderMap, name: &str) -> Option<String> {
@@ -139,12 +100,12 @@ fn cookie_value(headers: &HeaderMap, name: &str) -> Option<String> {
 /// that first request. `Secure` follows the public origin: the browser drops a
 /// `Secure` cookie on a plain-HTTP page, so pinning it on would make loopback
 /// development silently never sign anyone in.
-fn panel_cookie<'a>(
-    name: &'a str,
+fn panel_cookie(
+    name: String,
     value: String,
     state: &PanelState,
     max_age: time::Duration,
-) -> Cookie<'a> {
+) -> Cookie<'static> {
     Cookie::build((name, value))
         .http_only(true)
         .same_site(SameSite::Lax)
@@ -156,7 +117,12 @@ fn panel_cookie<'a>(
 
 pub fn with_session_cookie(jar: CookieJar, state: &PanelState, token: String) -> CookieJar {
     let max_age = time::Duration::seconds(state.config.session_ttl.num_seconds());
-    jar.add(panel_cookie(SESSION_COOKIE, token, state, max_age))
+    jar.add(panel_cookie(
+        SESSION_COOKIE.to_owned(),
+        token,
+        state,
+        max_age,
+    ))
 }
 
 /// Expire a cookie in the browser.
@@ -165,86 +131,51 @@ pub fn with_session_cookie(jar: CookieJar, state: &PanelState, token: String) ->
 /// the original cookie alongside the expired one and goes on sending it.
 pub fn without_cookie(jar: CookieJar, state: &PanelState, name: &'static str) -> CookieJar {
     jar.add(panel_cookie(
-        name,
+        name.to_owned(),
         String::new(),
         state,
         time::Duration::seconds(0),
     ))
 }
 
-/// Record one more sign-in this browser has started.
-///
-/// Newest first, and capped, so a browser that keeps opening the start route
-/// drops its oldest pending sign-in rather than growing the cookie forever.
+/// Record one sign-in under a cookie name derived from its state.
 pub fn with_pending_sign_in(
     jar: CookieJar,
     state: &PanelState,
-    headers: &HeaderMap,
     value: String,
     ttl_seconds: i64,
 ) -> CookieJar {
-    let mut pending = sign_in_states(headers);
-    pending.retain(|candidate| candidate != &value);
-    pending.insert(0, value);
-    pending.truncate(MAX_PENDING_SIGN_INS);
-    set_pending(jar, state, &pending, ttl_seconds)
-}
-
-/// Spend one pending sign-in, leaving any other tab's alone.
-///
-/// Clearing the whole cookie here would refuse the other tab when it came back,
-/// which is the failure this list exists to prevent.
-pub fn without_pending_sign_in(
-    jar: CookieJar,
-    state: &PanelState,
-    headers: &HeaderMap,
-    value: &str,
-    ttl_seconds: i64,
-) -> CookieJar {
-    let mut pending = sign_in_states(headers);
-    pending.retain(|candidate| candidate != value);
-    if pending.is_empty() {
-        return without_cookie(jar, state, SIGN_IN_COOKIE);
-    }
-    set_pending(jar, state, &pending, ttl_seconds)
-}
-
-fn set_pending(
-    jar: CookieJar,
-    state: &PanelState,
-    pending: &[String],
-    ttl_seconds: i64,
-) -> CookieJar {
+    let name = sign_in_cookie_name(&value);
     jar.add(panel_cookie(
-        SIGN_IN_COOKIE,
-        pending.join(PENDING_SEPARATOR),
+        name,
+        value,
         state,
         time::Duration::seconds(ttl_seconds),
     ))
 }
 
+/// Expire only the cookie for this sign-in, leaving every other tab alone.
+pub fn without_pending_sign_in(jar: CookieJar, state: &PanelState, value: &str) -> CookieJar {
+    jar.add(panel_cookie(
+        sign_in_cookie_name(value),
+        String::new(),
+        state,
+        time::Duration::seconds(0),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{MAX_PENDING_SIGN_INS, pending_states};
+    use super::sign_in_cookie_name;
 
     #[test]
-    fn a_cookie_the_panel_wrote_round_trips() {
-        assert_eq!(pending_states("a.b.c"), vec!["a", "b", "c"]);
-        assert!(pending_states("").is_empty());
-    }
+    fn each_state_has_a_stable_independent_cookie_name() {
+        let first = sign_in_cookie_name("first");
+        let second = sign_in_cookie_name("second");
 
-    /// The browser can return anything, so the cap has to hold on the way in
-    /// and not only on the way out.
-    #[test]
-    fn an_oversized_cookie_is_truncated_rather_than_trusted() {
-        let crafted = vec!["x"; 10_000].join(".");
-
-        assert_eq!(pending_states(&crafted).len(), MAX_PENDING_SIGN_INS);
-    }
-
-    /// A cookie that is nothing but separators must cost nothing to read.
-    #[test]
-    fn empty_segments_are_dropped() {
-        assert!(pending_states(&".".repeat(10_000)).is_empty());
+        assert_eq!(first, sign_in_cookie_name("first"));
+        assert_ne!(first, second);
+        assert!(first.starts_with("harness_panel_signin_"));
+        assert_eq!(first.len(), "harness_panel_signin_".len() + 64);
     }
 }

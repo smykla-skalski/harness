@@ -74,6 +74,7 @@ impl PanelError {
 pub enum ApiError {
     Unauthenticated,
     Forbidden(&'static str),
+    RateLimited(&'static str),
     BadRequest(String),
     SignInFailed(String),
     Internal(PanelError),
@@ -88,6 +89,11 @@ impl ApiError {
                 "sign in to use the panel".to_owned(),
             ),
             Self::Forbidden(message) => (StatusCode::FORBIDDEN, "forbidden", (*message).to_owned()),
+            Self::RateLimited(message) => (
+                StatusCode::TOO_MANY_REQUESTS,
+                "rate_limited",
+                (*message).to_owned(),
+            ),
             Self::BadRequest(message) => (StatusCode::BAD_REQUEST, "bad_request", message.clone()),
             Self::SignInFailed(message) => (StatusCode::BAD_REQUEST, "sign_in", message.clone()),
             Self::Internal(_) => (
@@ -163,6 +169,11 @@ mod tests {
                 ApiError::Forbidden("owner only"),
                 StatusCode::FORBIDDEN,
                 "forbidden",
+            ),
+            (
+                ApiError::RateLimited("try later"),
+                StatusCode::TOO_MANY_REQUESTS,
+                "rate_limited",
             ),
             (
                 ApiError::BadRequest("missing code".to_owned()),

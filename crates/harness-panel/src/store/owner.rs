@@ -94,7 +94,7 @@ mod tests {
         store
             .upsert_account(
                 &AccountIdentity {
-                    provider: "github".to_owned(),
+                    provider: "github:https://api.github.com".to_owned(),
                     subject_id: subject_id.to_owned(),
                     login: login.to_owned(),
                     display_name: login.to_owned(),
@@ -173,5 +173,33 @@ mod tests {
 
         assert!(!binding.matches(&stranger));
         assert_eq!(binding.login, "ada", "the recorded login is only a label");
+    }
+
+    #[tokio::test]
+    async fn an_equal_subject_from_another_installation_is_not_the_owner() {
+        let store = Store::open_in_memory().await.expect("store");
+        let github = account(&store, "ada", "4242").await;
+        store.bind_owner(&github, at(11)).await.expect("bind");
+        let enterprise = store
+            .upsert_account(
+                &AccountIdentity {
+                    provider: "github:https://ghe.example.com".to_owned(),
+                    subject_id: "4242".to_owned(),
+                    login: "ada".to_owned(),
+                    display_name: "ada".to_owned(),
+                    avatar_url: None,
+                },
+                at(12),
+            )
+            .await
+            .expect("enterprise account");
+
+        let binding = store
+            .owner_binding()
+            .await
+            .expect("binding")
+            .expect("claimed");
+
+        assert!(!binding.matches(&enterprise));
     }
 }

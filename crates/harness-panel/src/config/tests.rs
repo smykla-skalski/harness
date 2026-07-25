@@ -155,12 +155,42 @@ fn refuses_the_origin_root_as_a_mount_point() {
 
 #[test]
 fn refuses_a_mount_point_that_is_not_a_plain_path() {
-    for raw in ["panel", "/panel?x=1", "/panel#top", "/pa nel", "/pa\nnel"] {
+    for raw in [
+        "panel",
+        "/panel?x=1",
+        "/panel#top",
+        "/pa nel",
+        "/pa\nnel",
+        "/panel/{tenant}",
+        "/panel/*rest",
+        r"/panel\settings",
+        "/pa\u{7}nel",
+        "/pa\u{7f}nel",
+    ] {
         assert!(
             normalize_base_path(raw).is_err(),
             "{raw:?} should be refused"
         );
     }
+}
+
+/// Axum interprets a segment beginning with `:` as legacy capture syntax and
+/// panics while constructing the router. Accepted configuration must never
+/// make startup panic.
+#[test]
+fn refuses_router_capture_syntax_inside_the_mount_point() {
+    for raw in ["/:panel", "/harness/:panel"] {
+        let error = normalize_base_path(raw).expect_err("capture syntax must be refused");
+        assert!(
+            error.to_string().contains("capture syntax"),
+            "{raw}: {error}"
+        );
+    }
+
+    assert_eq!(
+        normalize_base_path("/panel:v2").expect("a colon within a segment is literal"),
+        "/panel:v2"
+    );
 }
 
 /// A browser resolves `.` and `..` before it sends the request and before it
@@ -175,6 +205,9 @@ fn refuses_a_dot_segment_inside_the_mount_point() {
         "/./panel",
         "/panel/..",
         "/..",
+        "/panel/%2e%2e/admin",
+        "/panel/.%2E/admin",
+        "/%2e/panel",
     ] {
         let error = normalize_base_path(raw).expect_err(&format!("{raw} should be refused"));
         assert!(
@@ -305,4 +338,71 @@ fn refuses_a_github_endpoint_that_is_not_http() {
     let error = args.resolve().expect_err("a file url must be refused");
 
     assert!(error.to_string().contains("--github-token-url"), "{error}");
+}
+
+#[test]
+fn refuses_secret_bearing_or_ambiguous_github_endpoint_components() {
+    let directory = tempfile::tempdir().expect("temp dir");
+
+    for raw in [
+        "https://user:secret@ghe.example.com/api/v3",
+        "https://ghe.example.com/api/v3?token=secret",
+        "https://ghe.example.com/api/v3#alternate",
+        "ftp://user:secret@ghe.example.com/api/v3?token=secret#fragment",
+        "https://[secret?token=secret",
+        "https://ghe.example.com/api/token=secret\n",
+    ] {
+        let mut args = args(directory.path());
+        args.github_api_url = raw.to_owned();
+
+        let error = args
+            .resolve()
+            .expect_err("extra URL components must be refused");
+        assert!(error.to_string().contains("--github-api-url"), "{error}");
+        assert!(!error.to_string().contains("secret"), "{error}");
+    }
+}
+
+#[test]
+fn refuses_plain_http_github_endpoints_away_from_loopback() {
+    let directory = tempfile::tempdir().expect("temp dir");
+
+    for (flag, update) in [
+        (
+            "--github-authorize-url",
+            fn_set_authorize_url as fn(&mut PanelArgs, String),
+        ),
+        ("--github-token-url", fn_set_token_url),
+        ("--github-api-url", fn_set_api_url),
+    ] {
+        let mut args = args(directory.path());
+        update(&mut args, "http://ghe.example.com/oauth".to_owned());
+
+        let error = args.resolve().expect_err("remote http must be refused");
+        assert!(error.to_string().contains(flag), "{error}");
+        assert!(error.to_string().contains("https"), "{error}");
+    }
+}
+
+#[test]
+fn accepts_plain_http_github_endpoints_on_loopback() {
+    let directory = tempfile::tempdir().expect("temp dir");
+    let mut args = args(directory.path());
+    args.github_authorize_url = "http://localhost:8788/login/oauth/authorize".to_owned();
+    args.github_token_url = "http://127.0.0.2:8788/login/oauth/access_token".to_owned();
+    args.github_api_url = "http://[::1]:8788/api/v3".to_owned();
+
+    args.resolve().expect("loopback endpoints are valid");
+}
+
+fn fn_set_authorize_url(args: &mut PanelArgs, value: String) {
+    args.github_authorize_url = value;
+}
+
+fn fn_set_token_url(args: &mut PanelArgs, value: String) {
+    args.github_token_url = value;
+}
+
+fn fn_set_api_url(args: &mut PanelArgs, value: String) {
+    args.github_api_url = value;
 }

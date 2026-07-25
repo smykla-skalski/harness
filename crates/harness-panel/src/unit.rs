@@ -21,7 +21,7 @@
 
 use std::path::Path;
 
-use crate::config::{PanelArgs, normalize_base_path};
+use crate::config::{PanelArgs, normalize_base_path, parse_endpoint};
 use crate::error::PanelError;
 
 /// Where the client secret is exposed inside the unit. `LoadCredential` copies
@@ -176,6 +176,13 @@ fn serve_command(
     args: &PanelArgs,
 ) -> Result<Vec<ExecArgument>, PanelError> {
     let base_path = normalize_base_path(&args.base_path)?;
+    for (flag, value) in [
+        ("--github-authorize-url", &args.github_authorize_url),
+        ("--github-token-url", &args.github_token_url),
+        ("--github-api-url", &args.github_api_url),
+    ] {
+        parse_endpoint(flag, value)?;
+    }
     let command = vec![
         ExecArgument::Value(binary_path.display().to_string()),
         ExecArgument::Value("serve".to_owned()),
@@ -192,6 +199,12 @@ fn serve_command(
         ExecArgument::Specifier(format!("%S/{unit}")),
         ExecArgument::Value("--github-client-id".to_owned()),
         ExecArgument::Value(args.github_client_id.clone()),
+        ExecArgument::Value("--github-authorize-url".to_owned()),
+        ExecArgument::Value(args.github_authorize_url.clone()),
+        ExecArgument::Value("--github-token-url".to_owned()),
+        ExecArgument::Value(args.github_token_url.clone()),
+        ExecArgument::Value("--github-api-url".to_owned()),
+        ExecArgument::Value(args.github_api_url.clone()),
         ExecArgument::Value("--github-client-secret-file".to_owned()),
         // %d is the credentials directory LoadCredential= populated.
         ExecArgument::Specifier(format!("%d/{CREDENTIAL_NAME}")),

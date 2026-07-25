@@ -45,6 +45,52 @@ fn the_unit_starts_the_panel_with_the_configured_flags() {
     assert!(unit.contains("--session-ttl-hours 12"), "{unit}");
 }
 
+#[test]
+fn the_unit_preserves_github_enterprise_endpoints() {
+    let mut args = args();
+    args.github_authorize_url = "https://ghe.example.com/login/oauth/authorize".to_owned();
+    args.github_token_url = "https://ghe.example.com/login/oauth/access_token".to_owned();
+    args.github_api_url = "https://ghe.example.com/api/v3".to_owned();
+
+    let unit = render_unit(
+        "harness-panel",
+        Path::new("/usr/local/bin/harness-panel"),
+        &args,
+    )
+    .expect("a renderable unit");
+
+    assert!(
+        unit.contains("--github-authorize-url https://ghe.example.com/login/oauth/authorize"),
+        "{unit}"
+    );
+    assert!(
+        unit.contains("--github-token-url https://ghe.example.com/login/oauth/access_token"),
+        "{unit}"
+    );
+    assert!(
+        unit.contains("--github-api-url https://ghe.example.com/api/v3"),
+        "{unit}"
+    );
+}
+
+#[test]
+fn a_rejected_endpoint_never_exposes_its_value() {
+    let mut args = args();
+    args.github_api_url = "https://ghe.example.com/api/token=secret\n".to_owned();
+
+    let error = render_unit(
+        "harness-panel",
+        Path::new("/usr/local/bin/harness-panel"),
+        &args,
+    )
+    .expect_err("a control character in an endpoint must be refused");
+    let message = error.to_string();
+
+    assert!(message.contains("--github-api-url"), "{message}");
+    assert!(message.contains("control characters"), "{message}");
+    assert!(!message.contains("secret"), "{message}");
+}
+
 /// The rendered flags are what the panel actually runs with, so a mount point
 /// the operator typed with a trailing slash has to be normalised here too.
 #[test]

@@ -224,7 +224,11 @@ pub fn normalize_base_path(raw: &str) -> Result<String, PanelError> {
             "--base-path must start with '/', got {trimmed:?}"
         )));
     }
-    if trimmed.contains(['?', '#', ' ']) || trimmed.chars().any(char::is_control) {
+    if trimmed.contains(['?', '#', '{', '}', '*', '\\'])
+        || trimmed
+            .chars()
+            .any(|character| character.is_whitespace() || character.is_control())
+    {
         return Err(PanelError::config(format!(
             "--base-path must be a plain path, got {trimmed:?}"
         )));
@@ -247,15 +251,28 @@ pub fn normalize_base_path(raw: &str) -> Result<String, PanelError> {
     // subtree in the router and a different one in every request. The cookie
     // would then never be offered back and sign-in would never take, with
     // nothing to show for it.
-    if normalized
-        .split('/')
-        .any(|segment| matches!(segment, "." | ".."))
-    {
+    if normalized.split('/').any(is_url_dot_segment) {
         return Err(PanelError::config(format!(
             "--base-path must not contain a '.' or '..' segment, got {trimmed:?}"
         )));
     }
+    if normalized
+        .split('/')
+        .any(|segment| segment.starts_with(':'))
+    {
+        return Err(PanelError::config(format!(
+            "--base-path must not contain router capture syntax, got {trimmed:?}"
+        )));
+    }
     Ok(normalized.to_owned())
+}
+
+fn is_url_dot_segment(segment: &str) -> bool {
+    matches!(segment, "." | "..")
+        || segment.eq_ignore_ascii_case("%2e")
+        || segment.eq_ignore_ascii_case(".%2e")
+        || segment.eq_ignore_ascii_case("%2e.")
+        || segment.eq_ignore_ascii_case("%2e%2e")
 }
 
 /// Reduce `--public-origin` to a scheme, host, and port with no trailing slash.
@@ -315,12 +332,32 @@ fn is_loopback_host(host: &Host<&str>) -> bool {
     }
 }
 
-fn parse_endpoint(flag: &str, raw: &str) -> Result<Url, PanelError> {
-    let parsed = Url::parse(raw.trim())
-        .map_err(|error| PanelError::config(format!("{flag} {raw:?}: {error}")))?;
-    if !matches!(parsed.scheme(), "http" | "https") {
+pub(crate) fn parse_endpoint(flag: &str, raw: &str) -> Result<Url, PanelError> {
+    if raw.chars().any(char::is_control) {
         return Err(PanelError::config(format!(
-            "{flag} must be http or https, got {raw:?}"
+            "{flag} must not contain control characters"
+        )));
+    }
+    let parsed = Url::parse(raw.trim())
+        .map_err(|_| PanelError::config(format!("{flag} must be a valid URL")))?;
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return Err(PanelError::config(format!("{flag} must be http or https")));
+    }
+    if !parsed.username().is_empty()
+        || parsed.password().is_some()
+        || parsed.query().is_some()
+        || parsed.fragment().is_some()
+    {
+        return Err(PanelError::config(format!(
+            "{flag} must not contain URL credentials, a query, or a fragment"
+        )));
+    }
+    let host = parsed
+        .host()
+        .ok_or_else(|| PanelError::config(format!("{flag} must contain a host")))?;
+    if parsed.scheme() == "http" && !is_loopback_host(&host) {
+        return Err(PanelError::config(format!(
+            "{flag} must use https away from loopback"
         )));
     }
     Ok(parsed)

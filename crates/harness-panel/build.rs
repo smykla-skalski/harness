@@ -28,12 +28,16 @@ fn main() {
     );
     let frontend = manifest_dir.join("frontend");
     let dist = frontend.join("dist");
+    let installer = manifest_dir.join("../../scripts/install-panel-frontend.sh");
+    let lock_helper = manifest_dir.join("../../scripts/lib/release-set.sh");
 
     // Both are read below, and a build script that declares any rerun-if
     // directive is rerun for those inputs alone, so an undeclared one looks
     // like an override that does nothing until something else changes.
     println!("cargo:rerun-if-env-changed={SKIP_ENV}");
     println!("cargo:rerun-if-env-changed={NPM_ENV}");
+    println!("cargo:rerun-if-changed={}", installer.display());
+    println!("cargo:rerun-if-changed={}", lock_helper.display());
     for input in [
         "src",
         "tests",
@@ -52,7 +56,7 @@ fn main() {
         return;
     }
 
-    install_dependencies(&frontend);
+    install_dependencies(&installer, &frontend);
     run_npm(&frontend, &["run", "build"]);
     let marker = dist.join(PLACEHOLDER_MARKER);
     if marker.exists() {
@@ -60,29 +64,21 @@ fn main() {
     }
 }
 
-/// Install exactly what the lockfile pins, and only when the installed tree no
-/// longer matches it.
-///
-/// `npm ci` rather than `npm install`: `install` is free to resolve a different
-/// tree and to rewrite `package-lock.json`, so an ordinary `cargo build` could
-/// leave the working tree dirty and produce a binary nobody can reproduce.
-/// The stamp lives beside `node_modules` so it is invalidated together with the
-/// tree it describes, which keeps the reinstall off the common path where the
-/// build already runs on every source change.
-fn install_dependencies(frontend: &Path) {
-    let lockfile = frontend.join("package-lock.json");
-    let stamp = frontend.join("node_modules").join(".harness-panel-stamp");
-    let expected = fs::read(&lockfile).map_or_else(|_| String::new(), |bytes| digest(&bytes));
-
-    if !expected.is_empty()
-        && fs::read_to_string(&stamp).is_ok_and(|recorded| recorded.trim() == expected)
-    {
-        return;
-    }
-
-    run_npm(frontend, &["ci", "--no-audit", "--no-fund"]);
-    if !expected.is_empty() {
-        fs::write(&stamp, expected).expect("recording the installed lockfile digest");
+/// Use the same lock-aware installer as the frontend Mise tasks. On a fresh
+/// checkout those tasks and this build script run in parallel, and two
+/// independent `npm ci` processes delete each other's `node_modules`.
+fn install_dependencies(installer: &Path, frontend: &Path) {
+    let status = Command::new(installer)
+        .env("HARNESS_PANEL_FRONTEND_DIR", frontend)
+        .status();
+    match status {
+        Ok(status) if status.success() => {}
+        Ok(status) => panic!("panel frontend dependency installation failed with {status}"),
+        Err(error) => panic!(
+            "could not run {}: {error}. Install Node, or set {SKIP_ENV}=1 to build without the \
+             panel's web assets.",
+            installer.display()
+        ),
     }
 }
 
@@ -140,15 +136,4 @@ fn write_placeholder(dist: &Path) {
         "/* built without the panel's web assets */\n",
     )
     .expect("writing the placeholder asset");
-}
-
-fn digest(bytes: &[u8]) -> String {
-    // A build script cannot use the crate's own dependencies, and the stamp only
-    // has to notice that the lockfile changed, so FNV-1a is enough here.
-    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
-    for byte in bytes {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
-    }
-    format!("{hash:016x}")
 }

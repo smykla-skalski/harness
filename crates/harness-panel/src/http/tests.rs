@@ -11,7 +11,7 @@ use std::path::Path;
 
 use axum::body::{Body, to_bytes};
 use axum::http::{Request, StatusCode, header};
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use tower::ServiceExt;
 
 use super::session::SESSION_COOKIE;
@@ -100,25 +100,25 @@ impl Harness {
     /// case GitHub allows: a login freed by a rename and taken by someone else.
     async fn sign_in_as(&self, login: &str, subject_id: &str) -> String {
         let identity = AccountIdentity {
-            provider: "github".to_owned(),
+            provider: "github:https://api.github.com".to_owned(),
             subject_id: subject_id.to_owned(),
             login: login.to_owned(),
             display_name: login.to_owned(),
             avatar_url: None,
         };
-        let account = self
+        let claim_owner = self.state.config.matches_owner_login(login);
+        let (_, token) = self
             .state
             .store
-            .upsert_account(&identity, Utc::now())
+            .complete_sign_in(
+                &identity,
+                claim_owner,
+                self.state.config.session_ttl,
+                Utc::now(),
+            )
             .await
-            .expect("account");
-        self.state
-            .store
-            .create_session(&account.id, Duration::hours(12), Utc::now())
-            .await
-            .expect("session")
-            .expose()
-            .to_owned()
+            .expect("session");
+        token.expose().to_owned()
     }
 
     async fn get(&self, path: &str, session: Option<&str>) -> (StatusCode, String) {
@@ -166,25 +166,13 @@ impl Harness {
             .get_all(header::SET_COOKIE)
             .iter()
             .filter_map(|value| value.to_str().ok())
-            .find(|value| value.starts_with("harness_panel_signin="))
+            .find(|value| value.starts_with("harness_panel_signin_"))
             .and_then(|value| value.split(';').next())
             .expect("a sign-in cookie")
             .to_owned();
 
         StartedSignIn { state, cookie }
     }
-}
-
-/// The pending sign-ins a `name=value` cookie pair carries.
-fn pending_states(cookie: &str) -> Vec<String> {
-    cookie
-        .split_once('=')
-        .map(|(_, value)| value)
-        .unwrap_or_default()
-        .split('.')
-        .filter(|candidate| !candidate.is_empty())
-        .map(str::to_owned)
-        .collect()
 }
 
 /// The point of the field is that a deploy which skipped the frontend build is
@@ -254,15 +242,9 @@ async fn the_owner_is_recognised_whatever_the_case() {
 async fn a_stranger_who_takes_the_freed_owner_login_is_not_the_owner() {
     let harness = Harness::new("ada").await;
 
-    // The real owner signs in, which claims the panel for subject 4242.
-    let owner = harness.sign_in_as("ada", "4242").await;
-    assert!(
-        harness
-            .get("/panel/api/me", Some(&owner))
-            .await
-            .1
-            .contains("\"is_owner\":true")
-    );
+    // The real owner finishes the callback and closes the page without ever
+    // loading `/api/me`. The callback itself must have claimed the panel.
+    harness.sign_in_as("ada", "4242").await;
 
     // They rename, freeing "ada", and a stranger registers it.
     harness.sign_in_as("ada-lovelace", "4242").await;

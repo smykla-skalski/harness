@@ -90,7 +90,7 @@ async fn a_state_from_another_browser_is_refused() {
 
     assert_eq!(forged.status(), StatusCode::BAD_REQUEST);
     let body = forged.text().await.expect("body");
-    assert!(body.contains("does not match"), "{body}");
+    assert!(body.contains("did not start this sign-in"), "{body}");
     assert_eq!(github.token_exchanges(), 0, "no code should be exchanged");
 }
 
@@ -159,13 +159,40 @@ async fn signing_in_again_after_a_rename_is_the_same_account() {
     let body = me.text().await.expect("body");
     assert!(body.contains("\"login\":\"ada-lovelace\""), "{body}");
 
-    // The owner flag follows the configured login, which now names nobody.
-    assert!(body.contains("\"is_owner\":false"), "{body}");
+    // The callback claimed the panel before the browser loaded `/api/me`, so a
+    // later rename cannot make ownership depend on the configured login.
+    assert!(body.contains("\"is_owner\":true"), "{body}");
     // The first session belongs to the same account and stays usable.
     assert_eq!(
         panel.get("/panel/api/me", Some(&first)).await.status(),
         StatusCode::OK
     );
+}
+
+/// Ownership is fixed by the successful callback, not by the redirected page
+/// eventually loading `/api/me`. Closing that page must not leave the
+/// configured login available for a later holder to claim.
+#[tokio::test]
+async fn closing_after_the_owner_callback_cannot_leave_a_takeover_window() {
+    let github = GitHubStub::start("ada", 4242).await;
+    let panel = PanelUnderTest::start(&github, "ada").await;
+
+    panel.sign_in().await;
+    github.become_user("ada", 7777);
+    let stranger = panel.sign_in().await;
+
+    let stranger_view = panel.get("/panel/api/me", Some(&stranger)).await;
+    let stranger_body = stranger_view.text().await.expect("body");
+    assert!(
+        stranger_body.contains("\"is_owner\":false"),
+        "{stranger_body}"
+    );
+
+    github.become_user("ada-lovelace", 4242);
+    let renamed_owner = panel.sign_in().await;
+    let owner_view = panel.get("/panel/api/me", Some(&renamed_owner)).await;
+    let owner_body = owner_view.text().await.expect("body");
+    assert!(owner_body.contains("\"is_owner\":true"), "{owner_body}");
 }
 
 #[tokio::test]

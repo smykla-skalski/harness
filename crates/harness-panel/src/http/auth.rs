@@ -9,7 +9,7 @@ use serde::Deserialize;
 
 use super::PanelState;
 use super::session::{
-    session_token, sign_in_states, with_pending_sign_in, with_session_cookie, without_cookie,
+    has_pending_sign_in, session_token, with_pending_sign_in, with_session_cookie, without_cookie,
     without_pending_sign_in,
 };
 use crate::config::OAUTH_STATE_TTL_MINUTES;
@@ -41,20 +41,20 @@ pub struct CallbackQuery {
 ///
 /// # Errors
 /// Returns [`ApiError::Internal`] when the sign-in cannot be recorded.
-pub async fn start(
-    State(state): State<PanelState>,
-    jar: CookieJar,
-    headers: HeaderMap,
-) -> Result<Response, ApiError> {
-    let issued = state
+pub async fn start(State(state): State<PanelState>, jar: CookieJar) -> Result<Response, ApiError> {
+    let Some(issued) = state
         .store
         .create_oauth_state(Duration::minutes(OAUTH_STATE_TTL_MINUTES), Utc::now())
-        .await?;
+        .await?
+    else {
+        return Err(ApiError::RateLimited(
+            "too many sign-ins are already waiting to finish",
+        ));
+    };
     let redirect = state.github.authorize_url(issued.expose());
     let jar = with_pending_sign_in(
         jar,
         &state,
-        &headers,
         issued.expose().to_owned(),
         OAUTH_STATE_TTL_MINUTES * 60,
     );
@@ -79,13 +79,7 @@ pub async fn callback(
     // its own. A callback carrying no state answers for nothing, so it spends
     // nothing.
     let jar = match query.state.as_deref() {
-        Some(presented) => without_pending_sign_in(
-            jar,
-            &state,
-            &headers,
-            presented,
-            OAUTH_STATE_TTL_MINUTES * 60,
-        ),
+        Some(presented) => without_pending_sign_in(jar, &state, presented),
         None => jar,
     };
 
@@ -117,10 +111,10 @@ async fn complete_sign_in(
 )]
 async fn issue_session(state: &PanelState, identity: &AccountIdentity) -> Result<String, ApiError> {
     let now = Utc::now();
-    let account = state.store.upsert_account(identity, now).await?;
-    let token = state
+    let claim_owner = state.config.matches_owner_login(&identity.login);
+    let (account, token) = state
         .store
-        .create_session(&account.id, state.config.session_ttl, now)
+        .complete_sign_in(identity, claim_owner, state.config.session_ttl, now)
         .await?;
     tracing::info!(
         login = %account.login,
@@ -147,15 +141,9 @@ async fn finish_sign_in(
         .state
         .as_deref()
         .ok_or_else(|| ApiError::SignInFailed("the callback carried no state".to_owned()))?;
-    let pending = sign_in_states(headers);
-    if pending.is_empty() {
+    if !has_pending_sign_in(headers, presented) {
         return Err(ApiError::SignInFailed(
-            "this browser did not start a sign-in, or took longer than ten minutes".to_owned(),
-        ));
-    }
-    if !pending.iter().any(|candidate| candidate == presented) {
-        return Err(ApiError::SignInFailed(
-            "the callback state does not match any sign-in this browser started".to_owned(),
+            "this browser did not start this sign-in, or took longer than ten minutes".to_owned(),
         ));
     }
     if !state

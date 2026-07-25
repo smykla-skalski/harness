@@ -250,7 +250,7 @@ pub fn location(response: &Response) -> String {
 }
 
 pub fn sign_in_cookie(response: &Response) -> String {
-    cookie_named(response, "harness_panel_signin")
+    cookie_with_prefix(response, "harness_panel_signin_")
 }
 
 pub fn session_cookie(response: &Response) -> String {
@@ -266,6 +266,18 @@ fn cookie_named(response: &Response, name: &str) -> String {
         .find(|value| value.starts_with(&format!("{name}=")))
         .and_then(|value| value.split(';').next())
         .unwrap_or_else(|| panic!("no {name} cookie was set"))
+        .to_owned()
+}
+
+fn cookie_with_prefix(response: &Response, prefix: &str) -> String {
+    response
+        .headers()
+        .get_all(SET_COOKIE)
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .find(|value| value.starts_with(prefix))
+        .and_then(|value| value.split(';').next())
+        .unwrap_or_else(|| panic!("no {prefix} cookie was set"))
         .to_owned()
 }
 

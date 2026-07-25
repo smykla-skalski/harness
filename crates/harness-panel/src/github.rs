@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use reqwest::Client;
 use reqwest::header::{ACCEPT, AUTHORIZATION, USER_AGENT};
+use reqwest::redirect::Policy;
 use serde::Deserialize;
 use url::Url;
 
@@ -24,13 +25,13 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 /// as storage.
 const MAX_FIELD_CHARS: usize = 200;
 
-const PROVIDER: &str = "github";
 const SCOPE: &str = "read:user";
 
 /// Talks to GitHub as the panel's OAuth app.
 #[derive(Debug, Clone)]
 pub struct GitHubClient {
     config: GitHubConfig,
+    provider: String,
     callback_url: String,
     http: Client,
 }
@@ -41,12 +42,18 @@ impl GitHubClient {
     /// # Errors
     /// Returns [`PanelError::GitHub`] when the HTTP client cannot be built.
     pub fn new(config: GitHubConfig, callback_url: String) -> Result<Self, PanelError> {
+        let provider = installation_provider(&config.api_url);
         let http = Client::builder()
             .timeout(REQUEST_TIMEOUT)
+            // OAuth credentials must never follow a redirect to a URL that did
+            // not pass configuration validation. Refusing every redirect also
+            // protects bearer profile requests from HTTPS-to-HTTP downgrades.
+            .redirect(Policy::none())
             .build()
             .map_err(|error| PanelError::github(format!("building the HTTP client: {error}")))?;
         Ok(Self {
             config,
+            provider,
             callback_url,
             http,
         })
@@ -128,7 +135,7 @@ impl GitHubClient {
             .json()
             .await
             .map_err(|error| PanelError::github(format!("parsing the profile: {error}")))?;
-        identity_from_user(user)
+        identity_from_user(user, &self.provider)
     }
 }
 
@@ -181,7 +188,7 @@ fn parse_token_response(body: &str) -> Result<String, PanelError> {
 /// next slice, into the pairing subject the daemon records, so a control
 /// character here would forge structure somewhere downstream. They are refused
 /// at the boundary instead of escaped at each sink.
-fn identity_from_user(user: GitHubUser) -> Result<AccountIdentity, PanelError> {
+fn identity_from_user(user: GitHubUser, provider: &str) -> Result<AccountIdentity, PanelError> {
     let GitHubUser {
         id,
         login,
@@ -204,12 +211,24 @@ fn identity_from_user(user: GitHubUser) -> Result<AccountIdentity, PanelError> {
         .transpose()?;
 
     Ok(AccountIdentity {
-        provider: PROVIDER.to_owned(),
+        provider: provider.to_owned(),
         subject_id: id.to_string(),
         login,
         display_name,
         avatar_url,
     })
+}
+
+/// Namespace a GitHub subject by the installation that issued it.
+///
+/// GitHub's numeric user ids are unique only within an installation. The full
+/// API base distinguishes installations routed under different paths on one
+/// gateway, while trimming its trailing slash keeps equivalent spellings
+/// stable.
+fn installation_provider(api_url: &Url) -> String {
+    let origin = api_url.origin().ascii_serialization();
+    let path = api_url.path().trim_end_matches('/');
+    format!("github:{origin}{path}")
 }
 
 fn checked_field(label: &str, value: &str) -> Result<String, PanelError> {
