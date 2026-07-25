@@ -107,9 +107,11 @@ gh api --method POST repos/smykla-skalski/harness/pulls/<PR_NUMBER>/requested_re
 
 ### Close out
 
-This repository allows squash merges only. The branch collapses into one new commit on `upstream/main`, so its commits never reach `main` and it can never fast-forward. Closeout realigns local state instead of integrating anything.
+This repository allows squash merges only. The session branch collapses into one new commit on `upstream/main`, so its own commits never reach `main` and the branch can never fast-forward onto it. Closeout realigns local state instead of integrating anything, unless the worktree and branch existed only to deliver one standalone, non-umbrella issue or task, in which case closeout removes them instead. A worktree kept alive for an umbrella's remaining slices or another follow-up in the same PR series always takes the realign path; when it is unclear whether more work is coming, default to realign and ask before removing anything.
 
-Confirm the PR merged, then check that `<main-checkout>` is on `main`, `<worktree>` is on `<session-branch>`, both are clean, and local `main` carries no unpublished `replay` commits (reconcile those first, as described below):
+Confirm the PR merged before either path, then check that `<main-checkout>` is on `main`, `<worktree>` is on `<session-branch>`, both are clean, and local `main` carries no unpublished `replay` commits (reconcile those first, as described below).
+
+#### Realign
 
 ```bash
 git -C <main-checkout> fetch --prune upstream
@@ -118,13 +120,24 @@ git -C <worktree> reset --hard main
 git -C <worktree> branch --unset-upstream <session-branch> || true  # no-op on a rerun
 ```
 
-That is the whole closeout. The squash commit on `main` already carries every change the `reset --hard` discards. Do not rerun validation on `main`, and keep the worktree and lane available.
+That is the whole realign path. The squash commit on `main` already carries every change the `reset --hard` discards. Do not rerun validation on `main`, and keep the worktree and lane available.
 
 It deliberately skips three things:
 
 - No signature check on the merge. GitHub creates the squash commit and signs it with its own key, so a local signature check cannot verify it. That is expected. The signing contract covers commits the agent writes.
 - No remote branch deletion. GitHub deletes it on merge and `fetch --prune` drops the tracking ref.
 - No head comparison. A merged PR is proof enough.
+
+#### Cleanup
+
+```bash
+git -C <main-checkout> fetch --prune upstream
+git -C <main-checkout> merge --ff-only upstream/main
+git -C <main-checkout> worktree remove <worktree>
+git -C <main-checkout> branch -D <session-branch>
+```
+
+Use `-D`, not `-d`: the squash commit means the local branch's commits are never an ancestor of `main`, so the safe delete refuses. Skip a separate remote delete; GitHub already removed the remote branch on merge, and `fetch --prune` already dropped the local tracking ref. Confirm with `git ls-remote --heads upstream <session-branch>` if in doubt.
 
 When unpublished local `replay` commits sit on `main`, rebase and re-sign only that range onto merged `upstream/main`, preserve its sign-offs, and wait for the user to push. Never cherry-pick the squash commit on top of that range or reset those commits away. Stop for the user if any unpublished commit falls outside a stable, signed, signed-off replay range.
 
