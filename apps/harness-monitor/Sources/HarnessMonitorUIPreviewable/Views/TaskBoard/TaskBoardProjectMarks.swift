@@ -182,6 +182,23 @@ struct TaskBoardProjectMarkOutline: InsettableShape {
   }
 }
 
+/// Cap heights for the handful of text styles a mark sits beside. The metric is
+/// a property of the style's font, so it is resolved once instead of on every
+/// card's every render; the caller still scales it, which is the part that moves.
+@MainActor
+private enum TaskBoardProjectMarkCapHeights {
+  private static var resolved: [NSFont.TextStyle: CGFloat] = [:]
+
+  static func capHeight(for style: NSFont.TextStyle) -> CGFloat {
+    if let known = resolved[style] {
+      return known
+    }
+    let height = NSFont.preferredFont(forTextStyle: style).capHeight
+    resolved[style] = height
+    return height
+  }
+}
+
 /// The project mark itself. Small, and deliberately not the only thing naming
 /// the project: the footer prints the name right beside it, so this is
 /// decorative to VoiceOver rather than a second, colour-only label.
@@ -205,7 +222,7 @@ struct TaskBoardProjectMark: View {
     // back into the view's MainActor state.
     let diameter = diameter
     let baseline = diameter / 2
-      + NSFont.preferredFont(forTextStyle: alignsWith).capHeight * fontScale / 2
+      + TaskBoardProjectMarkCapHeights.capHeight(for: alignsWith) * fontScale / 2
     let outline = TaskBoardProjectMarkOutline(shape: style.shape)
     return outline
       .fill(style.color.color)
