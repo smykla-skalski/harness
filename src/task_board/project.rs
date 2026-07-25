@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use super::item_fields::{ExternalRef, ExternalRefProvider};
 use super::project_color::TaskBoardProjectColor;
 use super::project_shape::TaskBoardProjectShape;
 use super::runtime_config::normalize_repository_slug;
@@ -159,7 +160,7 @@ pub fn item_attribution(item: &super::types::TaskBoardItem) -> ItemProjectAttrib
                 .filter(|value| !value.is_empty())
         });
     let Some(raw) = raw else {
-        return ItemProjectAttribution::Unattributed;
+        return external_ref_attribution(item);
     };
     if let Some(slug) = TaskBoardProjectSource::GitHub.normalize_slug(raw) {
         return ItemProjectAttribution::Register(TaskBoardProjectSource::GitHub, slug);
@@ -169,6 +170,61 @@ pub fn item_attribution(item: &super::types::TaskBoardItem) -> ItemProjectAttrib
         ItemProjectAttribution::Unattributed,
         |slug| ItemProjectAttribution::Register(source, slug),
     )
+}
+
+/// The repository named by the first GitHub ref that carries one.
+///
+/// A review requested on a repository nothing else tracks arrives with both
+/// columns empty and its repository only inside `owner/repo#number` or the pull
+/// request URL. The card already reads its label from that ref, so attribution
+/// has to read it too or the label names a project the item does not have.
+fn external_ref_attribution(item: &super::types::TaskBoardItem) -> ItemProjectAttribution {
+    item.external_refs
+        .iter()
+        .filter(|reference| reference.provider == ExternalRefProvider::GitHub)
+        .find_map(external_ref_slug)
+        .map_or(ItemProjectAttribution::Unattributed, |slug| {
+            ItemProjectAttribution::Register(TaskBoardProjectSource::GitHub, slug)
+        })
+}
+
+fn external_ref_slug(reference: &ExternalRef) -> Option<String> {
+    let raw = reference
+        .url
+        .as_deref()
+        .and_then(slug_from_github_url)
+        .or_else(|| slug_from_reference_id(&reference.external_id))?;
+    TaskBoardProjectSource::GitHub.normalize_slug(&raw)
+}
+
+fn slug_from_github_url(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    let rest = trimmed
+        .strip_prefix("https://")
+        .or_else(|| trimmed.strip_prefix("http://"))?;
+    let (host, path) = rest.split_once('/')?;
+    let host = host.to_ascii_lowercase();
+    if host != "github.com" && host != "www.github.com" {
+        return None;
+    }
+    slug_from_segments(path)
+}
+
+fn slug_from_reference_id(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    slug_from_github_url(trimmed).or_else(|| slug_from_segments(trimmed))
+}
+
+/// The owner and repository at the front of a path, with everything a URL can
+/// hang off the end cut away first. `owner/repo#42` and `owner/repo?tab=readme`
+/// both name `owner/repo`, and a slug that kept the suffix would name a project
+/// no repository can ever match.
+fn slug_from_segments(path: &str) -> Option<String> {
+    let path = path.split_once(['?', '#']).map_or(path, |(head, _)| head);
+    let mut segments = path.split('/').filter(|segment| !segment.is_empty());
+    let owner = segments.next()?;
+    let repository = segments.next()?;
+    Some(format!("{owner}/{repository}"))
 }
 
 #[cfg(test)]

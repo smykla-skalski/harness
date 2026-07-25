@@ -1,5 +1,5 @@
 use super::*;
-use crate::task_board::ExternalRefProvider;
+use crate::task_board::{ExternalRef, ExternalRefProvider};
 
 #[test]
 fn github_slug_is_normalized_to_lowercase_owner_and_repository() {
@@ -173,6 +173,78 @@ fn an_explicit_project_wins_over_the_execution_target() {
         item_attribution(&item),
         ItemProjectAttribution::Register(TaskBoardProjectSource::GitHub, "acme/source".into())
     );
+}
+
+#[test]
+fn a_review_import_is_attributed_through_its_external_ref() {
+    // A review-requested pull request in an untracked repository arrives with
+    // neither column filled: its repository is named only by the ref.
+    let mut item = item();
+    item.external_refs.push(ExternalRef {
+        provider: ExternalRefProvider::GitHub,
+        external_id: "Acme/Widgets#97".into(),
+        url: Some("https://github.com/Acme/Widgets/pull/97".into()),
+        sync_state: None,
+    });
+
+    assert_eq!(
+        item_attribution(&item),
+        ItemProjectAttribution::Register(TaskBoardProjectSource::GitHub, "acme/widgets".into())
+    );
+}
+
+#[test]
+fn a_column_wins_over_an_external_ref() {
+    let mut item = item();
+    item.execution_repository = Some("acme/source".into());
+    item.external_refs.push(ExternalRef {
+        provider: ExternalRefProvider::GitHub,
+        external_id: "acme/other#1".into(),
+        url: None,
+        sync_state: None,
+    });
+
+    assert_eq!(
+        item_attribution(&item),
+        ItemProjectAttribution::Register(TaskBoardProjectSource::GitHub, "acme/source".into())
+    );
+}
+
+#[test]
+fn a_query_or_fragment_never_reaches_the_slug() {
+    // A slug carrying one would name a project no repository can match.
+    for reference in [
+        "https://github.com/Acme/Widgets?tab=readme",
+        "https://github.com/Acme/Widgets#readme",
+        "Acme/Widgets?tab=readme",
+    ] {
+        let mut item = item();
+        item.external_refs.push(ExternalRef {
+            provider: ExternalRefProvider::GitHub,
+            external_id: reference.to_owned(),
+            url: None,
+            sync_state: None,
+        });
+
+        assert_eq!(
+            item_attribution(&item),
+            ItemProjectAttribution::Register(TaskBoardProjectSource::GitHub, "acme/widgets".into()),
+            "reference {reference}"
+        );
+    }
+}
+
+#[test]
+fn a_ref_that_names_no_repository_leaves_the_item_unattributed() {
+    let mut item = item();
+    item.external_refs.push(ExternalRef {
+        provider: ExternalRefProvider::GitHub,
+        external_id: "12345".into(),
+        url: None,
+        sync_state: None,
+    });
+
+    assert_eq!(item_attribution(&item), ItemProjectAttribution::Unattributed);
 }
 
 #[test]

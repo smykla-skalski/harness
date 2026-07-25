@@ -91,6 +91,10 @@ async fn task_board_items_round_trip_and_mutate_atomically() {
         .create_task_board_item(item.clone())
         .await
         .expect("create item");
+    // The store attributes the ref's repository on write, which is the one
+    // field a round trip is expected to come back changed.
+    assert!(created.item.source_project_id.is_some());
+    item.source_project_id = created.item.source_project_id.clone();
     assert_eq!(created.item, item);
     assert!(created.change_revision > 0);
     assert_eq!(db.task_board_item(&item.id).await.expect("load item"), item);
