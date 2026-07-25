@@ -94,6 +94,18 @@ agent_build_share() {
 
 # Key the pool by an arbitrary string so a scenario never shares a supervisor
 # with the developer's real repository pool.
+# The pool is only offered to a make that can parse a fifo endpoint, so a
+# scenario meaning to exercise pool mode has to pin one. Without it these tests
+# assert on the runner's make version - green on a macOS box with 4.4, falling
+# back to the reserve on Ubuntu 24.04, and never the code they were written for.
+fifo_capable_make_path() {
+  local shim="$SANDBOX/make-shim"
+  mkdir -p "$shim"
+  printf '#!/usr/bin/env bash\nprintf "GNU Make 4.4.1\\n"\n' >"$shim/make"
+  chmod +x "$shim/make"
+  printf '%s\n' "$shim"
+}
+
 print_cargo_env_with_pool_key() {
   local pool_key="$1"
   shift
@@ -101,6 +113,14 @@ print_cargo_env_with_pool_key() {
   # in-repo TMPDIR base, and the scenarios below need to own that path.
   local scratch="$SANDBOX/pool-tmp"
   mkdir -p "$scratch"
+  # Whether the pool may be used at all now depends on the host's make, so
+  # without this every pool assertion below would test the runner rather than
+  # the code - passing on a macOS box with make 4.4 and falling back on Ubuntu
+  # 24.04. The scenario that owns that decision sets its own make instead.
+  # Passed as a per-command assignment rather than set inside the subshell, so
+  # the shim reaches cargo-local.sh without shellcheck reading it as a lost edit.
+  local run_path="$PATH"
+  [[ -n "${HARNESS_TEST_MAKE_ON_PATH:-}" ]] || run_path="$(fifo_capable_make_path):$PATH"
   # Start the supervisor up front so the run under test only has to attach to a
   # pool that already answers. Folding daemon startup into the assertion made
   # this flaky on a loaded host, where spawning it can outrun the wait.
@@ -117,6 +137,7 @@ print_cargo_env_with_pool_key() {
     unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR
     unset CARGO_BUILD_JOBS HARNESS_CARGO_JOBS MAKEFLAGS MFLAGS CARGO_MAKEFLAGS
     TMPDIR="$scratch/" \
+      PATH="$run_path" \
       RUSTC_WRAPPER='' \
       SCCACHE_BIN='' \
       CODEX_SESSION_ID="cargo-local-pool-$$" \
@@ -198,9 +219,10 @@ scenario_nextest_build_phase_keeps_the_whole_pool() {
     --repo-root "$key" --budget "$budget" >/dev/null 2>&1 || true
 
   (
-    unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR MAKEFLAGS
+    unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR MAKEFLAGS MFLAGS CARGO_MAKEFLAGS
     unset NEXTEST_TEST_THREADS HARNESS_NEXTEST_JOBS
     TMPDIR="$scratch/" \
+      PATH="$(fifo_capable_make_path):$PATH" \
       TOKEN_LOG="$log" \
       SCCACHE_BIN='' RUSTC_WRAPPER='' \
       CODEX_SESSION_ID="cargo-local-buildphase-$$" \
@@ -250,9 +272,10 @@ scenario_build_only_flag_precedes_a_separator() {
     --repo-root "$key" --budget "$budget" >/dev/null 2>&1 || true
 
   (
-    unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR MAKEFLAGS
+    unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR MAKEFLAGS MFLAGS CARGO_MAKEFLAGS
     unset NEXTEST_TEST_THREADS HARNESS_NEXTEST_JOBS
     TMPDIR="$scratch/" \
+      PATH="$(fifo_capable_make_path):$PATH" \
       TOKEN_LOG="$log" \
       SCCACHE_BIN='' RUSTC_WRAPPER='' \
       CODEX_SESSION_ID="cargo-local-sep-$$" \
@@ -291,9 +314,10 @@ scenario_nextest_detection_skips_global_flag_values() {
 
   run_flagvalue() {
     (
-      unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR MAKEFLAGS
+      unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR MAKEFLAGS MFLAGS CARGO_MAKEFLAGS
       unset NEXTEST_TEST_THREADS HARNESS_NEXTEST_JOBS
       TMPDIR="$scratch/" \
+        PATH="$(fifo_capable_make_path):$PATH" \
         TOKEN_LOG="$log" \
         SCCACHE_BIN='' RUSTC_WRAPPER='' \
         CODEX_SESSION_ID="cargo-local-flagvalue-$$" \
@@ -345,9 +369,10 @@ scenario_nextest_detection_handles_toolchain_and_list() {
 
   run_detect() {
     (
-      unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR MAKEFLAGS
+      unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR MAKEFLAGS MFLAGS CARGO_MAKEFLAGS
       unset NEXTEST_TEST_THREADS HARNESS_NEXTEST_JOBS
       TMPDIR="$scratch/" \
+        PATH="$(fifo_capable_make_path):$PATH" \
         TOKEN_LOG="$log" \
         SCCACHE_BIN='' RUSTC_WRAPPER='' \
         CODEX_SESSION_ID="cargo-local-detect-$$" \
@@ -404,6 +429,45 @@ scenario_jobserver_pool_takes_over_build_sizing() {
     return
   fi
   pass "an available pool widens build jobs and exports a jobserver"
+}
+
+scenario_old_make_keeps_the_pool_at_arms_length() {
+  local key fake_bin output version expected_mode skipped
+  local -a cases=("4.3:reserve" "3.81:reserve" "4.4.1:pool" "5.0:pool" "bmake-nonsense:reserve")
+  local entry
+
+  for entry in "${cases[@]}"; do
+    version="${entry%%:*}"
+    expected_mode="${entry##*:}"
+    key="pool-make-$version-$$"
+    fake_bin="$SANDBOX/make-$version"
+    mkdir -p "$fake_bin"
+    if [[ "$version" == bmake-nonsense ]]; then
+      printf '#!/usr/bin/env bash\nprintf "not a gnu make\\n"\n' >"$fake_bin/make"
+    else
+      printf '#!/usr/bin/env bash\nprintf "GNU Make %s\\n"\n' "$version" >"$fake_bin/make"
+    fi
+    chmod +x "$fake_bin/make"
+
+    output="$(HARNESS_TEST_MAKE_ON_PATH=1 PATH="$fake_bin:$PATH" \
+      print_cargo_env_with_pool_key "$key")"
+    stop_pool_for_key "$key"
+    skipped="$(awk -F= '$1 == "JOBSERVER_SKIPPED" { print $2 }' <<<"$output")"
+
+    if ! assert_line "JOBSERVER=$expected_mode" "$output"; then
+      fail "make $version should give $expected_mode: $(grep '^JOBSERVER=' <<<"$output")"
+      return
+    fi
+    if [[ "$expected_mode" == reserve && "$skipped" != "old-make" ]]; then
+      fail "make $version fell back without naming why: JOBSERVER_SKIPPED=$skipped"
+      return
+    fi
+    if [[ "$expected_mode" == pool && -n "$skipped" ]]; then
+      fail "make $version attached but claimed a skip: JOBSERVER_SKIPPED=$skipped"
+      return
+    fi
+  done
+  pass "a make too old for a fifo endpoint keeps the static reserve"
 }
 
 scenario_pool_endpoint_never_reaches_make() {
@@ -1148,6 +1212,7 @@ scenario_jobserver_pool_takes_over_build_sizing
 scenario_jobserver_absent_falls_back_to_the_reserve
 scenario_reserve_drops_an_inherited_jobserver
 scenario_pool_endpoint_never_reaches_make
+scenario_old_make_keeps_the_pool_at_arms_length
 scenario_explicit_job_override_beats_the_pool
 scenario_nextest_build_phase_keeps_the_whole_pool
 scenario_build_only_flag_precedes_a_separator

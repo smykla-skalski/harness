@@ -18,6 +18,9 @@ active_build_count=1
 AGENT_BUILD_SHARE=4
 # "pool" once attached to the shared jobserver, "reserve" on the static fallback.
 jobserver_mode="reserve"
+# Why the pool was passed over, when it was passed over for a reason worth
+# naming rather than simply being unreachable.
+jobserver_skipped=""
 skip_build_lease="${HARNESS_CARGO_SKIP_LEASE:-0}"
 
 first_nonempty_env() {
@@ -375,6 +378,25 @@ jobserver_budget() {
   printf '%s\n' "$budget"
 }
 
+# Whether a sub-make could survive being handed this pool. Cargo keeps the fifo
+# endpoint out of MAKEFLAGS, but cmake-rs copies CARGO_MAKEFLAGS into MAKEFLAGS
+# itself whenever the generated project is Makefile based, and make below 4.4
+# does not ignore an endpoint it cannot parse - 4.3 exits 2 on one. A crate like
+# aws-lc-sys would then fail the whole build, so on such a host the pool is not
+# safe to attach to at all and the static reserve stands in.
+make_understands_fifo_jobserver() {
+  local version major minor
+  command -v make >/dev/null 2>&1 || return 0
+  version="$(make --version 2>/dev/null | head -1)"
+  version="${version##* }"
+  IFS=. read -r major minor _ <<<"$version"
+  # Anything that does not answer with a version number - bmake, a wrapper - is
+  # assumed unable to cope, because guessing wrong here breaks builds.
+  [[ "$major" =~ ^[0-9]+$ ]] || return 1
+  [[ "$minor" =~ ^[0-9]+$ ]] || minor=0
+  (( major > 4 || (major == 4 && minor >= 4) ))
+}
+
 # Attach to the shared pool. Cargo speaks the jobserver protocol natively, so
 # once CARGO_MAKEFLAGS points at the pool it renegotiates its own width against
 # every other build for as long as it runs - which the sampled-once reserve
@@ -383,6 +405,7 @@ configure_jobserver() {
   local line
 
   jobserver_mode="reserve"
+  jobserver_skipped=""
   # Reserve means this script sizes the build, so an inherited jobserver must
   # not silently govern instead. A stale one - the pool this very script
   # exported before it died - pins cargo to its implicit slot while
@@ -394,6 +417,12 @@ configure_jobserver() {
   fi
   command -v python3 >/dev/null 2>&1 || return 0
   [[ -f "$(jobserver_script)" ]] || return 0
+  # Named so the fallback is visible. Dropping to the reserve without saying why
+  # is the same silent degradation the pool exists to make impossible.
+  if ! make_understands_fifo_jobserver; then
+    jobserver_skipped="old-make"
+    return 0
+  fi
 
   line="$(python3 "$(jobserver_script)" ensure \
     --repo-root "$(jobserver_pool_key)" \
@@ -516,6 +545,7 @@ if [[ "${1:-}" == "--print-env" ]]; then
   printf 'MAKEFLAGS=%s\n' "${MAKEFLAGS:-}"
   printf 'CARGO_MAKEFLAGS=%s\n' "${CARGO_MAKEFLAGS:-}"
   printf 'JOBSERVER=%s\n' "$jobserver_mode"
+  printf 'JOBSERVER_SKIPPED=%s\n' "$jobserver_skipped"
   printf 'ACTIVE_BUILD_COUNT=%s\n' "$active_build_count"
   if [[ -n "$session_id" ]]; then
     printf 'SESSION_MODE=agent\n'
