@@ -23,6 +23,7 @@ extension HarnessMonitorStore {
     let sessions: MeasuredOperation<[SessionSummary]>
     let taskBoardItems: TaskBoardSnapshotLoad<[TaskBoardItem]>
     let taskBoardOrchestratorStatus: TaskBoardSnapshotLoad<TaskBoardOrchestratorStatus?>
+    let taskBoardProjects: TaskBoardSnapshotLoad<[TaskBoardProjectSummary]>
     let stepModeConfirmationRevision: UInt64
   }
 
@@ -32,6 +33,7 @@ extension HarnessMonitorStore {
     case sessions(MeasuredOperation<[SessionSummary]>)
     case taskBoardItems(TaskBoardSnapshotLoad<[TaskBoardItem]>)
     case taskBoardOrchestratorStatus(TaskBoardSnapshotLoad<TaskBoardOrchestratorStatus?>)
+    case taskBoardProjects(TaskBoardSnapshotLoad<[TaskBoardProjectSummary]>)
   }
 
   func connect(using client: any HarnessMonitorClientProtocol) async {
@@ -301,12 +303,18 @@ extension HarnessMonitorStore {
           await Self.loadTaskBoardOrchestratorStatusSnapshot(using: client)
         )
       }
+      group.addTask {
+        RefreshSnapshotPiece.taskBoardProjects(
+          await Self.loadTaskBoardProjectsSnapshot(using: client)
+        )
+      }
 
       var diagnostics: MeasuredOperation<DaemonDiagnosticsReport>?
       var projects: MeasuredOperation<[ProjectSummary]>?
       var sessions: MeasuredOperation<[SessionSummary]>?
       var taskBoardItems: TaskBoardSnapshotLoad<[TaskBoardItem]>?
       var taskBoardOrchestratorStatus: TaskBoardSnapshotLoad<TaskBoardOrchestratorStatus?>?
+      var taskBoardProjects: TaskBoardSnapshotLoad<[TaskBoardProjectSummary]>?
 
       for try await piece in group {
         switch piece {
@@ -320,6 +328,8 @@ extension HarnessMonitorStore {
           taskBoardItems = measuredTaskBoardItems
         case .taskBoardOrchestratorStatus(let measuredTaskBoardOrchestratorStatus):
           taskBoardOrchestratorStatus = measuredTaskBoardOrchestratorStatus
+        case .taskBoardProjects(let measuredTaskBoardProjects):
+          taskBoardProjects = measuredTaskBoardProjects
         }
       }
 
@@ -328,7 +338,8 @@ extension HarnessMonitorStore {
         let projects,
         let sessions,
         let taskBoardItems,
-        let taskBoardOrchestratorStatus
+        let taskBoardOrchestratorStatus,
+        let taskBoardProjects
       else {
         throw CancellationError()
       }
@@ -339,6 +350,7 @@ extension HarnessMonitorStore {
         sessions: sessions,
         taskBoardItems: taskBoardItems,
         taskBoardOrchestratorStatus: taskBoardOrchestratorStatus,
+        taskBoardProjects: taskBoardProjects,
         stepModeConfirmationRevision: stepModeConfirmationRevision
       )
     }

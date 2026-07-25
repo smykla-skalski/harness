@@ -52,6 +52,7 @@ extension HarnessMonitorStore {
       }
       globalTaskBoardItems = resolvedTaskBoardSnapshot.items
       globalTaskBoardOrchestratorStatus = resolvedTaskBoardSnapshot.orchestratorStatus
+      globalTaskBoardProjects = refreshSnapshot.taskBoardProjects.value ?? globalTaskBoardProjects
       mergeTaskBoardAutomationSnapshot(measuredAutomationSnapshot)
     }
     if didChangeTaskBoardSnapshot {

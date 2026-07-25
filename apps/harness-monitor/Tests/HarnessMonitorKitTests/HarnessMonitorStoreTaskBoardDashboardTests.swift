@@ -64,6 +64,23 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
     #expect(store.contentUI.dashboard.taskBoardProjects?.isEmpty == false)
   }
 
+  @Test("Connecting fills the project catalog before any board refresh")
+  func connectingFillsProjectCatalog() async {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardItems([
+      sampleTaskBoardItem(
+        id: "board-1", status: .todo, agentMode: .interactive, projectId: "project-1")
+    ])
+
+    // Startup loads the board through its own snapshot, so a card opened right
+    // after launch has to be marked without waiting for a mutation to schedule
+    // the dashboard refresh.
+    let store = await makeBootstrappedStore(client: client)
+
+    #expect(store.globalTaskBoardProjects?.isEmpty == false)
+    #expect(store.contentUI.dashboard.taskBoardProjects?.isEmpty == false)
+  }
+
   @Test("An unavailable project catalog keeps the marks already on screen")
   func unavailableProjectCatalogKeepsExistingMarks() async {
     let client = RecordingHarnessClient()
