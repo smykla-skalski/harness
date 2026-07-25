@@ -37,9 +37,11 @@ pub fn render_unit(unit: &str, binary_path: &Path, args: &PanelArgs) -> Result<S
     let exec_start = render_exec_start(&serve_command(unit, binary_path, args)?);
     // The secret path is the one operator value that never reaches `ExecStart`,
     // because the command points at the credential systemd re-exposes instead.
-    // It still lands in a directive, so it needs the same refusal.
+    // It still lands in a directive, so it needs the same refusal and the same
+    // specifier escaping.
     let secret_source = args.github_client_secret_file.display().to_string();
     refuse_control_characters("the github client secret path", &secret_source)?;
+    let secret_source = escape_directive_value(&secret_source);
     Ok(format!(
         "[Unit]\n\
          Description=Harness panel\n\
@@ -101,6 +103,17 @@ fn refuse_control_characters(label: &str, value: &str) -> Result<(), PanelError>
         )));
     }
     Ok(())
+}
+
+/// Escape a value the panel writes into a directive rather than `ExecStart`.
+///
+/// systemd expands `%` specifiers in directive values too, not only on the
+/// command line, so a path an operator typed with a `%` in it would be read as
+/// a specifier and resolve to something else entirely. `%%` is how systemd
+/// spells a literal `%`. Quoting is not involved here: unlike `ExecStart`,
+/// a directive value is taken whole, so escaping is the only thing needed.
+fn escape_directive_value(value: &str) -> String {
+    value.replace('%', "%%")
 }
 
 /// Refuse a unit name that would not survive the two places it is used.

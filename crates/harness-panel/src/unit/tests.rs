@@ -186,6 +186,27 @@ fn an_ordinary_unit_name_is_accepted() {
     }
 }
 
+/// `LoadCredential=` expands specifiers just as `ExecStart` does, so a `%` an
+/// operator typed into the secret path would resolve to something else and
+/// systemd would look for the credential somewhere they never named.
+#[test]
+fn a_percent_in_the_secret_path_is_escaped() {
+    let mut args = args();
+    args.github_client_secret_file = PathBuf::from("/etc/harness-panel/100%secret");
+
+    let unit = render_unit(
+        "harness-panel",
+        Path::new("/usr/local/bin/harness-panel"),
+        &args,
+    )
+    .expect("a renderable unit");
+
+    assert!(
+        unit.contains("LoadCredential=github-client-secret:/etc/harness-panel/100%%secret"),
+        "{unit}"
+    );
+}
+
 /// The two specifiers the panel builds deliberately mean what they say, so
 /// escaping them alongside operator input would break the paths.
 #[test]
