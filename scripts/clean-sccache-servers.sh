@@ -46,6 +46,12 @@ fi
 # Every orphan still shows as listening on this path, so "is something listening"
 # cannot separate them. Connecting can: the kernel routes to whichever socket the
 # path resolves to now, and SO_PEERCRED names that process.
+#
+# The two ways this fails are not the same and must not be treated alike. Nobody
+# home - refused, or no such file - means the whole set really is orphaned and
+# reaping all of it is the point. Anything else, a timeout under load most of
+# all, means the answer is unknown, and killing on an unknown would take the live
+# server with it. Exit 2 says the first, exit 1 says the second.
 live_server_pid() {
   [[ -n "$socket_path" ]] || return 1
   python3 - "$socket_path" <<'PY' 2>/dev/null
@@ -58,6 +64,8 @@ try:
     creds = sock.getsockopt(
         socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i")
     )
+except (ConnectionRefusedError, FileNotFoundError):
+    sys.exit(2)
 except OSError:
     sys.exit(1)
 print(struct.unpack("3i", creds)[0])
@@ -76,7 +84,9 @@ server_pids() {
   for pid in $(pgrep -u "$(id -u)" -x sccache 2>/dev/null || true); do
     arg_count="$(tr '\0' '\n' <"/proc/$pid/cmdline" 2>/dev/null | grep -c . || true)"
     [[ "$arg_count" == "1" ]] || continue
-    grep -qz "^SCCACHE_SERVER_UDS=$socket_path$" "/proc/$pid/environ" 2>/dev/null || continue
+    # -F because a socket path carries dots that would otherwise be regex, and
+    # -x so the whole NUL-separated entry has to match rather than a prefix.
+    grep -qzxF "SCCACHE_SERVER_UDS=$socket_path" "/proc/$pid/environ" 2>/dev/null || continue
     printf '%s\n' "$pid"
   done
 }
@@ -87,7 +97,13 @@ if ((${#servers[@]} == 0)); then
   exit 0
 fi
 
-live_pid="$(live_server_pid || true)"
+probe_status=0
+live_pid="$(live_server_pid)" || probe_status=$?
+if ((probe_status == 1)); then
+  printf 'sccache: cannot tell which server owns the socket, so nothing is stopped\n' >&2
+  exit 1
+fi
+
 orphans=()
 for pid in "${servers[@]}"; do
   [[ "$pid" == "$live_pid" ]] && continue

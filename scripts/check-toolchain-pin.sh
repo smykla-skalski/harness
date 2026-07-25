@@ -45,9 +45,12 @@ fi
 # The Linux profile links with mold. A host without it fails deep in the link
 # step with an unknown-linker error from cc, which names neither the flag nor
 # where it came from.
+linker_note=""
 if [[ "$(uname -s)" == "Linux" ]] \
   && grep -q 'fuse-ld=mold' "$ROOT/.cargo/config.toml"; then
-  if ! command -v mold >/dev/null 2>&1 && ! command -v ld.mold >/dev/null 2>&1; then
+  if command -v mold >/dev/null 2>&1 || command -v ld.mold >/dev/null 2>&1; then
+    linker_note=", and the configured linker is present"
+  else
     errors+=("mold is the configured Linux linker but is not on PATH (install it, for example: apt install mold)")
   fi
 fi
@@ -58,5 +61,5 @@ if ((${#errors[@]})); then
   exit 1
 fi
 
-printf 'toolchain: pin %s agrees across rust-toolchain.toml, .mise.toml, and mise.lock, and the configured linker is present\n' \
-  "$toolchain_pin"
+printf 'toolchain: pin %s agrees across rust-toolchain.toml, .mise.toml, and mise.lock%s\n' \
+  "$toolchain_pin" "$linker_note"
