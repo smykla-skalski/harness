@@ -16,6 +16,8 @@ active_build_count=1
 # How many concurrent agent builds a single agent assumes it must leave room
 # for when the lease count cannot tell it yet.
 AGENT_BUILD_SHARE=4
+# "pool" once attached to the shared jobserver, "reserve" on the static fallback.
+jobserver_mode="reserve"
 skip_build_lease="${HARNESS_CARGO_SKIP_LEASE:-0}"
 
 first_nonempty_env() {
@@ -354,7 +356,54 @@ concurrency_share() {
   printf '%s\n' "$share"
 }
 
+jobserver_script() {
+  printf '%s\n' "$ROOT/scripts/harness-jobserver.py"
+}
+
+jobserver_pool_key() {
+  printf '%s\n' "${HARNESS_JOBSERVER_POOL_KEY:-$COMMON_REPO_ROOT}"
+}
+
+# One token short of the CPU count: every cargo may run a single unit of work
+# without holding a token, so the pool plus that implicit slot lands on the
+# machine's real width rather than one above it.
+jobserver_budget() {
+  local budget=$(($(detect_cpu_count) - 1))
+  if (( budget < 1 )); then
+    budget=1
+  fi
+  printf '%s\n' "$budget"
+}
+
+# Attach to the shared pool. Cargo speaks the jobserver protocol natively, so
+# once MAKEFLAGS points at the pool it renegotiates its own width against every
+# other build for as long as it runs - which the sampled-once reserve cannot do.
+configure_jobserver() {
+  local line
+
+  jobserver_mode="reserve"
+  if [[ "${HARNESS_JOBSERVER:-1}" == "0" ]]; then
+    return 0
+  fi
+  command -v python3 >/dev/null 2>&1 || return 0
+  [[ -f "$(jobserver_script)" ]] || return 0
+
+  line="$(python3 "$(jobserver_script)" ensure \
+    --repo-root "$(jobserver_pool_key)" \
+    --budget "$(jobserver_budget)" 2>/dev/null)" || return 0
+  [[ "$line" == MAKEFLAGS=* ]] || return 0
+
+  export MAKEFLAGS="${line#MAKEFLAGS=}"
+  jobserver_mode="pool"
+}
+
 default_jobs() {
+  # Under the pool the cap belongs to the token count, not to this process. A
+  # reserve applied on top would throttle a build twice and strand tokens.
+  if [[ "$jobserver_mode" == "pool" ]]; then
+    detect_cpu_count
+    return 0
+  fi
   concurrency_share "$(detect_cpu_count)"
 }
 
@@ -431,6 +480,14 @@ if [[ -n "${SCCACHE_BIN:-}" ]]; then
 fi
 
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${HARNESS_CARGO_TARGET_DIR:-$COMMON_REPO_ROOT/target/dev/$target_segment}}"
+# An explicit thread count is the caller's decision, so record that before the
+# default lands on top of it - the pool must not renegotiate a chosen width.
+nextest_threads_explicit=0
+if [[ -n "${NEXTEST_TEST_THREADS:-}" ]] || [[ -n "${HARNESS_NEXTEST_JOBS:-}" ]]; then
+  nextest_threads_explicit=1
+fi
+
+configure_jobserver
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-${HARNESS_CARGO_JOBS:-$(default_jobs)}}"
 export NEXTEST_TEST_THREADS="${NEXTEST_TEST_THREADS:-${HARNESS_NEXTEST_JOBS:-$(default_test_jobs)}}"
 if [[ "$NEXTEST_TEST_THREADS" != "num-cpus" ]] \
@@ -445,6 +502,8 @@ if [[ "${1:-}" == "--print-env" ]]; then
   printf 'CARGO_BUILD_JOBS=%s\n' "$CARGO_BUILD_JOBS"
   printf 'NEXTEST_TEST_THREADS=%s\n' "$NEXTEST_TEST_THREADS"
   printf 'CARGO_BUILD_BUILD_DIR=%s\n' "${CARGO_BUILD_BUILD_DIR:-}"
+  printf 'MAKEFLAGS=%s\n' "${MAKEFLAGS:-}"
+  printf 'JOBSERVER=%s\n' "$jobserver_mode"
   printf 'ACTIVE_BUILD_COUNT=%s\n' "$active_build_count"
   if [[ -n "$session_id" ]]; then
     printf 'SESSION_MODE=agent\n'
@@ -499,6 +558,37 @@ fi
 
 if [[ "${HARNESS_CARGO_GROUP_CHILD:-0}" == "1" ]]; then
   exec "$cargo_bin" "$@"
+fi
+
+command_is_nextest() {
+  local arg
+  for arg in "$@"; do
+    case "$arg" in
+      nextest) return 0 ;;
+      -*) ;;
+      *) return 1 ;;
+    esac
+  done
+  return 1
+}
+
+# nextest does not speak the jobserver protocol and has said it will not, so its
+# width cannot renegotiate mid-run. Draw a block from the same pool instead and
+# hold it for the run: the count then reflects what the machine actually had
+# free, rather than a worst case guessed before the first test started. The
+# block is held over the build phase too, which keeps one budget honest across
+# both halves of a `nextest run`.
+if [[ "$jobserver_mode" == "pool" ]] \
+  && (( nextest_threads_explicit == 0 )) \
+  && command_is_nextest "$@"; then
+  harness_run_step "cargo-local command" \
+    python3 "$(jobserver_script)" run \
+    --repo-root "$(jobserver_pool_key)" \
+    --max "$(jobserver_budget)" \
+    --env NEXTEST_TEST_THREADS \
+    --floor 2 \
+    -- "$cargo_bin" "$@"
+  exit $?
 fi
 
 harness_run_step "cargo-local command" "$cargo_bin" "$@"

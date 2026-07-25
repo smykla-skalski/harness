@@ -92,6 +92,112 @@ agent_build_share() {
   printf '%s\n' "$share"
 }
 
+# Key the pool by an arbitrary string so a scenario never shares a supervisor
+# with the developer's real repository pool.
+print_cargo_env_with_pool_key() {
+  local pool_key="$1"
+  shift
+  # Hand over an explicit TMPDIR. Without one these runs create the shared
+  # in-repo TMPDIR base, and the scenarios below need to own that path.
+  local scratch="$SANDBOX/pool-tmp"
+  mkdir -p "$scratch"
+  (
+    unset SCCACHE_SERVER_UDS SCCACHE_SERVER_PORT SCCACHE_NO_DAEMON
+    unset SCCACHE_BASEDIRS SCCACHE_IDLE_TIMEOUT SCCACHE_CACHE_SIZE SCCACHE_VERSION
+    unset HARNESS_SCCACHE_TMPDIR
+    unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR
+    unset CARGO_BUILD_JOBS HARNESS_CARGO_JOBS MAKEFLAGS
+    TMPDIR="$scratch/" \
+      RUSTC_WRAPPER='' \
+      SCCACHE_BIN='' \
+      CODEX_SESSION_ID="cargo-local-pool-$$" \
+      HARNESS_CARGO_SKIP_LEASE=1 \
+      HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+      HARNESS_JOBSERVER_POOL_KEY="$pool_key" \
+      "$@" \
+      "$ROOT/scripts/cargo-local.sh" --print-env
+  )
+}
+
+stop_pool_for_key() {
+  local key="$1" dir pid
+  dir="$(python3 - "$ROOT/scripts/harness-jobserver.py" "$key" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("js", sys.argv[1])
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+print(mod.pool_dir(sys.argv[2]))
+PY
+)" || return 0
+  pid="$(head -1 "$dir/lock" 2>/dev/null || true)"
+  if [[ "$pid" =~ ^[0-9]+$ ]]; then
+    kill "$pid" 2>/dev/null || true
+  fi
+  rm -rf "$dir" 2>/dev/null || true
+}
+
+scenario_jobserver_pool_takes_over_build_sizing() {
+  local key="pool-sizing-$$"
+  local output cpu
+  output="$(print_cargo_env_with_pool_key "$key")"
+  cpu="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.logicalcpu)"
+  stop_pool_for_key "$key"
+
+  if ! assert_line "JOBSERVER=pool" "$output"; then
+    fail "jobserver pool was not used: $(grep '^JOBSERVER=' <<<"$output")"
+    return
+  fi
+  if ! assert_contains "--jobserver-auth=fifo:" "$output"; then
+    fail "MAKEFLAGS carried no jobserver endpoint: $(grep '^MAKEFLAGS=' <<<"$output")"
+    return
+  fi
+  # The pool caps concurrency now, so the per-process reserve must step aside
+  # and let cargo ask for the whole machine.
+  if ! assert_line "CARGO_BUILD_JOBS=$cpu" "$output"; then
+    fail "pool did not widen build jobs to $cpu: $(grep '^CARGO_BUILD_JOBS=' <<<"$output")"
+    return
+  fi
+  pass "an available pool widens build jobs and exports a jobserver"
+}
+
+scenario_jobserver_absent_falls_back_to_the_reserve() {
+  local key="pool-absent-$$"
+  local output share cpu expected
+  output="$(print_cargo_env_with_pool_key "$key" env HARNESS_JOBSERVER=0)"
+  stop_pool_for_key "$key"
+
+  share="$(agent_build_share)" || return
+  cpu="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.logicalcpu)"
+  expected=$(((cpu + share - 1) / share))
+
+  if ! assert_line "JOBSERVER=reserve" "$output"; then
+    fail "disabled jobserver did not fall back: $(grep '^JOBSERVER=' <<<"$output")"
+    return
+  fi
+  if ! assert_line "MAKEFLAGS=" "$output"; then
+    fail "disabled jobserver still exported MAKEFLAGS: $(grep '^MAKEFLAGS=' <<<"$output")"
+    return
+  fi
+  if ! assert_line "CARGO_BUILD_JOBS=$expected" "$output"; then
+    fail "fallback lost the static reserve: $(grep '^CARGO_BUILD_JOBS=' <<<"$output")"
+    return
+  fi
+  pass "an unavailable pool falls back to the static reserve"
+}
+
+scenario_explicit_job_override_beats_the_pool() {
+  local key="pool-override-$$"
+  local output
+  output="$(print_cargo_env_with_pool_key "$key" env HARNESS_CARGO_JOBS=3)"
+  stop_pool_for_key "$key"
+
+  if ! assert_line "CARGO_BUILD_JOBS=3" "$output"; then
+    fail "explicit job override was overridden by the pool: $(grep '^CARGO_BUILD_JOBS=' <<<"$output")"
+    return
+  fi
+  pass "an explicit job override still beats the pool"
+}
+
 print_cargo_env_without_tmpdir() {
   local fake_bin="$1" sccache_bin="$2" session="$3"
   (
@@ -277,10 +383,13 @@ exit 1
 EOF
   chmod +x "$fake_bin/getconf"
 
+  # Pin the fallback. With a pool reachable the token count governs instead,
+  # and this scenario is about what happens when there is no pool.
   agent_output="$(
     PATH="$fake_bin:$PATH" \
       CARGO_BUILD_JOBS='' \
       HARNESS_CARGO_JOBS='' \
+      HARNESS_JOBSERVER=0 \
       print_tmpdir_env "cargo-local-all-cpus-agent-$$"
   )"
   local_output="$(
@@ -289,6 +398,7 @@ EOF
     PATH="$fake_bin:$PATH" \
       CARGO_BUILD_JOBS='' \
       HARNESS_CARGO_JOBS='' \
+      HARNESS_JOBSERVER=0 \
       HARNESS_CARGO_SKIP_LEASE=1 \
       HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
       SCCACHE_BIN="$SANDBOX/missing-sccache" \
@@ -338,6 +448,7 @@ EOF
         CODEX_SESSION_ID="cargo-local-curve-$$" \
         SCCACHE_BIN="$SANDBOX/missing-sccache" \
         RUSTC_WRAPPER='' \
+        HARNESS_JOBSERVER=0 \
         HARNESS_CARGO_SKIP_LEASE=1 \
         HARNESS_CARGO_ACTIVE_BUILD_COUNT="$n" \
         "$ROOT/scripts/cargo-local.sh" --print-env \
@@ -721,6 +832,9 @@ EOF
   fi
 }
 
+scenario_jobserver_pool_takes_over_build_sizing
+scenario_jobserver_absent_falls_back_to_the_reserve
+scenario_explicit_job_override_beats_the_pool
 scenario_missing_tmpdir_uses_short_external_fallback
 scenario_concurrent_tmpdir_creation_is_idempotent
 scenario_unusable_tmpdir_uses_short_external_fallback
