@@ -109,7 +109,7 @@ gh api --method POST repos/smykla-skalski/harness/pulls/<PR_NUMBER>/requested_re
 
 This repository allows squash merges only. The branch collapses into one new commit on `upstream/main`, so its commits never reach `main` and it can never fast-forward. Closeout realigns local state instead of integrating anything, unless the worktree and branch existed only to deliver one standalone, non-umbrella issue or task, in which case closeout removes them instead. A worktree kept alive for an umbrella's remaining slices or another follow-up in the same PR series always takes the realign path; when it is unclear whether more work is coming, default to realign and ask before removing anything.
 
-Confirm the PR merged before either path, then check that `<main-checkout>` is on `main`, both `<main-checkout>` and `<worktree>` are clean, and local `main` carries no unpublished `replay` commits (reconcile those first, as described below).
+Confirm the PR merged before either path, then check that `<main-checkout>` is on `main`, `<worktree>` is on `<session-branch>`, both are clean, and local `main` carries no unpublished `replay` commits (reconcile those first, as described below).
 
 #### Realign
 
