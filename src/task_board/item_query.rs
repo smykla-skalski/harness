@@ -64,14 +64,42 @@ pub struct TaskBoardItemQuery {
 }
 
 impl TaskBoardItemQuery {
+    /// Reduce the query's text and tags to the form matching compares against.
+    ///
+    /// Scanning a board runs the match once per item, so anything derived from
+    /// the query alone is folded in here instead: doing it inside the match
+    /// would allocate a fresh needle and a fresh canonical tag for every row.
+    #[must_use]
+    pub fn prepared(&self) -> PreparedTaskBoardItemQuery<'_> {
+        PreparedTaskBoardItemQuery {
+            query: self,
+            text: self.text.as_deref().map(str::to_lowercase),
+            tags: self.tags.iter().map(|tag| canonical_tag(tag)).collect(),
+        }
+    }
+}
+
+/// One query reduced for scanning, borrowed from the selection it came from.
+pub struct PreparedTaskBoardItemQuery<'a> {
+    query: &'a TaskBoardItemQuery,
+    text: Option<String>,
+    tags: Vec<String>,
+}
+
+impl PreparedTaskBoardItemQuery<'_> {
     #[must_use]
     pub fn matches(&self, fields: &TaskBoardQueryFields<'_>) -> bool {
         self.status_matches(fields.status)
-            && self.priority.is_none_or(|wanted| wanted == fields.priority)
             && self
+                .query
+                .priority
+                .is_none_or(|wanted| wanted == fields.priority)
+            && self
+                .query
                 .agent_mode
                 .is_none_or(|wanted| wanted == fields.agent_mode)
             && self
+                .query
                 .project_id
                 .as_deref()
                 .is_none_or(|wanted| fields.project_id == Some(wanted))
@@ -80,29 +108,27 @@ impl TaskBoardItemQuery {
     }
 
     fn status_matches(&self, status: TaskBoardStatus) -> bool {
-        self.status.is_none_or(|wanted| {
+        self.query.status.is_none_or(|wanted| {
             wanted.canonical_persisted_status() == status.canonical_persisted_status()
         })
     }
 
     fn tags_match(&self, tags: &[String]) -> bool {
-        self.tags.iter().all(|wanted| {
-            let wanted = canonical_tag(wanted);
-            tags.iter().any(|tag| canonical_tag(tag) == wanted)
-        })
+        self.tags
+            .iter()
+            .all(|wanted| tags.iter().any(|tag| &canonical_tag(tag) == wanted))
     }
 
     fn text_matches(&self, fields: &TaskBoardQueryFields<'_>) -> bool {
         let Some(text) = self.text.as_deref() else {
             return true;
         };
-        let text = text.to_lowercase();
-        contains_ignoring_case(fields.title, &text)
-            || contains_ignoring_case(fields.body, &text)
+        contains_ignoring_case(fields.title, text)
+            || contains_ignoring_case(fields.body, text)
             || fields
                 .tags
                 .iter()
-                .any(|tag| contains_ignoring_case(tag, &text))
+                .any(|tag| contains_ignoring_case(tag, text))
     }
 }
 

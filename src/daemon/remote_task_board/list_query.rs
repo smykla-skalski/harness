@@ -86,10 +86,11 @@ fn select_matching_page<T: TaskBoardQueryTarget>(
     items: Vec<T>,
     selection: &TaskBoardListItemsSelection,
 ) -> MatchedPage<T> {
+    let query = selection.query.prepared();
     let matched = items
         .iter()
         .enumerate()
-        .filter(|(_, item)| selection.query.matches(&item.query_fields()))
+        .filter(|(_, item)| query.matches(&item.query_fields()))
         .map(|(index, item)| (index, item.query_fields().id))
         .collect::<Vec<_>>();
     let matched_ids = matched.iter().map(|(_, id)| *id).collect::<Vec<_>>();

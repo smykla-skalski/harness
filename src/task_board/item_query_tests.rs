@@ -20,7 +20,7 @@ fn ids<'a>(items: &'a [TaskBoardItem]) -> Vec<&'a str> {
 #[test]
 fn an_empty_query_matches_every_item() {
     let item = item("task-1", "Ship the thing", "with a body");
-    assert!(TaskBoardItemQuery::default().matches(&item.query_fields()));
+    assert!(TaskBoardItemQuery::default().prepared().matches(&item.query_fields()));
 }
 
 #[test]
@@ -36,19 +36,19 @@ fn facets_narrow_by_field_value() {
         project_id: Some("project-alpha".to_string()),
         ..TaskBoardItemQuery::default()
     };
-    assert!(matching.matches(&item.query_fields()));
+    assert!(matching.prepared().matches(&item.query_fields()));
 
     let wrong_project = TaskBoardItemQuery {
         project_id: Some("project-beta".to_string()),
         ..TaskBoardItemQuery::default()
     };
-    assert!(!wrong_project.matches(&item.query_fields()));
+    assert!(!wrong_project.prepared().matches(&item.query_fields()));
 
     let wrong_priority = TaskBoardItemQuery {
         priority: Some(TaskBoardPriority::Low),
         ..TaskBoardItemQuery::default()
     };
-    assert!(!wrong_priority.matches(&item.query_fields()));
+    assert!(!wrong_priority.prepared().matches(&item.query_fields()));
 }
 
 /// A status facet has to read the same lane a persisted item does, or every
@@ -62,7 +62,7 @@ fn a_status_facet_matches_through_its_canonical_alias() {
         status: Some(TaskBoardStatus::New),
         ..TaskBoardItemQuery::default()
     };
-    assert!(query.matches(&item.query_fields()));
+    assert!(query.prepared().matches(&item.query_fields()));
 }
 
 #[test]
@@ -74,13 +74,13 @@ fn every_requested_tag_must_be_present() {
         tags: vec!["backend".to_string(), "urgent".to_string()],
         ..TaskBoardItemQuery::default()
     };
-    assert!(both.matches(&item.query_fields()));
+    assert!(both.prepared().matches(&item.query_fields()));
 
     let missing_one = TaskBoardItemQuery {
         tags: vec!["backend".to_string(), "frontend".to_string()],
         ..TaskBoardItemQuery::default()
     };
-    assert!(!missing_one.matches(&item.query_fields()));
+    assert!(!missing_one.prepared().matches(&item.query_fields()));
 }
 
 /// Tags are stored exactly as they arrive, so both sides have to be reduced
@@ -94,7 +94,7 @@ fn a_tag_facet_ignores_surrounding_whitespace_on_either_side() {
         tags: vec![" backend".to_string()],
         ..TaskBoardItemQuery::default()
     };
-    assert!(query.matches(&item.query_fields()));
+    assert!(query.prepared().matches(&item.query_fields()));
 }
 
 #[test]
@@ -108,7 +108,7 @@ fn text_matches_title_body_and_tags_case_insensitively() {
             ..TaskBoardItemQuery::default()
         };
         assert!(
-            query.matches(&item.query_fields()),
+            query.prepared().matches(&item.query_fields()),
             "expected {text} to match"
         );
     }
@@ -117,7 +117,7 @@ fn text_matches_title_body_and_tags_case_insensitively() {
         text: Some("absent".to_string()),
         ..TaskBoardItemQuery::default()
     };
-    assert!(!miss.matches(&item.query_fields()));
+    assert!(!miss.prepared().matches(&item.query_fields()));
 }
 
 #[test]
