@@ -45,6 +45,7 @@ An important nuance from objc.io: `disablesAnimations = true` does NOT disable a
 The `withTransaction` approach with `Transaction(animation: .none)` plus `disablesAnimations = true` is more aggressive and suppresses both implicit and explicit animations for state changes within the closure. Fat Bob Man recommends this for sheet and NavigationStack transitions where instant presentation is desired.
 
 Sources:
+
 - https://www.avanderlee.com/swiftui/disable-animations-transactions/ - Transaction modifier technique, replaces deprecated .animation(nil)
 - https://www.objc.io/blog/2021/11/25/transactions-and-animations/ - Technical analysis: "The flag disablesAnimations has a confusing name: it does not actually disable animations: it only disables the implicit animations"
 - https://fatbobman.com/en/snippet/disable-transition-animations-for-sheet-and-navigationstack-in-swiftui/ - withTransaction pattern for instant sheet/navigation presentation, edge cases on scope isolation
@@ -158,48 +159,30 @@ macOS SwiftUI `List` sidebar items appear as `.button`, `.cell`, or `.radioButto
 
 ## Results
 
-| Metric | Before | After | Change |
-|--------|--------|-------|--------|
-| Total test time | 36s | 29s | -19% |
-| Settings window open delay | 3-5s visible | <1s | eliminated |
-| Confirmation dialog cycle | ~8s each | ~3s each | -62% |
+| Metric                     | Before       | After    | Change     |
+| -------------------------- | ------------ | -------- | ---------- |
+| Total test time            | 36s          | 29s      | -19%       |
+| Settings window open delay | 3-5s visible | <1s      | eliminated |
+| Confirmation dialog cycle  | ~8s each     | ~3s each | -62%       |
 
 The remaining 29 seconds breaks down as: app launch ~8s, main window render ~3s, settings window open + navigate ~4s, 3 confirmation cycles ~9s, scroll + verify ~5s. The launch and main window render are irreducible overhead from XCUITest's process management.
 
 ## References
 
-1. Jesse Squires - Xcode UI Testing Reliability Tips (2021-03-17)
-   https://www.jessesquires.com/blog/2021/03/17/xcode-ui-testing-reliability-tips/
-   Covers: animation disabling via launch args, window.layer.speed acceleration, timeout management
+1. Jesse Squires - Xcode UI Testing Reliability Tips (2021-03-17) https://www.jessesquires.com/blog/2021/03/17/xcode-ui-testing-reliability-tips/ Covers: animation disabling via launch args, window.layer.speed acceleration, timeout management
 
-2. Antoine van der Lee - Disable Animations in SwiftUI Using Transactions
-   https://www.avanderlee.com/swiftui/disable-animations-transactions/
-   Covers: .transaction modifier replacing deprecated .animation(nil), scope of effect
+2. Antoine van der Lee - Disable Animations in SwiftUI Using Transactions https://www.avanderlee.com/swiftui/disable-animations-transactions/ Covers: .transaction modifier replacing deprecated .animation(nil), scope of effect
 
-3. objc.io - Transactions and Animations (2021-11-25)
-   https://www.objc.io/blog/2021/11/25/transactions-and-animations/
-   Covers: how transactions propagate, disablesAnimations only kills implicit animations, explicit animation override behavior
+3. objc.io - Transactions and Animations (2021-11-25) https://www.objc.io/blog/2021/11/25/transactions-and-animations/ Covers: how transactions propagate, disablesAnimations only kills implicit animations, explicit animation override behavior
 
-4. Fat Bob Man - Disable Transition Animations for Sheet and NavigationStack
-   https://fatbobman.com/en/snippet/disable-transition-animations-for-sheet-and-navigationstack-in-swiftui/
-   Covers: withTransaction pattern, scope isolation edge cases, sheet + navigation instant presentation
+4. Fat Bob Man - Disable Transition Animations for Sheet and NavigationStack https://fatbobman.com/en/snippet/disable-transition-animations-for-sheet-and-navigationstack-in-swiftui/ Covers: withTransaction pattern, scope isolation edge cases, sheet + navigation instant presentation
 
-5. Alex Ilyenko - Waits in XCUITest
-   https://alexilyenko.github.io/xcuitest-waiting/
-   Covers: XCTWaiter API, expectation types (KVO, notification, predicate), explicit vs implicit waits
+5. Alex Ilyenko - Waits in XCUITest https://alexilyenko.github.io/xcuitest-waiting/ Covers: XCTWaiter API, expectation types (KVO, notification, predicate), explicit vs implicit waits
 
-6. Pol Piella - Configuring UI Tests with Launch Arguments
-   https://www.polpiella.dev/configuring-ui-tests-with-launch-arguments
-   Covers: ProcessInfo.processInfo.arguments pattern, UIView.setAnimationsEnabled in test host, locale configuration
+6. Pol Piella - Configuring UI Tests with Launch Arguments https://www.polpiella.dev/configuring-ui-tests-with-launch-arguments Covers: ProcessInfo.processInfo.arguments pattern, UIView.setAnimationsEnabled in test host, locale configuration
 
-7. Apple - NSAnimationContext
-   https://developer.apple.com/documentation/appkit/nsanimationcontext
-   Covers: animation context duration, grouping, implicit animation control (requires JS to render)
+7. Apple - NSAnimationContext https://developer.apple.com/documentation/appkit/nsanimationcontext Covers: animation context duration, grouping, implicit animation control (requires JS to render)
 
-8. Apple - NSWindow.animationBehavior
-   https://developer.apple.com/documentation/appkit/nswindow/animationbehavior-swift.property
-   Covers: window presentation animation control (requires JS to render)
+8. Apple - NSWindow.animationBehavior https://developer.apple.com/documentation/appkit/nswindow/animationbehavior-swift.property Covers: window presentation animation control (requires JS to render)
 
-9. Apple - Transaction (SwiftUI)
-   https://developer.apple.com/documentation/swiftui/transaction
-   Covers: state-processing update context, disablesAnimations property (requires JS to render)
+9. Apple - Transaction (SwiftUI) https://developer.apple.com/documentation/swiftui/transaction Covers: state-processing update context, disablesAnimations property (requires JS to render)

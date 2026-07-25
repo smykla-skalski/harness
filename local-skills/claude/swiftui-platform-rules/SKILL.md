@@ -33,13 +33,13 @@ Native platform conventions for macOS (current) and iOS (aspirational) plus XCUI
 
 #### Window chrome measurements
 
-| Element | Size |
-|---|---|
-| Title bar | 22pt (standard), 28pt (large title) |
-| Unified toolbar | 52pt (standard), 38pt (compact) |
+| Element               | Size                                        |
+| --------------------- | ------------------------------------------- |
+| Title bar             | 22pt (standard), 28pt (large title)         |
+| Unified toolbar       | 52pt (standard), 38pt (compact)             |
 | Traffic light buttons | 12x12pt, 7pt from leading edge, 6pt spacing |
-| Window corner radius | 10pt |
-| Minimum window size | 400x300pt recommended |
+| Window corner radius  | 10pt                                        |
+| Minimum window size   | 400x300pt recommended                       |
 
 ### Toolbar
 
@@ -100,22 +100,22 @@ For SwiftUI `.draggable` / `.dropDestination` API rules, see the `swiftui-api-pa
 
 These shortcuts must work in any macOS app:
 
-| Action | Shortcut |
-|---|---|
-| New | Cmd+N |
-| Open | Cmd+O |
-| Save | Cmd+S |
-| Close | Cmd+W |
-| Quit | Cmd+Q |
-| Undo | Cmd+Z |
-| Redo | Cmd+Shift+Z |
-| Cut/Copy/Paste | Cmd+X/C/V |
-| Select All | Cmd+A |
-| Find | Cmd+F |
-| Settings | Cmd+, |
-| Minimize | Cmd+M |
-| Full Screen | Ctrl+Cmd+F |
-| Hide | Cmd+H |
+| Action         | Shortcut    |
+| -------------- | ----------- |
+| New            | Cmd+N       |
+| Open           | Cmd+O       |
+| Save           | Cmd+S       |
+| Close          | Cmd+W       |
+| Quit           | Cmd+Q       |
+| Undo           | Cmd+Z       |
+| Redo           | Cmd+Shift+Z |
+| Cut/Copy/Paste | Cmd+X/C/V   |
+| Select All     | Cmd+A       |
+| Find           | Cmd+F       |
+| Settings       | Cmd+,       |
+| Minimize       | Cmd+M       |
+| Full Screen    | Ctrl+Cmd+F  |
+| Hide           | Cmd+H       |
 
 ## iOS platform rules
 
@@ -189,6 +189,7 @@ These rules apply to current and future iOS apps in this repository. The Harness
 ### Animation suppression in the test host
 
 The app disables animations when `HARNESS_MONITOR_UI_TESTS=1` via three layers:
+
 - SwiftUI: `.transaction { $0.disablesAnimations = true }` on root views
 - AppKit: `NSAnimationContext.current.duration = 0`
 - NSWindow: `.animationBehavior = .none` on every window via `didBecomeKeyNotification`

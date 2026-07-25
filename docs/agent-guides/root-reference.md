@@ -1,18 +1,12 @@
 # Root Agent Reference
 
-Load this file only when the repo-root `AGENTS.md` routes the current task here.
-The root `AGENTS.md` contains the mandatory contract; this file keeps the longer
-reference material out of the default prompt path.
+Load this file only when the repo-root `AGENTS.md` routes the current task here. The root `AGENTS.md` contains the mandatory contract; this file keeps the longer reference material out of the default prompt path.
 
 ## Workflow systems
 
-`suite:run` lives in `src/workflow/runner.rs`. It orchestrates test runs through
-`bootstrap -> ready -> approved -> running -> verdict`. State is persisted as
-versioned JSON through `VersionedJsonRepository`, using tmp-file then rename
-saves.
+`suite:run` lives in `src/workflow/runner.rs`. It orchestrates test runs through `bootstrap -> ready -> approved -> running -> verdict`. State is persisted as versioned JSON through `VersionedJsonRepository`, using tmp-file then rename saves.
 
-`suite:create` lives in `src/workflow/create.rs`. It manages interactive suite
-creation with multi-step proposals and manifest validation.
+`suite:create` lives in `src/workflow/create.rs`. It manages interactive suite creation with multi-step proposals and manifest validation.
 
 ## Hook system
 
@@ -22,158 +16,74 @@ Hooks intercept Codex tool usage. The constants are classified in `src/cli.rs`:
 - Blocking: `guard-stop`.
 - Subagent gates: `context-agent` and `validate-agent`.
 
-The four suite-lifecycle hooks (`guard-stop`, `context-agent`,
-`validate-agent`, `tool-failure`) are gated behind
-`HARNESS_FEATURE_SUITE_HOOKS`. Re-enable them for a setup invocation with
-`--enable-suite-hooks` on `harness setup bootstrap`, or globally with
-`HARNESS_FEATURE_SUITE_HOOKS=1`. The CLI flag wins over the env var. Bootstrap
-logs an `info!` line per regenerated config naming any omitted family.
+The four suite-lifecycle hooks (`guard-stop`, `context-agent`, `validate-agent`, `tool-failure`) are gated behind `HARNESS_FEATURE_SUITE_HOOKS`. Re-enable them for a setup invocation with `--enable-suite-hooks` on `harness setup bootstrap`, or globally with `HARNESS_FEATURE_SUITE_HOOKS=1`. The CLI flag wins over the env var. Bootstrap logs an `info!` line per regenerated config naming any omitted family.
 
-Repo-policy/manual-task enforcement belongs to `aff`. Use harness setup tasks
-for harness-owned outputs and the separate `aff:*` tasks for aff-owned runtime
-hooks.
+Repo-policy/manual-task enforcement belongs to `aff`. Use harness setup tasks for harness-owned outputs and the separate `aff:*` tasks for aff-owned runtime hooks.
 
 ## Key modules
 
-- `errors.rs` - unified error and hook-message system with placeholder
-  substitution.
+- `errors.rs` - unified error and hook-message system with placeholder substitution.
 - `schema.rs` - custom frontmatter parser for suite/run YAML metadata.
-- `context.rs` - run lifecycle types such as `RunLayout`, `RunMetadata`, and
-  `CommandEnv`.
+- `context.rs` - run lifecycle types such as `RunLayout`, `RunMetadata`, and `CommandEnv`.
 - `prepared_suite.rs` - suite artifact types.
 - `compact.rs` - file fingerprinting with SHA256 and mtime.
 - `core_defs.rs` - build info, timestamps, XDG paths, and session scope.
 - `rules.rs` - declarative denied-binary lists and repo policy rules.
 - `commands/` - CLI command handlers.
-- `session/` - multi-agent orchestration types, roles, storage, service,
-  transport, and observation.
-- `task_board/` - cross-project board state, planning gates, dispatch/evaluate
-  reconciliation, orchestrator state, external sync, and policy pipeline graph
-  evaluation. See `docs/agent-guides/task-board-workflow.md` for operator
-  behavior.
-- `agents/runtime/` - runtime adapters, conversation events, signal protocol,
-  and liveness detection.
+- `session/` - multi-agent orchestration types, roles, storage, service, transport, and observation.
+- `task_board/` - cross-project board state, planning gates, dispatch/evaluate reconciliation, orchestrator state, external sync, and policy pipeline graph evaluation. See `docs/agent-guides/task-board-workflow.md` for operator behavior.
+- `agents/runtime/` - runtime adapters, conversation events, signal protocol, and liveness detection.
 
 ## Managed ACP agents
 
-Harness speaks the Agent Client Protocol (ACP, wire protocol v1) to agents it
-manages for a session. The client half lives in `src/agents/acp/` (connection,
-streaming events, permission bridge, supervision); the daemon half in
-`src/daemon/agent_acp/` (protocol loop, session lifecycle, per-agent state, and
-the HTTP routes the CLI and Monitor call). Wire types shared with the Monitor
-live in `crates/harness-protocol/src/managed_agents/acp/`.
+Harness speaks the Agent Client Protocol (ACP, wire protocol v1) to agents it manages for a session. The client half lives in `src/agents/acp/` (connection, streaming events, permission bridge, supervision); the daemon half in `src/daemon/agent_acp/` (protocol loop, session lifecycle, per-agent state, and the HTTP routes the CLI and Monitor call). Wire types shared with the Monitor live in `crates/harness-protocol/src/managed_agents/acp/`.
 
-Bundled adapters are version-pinned by harness: `codex-acp`
-(`crates/harness-codex-acp/`) and the OpenRouter agent
-(`crates/harness-openrouter-agent/`). External adapters such as
-`claude-agent-acp` and `copilot --acp` are user-installed; harness does not pin
-them and surfaces their reported version through inspect instead of managing it.
+Bundled adapters are version-pinned by harness: `codex-acp` (`crates/harness-codex-acp/`) and the OpenRouter agent (`crates/harness-openrouter-agent/`). External adapters such as `claude-agent-acp` and `copilot --acp` are user-installed; harness does not pin them and surfaces their reported version through inspect instead of managing it.
 
 ### Handshake and capabilities
 
-On `session/initialize` harness advertises fixed client capabilities
-(`fs.readTextFile`/`writeTextFile`, terminal, and boolean session config
-options) and records the agent's response as an `AcpAgentHandshake`: the
-negotiated protocol version, agentInfo (name, version, title), auth methods, and
-one flag per stable-v1 capability (load, list, resume, close, and delete
-session, additionalDirectories, MCP http/sse, and logout). Every lifecycle call
-is gated on the matching capability and falls back cleanly when the agent does
-not advertise it.
+On `session/initialize` harness advertises fixed client capabilities (`fs.readTextFile`/`writeTextFile`, terminal, and boolean session config options) and records the agent's response as an `AcpAgentHandshake`: the negotiated protocol version, agentInfo (name, version, title), auth methods, and one flag per stable-v1 capability (load, list, resume, close, and delete session, additionalDirectories, MCP http/sse, and logout). Every lifecycle call is gated on the matching capability and falls back cleanly when the agent does not advertise it.
 
 ### Session lifecycle
 
-`session/new` carries `additionalDirectories` and `mcpServers`, both defaulting
-to empty; MCP http/sse entries are dropped for agents that do not advertise the
-transport. When a pooled agent process dies, harness prefers `session/resume` on
-the fresh process, then `session/load` with replay-safe persistence, then a new
-session. `session/close` fires on teardown for agents that support it. The ids
-`session/list` reports belong to the agent, so harness treats them as display
-data distinct from its own session ids.
+`session/new` carries `additionalDirectories` and `mcpServers`, both defaulting to empty; MCP http/sse entries are dropped for agents that do not advertise the transport. When a pooled agent process dies, harness prefers `session/resume` on the fresh process, then `session/load` with replay-safe persistence, then a new session. `session/close` fires on teardown for agents that support it. The ids `session/list` reports belong to the agent, so harness treats them as display data distinct from its own session ids.
 
 ### Telemetry
 
-Prompt-turn usage, message ids, and stop reasons (refusal included) flow into
-`ConversationEvent` payloads without changing the event's own wire shape, so the
-Monitor decodes them without codegen churn. The `config_option_update`,
-`current_mode_update`, `available_commands_update`, and `session_info_update`
-notifications mutate the per-session `AcpAgentSessionState` surfaced through
-inspect.
+Prompt-turn usage, message ids, and stop reasons (refusal included) flow into `ConversationEvent` payloads without changing the event's own wire shape, so the Monitor decodes them without codegen churn. The `config_option_update`, `current_mode_update`, `available_commands_update`, and `session_info_update` notifications mutate the per-session `AcpAgentSessionState` surfaced through inspect.
 
 ### Remote transport
 
-A start can replace the descriptor's command with a remote endpoint:
-`--endpoint` with a `ws`/`wss` URL connects over WebSocket, an `http`/`https`
-URL over SSE with POST. `--header-env Name=ENV_VAR` resolves each header value
-from the daemon's environment at connect time, so no secret rides the request;
-WebSocket connects drop request headers, so `--header-env` needs an http/https
-endpoint. Remote agents run the same protocol loop behind a childless supervisor
-with no pid or stderr tail. The transport lives behind
-`agent-client-protocol-http`, gated on the `daemon-runtime` feature.
+A start can replace the descriptor's command with a remote endpoint: `--endpoint` with a `ws`/`wss` URL connects over WebSocket, an `http`/`https` URL over SSE with POST. `--header-env Name=ENV_VAR` resolves each header value from the daemon's environment at connect time, so no secret rides the request; WebSocket connects drop request headers, so `--header-env` needs an http/https endpoint. Remote agents run the same protocol loop behind a childless supervisor with no pid or stderr tail. The transport lives behind `agent-client-protocol-http`, gated on the `daemon-runtime` feature.
 
 ### CLI
 
-`harness session agents start acp` launches a descriptor or, with `--endpoint`,
-connects to a remote one. `harness session agents acp` groups the live-agent
-verbs: `inspect` (a per-agent doctor view of protocol version, agentInfo, and
-freshness notes, or `--json` for the raw daemon snapshot), `logout`, `sessions`,
-`close-session`, and `delete-session`. See
-`docs/agent-guides/task-board-workflow.md` for the operator summary.
+`harness session agents start acp` launches a descriptor or, with `--endpoint`, connects to a remote one. `harness session agents acp` groups the live-agent verbs: `inspect` (a per-agent doctor view of protocol version, agentInfo, and freshness notes, or `--json` for the raw daemon snapshot), `logout`, `sessions`, `close-session`, and `delete-session`. See `docs/agent-guides/task-board-workflow.md` for the operator summary.
 
 ## Data directories
 
 - `$XDG_DATA_HOME/harness/suites/` - suite library.
-- `$XDG_DATA_HOME/harness/runs/` - run directories with artifacts, commands,
-  state, manifests, and reports.
+- `$XDG_DATA_HOME/harness/runs/` - run directories with artifacts, commands, state, manifests, and reports.
 - `$XDG_DATA_HOME/harness/contexts/{session-hash}/` - session context.
-- `$XDG_DATA_HOME/harness/projects/project-{digest}/orchestration/` -
-  multi-agent session state.
-- `$XDG_DATA_HOME/harness/projects/project-{digest}/agents/signals/` -
-  file-based agent signaling.
-- Task-board state uses the board root resolved by the CLI/daemon, normally
-  under the project Harness data area. Access it through `harness task-board`
-  commands or daemon task-board routes instead of reading JSON files directly.
+- `$XDG_DATA_HOME/harness/projects/project-{digest}/orchestration/` - multi-agent session state.
+- `$XDG_DATA_HOME/harness/projects/project-{digest}/agents/signals/` - file-based agent signaling.
+- Task-board state uses the board root resolved by the CLI/daemon, normally under the project Harness data area. Access it through `harness task-board` commands or daemon task-board routes instead of reading JSON files directly.
 
 ## Testing details
 
-Integration tests live in `tests/integration/` and cover hooks, commands, and
-workflows end to end. Canonical Rust test tasks use nextest process isolation
-and parallel scheduling. A test must isolate its environment, filesystem
-paths, ports, and external resource names instead of requiring runner-wide
-serialization. Tests that read XDG paths must isolate state with
-`temp_env::with_vars`, setting both `XDG_DATA_HOME` and `CLAUDE_SESSION_ID`.
-Avoid mocks; tests use real filesystem state.
+Integration tests live in `tests/integration/` and cover hooks, commands, and workflows end to end. Canonical Rust test tasks use nextest process isolation and parallel scheduling. A test must isolate its environment, filesystem paths, ports, and external resource names instead of requiring runner-wide serialization. Tests that read XDG paths must isolate state with `temp_env::with_vars`, setting both `XDG_DATA_HOME` and `CLAUDE_SESSION_ID`. Avoid mocks; tests use real filesystem state.
 
 ## Build lane and fsmonitor cleanup
 
-The Harness Monitor xcodebuild wrapper at
-`apps/harness-monitor/Scripts/monitor-xcodebuild.sh` enforces a hardcoded
-global concurrency cap (currently 8) via a counting semaphore at
-`.cache/harness-monitor-xcodebuild-semaphore/`. The cap is intentionally not
-raisable via env var; `HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY` is rejected
-with a stderr warning.
+The Harness Monitor xcodebuild wrapper at `apps/harness-monitor/Scripts/monitor-xcodebuild.sh` enforces a hardcoded global concurrency cap (currently 8) via a counting semaphore at `.cache/harness-monitor-xcodebuild-semaphore/`. The cap is intentionally not raisable via env var; `HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY` is rejected with a stderr warning.
 
-The slot owner refreshes a heartbeat file every 15 seconds and records direct
-child PIDs to `slot/descendant_pids`, so the reaper can fall back to descendant
-liveness when the heartbeat file goes stale. An orphan-wrapper guard checks the
-initial PPID from slot acquisition against the current PPID in both the
-heartbeat and reaper, reclaiming slots whose owner has been reparented to
-launchd. The test-only override env path is the verbose triple
-`_HARNESS_INTERNAL_TEST_ONLY_{CONCURRENCY,AUTHORIZED,RUNNER_PID}`; setting all
-three with a matching PPID is the only way to lower the cap, and the wrapper
-logs a loud stderr warning when the override fires.
+The slot owner refreshes a heartbeat file every 15 seconds and records direct child PIDs to `slot/descendant_pids`, so the reaper can fall back to descendant liveness when the heartbeat file goes stale. An orphan-wrapper guard checks the initial PPID from slot acquisition against the current PPID in both the heartbeat and reaper, reclaiming slots whose owner has been reparented to launchd. The test-only override env path is the verbose triple `_HARNESS_INTERNAL_TEST_ONLY_{CONCURRENCY,AUTHORIZED,RUNNER_PID}`; setting all three with a matching PPID is the only way to lower the cap, and the wrapper logs a loud stderr warning when the override fires.
 
 Related cleanup scripts:
 
-- `scripts/clean-stale-fsmonitor.sh` classifies running
-  `git fsmonitor--daemon` processes as live, orphan, redundant, or unknown and
-  kills orphans plus redundant duplicates under `--apply`. Redundant means
-  multiple daemons share one gitdir; the oldest are killed and the newest stays.
-- `scripts/disable-fsmonitor-dormant.sh` sets `core.fsmonitor=false` per repo
-  on repos untouched for more than `--days` days so they stop respawning
-  daemons. Default: 30 days, dry-run. Excludes harness, kuma, kong-mesh,
-  plugins, dotfiles, and codex-home by default.
-- `scripts/launchd-fsmonitor-install.sh` installs a weekly launchd agent that
-  runs both cleanup scripts every Sunday at 03:15 local.
+- `scripts/clean-stale-fsmonitor.sh` classifies running `git fsmonitor--daemon` processes as live, orphan, redundant, or unknown and kills orphans plus redundant duplicates under `--apply`. Redundant means multiple daemons share one gitdir; the oldest are killed and the newest stays.
+- `scripts/disable-fsmonitor-dormant.sh` sets `core.fsmonitor=false` per repo on repos untouched for more than `--days` days so they stop respawning daemons. Default: 30 days, dry-run. Excludes harness, kuma, kong-mesh, plugins, dotfiles, and codex-home by default.
+- `scripts/launchd-fsmonitor-install.sh` installs a weekly launchd agent that runs both cleanup scripts every Sunday at 03:15 local.
 
 Mise tasks:
 
@@ -202,8 +112,7 @@ Derived surfaces maintained by `mise run version:*`:
 
 Additional version notes:
 
-- `src/observe/output.rs` reads SARIF `driver.version` from
-  `env!("CARGO_PKG_VERSION")`.
+- `src/observe/output.rs` reads SARIF `driver.version` from `env!("CARGO_PKG_VERSION")`.
 - `src/cli.rs` uses Clap's derived version.
 
 ## Logging
@@ -215,14 +124,11 @@ All diagnostics use `tracing` macros:
 - `debug!` for verbose dumps.
 - `println!` remains for user-facing command output and hook JSON protocol.
 
-Use structured fields such as `warn!(%error, "failed to load context")`. Do not
-add `#[instrument]` unless explicitly requested. The subscriber is initialized
-in `main.rs`; tests run without one. Default filter: `RUST_LOG=harness=info`.
+Use structured fields such as `warn!(%error, "failed to load context")`. Do not add `#[instrument]` unless explicitly requested. The subscriber is initialized in `main.rs`; tests run without one. Default filter: `RUST_LOG=harness=info`.
 
 ## Clippy complexity and tracing
 
-Tracing macros can inflate `clippy::cognitive_complexity`
-(tokio-rs/tracing#553). When clippy flags complexity:
+Tracing macros can inflate `clippy::cognitive_complexity` (tokio-rs/tracing#553). When clippy flags complexity:
 
 1. Simplify the function first.
 2. Check whether tracing expansion is the only remaining driver.
@@ -239,8 +145,7 @@ Never add that suppression as the first move.
 
 ## Grafana dashboards
 
-Dashboards in `resources/observability/grafana/dashboards/` use Grafana 12+
-responsive auto-grid layout:
+Dashboards in `resources/observability/grafana/dashboards/` use Grafana 12+ responsive auto-grid layout:
 
 - Root `layout`: `kind: "auto-grid"`, `maxColumns: 4`, `minColumnWidth: 300`.
 - Stat panels: `gridPos.w: 6`.

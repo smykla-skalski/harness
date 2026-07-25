@@ -39,10 +39,7 @@ mise run monitor:audit:from-ref -- --ref <sha-or-ref> --label baseline
 mise run monitor:audit -- --label regression --debug-retention
 ```
 
-Audit runs now persist per-capture `launch_metrics` in the manifest/summary,
-surface `launch_app_init_to_ready_ms` plus time-profile sample counts in
-`summary.csv`, and render comparison markdown with separate hard-budget and
-investigative metric sections.
+Audit runs now persist per-capture `launch_metrics` in the manifest/summary, surface `launch_app_init_to_ready_ms` plus time-profile sample counts in `summary.csv`, and render comparison markdown with separate hard-budget and investigative metric sections.
 
 The audit artifact contract is:
 
@@ -54,15 +51,9 @@ The audit artifact contract is:
 | `comparison.json` / `comparison.md` | baseline/current diff, missing-capture reporting, missing-metric reporting, hard-vs-investigative metric grouping, time-profile sample deltas, first-class findings deltas, and an app-trace pair/diff section |
 | `debug-retention.json` | explicit sentinel that a regression/debug run preserved raw traces, exported XML, and extraction intermediates |
 
-Machine-readable schema snapshots for those JSON outputs live under
-`Tools/HarnessMonitorPerf/Schemas/`.
-Regenerate them with `mise run monitor:tools:generate:schemas`.
+Machine-readable schema snapshots for those JSON outputs live under `Tools/HarnessMonitorPerf/Schemas/`. Regenerate them with `mise run monitor:tools:generate:schemas`.
 
-For provenance checks, treat `targets.staged_host_bundle_id`,
-`targets.staged_host_binary_path`, `build_provenance.host`,
-`build_provenance.shipping`, capture-level `launched_process_path`, and
-capture-level `daemon_data_home_probe` as the minimum trust surface before using
-the numbers in a regression review.
+For provenance checks, treat `targets.staged_host_bundle_id`, `targets.staged_host_binary_path`, `build_provenance.host`, `build_provenance.shipping`, capture-level `launched_process_path`, and capture-level `daemon_data_home_probe` as the minimum trust surface before using the numbers in a regression review.
 
 Field telemetry should use the same vocabulary as the local audit:
 
@@ -104,10 +95,7 @@ mise run monitor
 mise run monitor:release:external
 ```
 
-`monitor:release:external` regenerates the project, builds the signed Release
-bundle, persists `HarnessMonitor.DaemonOwnership=external`, and opens the built
-app with `open -na` so the exact Release bundle launches even if another
-Harness Monitor instance is already running.
+`monitor:release:external` regenerates the project, builds the signed Release bundle, persists `HarnessMonitor.DaemonOwnership=external`, and opens the built app with `open -na` so the exact Release bundle launches even if another Harness Monitor instance is already running.
 
 The wrapper and repo scripts resolve `xcode-derived` at the git common root, so linked worktrees reuse one default CLI DerivedData tree instead of bloating each checkout. For an isolated CLI build/test lane, set `HARNESS_MONITOR_BUILD_LANE=<name>`; that moves the build root to `xcode-derived-lanes/<slug>` and gives the lane its own wrapper lock.
 
@@ -150,18 +138,9 @@ HARNESS_MONITOR_RUNTIME_LANE=bart-dev mise run monitor:daemon:dev
 
 ## Task Board automation
 
-The Task Board Automation inspector consumes the daemon's durable snapshot. Its
-Manual surface provides start, stop, run-once, and exact-target remote force
-cancel controls; its History surface pages durable runs and their stage detail.
-Remote force cancel requires an `admin` profile scope. Monitor rechecks the full
-execution/assignment/host/fence/action/attempt/idempotency/state/digest binding
-immediately before transport and suppresses stale or already-pending selections;
-the daemon applies the same exact binding fence. The target list is bounded to
-100 entries and displays a truncation warning when more are eligible.
+The Task Board Automation inspector consumes the daemon's durable snapshot. Its Manual surface provides start, stop, run-once, and exact-target remote force cancel controls; its History surface pages durable runs and their stage detail. Remote force cancel requires an `admin` profile scope. Monitor rechecks the full execution/assignment/host/fence/action/attempt/idempotency/state/digest binding immediately before transport and suppresses stale or already-pending selections; the daemon applies the same exact binding fence. The target list is bounded to 100 entries and displays a truncation warning when more are eligible.
 
-See the [Task Board workflow guide](../../docs/agent-guides/task-board-workflow.md#orchestrator)
-for the daemon's default-on behavior, explicit-stop preservation, legacy-intent
-migration, and compatibility override.
+See the [Task Board workflow guide](../../docs/agent-guides/task-board-workflow.md#orchestrator) for the daemon's default-on behavior, explicit-stop preservation, legacy-intent migration, and compatibility override.
 
 ## Reviews Auto policies
 
@@ -183,13 +162,7 @@ mise run monitor:reset
 
 If you explicitly want the broader destructive shared reset, use `mise run clean:stale:full`.
 
-Production builds support both managed and external daemon ownership. The app
-defaults to managed mode; switch future launches to external mode in
-**Settings > General > Startup daemon mode**, or set
-`HARNESS_MONITOR_EXTERNAL_DAEMON=1` before launch. For sandboxed production
-external mode, prefer `HARNESS_MONITOR_RUNTIME_LANE`,
-`HARNESS_DAEMON_DATA_HOME`, or a daemon started through `mise run monitor:daemon:dev`
-so the manifest stays inside the shared app-group runtime roots.
+Production builds support both managed and external daemon ownership. The app defaults to managed mode; switch future launches to external mode in **Settings > General > Startup daemon mode**, or set `HARNESS_MONITOR_EXTERNAL_DAEMON=1` before launch. For sandboxed production external mode, prefer `HARNESS_MONITOR_RUNTIME_LANE`, `HARNESS_DAEMON_DATA_HOME`, or a daemon started through `mise run monitor:daemon:dev` so the manifest stays inside the shared app-group runtime roots.
 
 Common runtime-lane commands:
 

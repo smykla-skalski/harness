@@ -10,18 +10,17 @@ Multi-agent session orchestration and observation. First argument selects the co
 ## Dispatch
 
 Parse `$ARGUMENTS`:
+
 - First positional: `session` or `observe`
 - Remaining args: passed to subcommand
 
 | Command | Purpose |
-|---------|---------|
+| --- | --- |
 | `session` | Multi-agent orchestration |
 | `task-board` | Cross-project task board, dispatch, evaluate, orchestrator, and policy routes |
 | `observe` | Session observation pipeline |
 
-Read [references/session-commands.md](references/session-commands.md) for `harness session` subcommands.
-Read [references/task-board-workflow.md](references/task-board-workflow.md) before coordinating task-board work.
-Read [references/observe-commands.md](references/observe-commands.md) for `harness observe` subcommands.
+Read [references/session-commands.md](references/session-commands.md) for `harness session` subcommands. Read [references/task-board-workflow.md](references/task-board-workflow.md) before coordinating task-board work. Read [references/observe-commands.md](references/observe-commands.md) for `harness observe` subcommands.
 
 ## Contract
 
@@ -44,13 +43,13 @@ If you catch yourself about to edit a file or run code to implement something: s
 
 ### Arguments
 
-| Argument | Default | Purpose |
-|----------|---------|---------|
-| `--context` | required | Human-readable goal for the session |
-| `--session-id` | auto-generated | Explicit session ID |
-| `--title` | none | Short human-readable session name |
-| `--project-dir` | cwd | Project directory |
-| `--policy-preset` | none | Session policy preset |
+| Argument          | Default        | Purpose                             |
+| ----------------- | -------------- | ----------------------------------- |
+| `--context`       | required       | Human-readable goal for the session |
+| `--session-id`    | auto-generated | Explicit session ID                 |
+| `--title`         | none           | Short human-readable session name   |
+| `--project-dir`   | cwd            | Project directory                   |
+| `--policy-preset` | none           | Session policy preset               |
 
 ### Workflow
 
@@ -63,7 +62,7 @@ digraph session_start {
   assign [label="Assign tasks"];
   monitor [label="Monitor progress"];
   end [label="harness session end"];
-  
+
   start -> plan -> create -> wait -> assign -> monitor -> end;
   monitor -> assign [label="reassign if needed"];
 }
@@ -82,9 +81,7 @@ digraph session_start {
 11. Monitor overview: `harness task-board audit --json`
 12. End when done: `harness session end <session-id> --actor <agent-id>`
 
-Read [references/signals.md](references/signals.md) for signal protocol when redirecting agents.
-Read [references/session-commands.md](references/session-commands.md) for exact command syntax.
-Read [references/task-board-workflow.md](references/task-board-workflow.md) for task-board operating rules.
+Read [references/signals.md](references/signals.md) for signal protocol when redirecting agents. Read [references/session-commands.md](references/session-commands.md) for exact command syntax. Read [references/task-board-workflow.md](references/task-board-workflow.md) for task-board operating rules.
 
 ---
 
@@ -94,12 +91,12 @@ Join with a role. Behavior depends on role.
 
 ### Arguments
 
-| Argument | Default | Purpose |
-|----------|---------|---------|
-| positional | interactive | Session ID to join |
-| `--role` | `worker` | Role: worker, observer, reviewer, improver |
-| `--runtime` | auto-detect | Which runtime you are |
-| `--capabilities` | none | Comma-separated capability tags |
+| Argument         | Default     | Purpose                                    |
+| ---------------- | ----------- | ------------------------------------------ |
+| positional       | interactive | Session ID to join                         |
+| `--role`         | `worker`    | Role: worker, observer, reviewer, improver |
+| `--runtime`      | auto-detect | Which runtime you are                      |
+| `--capabilities` | none        | Comma-separated capability tags            |
 
 ### Session picker
 
@@ -113,12 +110,12 @@ If exactly one active session, confirm before joining. If multiple, present numb
 
 ### Roles
 
-| Role | Can do |
-|------|--------|
-| worker | Execute tasks, update own status |
+| Role     | Can do                              |
+| -------- | ----------------------------------- |
+| worker   | Execute tasks, update own status    |
 | observer | Monitor, create tasks from findings |
-| reviewer | Review done tasks, reassign |
-| improver | Review and make improvements |
+| reviewer | Review done tasks, reassign         |
+| improver | Review and make improvements        |
 
 Read [references/roles-and-permissions.md](references/roles-and-permissions.md) for full permission matrix.
 
@@ -147,9 +144,7 @@ Read [references/issue-taxonomy.md](references/issue-taxonomy.md) for category o
 
 ### Managed agent dispatch
 
-Task-board dispatch records session/task links and the intended worker,
-reviewer, evaluator, and policy decision. It does not directly spawn agents.
-Use managed agent commands when the plan needs daemon-managed capacity:
+Task-board dispatch records session/task links and the intended worker, reviewer, evaluator, and policy decision. It does not directly spawn agents. Use managed agent commands when the plan needs daemon-managed capacity:
 
 ```bash
 harness session agents start terminal <session-id> --runtime <runtime> --role worker --prompt "..."
@@ -162,8 +157,7 @@ harness session agents interrupt <agent-id>
 harness session agents approve <agent-id> <approval-id> --decision <accept|reject>
 ```
 
-Use capability tags, name, persona, model, effort, and project-dir flags when
-the runtime supports targeted routing.
+Use capability tags, name, persona, model, effort, and project-dir flags when the runtime supports targeted routing.
 
 ### Reviewer / Improver workflow
 
@@ -178,8 +172,7 @@ the runtime supports targeted routing.
 
 ## task-board
 
-Use `task-board` for backlog state, session dispatch, linked-work evaluation,
-orchestrator ticks, and policy-pipeline visibility.
+Use `task-board` for backlog state, session dispatch, linked-work evaluation, orchestrator ticks, and policy-pipeline visibility.
 
 Key routes:
 
@@ -192,13 +185,9 @@ harness task-board orchestrator run-once --dry-run --json
 harness task-board orchestrator run-once --apply --status todo --json
 ```
 
-Policy pipeline is exposed through daemon HTTP/WebSocket routes, not a direct
-CLI editing subcommand. Use it to load/save draft graphs, simulate, promote
-after a successful exact-revision simulation, and audit active policy state.
+Policy pipeline is exposed through daemon HTTP/WebSocket routes, not a direct CLI editing subcommand. Use it to load/save draft graphs, simulate, promote after a successful exact-revision simulation, and audit active policy state.
 
-Read [references/task-board-workflow.md](references/task-board-workflow.md) for
-the policy evidence predicates, orchestrator settings, dispatch plan shape, and
-evaluation state mapping.
+Read [references/task-board-workflow.md](references/task-board-workflow.md) for the policy evidence predicates, orchestrator settings, dispatch plan shape, and evaluation state mapping.
 
 ---
 
@@ -209,12 +198,13 @@ Observe a session through the classifier pipeline.
 ### Contract
 
 All state flows through `harness observe`. Do not read state paths directly:
+
 - `~harness/projects/project-<digest>/agents/observe/<observe-id>/`
 
 ### Arguments
 
 | Argument | Default | Purpose |
-|----------|---------|---------|
+| --- | --- | --- |
 | positional | required | Session ID to observe |
 | `--agent` | none | Narrow to runtime (claude/codex/gemini/copilot) |
 | `--observe-id` | `project-default` | Shared observer state identity |
@@ -223,6 +213,7 @@ All state flows through `harness observe`. Do not read state paths directly:
 | `--focus` | `all` | Category filter preset (harness/skills/all) |
 
 Resolution rules for `--from`:
+
 - Numeric: use directly as line number
 - ISO timestamp: first event at or after that time
 - Prose: earliest matching substring
@@ -236,7 +227,7 @@ digraph observe {
   summarize [label="Summarize findings"];
   triage [label="Triage by severity"];
   watch [label="harness observe watch"];
-  
+
   doctor -> scan -> summarize -> triage;
   triage -> watch [label="if continuous"];
 }
@@ -249,27 +240,26 @@ digraph observe {
 
 Do not auto-fix. Triage first.
 
-Read [references/observe-commands.md](references/observe-commands.md) for full command surface.
-Read [references/issue-taxonomy.md](references/issue-taxonomy.md) for category ownership and fix routing.
-Read [references/observe-overrides.md](references/observe-overrides.md) for mute/focus configuration.
+Read [references/observe-commands.md](references/observe-commands.md) for full command surface. Read [references/issue-taxonomy.md](references/issue-taxonomy.md) for category ownership and fix routing. Read [references/observe-overrides.md](references/observe-overrides.md) for mute/focus configuration.
 
 ### Maintenance actions
 
 Manage observer state through `scan --action`:
 
-| Action | Purpose |
-|--------|---------|
-| `cycle` | Advance stored cursor, persist new findings |
-| `status` | Inspect current observer state |
-| `resume` | Continue from stored cursor |
-| `verify` | Check if fingerprint still reproduces |
-| `resolve-from` | Resolve line from prose/timestamp |
-| `compare` | Compare two windows |
-| `mute` / `unmute` | Manage muted issue codes |
+| Action            | Purpose                                     |
+| ----------------- | ------------------------------------------- |
+| `cycle`           | Advance stored cursor, persist new findings |
+| `status`          | Inspect current observer state              |
+| `resume`          | Continue from stored cursor                 |
+| `verify`          | Check if fingerprint still reproduces       |
+| `resolve-from`    | Resolve line from prose/timestamp           |
+| `compare`         | Compare two windows                         |
+| `mute` / `unmute` | Manage muted issue codes                    |
 
 ### When to use dump
 
 Use `harness observe dump` when:
+
 - A classifier finding looks suspicious
 - The issue is `unexpected_behavior`
 - You need exact raw context around a line range
@@ -277,6 +267,7 @@ Use `harness observe dump` when:
 ### Spawning deep analyst
 
 For subtle issues the classifier may miss, spawn `deep-analyst` agent:
+
 - Provide session-id, project-hint, line range
 - Agent returns plain markdown with line-level findings
 

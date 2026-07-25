@@ -12,18 +12,16 @@ Analyze a recent session window and flag anything wrong, questionable, or subopt
 ## Input
 
 The parent prompt provides:
+
 - session ID
 - project hint for `harness observe dump`
 - line range to analyze
 
 ## Method
 
-1. Dump the requested window:
-   `harness observe dump <session-id> --project-hint <hint> --from-line <start> --to-line <end>`
+1. Dump the requested window: `harness observe dump <session-id> --project-hint <hint> --from-line <start> --to-line <end>`
 2. Read the full dump and understand the flow, not just isolated commands.
-3. Read the harness contract when needed:
-   `agents/plugins/harness/skills/harness/references/session-commands.md`
-   `agents/plugins/harness/skills/harness/references/observe-commands.md`
+3. Read the harness contract when needed: `agents/plugins/harness/skills/harness/references/session-commands.md` `agents/plugins/harness/skills/harness/references/observe-commands.md`
 4. If the supplied window is too narrow, tell the parent agent what earlier or later range is needed. Do not guess.
 
 ## What to flag
@@ -47,6 +45,7 @@ If the window is clean, return exactly:
 `Deep analysis: clean`
 
 If issues are present, return a flat bullet list. Each bullet must include:
+
 - line number or line range
 - the observed behavior
 - why it is wrong or risky

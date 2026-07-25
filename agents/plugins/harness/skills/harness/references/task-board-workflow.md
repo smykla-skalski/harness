@@ -1,21 +1,14 @@
 # Task Board Workflow
 
-Harness task boards are cross-project work items managed through
-`harness task-board`. Use this guide for backlog intake, planning review,
-dispatch readiness, and overview reporting.
+Harness task boards are cross-project work items managed through `harness task-board`. Use this guide for backlog intake, planning review, dispatch readiness, and overview reporting.
 
 ## Contract
 
-- Treat the task board as daemon-owned Harness state. Read and mutate it only
-  through `harness task-board ...` commands.
-- Task-board commands require a running daemon that advertises database-backed
-  task-board storage. Start Harness Monitor or run `harness-daemon dev` first.
-- Use `--json` for machine-readable reads. Do not access the daemon database
-  directly.
-- Keep titles short and imperative. Put scope, constraints, acceptance
-  criteria, and verification notes in `--body`.
-- Use `--project-id` when the work belongs to a known project. Use `--tag` for
-  routing labels.
+- Treat the task board as daemon-owned Harness state. Read and mutate it only through `harness task-board ...` commands.
+- Task-board commands require a running daemon that advertises database-backed task-board storage. Start Harness Monitor or run `harness-daemon dev` first.
+- Use `--json` for machine-readable reads. Do not access the daemon database directly.
+- Keep titles short and imperative. Put scope, constraints, acceptance criteria, and verification notes in `--body`.
+- Use `--project-id` when the work belongs to a known project. Use `--tag` for routing labels.
 
 ## Command Surface
 
@@ -41,21 +34,19 @@ Common read flag: `--json`.
 Each task carries:
 
 - `id`, `title`, `body`
-- `status`: `new`, `planning`, `plan_review`, `todo`, `in_progress`,
-  `in_review`, `done`, `blocked`
+- `status`: `new`, `planning`, `plan_review`, `todo`, `in_progress`, `in_review`, `done`, `blocked`
 - `priority`: `low`, `medium`, `high`, `critical`
 - `agent_mode`: `headless`, `interactive`, `planning`, `evaluate`
-- `tags`, optional `project_id`, external refs, planning metadata, and optional
-  session/work-item links
+- `tags`, optional `project_id`, external refs, planning metadata, and optional session/work-item links
 
 Priority maps to dispatch severity when session plans are built:
 
-| Priority | Use for |
-| --- | --- |
-| `critical` | Session-blocking correctness or safety issue. |
-| `high` | Important work needed before closeout. |
-| `medium` | Normal implementation, verification, or cleanup item. |
-| `low` | Opportunistic polish or non-blocking follow-up. |
+| Priority   | Use for                                               |
+| ---------- | ----------------------------------------------------- |
+| `critical` | Session-blocking correctness or safety issue.         |
+| `high`     | Important work needed before closeout.                |
+| `medium`   | Normal implementation, verification, or cleanup item. |
+| `low`      | Opportunistic polish or non-blocking follow-up.       |
 
 ## Status Flow
 
@@ -66,8 +57,7 @@ new -> planning -> plan_review -> todo -> in_progress -> in_review -> done
         blocked                   blocked    blocked
 ```
 
-`blocked` means the task cannot proceed without new input, an external
-dependency, or a planning/review decision.
+`blocked` means the task cannot proceed without new input, an external dependency, or a planning/review decision.
 
 Dispatch readiness requires:
 
@@ -79,10 +69,7 @@ Dispatch readiness requires:
 
 The CLI sets `approved_at` when `--approved-by` is provided.
 
-Applied GitHub pulls synthesize planning approval with the control-plane actor so
-imported issues land as repo-scoped `todo` items that are immediately eligible
-for dispatch. The full issue body remains in the task body; the synthesized plan
-summary only captures the automation intent.
+Applied GitHub pulls synthesize planning approval with the control-plane actor so imported issues land as repo-scoped `todo` items that are immediately eligible for dispatch. The full issue body remains in the task body; the synthesized plan summary only captures the automation intent.
 
 ## Intake And Planning
 
@@ -128,19 +115,14 @@ summary only captures the automation intent.
    harness task-board dispatch --dry-run --json
    ```
 
-2. Apply ready dispatch plans when the leader is ready to create or reuse
-   sessions and link board items to session work items.
+2. Apply ready dispatch plans when the leader is ready to create or reuse sessions and link board items to session work items.
 
    ```bash
    harness task-board dispatch --dry-run --json
    harness task-board dispatch --project-dir <project-dir> --actor <leader-id> --json
    ```
 
-   Dry runs only report plans. Applied dispatch creates a session when the item
-   has no `session_id`, creates a session work item from the board title/body,
-   maps priority to task severity, stores `session_id` and `work_item_id`, marks
-   the board item `in_progress`, and advances workflow state to `running` at
-   the `dispatch` step.
+   Dry runs only report plans. Applied dispatch creates a session when the item has no `session_id`, creates a session work item from the board title/body, maps priority to task severity, stores `session_id` and `work_item_id`, marks the board item `in_progress`, and advances workflow state to `running` at the `dispatch` step.
 
 3. Mark active work explicitly when work starts outside applied dispatch.
 
@@ -161,19 +143,17 @@ summary only captures the automation intent.
    harness task-board evaluate --json
    ```
 
-   `evaluate` skips unlinked board items. For linked items, it reads the
-   session work item and maps session task state to board state:
+   `evaluate` skips unlinked board items. For linked items, it reads the session work item and maps session task state to board state:
 
-   | Session task state | Board result |
-   | --- | --- |
-   | `open`, `in_progress` | `in_progress`, workflow `running` |
-   | `awaiting_review`, `in_review` | `in_review`, workflow `running` |
-   | `done` | `done`, workflow `completed` |
-   | `blocked` | `blocked`, workflow `failed` |
-   | missing session or task | `blocked`, workflow `failed` |
+   | Session task state             | Board result                      |
+   | ------------------------------ | --------------------------------- |
+   | `open`, `in_progress`          | `in_progress`, workflow `running` |
+   | `awaiting_review`, `in_review` | `in_review`, workflow `running`   |
+   | `done`                         | `done`, workflow `completed`      |
+   | `blocked`                      | `blocked`, workflow `failed`      |
+   | missing session or task        | `blocked`, workflow `failed`      |
 
-   A non-approving review consensus keeps the board item `in_review` and stores
-   the review summary as the workflow error context.
+   A non-approving review consensus keeps the board item `in_review` and stores the review summary as the workflow error context.
 
 6. Close or block after review when not using `evaluate`.
 
@@ -182,9 +162,7 @@ summary only captures the automation intent.
    harness task-board update <task-id> --status blocked
    ```
 
-Use the task body, tags, and planning summary for review context. If the plan
-changes materially, return to `planning` or `plan_review` before dispatching
-again.
+Use the task body, tags, and planning summary for review context. If the plan changes materially, return to `planning` or `plan_review` before dispatching again.
 
 ## Overview Integration
 
@@ -204,37 +182,23 @@ harness task-board orchestrator settings --json
 - `audit` gives total, ready, blocked, and by-status counts.
 - `project` groups local items by `project_id` and ready count.
 - `machine` groups local items by `agent_mode` and ready count.
-- `sync` reports external-provider configuration, linked, pushable, and blocked
-  counts plus previewed/applied operations. `--provider` narrows the provider,
-  `--direction` narrows pull/push intent, and `--apply` persists external
-  changes instead of previewing them. GitHub pull imports preserve `owner/repo`
-  in `project_id` and synthesize dispatch-ready planning approval.
-- `dispatch` reports the session, worker, reviewer, and evaluator intent for
-  each selected board item, including readiness block reasons.
-- `evaluate` reports evaluated, updated, skipped, completed, running,
-  reviewing, blocked, and failed counts for the selected status or item.
-- `orchestrator status` reports enabled/running intent, current tick, last run,
-  workflow-state counts, settings, dispatch results, evaluation results, and
-  policy trace IDs.
+- `sync` reports external-provider configuration, linked, pushable, and blocked counts plus previewed/applied operations. `--provider` narrows the provider, `--direction` narrows pull/push intent, and `--apply` persists external changes instead of previewing them. GitHub pull imports preserve `owner/repo` in `project_id` and synthesize dispatch-ready planning approval.
+- `dispatch` reports the session, worker, reviewer, and evaluator intent for each selected board item, including readiness block reasons.
+- `evaluate` reports evaluated, updated, skipped, completed, running, reviewing, blocked, and failed counts for the selected status or item.
+- `orchestrator status` reports enabled/running intent, current tick, last run, workflow-state counts, settings, dispatch results, evaluation results, and policy trace IDs.
 
 ## Dispatch Intent
 
-Each dispatch plan contains the control-plane intent needed to coordinate
-agents:
+Each dispatch plan contains the control-plane intent needed to coordinate agents:
 
-- `session`: reuse `session_id` when present; otherwise create a session with
-  the board title, body context, and project id.
-- `task`: create a session work item from the title/body, planning summary,
-  priority-derived severity, tags, and external refs.
-- `worker`: use the board item's `agent_mode` (`headless`, `interactive`,
-  `planning`, or `evaluate`) as the requested worker mode.
-- `reviewer`: request the `code-reviewer` persona after worker review with
-  consensus count `2`.
+- `session`: reuse `session_id` when present; otherwise create a session with the board title, body context, and project id.
+- `task`: create a session work item from the title/body, planning summary, priority-derived severity, tags, and external refs.
+- `worker`: use the board item's `agent_mode` (`headless`, `interactive`, `planning`, or `evaluate`) as the requested worker mode.
+- `reviewer`: request the `code-reviewer` persona after worker review with consensus count `2`.
 - `evaluator`: request an `evaluate` follow-up after worker review.
 - `policy`: include the policy decision that allowed or blocked dispatch.
 
-Applied dispatch uses the daemon executor and queues managed workers. Leaders
-can use the dispatch plan plus session agent commands to add capacity:
+Applied dispatch uses the daemon executor and queues managed workers. Leaders can use the dispatch plan plus session agent commands to add capacity:
 
 ```bash
 harness session agents start terminal <session-id> --runtime <runtime> \
@@ -244,15 +208,11 @@ harness session agents start acp --session-id <session-id> --agent <descriptor> 
   --role worker --prompt "..."
 ```
 
-Managed agent controls include `list`, `show`, terminal `input`/`resize`/`stop`,
-Codex `steer`/`interrupt`/`approve`, and ACP `inspect`. Start commands can carry
-role, fallback role, capability tags, display name, persona, model, effort, and
-project directory where the runtime supports them.
+Managed agent controls include `list`, `show`, terminal `input`/`resize`/`stop`, Codex `steer`/`interrupt`/`approve`, and ACP `inspect`. Start commands can carry role, fallback role, capability tags, display name, persona, model, effort, and project directory where the runtime supports them.
 
 ## Orchestrator
 
-`harness task-board orchestrator` persists autonomous intent and one-tick run
-state in the daemon database. Its command surface is:
+`harness task-board orchestrator` persists autonomous intent and one-tick run state in the daemon database. Its command surface is:
 
 ```bash
 harness task-board orchestrator status --json
@@ -266,49 +226,20 @@ harness task-board orchestrator settings --dispatch-status-filter todo --json
 harness task-board orchestrator settings --project-dir <project-dir> --json
 ```
 
-Defaults are conservative: workflows enabled for default tasks, PR fixes, PR
-reviews, and dependency updates; `dry_run_default=true`; and
-`dispatch_status_filter=todo`. `run-once` records a `dispatch` phase, executes
-task-board dispatch through the daemon service, records an `evaluation` phase,
-then evaluates linked work. When `github_project.enabled_automations` includes
-`sync_task_board`, `run-once` first performs a GitHub pull preview/apply with
-the current dry-run mode. The persisted `github_project.owner`/`repo` settings
-act as the repository fallback when `HARNESS_GITHUB_REPOSITORY` or
-`GITHUB_REPOSITORY` is unset. `--apply` overrides the dry-run default for that
-tick. Failures persist a failed last-run summary instead of silently dropping
-tick state.
+Defaults are conservative: workflows enabled for default tasks, PR fixes, PR reviews, and dependency updates; `dry_run_default=true`; and `dispatch_status_filter=todo`. `run-once` records a `dispatch` phase, executes task-board dispatch through the daemon service, records an `evaluation` phase, then evaluates linked work. When `github_project.enabled_automations` includes `sync_task_board`, `run-once` first performs a GitHub pull preview/apply with the current dry-run mode. The persisted `github_project.owner`/`repo` settings act as the repository fallback when `HARNESS_GITHUB_REPOSITORY` or `GITHUB_REPOSITORY` is unset. `--apply` overrides the dry-run default for that tick. Failures persist a failed last-run summary instead of silently dropping tick state.
 
-When GitHub automations are enabled, the same tick also reuses the dispatched
-session worktree to manage the PR lifecycle for repo-scoped items. Harness
-publishes the managed branch, creates or reuses the configured draft PR, marks
-it ready for review when requested, syncs managed labels, reads checks and
-review evidence through GitHub, and auto-merges only when the merge policy
-allows it. Review-changes-requested items do not open fresh PRs until the
-underlying task becomes reviewable again.
+When GitHub automations are enabled, the same tick also reuses the dispatched session worktree to manage the PR lifecycle for repo-scoped items. Harness publishes the managed branch, creates or reuses the configured draft PR, marks it ready for review when requested, syncs managed labels, reads checks and review evidence through GitHub, and auto-merges only when the merge policy allows it. Review-changes-requested items do not open fresh PRs until the underlying task becomes reviewable again.
 
 ## Policy Pipeline
 
-Dispatch policy is part of readiness. The built-in gate allows normal planning,
-sync, triage, spawn-agent, branch, PR, review, and stop-agent actions; forces
-repository mutation into dry-run-only; requires a human for worktree deletion,
-secret access, and destructive filesystem actions; and gates PR merge by
-evidence.
+Dispatch policy is part of readiness. The built-in gate allows normal planning, sync, triage, spawn-agent, branch, PR, review, and stop-agent actions; forces repository mutation into dry-run-only; requires a human for worktree deletion, secret access, and destructive filesystem actions; and gates PR merge by evidence.
 
-When the durable policy graph exists in `dry_run` or `enforced` mode, dispatch
-uses the graph policy gate instead of the built-in gate. Draft graphs are stored
-but do not affect dispatch readiness. The daemon exposes policy-pipeline
-routes to load the graph, save drafts, simulate, promote, and audit:
+When the durable policy graph exists in `dry_run` or `enforced` mode, dispatch uses the graph policy gate instead of the built-in gate. Draft graphs are stored but do not affect dispatch readiness. The daemon exposes policy-pipeline routes to load the graph, save drafts, simulate, promote, and audit:
 
-- HTTP: `/v1/task-board/policy/pipeline`, `/v1/task-board/policy/simulate`,
-  `/v1/task-board/policy/promote`, `/v1/task-board/policy/audit`
-- WebSocket: `task_board.policy_pipeline_get`,
-  `task_board.policy_pipeline_save_draft`,
-  `task_board.policy_pipeline_simulate`,
-  `task_board.policy_pipeline_promote`, and
-  `task_board.policy_pipeline_audit`
+- HTTP: `/v1/task-board/policy/pipeline`, `/v1/task-board/policy/simulate`, `/v1/task-board/policy/promote`, `/v1/task-board/policy/audit`
+- WebSocket: `task_board.policy_pipeline_get`, `task_board.policy_pipeline_save_draft`, `task_board.policy_pipeline_simulate`, `task_board.policy_pipeline_promote`, and `task_board.policy_pipeline_audit`
 
-Policy promotion requires a successful exact-revision simulation. Simulation
-records decisions for all policy actions and writes policy trace IDs for audit.
+Policy promotion requires a successful exact-revision simulation. Simulation records decisions for all policy actions and writes policy trace IDs for audit.
 
 Merge evidence predicates are:
 
@@ -325,12 +256,8 @@ Missing merge evidence requires a human. Invalid graphs also require a human.
 
 ## Operating Rules
 
-- Prefer many small tasks over one broad task. Each task needs one clear close
-  condition.
-- Do not dispatch `new`, `planning`, `plan_review`, `in_progress`,
-  `in_review`, `done`, or `blocked` items.
-- Do not bypass the planning/review gate by setting `todo` without
-  `--planning-summary` and `--approved-by`.
+- Prefer many small tasks over one broad task. Each task needs one clear close condition.
+- Do not dispatch `new`, `planning`, `plan_review`, `in_progress`, `in_review`, `done`, or `blocked` items.
+- Do not bypass the planning/review gate by setting `todo` without `--planning-summary` and `--approved-by`.
 - Use `delete` for tombstones; do not mutate task-board storage directly.
-- Keep `audit`, `project`, `machine`, and `dispatch` output in closeout notes
-  when coordinating multiple projects or worker modes.
+- Keep `audit`, `project`, `machine`, and `dispatch` output in closeout notes when coordinating multiple projects or worker modes.

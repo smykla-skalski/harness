@@ -1,10 +1,9 @@
 # Swarm Full-Flow E2E Gap Ledger
 
-Rows marked `Open` are counted by `mise run e2e:swarm:gaps-open`.
-The Slice 6 orchestrator appends optional-runtime skips as `Closed` rows so missing optional tools are visible without making the lane fail.
+Rows marked `Open` are counted by `mise run e2e:swarm:gaps-open`. The Slice 6 orchestrator appends optional-runtime skips as `Closed` rows so missing optional tools are visible without making the lane fail.
 
 | ID | Status | Severity | Subsystem | Current behavior | Desired behavior | Closed by |
-|---|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- | --- |
 | G-01 | Closed | high | review-state | Worker review handoff can double-book without review-aware state. | Awaiting-review task and agent state prevent new assignments. | Slice 1-5 commits |
 | G-02 | Closed | high | review-state | Reviewers can mutate without single-runtime claim discipline. | Claim-review rejects duplicate same-runtime reviewers. | Slice 1-5 commits |
 | G-03 | Closed | high | review-state | Quorum lacks a durable consensus object. | Distinct-runtime reviews compute consensus. | Slice 1-5 commits |
