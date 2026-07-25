@@ -86,7 +86,7 @@ class SwiftPackageFreshnessTests(unittest.TestCase):
 
             source_file.parent.mkdir(parents=True)
             source_file.write_text("// source\n")
-            (package_dir / "Package.swift").write_text("// package\n")
+            (package_dir / "Package.swift").write_text("// swift-tools-version:5.9\n// package\n")
 
             completed = self._run_ensure_binary(
                 package_dir=package_dir,
@@ -117,7 +117,7 @@ class SwiftPackageFreshnessTests(unittest.TestCase):
 
             source_file.parent.mkdir(parents=True)
             source_file.write_text("// source\n")
-            package_swift.write_text("// package\n")
+            package_swift.write_text("// swift-tools-version:5.9\n// package\n")
             binary_path.parent.mkdir(parents=True)
             binary_path.write_text("")
             binary_path.chmod(binary_path.stat().st_mode | stat.S_IXUSR)
@@ -152,7 +152,7 @@ class SwiftPackageFreshnessTests(unittest.TestCase):
 
             source_file.parent.mkdir(parents=True)
             source_file.write_text("// source\n")
-            package_swift.write_text("// package\n")
+            package_swift.write_text("// swift-tools-version:5.9\n// package\n")
             binary_path.parent.mkdir(parents=True)
             binary_path.write_text("")
             binary_path.chmod(binary_path.stat().st_mode | stat.S_IXUSR)
@@ -209,7 +209,7 @@ class SwiftPackageFreshnessTests(unittest.TestCase):
 
             source_file.parent.mkdir(parents=True)
             source_file.write_text("// source\n")
-            (package_dir / "Package.swift").write_text("// package\n")
+            (package_dir / "Package.swift").write_text("// swift-tools-version:5.9\n// package\n")
             binary_path.parent.mkdir(parents=True)
             binary_path.write_text("")
             binary_path.chmod(binary_path.stat().st_mode | stat.S_IXUSR)
@@ -263,7 +263,7 @@ class SwiftPackageFreshnessTests(unittest.TestCase):
 
             source_file.parent.mkdir(parents=True)
             source_file.write_text("// source\n")
-            (package_dir / "Package.swift").write_text("// package\n")
+            (package_dir / "Package.swift").write_text("// swift-tools-version:5.9\n// package\n")
             binary_path.parent.mkdir(parents=True)
             binary_path.write_text("")
             binary_path.chmod(binary_path.stat().st_mode | stat.S_IXUSR)
