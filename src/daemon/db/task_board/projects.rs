@@ -1,6 +1,7 @@
 use sqlx::{FromRow, Sqlite, Transaction, query, query_as};
 
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
+use crate::errors::CliErrorKind;
 use crate::task_board::project::{
     ItemProjectAttribution, TaskBoardProject, TaskBoardProjectSource, item_attribution,
 };
@@ -207,15 +208,19 @@ impl AsyncDaemonDb {
         slug: Option<&str>,
         display_name: DisplayNameEdit<'_>,
     ) -> Result<TaskBoardProject, CliError> {
+        // Both of these are the caller naming something wrong, not the store
+        // failing. Reporting them as IO would tell an API consumer to retry.
         let existing = self.get_task_board_project(project_id).await?.ok_or_else(|| {
-            db_error(format!("task board project '{project_id}' is not registered"))
+            CliError::from(CliErrorKind::usage_error(format!(
+                "task board project '{project_id}' is not registered"
+            )))
         })?;
         let slug = match slug {
             Some(raw) => existing.source.normalize_slug(raw).ok_or_else(|| {
-                db_error(format!(
+                CliError::from(CliErrorKind::usage_error(format!(
                     "'{raw}' cannot name a {} project",
                     existing.source.as_str()
-                ))
+                )))
             })?,
             None => existing.slug.clone(),
         };

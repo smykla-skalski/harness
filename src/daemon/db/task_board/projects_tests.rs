@@ -165,9 +165,25 @@ async fn renaming_to_an_unusable_slug_is_refused() {
         .expect("register project")
         .expect("names a project");
 
-    assert!(
-        db.update_task_board_project(&project_id, Some("not-a-repository"), DisplayNameEdit::Keep)
-            .await
-            .is_err()
-    );
+    // The caller named the slug wrong; an IO code would tell them to retry.
+    let error = db
+        .update_task_board_project(&project_id, Some("not-a-repository"), DisplayNameEdit::Keep)
+        .await
+        .expect_err("an unusable slug is refused");
+    assert_eq!(error.code(), "USAGE", "{error}");
+}
+
+#[tokio::test]
+async fn renaming_an_unregistered_project_is_a_usage_error() {
+    let (_directory, db) = database().await;
+
+    let error = db
+        .update_task_board_project(
+            "project-00000000000000000000000000000000",
+            None,
+            DisplayNameEdit::Clear,
+        )
+        .await
+        .expect_err("an unknown project is refused");
+    assert_eq!(error.code(), "USAGE", "{error}");
 }
