@@ -156,14 +156,13 @@ Reclaim this session's two build caches first, because `git worktree remove` del
 - `<worktree>/target` - direct `cargo` and `cargo nextest` output.
 - `<main-checkout>/target/dev/wt-<worktree-name>-<hash>` - everything from `scripts/cargo-local.sh`, which every `mise run test:*` task uses. Sits outside the worktree and is usually the larger.
 
-Every other session holds its own `target/dev/wt-*` lane and may be building in it, so match the suffix exactly and confirm nothing is using it.
+Every other session holds its own `target/dev/wt-*` lane and may be building in it. Derive this session's lane the way `cargo-local.sh` does instead of globbing the prefix: a wrong derivation names a path that does not exist and deletes nothing, while a prefix glob can select and delete a neighbouring session's live cache.
 
 ```bash
-# assumes: PR merged, <worktree> clean, this session has no build of its own running
-lane=$(ls -d <main-checkout>/target/dev/wt-<worktree-name>-* 2>/dev/null | head -1)
-[ -n "$lane" ] && lsof +D "$lane" | head                                          # must print nothing
-pgrep -f cargo-nextest | xargs -I{} lsof -a -p {} -d cwd -Fn | grep -F <worktree> # must print nothing
-rm -rf <worktree>/target ${lane:+"$lane"}
+# assumes: PR merged, <worktree> clean, <worktree> spelled as its physical path, as `pwd -P` prints it
+lane="<main-checkout>/target/dev/wt-$(printf '%s' "$(basename <worktree>)" | tr -cs '[:alnum:]._-' '-')-$(printf '%s' <worktree> | shasum -a 256 | cut -c1-16)"
+lsof +D "$lane" 2>/dev/null | head   # must print nothing; a live build means stop
+rm -rf <worktree>/target "$lane"
 ```
 
 Then remove the worktree and the branch:
