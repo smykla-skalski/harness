@@ -378,6 +378,16 @@ with tempfile.TemporaryDirectory() as directory:
     results.append("file->%s/%d" % (stat.S_ISFIFO(os.lstat(fifo).st_mode), pool._drain()))
 
 with tempfile.TemporaryDirectory() as directory:
+    # A directory takes the other route: unlink refuses it, so the supervisor
+    # died on every spawn and each ensure paid the startup timeout forever.
+    fifo = os.path.join(directory, "fifo")
+    os.mkdir(fifo)
+    with open(os.path.join(fifo, "junk"), "wb") as handle:
+        handle.write(b"junk")
+    pool = mod.Pool(directory, 3)
+    results.append("dir->%s/%d" % (stat.S_ISFIFO(os.lstat(fifo).st_mode), pool._drain()))
+
+with tempfile.TemporaryDirectory() as directory:
     # A symlink is the dangerous one: the refill writes tokens into the target.
     victim = os.path.join(directory, "victim")
     with open(victim, "wb") as handle:
@@ -392,7 +402,7 @@ with tempfile.TemporaryDirectory() as directory:
 print(" ".join(results))
 PY
 )"
-  if [[ "$out" != "file->True/3 link->True/3/True" ]]; then
+  if [[ "$out" != "file->True/3 dir->True/3 link->True/3/True" ]]; then
     fail "$name (expected a real FIFO with 3 tokens and an untouched target, got: $out)"
     return
   fi

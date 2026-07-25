@@ -23,6 +23,7 @@ import fcntl
 import hashlib
 import os
 import selectors
+import shutil
 import signal
 import socket
 import stat
@@ -109,10 +110,15 @@ class Pool:
         os.open succeeds on a regular file, and a file has one shared offset, so
         the refill lands past the read position and every later acquire sees an
         empty pool - the silent floor-width failure again. A symlink is worse:
-        the tokens get written into whatever it points at.
+        the tokens get written into whatever it points at. A directory takes a
+        different route to the same place: unlink refuses it, so every spawned
+        supervisor dies here and each ensure pays the startup timeout forever.
         """
         with contextlib.suppress(FileNotFoundError):
-            if not stat.S_ISFIFO(os.lstat(self.fifo_path).st_mode):
+            mode = os.lstat(self.fifo_path).st_mode
+            if stat.S_ISDIR(mode):
+                shutil.rmtree(self.fifo_path)
+            elif not stat.S_ISFIFO(mode):
                 os.unlink(self.fifo_path)
         with contextlib.suppress(FileExistsError):
             os.mkfifo(self.fifo_path, 0o600)
