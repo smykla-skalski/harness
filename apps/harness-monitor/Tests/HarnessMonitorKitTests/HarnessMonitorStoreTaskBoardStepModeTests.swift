@@ -25,6 +25,21 @@ struct HarnessMonitorStoreTaskBoardStepModeTests {
     #expect(!store.isDaemonActionInFlight)
   }
 
+  @Test("Toggling step mode raises no success toast")
+  func togglingStepModeRaisesNoSuccessToast() async throws {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+
+    #expect(await store.setTaskBoardStepMode(enabled: true))
+    #expect(store.globalTaskBoardOrchestratorStatus?.stepMode == true)
+    #expect(store.currentSuccessFeedbackMessage == nil)
+
+    #expect(await store.setTaskBoardStepMode(enabled: false))
+    #expect(store.globalTaskBoardOrchestratorStatus?.stepMode == false)
+    #expect(store.currentSuccessFeedbackMessage == nil)
+    #expect(recordedStepModeMutations(client) == [true, false])
+  }
+
   @Test("Failure rolls back to the last authoritative settings")
   func failureRollsBackToLastAuthoritativeSettings() async throws {
     let client = RecordingHarnessClient()
