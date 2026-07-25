@@ -9,6 +9,21 @@ import unittest
 from pathlib import Path
 
 
+# The fake `swift` on PATH never reads these, but a real toolchain leaking into
+# the test would, and a manifest it rejects fails for a reason that has nothing
+# to do with freshness. Keep both genuinely buildable so that leak surfaces as
+# the fake-build assertion it is, not as a SwiftPM parse error.
+PACKAGE_MANIFEST = """// swift-tools-version:5.9
+import PackageDescription
+
+let package = Package(
+  name: "fake-tool",
+  targets: [.executableTarget(name: "fake-tool", path: "Sources")]
+)
+"""
+# Not named main.swift, so the entry point has to be spelled with @main.
+PACKAGE_SOURCE = "@main struct FakeTool { static func main() {} }\n"
+
 SCRIPTS_ROOT = Path(__file__).resolve().parents[1]
 SWIFT_TOOL_ENV_SOURCE = SCRIPTS_ROOT / "lib" / "swift-tool-env.sh"
 FRESHNESS_SOURCE = SCRIPTS_ROOT / "lib" / "swift-package-freshness.sh"
@@ -85,8 +100,8 @@ class SwiftPackageFreshnessTests(unittest.TestCase):
             self._make_fake_swift(fake_bin_dir)
 
             source_file.parent.mkdir(parents=True)
-            source_file.write_text("// source\n")
-            (package_dir / "Package.swift").write_text("// swift-tools-version:5.9\n// package\n")
+            source_file.write_text(PACKAGE_SOURCE)
+            (package_dir / "Package.swift").write_text(PACKAGE_MANIFEST)
 
             completed = self._run_ensure_binary(
                 package_dir=package_dir,
@@ -116,8 +131,8 @@ class SwiftPackageFreshnessTests(unittest.TestCase):
             self._make_fake_swift(fake_bin_dir)
 
             source_file.parent.mkdir(parents=True)
-            source_file.write_text("// source\n")
-            package_swift.write_text("// swift-tools-version:5.9\n// package\n")
+            source_file.write_text(PACKAGE_SOURCE)
+            package_swift.write_text(PACKAGE_MANIFEST)
             binary_path.parent.mkdir(parents=True)
             binary_path.write_text("")
             binary_path.chmod(binary_path.stat().st_mode | stat.S_IXUSR)
@@ -151,8 +166,8 @@ class SwiftPackageFreshnessTests(unittest.TestCase):
             self._make_fake_swift(fake_bin_dir)
 
             source_file.parent.mkdir(parents=True)
-            source_file.write_text("// source\n")
-            package_swift.write_text("// swift-tools-version:5.9\n// package\n")
+            source_file.write_text(PACKAGE_SOURCE)
+            package_swift.write_text(PACKAGE_MANIFEST)
             binary_path.parent.mkdir(parents=True)
             binary_path.write_text("")
             binary_path.chmod(binary_path.stat().st_mode | stat.S_IXUSR)
@@ -208,8 +223,8 @@ class SwiftPackageFreshnessTests(unittest.TestCase):
             self._make_fake_swift(fake_bin_dir)
 
             source_file.parent.mkdir(parents=True)
-            source_file.write_text("// source\n")
-            (package_dir / "Package.swift").write_text("// swift-tools-version:5.9\n// package\n")
+            source_file.write_text(PACKAGE_SOURCE)
+            (package_dir / "Package.swift").write_text(PACKAGE_MANIFEST)
             binary_path.parent.mkdir(parents=True)
             binary_path.write_text("")
             binary_path.chmod(binary_path.stat().st_mode | stat.S_IXUSR)
@@ -262,8 +277,8 @@ class SwiftPackageFreshnessTests(unittest.TestCase):
             self._make_fake_swift(fake_bin_dir)
 
             source_file.parent.mkdir(parents=True)
-            source_file.write_text("// source\n")
-            (package_dir / "Package.swift").write_text("// swift-tools-version:5.9\n// package\n")
+            source_file.write_text(PACKAGE_SOURCE)
+            (package_dir / "Package.swift").write_text(PACKAGE_MANIFEST)
             binary_path.parent.mkdir(parents=True)
             binary_path.write_text("")
             binary_path.chmod(binary_path.stat().st_mode | stat.S_IXUSR)
