@@ -49,6 +49,7 @@ mod session_title;
 mod signal_reconciliation;
 mod signals;
 mod snapshot_broadcast;
+mod startup_reconciliation;
 mod startup_telemetry;
 mod stream_initial_events;
 mod task_active_delivery;

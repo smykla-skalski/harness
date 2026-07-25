@@ -1,10 +1,39 @@
 import Foundation
-import HarnessMonitorKit
 import XCTest
 
 @testable import HarnessMonitorIntents
+@testable import HarnessMonitorKit
+
+extension WebSocketTransport {
+  func installTestWebSocketTask(_ task: URLSessionWebSocketTask) {
+    webSocketTask = task
+  }
+
+  var testWebSocketTask: URLSessionWebSocketTask? {
+    webSocketTask
+  }
+}
 
 final class IntentDaemonClientLifecycleTests: XCTestCase {
+  /// `invalidateConnection()` used to drop only the cached task, leaving the
+  /// socket open. Every failing pump tick then reconnected and stranded
+  /// another ESTABLISHED socket - observed as 10 live sockets to one daemon.
+  func testInvalidateConnectionTearsDownTheTransport() async throws {
+    let client = makeClient()
+    let stranded = URLSession.shared.webSocketTask(
+      with: URL(string: "ws://127.0.0.1:1/v1/ws")!
+    )
+    await client.transport.installTestWebSocketTask(stranded)
+
+    await client.invalidateConnection()
+
+    let remaining = await client.transport.testWebSocketTask
+    XCTAssertNil(
+      remaining,
+      "invalidateConnection must close the socket, not just forget the cached task"
+    )
+  }
+
   func testInvalidateConnectionClearsCachedTask() async throws {
     let client = makeClient()
 

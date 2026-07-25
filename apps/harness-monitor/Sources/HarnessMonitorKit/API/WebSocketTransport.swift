@@ -97,6 +97,10 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
       let requestID = HarnessMonitorTelemetry.shared.decorate(&request, spanContext: span.context)
       span.setAttribute(key: "harness.request_id", value: requestID)
     #endif
+    // Assigning straight over `webSocketTask` stranded whatever was already
+    // there: nothing else held a reference, so the old socket stayed open and
+    // `disconnect()` never ran for it.
+    webSocketTask?.cancel(with: .goingAway, reason: nil)
     let task = session.webSocketTask(with: request)
     webSocketTask = task
     task.resume()

@@ -155,7 +155,7 @@ fn configured_sync_clients_with_review_source(
             _ if provider_was_requested => {
                 config.require_token(provider)?;
             }
-            _ => {}
+            ExternalProvider::GitHub => {}
         }
     }
     Ok(clients)
