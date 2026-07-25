@@ -34,10 +34,17 @@ case "$host_os" in
     ;;
 esac
 
+# This sends signals, so an argument it does not understand is a reason to stop
+# rather than something to ignore on the way to killing things.
 dry_run=0
-if [[ "${1:-}" == "--dry-run" ]]; then
-  dry_run=1
-fi
+case "$#:${1:-}" in
+  0:) ;;
+  1:--dry-run) dry_run=1 ;;
+  *)
+    printf 'usage: %s [--dry-run]\n' "${0##*/}" >&2
+    exit 2
+    ;;
+esac
 
 socket_path="${SCCACHE_SERVER_UDS:-}"
 if [[ -z "$socket_path" ]]; then
