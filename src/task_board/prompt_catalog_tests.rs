@@ -184,6 +184,18 @@ fn a_configuration_with_a_non_text_prompt_is_rejected_whole() {
 }
 
 #[test]
+fn a_configuration_with_an_empty_prompt_is_rejected_whole() {
+    for document in [
+        &br#"{"worker": ""}"#[..],
+        &br#"{"worker": "   \n  "}"#[..],
+        &br#"{"worker": []}"#[..],
+    ] {
+        let error = PromptCatalog::from_json(document).expect_err("empty prompt rejected");
+        assert!(error.message().contains("worker"), "{}", error.message());
+    }
+}
+
+#[test]
 fn an_override_naming_an_unknown_variable_fails_only_its_own_prompt() {
     let catalog = PromptCatalog::from_json(
         br#"{"triage_escalation": "Decide on {{ titel }}", "worker": "Work on {{ title }}"}"#,
@@ -229,9 +241,8 @@ fn the_active_catalog_is_builtin_until_one_is_installed() {
 #[test]
 fn a_scoped_catalog_replaces_the_active_one_and_restores_it_on_drop() {
     let _guard = CATALOG_TEST_LOCK.lock().expect("catalog test lock");
-    let catalog =
-        PromptCatalog::from_json(br#"{"triage_escalation": "Decide on {{ title }}"}"#)
-            .expect("parse overrides");
+    let catalog = PromptCatalog::from_json(br#"{"triage_escalation": "Decide on {{ title }}"}"#)
+        .expect("parse overrides");
 
     {
         let _installed = scoped_prompt_catalog(catalog);

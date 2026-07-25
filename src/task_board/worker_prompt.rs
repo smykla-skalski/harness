@@ -47,9 +47,19 @@ pub(crate) fn render_worker_prompt(
     let tags = (!item.tags.is_empty()).then(|| item.tags.join(", "));
     let external_refs = render_external_refs(&item.external_refs);
     let facts: [Fact<'_>; 8] = [
-        Fact::new("project_id", "project_id_section", "Project", item.project_id.as_deref()),
+        Fact::new(
+            "project_id",
+            "project_id_section",
+            "Project",
+            item.project_id.as_deref(),
+        ),
         Fact::new("worktree", "worktree_section", "Worktree", context.worktree),
-        Fact::new("session_id", "session_id_section", "Session id", context.session_id),
+        Fact::new(
+            "session_id",
+            "session_id_section",
+            "Session id",
+            context.session_id,
+        ),
         Fact::new(
             "managed_run_id",
             "managed_run_id_section",

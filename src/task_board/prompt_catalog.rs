@@ -119,7 +119,11 @@ impl PromptCatalog {
             let id = PromptId::from_config_key(&key).ok_or_else(|| {
                 parse_error(format!("prompt configuration names unknown prompt '{key}'"))
             })?;
-            let template = PromptTemplate::new(prompt_text(&key, &value)?);
+            let text = prompt_text(&key, &value)?;
+            if text.trim().is_empty() {
+                return Err(parse_error(format!("prompt '{key}' is empty")));
+            }
+            let template = PromptTemplate::new(text);
             if let Err(error) = template.validate_names(id.allowed_variables()) {
                 catalog.errors.insert(id, error);
             }
@@ -142,13 +146,10 @@ impl PromptCatalog {
             ))
             .into());
         }
-        self.templates.get(&id).ok_or_else(|| {
-            CliErrorKind::invalid_transition(format!(
-                "no template for prompt '{}'",
-                id.config_key()
-            ))
-            .into()
-        })
+        Ok(self
+            .templates
+            .get(&id)
+            .expect("every catalog starts from the builtins, which cover every prompt"))
     }
 
     /// Whether nothing has been customized, so every prompt renders exactly
