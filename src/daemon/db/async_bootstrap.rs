@@ -318,7 +318,7 @@ fn baseline_migration() -> Result<&'static Migration, CliError> {
         .ok_or_else(|| db_error("missing daemon async baseline migration"))
 }
 
-/// Migrations that rebuild a referenced table have to rename it, and SQLite
+/// Migrations that rebuild a referenced table have to rename it, and `SQLite`
 /// rewrites every REFERENCES clause pointing at a renamed table while
 /// enforcement is on - which turns the rename into a dangling foreign key once
 /// the temp table is dropped. The pragma is ignored inside a transaction and
@@ -348,7 +348,7 @@ async fn run_daemon_migrator(pool: &SqlitePool) -> Result<(), CliError> {
 /// The connection goes back to the pool afterwards, so a restore that misses a
 /// statement leaves that one connection with enforcement off while every other
 /// connection in the pool has it on. Each pragma is its own statement because
-/// SQLite prepares one statement at a time.
+/// `SQLite` prepares one statement at a time.
 async fn restore_migration_pragmas(
     conn: &mut sqlx::SqliteConnection,
 ) -> Result<(), CliError> {

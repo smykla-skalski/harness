@@ -142,23 +142,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         managed_agent_mutation_locks: http::ManagedAgentMutationLocks::default(),
         recovery_snapshot: Arc::default(),
     };
-    // Startup recovery renders prompts (it re-seals remote offers), so the
-    // catalog has to be resolved before it, not with the background tasks
-    // further down. Installing it later meant recovery sealed offers with the
-    // shipped prompts while everything after used the configured ones.
-    install_prompt_catalog(resolve_prompt_catalog_from_env());
-    if let Some(async_db) = app_state.async_db.get() {
-        Box::pin(recover_remote_assignments_at_startup_with_controller(
-            &app_state, async_db,
-        ))
-        .await?;
-    }
-    Box::pin(
-        app_state
-            .codex_controller
-            .reconcile_task_board_admission_workers_after_restart(),
-    )
-    .await?;
+    run_startup_recovery(&app_state).await?;
     let _background = spawn_background_tasks(&app_state, config.poll_interval, &shutdown_rx);
 
     let serve_result = http::serve(listener, app_state, shutdown_rx).await;
@@ -175,6 +159,27 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         (Err(error), _, _) | (Ok(()), Err(error), _) | (Ok(()), Ok(()), Err(error)) => Err(error),
         (Ok(()), Ok(()), Ok(())) => Ok(()),
     }
+}
+
+/// Startup recovery renders prompts (it re-seals remote offers), so the catalog
+/// has to be resolved before it, not with the background tasks that follow.
+/// Installing it later meant recovery sealed offers with the shipped prompts
+/// while everything after used the configured ones.
+async fn run_startup_recovery(app_state: &DaemonHttpState) -> Result<(), CliError> {
+    install_prompt_catalog(resolve_prompt_catalog_from_env());
+    if let Some(async_db) = app_state.async_db.get() {
+        Box::pin(recover_remote_assignments_at_startup_with_controller(
+            app_state, async_db,
+        ))
+        .await?;
+    }
+    Box::pin(
+        app_state
+            .codex_controller
+            .reconcile_task_board_admission_workers_after_restart(),
+    )
+    .await?;
+    Ok(())
 }
 
 #[expect(
