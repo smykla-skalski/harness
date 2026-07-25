@@ -384,7 +384,7 @@ async fn start_codex_worker(
 ) -> Result<ManagedAgentSnapshot, CliError> {
     let session_id = applied.session_id.clone();
     let run_id = codex_worker_id(dispatch_intent_id);
-    let request = codex_worker_request(applied, &run_id);
+    let request = codex_worker_request(applied, &run_id)?;
     run_codex_agent_blocking(state, "task-board worker start", move |controller| {
         controller
             .start_run_with_id(&session_id, &request, run_id)
@@ -400,7 +400,7 @@ async fn start_interactive_worker(
 ) -> Result<ManagedAgentSnapshot, CliError> {
     let session_id = applied.session_id.clone();
     let tui_id = terminal_worker_id(dispatch_intent_id);
-    let request = terminal_worker_request(applied, &tui_id);
+    let request = terminal_worker_request(applied, &tui_id)?;
     run_terminal_agent_blocking(state, "task-board worker start", move |manager| {
         manager
             .start_with_id(&session_id, &request, tui_id)
@@ -447,10 +447,16 @@ pub(crate) fn managed_admission_owner_id(
     }
 }
 
+/// The prompt this dispatch will start its worker with, rendered the same way
+/// the start path renders it.
+///
+/// # Errors
+/// Returns an error when the configured prompt cannot be rendered for this
+/// item.
 pub(crate) fn rendered_worker_prompt(
     applied: &DispatchAppliedTask,
     dispatch_intent_id: &str,
-) -> String {
+) -> Result<String, CliError> {
     let managed_run_id = managed_worker_id(applied, dispatch_intent_id);
     worker_prompt(applied, &managed_run_id)
 }

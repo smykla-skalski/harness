@@ -40,7 +40,7 @@ fn worker_vars() -> BTreeMap<&'static str, String> {
         ("work_item_id", "task-1"),
         ("priority", "Medium"),
         ("status", "InProgress"),
-        ("project_section", "\n\nProject:\nproject-7"),
+        ("project_id_section", "\n\nProject:\nproject-7"),
         ("worktree_section", "\n\nWorktree:\n/tmp/worktree"),
         ("session_id_section", "\n\nSession id:\nsession-1"),
         ("managed_run_id_section", "\n\nManaged run id:\ncodex-1"),

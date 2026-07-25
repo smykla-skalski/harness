@@ -1,5 +1,9 @@
+use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
+use crate::errors::CliError;
+
+use super::prompt_catalog::{PromptId, render_prompt};
 use super::{ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 
 pub(crate) const DISPATCH_PLACEHOLDER: &str = "<assigned-at-dispatch>";
@@ -13,47 +17,127 @@ pub(crate) struct WorkerPromptContext<'a> {
     pub(crate) status: TaskBoardStatus,
 }
 
+/// Render the worker prompt for one item from the active prompt catalog.
+///
+/// Each optional fact contributes two variables: `<name>_section`, always
+/// present and empty when the fact is missing, which is what lets one fixed
+/// template reproduce the shipped prompt; and the raw `<name>`, present only
+/// when the item has it, so a custom template naming it fails for an item that
+/// does not.
+///
+/// # Errors
+/// Returns an error when the configured prompt cannot be rendered for this
+/// item, so the caller refuses the spawn rather than starting an agent with a
+/// prompt it could not complete.
 pub(crate) fn render_worker_prompt(
     item: &TaskBoardItem,
     context: &WorkerPromptContext<'_>,
-) -> String {
-    let mut prompt = format!(
-        "Work on task-board item '{}'.\n\nBoard item: {}\nSession task: {}\nPriority: {:?}\nStatus: {:?}",
-        item.title, context.board_item_id, context.work_item_id, item.priority, context.status
-    );
-    push_optional_section(&mut prompt, "Project", item.project_id.as_deref());
-    push_optional_section(&mut prompt, "Worktree", context.worktree);
-    push_optional_section(&mut prompt, "Session id", context.session_id);
-    push_optional_section(&mut prompt, "Managed run id", context.managed_run_id);
+) -> Result<String, CliError> {
+    let mut variables: BTreeMap<&'static str, String> = BTreeMap::from([
+        ("title", item.title.clone()),
+        ("board_item_id", context.board_item_id.to_string()),
+        ("work_item_id", context.work_item_id.to_string()),
+        ("priority", format!("{:?}", item.priority)),
+        ("status", format!("{:?}", context.status)),
+        (
+            "lifecycle_section",
+            lifecycle_section(context.session_id, context.work_item_id),
+        ),
+    ]);
     let tags = (!item.tags.is_empty()).then(|| item.tags.join(", "));
-    push_optional_section(&mut prompt, "Tags", tags.as_deref());
     let external_refs = render_external_refs(&item.external_refs);
-    push_optional_section(&mut prompt, "External refs", external_refs.as_deref());
-    push_optional_section(
-        &mut prompt,
-        "Planning summary",
-        item.planning.summary.as_deref(),
-    );
-    push_optional_section(&mut prompt, "Task body", non_empty(item.body.as_str()));
-    push_lifecycle(&mut prompt, context.session_id, context.work_item_id);
-    prompt
+    let facts: [Fact<'_>; 8] = [
+        Fact::new("project_id", "project_id_section", "Project", item.project_id.as_deref()),
+        Fact::new("worktree", "worktree_section", "Worktree", context.worktree),
+        Fact::new("session_id", "session_id_section", "Session id", context.session_id),
+        Fact::new(
+            "managed_run_id",
+            "managed_run_id_section",
+            "Managed run id",
+            context.managed_run_id,
+        ),
+        Fact::new("tags", "tags_section", "Tags", tags.as_deref()),
+        Fact::new(
+            "external_refs",
+            "external_refs_section",
+            "External refs",
+            external_refs.as_deref(),
+        ),
+        Fact::new(
+            "planning_summary",
+            "planning_summary_section",
+            "Planning summary",
+            item.planning.summary.as_deref(),
+        ),
+        Fact::new(
+            "task_body",
+            "task_body_section",
+            "Task body",
+            non_empty(item.body.as_str()),
+        ),
+    ];
+    for fact in facts {
+        fact.push_into(&mut variables);
+    }
+    render_prompt(PromptId::Worker, &variables)
 }
 
-fn push_lifecycle(prompt: &mut String, session_id: Option<&str>, work_item_id: &str) {
-    prompt.push_str(
+/// One optional item fact and the section the shipped prompt wrapped it in.
+struct Fact<'a> {
+    name: &'static str,
+    section_name: &'static str,
+    section_title: &'static str,
+    value: Option<&'a str>,
+}
+
+impl<'a> Fact<'a> {
+    const fn new(
+        name: &'static str,
+        section_name: &'static str,
+        section_title: &'static str,
+        value: Option<&'a str>,
+    ) -> Self {
+        Self {
+            name,
+            section_name,
+            section_title,
+            value,
+        }
+    }
+
+    fn push_into(self, variables: &mut BTreeMap<&'static str, String>) {
+        let Some(value) = self.value else {
+            variables.insert(self.section_name, String::new());
+            return;
+        };
+        variables.insert(
+            self.section_name,
+            format!("\n\n{}:\n{value}", self.section_title),
+        );
+        variables.insert(self.name, value.to_string());
+    }
+}
+
+fn lifecycle_section(session_id: Option<&str>, work_item_id: &str) -> String {
+    let mut section = String::from(
         "\n\nLifecycle:\nImplement the requested work, keep changes scoped, and run the smallest relevant validation.",
     );
     let Some(session_id) = session_id else {
-        prompt.push_str(" Submit the task for review when ready.");
-        return;
+        section.push_str(" Submit the task for review when ready.");
+        return section;
     };
     write!(
-        prompt,
+        section,
         "\n1. Run `harness session task list {session_id} --json` and read `assigned_to` from task `{work_item_id}`; use that value as `<assigned-agent-id>`.\n2. Report progress with `harness session task checkpoint {session_id} {work_item_id} --actor <assigned-agent-id> --summary \"<summary>\" --progress <0-100>`.\n3. Submit with `harness session task submit-for-review {session_id} {work_item_id} --actor <assigned-agent-id> --summary \"<summary>\"`.\nThe controller also advances this task when the managed run completes and is the authoritative safety net."
     )
     .expect("writing to a string cannot fail");
+    section
 }
 
+/// The prompt shown in a dispatch preview. Previews are informational and the
+/// spawn re-renders independently, so a prompt that cannot be rendered for
+/// this item shows the reason rather than substituting text no agent will run.
+#[must_use]
 pub(crate) fn plan_worker_prompt(item: &TaskBoardItem) -> String {
     render_worker_prompt(
         item,
@@ -70,6 +154,7 @@ pub(crate) fn plan_worker_prompt(item: &TaskBoardItem) -> String {
             status: TaskBoardStatus::InProgress,
         },
     )
+    .unwrap_or_else(|error| error.message().to_string())
 }
 
 fn render_external_refs(references: &[ExternalRef]) -> Option<String> {
@@ -91,42 +176,11 @@ fn render_external_refs(references: &[ExternalRef]) -> Option<String> {
     })
 }
 
-fn push_optional_section(prompt: &mut String, title: &str, value: Option<&str>) {
-    let Some(value) = value else {
-        return;
-    };
-    prompt.push_str("\n\n");
-    prompt.push_str(title);
-    prompt.push_str(":\n");
-    prompt.push_str(value);
-}
-
 fn non_empty(value: &str) -> Option<&str> {
     let trimmed = value.trim();
     (!trimmed.is_empty()).then_some(trimmed)
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::task_board::TaskBoardItem;
-
-    #[test]
-    fn plan_prompt_preserves_existing_session_checkout_and_marks_reserved_ids() {
-        let mut item = TaskBoardItem::new(
-            "board-1".into(),
-            "Existing session task".into(),
-            "Implement it".into(),
-            "2026-07-13T00:00:00Z".into(),
-        );
-        item.session_id = Some("session-existing".into());
-        item.workflow.worktree = Some("/tmp/existing-worktree".into());
-
-        let prompt = plan_worker_prompt(&item);
-
-        assert!(prompt.contains("Session id:\nsession-existing"));
-        assert!(prompt.contains("Worktree:\n/tmp/existing-worktree"));
-        assert!(prompt.contains("Session task: <assigned-at-dispatch>"));
-        assert!(prompt.contains("Managed run id:\n<assigned-at-dispatch>"));
-    }
-}
+#[path = "worker_prompt_tests.rs"]
+mod tests;

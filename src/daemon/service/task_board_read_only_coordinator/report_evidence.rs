@@ -64,6 +64,8 @@ pub(super) fn validate_run_binding(
 ) -> Result<(), CliError> {
     let context = super::requests::run_context(execution)?;
     let session_id = context.session_id.as_str();
+    // The prompt is configuration and may have been customized after this
+    // attempt started, so the frozen attempt identity is what binds the run.
     let valid = run.run_id == attempt.idempotency_key
         && run.session_id == session_id
         && run.task_id == expected.task_id
@@ -71,16 +73,29 @@ pub(super) fn validate_run_binding(
         && run.workflow_execution_id.as_deref() == Some(execution.execution_id.as_str())
         && run.project_dir == context.worktree
         && run.mode == expected.mode
-        && run.prompt == expected.prompt
         && run.model == expected.model
         && run.effort == expected.effort;
-    if valid {
-        Ok(())
-    } else {
-        Err(invalid_transition(
+    if !valid {
+        return Err(invalid_transition(
             "durable Codex run does not match the frozen workflow attempt binding",
-        ))
+        ));
     }
+    if run.prompt != expected.prompt {
+        note_attempt_prompt_change(&attempt.idempotency_key);
+    }
+    Ok(())
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing::info! macro expands into a chain clippy reads as branchy"
+)]
+fn note_attempt_prompt_change(idempotency_key: &str) {
+    tracing::info!(
+        target: "harness::task_board",
+        managed_run_id = %idempotency_key,
+        "durable attempt run was launched with a different prompt; binding confirmed structurally",
+    );
 }
 
 pub(super) fn parse_attempt_result(

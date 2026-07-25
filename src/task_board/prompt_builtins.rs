@@ -53,7 +53,7 @@ pub(super) const WORKER: &str = "Work on task-board item '{{ title }}'.\n\n\
      Session task: {{ work_item_id }}\n\
      Priority: {{ priority }}\n\
      Status: {{ status }}\
-     {{ project_section }}{{ worktree_section }}{{ session_id_section }}\
+     {{ project_id_section }}{{ worktree_section }}{{ session_id_section }}\
      {{ managed_run_id_section }}{{ tags_section }}{{ external_refs_section }}\
      {{ planning_summary_section }}{{ task_body_section }}{{ lifecycle_section }}";
 
@@ -69,7 +69,7 @@ pub(super) const WORKER_VARIABLES: &[&str] = &[
     "planning_summary_section",
     "priority",
     "project_id",
-    "project_section",
+    "project_id_section",
     "session_id",
     "session_id_section",
     "status",
@@ -85,9 +85,12 @@ pub(super) const WORKER_VARIABLES: &[&str] = &[
 
 /// Default `write_implementation` template. Reproduces
 /// `write_implementation_prompt`'s former literal.
-pub(super) const WRITE_IMPLEMENTATION: &str = "Implement the exact approved plan for Task Board item '{{ board_item_id }}'.\n\nTitle: {{ title }}\nWorktree: {{ worktree }}\nBase head: {{ base_head_revision }}\n\nApproved plan:\n{{ plan_markdown }}\n\nAcceptance criteria:\n{{ acceptance_criteria }}\n\nWork only in the assigned worktree. Preserve unrelated changes, run focused validation through repository workflows, and create local commits as required by the repository; do not push, publish, or merge. Before responding, replace every REPLACE_WITH_CURRENT_HEAD token below with the exact resulting Git HEAD. Your final message must contain only one JSON value matching this exact identity and shape:\n{{ response_json }}";
+pub(super) const WRITE_IMPLEMENTATION: &str = "Implement the exact approved plan for Task Board item '{{ board_item_id }}'.\n\nTitle: {{ title }}\n{{ workspace_directive }}\nBase head: {{ base_head_revision }}\n\nApproved plan:\n{{ plan_markdown }}\n\nAcceptance criteria:\n{{ acceptance_criteria }}\n\nWork only in the assigned worktree. Preserve unrelated changes, run focused validation through repository workflows, and create local commits as required by the repository; do not push, publish, or merge. Before responding, replace every REPLACE_WITH_CURRENT_HEAD token below with the exact resulting Git HEAD. Your final message must contain only one JSON value matching this exact identity and shape:\n{{ response_json }}";
 
 /// Variables the `write_implementation` template may reference.
+/// `workspace_directive` is the whole workspace line, which names a worktree
+/// locally and an executor checkout remotely; `worktree` is supplied only for
+/// a run that has one.
 pub(super) const WRITE_IMPLEMENTATION_VARIABLES: &[&str] = &[
     "acceptance_criteria",
     "base_head_revision",
@@ -97,15 +100,18 @@ pub(super) const WRITE_IMPLEMENTATION_VARIABLES: &[&str] = &[
     "plan_markdown",
     "response_json",
     "title",
+    "workspace_directive",
     "worktree",
 ];
 
 /// Default `read_only_review` template. Reproduces `read_only_review_prompt`'s
 /// former literal. `pull_request_line` is empty when the item has no pull
 /// request, matching the former optional `{}` argument.
-pub(super) const READ_ONLY_REVIEW: &str = "Run a strictly read-only review for Task Board item '{{ board_item_id }}'.\n\nTitle: {{ title }}\nContext: {{ context }}\nExact head: {{ exact_head_revision }}{{ pull_request_line }}\nWorktree: {{ worktree }}\n\nDo not modify files, commits, branches, task state, pull requests, or external systems. Verify that every inspected change belongs to the exact frozen head above; return human_required when that revision cannot be inspected. Your final message must contain only one JSON value matching this exact identity and shape (use verdict pass, changes_required, or human_required):\n{{ response_json }}";
+pub(super) const READ_ONLY_REVIEW: &str = "Run a strictly read-only review for Task Board item '{{ board_item_id }}'.\n\nTitle: {{ title }}\nContext: {{ context }}\nExact head: {{ exact_head_revision }}{{ pull_request_line }}\n{{ workspace_directive }}\n\nDo not modify files, commits, branches, task state, pull requests, or external systems. Verify that every inspected change belongs to the exact frozen head above; return human_required when that revision cannot be inspected. Your final message must contain only one JSON value matching this exact identity and shape (use verdict pass, changes_required, or human_required):\n{{ response_json }}";
 
-/// Variables the `read_only_review` template may reference.
+/// Variables the `read_only_review` template may reference. `pull_request_line`
+/// is empty when the item has no pull request, matching the former optional
+/// argument, and `pull_request` is supplied only when there is one.
 pub(super) const READ_ONLY_REVIEW_VARIABLES: &[&str] = &[
     "board_item_id",
     "context",
@@ -117,5 +123,21 @@ pub(super) const READ_ONLY_REVIEW_VARIABLES: &[&str] = &[
     "pull_request_line",
     "response_json",
     "title",
+    "workspace_directive",
     "worktree",
+];
+
+/// Default `evaluation` template. Reproduces the durable workflow
+/// coordinator's former evaluation literal.
+pub(super) const EVALUATION: &str = "Evaluate the durable review evidence for Task Board item '{{ board_item_id }}'.\n\nTitle: {{ title }}\nExact head: {{ exact_head_revision }}\nReview evidence:\n{{ review_evidence }}\n\nDo not modify files, commits, branches, task state, pull requests, or external systems. Confirm the evidence is internally consistent and bound to the exact frozen head. Your final message must contain only one JSON value matching this exact identity and shape (use verdict pass, changes_required, or human_required):\n{{ response_json }}";
+
+/// Variables the `evaluation` template may reference.
+pub(super) const EVALUATION_VARIABLES: &[&str] = &[
+    "board_item_id",
+    "exact_head_revision",
+    "execution_id",
+    "managed_run_id",
+    "response_json",
+    "review_evidence",
+    "title",
 ];

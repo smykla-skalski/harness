@@ -53,20 +53,38 @@ pub(super) fn validate_recovered_workflow_worker(
     let ManagedAgentSnapshot::Codex(run) = snapshot else {
         return Err(workflow_recovery_conflict(snapshot.agent_id()));
     };
-    let expected = codex_worker_request(applied, &run.run_id);
+    // The prompt is no longer part of the identity: it is configuration, and a
+    // customization landing between launch and recovery would otherwise strand
+    // a worker that is demonstrably doing the work it was started for. The
+    // frozen structural fields carry that proof instead, and a prompt that
+    // still matches is logged as the stronger confirmation it is.
+    let expected = codex_worker_request(applied, &run.run_id)?;
     let matches = run.project_dir == worktree
         && run.board_item_id.as_deref() == Some(applied.board_item_id.as_str())
         && run.workflow_execution_id == applied.item.workflow.execution_id
         && run.task_id.as_deref() == task_id
         && run.mode == expected.mode
-        && run.prompt == expected.prompt
         && run.model == expected.model
         && run.effort == expected.effort;
-    if matches {
-        Ok(())
-    } else {
-        Err(workflow_recovery_conflict(&run.run_id))
+    if !matches {
+        return Err(workflow_recovery_conflict(&run.run_id));
     }
+    if run.prompt != expected.prompt {
+        note_recovered_prompt_change(&run.run_id);
+    }
+    Ok(())
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing::info! macro expands into a chain clippy reads as branchy"
+)]
+fn note_recovered_prompt_change(run_id: &str) {
+    tracing::info!(
+        target: "harness::task_board",
+        managed_run_id = %run_id,
+        "recovered worker was launched with a different prompt; identity confirmed structurally",
+    );
 }
 
 fn workflow_recovery_conflict(worker_id: &str) -> CliError {

@@ -19,6 +19,7 @@ use super::prompt_template::{PromptConfigError, PromptTemplate};
 /// escalation judgment, an ordinary board worker, and the two workflow agents.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum PromptId {
+    Evaluation,
     ReadOnlyReview,
     TriageEscalation,
     Worker,
@@ -27,7 +28,8 @@ pub(crate) enum PromptId {
 
 impl PromptId {
     /// Every prompt, in configuration-key order.
-    pub(crate) const ALL: [Self; 4] = [
+    pub(crate) const ALL: [Self; 5] = [
+        Self::Evaluation,
         Self::ReadOnlyReview,
         Self::TriageEscalation,
         Self::Worker,
@@ -38,6 +40,7 @@ impl PromptId {
     #[must_use]
     pub(crate) const fn config_key(self) -> &'static str {
         match self {
+            Self::Evaluation => "evaluation",
             Self::ReadOnlyReview => "read_only_review",
             Self::TriageEscalation => "triage_escalation",
             Self::Worker => "worker",
@@ -53,6 +56,7 @@ impl PromptId {
     #[must_use]
     const fn builtin_template(self) -> &'static str {
         match self {
+            Self::Evaluation => prompt_builtins::EVALUATION,
             Self::ReadOnlyReview => prompt_builtins::READ_ONLY_REVIEW,
             Self::TriageEscalation => prompt_builtins::TRIAGE_ESCALATION,
             Self::Worker => prompt_builtins::WORKER,
@@ -64,6 +68,7 @@ impl PromptId {
     #[must_use]
     pub(crate) const fn allowed_variables(self) -> &'static [&'static str] {
         match self {
+            Self::Evaluation => prompt_builtins::EVALUATION_VARIABLES,
             Self::ReadOnlyReview => prompt_builtins::READ_ONLY_REVIEW_VARIABLES,
             Self::TriageEscalation => prompt_builtins::TRIAGE_ESCALATION_VARIABLES,
             Self::Worker => prompt_builtins::WORKER_VARIABLES,

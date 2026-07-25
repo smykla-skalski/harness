@@ -22,7 +22,7 @@ pub mod project_shape;
 pub mod policy_runtime;
 pub mod progress_rollup;
 mod prompt_builtins;
-mod prompt_catalog;
+pub(crate) mod prompt_catalog;
 #[cfg(feature = "daemon-runtime")]
 mod prompt_config;
 mod prompt_template;

@@ -27,11 +27,18 @@ use super::{
 #[path = "write_request_recovery_tests.rs"]
 mod write_request_recovery_tests;
 
+#[path = "prompt_tests.rs"]
+mod prompt_tests;
+
+#[path = "prompt_recovery_tests.rs"]
+mod prompt_recovery_tests;
+
 #[test]
 fn codex_worker_request_carries_task_board_identity() {
     let applied = applied_task(AgentMode::Headless);
 
-    let request = codex_worker_request(&applied, "codex-dispatch-intent-1");
+    let request =
+        codex_worker_request(&applied, "codex-dispatch-intent-1").expect("render worker request");
 
     assert_eq!(request.task_id.as_deref(), Some("task-1"));
     assert_eq!(request.board_item_id.as_deref(), Some("board-1"));
@@ -70,7 +77,8 @@ fn codex_worker_request_carries_task_board_identity() {
 fn planning_and_evaluate_workers_are_report_only() {
     for mode in [AgentMode::Planning, AgentMode::Evaluate] {
         let applied = applied_task(mode);
-        let request = codex_worker_request(&applied, "codex-read-only");
+        let request =
+            codex_worker_request(&applied, "codex-read-only").expect("render worker request");
 
         assert_eq!(request.mode, crate::daemon::protocol::CodexRunMode::Report);
     }
@@ -82,7 +90,8 @@ fn read_only_review_request_freezes_identity_and_has_no_session_task() {
     applied.item.workflow_kind = TaskBoardWorkflowKind::Review;
     applied.read_only_workflow = Some(review_launch());
 
-    let request = codex_worker_request(&applied, "codex-review-attempt");
+    let request =
+        codex_worker_request(&applied, "codex-review-attempt").expect("render review request");
 
     assert_eq!(request.mode, crate::daemon::protocol::CodexRunMode::Report);
     assert_eq!(request.task_id, None);
@@ -123,7 +132,8 @@ fn write_implementation_request_freezes_approved_plan_and_result_identity() {
     let mut applied = applied_task(AgentMode::Headless);
     applied.write_workflow = Some(Box::new(write_launch()));
 
-    let request = codex_worker_request(&applied, "codex-implementation-attempt");
+    let request = codex_worker_request(&applied, "codex-implementation-attempt")
+        .expect("render write request");
 
     assert_eq!(
         request.mode,
@@ -171,7 +181,8 @@ fn ordinary_dispatch_keeps_worker_scoped_admission() {
 fn interactive_worker_request_uses_terminal_runtime() {
     let applied = applied_task(AgentMode::Interactive);
 
-    let request = terminal_worker_request(&applied, "agent-tui-dispatch-intent-1");
+    let request = terminal_worker_request(&applied, "agent-tui-dispatch-intent-1")
+        .expect("render terminal request");
 
     assert_eq!(request.runtime, "codex");
     assert_eq!(request.task_id.as_deref(), Some("task-1"));
@@ -320,7 +331,7 @@ fn read_only_recovery_rejects_a_conflicting_durable_run() {
     applied.item.workflow_kind = TaskBoardWorkflowKind::Review;
     applied.read_only_workflow = Some(review_launch());
     let run_id = "codex-review-attempt";
-    let request = codex_worker_request(&applied, run_id);
+    let request = codex_worker_request(&applied, run_id).expect("render review request");
     let mut run = codex_snapshot(CodexRunStatus::Running, &applied.session_id);
     run.run_id = run_id.into();
     run.board_item_id = request.board_item_id;

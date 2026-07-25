@@ -17,7 +17,7 @@ fn durable_initial_write_request_matches_the_managed_launch() {
     let launch = write_launch();
     applied.write_workflow = Some(Box::new(launch.clone()));
     let run_id = "codex-implementation-attempt";
-    let managed = codex_worker_request(&applied, run_id);
+    let managed = codex_worker_request(&applied, run_id).expect("render managed request");
     let attempt = TaskBoardExecutionAttemptRecord {
         execution_id: "workflow-1".into(),
         action_key: "implementation:1".into(),
