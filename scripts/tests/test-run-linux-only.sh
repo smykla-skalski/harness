@@ -95,11 +95,23 @@ expected_tasks = {
     "harness:check:feature-isolation",
     "harness:check:rust",
 }
-wrapper = "./scripts/run-linux-only.sh"
-cargo = "./scripts/cargo-local.sh"
+# A script reaches these through whatever path spelling it already uses, so
+# compare the invoked name rather than the literal prefix. `$cargo_local` is
+# the resolved-cargo variable the isolation script assigns before calling it.
+wrapper = {"run-linux-only.sh"}
+cargo = {"cargo-local.sh", "$cargo_local"}
+
+
+def invoked_name(argument):
+    return argument.rsplit("/", 1)[-1]
 covered_tasks = set()
 task_name = None
-script_run_pattern = re.compile(r'run\s*=\s*"(\./scripts/[\w.-]+\.sh)"')
+# A task may reach its script through a wrapper rather than naming it alone,
+# so every script mentioned in the run line is followed. Anchoring on the whole
+# value instead silently stopped covering a task the moment one gained a
+# wrapper, and reported the coverage it could no longer see as missing.
+script_run_pattern = re.compile(r'run\s*=\s*"([^"]+)"')
+script_path_pattern = re.compile(r'\./scripts/[\w.-]+\.sh')
 
 
 def scan_line(line, task_name, source):
@@ -118,7 +130,8 @@ def scan_line(line, task_name, source):
     if task_name is None:
         raise SystemExit(f"harness-systemd selection has no task: {line}")
     covered_tasks.add(task_name)
-    if arguments[:2] != [wrapper, cargo]:
+    invoked = [invoked_name(argument) for argument in arguments[:2]]
+    if len(invoked) < 2 or invoked[0] not in wrapper or invoked[1] not in cargo:
         raise SystemExit(
             f"{task_name} selects harness-systemd without the Linux-only wrapper: "
             f"{command} ({source})"
@@ -131,12 +144,14 @@ for line in mise_path.read_text().splitlines():
         task_name = task_header.group(1)
         continue
     script_match = script_run_pattern.search(line)
-    if script_match:
-        script_path = repo_root / script_match.group(1)
-        if not script_path.is_file():
-            raise SystemExit(f"{task_name} delegates to a missing script: {script_path}")
-        for script_line in script_path.read_text().splitlines():
-            scan_line(script_line, task_name, script_path.name)
+    delegated = script_path_pattern.findall(script_match.group(1)) if script_match else []
+    if delegated:
+        for candidate in delegated:
+            script_path = repo_root / candidate
+            if not script_path.is_file():
+                raise SystemExit(f"{task_name} delegates to a missing script: {script_path}")
+            for script_line in script_path.read_text().splitlines():
+                scan_line(script_line, task_name, script_path.name)
         continue
     scan_line(line, task_name, mise_path.name)
 
