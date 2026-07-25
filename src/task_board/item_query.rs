@@ -116,7 +116,7 @@ impl PreparedTaskBoardItemQuery<'_> {
     fn tags_match(&self, tags: &[String]) -> bool {
         self.tags
             .iter()
-            .all(|wanted| tags.iter().any(|tag| &canonical_tag(tag) == wanted))
+            .all(|wanted| tags.iter().any(|tag| canonical_tag_eq(tag, wanted)))
     }
 
     fn text_matches(&self, fields: &TaskBoardQueryFields<'_>) -> bool {
@@ -244,6 +244,18 @@ fn contains_ignoring_case(haystack: &str, needle_lowercase: &str) -> bool {
 /// The write path stores tags exactly as they arrive, so an item really can
 /// hold `"backend "`, and comparing either side raw would leave it
 /// unmatchable.
+/// Whether a stored tag reduces to `canonical`, which is already in that form.
+///
+/// Scanning compares every requested tag against every tag on every item, so
+/// this walks the characters rather than building a canonical `String` for
+/// each of those pairs.
+fn canonical_tag_eq(tag: &str, canonical: &str) -> bool {
+    tag.trim()
+        .chars()
+        .flat_map(char::to_lowercase)
+        .eq(canonical.chars())
+}
+
 fn canonical_tag(tag: &str) -> String {
     tag.trim().to_lowercase()
 }

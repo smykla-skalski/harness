@@ -28,10 +28,15 @@ fn every_page_folds_into_one_response_that_keeps_the_board_wide_fields() {
     let mut pages = TaskBoardItemPages::default();
 
     assert_eq!(
-        pages.absorb(&page(&["task-1", "task-2"], Some("cursor-2"))),
+        pages
+            .absorb(&page(&["task-1", "task-2"], Some("cursor-2")))
+            .expect("a shaped page"),
         Some("cursor-2".to_string())
     );
-    assert_eq!(pages.absorb(&page(&["task-3"], None)), None);
+    assert_eq!(
+        pages.absorb(&page(&["task-3"], None)).expect("a shaped page"),
+        None
+    );
     let response = pages.into_response();
 
     assert_eq!(folded_ids(&response), ["task-1", "task-2", "task-3"]);
@@ -50,8 +55,12 @@ fn every_page_folds_into_one_response_that_keeps_the_board_wide_fields() {
 fn a_row_re_served_after_a_concurrent_delete_is_folded_once() {
     let mut pages = TaskBoardItemPages::default();
 
-    pages.absorb(&page(&["task-1", "task-2", "task-3"], Some("cursor-2")));
-    pages.absorb(&page(&["task-2", "task-3", "task-4"], None));
+    pages
+        .absorb(&page(&["task-1", "task-2", "task-3"], Some("cursor-2")))
+        .expect("a shaped page");
+    pages
+        .absorb(&page(&["task-2", "task-3", "task-4"], None))
+        .expect("a shaped page");
 
     assert_eq!(
         folded_ids(&pages.into_response()),
@@ -65,9 +74,34 @@ fn a_row_re_served_after_a_concurrent_delete_is_folded_once() {
 fn an_empty_page_ends_the_walk() {
     let mut pages = TaskBoardItemPages::default();
 
-    pages.absorb(&page(&["task-1"], Some("cursor-2")));
+    pages
+        .absorb(&page(&["task-1"], Some("cursor-2")))
+        .expect("a shaped page");
 
-    assert_eq!(pages.absorb(&page(&[], Some("cursor-3"))), None);
+    assert_eq!(
+        pages
+            .absorb(&page(&[], Some("cursor-3")))
+            .expect("a shaped page"),
+        None
+    );
+}
+
+/// A page missing its items array is a daemon this tool cannot read. Answering
+/// it as a drained selection would report a protocol mismatch as an empty
+/// board.
+#[test]
+fn a_page_without_an_items_array_fails_rather_than_reading_as_empty() {
+    let mut pages = TaskBoardItemPages::default();
+
+    for malformed in [json!(null), json!({}), json!({ "items": "nope" })] {
+        let error = pages
+            .absorb(&malformed)
+            .expect_err("a malformed page must not read as a drained board");
+        assert!(
+            format!("{error:?}").contains("items array"),
+            "unexpected: {error:?}"
+        );
+    }
 }
 
 #[test]

@@ -68,7 +68,7 @@ async fn walk_every_page(params: Value) -> Result<ToolResult, ToolError> {
             TaskBoardCallOutcome::Result(page) => page,
             refused @ TaskBoardCallOutcome::Refused(_) => return finish(refused),
         };
-        let Some(next) = merged.absorb(&page) else {
+        let Some(next) = merged.absorb(&page)? else {
             return finish(TaskBoardCallOutcome::Result(merged.into_response()));
         };
         // A cursor that names the same resume point can never drain, so stop
@@ -115,9 +115,15 @@ struct TaskBoardItemPages {
 
 impl TaskBoardItemPages {
     /// Take this page's items and return the cursor it offers, if any.
-    fn absorb(&mut self, page: &Value) -> Option<String> {
-        let items = page.get("items").and_then(Value::as_array);
-        for item in items.into_iter().flatten() {
+    ///
+    /// A page without an `items` array is a daemon this tool cannot read, not
+    /// an empty board: answering it as a drained selection would report a
+    /// protocol mismatch as "no items".
+    fn absorb(&mut self, page: &Value) -> Result<Option<String>, ToolError> {
+        let items = page.get("items").and_then(Value::as_array).ok_or_else(|| {
+            ToolError::internal("the daemon returned a task-board page with no items array")
+        })?;
+        for item in items {
             let fresh = match item.get("id").and_then(Value::as_str) {
                 Some(id) => self.seen.insert(id.to_string()),
                 None => true,
@@ -137,12 +143,13 @@ impl TaskBoardItemPages {
                 .map(|(key, value)| (key.clone(), value.clone()))
                 .collect();
         }
-        if items.is_some_and(Vec::is_empty) {
-            return None;
+        if items.is_empty() {
+            return Ok(None);
         }
-        page.get("next_cursor")
+        Ok(page
+            .get("next_cursor")
             .and_then(Value::as_str)
-            .map(ToString::to_string)
+            .map(ToString::to_string))
     }
 
     /// A drained walk answers the whole selection, so it carries no cursor.
