@@ -191,12 +191,12 @@ tokio-console = ["harness-telemetry/tokio-console"]
 name = "policy-wire-sample"
 path = "examples/policy-wire-sample.rs"
 
-# The integration suite is two targets rather than one because they need
-# different libraries, not because the file count grew: `integration` builds
-# against the default features and `integration_daemon` against `full-runtime`.
-# Splitting by count instead would link the same dependency tree more times and
-# cost more. `required-features` is what keeps a run that leaves `full-runtime`
-# off from building the daemon half at all.
+# The integration suite is two targets rather than one so that the daemon
+# dependency tree becomes optional, not because the file count grew. Only
+# `integration_daemon` requires `full-runtime`: a run that leaves the feature
+# off skips it and links `integration` against a library without that tree,
+# while a run that enables it, as the full gate does, builds both. Splitting by
+# count instead would link the same dependency tree more times and cost more.
 [[test]]
 name = "integration"
 path = "tests/integration.rs"

@@ -1,10 +1,11 @@
 // Integration test crate root for scenarios the daemon runtime does not reach.
-// Declares the submodules under tests/integration/ that compile against the
-// default feature set, so this target links a library built without axum,
-// sqlx, hyper, rustls and the rest of the `full-runtime` dependency tree.
-// Its sibling root tests/integration_daemon.rs owns the modules that do need
-// those symbols and reads the same directory, so a module changes target by
-// moving its `mod` line rather than its file.
+// Declares the submodules under tests/integration/ that compile without
+// `full-runtime`, so running this target on its own links a library built
+// without axum, sqlx, hyper, rustls and the rest of that dependency tree. It
+// does not forbid the feature: enabling it, as the full gate does, links the
+// larger library here too. Its sibling root tests/integration_daemon.rs owns
+// the modules that do need those symbols and reads the same directory, so a
+// module changes target by moving its `mod` line rather than its file.
 
 #![allow(
     clippy::absolute_paths,
