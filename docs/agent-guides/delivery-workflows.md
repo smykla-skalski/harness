@@ -156,13 +156,13 @@ Reclaim this session's two build caches first, because `git worktree remove` del
 - `<worktree>/target` - direct `cargo` and `cargo nextest` output.
 - `<main-checkout>/target/dev/wt-<worktree-name>-<hash>` - everything from `scripts/cargo-local.sh`, which every `mise run test:*` task uses. Sits outside the worktree and is usually the larger.
 
-Every other session holds its own `target/dev/wt-*` lane, so read the listing and take only the entry carrying this worktree's directory name; a prefix match can select a neighbour's. A lease file names the segment it covers, so an entry matching that lane means a build still owns it: leave the lane and stop there, because removing the worktree while a build holds its lane strands exactly the cache this step exists to reclaim.
+Every other session holds its own `target/dev/wt-*` lane, so ask `cargo-local.sh` for this one rather than matching a name by eye. A lease file names the segment it covers, so an entry matching that lane means a build still owns it: leave the lane and stop there, because removing the worktree while a build holds its lane strands exactly the cache this step exists to reclaim.
 
 ```bash
 # assumes: PR merged, <worktree> clean, no build running in this session's lane
-ls -d "<main-checkout>"/target/dev/wt-*              # this session's lane, by worktree directory name
+lane=$("<worktree>/scripts/cargo-local.sh" --print-target-dir)
 ls -A "<main-checkout>"/target/.cargo-local/leases/  # an entry naming that lane means stop, not delete
-rm -rf "<worktree>/target" "<main-checkout>/target/dev/<lane>"
+rm -rf "<worktree>/target" "$lane"
 ```
 
 Then remove the worktree and the branch:
