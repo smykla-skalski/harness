@@ -12,7 +12,6 @@ use tokio::time::timeout;
 use crate::daemon::db::TaskBoardRemotePriorPhaseBundle;
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteHostTrustFence,
-    TaskBoardRemoteOfferOutcome,
 };
 use crate::daemon::task_board_remote_transport::controller::{
     RemoteExecutionControllerClient, RemoteExecutionControllerError,
@@ -30,6 +29,8 @@ use crate::task_board::{
 
 #[path = "task_board_remote_controller/active_poll.rs"]
 mod active_poll;
+#[path = "task_board_remote_controller/offers.rs"]
+mod offers;
 #[path = "task_board_remote_controller/requests.rs"]
 mod requests;
 #[cfg(test)]
@@ -179,6 +180,10 @@ async fn refresh_host(db: &AsyncDaemonDb, host_id: &str) -> Result<(), CliError>
         .map_err(controller_database_error)
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "remote assignment state dispatch is clearer as one explicit match"
+)]
 async fn progress_assignment(
     db: &AsyncDaemonDb,
     assignment: TaskBoardRemoteAssignmentRecord,
@@ -248,6 +253,10 @@ async fn poll_unknown_assignment(
     .await
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "sequential settlement-handoff guards share the same status/finish-terminal closures"
+)]
 async fn poll_unknown_assignment_with<Status, StatusFuture, FinishTerminal, FinishFuture>(
     db: &AsyncDaemonDb,
     assignment: &TaskBoardRemoteAssignmentRecord,
@@ -305,85 +314,7 @@ async fn offer_remote_candidates(
         .remote_candidate_task_board_workflow_executions(CONTROLLER_CANDIDATE_LIMIT)
         .await?;
     for execution in candidates {
-        let Some(attempt) = remote_preparing_attempt(&execution) else {
-            continue;
-        };
-        let Some(phase) = execution.transition.phase else {
-            continue;
-        };
-        let now = canonical_now();
-        let prior_bundle = if requests::requires_prior_bundle(&execution, phase) {
-            db.task_board_remote_prior_phase_bundle(&execution, phase)
-                .await?
-        } else {
-            None
-        };
-        let Some(prepared_source) =
-            prepare_candidate_source(&execution, phase, prior_bundle.as_ref()).await?
-        else {
-            select_local_target(db, &execution, attempt, &now).await?;
-            continue;
-        };
-        let source_repository = prepared_source.repository().to_owned();
-        let host = db
-            .resolve_task_board_remote_host(&execution, &source_repository, phase, "codex", &now)
-            .await?;
-        let Some(host) = host else {
-            select_local_target(db, &execution, attempt, &now).await?;
-            continue;
-        };
-        // Sealing the offer renders the prompt, and a configured prompt can
-        // fail to render for this one execution -- a name the execution has no
-        // value for, or a template past the remote request's size ceiling.
-        // That is this candidate's problem, not the pass's: propagating it
-        // aborted the whole controller pass, which is a precondition of every
-        // dispatch route, so one bad candidate stopped every unrelated item
-        // from dispatching on every tick until the daemon restarted. Refusing
-        // remote and letting it run locally is what the neighbouring branches
-        // already do when a candidate cannot go remote.
-        let prepared =
-            match requests::prepare_offer(&execution, attempt, &host, prepared_source, &now) {
-                Ok(prepared) => prepared,
-                Err(error) => {
-                    warn_offer_render_refused(&execution.execution_id, &error);
-                    select_local_target(db, &execution, attempt, &now).await?;
-                    continue;
-                }
-            };
-        let Some(prepared) = prepared else {
-            select_local_target(db, &execution, attempt, &now).await?;
-            continue;
-        };
-        match Box::pin(db.offer_task_board_remote_assignment_with_source(
-            &TaskBoardWorkflowExecutionCas::from(&execution),
-            &TaskBoardExecutionAttemptCas::from(attempt),
-            &prepared.request,
-            prepared.source_content.as_deref(),
-            &host.config.host_id,
-            crate::daemon::db::TaskBoardRemoteOfferWindow::new(
-                &prepared.offered_at,
-                &prepared.lease_expires_at,
-                &prepared.deadline_at,
-            ),
-        ))
-        .await?
-        {
-            TaskBoardRemoteOfferOutcome::Created(_) | TaskBoardRemoteOfferOutcome::Replayed(_) => {
-                report.offered_attempts += 1;
-            }
-            // AcceptedReplay/Rejected carry executor-inbox receipts and are produced only by the
-            // executor offer inbox, never by offer_task_board_remote_assignment_with_source
-            // (Created/Replayed/Stale/Unavailable only). Fail closed rather than silently falling
-            // back to local at this pre-I/O offer boundary if that provenance invariant is broken.
-            TaskBoardRemoteOfferOutcome::AcceptedReplay(_)
-            | TaskBoardRemoteOfferOutcome::Rejected(_) => {
-                return Err(CliErrorKind::concurrent_modification(
-                    "controller offer creation returned an executor-inbox receipt outcome",
-                )
-                .into());
-            }
-            TaskBoardRemoteOfferOutcome::Unavailable | TaskBoardRemoteOfferOutcome::Stale => {}
-        }
+        Box::pin(offers::offer_remote_candidate(db, report, &execution)).await?;
     }
     Ok(())
 }
