@@ -160,12 +160,12 @@ Every other session holds its own `target/dev/wt-*` lane, so derive this session
 
 ```bash
 # assumes: PR merged, <worktree> clean, <worktree> spelled as its physical path, as `pwd -P` prints it
-seg="wt-$(printf '%s' "$(basename -- "<worktree>")" | tr -cs '[:alnum:]._-' '-')-$(printf '%s' "<worktree>" | shasum -a 256 | cut -c1-16)"
-lane="<main-checkout>/target/dev/$seg"
-[ -d "$lane" ] || ls -d "<main-checkout>"/target/dev/wt-*  # no match: set lane= by hand, then rerun
-held=$(for f in "<main-checkout>"/target/.cargo-local/leases/"$seg"-*; do
+lane="<main-checkout>/target/dev/wt-$(printf '%s' "$(basename -- "<worktree>")" | tr -cs '[:alnum:]._-' '-')-$(printf '%s' "<worktree>" | shasum -a 256 | cut -c1-16)"
+[ -d "$lane" ] || ls -d "<main-checkout>"/target/dev/wt-*  # no match: set lane= by hand, then rerun from here
+held=$(for f in "<main-checkout>"/target/.cargo-local/leases/"$(basename "$lane")"-*; do
   [ -f "$f" ] && kill -0 "$(cat "$f" 2>/dev/null)" 2>/dev/null && echo held; done)
-[ -d "$lane" ] && [ -z "$held" ] && rm -rf "<worktree>/target" "$lane"  # a running build keeps its lane
+[ -n "$held" ] && echo "a build still owns $lane - stop, do not remove the worktree"
+[ -d "$lane" ] && [ -z "$held" ] && rm -rf "<worktree>/target" "$lane"
 ```
 
 Then remove the worktree and the branch:
