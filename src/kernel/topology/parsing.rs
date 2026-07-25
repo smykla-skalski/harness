@@ -3,7 +3,7 @@ use std::env;
 
 use serde_json::Value;
 
-use crate::workspace::HARNESS_PREFIX;
+use crate::kernel::naming::HARNESS_PREFIX;
 
 use super::{ClusterMember, ClusterMode, ClusterProvider, ClusterSpec, HelmSetting, Platform};
 

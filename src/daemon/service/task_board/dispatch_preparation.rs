@@ -21,7 +21,7 @@ use crate::task_board::{
     DispatchAppliedTask, DispatchFailureKind, DispatchPlan, SessionIntent,
     TaskBoardReadOnlyWorkflowLaunch, TaskBoardWriteWorkflowLaunch,
 };
-use crate::workspace::adopter::SessionAdopter;
+use crate::session::adopter::SessionAdopter;
 use crate::workspace::layout::SessionLayout;
 use crate::workspace::worktree::WorktreeController;
 

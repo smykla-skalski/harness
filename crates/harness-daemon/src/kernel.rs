@@ -1,5 +1,7 @@
 #[path = "../../../src/kernel/command_intent/mod.rs"]
 pub mod command_intent;
+#[path = "../../../src/kernel/naming.rs"]
+pub mod naming;
 #[path = "../../../src/kernel/run_surface.rs"]
 pub mod run_surface;
 #[path = "../../../src/kernel/skills.rs"]

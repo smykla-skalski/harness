@@ -1,3 +1,4 @@
+pub mod adopter;
 pub mod observe;
 pub mod persona;
 pub mod roles;

@@ -3,7 +3,7 @@ use std::borrow::Cow;
 mod constructors;
 mod mapping;
 
-use crate::hooks::protocol::hook_result::{Decision, HookResult};
+use crate::errors::hook_result::{Decision, HookResult};
 
 /// Enum of all hook messages, replacing the static `HookDef` definitions.
 ///

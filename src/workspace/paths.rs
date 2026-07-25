@@ -2,8 +2,8 @@ use std::env;
 use std::io;
 use std::path::{Path, PathBuf};
 
-/// Prefix used for harness-owned resources (containers, networks, temp dirs).
-pub const HARNESS_PREFIX: &str = "harness-";
+pub use crate::kernel::naming::HARNESS_PREFIX;
+
 #[allow(
     dead_code,
     reason = "shared facade crates do not all use host-home resolution"
