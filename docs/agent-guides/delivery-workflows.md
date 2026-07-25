@@ -133,8 +133,8 @@ It deliberately skips three things:
 ```bash
 git -C <main-checkout> fetch --prune upstream
 git -C <main-checkout> merge --ff-only upstream/main
-git worktree remove <worktree>
-git branch -D <session-branch>
+git -C <main-checkout> worktree remove <worktree>
+git -C <main-checkout> branch -D <session-branch>
 ```
 
 Use `-D`, not `-d`: the squash commit means the local branch's commits are never an ancestor of `main`, so the safe delete refuses. Skip a separate remote delete; GitHub already removed the remote branch on merge, and `fetch --prune` already dropped the local tracking ref. Confirm with `git ls-remote --heads upstream <session-branch>` if in doubt.
