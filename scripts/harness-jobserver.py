@@ -442,12 +442,22 @@ def ensure(repo_root: str, budget: int, timeout: float | None = None) -> tuple[s
         while time.monotonic() < deadline and not _connectable(sock_path):
             time.sleep(0.05)
 
-    if not _connectable(sock_path) or not os.path.exists(fifo_path):
+    # Existence is not enough. A live socket beside a fifo path that something
+    # replaced would hand the caller a MAKEFLAGS endpoint cargo cannot draw on,
+    # and cargo answers that by building serially without saying so.
+    if not _connectable(sock_path) or not _is_fifo(fifo_path):
         return None
     # An already-running supervisor owns the width, and it need not be the one
     # this caller asked for; reporting the request would advertise a pool that
     # was never filled that way.
     return fifo_path, _read_budget(directory, budget)
+
+
+def _is_fifo(path: str) -> bool:
+    try:
+        return stat.S_ISFIFO(os.lstat(path).st_mode)
+    except OSError:
+        return False
 
 
 def _connectable(sock_path: str) -> bool:

@@ -557,6 +557,27 @@ PY
   pass "$name"
 }
 
+scenario_ensure_refuses_a_replaced_fifo() {
+  local name="ensure refuses a live socket beside a fifo path that is not a fifo"
+  local root; root="$(fake_root replacedfifo)"
+  track_pool "$root"
+  python3 "$JOBSERVER" ensure --repo-root "$root" --budget 3 >/dev/null 2>&1
+  local dir; dir="$(pool_dir_for "$root")"
+
+  # The socket stays live, so the supervisor keeps answering; only the endpoint
+  # handed to cargo is wrong, and cargo answers that by going serial in silence.
+  rm -f "$dir/fifo"
+  : >"$dir/fifo"
+
+  local status=0
+  python3 "$JOBSERVER" ensure --repo-root "$root" --budget 3 >/dev/null 2>&1 || status=$?
+  if (( status == 0 )); then
+    fail "$name (a regular file at the fifo path was handed out as a pool)"
+    return
+  fi
+  pass "$name"
+}
+
 scenario_junk_at_either_runtime_path_is_cleared() {
   local name="a directory at the fifo or the socket path does not wedge startup"
   local entry status dir
@@ -956,6 +977,7 @@ scenario_partial_pool_keeps_its_tokens
 scenario_signal_death_reports_a_shell_signal_status
 scenario_split_request_is_still_granted
 scenario_a_wiped_pool_does_not_wedge_its_successor
+scenario_ensure_refuses_a_replaced_fifo
 scenario_junk_at_either_runtime_path_is_cleared
 scenario_restart_does_not_mint_a_second_budget
 scenario_oversized_request_cannot_kill_the_pool
