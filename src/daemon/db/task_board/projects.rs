@@ -326,7 +326,18 @@ impl AsyncDaemonDb {
                 .map(ToOwned::to_owned),
             DisplayNameEdit::Clear => None,
         };
-        let color = self.resolve_color_edit(project_id, edit.color, existing.color).await?;
+        // The reset reads every held colour to pick the least-used one, so it
+        // has to write in the same transaction it read in. Allocating first and
+        // committing separately lets a registration in between take the colour
+        // this one just chose.
+        let mut transaction = self
+            .pool()
+            .begin()
+            .await
+            .map_err(|error| db_error(format!("begin task board project update: {error}")))?;
+        let color =
+            resolve_color_edit_in_tx(&mut transaction, project_id, edit.color, existing.color)
+                .await?;
         query(
             "UPDATE task_board_projects
              SET slug = ?2, display_name = ?3, color = ?4, updated_at = ?5
@@ -337,7 +348,7 @@ impl AsyncDaemonDb {
         .bind(display_name.as_deref())
         .bind(color.as_str())
         .bind(utc_now())
-        .execute(self.pool())
+        .execute(transaction.as_mut())
         .await
         .map_err(|error| {
             // The UNIQUE(source, slug) violation is the caller asking for a
@@ -354,31 +365,26 @@ impl AsyncDaemonDb {
             }
             db_error(format!("update task board project '{project_id}': {error}"))
         })?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit task board project update: {error}")))?;
         self.get_task_board_project(project_id)
             .await?
             .ok_or_else(|| db_error(format!("task board project '{project_id}' vanished")))
     }
+}
 
-    async fn resolve_color_edit(
-        &self,
-        project_id: &str,
-        edit: ColorEdit,
-        current: TaskBoardProjectColor,
-    ) -> Result<TaskBoardProjectColor, CliError> {
-        match edit {
-            ColorEdit::Keep => Ok(current),
-            ColorEdit::Set(color) => Ok(color),
-            ColorEdit::Reset => {
-                let mut transaction = self.pool().begin().await.map_err(|error| {
-                    db_error(format!("begin task board project color reset: {error}"))
-                })?;
-                let color = allocate_color_in_tx(&mut transaction, Some(project_id)).await?;
-                transaction.commit().await.map_err(|error| {
-                    db_error(format!("commit task board project color reset: {error}"))
-                })?;
-                Ok(color)
-            }
-        }
+async fn resolve_color_edit_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    project_id: &str,
+    edit: ColorEdit,
+    current: TaskBoardProjectColor,
+) -> Result<TaskBoardProjectColor, CliError> {
+    match edit {
+        ColorEdit::Keep => Ok(current),
+        ColorEdit::Set(color) => Ok(color),
+        ColorEdit::Reset => allocate_color_in_tx(transaction, Some(project_id)).await,
     }
 }
 
