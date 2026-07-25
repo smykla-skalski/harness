@@ -20,14 +20,7 @@ pub(crate) fn run_background_reconciliation(db: &Arc<Mutex<db::DaemonDb>>) {
     await_test_gate();
     let (projects, sessions) = match discover_background_reconciliation_inputs() {
         Ok(inputs) => inputs,
-        Err(error) => {
-            tracing::warn!(%error, "background file reconciliation failed");
-            let _ = state::append_event(
-                "warn",
-                &format!("background file reconciliation failed: {error}"),
-            );
-            return;
-        }
+        Err(error) => return record_reconciliation_failure(&error),
     };
 
     let mut result = db::ReconcileResult::default();
@@ -38,21 +31,15 @@ pub(crate) fn run_background_reconciliation(db: &Arc<Mutex<db::DaemonDb>>) {
         &mut result,
     ) {
         Ok(sessions) => sessions,
-        Err(error) => {
-            tracing::warn!(%error, "background file reconciliation failed");
-            let _ = state::append_event(
-                "warn",
-                &format!("background file reconciliation failed: {error}"),
-            );
-            return;
-        }
+        Err(error) => return record_reconciliation_failure(&error),
     };
 
     for resolved in &sessions_to_prepare {
         match apply_background_session_import(db, resolved) {
-            BackgroundSessionImportOutcome::Imported => result.sessions_imported += 1,
-            BackgroundSessionImportOutcome::Skipped => result.sessions_skipped += 1,
-            BackgroundSessionImportOutcome::Failed => {}
+            Ok(BackgroundSessionImportOutcome::Imported) => result.sessions_imported += 1,
+            Ok(BackgroundSessionImportOutcome::Skipped) => result.sessions_skipped += 1,
+            Ok(BackgroundSessionImportOutcome::Failed) => {}
+            Err(error) => return record_reconciliation_failure(&error),
         }
     }
     let message = format!(
@@ -88,6 +75,20 @@ pub(crate) fn sync_background_projects_and_collect_candidates(
     collect_background_session_candidates(db, sessions, result)
 }
 
+/// Every abort path records the same way, so a run that gave up is always
+/// distinguishable from one that finished.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn record_reconciliation_failure(error: &CliError) {
+    tracing::warn!(%error, "background file reconciliation failed");
+    let _ = state::append_event(
+        "warn",
+        &format!("background file reconciliation failed: {error}"),
+    );
+}
+
 /// A poisoned db lock means another thread panicked holding it. Reporting that
 /// as success let reconciliation skip its work and still log the normal
 /// completion line, which is indistinguishable from a clean run.
@@ -112,14 +113,18 @@ enum BackgroundSessionCandidate {
 fn apply_background_session_import(
     db: &Arc<Mutex<db::DaemonDb>>,
     resolved: &index::ResolvedSession,
-) -> BackgroundSessionImportOutcome {
+) -> Result<BackgroundSessionImportOutcome, CliError> {
     let Some(prepared) = prepare_background_session_import(resolved) else {
-        return BackgroundSessionImportOutcome::Failed;
+        return Ok(BackgroundSessionImportOutcome::Failed);
     };
+    // A poisoned lock is not a per-session failure - every remaining session
+    // would hit it too - so it has to leave this loop rather than be counted.
     let Ok(db_guard) = db.lock() else {
-        return BackgroundSessionImportOutcome::Failed;
+        return Err(locked_db_error());
     };
-    apply_prepared_background_session_import(&db_guard, &prepared)
+    Ok(apply_prepared_background_session_import(
+        &db_guard, &prepared,
+    ))
 }
 
 /// Takes the lock per project rather than once for the whole walk. This work

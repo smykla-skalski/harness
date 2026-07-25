@@ -29,7 +29,7 @@ pub(crate) use reconciliation::test_gate as reconciliation_test_gate;
 #[cfg(test)]
 pub(crate) use reconciliation::{
     discover_background_reconciliation_inputs, prepare_background_session_import,
-    prepared_session_import_required, session_import_required,
+    prepared_session_import_required, run_background_reconciliation, session_import_required,
     sync_background_projects_and_collect_candidates,
 };
 pub(crate) use remote::serve_remote_https;

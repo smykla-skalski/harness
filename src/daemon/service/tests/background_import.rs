@@ -217,3 +217,40 @@ fn background_project_sync_surfaces_a_poisoned_db_lock() {
         assert_eq!(result.projects, 0, "no project may count as synced");
     });
 }
+
+/// Covers every db-lock acquisition in reconciliation at once: whichever one a
+/// poisoned lock reaches first, the run must record the failure and must not
+/// emit the completion line that a clean run emits.
+#[test]
+fn poisoned_db_lock_never_reports_a_clean_reconciliation() {
+    use std::sync::{Arc, Mutex, OnceLock};
+
+    with_temp_project(|project| {
+        append_project_ledger_entry(project);
+        crate::daemon::state::ensure_daemon_dirs().expect("ensure daemon dirs");
+
+        let db_slot = Arc::new(OnceLock::<Arc<Mutex<crate::daemon::db::DaemonDb>>>::new());
+        let db = super::super::serve::open_and_publish_db(&db_slot).expect("publish daemon db");
+
+        let poisoner = Arc::clone(&db);
+        let _ = std::thread::spawn(move || {
+            let _guard = poisoner.lock().expect("acquire lock to poison");
+            panic!("poison the daemon db lock");
+        })
+        .join();
+        assert!(db.is_poisoned(), "expected the db lock to be poisoned");
+
+        super::super::serve::run_background_reconciliation(&db);
+
+        let events =
+            std::fs::read_to_string(state::daemon_root().join("events.jsonl")).unwrap_or_default();
+        assert!(
+            events.contains("background file reconciliation failed"),
+            "the poisoned lock must be recorded, got: {events}"
+        );
+        assert!(
+            !events.contains("background reconciliation:"),
+            "a poisoned run must not log the clean completion line, got: {events}"
+        );
+    });
+}
