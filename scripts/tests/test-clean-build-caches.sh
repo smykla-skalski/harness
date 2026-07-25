@@ -69,12 +69,29 @@ assert_output_line_contains() {
   }
 }
 
+# kill -0 fails both when a PID is gone and when it belongs to another user
+# we can't signal, so a live foreign-owned PID would look unused. ps -p
+# reports existence without needing signal permission.
+pid_exists() {
+  local pid="$1"
+  kill -0 "$pid" 2>/dev/null && return 0
+  ps -p "$pid" >/dev/null 2>&1
+}
+
 # A PID no process holds, found by probing upward from a value past any
 # realistic pid_max rather than spawning and reaping a real process, since
-# a just-freed PID can be reassigned before the lease file is read.
+# a just-freed PID can be reassigned before the lease file is read. Starts
+# above the kernel's configured pid_max where that's exposed (Linux), since
+# a raised pid_max can otherwise put 999999 inside the live range.
 unused_pid() {
-  local candidate=999999
-  while kill -0 "$candidate" 2>/dev/null; do
+  local candidate=999999 pid_max
+  if [[ -r /proc/sys/kernel/pid_max ]]; then
+    pid_max="$(cat /proc/sys/kernel/pid_max 2>/dev/null || true)"
+    if [[ "$pid_max" =~ ^[0-9]+$ ]] && (( pid_max >= candidate )); then
+      candidate=$((pid_max + 1))
+    fi
+  fi
+  while pid_exists "$candidate"; do
     candidate=$((candidate + 1))
   done
   printf '%s\n' "$candidate"
@@ -84,11 +101,14 @@ unused_pid() {
 # layout: target/dev/agent-live (a genuinely running background process
 # holds its lease), target/dev/agent-dead (lease PID has already exited),
 # target/dev/agent-nolease (no lease file at all), a stray top-level entry
-# directly under target/ that predates the per-agent scheme, and a stray
-# file directly under target/dev/ (not a segment directory).
+# directly under target/ that predates the per-agent scheme, a stray file
+# directly under target/dev/ (not a segment directory), and an empty
+# fake-home/ the caller can point HOME at so the script's global-cache
+# section doesn't size the real $HOME/Library/Caches/*.
 make_shared_target_fixture() {
   local repo="$1"
   mkdir -p "$repo/scripts/lib"
+  mkdir -p "$repo/fake-home"
   cp "$SCRIPT" "$repo/scripts/clean-build-caches.sh"
   cp "$ROOT/scripts/lib/common-repo-root.sh" "$repo/scripts/lib/common-repo-root.sh"
 
@@ -120,7 +140,7 @@ scenario_dry_run_keeps_leased_segment() {
   local output=""
 
   make_shared_target_fixture "$repo"
-  output="$(cd "$repo" && ./scripts/clean-build-caches.sh --dry-run)"
+  output="$(cd "$repo" && HOME="$repo/fake-home" ./scripts/clean-build-caches.sh --dry-run)"
 
   assert_output_line_contains "$output" "target/dev/agent-live" "(active build, kept)"
   assert_output_line_contains "$output" "target/dev/agent-dead" "(dry-run)"
