@@ -122,6 +122,16 @@ section() {
   printf '\n[%s]\n' "$1"
 }
 
+# kill -0 fails both when a PID is gone and when it belongs to another user
+# we can't signal, so it alone can't tell "dead" from "alive but foreign".
+# ps -p reports existence without needing signal permission, so a PID that
+# fails kill -0 but shows up in ps is still treated as alive.
+pid_is_alive() {
+  local pid="$1"
+  kill -0 "$pid" 2>/dev/null && return 0
+  ps -p "$pid" >/dev/null 2>&1
+}
+
 # A segment (target/dev/local or target/dev/agent-<session>) is leased when
 # a cargo-local.sh lease file names it with a PID that's still alive. The PID
 # comes from the lease file's content (the source of truth), not parsed out
@@ -137,7 +147,7 @@ segment_is_leased() {
     pid="$(cat "$lease_file" 2>/dev/null || true)"
     [[ "$pid" =~ ^[0-9]+$ ]] || continue
     base="$(basename "$lease_file")"
-    [[ "$base" == "$key-$pid" ]] && kill -0 "$pid" 2>/dev/null && return 0
+    [[ "$base" == "$key-$pid" ]] && pid_is_alive "$pid" && return 0
   done
   return 1
 }
