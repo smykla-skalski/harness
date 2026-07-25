@@ -3,6 +3,8 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
+use clap::Parser;
+use harness::app::cli::{self, Command};
 use harness::app::{AppContext, Execute};
 use harness::daemon::protocol::{
     PolicyApprovalGrantResolveResponse, PolicyApprovalGrantRevokeResponse,
@@ -231,6 +233,40 @@ fn workspace(
         spawn_kill_switch,
         scenarios: Vec::new(),
     }
+}
+
+/// The lane has to survive clap parsing all the way onto the wire. Asserting
+/// the parsed args alone would pass even if the request builder dropped it.
+#[test]
+fn create_sends_the_requested_status_through_public_command() {
+    let mut created = TaskBoardItem::new(
+        "task-1".to_string(),
+        "Straight to review".to_string(),
+        String::new(),
+        "2026-07-14T00:00:00Z".to_string(),
+    );
+    created.status = TaskBoardStatus::InReview;
+    let response = serde_json::to_string(&created).expect("serialize created item");
+    let cli = cli::Cli::try_parse_from([
+        "harness",
+        "task-board",
+        "create",
+        "--title",
+        "Straight to review",
+        "--status",
+        "in_review",
+    ])
+    .expect("parse create command");
+    let Command::TaskBoard { command } = cli.command else {
+        panic!("expected a task-board command");
+    };
+
+    let captured = run_command(&command, response);
+
+    assert_eq!(captured.method, "POST");
+    assert_eq!(captured.path, "/v1/task-board/items");
+    let body: Value = serde_json::from_str(&captured.body).expect("create body");
+    assert_eq!(body["status"], "in_review");
 }
 
 #[test]
