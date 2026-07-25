@@ -153,6 +153,7 @@ pub fn canonical_checkout_root(path: &Path) -> PathBuf {
 
 #[cfg(all(test, not(feature = "standalone-worker")))]
 mod tests {
+    use std::path::{Path, PathBuf};
     use std::process::Command;
 
     use fs_err as fs;
@@ -164,7 +165,7 @@ mod tests {
     };
     use crate::git::mutation::create_linked_worktree;
 
-    fn init_repo_with_commit(root: &std::path::Path) -> String {
+    fn init_repo_with_commit(root: &Path) -> String {
         fs::create_dir_all(root).expect("create repo");
         fs::write(root.join("README.md"), "hello\n").expect("write readme");
 
@@ -180,7 +181,7 @@ mod tests {
         run_git_output(root, &["rev-parse", "HEAD"])
     }
 
-    fn run_git(dir: &std::path::Path, args: &[&str]) {
+    fn run_git(dir: &Path, args: &[&str]) {
         let output = Command::new("git")
             .args(["-C"])
             .arg(dir)
@@ -190,7 +191,7 @@ mod tests {
         assert!(output.status.success(), "git {args:?} failed");
     }
 
-    fn run_git_output(dir: &std::path::Path, args: &[&str]) -> String {
+    fn run_git_output(dir: &Path, args: &[&str]) -> String {
         let output = Command::new("git")
             .args(["-C"])
             .arg(dir)
@@ -253,7 +254,7 @@ mod tests {
 
     #[test]
     fn infer_known_worktree_identity_uses_claude_worktree_layout_without_git() {
-        let root = std::path::PathBuf::from("/repo");
+        let root = PathBuf::from("/repo");
         let worktree = root.join(".claude/worktrees/feature-branch");
 
         let identity = infer_known_worktree_identity(&worktree).expect("identity");

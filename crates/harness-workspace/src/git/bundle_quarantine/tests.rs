@@ -1,3 +1,5 @@
+use std::fs;
+
 use super::*;
 
 #[test]
@@ -37,8 +39,8 @@ fn full_pack_rejects_one_object_byte_above_exact_limit() {
 fn stale_quarantine_is_removed_before_restart_reuse() {
     let temp = tempfile::tempdir().expect("quarantine fixture");
     let root = temp.path().join("quarantine");
-    std::fs::create_dir_all(&root).expect("stale quarantine");
-    std::fs::write(root.join("stale.pack"), b"stale").expect("stale pack");
+    fs::create_dir_all(&root).expect("stale quarantine");
+    fs::write(root.join("stale.pack"), b"stale").expect("stale pack");
 
     reset_quarantine(temp.path(), &root).expect("restart cleanup");
 

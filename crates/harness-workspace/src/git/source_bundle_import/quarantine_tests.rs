@@ -1,4 +1,5 @@
 use super::*;
+use crate::git::GitError;
 use crate::git::bundle_contract::GitBundleContentLimits;
 use crate::git::quarantine_test_support::bundle_with_extra_blob;
 
@@ -27,19 +28,28 @@ fn extra_unreachable_object_is_bounded_before_source_pack_promotion() {
         )
         .expect_err("one excess unreachable object byte must fail closed");
 
-    assert!(matches!(error, crate::git::GitError::Unsafe { .. }));
-    assert_eq!(git(&rejected.target, &["rev-parse", "HEAD"]), head);
-    assert!(git(&rejected.target, &["status", "--porcelain"]).is_empty());
-    assert!(!git_ref_exists(&rejected.target, &rejected_ref));
-    assert!(!object_exists(&rejected.target, &rejected.revision));
-    assert!(!object_exists(&rejected.target, &rejected_extra));
-    assert!(!quarantine_path(&rejected.target).exists());
+    assert!(matches!(error, GitError::Unsafe { .. }));
+    assert_rejected_import_left_no_trace(&rejected, &head, &rejected_ref, &rejected_extra);
+}
+
+fn assert_rejected_import_left_no_trace(
+    fixture: &Fixture,
+    head: &str,
+    import_ref: &str,
+    extra_object: &str,
+) {
+    assert_eq!(git(&fixture.target, &["rev-parse", "HEAD"]), head);
+    assert!(git(&fixture.target, &["status", "--porcelain"]).is_empty());
+    assert!(!git_ref_exists(&fixture.target, import_ref));
+    assert!(!object_exists(&fixture.target, &fixture.revision));
+    assert!(!object_exists(&fixture.target, extra_object));
+    assert!(!quarantine_path(&fixture.target).exists());
 }
 
 fn extra_object_bundle(fixture: &Fixture) -> (Vec<u8>, String) {
     let blob = vec![b'x'; EXTRA_BLOB_BYTES];
     bundle_with_extra_blob(
-        &fixture._temp.path().join("source"),
+        &fixture.temp.path().join("source"),
         &fixture.bytes,
         &[fixture.revision.as_str()],
         &blob,

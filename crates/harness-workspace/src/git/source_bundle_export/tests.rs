@@ -3,7 +3,8 @@ use std::process::Command;
 
 use tempfile::TempDir;
 
-use super::GitSourceBundleExportPlan;
+use super::{GitSourceBundleExport, GitSourceBundleExportPlan};
+use crate::git::{GitError, GitResult};
 
 const REPOSITORY: &str = "example/widgets";
 
@@ -15,11 +16,7 @@ fn exports_one_self_contained_exact_revision_and_cleans_private_ref() {
         .export(4 * 1024 * 1024)
         .expect("export exact source bundle");
 
-    assert_eq!(bundle.repository, REPOSITORY);
-    assert_eq!(bundle.revision, fixture.revision);
-    assert_eq!(bundle.advertised_ref, fixture.source_ref());
-    assert!(bundle.bytes.starts_with(b"# v2 git bundle\n"));
-    assert!(!bundle.bytes.windows(2).any(|window| window == b"\n-"));
+    assert_exact_self_contained_bundle(&fixture, &bundle);
     assert!(
         optional_git(
             &fixture.worktree,
@@ -28,9 +25,9 @@ fn exports_one_self_contained_exact_revision_and_cleans_private_ref() {
         .is_none()
     );
 
-    let bundle_path = fixture._temp.path().join("source.bundle");
+    let bundle_path = fixture.temp.path().join("source.bundle");
     fs_err::write(&bundle_path, &bundle.bytes).expect("write source bundle");
-    let clone = fixture._temp.path().join("clone");
+    let clone = fixture.temp.path().join("clone");
     fs_err::create_dir_all(&clone).expect("create clone");
     git(&clone, &["init", "--bare"]);
     git_at(
@@ -45,6 +42,14 @@ fn exports_one_self_contained_exact_revision_and_cleans_private_ref() {
         git(&clone, &["rev-parse", "refs/heads/source"]),
         fixture.revision
     );
+}
+
+fn assert_exact_self_contained_bundle(fixture: &Fixture, bundle: &GitSourceBundleExport) {
+    assert_eq!(bundle.repository, REPOSITORY);
+    assert_eq!(bundle.revision, fixture.revision);
+    assert_eq!(bundle.advertised_ref, fixture.source_ref());
+    assert!(bundle.bytes.starts_with(b"# v2 git bundle\n"));
+    assert!(!bundle.bytes.windows(2).any(|window| window == b"\n-"));
 }
 
 #[test]
@@ -110,7 +115,7 @@ fn fork_or_hostile_origin_rejects_without_exporting_a_private_ref() {
 fn configured_checkout_common_dir_proves_a_linked_worktree_without_origin() {
     let fixture = Fixture::new();
     git(&fixture.worktree, &["remote", "remove", "origin"]);
-    let linked = fixture._temp.path().join("linked");
+    let linked = fixture.temp.path().join("linked");
     git(
         &fixture.worktree,
         &[
@@ -158,7 +163,7 @@ fn in_progress_operation_performs_zero_source_export_mutation() {
 #[test]
 fn rejects_checkout_filter_without_invoking_it() {
     let fixture = Fixture::new();
-    let marker = fixture._temp.path().join("filter-ran");
+    let marker = fixture.temp.path().join("filter-ran");
     fs_err::write(
         fixture.worktree.join(".gitattributes"),
         "result.txt filter=unsafe\n",
@@ -220,7 +225,7 @@ fn rejects_a_source_tree_symlink_with_an_absolute_target() {
         .plan_result()
         .expect_err("an absolute source-tree symlink must fail closed");
 
-    assert!(matches!(error, crate::git::GitError::Unsafe { .. }));
+    assert!(matches!(error, GitError::Unsafe { .. }));
 }
 
 #[cfg(unix)]
@@ -233,7 +238,7 @@ fn rejects_a_source_tree_symlink_that_escapes_the_worktree() {
         .plan_result()
         .expect_err("a worktree-escaping source-tree symlink must fail closed");
 
-    assert!(matches!(error, crate::git::GitError::Unsafe { .. }));
+    assert!(matches!(error, GitError::Unsafe { .. }));
 }
 
 #[cfg(unix)]
@@ -250,16 +255,17 @@ fn accepts_a_source_tree_symlink_contained_in_the_worktree() {
 
 #[cfg(unix)]
 fn commit_source_symlink(fixture: &mut Fixture, target: &str) {
+    use std::os::unix::fs::symlink;
+
     fs_err::create_dir_all(fixture.worktree.join("changed")).expect("symlink parent");
-    std::os::unix::fs::symlink(target, fixture.worktree.join("changed/path"))
-        .expect("source symlink");
+    symlink(target, fixture.worktree.join("changed/path")).expect("source symlink");
     git(&fixture.worktree, &["add", "changed/path"]);
     git(&fixture.worktree, &["commit", "-m", "source symlink"]);
     fixture.revision = git(&fixture.worktree, &["rev-parse", "HEAD"]);
 }
 
 struct Fixture {
-    _temp: TempDir,
+    temp: TempDir,
     worktree: PathBuf,
     revision: String,
 }
@@ -289,7 +295,7 @@ impl Fixture {
         git(&worktree, &["commit", "-m", "result"]);
         let revision = git(&worktree, &["rev-parse", "HEAD"]);
         Self {
-            _temp: temp,
+            temp,
             worktree,
             revision,
         }
@@ -299,7 +305,7 @@ impl Fixture {
         self.plan_result().expect("source bundle export plan")
     }
 
-    fn plan_result(&self) -> crate::git::GitResult<GitSourceBundleExportPlan> {
+    fn plan_result(&self) -> GitResult<GitSourceBundleExportPlan> {
         GitSourceBundleExportPlan::for_revision(
             &self.worktree,
             REPOSITORY.into(),

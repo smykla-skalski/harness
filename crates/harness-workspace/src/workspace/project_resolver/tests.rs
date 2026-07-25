@@ -1,12 +1,16 @@
-use super::*;
+use std::fs;
+use std::path::PathBuf;
+
 use tempfile::TempDir;
+
+use super::*;
 
 #[test]
 fn unique_basenames_use_bare_name() {
     let tmp = TempDir::new().unwrap();
     let sessions = tmp.path().join("sessions");
-    std::fs::create_dir_all(&sessions).unwrap();
-    let canonical = std::path::PathBuf::from("/Users/b/Projects/kuma");
+    fs::create_dir_all(&sessions).unwrap();
+    let canonical = PathBuf::from("/Users/b/Projects/kuma");
     let name = resolve_name(&canonical, &sessions).unwrap();
     assert_eq!(name, "kuma");
 }
@@ -15,11 +19,11 @@ fn unique_basenames_use_bare_name() {
 fn collision_adds_hash_suffix() {
     let tmp = TempDir::new().unwrap();
     let sessions = tmp.path().join("sessions");
-    std::fs::create_dir_all(&sessions).unwrap();
-    let first = std::path::PathBuf::from("/Users/b/Projects/kuma");
-    let second = std::path::PathBuf::from("/Users/b/Projects-alt/kuma");
+    fs::create_dir_all(&sessions).unwrap();
+    let first = PathBuf::from("/Users/b/Projects/kuma");
+    let second = PathBuf::from("/Users/b/Projects-alt/kuma");
     let a = resolve_name(&first, &sessions).unwrap();
-    std::fs::create_dir_all(sessions.join(&a)).unwrap();
+    fs::create_dir_all(sessions.join(&a)).unwrap();
     write_origin_marker(&sessions.join(&a), &first).unwrap();
     let b = resolve_name(&second, &sessions).unwrap();
     assert_ne!(a, b);
@@ -31,10 +35,10 @@ fn collision_adds_hash_suffix() {
 fn resolves_idempotently() {
     let tmp = TempDir::new().unwrap();
     let sessions = tmp.path().join("sessions");
-    std::fs::create_dir_all(&sessions).unwrap();
-    let canonical = std::path::PathBuf::from("/Users/b/Projects/kuma");
+    fs::create_dir_all(&sessions).unwrap();
+    let canonical = PathBuf::from("/Users/b/Projects/kuma");
     let a = resolve_name(&canonical, &sessions).unwrap();
-    std::fs::create_dir_all(sessions.join(&a)).unwrap();
+    fs::create_dir_all(sessions.join(&a)).unwrap();
     write_origin_marker(&sessions.join(&a), &canonical).unwrap();
     let b = resolve_name(&canonical, &sessions).unwrap();
     assert_eq!(a, b);

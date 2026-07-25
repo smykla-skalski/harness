@@ -31,11 +31,13 @@ pub struct GitSourceBundleExportPlan {
 }
 
 impl GitSourceBundleExportPlan {
-    pub fn for_revision(
-        worktree: &Path,
-        repository: String,
-        revision: String,
-    ) -> GitResult<Self> {
+    /// # Errors
+    /// Returns `GitError` when `worktree` is not an exact checkout root, its coordinates
+    /// cannot be frozen, or validation fails: a sparse checkout, an unsupported object
+    /// format, an origin that does not prove `repository`, an in-progress git operation,
+    /// a dirty worktree, a noncanonical revision, a HEAD that is not that revision, a
+    /// revision that is not an exact commit, or a tree over the remote-result limits.
+    pub fn for_revision(worktree: &Path, repository: String, revision: String) -> GitResult<Self> {
         Self::new(
             worktree,
             repository,
@@ -75,6 +77,12 @@ impl GitSourceBundleExportPlan {
         Ok(plan)
     }
 
+    /// # Errors
+    /// Returns `GitError::Read` when `max_bytes` is zero or the worktree no longer
+    /// validates, `GitError::Mutation` when the private source ref conflicts or its
+    /// creation or cleanup fails, and `GitError::Unsafe` when the produced bundle
+    /// breaches the limits, is not self-contained, fails `git bundle verify`, or
+    /// advertises anything other than the exact source ref.
     pub fn export(&self, max_bytes: u64) -> GitResult<GitSourceBundleExport> {
         if max_bytes == 0 {
             return Err(GitError::read(

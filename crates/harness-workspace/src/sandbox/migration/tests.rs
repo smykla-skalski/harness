@@ -1,5 +1,7 @@
 use super::*;
 use std::fs;
+use std::os::unix::fs::symlink;
+use std::path::PathBuf;
 use tempfile::TempDir;
 
 #[test]
@@ -71,7 +73,7 @@ fn preserves_symlinks_on_cross_volume_fallback() {
     let src_dir = tmp.path().join("src");
     let dst_dir = tmp.path().join("dst");
     fs::create_dir_all(&src_dir).unwrap();
-    std::os::unix::fs::symlink(
+    symlink(
         "/418cf829-6691-5fc0-92b1-8e5013efa2cb/target",
         src_dir.join("link"),
     )
@@ -86,7 +88,7 @@ fn preserves_symlinks_on_cross_volume_fallback() {
     );
     assert_eq!(
         fs::read_link(&copied).unwrap(),
-        std::path::PathBuf::from("/418cf829-6691-5fc0-92b1-8e5013efa2cb/target")
+        PathBuf::from("/418cf829-6691-5fc0-92b1-8e5013efa2cb/target")
     );
 }
 

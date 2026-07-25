@@ -29,6 +29,12 @@ pub struct GitBundleExportPlan {
 }
 
 impl GitBundleExportPlan {
+    /// # Errors
+    /// Returns `GitError` when the coordinates cannot be frozen or the plan fails
+    /// validation: a sparse checkout, an in-progress git operation, a dirty worktree, a
+    /// HEAD that is not the result revision, equal base and result revisions, a base or
+    /// result that is not an exact commit, missing ancestry, a delta over the
+    /// remote-result limits, or a malformed advertised ref.
     pub fn for_result(
         worktree: &Path,
         base_revision: String,
@@ -48,6 +54,12 @@ impl GitBundleExportPlan {
         Ok(plan)
     }
 
+    /// # Errors
+    /// Returns `GitError::Read` when `max_bytes` is zero or the worktree no longer
+    /// validates, `GitError::Mutation` when the private result ref conflicts or its
+    /// creation or cleanup fails, and `GitError::Unsafe` when the produced bundle
+    /// breaches the limits, fails `git bundle verify`, or advertises anything other than
+    /// the exact result ref.
     pub fn export(&self, max_bytes: u64) -> GitResult<GitBundleExport> {
         if max_bytes == 0 {
             return Err(GitError::read(

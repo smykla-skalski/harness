@@ -1,5 +1,6 @@
 use std::ffi::OsStr;
-use std::io::{Cursor, Read as _};
+use std::io::{self, Cursor, Read as _};
+use std::time::Duration;
 
 use super::*;
 
@@ -60,7 +61,7 @@ fn resource_timeout_is_not_masked_by_a_closed_stdin_pipe() {
             &input,
             128,
             GitProcessLimits {
-                wall_time: std::time::Duration::ZERO,
+                wall_time: Duration::ZERO,
                 cpu_seconds: 1,
                 address_space_bytes: 512 * 1024 * 1024,
                 alloc_limit_bytes: 512 * 1024 * 1024,
@@ -103,7 +104,7 @@ fn early_child_stdin_close_is_subordinate_to_the_child_status() {
         Some(&input),
         128,
         Some(GitProcessLimits {
-            wall_time: std::time::Duration::from_secs(1),
+            wall_time: Duration::from_secs(1),
             cpu_seconds: 1,
             address_space_bytes: 512 * 1024 * 1024,
             alloc_limit_bytes: 512 * 1024 * 1024,
@@ -132,7 +133,7 @@ fn deterministic_index_pack_rejection_is_unsafe() {
             &input,
             128,
             GitProcessLimits {
-                wall_time: std::time::Duration::from_secs(1),
+                wall_time: Duration::from_secs(1),
                 cpu_seconds: 1,
                 address_space_bytes: 512 * 1024 * 1024,
                 alloc_limit_bytes: 512 * 1024 * 1024,
@@ -153,7 +154,7 @@ fn bounded_input_accepts_a_successful_git_command() {
             b"bounded input",
             128,
             GitProcessLimits {
-                wall_time: std::time::Duration::from_secs(1),
+                wall_time: Duration::from_secs(1),
                 cpu_seconds: 1,
                 address_space_bytes: 512 * 1024 * 1024,
                 alloc_limit_bytes: 512 * 1024 * 1024,
@@ -178,7 +179,7 @@ fn git_alloc_limit_fails_closed_on_an_oversized_allocation() {
             &input,
             128,
             GitProcessLimits {
-                wall_time: std::time::Duration::from_secs(5),
+                wall_time: Duration::from_secs(5),
                 cpu_seconds: 5,
                 address_space_bytes: 512 * 1024 * 1024,
                 alloc_limit_bytes: 256 * 1024,
@@ -193,11 +194,11 @@ fn git_alloc_limit_fails_closed_on_an_oversized_allocation() {
 #[test]
 fn non_broken_pipe_writer_failure_remains_primary() {
     let failure = WriterFailure {
-        error: std::io::Error::new(std::io::ErrorKind::InvalidInput, "input failed"),
+        error: io::Error::new(io::ErrorKind::InvalidInput, "input failed"),
     };
     assert!(writer_failure_is_primary(&failure, true));
     let closed = WriterFailure {
-        error: std::io::Error::new(std::io::ErrorKind::BrokenPipe, "child closed stdin"),
+        error: io::Error::new(io::ErrorKind::BrokenPipe, "child closed stdin"),
     };
     assert!(!writer_failure_is_primary(&closed, true));
 }

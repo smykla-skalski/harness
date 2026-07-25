@@ -32,11 +32,15 @@ pub struct RemoteKubernetesInstallMemberState {
     pub published_image_refs: Vec<String>,
 }
 
+#[must_use]
 pub fn remote_install_state_path_for_spec(spec: &ClusterSpec) -> PathBuf {
     let base = remote_cluster_state_dir(spec);
     base.join("install-state.json")
 }
 
+/// # Errors
+/// Returns a `CliError` when the state file exists but cannot be read or does not
+/// deserialize. A missing file is `Ok(None)`.
 pub fn load_remote_install_state_for_spec(
     spec: &ClusterSpec,
 ) -> Result<Option<RemoteKubernetesInstallState>, CliError> {
@@ -47,6 +51,9 @@ pub fn load_remote_install_state_for_spec(
     read_json_typed(&path).map(Some)
 }
 
+/// # Errors
+/// Returns a `CliError` when the state directory cannot be created or the file cannot be
+/// serialized and written.
 pub fn persist_remote_install_state(
     spec: &ClusterSpec,
     state: &RemoteKubernetesInstallState,
@@ -55,6 +62,9 @@ pub fn persist_remote_install_state(
     write_json_pretty(&path, state)
 }
 
+/// # Errors
+/// Returns a `CliError` when a generated kubeconfig or the state file exists but cannot
+/// be removed. The now-empty state directory is removed best-effort.
 pub fn cleanup_remote_install_state(
     spec: &ClusterSpec,
     state: &RemoteKubernetesInstallState,
@@ -79,6 +89,9 @@ pub fn cleanup_remote_install_state(
     Ok(())
 }
 
+/// # Errors
+/// Returns a `CliError` when the state root cannot be walked, or when a per-cluster
+/// state file cannot be read, deserialized, or written back after the flag changes.
 pub fn sync_gateway_api_install_state(
     repo_root: &Path,
     kubeconfig: &Path,

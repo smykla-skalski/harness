@@ -51,10 +51,7 @@ fn imports_and_replays_each_crash_safe_git_boundary() {
         replay.advance_one().expect("reattach exact branch"),
         GitBundleWorktreeState::AttachedResult
     );
-    let evidence = fixture.plan().require_applied().expect("applied evidence");
-    assert_eq!(evidence.base_revision, fixture.base);
-    assert_eq!(evidence.result_revision, fixture.result);
-    assert!(git(&fixture.controller, &["status", "--porcelain"]).is_empty());
+    assert_applied_evidence_on_a_clean_controller(&fixture);
 
     fixture
         .plan()
@@ -64,6 +61,13 @@ fn imports_and_replays_each_crash_safe_git_boundary() {
         .plan()
         .cleanup_import_ref()
         .expect("replayed import-ref cleanup");
+}
+
+fn assert_applied_evidence_on_a_clean_controller(fixture: &Fixture) {
+    let evidence = fixture.plan().require_applied().expect("applied evidence");
+    assert_eq!(evidence.base_revision, fixture.base);
+    assert_eq!(evidence.result_revision, fixture.result);
+    assert!(git(&fixture.controller, &["status", "--porcelain"]).is_empty());
 }
 
 #[test]
@@ -244,11 +248,7 @@ fn applied_replay_rejects_branch_and_head_drift_without_ref_repair() {
             &branch_drift.result,
         ],
     );
-    let error = branch_drift
-        .plan()
-        .require_applied()
-        .expect_err("same-tree branch drift must fail closed");
-    assert!(matches!(error, GitError::Unsafe { .. }));
+    assert_applied_fails_closed(&branch_drift, "same-tree branch drift must fail closed");
     assert_eq!(
         git(&branch_drift.controller, &["rev-parse", "refs/heads/main"]),
         interloper
@@ -260,11 +260,7 @@ fn applied_replay_rejects_branch_and_head_drift_without_ref_repair() {
         &head_drift.controller,
         &["checkout", "--detach", &head_drift.result],
     );
-    let error = head_drift
-        .plan()
-        .require_applied()
-        .expect_err("detached applied head must fail closed");
-    assert!(matches!(error, GitError::Unsafe { .. }));
+    assert_applied_fails_closed(&head_drift, "detached applied head must fail closed");
     assert_eq!(
         git(&head_drift.controller, &["rev-parse", "HEAD"]),
         head_drift.result
@@ -273,6 +269,11 @@ fn applied_replay_rejects_branch_and_head_drift_without_ref_repair() {
         git(&head_drift.controller, &["rev-parse", "refs/heads/main"]),
         head_drift.result
     );
+}
+
+fn assert_applied_fails_closed(fixture: &Fixture, context: &str) {
+    let error = fixture.plan().require_applied().expect_err(context);
+    assert!(matches!(error, GitError::Unsafe { .. }));
 }
 
 #[test]

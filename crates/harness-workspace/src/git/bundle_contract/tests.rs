@@ -1,3 +1,5 @@
+use std::iter::repeat_n;
+
 use super::*;
 
 #[test]
@@ -43,7 +45,7 @@ fn delta_output_limit_matches_one_maximum_raw_entry() {
     };
     let oid = "a".repeat(40);
     let mut raw = format!(":100644 100644 {oid} {oid} M\0").into_bytes();
-    raw.extend(std::iter::repeat_n(b'p', 4096));
+    raw.extend(repeat_n(b'p', 4096));
     raw.push(0);
     let limit = delta_output_limit(repository, 40, limits).expect("derive exact delta limit");
 
@@ -103,7 +105,7 @@ fn source_tree_output_limit_exposes_one_extra_byte() {
     };
     let oid = "a".repeat(40);
     let mut row = format!("160000 commit {oid}\t").into_bytes();
-    row.extend(std::iter::repeat_n(b'p', 4096));
+    row.extend(repeat_n(b'p', 4096));
     row.push(0);
     let limit = tree_output_limit(repository, 40, limits).expect("source tree output limit");
 

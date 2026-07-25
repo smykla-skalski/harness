@@ -1,4 +1,5 @@
 use super::*;
+use std::fs::File;
 use std::io::Write;
 use tempfile::TempDir;
 
@@ -36,7 +37,7 @@ fn round_trip_save_load() {
 fn load_unsupported_schema_version_errors() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("bookmarks.json");
-    let mut f = std::fs::File::create(&path).unwrap();
+    let mut f = File::create(&path).unwrap();
     f.write_all(br#"{"schemaVersion": 99, "bookmarks": []}"#)
         .unwrap();
 

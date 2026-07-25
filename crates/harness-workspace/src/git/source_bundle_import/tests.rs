@@ -4,6 +4,7 @@ use std::process::Command;
 use sha2::{Digest as _, Sha256};
 
 use super::GitSourceBundleImportPlan;
+use crate::git::GitResult;
 use crate::git::source_bundle_export::GitSourceBundleExportPlan;
 
 #[path = "quarantine_tests.rs"]
@@ -127,7 +128,7 @@ fn in_progress_git_operation_performs_zero_import_mutation() {
 }
 
 struct Fixture {
-    _temp: tempfile::TempDir,
+    temp: tempfile::TempDir,
     target: PathBuf,
     revision: String,
     advertised_ref: String,
@@ -160,7 +161,7 @@ impl Fixture {
         let import_ref =
             format!("refs/harness/task-board/source-imports/{offer_sha256}/{bundle_sha256}");
         Self {
-            _temp: temp,
+            temp,
             target,
             revision,
             advertised_ref: export.advertised_ref,
@@ -176,7 +177,7 @@ impl Fixture {
         self.import_plan_result().expect("source import plan")
     }
 
-    fn import_plan_result(&self) -> crate::git::GitResult<GitSourceBundleImportPlan> {
+    fn import_plan_result(&self) -> GitResult<GitSourceBundleImportPlan> {
         GitSourceBundleImportPlan::new(
             &self.target,
             REPOSITORY.into(),

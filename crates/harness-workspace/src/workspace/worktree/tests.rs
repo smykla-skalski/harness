@@ -1,21 +1,24 @@
+use std::fs;
+use std::path::Path;
 use std::process::Command;
 
 use harness_testkit::{git_branches_matching, git_head_sha, init_git_repo_with_seed};
 use tempfile::TempDir;
 
 use super::*;
+use crate::git::GitRepository;
 use crate::workspace::layout::SessionLayout;
 
 const SESSION_ONE: &str = "00000000-0000-4000-8000-000000000301";
 const SESSION_TWO: &str = "00000000-0000-4000-8000-000000000302";
 const SESSION_THREE: &str = "00000000-0000-4000-8000-000000000303";
 
-fn init_origin_repo(tmp: &std::path::Path) {
+fn init_origin_repo(tmp: &Path) {
     init_git_repo_with_seed(tmp);
 }
 
-fn commit_file(dir: &std::path::Path, path: &str, contents: &[u8], message: &str) {
-    std::fs::write(dir.join(path), contents).unwrap();
+fn commit_file(dir: &Path, path: &str, contents: &[u8], message: &str) {
+    fs::write(dir.join(path), contents).unwrap();
     run_git(dir, &["add", path]);
     run_git(
         dir,
@@ -23,7 +26,7 @@ fn commit_file(dir: &std::path::Path, path: &str, contents: &[u8], message: &str
     );
 }
 
-fn run_git(dir: &std::path::Path, args: &[&str]) {
+fn run_git(dir: &Path, args: &[&str]) {
     let output = Command::new("git")
         .args(["-C"])
         .arg(dir)
@@ -38,7 +41,7 @@ fn run_git(dir: &std::path::Path, args: &[&str]) {
     );
 }
 
-fn git_stdout(dir: &std::path::Path, args: &[&str]) -> String {
+fn git_stdout(dir: &Path, args: &[&str]) -> String {
     let output = Command::new("git")
         .args(["-C"])
         .arg(dir)
@@ -119,7 +122,7 @@ fn creates_worktree_and_branch() {
         project_name: "origin".into(),
         session_id: SESSION_ONE.into(),
     };
-    std::fs::create_dir_all(layout.project_dir()).unwrap();
+    fs::create_dir_all(layout.project_dir()).unwrap();
     WorktreeController::create(origin.path(), &layout, None).expect("create");
     assert!(layout.workspace().join("README.md").exists());
     assert!(layout.memory().exists());
@@ -139,7 +142,7 @@ fn destroy_removes_worktree_and_branch() {
         project_name: "origin".into(),
         session_id: SESSION_TWO.into(),
     };
-    std::fs::create_dir_all(layout.project_dir()).unwrap();
+    fs::create_dir_all(layout.project_dir()).unwrap();
     WorktreeController::create(origin.path(), &layout, None).unwrap();
     WorktreeController::destroy(origin.path(), &layout).expect("destroy");
     assert!(!layout.workspace().exists());
@@ -161,8 +164,8 @@ fn rollback_on_memory_create_failure() {
         project_name: "origin".into(),
         session_id: SESSION_THREE.into(),
     };
-    std::fs::create_dir_all(layout.session_root()).unwrap();
-    std::fs::write(layout.memory(), b"blocker").unwrap();
+    fs::create_dir_all(layout.session_root()).unwrap();
+    fs::write(layout.memory(), b"blocker").unwrap();
 
     let result = WorktreeController::create(origin.path(), &layout, None);
     assert!(
@@ -198,7 +201,7 @@ fn resolve_base_ref_prefers_tracking_remote_head_over_local_head() {
         "test setup must diverge from upstream"
     );
 
-    let repository = crate::git::GitRepository::discover(checkout.path()).expect("discover repo");
+    let repository = GitRepository::discover(checkout.path()).expect("discover repo");
     let resolved = resolve_base_ref(&repository).expect("resolve base ref");
     assert_eq!(resolved, "upstream/main");
 }

@@ -5,6 +5,7 @@ use tempfile::TempDir;
 
 use super::super::bundle_staging::staging_root_for_test;
 use super::GitBundleExportPlan;
+use crate::git::GitResult;
 
 #[test]
 fn exports_one_exact_bounded_descendant_and_cleans_the_private_ref() {
@@ -188,7 +189,7 @@ fn crashed_staging_replay_keeps_the_executor_worktree_clean() {
 #[test]
 fn linked_worktree_route_swap_fails_before_result_ref_or_target_mutation() {
     let fixture = Fixture::new();
-    let linked = fixture._temp.path().join("linked");
+    let linked = fixture.temp.path().join("linked");
     let linked_path = linked.to_str().expect("linked path utf8");
     git(
         &fixture.worktree,
@@ -198,7 +199,7 @@ fn linked_worktree_route_swap_fails_before_result_ref_or_target_mutation() {
         GitBundleExportPlan::for_result(&linked, fixture.base.clone(), fixture.result.clone())
             .expect("freeze linked worktree coordinates");
 
-    let target = fixture._temp.path().join("target");
+    let target = fixture.temp.path().join("target");
     fs_err::create_dir_all(&target).expect("create target repository");
     git(&target, &["init", "-b", "main"]);
     git(&target, &["config", "user.name", "Harness Test"]);
@@ -241,7 +242,7 @@ fn linked_worktree_route_swap_fails_before_result_ref_or_target_mutation() {
 }
 
 struct Fixture {
-    _temp: TempDir,
+    temp: TempDir,
     worktree: PathBuf,
     base: String,
     result: String,
@@ -263,7 +264,7 @@ impl Fixture {
         git(&worktree, &["commit", "-am", "result"]);
         let result = git(&worktree, &["rev-parse", "HEAD"]);
         Self {
-            _temp: temp,
+            temp,
             worktree,
             base,
             result,
@@ -274,7 +275,7 @@ impl Fixture {
         self.plan_result().expect("bundle export plan")
     }
 
-    fn plan_result(&self) -> crate::git::GitResult<GitBundleExportPlan> {
+    fn plan_result(&self) -> GitResult<GitBundleExportPlan> {
         GitBundleExportPlan::for_result(&self.worktree, self.base.clone(), self.result.clone())
     }
 

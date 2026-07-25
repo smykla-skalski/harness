@@ -1,3 +1,5 @@
+use std::fs::read_link;
+
 use super::*;
 use crate::git::bundle_contract::GitBundleContentLimits;
 use crate::git::quarantine_test_support::bundle_with_extra_blob;
@@ -59,7 +61,7 @@ fn changed_result_symlink_accepts_a_contained_relative_target() {
     fixture.apply();
 
     assert_eq!(
-        std::fs::read_link(fixture.controller.join("changed/path")).expect("read applied symlink"),
+        read_link(fixture.controller.join("changed/path")).expect("read applied symlink"),
         PathBuf::from("../result.txt")
     );
 }

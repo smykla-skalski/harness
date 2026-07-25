@@ -40,6 +40,7 @@ pub fn host_home_dir() -> PathBuf {
 }
 
 #[cfg(unix)]
+#[must_use]
 #[allow(
     dead_code,
     reason = "shared facade crates do not all use host-home resolution"

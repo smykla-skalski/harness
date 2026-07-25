@@ -1,15 +1,18 @@
-use super::*;
+use std::fs;
+
 use tempfile::TempDir;
+
+use super::*;
 
 #[test]
 fn removes_session_dir_without_state_json() {
     let tmp = TempDir::new().unwrap();
     let sessions = tmp.path().join("sessions");
     let orphan = sessions.join("proj/ab123456");
-    std::fs::create_dir_all(&orphan).unwrap();
+    fs::create_dir_all(&orphan).unwrap();
     let healthy = sessions.join("proj/cd789012");
-    std::fs::create_dir_all(&healthy).unwrap();
-    std::fs::write(healthy.join("state.json"), b"{}").unwrap();
+    fs::create_dir_all(&healthy).unwrap();
+    fs::write(healthy.join("state.json"), b"{}").unwrap();
     cleanup_orphans(&sessions).unwrap();
     assert!(!orphan.exists());
     assert!(healthy.exists());
@@ -19,7 +22,7 @@ fn removes_session_dir_without_state_json() {
 fn idempotent() {
     let tmp = TempDir::new().unwrap();
     let sessions = tmp.path().join("sessions");
-    std::fs::create_dir_all(sessions.join("proj/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed")).unwrap();
+    fs::create_dir_all(sessions.join("proj/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed")).unwrap();
     cleanup_orphans(&sessions).unwrap();
     cleanup_orphans(&sessions).unwrap();
 }
@@ -30,11 +33,11 @@ fn skips_dot_prefixed_siblings() {
     let sessions = tmp.path().join("sessions");
     // Dot-prefixed file at project level
     let dot_file = sessions.join("proj/.active.json");
-    std::fs::create_dir_all(dot_file.parent().unwrap()).unwrap();
-    std::fs::write(&dot_file, b"{}").unwrap();
+    fs::create_dir_all(dot_file.parent().unwrap()).unwrap();
+    fs::write(&dot_file, b"{}").unwrap();
     // Dot-prefixed directory at session level (no state.json)
     let dot_dir = sessions.join("proj/.something");
-    std::fs::create_dir_all(&dot_dir).unwrap();
+    fs::create_dir_all(&dot_dir).unwrap();
     cleanup_orphans(&sessions).unwrap();
     assert!(dot_file.exists(), ".active.json must survive sweep");
     assert!(dot_dir.exists(), ".something dir must survive sweep");
@@ -48,7 +51,7 @@ fn skips_symlinked_session_dirs() {
     let tmp = TempDir::new().unwrap();
     let sessions = tmp.path().join("sessions");
     let project = sessions.join("proj");
-    std::fs::create_dir_all(&project).unwrap();
+    fs::create_dir_all(&project).unwrap();
 
     // A symlink pointing at a non-existent target (dangling)
     let link = project.join("deadbeef");

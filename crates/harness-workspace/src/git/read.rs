@@ -23,6 +23,8 @@ impl GitRepository {
         }
     }
 
+    /// # Errors
+    /// Returns `GitError::Discover` when `path` is not inside a git repository.
     pub fn discover(path: &Path) -> GitResult<Self> {
         let repo = gix::discover(path).map_err(|error| GitError::discover(path, error))?;
         let resolved = repo
@@ -36,6 +38,8 @@ impl GitRepository {
         &self.path
     }
 
+    /// # Errors
+    /// Returns `GitError::Open` when gix cannot open the repository at this path.
     pub fn open_gix(&self) -> GitResult<gix::Repository> {
         gix::open(self.path()).map_err(|error| GitError::open(self.path(), error))
     }
@@ -47,6 +51,9 @@ impl GitRepository {
             .map_err(|error| GitError::read(self.path(), error))
     }
 
+    /// # Errors
+    /// Returns `GitError::Open` when the repository cannot be opened, or
+    /// `GitError::Read` when HEAD cannot be read. A detached HEAD is `Ok(None)`.
     pub fn current_branch_remote_name(&self) -> GitResult<Option<String>> {
         let repo = self.open_gix()?;
         let Some(head_name) = repo
@@ -76,6 +83,9 @@ impl GitRepository {
         }
     }
 
+    /// # Errors
+    /// Returns `GitError::Open` when the repository cannot be opened; reading the
+    /// remote list itself cannot fail once it is.
     pub fn remote_names(&self) -> GitResult<Vec<String>> {
         let repo = self.open_gix()?;
         Ok(repo
@@ -85,6 +95,9 @@ impl GitRepository {
             .collect())
     }
 
+    /// # Errors
+    /// Returns `GitError::Open` when the repository cannot be opened, or
+    /// `GitError::Read` when `spec` does not resolve to exactly one object.
     pub fn resolve_revision_to_commit(&self, spec: &str) -> GitResult<String> {
         let repo = self.open_gix()?;
         let id = repo
@@ -93,12 +106,18 @@ impl GitRepository {
         Ok(id.detach().to_hex().to_string())
     }
 
+    /// # Errors
+    /// Returns `GitError::Open` when the repository cannot be opened, or
+    /// `GitError::Read` when the tracked-file status walk fails.
     pub fn is_dirty(&self) -> GitResult<bool> {
         let repo = self.open_gix()?;
         repo.is_dirty()
             .map_err(|error| GitError::read(self.path(), error))
     }
 
+    /// # Errors
+    /// Returns `GitError::Open` when the repository cannot be opened, or
+    /// `GitError::Read` when the untracked-file walk or the dirty check fails.
     pub fn has_changes_including_untracked(&self) -> GitResult<bool> {
         let repo = self.open_gix()?;
         let platform = repo
@@ -116,6 +135,10 @@ impl GitRepository {
         Ok(self.is_dirty()? || has_untracked)
     }
 
+    /// # Errors
+    /// Returns `GitError::Open` when the repository cannot be opened, or
+    /// `GitError::Read` when HEAD cannot be read or peeled to a commit.
+    /// An unborn HEAD is `Ok(None)`.
     pub fn short_head_sha(&self, hex_len: usize) -> GitResult<Option<String>> {
         let repo = self.open_gix()?;
         let head = repo
@@ -135,12 +158,14 @@ impl GitRepository {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use fs_err as fs;
     use tempfile::tempdir;
 
     use super::GitRepository;
 
-    fn init_repo(root: &std::path::Path) {
+    fn init_repo(root: &Path) {
         fs::create_dir_all(root).expect("create repo");
         gix::init(root).expect("init repo");
     }

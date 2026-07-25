@@ -46,6 +46,11 @@ pub enum GitBundleWorktreeState {
 }
 
 impl GitBundleImportPlan {
+    /// # Errors
+    /// Returns `GitError::Unsafe` when `branch_ref` is not under `refs/heads/`, or when
+    /// the static contract fails: equal base and result revisions, a sparse checkout, an
+    /// unsupported object format, noncanonical revisions or private refs, or a base
+    /// revision that is not an exact commit. Coordinate freezing may also fail.
     pub fn new(
         worktree: &Path,
         branch_ref: String,
@@ -75,6 +80,9 @@ impl GitBundleImportPlan {
         Ok(plan)
     }
 
+    /// # Errors
+    /// Returns `GitError::Unsafe` when the worktree no longer matches the coordinates
+    /// frozen when the plan was built.
     pub fn evidence(&self) -> GitResult<GitBundleImportEvidence> {
         self.coordinates.require_current()?;
         Ok(GitBundleImportEvidence {
@@ -94,10 +102,19 @@ impl GitBundleImportPlan {
         })
     }
 
+    /// # Errors
+    /// Returns `GitError::Unsafe` when the bundle file exceeds the remote-result limits,
+    /// cannot be read, or fails any of the checks in `verify_and_import_bytes`.
     pub fn verify_and_import_objects(&self, bundle: &Path) -> GitResult<()> {
         self.verify_and_import_objects_with_limits(bundle, GitBundleContentLimits::REMOTE_RESULT)
     }
 
+    /// # Errors
+    /// Returns `GitError::Unsafe` when the worktree is not in a replay-safe state, the
+    /// bundle breaches the remote-result limits, `git bundle verify` fails, the bundle
+    /// advertises anything other than the exact sealed result ref, the quarantined
+    /// objects do not contain a base and a result commit with the expected ancestry, or
+    /// promotion, quarantine cleanup, or the import ref update fails.
     pub fn verify_and_import_bytes(&self, bytes: &[u8]) -> GitResult<()> {
         self.verify_and_import_bytes_with_limits(
             &self.worktree,
@@ -156,6 +173,11 @@ impl GitBundleImportPlan {
         self.create_or_verify_import_ref()
     }
 
+    /// # Errors
+    /// Returns `GitError::Unsafe` when the checkout is sparse, a git operation such as a
+    /// merge or rebase is in progress, the worktree has tracked, index, or untracked
+    /// changes, the branch ref is symbolic, or HEAD and the branch do not sit on one of
+    /// the four replay-safe (base, result) combinations.
     pub fn state(&self) -> GitResult<GitBundleWorktreeState> {
         self.coordinates.require_dense_checkout()?;
         self.require_no_git_operation()?;
@@ -200,6 +222,10 @@ impl GitBundleImportPlan {
         }
     }
 
+    /// # Errors
+    /// Returns `GitError::Unsafe` when the import ref no longer pins the exact result or
+    /// the worktree is not in a replay-safe state, and `GitError::Mutation` when the
+    /// checkout, ref update, or branch attach for this step fails.
     pub fn advance_one(&self) -> GitResult<GitBundleWorktreeState> {
         self.require_import_ref()?;
         match self.state()? {
@@ -228,6 +254,10 @@ impl GitBundleImportPlan {
         self.state()
     }
 
+    /// # Errors
+    /// Returns `GitError::Unsafe` when the worktree has not reached the attached result,
+    /// the import ref does not pin that exact result, or the result no longer descends
+    /// from the frozen base.
     pub fn require_applied(&self) -> GitResult<GitBundleImportEvidence> {
         if self.state()? != GitBundleWorktreeState::AttachedResult {
             return Err(GitError::unsafe_state(
@@ -240,6 +270,10 @@ impl GitBundleImportPlan {
         self.evidence()
     }
 
+    /// # Errors
+    /// Returns `GitError::Unsafe` when the import ref moved off the result revision
+    /// before cleanup or became symbolic, and `GitError::Mutation` when the compare-and-
+    /// delete fails. An already-absent ref is `Ok`.
     pub fn cleanup_import_ref(&self) -> GitResult<()> {
         match self.optional_revision(&self.import_ref)? {
             None => Ok(()),

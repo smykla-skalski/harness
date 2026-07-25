@@ -29,6 +29,13 @@ pub struct GitSourceBundleImportPlan {
 }
 
 impl GitSourceBundleImportPlan {
+    /// # Errors
+    /// Returns `GitError` when `repository` is not an exact checkout root, its
+    /// coordinates cannot be frozen, or the static contract fails: a sparse checkout, an
+    /// origin that does not prove `repository_slug`, an unsupported object format, a
+    /// noncanonical revision or bundle digest, a bundle size of zero or above the
+    /// remote-result limit, or an advertised or import ref that is not the exact
+    /// expected name.
     pub fn new(
         repository: &Path,
         repository_slug: String,
@@ -58,6 +65,13 @@ impl GitSourceBundleImportPlan {
         Ok(plan)
     }
 
+    /// # Errors
+    /// Returns `GitError::Unsafe` when the static contract no longer holds, the checkout
+    /// is dirty or mid-operation, the import ref already points elsewhere, `bytes` does
+    /// not match the pinned digest and size, the bundle breaches the limits, is not
+    /// self-contained, or fails `git bundle verify`, it advertises anything other than
+    /// the exact source ref, or the quarantined revision is not a commit whose tree fits
+    /// the limits. Promotion and the import ref update can also fail.
     pub fn verify_and_import_bytes(&self, bytes: &[u8]) -> GitResult<()> {
         self.verify_and_import_bytes_with_limits(bytes, GitBundleContentLimits::REMOTE_RESULT)
     }
@@ -111,6 +125,11 @@ impl GitSourceBundleImportPlan {
         )
     }
 
+    /// # Errors
+    /// Returns `GitError::Unsafe` when the static contract no longer holds, the import
+    /// ref moved off the pinned revision before cleanup, or it became symbolic, and
+    /// `GitError::Mutation` when the compare-and-delete fails. An already-absent ref is
+    /// `Ok`.
     pub fn cleanup_import_ref(&self) -> GitResult<()> {
         self.validate_static_contract()?;
         match self.optional_revision(&self.import_ref)? {
