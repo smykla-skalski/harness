@@ -65,6 +65,14 @@ pub fn router(state: PanelState) -> Router {
         .route(&format!("{base}/healthz"), get(api::healthz))
         .route(&format!("{base}/api/me"), get(api::me))
         .route(&format!("{base}/api/accounts"), get(api::accounts))
+        .route(
+            &format!("{base}/api/accounts/{{id}}/approve"),
+            post(api::approve),
+        )
+        .route(
+            &format!("{base}/api/accounts/{{id}}/revoke"),
+            post(api::revoke),
+        )
         .route(&format!("{base}/auth/github/start"), get(auth::start))
         .route(&format!("{base}/auth/github/callback"), get(auth::callback))
         .route(&format!("{base}/auth/signout"), post(auth::signout))

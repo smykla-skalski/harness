@@ -4,10 +4,11 @@ use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
+use chrono::Utc;
 use serde::Serialize;
 
 use super::PanelState;
-use super::session::require_viewer;
+use super::session::{Viewer, require_viewer};
 use crate::error::ApiError;
 use crate::store::accounts::Account;
 
@@ -60,15 +61,92 @@ pub async fn accounts(
     State(state): State<PanelState>,
     headers: HeaderMap,
 ) -> Result<Response, ApiError> {
-    let viewer = require_viewer(&state, &headers).await?;
-    if !viewer.is_owner {
-        return Err(ApiError::Forbidden(
-            "only the panel owner can list accounts",
-        ));
-    }
+    require_owner(&state, &headers).await?;
     Ok(private_json(&AccountsBody {
         accounts: state.store.list_accounts().await?,
     }))
+}
+
+/// Let an account generate pairing links.
+///
+/// # Errors
+/// Returns [`ApiError::Forbidden`] for anyone but the owner and
+/// [`ApiError::NotFound`] when the account is gone.
+pub async fn approve(
+    State(state): State<PanelState>,
+    headers: HeaderMap,
+    Path(account_id): Path<String>,
+) -> Result<Response, ApiError> {
+    decide(&state, &headers, &account_id, true).await
+}
+
+/// Withdraw that ability.
+///
+/// # Errors
+/// Returns [`ApiError::Forbidden`] for anyone but the owner and
+/// [`ApiError::NotFound`] when the account is gone.
+pub async fn revoke(
+    State(state): State<PanelState>,
+    headers: HeaderMap,
+    Path(account_id): Path<String>,
+) -> Result<Response, ApiError> {
+    decide(&state, &headers, &account_id, false).await
+}
+
+/// A cross-site POST arrives without the session cookie, because it is
+/// `SameSite=Lax`, so it is refused as unauthenticated before reaching here.
+/// That is what keeps another origin from deciding approvals on the owner's
+/// behalf, and it is why these are POST rather than GET.
+async fn decide(
+    state: &PanelState,
+    headers: &HeaderMap,
+    account_id: &str,
+    granted: bool,
+) -> Result<Response, ApiError> {
+    let owner = require_owner(state, headers).await?;
+
+    if !state
+        .store
+        .set_can_pair(account_id, granted, &owner.account, Utc::now())
+        .await?
+    {
+        return Err(ApiError::NotFound("no such account"));
+    }
+
+    let account = state
+        .store
+        .account_by_id(account_id)
+        .await?
+        .ok_or(ApiError::NotFound("no such account"))?;
+    record_decision(&account, &owner.account.login, granted);
+    Ok(private_json(&account))
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn record_decision(account: &Account, actor: &str, granted: bool) {
+    tracing::info!(
+        login = %account.login,
+        actor = %actor,
+        granted,
+        "panel pairing approval changed"
+    );
+}
+
+/// Resolve the signed-in owner, refusing anyone else.
+///
+/// # Errors
+/// Returns [`ApiError::Unauthenticated`] when signed out and
+/// [`ApiError::Forbidden`] for a signed-in account that does not own the panel.
+async fn require_owner(state: &PanelState, headers: &HeaderMap) -> Result<Viewer, ApiError> {
+    let viewer = require_viewer(state, headers).await?;
+    if viewer.is_owner {
+        Ok(viewer)
+    } else {
+        Err(ApiError::Forbidden("only the panel owner can do that"))
+    }
 }
 
 /// Answer with JSON that belongs to one session and nothing else.

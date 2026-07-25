@@ -23,6 +23,7 @@ use crate::config::{
 use crate::store::Store;
 use crate::store::accounts::AccountIdentity;
 
+mod approvals;
 mod auth;
 
 const BODY_LIMIT: usize = 1024 * 1024;
@@ -146,6 +147,47 @@ impl Harness {
                 header::COOKIE,
                 format!("{}={token}", session_cookie_name(&self.state)),
             );
+        }
+        let response = router(self.state.clone())
+            .oneshot(request.body(Body::empty()).expect("request"))
+            .await
+            .expect("response");
+        let status = response.status();
+        let bytes = to_bytes(response.into_body(), BODY_LIMIT)
+            .await
+            .expect("body");
+        (status, String::from_utf8_lossy(&bytes).into_owned())
+    }
+
+    /// The panel id of an account that has signed in, which the owner's page
+    /// would have read from the account list.
+    async fn account_id(&self, login: &str) -> String {
+        if self
+            .state
+            .store
+            .list_accounts()
+            .await
+            .expect("accounts")
+            .iter()
+            .all(|account| account.login != login)
+        {
+            self.sign_in(login).await;
+        }
+        self.state
+            .store
+            .list_accounts()
+            .await
+            .expect("accounts")
+            .into_iter()
+            .find(|account| account.login == login)
+            .expect("the account exists")
+            .id
+    }
+
+    async fn post(&self, path: &str, session: Option<&str>) -> (StatusCode, String) {
+        let mut request = Request::builder().method("POST").uri(path);
+        if let Some(token) = session {
+            request = request.header(header::COOKIE, format!("{SESSION_COOKIE}={token}"));
         }
         let response = router(self.state.clone())
             .oneshot(request.body(Body::empty()).expect("request"))
