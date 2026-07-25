@@ -43,39 +43,33 @@ struct TaskBoardItemPageWalkTests {
     #expect(merged.nextCursor == nil)
   }
 
-  /// Following a cursor that names the resume point it was just given would
-  /// re-fetch the same page and append it again.
-  @Test("stops on a cursor that never advances instead of collecting duplicates")
-  func stopsOnANonAdvancingCursor() async throws {
+  /// A cursor naming the resume point it was just given can never drain, and
+  /// every caller folds this result into a whole-board value, so the walk
+  /// fails rather than handing back the part it read.
+  @Test("fails on a cursor that never advances")
+  func failsOnANonAdvancingCursor() async throws {
     let source = StubTaskBoardPageSource(pages: [
       page(ids: ["task-1"], totalMatched: 9, changeSeq: 3, nextCursor: "cursor-stuck"),
       page(ids: ["task-2"], totalMatched: 9, changeSeq: 3, nextCursor: "cursor-stuck"),
-      page(ids: ["task-3"], totalMatched: 9, changeSeq: 3, nextCursor: "cursor-stuck"),
     ])
 
-    let merged = try await source.mergedTaskBoardItemPages(status: nil)
-
-    let requested = await source.requestedCursors
-    #expect(requested == [nil, "cursor-stuck"])
-    #expect(merged.items.map(\.id) == ["task-1", "task-2"])
-    #expect(merged.nextCursor == "cursor-stuck")
+    await #expect(throws: HarnessMonitorAPIError.invalidResponse) {
+      try await source.mergedTaskBoardItemPages(status: nil)
+    }
   }
 
-  /// A walk that stops early has to say so: `nextCursor` survives, so a
-  /// truncated read never reads as a complete board.
-  @Test("stops on a page that returns no items and keeps the unconsumed cursor")
-  func stopsOnAnEmptyPage() async throws {
+  /// The daemon never pairs a cursor with an empty page, so that shape is a
+  /// board this walk cannot finish reading rather than the end of one.
+  @Test("fails on a page that returns no items")
+  func failsOnAnEmptyPage() async throws {
     let source = StubTaskBoardPageSource(pages: [
       page(ids: ["task-1"], totalMatched: 1, changeSeq: 7, nextCursor: "cursor-2"),
       page(ids: [], totalMatched: 1, changeSeq: 7, nextCursor: "cursor-3"),
     ])
 
-    let merged = try await source.mergedTaskBoardItemPages(status: nil)
-
-    let requested = await source.requestedCursors
-    #expect(requested == [nil, "cursor-2"])
-    #expect(merged.items.map(\.id) == ["task-1"])
-    #expect(merged.nextCursor == "cursor-2")
+    await #expect(throws: HarnessMonitorAPIError.invalidResponse) {
+      try await source.mergedTaskBoardItemPages(status: nil)
+    }
   }
 
   /// The stall check above only catches a cursor that names the resume point it

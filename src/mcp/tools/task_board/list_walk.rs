@@ -143,13 +143,22 @@ impl TaskBoardItemPages {
                 .map(|(key, value)| (key.clone(), value.clone()))
                 .collect();
         }
-        if items.is_empty() {
-            return Ok(None);
-        }
-        Ok(page
+        let next = page
             .get("next_cursor")
             .and_then(Value::as_str)
-            .map(ToString::to_string))
+            .map(ToString::to_string);
+        // An empty page beside a cursor cannot be walked any further, and the
+        // merged response has nowhere to record that the read stopped early,
+        // so it would answer as a whole board. A drained board is the one
+        // legitimate empty page, and it carries no cursor.
+        match (items.is_empty(), next) {
+            (true, Some(cursor)) => Err(ToolError::internal(format!(
+                "the daemon returned no task-board items beside cursor '{cursor}'; \
+                 the board read cannot advance"
+            ))),
+            (true, None) => Ok(None),
+            (false, next) => Ok(next),
+        }
     }
 
     /// A drained walk answers the whole selection, so it carries no cursor.

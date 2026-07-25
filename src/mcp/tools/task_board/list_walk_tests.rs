@@ -68,10 +68,9 @@ fn a_row_re_served_after_a_concurrent_delete_is_folded_once() {
     );
 }
 
-/// An empty page advances nothing, so it ends the walk whatever cursor came
-/// back beside it.
+/// A drained board is the one legitimate empty page, and it carries no cursor.
 #[test]
-fn an_empty_page_ends_the_walk() {
+fn a_drained_page_ends_the_walk() {
     let mut pages = TaskBoardItemPages::default();
 
     pages
@@ -79,10 +78,28 @@ fn an_empty_page_ends_the_walk() {
         .expect("a shaped page");
 
     assert_eq!(
-        pages
-            .absorb(&page(&[], Some("cursor-3")))
-            .expect("a shaped page"),
+        pages.absorb(&page(&[], None)).expect("a drained page"),
         None
+    );
+}
+
+/// An empty page beside a cursor cannot be walked further, and the merged
+/// response has nowhere to say the read stopped early, so it would answer as a
+/// whole board.
+#[test]
+fn an_empty_page_beside_a_cursor_fails_rather_than_draining_the_walk() {
+    let mut pages = TaskBoardItemPages::default();
+
+    pages
+        .absorb(&page(&["task-1"], Some("cursor-2")))
+        .expect("a shaped page");
+
+    let error = pages
+        .absorb(&page(&[], Some("cursor-3")))
+        .expect_err("an empty page beside a cursor must not read as drained");
+    assert!(
+        format!("{error:?}").contains("cursor-3"),
+        "unexpected: {error:?}"
     );
 }
 
