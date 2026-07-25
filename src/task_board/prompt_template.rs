@@ -7,6 +7,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
+use std::mem;
 
 /// One parsed piece of a template: literal text, or a variable reference.
 enum Segment {
@@ -22,14 +23,15 @@ pub(crate) struct PromptTemplate {
 
 /// A referenced variable was not available when rendering a concrete item.
 /// Surfaced at the spawn preflight so the agent never starts with a prompt it
-/// could not fully render (outcome 4, runtime half).
+/// could not fully render.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct PromptRenderError {
     pub(crate) variable: String,
 }
 
 /// A configured override referenced a variable name that does not exist for
-/// its prompt. Surfaced at catalog load (outcome 4, static half).
+/// its prompt. Caught when the configuration is read, so a typo is known
+/// before anything tries to use that prompt.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct PromptConfigError {
     pub(crate) unknown: Vec<String>,
@@ -119,7 +121,7 @@ fn parse_segments(raw: &str) -> Vec<Segment> {
         if chars[index] == '{' && chars.get(index + 1) == Some(&'{') {
             if let Some((name, resume)) = try_placeholder(&chars, index) {
                 if !literal.is_empty() {
-                    segments.push(Segment::Literal(std::mem::take(&mut literal)));
+                    segments.push(Segment::Literal(mem::take(&mut literal)));
                 }
                 segments.push(Segment::Variable(name));
                 index = resume;

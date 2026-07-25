@@ -10,6 +10,7 @@ use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::remote_pairing_expiry_loop::spawn_remote_pairing_expiry_loop;
 use crate::daemon::websocket::{PreparedBroadcast, ReplayBuffer, run_broadcast_fanout};
+use crate::task_board::{install_prompt_catalog, resolve_prompt_catalog_from_env};
 
 #[path = "task_board_automation_loop.rs"]
 mod task_board_automation_loop;
@@ -77,7 +78,7 @@ pub(super) fn spawn_background_tasks(
 ) -> BackgroundTaskHandles {
     // Before any loop or route can render a prompt, so every agent this
     // process starts runs with the same resolved catalog.
-    crate::task_board::install_prompt_catalog(crate::task_board::resolve_prompt_catalog_from_env());
+    install_prompt_catalog(resolve_prompt_catalog_from_env());
     let async_db = app_state.async_db.get().cloned();
     let remote_recovery = async_db.as_ref().map(|_| {
         spawn_task_board_remote_recovery_loop(app_state.clone(), poll_interval, shutdown_rx.clone())

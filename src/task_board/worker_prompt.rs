@@ -164,7 +164,7 @@ pub(crate) fn plan_worker_prompt(item: &TaskBoardItem) -> String {
             status: TaskBoardStatus::InProgress,
         },
     )
-    .unwrap_or_else(|error| error.message().to_string())
+    .unwrap_or_else(|error| error.message().clone())
 }
 
 fn render_external_refs(references: &[ExternalRef]) -> Option<String> {
