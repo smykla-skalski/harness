@@ -46,6 +46,8 @@ Prompts you leave out keep their shipped text.
 
 `{{ name }}` is replaced with the named fact. Single braces pass through untouched, so embedded JSON needs no escaping, and a substituted value is never re-scanned — an item whose body contains `{{ title }}` is inert text.
 
+A closed `{{ ... }}` pair is never literal text. Its trimmed contents must be a valid identifier; `{{ }}`, `{{ a b }}`, and `{{ item.title }}` are all rejected, when the file is read and again at render. There is no escape sequence, so a prompt cannot contain a literal `{{` followed by `}}`. That is the deliberate trade: a doubled brace you meant literally costs you a refused prompt, where the alternative would hand an agent your typo as prose.
+
 Some variables are always available; others exist only for an item that has them. Naming one an item lacks is refused before the agent starts, and naming one that does not exist at all is refused for that prompt the first time it is used. Both surface as a failed spawn with the variable named, so the item stays unstarted.
 
 The `*_section` variables are the shipped prompt's optional blocks, already wrapped in their heading and empty when the fact is missing. Use them to reorder or drop sections; use the raw fact next to them when you want your own wording and are willing to have the spawn refused for an item without it.

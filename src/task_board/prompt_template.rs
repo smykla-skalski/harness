@@ -1,9 +1,15 @@
 //! Minimal `{{ name }}` prompt templating. No template-engine dependency: a
 //! single non-recursive substitution pass over a whitelist of variable names.
 //! Values are inserted verbatim and never re-scanned, so an item body that
-//! itself contains `{{ x }}` is inert. Single braces (and the braces inside an
-//! embedded `JSON` value) pass through untouched -- only a `{{ ... }}` pair
-//! whose trimmed contents form a valid identifier is treated as a placeholder.
+//! itself contains `{{ x }}` is inert. Single braces, and the braces inside an
+//! embedded `JSON` value, pass through untouched.
+//!
+//! A closed `{{ ... }}` pair does not. If its trimmed contents are a valid
+//! identifier it is a placeholder; if they are anything else -- `{{ }}`,
+//! `{{ a b }}`, `{{ item.title }}` -- the template is rejected outright, when
+//! the configuration is read and again at render. There is no escape sequence,
+//! so a prompt that needs a literal `{{` next to `}}` cannot be written; that
+//! is deliberate, because the alternative is a typo reaching an agent as prose.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
