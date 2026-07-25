@@ -161,9 +161,9 @@ Every other session holds its own `target/dev/wt-*` lane and may be building in 
 ```bash
 # assumes: PR merged, <worktree> clean, <worktree> spelled as its physical path, as `pwd -P` prints it
 lane="<main-checkout>/target/dev/wt-$(printf '%s' "$(basename -- "<worktree>")" | tr -cs '[:alnum:]._-' '-')-$(printf '%s' "<worktree>" | shasum -a 256 | cut -c1-16)"
-[ -d "$lane" ] || ls -d "<main-checkout>"/target/dev/wt-*  # no match: set lane= by hand before going on
-lsof +D "$lane" | head                                     # nothing means idle; a hit or an error means stop
-[ -d "$lane" ] && rm -rf "<worktree>/target" "$lane"       # deletes nothing until lane names a real dir
+[ -d "$lane" ] || ls -d "<main-checkout>"/target/dev/wt-*  # no match: set lane= by hand, then rerun
+command -v lsof >/dev/null && [ -d "$lane" ] && [ -z "$(lsof -t +D "$lane")" ] \
+  && rm -rf "<worktree>/target" "$lane"                    # every guard holds, or nothing is deleted
 ```
 
 Then remove the worktree and the branch:
