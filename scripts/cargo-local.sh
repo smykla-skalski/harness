@@ -94,7 +94,10 @@ configure_sccache_socket() {
     sweep_dead_sccache_sockets "/tmp/harness-sccache-$safe_user"
   fi
 
-  socket_id="$(short_hash "$COMMON_REPO_ROOT:$target_segment")"
+  # Every server enforces its own size limit over the same on-disk cache, so
+  # keying the socket per checkout put several of them in an eviction fight.
+  # One server per repository keeps a single owner of that cache.
+  socket_id="$(short_hash "$COMMON_REPO_ROOT")"
   export SCCACHE_SERVER_UDS="$socket_root/$socket_id.sock"
   export SCCACHE_IDLE_TIMEOUT="${SCCACHE_IDLE_TIMEOUT:-1800}"
   export SCCACHE_CACHE_SIZE="${SCCACHE_CACHE_SIZE:-30G}"
@@ -229,7 +232,9 @@ configure_tmpdir() {
     return 0
   fi
 
-  tmpdir_id="$(short_hash "${UID:-${USER:-user}}:$COMMON_REPO_ROOT:$ROOT:$target_segment")"
+  # Scratch files stay per session even though the build cache is per checkout,
+  # so concurrent sessions in one worktree cannot collide over a shared TMPDIR.
+  tmpdir_id="$(short_hash "${UID:-${USER:-user}}:$COMMON_REPO_ROOT:$ROOT:${session_id:-local}")"
   external_fallback="/tmp/harness-cargo-$tmpdir_id"
   if tmpdir_is_usable "/tmp"; then
     if ! prepare_private_tmpdir "$external_fallback"; then
@@ -305,12 +310,25 @@ detect_cpu_count() {
 }
 
 default_jobs() {
-  local cpu_count base_jobs
+  local cpu_count base_jobs staggered_cap
   cpu_count="$(detect_cpu_count)"
 
-  # A single build group receives the full logical CPU budget. Concurrent
-  # groups divide that shared budget below.
+  # Start from the full logical CPU budget; the caps below narrow it.
   base_jobs=$cpu_count
+
+  # The lease count is sampled once, before this build starts compiling, so a
+  # build that arrives alone keeps the whole machine even after other agents
+  # join. Agents arrive independently and cannot renegotiate, so cap their
+  # share up front; otherwise staggered arrivals sum well past the CPU count.
+  if [[ -n "$session_id" ]]; then
+    staggered_cap=$(((cpu_count + 3) / 4))
+    if (( staggered_cap < 2 )); then
+      staggered_cap=2
+    fi
+    if (( base_jobs > staggered_cap )); then
+      base_jobs=$staggered_cap
+    fi
+  fi
 
   if (( active_build_count > 1 )); then
     base_jobs=$(((base_jobs + active_build_count - 1) / active_build_count))
@@ -367,9 +385,12 @@ else
   trap release_build_lease EXIT
 fi
 
+# Key the build cache by checkout, not by session. Session keying handed every
+# new agent a cold rebuild of the whole workspace, and Cargo's incremental
+# output is opaque to sccache, so no shared cache could absorb that cost.
 target_segment="local"
-if [[ -n "$session_id" ]]; then
-  target_segment="agent-$(sanitize_segment "$session_id")"
+if [[ "$ROOT" != "$COMMON_REPO_ROOT" ]]; then
+  target_segment="wt-$(sanitize_segment "$(basename -- "$ROOT")")-$(short_hash "$ROOT")"
 fi
 
 configure_tmpdir

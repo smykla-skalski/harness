@@ -208,14 +208,19 @@ scenario_usable_tmpdir_is_preserved() {
   fi
 }
 
-scenario_default_build_jobs_use_all_logical_cpus() {
+scenario_agent_build_jobs_leave_room_for_later_arrivals() {
   local fake_bin="$SANDBOX/cpu-bin"
   local agent_output local_output
+  local cpu_count=24 expected_agent_jobs
+  # An agent that starts alone still has to leave room for agents that join
+  # later, because the lease count it saw can only shrink its share, never
+  # grow it back.
+  expected_agent_jobs=$(((cpu_count + 3) / 4))
   mkdir -p "$fake_bin"
-  cat >"$fake_bin/getconf" <<'EOF'
+  cat >"$fake_bin/getconf" <<EOF
 #!/usr/bin/env bash
-if [[ "${1:-}" == "_NPROCESSORS_ONLN" ]]; then
-  printf '24\n'
+if [[ "\${1:-}" == "_NPROCESSORS_ONLN" ]]; then
+  printf '$cpu_count\n'
   exit 0
 fi
 exit 1
@@ -241,12 +246,38 @@ EOF
       "$ROOT/scripts/cargo-local.sh" --print-env
   )"
 
-  if assert_line "CARGO_BUILD_JOBS=24" "$agent_output" \
-    && assert_line "CARGO_BUILD_JOBS=24" "$local_output"; then
-    pass "default build jobs use all detected logical CPUs"
+  if assert_line "CARGO_BUILD_JOBS=$expected_agent_jobs" "$agent_output" \
+    && assert_line "CARGO_BUILD_JOBS=$cpu_count" "$local_output"; then
+    pass "local builds take every CPU and agent builds keep a bounded share"
   else
-    fail "default build jobs were capped: agent=$agent_output local=$local_output"
+    fail "unexpected build job split: agent=$agent_output local=$local_output"
   fi
+}
+
+scenario_target_dir_is_shared_across_sessions() {
+  local first second first_dir second_dir first_tmp second_tmp
+
+  first="$(print_tmpdir_env "cargo-local-target-a-$$")"
+  second="$(print_tmpdir_env "cargo-local-target-b-$$")"
+  first_dir="$(
+    awk -F= '$1 == "CARGO_TARGET_DIR" { print substr($0, index($0, "=") + 1) }' <<<"$first"
+  )"
+  second_dir="$(
+    awk -F= '$1 == "CARGO_TARGET_DIR" { print substr($0, index($0, "=") + 1) }' <<<"$second"
+  )"
+  first_tmp="$(awk -F= '$1 == "TMPDIR" { print substr($0, index($0, "=") + 1) }' <<<"$first")"
+  second_tmp="$(awk -F= '$1 == "TMPDIR" { print substr($0, index($0, "=") + 1) }' <<<"$second")"
+
+  if [[ -n "$first_dir" ]] \
+    && [[ "$first_dir" == "$second_dir" ]] \
+    && [[ "$first_dir" != *"cargo-local-target-a-$$"* ]] \
+    && [[ "$first_tmp" != "$second_tmp" ]]; then
+    pass "sessions in one checkout share a build cache and keep separate TMPDIRs"
+  else
+    fail "build cache is still session-scoped: a=$first_dir b=$second_dir"
+  fi
+
+  rm -rf "${first_tmp%/}" "${second_tmp%/}"
 }
 
 scenario_single_thread_nextest_override_is_rejected() {
@@ -298,10 +329,13 @@ scenario_supported_sccache_is_resolved_once() {
   write_fake_sccache "$fake_bin/sccache" "0.16.0"
 
   output="$(print_cargo_env "$fake_bin" "$fake_bin/sccache" "$tmpdir")"
+  # A sandbox under the macOS per-user TMPDIR already exceeds the socket-root
+  # length limit, so the short /tmp root is a correct answer here too.
   if assert_line "SCCACHE_BIN=$fake_bin/sccache" "$output" \
     && assert_line "SCCACHE_VERSION=0.16.0" "$output" \
     && assert_line "SCCACHE_BASEDIRS=$ROOT:$COMMON_REPO_ROOT" "$output" \
-    && assert_contains "SCCACHE_SERVER_UDS=$tmpdir/harness-sccache/" "$output" \
+    && { assert_contains "SCCACHE_SERVER_UDS=$tmpdir/harness-sccache/" "$output" \
+      || assert_contains "SCCACHE_SERVER_UDS=/tmp/harness-sccache-" "$output"; } \
     && assert_line "CACHE_MODE=sccache" "$output"; then
     pass "supported sccache is resolved once"
   else
@@ -379,7 +413,8 @@ scenario_missing_tmpdir_uses_short_external_fallback
 scenario_concurrent_tmpdir_creation_is_idempotent
 scenario_unusable_tmpdir_uses_short_external_fallback
 scenario_usable_tmpdir_is_preserved
-scenario_default_build_jobs_use_all_logical_cpus
+scenario_agent_build_jobs_leave_room_for_later_arrivals
+scenario_target_dir_is_shared_across_sessions
 scenario_single_thread_nextest_override_is_rejected
 scenario_noncanonical_nextest_override_is_rejected
 scenario_supported_sccache_is_resolved_once
