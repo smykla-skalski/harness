@@ -387,9 +387,21 @@ fn remote_systemd_plan_omits_companion_flags_when_none_is_configured() {
 fn remote_systemd_plan_refuses_a_companion_the_daemon_would_reject() {
     for (upstream, prefix) in [
         ("http://198.51.100.9:8787", "/panel"),
+        ("http://panel.internal:8787", "/panel"),
         ("https://127.0.0.1:8787", "/panel"),
+        ("http://127.0.0.1:8787/panel", "/panel"),
         ("http://127.0.0.1:8787", "/v1"),
+        ("http://127.0.0.1:8787", "/v1/remote"),
+        ("http://127.0.0.1:8787", "/"),
+        ("http://127.0.0.1:8787", "panel"),
         ("http://127.0.0.1:8787", "/panel/"),
+        ("http://127.0.0.1:8787", "/panel//api"),
+        ("http://127.0.0.1:8787", "/pa nel"),
+        ("http://127.0.0.1:8787", "/panel?x=1"),
+        ("http://127.0.0.1:8787", "/panel#top"),
+        ("http://127.0.0.1:8787", "/{panel}"),
+        ("http://127.0.0.1:8787", "/panel/*"),
+        ("http://127.0.0.1:8787", "/panel\\x"),
     ] {
         let args = install_args([
             "test",

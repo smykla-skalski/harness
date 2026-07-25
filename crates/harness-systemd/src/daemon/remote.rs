@@ -102,8 +102,8 @@ impl fmt::Display for RemoteDaemonConfigError {
             ),
             Self::CompanionPathPrefixInvalid(prefix) => write!(
                 formatter,
-                "remote daemon companion path prefix {prefix} must be an absolute path below \
-                 /{DAEMON_API_SEGMENT} with no trailing slash"
+                "remote daemon companion path prefix {prefix} must be an absolute path with no \
+                 trailing slash, no empty segment, and must not start with /{DAEMON_API_SEGMENT}"
             ),
         }
     }
@@ -217,10 +217,13 @@ fn is_valid_companion_prefix(prefix: &str) -> bool {
     if !prefix.starts_with('/') || prefix == "/" || prefix.ends_with('/') {
         return false;
     }
-    if prefix
-        .chars()
-        .any(|c| c.is_whitespace() || c.is_control() || matches!(c, '?' | '#' | '{' | '}' | '*'))
-    {
+    // Must stay identical to the daemon's own rejected set, or `install` writes
+    // a unit whose daemon refuses to start.
+    if prefix.chars().any(|character| {
+        character.is_whitespace()
+            || character.is_control()
+            || matches!(character, '?' | '#' | '{' | '}' | '*' | '\\')
+    }) {
         return false;
     }
     let mut segments = prefix.split('/').skip(1);
