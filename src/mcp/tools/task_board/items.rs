@@ -4,8 +4,8 @@ use serde_json::{Value, json};
 // because this file also compiles into the standalone `harness-mcp` crate,
 // which has no `task_board` module.
 use crate::daemon::protocol::{
-    TASK_BOARD_LIST_MAX_LIMIT, TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS,
-    ws_methods,
+    TASK_BOARD_LIST_MAX_CURSOR_CHARS, TASK_BOARD_LIST_MAX_LIMIT, TASK_BOARD_LIST_MAX_QUERY_CHARS,
+    TASK_BOARD_LIST_MAX_TAGS, ws_methods,
 };
 use crate::mcp::tool::ToolRegistry;
 
@@ -313,8 +313,9 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        TASK_BOARD_LIST_MAX_LIMIT, TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS,
-        create_schema, list_schema, update_schema,
+        TASK_BOARD_LIST_MAX_CURSOR_CHARS, TASK_BOARD_LIST_MAX_LIMIT,
+        TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS, create_schema, list_schema,
+        update_schema,
     };
 
     /// A `minLength` of 1 would still advertise a whitespace-only title as
@@ -363,6 +364,10 @@ mod tests {
         assert_eq!(
             properties["limit"]["maximum"],
             json!(TASK_BOARD_LIST_MAX_LIMIT)
+        );
+        assert_eq!(
+            properties["cursor"]["maxLength"],
+            json!(TASK_BOARD_LIST_MAX_CURSOR_CHARS)
         );
         assert_eq!(schema["required"], json!(null));
     }

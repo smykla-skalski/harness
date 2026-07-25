@@ -19,8 +19,8 @@ pub mod ws_methods;
 pub mod task_board_list_bounds;
 
 pub use task_board_list_bounds::{
-    TASK_BOARD_LIST_DEFAULT_LIMIT, TASK_BOARD_LIST_MAX_LIMIT, TASK_BOARD_LIST_MAX_QUERY_CHARS,
-    TASK_BOARD_LIST_MAX_TAGS,
+    TASK_BOARD_LIST_DEFAULT_LIMIT, TASK_BOARD_LIST_MAX_CURSOR_CHARS, TASK_BOARD_LIST_MAX_LIMIT,
+    TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS,
 };
 
 // Kept in sync by hand with `src/daemon/protocol/api_contract.rs`'s
