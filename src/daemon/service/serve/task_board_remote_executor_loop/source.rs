@@ -62,6 +62,10 @@ pub(super) async fn prepare_remote_workspace(
     Ok(workspace)
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "three-way session resolve whose branches share the snapshot-import cleanup contract"
+)]
 pub(super) async fn ensure_remote_session(
     db: &AsyncDaemonDb,
     record: &TaskBoardRemoteAssignmentRecord,
@@ -99,37 +103,52 @@ pub(super) async fn ensure_remote_session(
             "started remote assignment has no durable executor session",
         ));
     } else {
-        #[cfg(test)]
-        super::test_seam::record_provision();
-        let session = start_session_direct_async(
-            &SessionStartRequest {
-                title: format!("Remote Task Board {}", record.execution_id),
-                context: format!(
-                    "Remote Task Board assignment {} fencing epoch {}",
-                    record.assignment_id, record.fencing_epoch
-                ),
-                session_id: Some(identity.session_id.clone()),
-                project_dir: origin.to_string_lossy().into_owned(),
-                policy_preset: None,
-                base_ref: Some(revision.to_string()),
-            },
-            db,
-        )
-        .await?;
-        #[cfg(test)]
-        wait_after_remote_session_creation(record).await;
-        validate_remote_session(
-            &session,
-            &origin,
-            revision,
-            &identity.session_id,
-            require_source_head,
-        )
-        .await?;
-        session.worktree_path
+        provision_remote_session(db, record, identity, &origin, revision, require_source_head)
+            .await?
     };
     cleanup_repository_snapshot_import(snapshot_import).await?;
     Ok(workspace)
+}
+
+/// Creates the executor's durable session. A failure here propagates without
+/// cleaning up the snapshot import, exactly as the inline path did: the caller
+/// only reclaims it once a session exists to own the checkout.
+async fn provision_remote_session(
+    db: &AsyncDaemonDb,
+    record: &TaskBoardRemoteAssignmentRecord,
+    identity: &RemoteWorkerIdentity,
+    origin: &Path,
+    revision: &str,
+    require_source_head: bool,
+) -> Result<PathBuf, CliError> {
+    #[cfg(test)]
+    super::test_seam::record_provision();
+    let session = start_session_direct_async(
+        &SessionStartRequest {
+            title: format!("Remote Task Board {}", record.execution_id),
+            context: format!(
+                "Remote Task Board assignment {} fencing epoch {}",
+                record.assignment_id, record.fencing_epoch
+            ),
+            session_id: Some(identity.session_id.clone()),
+            project_dir: origin.to_string_lossy().into_owned(),
+            policy_preset: None,
+            base_ref: Some(revision.to_string()),
+        },
+        db,
+    )
+    .await?;
+    #[cfg(test)]
+    wait_after_remote_session_creation(record).await;
+    validate_remote_session(
+        &session,
+        origin,
+        revision,
+        &identity.session_id,
+        require_source_head,
+    )
+    .await?;
+    Ok(session.worktree_path)
 }
 
 #[cfg(test)]

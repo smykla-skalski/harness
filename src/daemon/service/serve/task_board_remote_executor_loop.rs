@@ -164,10 +164,33 @@ async fn reconcile_remote_executor_assignment_with_shutdown(
         return Ok(());
     };
     let identity = remote_executor_identity(&initial)?;
+    // `_guard` has to outlive the call below: it is the mutation lock the whole
+    // reconciliation runs under, and dropping it here would unserialise it.
     let _guard = state
         .managed_agent_mutation_locks
         .lock(&identity.session_id, &identity.run_id)
         .await;
+    Box::pin(reconcile_remote_executor_assignment_locked(
+        state,
+        db,
+        assignment_id,
+        &identity,
+        shutdown_rx,
+    ))
+    .await
+}
+
+/// Requires the caller to hold `state.managed_agent_mutation_locks` for this
+/// assignment's `(session_id, run_id)` across the whole call. Every branch
+/// re-reads the record and mutates executor state that only that lock
+/// serialises, so calling this unlocked races another reconciler.
+async fn reconcile_remote_executor_assignment_locked(
+    state: &DaemonHttpState,
+    db: &AsyncDaemonDb,
+    assignment_id: &str,
+    identity: &RemoteWorkerIdentity,
+    shutdown_rx: Option<&watch::Receiver<bool>>,
+) -> Result<(), CliError> {
     let Some(record) = db.task_board_remote_assignment(assignment_id).await? else {
         return Ok(());
     };
@@ -181,7 +204,7 @@ async fn reconcile_remote_executor_assignment_with_shutdown(
             | TaskBoardRemoteAssignmentState::Cancelled
             | TaskBoardRemoteAssignmentState::Unknown
             | TaskBoardRemoteAssignmentState::Superseded
-    ) && reconcile_settled_executor_cleanup(state, db, &record, &identity).await?
+    ) && reconcile_settled_executor_cleanup(state, db, &record, identity).await?
     {
         return Ok(());
     }
@@ -189,13 +212,13 @@ async fn reconcile_remote_executor_assignment_with_shutdown(
         record.state,
         TaskBoardRemoteAssignmentState::Cancelled | TaskBoardRemoteAssignmentState::Unknown
     ) {
-        return stop_terminal_remote_worker(state, db, &record, &identity).await;
+        return stop_terminal_remote_worker(state, db, &record, identity).await;
     }
     Box::pin(reconcile_active_remote_worker(
         state,
         db,
         record,
-        &identity,
+        identity,
         shutdown_rx,
     ))
     .await

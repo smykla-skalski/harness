@@ -16,6 +16,10 @@ use crate::workspace::utc_now;
 mod orchestration;
 pub(crate) use orchestration::import_and_adopt_task_board_remote_implementation_result;
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "flat guard chain over prior-record and import state; each guard has one recovery"
+)]
 pub(crate) async fn import_task_board_remote_implementation_result(
     db: &AsyncDaemonDb,
     expected: &TaskBoardWorkflowExecutionCas,
@@ -40,27 +44,14 @@ pub(crate) async fn import_task_board_remote_implementation_result(
     }
     let plan = match plan_from_request(request) {
         Ok(plan) => plan,
-        Err(error) => match existing.as_ref() {
-            Some(record) if manual_git_failure(&error) => {
-                return Box::pin(mark_or_retry(db, request, record, error)).await;
-            }
-            _ => return Err(git_error(&error)),
-        },
+        Err(error) => return recover_plan_error(db, request, existing.as_ref(), error).await,
     };
     let plan_evidence = match plan.evidence() {
         Ok(evidence) => evidence,
-        Err(error) => match existing.as_ref() {
-            Some(record) if manual_git_failure(&error) => {
-                return Box::pin(mark_or_retry(db, request, record, error)).await;
-            }
-            _ => return Err(git_error(&error)),
-        },
+        Err(error) => return recover_plan_error(db, request, existing.as_ref(), error).await,
     };
     if let Err(error) = require_plan_matches_request(&plan_evidence, request) {
-        match existing.as_ref() {
-            Some(record) => return Box::pin(mark_or_retry(db, request, record, error)).await,
-            None => return Err(git_error(&error)),
-        }
+        return recover_plan_error(db, request, existing.as_ref(), error).await;
     }
     let work = match db
         .prepare_task_board_remote_result_import(expected, request)
@@ -217,6 +208,23 @@ async fn settle_git_failure(
         }
     }
     Box::pin(mark_or_retry(db, request, record, error)).await
+}
+
+/// Recovers a git failure raised while building or checking the import plan.
+/// Without a prior record there is nothing to mark, so the error just
+/// propagates. `mark_or_retry` re-tests `manual_git_failure` itself and returns
+/// the same plain git error when it does not hold, which is why no caller needs
+/// to screen for it first.
+async fn recover_plan_error(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardRemoteResultImportRequest,
+    existing: Option<&TaskBoardRemoteResultImportRecord>,
+    error: GitError,
+) -> Result<TaskBoardRemoteResultImportRecord, CliError> {
+    match existing {
+        Some(record) => Box::pin(mark_or_retry(db, request, record, error)).await,
+        None => Err(git_error(&error)),
+    }
 }
 
 async fn mark_or_retry(

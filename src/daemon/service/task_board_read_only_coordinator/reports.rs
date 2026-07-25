@@ -1,21 +1,25 @@
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 
 use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::protocol::{CodexRunMode, CodexRunRequest, CodexRunSnapshot, CodexRunStatus};
+use crate::daemon::protocol::{CodexRunMode, CodexRunSnapshot, CodexRunStatus};
 use harness_kernel::errors::CliError;
 use crate::task_board::{
-    TASK_BOARD_SIDE_EFFECT_CLAIM_GRACE_SECONDS, TaskBoardAttemptResultArtifact,
-    TaskBoardAttemptRetryDecision, TaskBoardAttemptState, TaskBoardExecutionAttemptCas,
-    TaskBoardExecutionAttemptCasOutcome, TaskBoardExecutionAttemptRecord,
-    TaskBoardExecutionDiagnostic, TaskBoardExecutionState, TaskBoardFailureClass,
-    TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
-    task_board_attempt_retry_decision,
+    TaskBoardAttemptResultArtifact, TaskBoardAttemptRetryDecision, TaskBoardAttemptState,
+    TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptCasOutcome,
+    TaskBoardExecutionAttemptRecord, TaskBoardExecutionDiagnostic, TaskBoardExecutionState,
+    TaskBoardFailureClass, TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionCas,
+    TaskBoardWorkflowExecutionRecord, task_board_attempt_retry_decision,
 };
 
 use super::super::task_board_read_only_runtime::TaskBoardReadOnlyRuntime;
 use super::attempts::{invalid_transition, require_human, set_execution_state};
-use super::requests::{attempt_run_identity, codex_attempt_request};
+use super::report_starts::start_new_report_run;
+use super::requests::attempt_run_identity;
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "flat match resolving the durable run snapshot; each arm is one terminal attempt outcome"
+)]
 pub(super) async fn reconcile_report_attempt<R>(
     db: &AsyncDaemonDb,
     runtime: &R,
@@ -43,30 +47,12 @@ where
         }
         None if !allow_start => return Ok(false),
         None => {
-            // Rendered before the claim so a refusal costs no side effect.
-            let request = match codex_attempt_request(execution, attempt) {
-                Ok(request) => request,
-                Err(error) => {
-                    refuse_unrenderable_request(db, execution, attempt, now, &error).await?;
-                    return Ok(true);
-                }
-            };
-            let Some(claimed) = claim_report_side_effect(db, attempt, now).await? else {
+            let Some(run) =
+                Box::pin(start_new_report_run(db, runtime, execution, attempt, now)).await?
+            else {
                 return Ok(true);
             };
-            let session_id = super::requests::run_context(execution)?.session_id.as_str();
-            match start_codex_run(runtime, session_id, &request, &claimed.idempotency_key).await {
-                Ok(run) => run,
-                Err(error) => {
-                    let Some(run) =
-                        reconcile_report_start_error(db, runtime, execution, &claimed, &error, now)
-                            .await?
-                    else {
-                        return Ok(true);
-                    };
-                    run
-                }
-            }
+            run
         }
     };
     let durable_attempt = current_attempt(db, attempt).await?;
@@ -82,7 +68,7 @@ where
     Ok(true)
 }
 
-async fn load_codex_run<R>(
+pub(super) async fn load_codex_run<R>(
     runtime: &R,
     mode: CodexRunMode,
     run_id: &str,
@@ -99,130 +85,6 @@ where
     }
 }
 
-async fn start_codex_run<R>(
-    runtime: &R,
-    session_id: &str,
-    request: &CodexRunRequest,
-    run_id: &str,
-) -> Result<CodexRunSnapshot, CliError>
-where
-    R: TaskBoardReadOnlyRuntime,
-{
-    match request.mode {
-        CodexRunMode::Report => {
-            runtime
-                .start_codex_report_run(session_id, request, run_id)
-                .await
-        }
-        CodexRunMode::WorkspaceWrite => {
-            runtime
-                .start_codex_workspace_run(session_id, request, run_id)
-                .await
-        }
-        CodexRunMode::Approval => Err(invalid_transition(
-            "workflow attempts do not admit Codex Approval mode",
-        )),
-    }
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-)]
-async fn reconcile_report_start_error<R>(
-    db: &AsyncDaemonDb,
-    runtime: &R,
-    execution: &TaskBoardWorkflowExecutionRecord,
-    claimed: &TaskBoardExecutionAttemptRecord,
-    start_error: &CliError,
-    now: &str,
-) -> Result<Option<CodexRunSnapshot>, CliError>
-where
-    R: TaskBoardReadOnlyRuntime,
-{
-    let identity = attempt_run_identity(execution, claimed)?;
-    match load_codex_run(runtime, identity.mode, &claimed.idempotency_key).await {
-        Ok(Some(run)) => Ok(Some(run)),
-        Ok(None) => {
-            if super::attempts::settlement_is_current(db, &execution.execution_id, now).await? {
-                record_retry_or_human(db, execution, claimed, &start_error.to_string(), now)
-                    .await?;
-            }
-            Ok(None)
-        }
-        Err(probe_error) => {
-            tracing::warn!(
-                execution_id = %execution.execution_id,
-                idempotency_key = %claimed.idempotency_key,
-                error = %start_error,
-                probe_error = %probe_error,
-                "failed to start and re-probe durable Codex report run; retaining the claim for grace recovery"
-            );
-            Ok(None)
-        }
-    }
-}
-
-async fn claim_report_side_effect(
-    db: &AsyncDaemonDb,
-    attempt: &TaskBoardExecutionAttemptRecord,
-    now: &str,
-) -> Result<Option<TaskBoardExecutionAttemptRecord>, CliError> {
-    loop {
-        let execution = db
-            .task_board_workflow_execution(&attempt.execution_id)
-            .await?
-            .ok_or_else(|| {
-                invalid_transition("workflow execution disappeared before report claim")
-            })?;
-        let current = execution
-            .attempts
-            .iter()
-            .find(|current| {
-                current.action_key == attempt.action_key && current.attempt == attempt.attempt
-            })
-            .ok_or_else(|| {
-                invalid_transition("workflow attempt disappeared before report claim")
-            })?;
-        // The claim needs an execution target; when the remote controller has not selected one,
-        // the coordinator selects local itself (a no-op once targeted or fenced by a remote
-        // assignment). Selection advances the attempt to Starting, so reload before the claim.
-        if current.state == TaskBoardAttemptState::Preparing
-            && db
-                .select_task_board_local_execution_target(
-                    &TaskBoardWorkflowExecutionCas::from(&execution),
-                    &TaskBoardExecutionAttemptCas::from(current),
-                    now,
-                )
-                .await?
-        {
-            continue;
-        }
-        let mut claimed = current.clone();
-        claimed.state = TaskBoardAttemptState::Running;
-        claimed.updated_at = now.to_string();
-        claimed.available_at = Some(report_claim_deadline(now)?);
-        return db
-            .claim_task_board_workflow_side_effect(
-                &TaskBoardWorkflowExecutionCas::from(&execution),
-                &TaskBoardExecutionAttemptCas::from(current),
-                &claimed,
-                now,
-            )
-            .await;
-    }
-}
-
-fn report_claim_deadline(now: &str) -> Result<String, CliError> {
-    let now = DateTime::parse_from_rfc3339(now)
-        .map_err(|error| invalid_transition(format!("invalid report claim time: {error}")))?;
-    now.checked_add_signed(Duration::seconds(
-        TASK_BOARD_SIDE_EFFECT_CLAIM_GRACE_SECONDS,
-    ))
-    .ok_or_else(|| invalid_transition("report claim deadline is out of range"))
-    .map(|deadline| deadline.to_rfc3339())
-}
-
 fn report_claim_verification_due(
     attempt: &TaskBoardExecutionAttemptRecord,
     now: &str,
@@ -237,6 +99,10 @@ fn report_claim_verification_due(
     Ok(now >= deadline)
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "flat match over codex run status; each arm handles one status variant"
+)]
 async fn handle_run_status(
     db: &AsyncDaemonDb,
     execution: &TaskBoardWorkflowExecutionRecord,
@@ -303,6 +169,10 @@ async fn handle_run_status(
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "two-arm match over retry decision; each arm is a short transition-then-notify sequence"
+)]
 pub(super) async fn record_retry_or_human(
     db: &AsyncDaemonDb,
     execution: &TaskBoardWorkflowExecutionRecord,
@@ -376,37 +246,6 @@ pub(super) async fn record_retry_or_human(
     }
 }
 
-/// A prompt that cannot render is a configuration mistake, not a transient
-/// fault, and nothing was started. Retrying it on a backoff would only repeat
-/// the same refusal, so the attempt fails permanently and says what to fix.
-async fn refuse_unrenderable_request(
-    db: &AsyncDaemonDb,
-    execution: &TaskBoardWorkflowExecutionRecord,
-    attempt: &TaskBoardExecutionAttemptRecord,
-    now: &str,
-    error: &CliError,
-) -> Result<(), CliError> {
-    transition_attempt(
-        db,
-        attempt,
-        TaskBoardAttemptState::Failed,
-        now,
-        Some(TaskBoardFailureClass::Permanent),
-        Some(&error.to_string()),
-        None,
-    )
-    .await?;
-    require_human(
-        db,
-        &execution.execution_id,
-        "attempt_prompt_unrenderable",
-        "the configured prompt for this attempt cannot be rendered",
-        TaskBoardTerminalOutcomeKind::HumanRequired,
-        now,
-    )
-    .await
-}
-
 async fn mark_unknown(
     db: &AsyncDaemonDb,
     execution: &TaskBoardWorkflowExecutionRecord,
@@ -435,6 +274,10 @@ async fn mark_unknown(
     .await
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "sequential attempt-record builder followed by one flat match over the CAS outcome"
+)]
 pub(super) async fn transition_attempt(
     db: &AsyncDaemonDb,
     current: &TaskBoardExecutionAttemptRecord,
@@ -459,20 +302,7 @@ pub(super) async fn transition_attempt(
     updated.updated_at = now.to_string();
     updated.available_at = None;
     if state == TaskBoardAttemptState::RetryWait {
-        let settings = db.task_board_orchestrator_settings_snapshot().await?;
-        let timestamp = DateTime::parse_from_rfc3339(now)
-            .map(|value| value.with_timezone(&Utc))
-            .map_err(|parse| invalid_transition(format!("invalid retry timestamp: {parse}")))?;
-        if let TaskBoardAttemptRetryDecision::Retry(retry) = task_board_attempt_retry_decision(
-            &settings.settings.retry,
-            &format!("{}:{}", current.execution_id, current.action_key),
-            &current.action_key,
-            current.attempt,
-            failure_class.unwrap_or(TaskBoardFailureClass::Transient),
-            timestamp,
-        ) {
-            updated.available_at = Some(retry.available_at);
-        }
+        updated.available_at = retry_wait_available_at(db, current, failure_class, now).await?;
     }
     if matches!(
         state,
@@ -495,6 +325,33 @@ pub(super) async fn transition_attempt(
         TaskBoardExecutionAttemptCasOutcome::Stale(_) => {
             Err(invalid_transition("workflow attempt CAS became stale"))
         }
+    }
+}
+
+/// The retry policy decides when a `RetryWait` attempt becomes eligible again.
+/// `Ok(None)` leaves the attempt without a deadline, which is what a policy that
+/// declines to retry means here.
+async fn retry_wait_available_at(
+    db: &AsyncDaemonDb,
+    current: &TaskBoardExecutionAttemptRecord,
+    failure_class: Option<TaskBoardFailureClass>,
+    now: &str,
+) -> Result<Option<String>, CliError> {
+    let settings = db.task_board_orchestrator_settings_snapshot().await?;
+    let timestamp = DateTime::parse_from_rfc3339(now)
+        .map(|value| value.with_timezone(&Utc))
+        .map_err(|parse| invalid_transition(format!("invalid retry timestamp: {parse}")))?;
+    let decision = task_board_attempt_retry_decision(
+        &settings.settings.retry,
+        &format!("{}:{}", current.execution_id, current.action_key),
+        &current.action_key,
+        current.attempt,
+        failure_class.unwrap_or(TaskBoardFailureClass::Transient),
+        timestamp,
+    );
+    match decision {
+        TaskBoardAttemptRetryDecision::Retry(retry) => Ok(Some(retry.available_at)),
+        TaskBoardAttemptRetryDecision::HumanRequired => Ok(None),
     }
 }
 
