@@ -67,9 +67,10 @@ impl PanelError {
 /// A failure the browser is allowed to see.
 ///
 /// Every variant carries a stable machine-readable code so the single-page app
-/// can tell "sign in first" from "the account store is down" without matching
-/// on prose. Storage and upstream failures deliberately answer with a fixed
-/// message: the detail belongs in the log, not in a page anyone can load.
+/// can distinguish authentication and sign-in failures from an internal
+/// failure without matching on prose. Storage and upstream failures
+/// deliberately share the fixed `internal` code and message: the detail
+/// belongs in the log, not in a page anyone can load.
 #[derive(Debug)]
 pub enum ApiError {
     Unauthenticated,

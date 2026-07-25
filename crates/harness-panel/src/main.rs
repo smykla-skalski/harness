@@ -16,7 +16,7 @@ const DEFAULT_UNIT: &str = "harness-panel";
 #[derive(Debug, Parser)]
 #[command(
     name = "harness-panel",
-    about = "Harness panel: sign in with GitHub and manage your own pairing",
+    about = "Harness panel: GitHub sign-in and account roster",
     version
 )]
 struct Cli {
