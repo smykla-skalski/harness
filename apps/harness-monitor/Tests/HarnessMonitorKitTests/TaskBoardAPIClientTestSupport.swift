@@ -108,6 +108,8 @@ private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
   .taskBoardProjects: .array([
     .object([
       "project_id": .string("project-1"),
+      "source": .string("github"),
+      "slug": .string("example/harness"),
       "item_count": .number(1),
       "ready_count": .number(1),
     ])
@@ -246,7 +248,7 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
     Route("/v1/task-board/evaluate"): sampleTaskBoardEvaluationSummaryText,
     Route("/v1/task-board/audit"): #"{"total":1,"ready":1,"blocked":0,"deleted":0,"by_status":[]}"#,
     Route("/v1/task-board/projects"):
-      #"[{"project_id":"project-1","item_count":1,"ready_count":1}]"#,
+      #"[{"project_id":"project-1","source":"github","slug":"example/harness","item_count":1,"ready_count":1}]"#,
     Route("/v1/task-board/machines"): #"[{"mode":"interactive","item_count":1,"ready_count":1}]"#,
     Route("/v1/task-board/orchestrator/status"): sampleOrchestratorStatusText,
     Route("/v1/task-board/orchestrator/start"): sampleOrchestratorStatusText,
