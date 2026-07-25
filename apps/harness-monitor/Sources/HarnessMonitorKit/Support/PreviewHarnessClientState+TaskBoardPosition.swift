@@ -55,10 +55,12 @@ extension PreviewHarnessClientState {
     )
     replacePosition(
       current,
-      status: destination,
-      lanePosition: request.lanePosition,
-      laneOrigin: .manual(actor: request.actor),
-      laneSetAt: Self.mutationTimestamp,
+      PreviewLanePlacement(
+        status: destination,
+        lanePosition: request.lanePosition,
+        laneOrigin: .manual(actor: request.actor),
+        laneSetAt: Self.mutationTimestamp
+      ),
       updatedAt: Self.mutationTimestamp
     )
     taskBoardItemsChangeSeq += 1
@@ -87,10 +89,12 @@ extension PreviewHarnessClientState {
     )
     replacePosition(
       current,
-      status: current.status,
-      lanePosition: nil,
-      laneOrigin: nil,
-      laneSetAt: nil,
+      PreviewLanePlacement(
+        status: current.status,
+        lanePosition: nil,
+        laneOrigin: nil,
+        laneSetAt: nil
+      ),
       updatedAt: Self.mutationTimestamp
     )
     taskBoardItemsChangeSeq += 1
@@ -112,20 +116,24 @@ extension PreviewHarnessClientState {
     }
   }
 
+  struct PreviewLanePlacement {
+    let status: TaskBoardStatus
+    let lanePosition: UInt32?
+    let laneOrigin: TaskBoardLaneOrigin?
+    let laneSetAt: String?
+  }
+
   func replacePosition(
     _ item: TaskBoardItem,
-    status: TaskBoardStatus,
-    lanePosition: UInt32?,
-    laneOrigin: TaskBoardLaneOrigin?,
-    laneSetAt: String?,
+    _ placement: PreviewLanePlacement,
     updatedAt: String
   ) {
     guard let index = taskBoardItems.firstIndex(where: { $0.id == item.id }) else { return }
     taskBoardItems[index] = item.replacingPreviewPosition(
-      status: status,
-      lanePosition: lanePosition,
-      laneOrigin: laneOrigin,
-      laneSetAt: laneSetAt,
+      status: placement.status,
+      lanePosition: placement.lanePosition,
+      laneOrigin: placement.laneOrigin,
+      laneSetAt: placement.laneSetAt,
       updatedAt: updatedAt
     )
     taskBoardItemRevisions[item.id, default: 0] += 1
@@ -173,10 +181,12 @@ extension PreviewHarnessClientState {
       guard let next else { continue }
       replacePosition(
         item,
-        status: item.status,
-        lanePosition: next,
-        laneOrigin: item.laneOrigin,
-        laneSetAt: item.laneSetAt,
+        PreviewLanePlacement(
+          status: item.status,
+          lanePosition: next,
+          laneOrigin: item.laneOrigin,
+          laneSetAt: item.laneSetAt
+        ),
         updatedAt: item.updatedAt
       )
       shifted.append(
@@ -201,10 +211,12 @@ extension PreviewHarnessClientState {
       else { return nil }
       replacePosition(
         item,
-        status: item.status,
-        lanePosition: lanePosition - 1,
-        laneOrigin: item.laneOrigin,
-        laneSetAt: item.laneSetAt,
+        PreviewLanePlacement(
+          status: item.status,
+          lanePosition: lanePosition - 1,
+          laneOrigin: item.laneOrigin,
+          laneSetAt: item.laneSetAt
+        ),
         updatedAt: item.updatedAt
       )
       return TaskBoardShiftedItemRevision(

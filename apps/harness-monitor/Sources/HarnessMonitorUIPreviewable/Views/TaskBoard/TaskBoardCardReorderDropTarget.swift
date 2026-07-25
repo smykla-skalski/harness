@@ -27,10 +27,12 @@ struct TaskBoardCardReorderDropTarget: ViewModifier {
         defer { clearInsertionHint() }
         switch TaskBoardCardReorderPlan.dropDecision(
           isEnabled: isEnabled,
-          draggedItemID: draggedItemID,
-          lane: lane,
-          apiItems: apiItems,
-          hoveredItemID: hoveredItemID,
+          TaskBoardCardReorderDropContext(
+            draggedItemID: draggedItemID,
+            lane: lane,
+            apiItems: apiItems,
+            hoveredItemID: hoveredItemID
+          ),
           insertAfterHovered: insertsAfter(session)
         ) {
         case .proceed(let plan):
@@ -103,20 +105,17 @@ extension View {
   }
 
   func taskBoardCardReorderDropTarget(
-    hoveredItemID: String,
-    lane: TaskBoardInboxLane,
-    apiItems: [TaskBoardItem],
-    draggedItemID: String?,
+    _ context: TaskBoardCardReorderDropContext,
     isEnabled: Bool,
     actions: TaskBoardOverviewActions,
     insertionHint: Binding<TaskBoardCardReorderInsertionHint?>
   ) -> some View {
     modifier(
       TaskBoardCardReorderDropTarget(
-        hoveredItemID: hoveredItemID,
-        lane: lane,
-        apiItems: apiItems,
-        draggedItemID: draggedItemID,
+        hoveredItemID: context.hoveredItemID,
+        lane: context.lane,
+        apiItems: context.apiItems,
+        draggedItemID: context.draggedItemID,
         isEnabled: isEnabled,
         actions: actions,
         insertionHint: insertionHint

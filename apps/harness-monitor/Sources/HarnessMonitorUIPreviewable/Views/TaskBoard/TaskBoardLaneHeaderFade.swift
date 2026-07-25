@@ -125,8 +125,11 @@ private struct TaskBoardLaneHeaderFadeModifier: ViewModifier {
         isHovered = hovering
       }
       .simultaneousGesture(pressGesture)
-      .animation(TaskBoardLaneHeaderFade.hoverAnimation(reduceMotion: reduceMotion), value: isHovered)
-      .animation(TaskBoardLaneHeaderFade.pressAnimation(reduceMotion: reduceMotion), value: isPressed)
+      .animation(
+        TaskBoardLaneHeaderFade.hoverAnimation(reduceMotion: reduceMotion), value: isHovered
+      )
+      .animation(
+        TaskBoardLaneHeaderFade.pressAnimation(reduceMotion: reduceMotion), value: isPressed)
   }
 
   private var pressGesture: some Gesture {

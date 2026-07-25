@@ -58,15 +58,15 @@ extension RecordingHarnessClient {
     try lock.withLock {
       taskBoardTriageRulesActivateRequests.append(request)
       try throwQueuedTriageRulesErrorIfNeeded()
-      guard taskBoardActiveTriageRuleSetRevisionStorage == request.expectedActiveRevision else {
+      guard activeTriageRuleSetRevisionStorage == request.expectedActiveRevision else {
         return TriageRuleSetActivationResult(
           validation: TriageRuleSetValidationReport(),
           activated: false,
-          revision: taskBoardActiveTriageRuleSetRevisionStorage,
+          revision: activeTriageRuleSetRevisionStorage,
           reevaluatedItemCount: 0
         )
       }
-      if let previousRevision = taskBoardActiveTriageRuleSetRevisionStorage,
+      if let previousRevision = activeTriageRuleSetRevisionStorage,
         let index = taskBoardTriageRuleSetRevisionsStorage.firstIndex(where: {
           $0.revision == previousRevision
         })
@@ -98,7 +98,7 @@ extension RecordingHarnessClient {
           )
         )
       }
-      taskBoardActiveTriageRuleSetRevisionStorage = newRevision
+      activeTriageRuleSetRevisionStorage = newRevision
       taskBoardTriageRuleSetAuditStorage.insert(
         TriageRuleSetAuditEntry(
           auditId: "recording-audit-\(taskBoardTriageRuleSetAuditStorage.count)",

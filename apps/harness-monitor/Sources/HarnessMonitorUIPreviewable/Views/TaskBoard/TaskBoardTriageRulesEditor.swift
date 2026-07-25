@@ -48,8 +48,7 @@ struct TaskBoardTriageRulesEditor: View {
     .accessibilityIdentifier("harness.task-board.triage-rules")
   }
 
-  @ViewBuilder
-  private var statusLine: some View {
+  @ViewBuilder private var statusLine: some View {
     HStack {
       Text(activeRevisionText)
         .font(.caption)
@@ -72,8 +71,7 @@ struct TaskBoardTriageRulesEditor: View {
     }
   }
 
-  @ViewBuilder
-  private var controlRow: some View {
+  @ViewBuilder private var controlRow: some View {
     HStack {
       Button("Load") { actions.load() }
         .disabled(state.isBusy)
@@ -140,8 +138,7 @@ struct TaskBoardTriageRulesEditor: View {
     .accessibilityIdentifier("harness.task-board.triage-rules.preview-diff")
   }
 
-  @ViewBuilder
-  private var revisionsList: some View {
+  @ViewBuilder private var revisionsList: some View {
     VStack(alignment: .leading, spacing: 2) {
       Text("Revision history")
         .font(.caption.weight(.semibold))
@@ -156,8 +153,7 @@ struct TaskBoardTriageRulesEditor: View {
     .accessibilityIdentifier("harness.task-board.triage-rules.revisions")
   }
 
-  @ViewBuilder
-  private var auditList: some View {
+  @ViewBuilder private var auditList: some View {
     VStack(alignment: .leading, spacing: 2) {
       Text("Audit")
         .font(.caption.weight(.semibold))

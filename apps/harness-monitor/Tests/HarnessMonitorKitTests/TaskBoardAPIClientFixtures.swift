@@ -279,4 +279,3 @@ let sampleGitHubTokensSyncJSON: [String: JSONValue] = [
   "global_token_configured": .bool(true),
   "repository_token_count": .number(1),
 ]
-

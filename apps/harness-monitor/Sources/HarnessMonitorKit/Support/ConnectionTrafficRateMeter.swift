@@ -15,7 +15,7 @@ struct ConnectionTrafficRateMeter {
   private var total = 0
   private var newestSecond: Int?
 
-  init(windowSeconds: Int = ConnectionTrafficRateMeter.defaultWindowSeconds) {
+  init(windowSeconds: Int = Self.defaultWindowSeconds) {
     buckets = Array(repeating: 0, count: max(1, windowSeconds))
   }
 

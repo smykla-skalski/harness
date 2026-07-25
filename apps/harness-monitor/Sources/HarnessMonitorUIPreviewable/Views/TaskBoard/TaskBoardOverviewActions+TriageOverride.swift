@@ -1,8 +1,7 @@
 import HarnessMonitorKit
 
 extension TaskBoardOverviewActions {
-  @MainActor
-  var canMutateTaskBoardTriageOverride: Bool {
+  @MainActor var canMutateTaskBoardTriageOverride: Bool {
     guard let store else { return false }
     guard let profile = store.remoteDaemonProfile else { return true }
     return profile.status == .active

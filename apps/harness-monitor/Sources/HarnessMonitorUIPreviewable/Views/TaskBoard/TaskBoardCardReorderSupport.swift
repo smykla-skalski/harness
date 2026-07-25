@@ -6,6 +6,17 @@ enum TaskBoardCardReorderDropDecision: Equatable {
   case reject(String)
 }
 
+/// The dragged card, its lane, the lane's current ordering, and the card it
+/// hovers over - everything a reorder decision needs to know about the board,
+/// as opposed to `isEnabled`/`insertAfterHovered`, which describe the drop
+/// gesture itself.
+struct TaskBoardCardReorderDropContext {
+  let draggedItemID: String?
+  let lane: TaskBoardInboxLane
+  let apiItems: [TaskBoardItem]
+  let hoveredItemID: String
+}
+
 /// Same-lane reorder plan: a card dropped on another card within its own lane.
 /// The daemon's lane-position contract (`place_in_destination` in
 /// `lane_order.rs`) removes the dragged item from its current slot first, then
@@ -18,19 +29,13 @@ struct TaskBoardCardReorderPlan: Equatable {
   let placement: TaskBoardRelativeLanePlacement
 
   static func resolve(
-    draggedItemID: String,
-    lane: TaskBoardInboxLane,
-    apiItems: [TaskBoardItem],
-    hoveredItemID: String,
+    _ context: TaskBoardCardReorderDropContext,
     insertAfterHovered: Bool
   ) -> Self? {
     guard
       case .proceed(let plan) = dropDecision(
         isEnabled: true,
-        draggedItemID: draggedItemID,
-        lane: lane,
-        apiItems: apiItems,
-        hoveredItemID: hoveredItemID,
+        context,
         insertAfterHovered: insertAfterHovered
       )
     else {
@@ -41,18 +46,18 @@ struct TaskBoardCardReorderPlan: Equatable {
 
   static func dropDecision(
     isEnabled: Bool,
-    draggedItemID: String?,
-    lane: TaskBoardInboxLane,
-    apiItems: [TaskBoardItem],
-    hoveredItemID: String,
+    _ context: TaskBoardCardReorderDropContext,
     insertAfterHovered: Bool
   ) -> TaskBoardCardReorderDropDecision {
     guard isEnabled else {
       return .reject("Cannot reorder task: it can no longer move within this lane")
     }
+    let lane = context.lane
+    let apiItems = context.apiItems
+    let hoveredItemID = context.hoveredItemID
     guard
       lane != .umbrella,
-      let draggedItemID,
+      let draggedItemID = context.draggedItemID,
       let draggedIndex = apiItems.firstIndex(where: { $0.id == draggedItemID }),
       let hoveredIndex = apiItems.firstIndex(where: { $0.id == hoveredItemID }),
       TaskBoardInboxLane(taskBoardItem: apiItems[draggedIndex]) == lane,

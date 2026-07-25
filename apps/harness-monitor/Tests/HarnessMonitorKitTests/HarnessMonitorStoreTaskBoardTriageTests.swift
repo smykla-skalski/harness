@@ -95,7 +95,7 @@ struct HarnessMonitorStoreTaskBoardTriageTests {
       code: 501,
       message: "Triage override unavailable"
     )
-    client.taskBoardTriageOverrideErrorRemainingUses = 1
+    client.triageOverrideErrorRemainingUses = 1
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController(client: client))
     store.client = client
     store.connectionState = .online
@@ -116,7 +116,7 @@ struct HarnessMonitorStoreTaskBoardTriageTests {
     let task = Self.item(id: "task-1")
     client.taskBoardItemsStorage = [task, Self.item(id: "task-2")]
     client.taskBoardTriageOverrideError = Self.concurrentModificationError
-    client.taskBoardTriageOverrideErrorRemainingUses = 1
+    client.triageOverrideErrorRemainingUses = 1
     client.taskBoardTriageOverrideItemsAfterError = [
       task,
       Self.item(id: "task-2", title: "Changed elsewhere"),
@@ -141,7 +141,7 @@ struct HarnessMonitorStoreTaskBoardTriageTests {
     let task = Self.item(id: "task-1")
     client.taskBoardItemsStorage = [task]
     client.taskBoardTriageOverrideError = Self.concurrentModificationError
-    client.taskBoardTriageOverrideErrorRemainingUses = 1
+    client.triageOverrideErrorRemainingUses = 1
     client.taskBoardTriageOverrideItemsAfterError = [
       Self.item(id: task.id, title: "Changed by another operator")
     ]
@@ -164,7 +164,7 @@ struct HarnessMonitorStoreTaskBoardTriageTests {
     client.taskBoardItemsStorage = [task, Self.item(id: "task-2")]
     client.taskBoardTriageOverridesStorage[task.id] = Self.triageOverride
     client.taskBoardTriageOverrideError = Self.concurrentModificationError
-    client.taskBoardTriageOverrideErrorRemainingUses = 1
+    client.triageOverrideErrorRemainingUses = 1
     client.taskBoardTriageOverrideItemsAfterError = [
       task,
       Self.item(id: "task-2", title: "Changed elsewhere"),
@@ -186,7 +186,7 @@ struct HarnessMonitorStoreTaskBoardTriageTests {
     client.taskBoardItemsStorage = [task]
     client.taskBoardTriageOverridesStorage[task.id] = Self.triageOverride
     client.taskBoardTriageOverrideError = Self.concurrentModificationError
-    client.taskBoardTriageOverrideErrorRemainingUses = 1
+    client.triageOverrideErrorRemainingUses = 1
     client.taskBoardTriageOverrideItemsAfterError = [
       Self.item(id: task.id, title: "Changed by another operator")
     ]

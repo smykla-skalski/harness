@@ -1,4 +1,5 @@
 import Foundation
+
 extension HarnessMonitorStore {
   nonisolated static func loadPolicyPipelineSnapshot(
     using client: any HarnessMonitorClientProtocol,

@@ -60,7 +60,7 @@ struct TaskBoardUmbrellaChildrenSummary: Equatable {
     _ umbrellaID: String,
     in items: [TaskBoardItem],
     collapsedLanes: Set<TaskBoardInboxLane>
-  ) -> TaskBoardUmbrellaChildrenSummary {
+  ) -> Self {
     let children = TaskBoardUmbrellaHierarchy.children(of: umbrellaID, in: items)
     var visible: [TaskBoardItem] = []
     var hidden: [TaskBoardItem] = []
@@ -71,6 +71,6 @@ struct TaskBoardUmbrellaChildrenSummary: Equatable {
         visible.append(child)
       }
     }
-    return TaskBoardUmbrellaChildrenSummary(visibleChildren: visible, hiddenChildren: hidden)
+    return Self(visibleChildren: visible, hiddenChildren: hidden)
   }
 }

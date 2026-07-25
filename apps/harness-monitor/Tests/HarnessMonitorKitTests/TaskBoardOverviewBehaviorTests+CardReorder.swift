@@ -19,10 +19,12 @@ extension TaskBoardOverviewBehaviorTests {
 
     let plan = try #require(
       TaskBoardCardReorderPlan.resolve(
-        draggedItemID: "d",
-        lane: .todo,
-        apiItems: items,
-        hoveredItemID: "a",
+        TaskBoardCardReorderDropContext(
+          draggedItemID: "d",
+          lane: .todo,
+          apiItems: items,
+          hoveredItemID: "a"
+        ),
         insertAfterHovered: false
       )
     )
@@ -40,10 +42,12 @@ extension TaskBoardOverviewBehaviorTests {
 
     let plan = try #require(
       TaskBoardCardReorderPlan.resolve(
-        draggedItemID: "a",
-        lane: .todo,
-        apiItems: items,
-        hoveredItemID: "c",
+        TaskBoardCardReorderDropContext(
+          draggedItemID: "a",
+          lane: .todo,
+          apiItems: items,
+          hoveredItemID: "c"
+        ),
         insertAfterHovered: true
       )
     )
@@ -57,10 +61,12 @@ extension TaskBoardOverviewBehaviorTests {
 
     #expect(
       TaskBoardCardReorderPlan.resolve(
-        draggedItemID: "a",
-        lane: .todo,
-        apiItems: items,
-        hoveredItemID: "b",
+        TaskBoardCardReorderDropContext(
+          draggedItemID: "a",
+          lane: .todo,
+          apiItems: items,
+          hoveredItemID: "b"
+        ),
         insertAfterHovered: false
       ) == nil
     )
@@ -72,19 +78,23 @@ extension TaskBoardOverviewBehaviorTests {
 
     #expect(
       TaskBoardCardReorderPlan.resolve(
-        draggedItemID: "b",
-        lane: .todo,
-        apiItems: items,
-        hoveredItemID: "b",
+        TaskBoardCardReorderDropContext(
+          draggedItemID: "b",
+          lane: .todo,
+          apiItems: items,
+          hoveredItemID: "b"
+        ),
         insertAfterHovered: false
       ) == nil
     )
     #expect(
       TaskBoardCardReorderPlan.resolve(
-        draggedItemID: "b",
-        lane: .todo,
-        apiItems: items,
-        hoveredItemID: "b",
+        TaskBoardCardReorderDropContext(
+          draggedItemID: "b",
+          lane: .todo,
+          apiItems: items,
+          hoveredItemID: "b"
+        ),
         insertAfterHovered: true
       ) == nil
     )
@@ -99,10 +109,12 @@ extension TaskBoardOverviewBehaviorTests {
 
     #expect(
       TaskBoardCardReorderPlan.resolve(
-        draggedItemID: "a",
-        lane: .todo,
-        apiItems: items,
-        hoveredItemID: "b",
+        TaskBoardCardReorderDropContext(
+          draggedItemID: "a",
+          lane: .todo,
+          apiItems: items,
+          hoveredItemID: "b"
+        ),
         insertAfterHovered: false
       ) == nil
     )
@@ -114,19 +126,23 @@ extension TaskBoardOverviewBehaviorTests {
 
     #expect(
       TaskBoardCardReorderPlan.resolve(
-        draggedItemID: "missing",
-        lane: .todo,
-        apiItems: items,
-        hoveredItemID: "a",
+        TaskBoardCardReorderDropContext(
+          draggedItemID: "missing",
+          lane: .todo,
+          apiItems: items,
+          hoveredItemID: "a"
+        ),
         insertAfterHovered: false
       ) == nil
     )
     #expect(
       TaskBoardCardReorderPlan.resolve(
-        draggedItemID: "a",
-        lane: .todo,
-        apiItems: items,
-        hoveredItemID: "missing",
+        TaskBoardCardReorderDropContext(
+          draggedItemID: "a",
+          lane: .todo,
+          apiItems: items,
+          hoveredItemID: "missing"
+        ),
         insertAfterHovered: false
       ) == nil
     )
@@ -139,20 +155,24 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(
       TaskBoardCardReorderPlan.dropDecision(
         isEnabled: true,
-        draggedItemID: "a",
-        lane: .todo,
-        apiItems: items,
-        hoveredItemID: "b",
+        TaskBoardCardReorderDropContext(
+          draggedItemID: "a",
+          lane: .todo,
+          apiItems: items,
+          hoveredItemID: "b"
+        ),
         insertAfterHovered: false
       ) == .noChange
     )
     #expect(
       TaskBoardCardReorderPlan.dropDecision(
         isEnabled: true,
-        draggedItemID: "missing",
-        lane: .todo,
-        apiItems: items,
-        hoveredItemID: "b",
+        TaskBoardCardReorderDropContext(
+          draggedItemID: "missing",
+          lane: .todo,
+          apiItems: items,
+          hoveredItemID: "b"
+        ),
         insertAfterHovered: false
       )
         == .reject("Cannot reorder task: the board changed before the drop completed")
@@ -160,10 +180,12 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(
       TaskBoardCardReorderPlan.dropDecision(
         isEnabled: true,
-        draggedItemID: nil,
-        lane: .todo,
-        apiItems: items,
-        hoveredItemID: "b",
+        TaskBoardCardReorderDropContext(
+          draggedItemID: nil,
+          lane: .todo,
+          apiItems: items,
+          hoveredItemID: "b"
+        ),
         insertAfterHovered: false
       )
         == .reject("Cannot reorder task: the board changed before the drop completed")
@@ -171,10 +193,12 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(
       TaskBoardCardReorderPlan.dropDecision(
         isEnabled: false,
-        draggedItemID: "a",
-        lane: .todo,
-        apiItems: items,
-        hoveredItemID: "b",
+        TaskBoardCardReorderDropContext(
+          draggedItemID: "a",
+          lane: .todo,
+          apiItems: items,
+          hoveredItemID: "b"
+        ),
         insertAfterHovered: false
       )
         == .reject("Cannot reorder task: it can no longer move within this lane")
@@ -187,10 +211,12 @@ extension TaskBoardOverviewBehaviorTests {
 
     let plan = try #require(
       TaskBoardCardReorderPlan.resolve(
-        draggedItemID: "a",
-        lane: .todo,
-        apiItems: items,
-        hoveredItemID: "d",
+        TaskBoardCardReorderDropContext(
+          draggedItemID: "a",
+          lane: .todo,
+          apiItems: items,
+          hoveredItemID: "d"
+        ),
         insertAfterHovered: true
       )
     )
@@ -207,10 +233,12 @@ extension TaskBoardOverviewBehaviorTests {
 
     #expect(
       TaskBoardCardReorderPlan.resolve(
-        draggedItemID: "closed",
-        lane: .umbrella,
-        apiItems: items,
-        hoveredItemID: "open",
+        TaskBoardCardReorderDropContext(
+          draggedItemID: "closed",
+          lane: .umbrella,
+          apiItems: items,
+          hoveredItemID: "open"
+        ),
         insertAfterHovered: false
       ) == nil
     )

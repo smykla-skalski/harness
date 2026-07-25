@@ -111,12 +111,12 @@ extension RecordingHarnessClient {
 
   private func throwQueuedTriageOverrideErrorIfNeeded() throws {
     guard
-      taskBoardTriageOverrideErrorRemainingUses > 0,
+      triageOverrideErrorRemainingUses > 0,
       let error = taskBoardTriageOverrideError
     else {
       return
     }
-    taskBoardTriageOverrideErrorRemainingUses -= 1
+    triageOverrideErrorRemainingUses -= 1
     applyTriageOverrideItemsAfterErrorIfNeeded()
     throw error
   }

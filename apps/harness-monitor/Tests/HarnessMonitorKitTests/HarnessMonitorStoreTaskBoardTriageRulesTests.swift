@@ -110,7 +110,7 @@ struct HarnessMonitorStoreTaskBoardTriageRulesTests {
   @Test("A stale expected active revision is rejected without throwing")
   func activateRejectsStaleRevision() async throws {
     let client = RecordingHarnessClient()
-    client.taskBoardActiveTriageRuleSetRevisionStorage = 3
+    client.activeTriageRuleSetRevisionStorage = 3
     let store = Self.onlineStore(client: client)
 
     let result = await store.activateTaskBoardTriageRules(
@@ -124,7 +124,7 @@ struct HarnessMonitorStoreTaskBoardTriageRulesTests {
   @Test("Deactivating passes nil rules through to the client request")
   func deactivatePassesNilRules() async throws {
     let client = RecordingHarnessClient()
-    client.taskBoardActiveTriageRuleSetRevisionStorage = 1
+    client.activeTriageRuleSetRevisionStorage = 1
     client.taskBoardTriageRuleSetRevisionsStorage = [
       TriageRuleSetRevisionSummary(
         revision: 1, schemaVersion: 1, ruleCount: 1, status: .active, actor: "operator-1",

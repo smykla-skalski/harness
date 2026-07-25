@@ -213,10 +213,12 @@ struct TaskBoardLaneUnifiedColumn: View {
           onChange: resolveHoveredCard
         )
         .taskBoardCardReorderDropTarget(
-          hoveredItemID: item.id,
-          lane: lane,
-          apiItems: apiItems,
-          draggedItemID: reorderDraggedItemID,
+          TaskBoardCardReorderDropContext(
+            draggedItemID: reorderDraggedItemID,
+            lane: lane,
+            apiItems: apiItems,
+            hoveredItemID: item.id
+          ),
           isEnabled: isReorderDropEnabled(for: item.id),
           actions: actions,
           insertionHint: $reorderInsertionHint

@@ -46,8 +46,7 @@ public struct RemoteDaemonPairingConfirmationView: View {
     }
   }
 
-  @ViewBuilder
-  private var header: some View {
+  @ViewBuilder private var header: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       Text("Pair with Remote Daemon")
         .font(.headline)
@@ -61,8 +60,7 @@ public struct RemoteDaemonPairingConfirmationView: View {
     }
   }
 
-  @ViewBuilder
-  private var details: some View {
+  @ViewBuilder private var details: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       LabeledContent("Endpoint", value: invitation.endpoint.absoluteString)
         .textSelection(.enabled)
@@ -86,8 +84,7 @@ public struct RemoteDaemonPairingConfirmationView: View {
     }
   }
 
-  @ViewBuilder
-  private var actions: some View {
+  @ViewBuilder private var actions: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
       Button("Cancel", role: .cancel) {
         onCancel()
