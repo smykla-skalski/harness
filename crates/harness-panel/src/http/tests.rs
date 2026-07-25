@@ -367,6 +367,67 @@ async fn a_callback_without_the_sign_in_cookie_is_refused() {
     assert!(body.contains("\"code\":\"sign_in\""), "{body}");
 }
 
+/// A refused callback must not leave the browser holding the state value it
+/// just refused. The cleared cookie only reaches the browser if the failure
+/// response carries it, which an early return would silently skip.
+#[tokio::test]
+async fn a_refused_callback_still_clears_the_sign_in_cookie() {
+    let harness = Harness::new("ada").await;
+
+    let response = router(harness.state.clone())
+        .oneshot(
+            Request::builder()
+                .uri("/panel/auth/github/callback?code=abc&state=whatever")
+                .header(header::COOKIE, "harness_panel_signin=whatever")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let cleared = response
+        .headers()
+        .get_all(header::SET_COOKIE)
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .find(|value| value.starts_with("harness_panel_signin"))
+        .expect("the sign-in cookie is expired on the failure response");
+    assert!(cleared.contains("Max-Age=0"), "{cleared}");
+}
+
+/// These bodies belong to one session, and a 200 is heuristically cacheable, so
+/// a proxy between the daemon and the browser would otherwise be free to hand
+/// one person's answer to the next request.
+#[tokio::test]
+async fn session_derived_responses_are_never_cached() {
+    let harness = Harness::new("ada").await;
+    let owner = harness.sign_in("ada").await;
+
+    for path in ["/panel/api/me", "/panel/api/accounts"] {
+        let response = router(harness.state.clone())
+            .oneshot(
+                Request::builder()
+                    .uri(path)
+                    .header(header::COOKIE, format!("{SESSION_COOKIE}={owner}"))
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::OK, "{path}");
+        assert_eq!(
+            response
+                .headers()
+                .get(header::CACHE_CONTROL)
+                .and_then(|value| value.to_str().ok()),
+            Some("no-store"),
+            "{path} must not be cacheable"
+        );
+    }
+}
+
 #[tokio::test]
 async fn a_callback_github_refused_reports_the_reason() {
     let harness = Harness::new("ada").await;
