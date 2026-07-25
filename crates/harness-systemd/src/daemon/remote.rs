@@ -100,10 +100,14 @@ impl fmt::Display for RemoteDaemonConfigError {
                 formatter,
                 "remote daemon companion upstream must be an http loopback origin, got {upstream}"
             ),
+            // One variant covers every prefix rejection, so the message has to
+            // name every rule; an operator reading it should not have to guess
+            // which one their value broke.
             Self::CompanionPathPrefixInvalid(prefix) => write!(
                 formatter,
                 "remote daemon companion path prefix {prefix} must be an absolute path with no \
-                 trailing slash, no empty segment, and must not start with /{DAEMON_API_SEGMENT}"
+                 trailing slash, no empty segment, and no whitespace, control, or URL-structural \
+                 character, and must not start with /{DAEMON_API_SEGMENT}"
             ),
         }
     }

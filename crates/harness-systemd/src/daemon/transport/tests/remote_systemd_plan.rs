@@ -456,6 +456,42 @@ fn remote_systemd_plan_refuses_a_companion_the_daemon_would_reject() {
     }
 }
 
+/// One error variant covers every prefix rejection, so its message has to name
+/// every rule or an operator cannot tell which one their value broke.
+#[test]
+fn remote_systemd_prefix_rejection_names_every_rule_it_covers() {
+    let args = install_args([
+        "test",
+        "--domain",
+        "daemon.example.com",
+        "--acme-email",
+        "ops@example.com",
+        "--companion-upstream",
+        "http://127.0.0.1:8787",
+        "--companion-path-prefix",
+        "/pa nel",
+    ]);
+
+    let error = RemoteSystemdInstallPlan::for_tests(
+        &args,
+        PathBuf::from("/usr/local/bin/harness"),
+        PathBuf::from("/etc/systemd/system/harness-remote-daemon.service"),
+        PathBuf::from("/etc/harness/harness-remote-daemon.env"),
+    )
+    .expect_err("a prefix containing a space must be refused")
+    .to_string();
+
+    for rule in [
+        "absolute path",
+        "trailing slash",
+        "empty segment",
+        "whitespace, control, or URL-structural character",
+        "must not start with /v1",
+    ] {
+        assert!(error.contains(rule), "message omits {rule}: {error}");
+    }
+}
+
 fn install_args<const N: usize>(args: [&str; N]) -> DaemonRemoteSystemdInstallArgs {
     #[derive(Debug, Parser)]
     struct Harness {
