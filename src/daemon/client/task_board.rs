@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use serde::de::DeserializeOwned;
 
 use crate::daemon::protocol::{
@@ -101,7 +103,7 @@ impl DaemonClient {
     ) -> Result<Vec<TaskBoardItem>, CliError> {
         let mut request = request.clone();
         let mut items = Vec::new();
-        let mut seen = std::collections::HashSet::new();
+        let mut seen = HashSet::new();
         for _ in 0..TASK_BOARD_LIST_MAX_PAGES {
             let page = self.list_task_board_items_page(&request)?;
             let drained = page.items.is_empty();
