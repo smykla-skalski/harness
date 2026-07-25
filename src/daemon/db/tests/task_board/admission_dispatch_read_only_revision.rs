@@ -297,7 +297,8 @@ async fn held_read_only_launch_advances_revision_fence_through_completion() {
     let claim = db
         .claim_held_task_board_dispatch(&applied.board_item_id)
         .await
-        .expect("claim held read-only dispatch");
+        .expect("claim held read-only dispatch")
+        .claim;
     let claimed = claim
         .applied
         .read_only_workflow

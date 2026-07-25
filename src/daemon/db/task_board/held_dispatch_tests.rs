@@ -164,7 +164,8 @@ async fn held_delivery_rechecks_kill_switch_then_advances_worker_state() {
         .db
         .claim_held_task_board_dispatch(&fixture.item_id)
         .await
-        .expect("claim after kill switch clears");
+        .expect("claim after kill switch clears")
+        .claim;
     assert_eq!(
         claim.consumed_approval_grant_id.as_deref(),
         Some(fixture.grant.id.as_str())
@@ -192,7 +193,8 @@ async fn failed_worker_start_restores_unexpired_one_shot_grant() {
         .db
         .claim_held_task_board_dispatch(&fixture.item_id)
         .await
-        .expect("claim held delivery");
+        .expect("claim held delivery")
+        .claim;
     fixture
         .db
         .fail_task_board_dispatch(
@@ -377,10 +379,11 @@ fn approval_graph(revision: u64) -> PolicyGraph {
     .expect("approval graph")
 }
 
-/// Delivery renders the worker prompt before claiming. The claim commits the
-/// starting transition, the attempt row and the lane move, and consumes the
-/// one-shot approval grant, and no compensation follows it -- so a prompt that
-/// cannot render has to refuse while the dispatch is still merely held.
+/// The claim renders the prompt itself, so a prompt that cannot render leaves
+/// the dispatch held and its one-shot grant unspent. The route-level pair in
+/// `http::tests::task_board_deliver_prompt` covers the case that actually
+/// bites, where the item is edited during the hold; this pins the same refusal
+/// against the approval-grant fixture, which that pair does not exercise.
 #[tokio::test]
 async fn an_unrenderable_prompt_leaves_the_dispatch_held_and_the_grant_live() {
     let _lock = crate::task_board::prompt_catalog::prompt_catalog_test_lock();
@@ -391,17 +394,12 @@ async fn an_unrenderable_prompt_leaves_the_dispatch_held_and_the_grant_live() {
         )
         .expect("parse overrides"),
     );
-    let held = fixture
-        .db
-        .held_task_board_dispatch(&fixture.item_id)
-        .await
-        .expect("held dispatch");
 
-    let error = crate::daemon::task_board_managed_agents::rendered_worker_prompt(
-        &held.applied,
-        &held.intent_id,
-    )
-    .expect_err("the item has no project, so the prompt cannot render");
+    let error = fixture
+        .db
+        .claim_held_task_board_dispatch(&fixture.item_id)
+        .await
+        .expect_err("the item has no project, so the claim cannot render");
     assert!(error.message().contains("project_id"), "{}", error.message());
 
     assert_eq!(

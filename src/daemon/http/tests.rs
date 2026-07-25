@@ -65,6 +65,7 @@ mod task_board;
 mod task_board_automation_route_parity;
 mod task_board_catalog;
 mod task_board_crud;
+mod task_board_deliver_prompt;
 mod task_board_dispatch_pick;
 mod task_board_managed_worker_assertions;
 mod task_board_parity;
