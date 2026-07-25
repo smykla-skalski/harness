@@ -74,6 +74,14 @@ pub(super) fn unusable_task_board_page(cursor: &str, fault: &str) -> CliError {
     .into()
 }
 
+pub(super) fn changed_task_board_read(expected: i64, actual: i64) -> CliError {
+    CliErrorKind::workflow_io(format!(
+        "the task-board changed from sequence {expected} to {actual} during the page walk; \
+         restart from the first page"
+    ))
+    .into()
+}
+
 /// Stop the page walk after this many pages.
 ///
 /// Refusing a repeated cursor only catches a resume point that stalls on the

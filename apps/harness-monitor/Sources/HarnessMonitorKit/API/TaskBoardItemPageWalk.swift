@@ -18,10 +18,9 @@ protocol TaskBoardItemPageSource: Sendable {
 extension TaskBoardItemPageSource {
   /// Read the whole selection by walking from the first page.
   ///
-  /// The merged response keeps the *first* page's `itemsChangeSeq` on purpose.
-  /// It is the oldest observation of the board, so a board that changed under
-  /// the walk fails the next position CAS instead of letting it apply against
-  /// a sequence that never described the items beside it.
+  /// Every page must carry the first page's `itemsChangeSeq`. The daemon binds
+  /// cursors to that sequence, and checking it here keeps an older or malformed
+  /// daemon from returning a mixed board snapshot.
   ///
   /// A walk that cannot drain the selection throws rather than answering with
   /// what it has. Every caller folds this into a whole-board value - one of
@@ -29,12 +28,9 @@ extension TaskBoardItemPageSource {
   /// the read stopped early - so a partial result would be indistinguishable
   /// from a complete one at every call site.
   ///
-  /// Ids are tracked because a repeat does not only come from a cursor that
-  /// stalls. A cursor whose anchor left the selection between two reads resumes
-  /// at the slot that anchor held, so a page can re-serve a row an earlier page
-  /// returned while still advancing to a *different* cursor - the stall check
-  /// below never sees it. These items reach `ForEach(..., id: \.id)`, which
-  /// breaks on a duplicate identity, so the walk drops the repeat.
+  /// Sequence-bound cursors prevent overlap in valid responses. Ids are still
+  /// tracked so a malformed overlapping page cannot put duplicate identities
+  /// into `ForEach(..., id: \.id)`.
   func mergedTaskBoardItemPages(
     status: TaskBoardStatus?
   ) async throws -> TaskBoardListItemsResponseWire {
@@ -51,11 +47,15 @@ extension TaskBoardItemPageSource {
         throw HarnessMonitorAPIError.invalidResponse
       }
       let page = try await taskBoardItemPage(status: status, cursor: next)
-      guard !page.items.isEmpty, page.nextCursor != next else {
+      guard
+        page.itemsChangeSeq == merged.itemsChangeSeq,
+        !page.items.isEmpty,
+        page.nextCursor != next
+      else {
         throw HarnessMonitorAPIError.invalidResponse
       }
       merged.items.append(contentsOf: page.items.filter { seen.insert($0.id).inserted })
-      merged.itemRevisions.merge(page.itemRevisions) { _, latest in latest }
+      merged.itemRevisions.merge(page.itemRevisions) { current, _ in current }
       cursor = page.nextCursor
       pages += 1
     }

@@ -112,6 +112,7 @@ fn page_params(params: &Value, cursor: Option<&str>) -> Result<Value, ToolError>
 struct TaskBoardItemPages {
     items: Vec<Value>,
     seen: std::collections::HashSet<String>,
+    items_change_seq: Option<i64>,
     revisions: Map<String, Value>,
     extra: Map<String, Value>,
 }
@@ -126,6 +127,23 @@ impl TaskBoardItemPages {
         let items = page.get("items").and_then(Value::as_array).ok_or_else(|| {
             ToolError::internal("the daemon returned a task-board page with no items array")
         })?;
+        let items_change_seq = page
+            .get("items_change_seq")
+            .and_then(Value::as_i64)
+            .ok_or_else(|| {
+                ToolError::internal(
+                    "the daemon returned a task-board page with no items change sequence",
+                )
+            })?;
+        if self
+            .items_change_seq
+            .is_some_and(|expected| expected != items_change_seq)
+        {
+            return Err(ToolError::internal(
+                "the task-board changed during the page walk; restart from the first page",
+            ));
+        }
+        self.items_change_seq.get_or_insert(items_change_seq);
         for item in items {
             // Every id the walk folds on comes from here, so an item without
             // one cannot be deduplicated or resumed past: it would ride into
@@ -142,7 +160,9 @@ impl TaskBoardItemPages {
         // first page's rows.
         if let Some(revisions) = page.get("item_revisions").and_then(Value::as_object) {
             for (id, revision) in revisions {
-                self.revisions.insert(id.clone(), revision.clone());
+                self.revisions
+                    .entry(id.clone())
+                    .or_insert_with(|| revision.clone());
             }
         }
         // Every page reports the same board-wide roll-ups and totals, so the

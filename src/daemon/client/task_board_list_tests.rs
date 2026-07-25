@@ -134,12 +134,10 @@ fn task_board_list_refuses_a_cursor_with_no_items() {
     );
 }
 
-/// A cursor whose anchor was deleted between two reads resumes at the slot that
-/// anchor held, so a page can re-serve a row an earlier page already returned.
-/// This call promises one whole board and every consumer keys on item id, so a
-/// repeat has to be dropped rather than handed back twice.
+/// Sequence-bound cursors prevent overlap in valid responses. A malformed
+/// overlapping page still must not hand one id back twice.
 #[test]
-fn task_board_list_walks_a_re_served_row_only_once() {
+fn task_board_list_walks_an_overlapping_row_only_once() {
     let (endpoint, _request_lines, handle) = spawn_mock_sequence(vec![
         page_of(&["task-1", "task-2", "task-3"], Some("cursor-2")),
         page_of(&["task-2", "task-3", "task-4"], None),
@@ -156,6 +154,24 @@ fn task_board_list_walks_a_re_served_row_only_once() {
             .map(|item| item.id.as_str())
             .collect::<Vec<_>>(),
         ["task-1", "task-2", "task-3", "task-4"]
+    );
+}
+
+#[test]
+fn task_board_list_refuses_a_changed_board_sequence() {
+    let (endpoint, _request_lines, handle) = spawn_mock_sequence(vec![
+        page_of_at(&["task-1"], Some("cursor-2"), 41),
+        page_of_at(&["task-2"], None, 42),
+    ]);
+
+    let error = client_with(endpoint)
+        .list_task_board_items(&TaskBoardListItemsRequest::default())
+        .expect_err("a mixed board snapshot must fail");
+    handle.join().expect("server");
+
+    assert!(
+        error.to_string().contains("changed from sequence 41 to 42"),
+        "unexpected: {error}"
     );
 }
 
@@ -193,6 +209,10 @@ fn task_board_list_stops_at_the_page_cap_when_a_read_never_drains() {
 }
 
 fn page_of(ids: &[&str], next_cursor: Option<&str>) -> String {
+    page_of_at(ids, next_cursor, 9)
+}
+
+fn page_of_at(ids: &[&str], next_cursor: Option<&str>, items_change_seq: i64) -> String {
     let items = ids
         .iter()
         .map(|id| {
@@ -201,7 +221,11 @@ fn page_of(ids: &[&str], next_cursor: Option<&str>) -> String {
             item
         })
         .collect::<Vec<_>>();
-    let mut page = serde_json::json!({ "items": items, "total_matched": ids.len() });
+    let mut page = serde_json::json!({
+        "items": items,
+        "items_change_seq": items_change_seq,
+        "total_matched": ids.len(),
+    });
     if let Some(cursor) = next_cursor {
         page["next_cursor"] = serde_json::json!(cursor);
     }

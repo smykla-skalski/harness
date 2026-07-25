@@ -26,11 +26,11 @@ private actor StubTaskBoardPageSource: TaskBoardItemPageSource {
 /// without a cursor, and a cursor that stops producing items.
 @Suite("Task board item page walk")
 struct TaskBoardItemPageWalkTests {
-  @Test("folds every page into one response and keeps the first change sequence")
+  @Test("folds every page from one board sequence into one response")
   func foldsEveryPage() async throws {
     let source = StubTaskBoardPageSource(pages: [
       page(ids: ["task-1", "task-2"], totalMatched: 3, changeSeq: 41, nextCursor: "cursor-2"),
-      page(ids: ["task-3"], totalMatched: 3, changeSeq: 42, nextCursor: nil),
+      page(ids: ["task-3"], totalMatched: 3, changeSeq: 41, nextCursor: nil),
     ])
 
     let merged = try await source.mergedTaskBoardItemPages(status: nil)
@@ -72,24 +72,37 @@ struct TaskBoardItemPageWalkTests {
     }
   }
 
-  /// The stall check above only catches a cursor that names the resume point it
-  /// was just given. A cursor whose anchor was deleted between two reads resumes
-  /// at that anchor's slot, so a page can re-serve a row while still advancing
-  /// to a different cursor - and duplicate ids break `ForEach(..., id: \.id)`.
-  @Test("folds a row a later page re-served under a different cursor")
-  func foldsARowReServedUnderADifferentCursor() async throws {
+  @Test("fails when a later page carries a different board sequence")
+  func failsOnAChangedBoardSequence() async throws {
+    let source = StubTaskBoardPageSource(pages: [
+      page(ids: ["task-1"], totalMatched: 2, changeSeq: 41, nextCursor: "cursor-2"),
+      page(ids: ["task-2"], totalMatched: 2, changeSeq: 42, nextCursor: nil),
+    ])
+
+    await #expect(throws: HarnessMonitorAPIError.invalidResponse) {
+      try await source.mergedTaskBoardItemPages(status: nil)
+    }
+  }
+
+  /// Sequence-bound cursors prevent overlap in valid responses. A malformed
+  /// overlapping page still must not hand one id back twice or replace the
+  /// retained item's revision with a later value.
+  @Test("folds an item repeated by an overlapping page")
+  func foldsAnItemRepeatedByAnOverlappingPage() async throws {
     let source = StubTaskBoardPageSource(pages: [
       page(
         ids: ["task-1", "task-2", "task-3"], totalMatched: 4, changeSeq: 9,
         nextCursor: "cursor-2"),
       page(
         ids: ["task-2", "task-3", "task-4"], totalMatched: 4, changeSeq: 9,
-        nextCursor: nil),
+        nextCursor: nil,
+        itemRevisions: ["task-2": 2, "task-3": 2, "task-4": 1]),
     ])
 
     let merged = try await source.mergedTaskBoardItemPages(status: nil)
 
     #expect(merged.items.map(\.id) == ["task-1", "task-2", "task-3", "task-4"])
+    #expect(merged.itemRevisions == ["task-1": 1, "task-2": 1, "task-3": 1, "task-4": 1])
     #expect(merged.nextCursor == nil)
   }
 
@@ -112,14 +125,15 @@ private func page(
   ids: [String],
   totalMatched: UInt,
   changeSeq: Int64,
-  nextCursor: String?
+  nextCursor: String?,
+  itemRevisions: [String: Int64]? = nil
 ) -> TaskBoardListItemsResponseWire {
   TaskBoardListItemsResponseWire(
     items: ids.map(item(id:)),
     itemsChangeSeq: changeSeq,
-    // Tolerates a repeated id so a scenario can script a page that re-serves a
-    // row the walk is expected to fold away.
-    itemRevisions: Dictionary(ids.map { ($0, Int64(1)) }, uniquingKeysWith: { first, _ in first }),
+    // Tolerates a repeated id so a scenario can script a malformed overlap.
+    itemRevisions: itemRevisions
+      ?? Dictionary(ids.map { ($0, Int64(1)) }, uniquingKeysWith: { first, _ in first }),
     totalMatched: totalMatched,
     nextCursor: nextCursor
   )

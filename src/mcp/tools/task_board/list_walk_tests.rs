@@ -5,6 +5,7 @@ use super::{TaskBoardItemPages, page_params};
 fn page(ids: &[&str], next_cursor: Option<&str>) -> serde_json::Value {
     let mut page = json!({
         "items": ids.iter().map(|id| json!({ "id": id })).collect::<Vec<_>>(),
+        "items_change_seq": 9,
         "total_matched": 3,
         "progress_rollups": { "umbrella-1": { "done": 1 } },
         "item_revisions": ids.iter().map(|id| ((*id).to_string(), json!(1))).collect::<serde_json::Map<_, _>>(),
@@ -59,17 +60,42 @@ fn every_page_folds_into_one_response_that_keeps_the_board_wide_fields() {
 #[test]
 fn an_item_repeated_by_an_overlapping_page_is_folded_once() {
     let mut pages = TaskBoardItemPages::default();
+    let mut overlapping = page(&["task-2", "task-3", "task-4"], None);
+    overlapping["item_revisions"]["task-2"] = json!(2);
+    overlapping["item_revisions"]["task-3"] = json!(2);
 
     pages
         .absorb(&page(&["task-1", "task-2", "task-3"], Some("cursor-2")))
         .expect("a shaped page");
-    pages
-        .absorb(&page(&["task-2", "task-3", "task-4"], None))
-        .expect("a shaped page");
+    pages.absorb(&overlapping).expect("a shaped page");
+    let response = pages.into_response();
 
     assert_eq!(
-        folded_ids(&pages.into_response()),
+        folded_ids(&response),
         ["task-1", "task-2", "task-3", "task-4"]
+    );
+    assert_eq!(
+        response["item_revisions"],
+        json!({ "task-1": 1, "task-2": 1, "task-3": 1, "task-4": 1 })
+    );
+}
+
+#[test]
+fn a_changed_board_sequence_refuses_the_page_walk() {
+    let mut pages = TaskBoardItemPages::default();
+    let mut changed = page(&["task-2"], None);
+    changed["items_change_seq"] = json!(10);
+
+    pages
+        .absorb(&page(&["task-1"], Some("cursor-2")))
+        .expect("first page");
+    let error = pages
+        .absorb(&changed)
+        .expect_err("a mixed board snapshot must fail");
+
+    assert!(
+        format!("{error:?}").contains("changed during the page walk"),
+        "unexpected: {error:?}"
     );
 }
 
@@ -80,7 +106,10 @@ fn an_item_without_an_id_fails_the_page() {
     let mut pages = TaskBoardItemPages::default();
 
     let error = pages
-        .absorb(&json!({ "items": [{ "title": "no id here" }] }))
+        .absorb(&json!({
+            "items": [{ "title": "no id here" }],
+            "items_change_seq": 9,
+        }))
         .expect_err("an item without an id must not reach the merged response");
     assert!(
         format!("{error:?}").contains("no id"),

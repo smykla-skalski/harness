@@ -38,8 +38,8 @@ use crate::task_board::{
 
 use super::DaemonClient;
 use super::task_board_list::{
-    TASK_BOARD_LIST_MAX_PAGES, enum_label, task_board_list_query, undrained_task_board_read,
-    unusable_task_board_page,
+    TASK_BOARD_LIST_MAX_PAGES, changed_task_board_read, enum_label, task_board_list_query,
+    undrained_task_board_read, unusable_task_board_page,
 };
 
 #[expect(
@@ -92,10 +92,9 @@ impl DaemonClient {
     /// daemon is not the one this client is built against - and a `Vec` has
     /// nowhere to say the board was read only in part.
     ///
-    /// A cursor whose anchor left the selection between two reads resumes at
-    /// the slot that anchor held, so a page can re-serve a row an earlier page
-    /// already returned. Ids are tracked and a repeat is dropped, because this
-    /// call promises one whole board and every consumer keys on item id.
+    /// Sequence-bound cursors prevent overlap in valid responses. Ids are
+    /// still tracked so a malformed overlapping page cannot put duplicate
+    /// rows in the returned board.
     pub fn list_task_board_items(
         &self,
         request: &TaskBoardListItemsRequest,
@@ -103,8 +102,15 @@ impl DaemonClient {
         let mut request = request.clone();
         let mut items = Vec::new();
         let mut seen = HashSet::new();
+        let mut items_change_seq = None;
         for _ in 0..TASK_BOARD_LIST_MAX_PAGES {
             let page = self.list_task_board_items_page(&request)?;
+            if let Some(expected) = items_change_seq
+                && page.items_change_seq != expected
+            {
+                return Err(changed_task_board_read(expected, page.items_change_seq));
+            }
+            items_change_seq.get_or_insert(page.items_change_seq);
             let drained = page.items.is_empty();
             items.extend(
                 page.items
