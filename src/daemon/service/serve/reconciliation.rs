@@ -281,26 +281,53 @@ fn await_test_gate() {
 pub(crate) mod test_gate {
     use std::sync::{Arc, Condvar, Mutex};
 
-    pub(crate) type Gate = Arc<(Mutex<bool>, Condvar)>;
+    type Gate = Arc<(Mutex<bool>, Condvar)>;
 
     static INSTALLED: Mutex<Option<Gate>> = Mutex::new(None);
 
     /// Hold reconciliation at its entry point so a test can prove the daemon
     /// publishes its manifest without waiting for it.
-    pub(crate) fn install() -> Gate {
+    ///
+    /// Keep the returned guard alive for as long as the gate should apply.
+    pub(crate) fn install() -> GateGuard {
         let gate: Gate = Arc::new((Mutex::new(false), Condvar::new()));
-        *INSTALLED.lock().expect("reconciliation gate") = Some(Arc::clone(&gate));
-        gate
+        if let Ok(mut installed) = INSTALLED.lock() {
+            *installed = Some(Arc::clone(&gate));
+        }
+        GateGuard { gate }
     }
 
-    pub(crate) fn release(gate: &Gate) {
+    pub(crate) struct GateGuard {
+        gate: Gate,
+    }
+
+    impl GateGuard {
+        /// Let reconciliation through before the guard drops, so a test can
+        /// observe what happens once the work is allowed to run.
+        pub(crate) fn release(&self) {
+            release(&self.gate);
+        }
+    }
+
+    impl Drop for GateGuard {
+        /// Also runs while a test is unwinding. A panic between `install` and
+        /// `release` would otherwise leave a `spawn_blocking` thread parked on
+        /// the condvar and the gate installed for whatever runs next, so this
+        /// must never itself panic - hence the ignored lock results.
+        fn drop(&mut self) {
+            release(&self.gate);
+            if let Ok(mut installed) = INSTALLED.lock() {
+                *installed = None;
+            }
+        }
+    }
+
+    fn release(gate: &Gate) {
         let (flag, condvar) = &**gate;
-        *flag.lock().expect("reconciliation gate flag") = true;
+        if let Ok(mut released) = flag.lock() {
+            *released = true;
+        }
         condvar.notify_all();
-    }
-
-    pub(crate) fn clear() {
-        *INSTALLED.lock().expect("reconciliation gate") = None;
     }
 
     pub(super) fn wait() {

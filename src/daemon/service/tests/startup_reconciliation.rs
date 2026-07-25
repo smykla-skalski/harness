@@ -49,7 +49,7 @@ fn manifest_is_published_without_waiting_for_background_reconciliation() {
 
                     // Release before asserting so a regression fails the
                     // assertion instead of hanging the still-gated daemon.
-                    reconciliation_test_gate::release(&gate);
+                    gate.release();
                     assert!(
                         published.is_ok(),
                         "daemon must publish its manifest while reconciliation is still gated"
@@ -76,7 +76,6 @@ fn manifest_is_published_without_waiting_for_background_reconciliation() {
                         .expect("join daemon serve task")
                         .expect("daemon serve result");
                 });
-                reconciliation_test_gate::clear();
             },
         );
     });
