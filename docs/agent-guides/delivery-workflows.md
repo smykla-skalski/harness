@@ -156,14 +156,15 @@ Reclaim this session's two build caches first, because `git worktree remove` del
 - `<worktree>/target` - direct `cargo` and `cargo nextest` output.
 - `<main-checkout>/target/dev/wt-<worktree-name>-<hash>` - everything from `scripts/cargo-local.sh`, which every `mise run test:*` task uses. Sits outside the worktree and is usually the larger.
 
-Every other session holds its own `target/dev/wt-*` lane, so ask `cargo-local.sh` for this one rather than matching a name by eye, and clear any target-dir override first, since the script honours one and would otherwise answer with the redirect. A lease is named for the segment it covers and the PID holding it, so an entry for this lane means a build still owns it: stop there rather than delete, because removing the worktree mid-build strands exactly the cache this step exists to reclaim. Confirm that PID is really gone before dismissing a leftover entry as stale.
+Every other session holds its own `target/dev/wt-*` lane, so ask `cargo-local.sh` for this one rather than matching a name by eye, and clear any target-dir override first, since the script honours one and would otherwise answer with the redirect. A lease is named for the segment it covers and the PID holding it, and a running build's lane must survive, so the delete stands down while one of those PIDs is alive. Match on the PID rather than the file, the way `clean-build-caches.sh` does: a lease left by a crashed build would otherwise block reclamation for good, which strands the lane just as surely as never running this step.
 
 ```bash
-# assumes: PR merged, <worktree> clean, no build running in this session's lane
+# assumes: PR merged, <worktree> clean
 lane=$(env -u CARGO_TARGET_DIR -u HARNESS_CARGO_TARGET_DIR \
   "<worktree>/scripts/cargo-local.sh" --print-target-dir)
-ls "<main-checkout>"/target/.cargo-local/leases/"$(basename "$lane")"-*  # a hit names the live PID: stop
-rm -rf "<worktree>/target" "$lane"
+held=$(for f in "<main-checkout>"/target/.cargo-local/leases/"$(basename "$lane")"-*; do
+  [ -f "$f" ] && kill -0 "$(cat "$f" 2>/dev/null)" 2>/dev/null && echo held; done)
+[ -z "$held" ] && rm -rf "<worktree>/target" "$lane"   # a running build keeps its lane
 ```
 
 Then remove the worktree and the branch:
