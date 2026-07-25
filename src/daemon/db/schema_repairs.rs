@@ -149,6 +149,11 @@ pub(super) fn current_schema_shape_needs_repair(
     if super::schema_repairs_triage_override::shape_needs_repair(conn)? {
         return Ok(true);
     }
+    // A missing index answers every query correctly, just slowly, so nothing
+    // else here would ever notice it had gone.
+    if !index_exists(conn, "task_board_items_source_project")? {
+        return Ok(true);
+    }
     Ok(false)
 }
 
@@ -421,6 +426,16 @@ fn table_exists(conn: &super::Connection, table_name: &str) -> Result<bool, CliE
     )
     .map(|count| count > 0)
     .map_err(|error| db_error(format!("check {table_name} table existence: {error}")))
+}
+
+fn index_exists(conn: &super::Connection, index_name: &str) -> Result<bool, CliError> {
+    conn.query_row(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = ?1",
+        [index_name],
+        |row| row.get::<_, i64>(0),
+    )
+    .map(|count| count > 0)
+    .map_err(|error| db_error(format!("check {index_name} index existence: {error}")))
 }
 
 fn trigger_exists(conn: &super::Connection, trigger_name: &str) -> Result<bool, CliError> {

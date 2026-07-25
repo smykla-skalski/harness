@@ -96,7 +96,4 @@ WHERE item_id IN (SELECT item_id FROM task_board_projects_backfill);
 
 DROP TABLE task_board_projects_backfill;
 
-CREATE INDEX IF NOT EXISTS task_board_items_source_project
-    ON task_board_items(source_project_id, deleted_at);
-
 UPDATE schema_meta SET value = '51' WHERE key = 'version';

@@ -162,9 +162,10 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         42 => 48,
         43 => 49,
         44 => 50,
-        // Schema v51 ships as two files: the projects table and the item
-        // attribution that references it.
-        45 | 46 => 51,
+        // Schema v51 ships as three files: the projects table, the item
+        // attribution that references it, and the index kept separate so it
+        // can be rebuilt on its own.
+        45 | 46 | 47 => 51,
         _ => u64::MAX,
     }
 }
