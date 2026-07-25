@@ -128,7 +128,7 @@ gh api 'users/copilot-pull-request-reviewer%5Bbot%5D' --jq '.id'
 
 ### Close out
 
-This repository allows squash merges only. The session branch collapses into one new commit on `upstream/main`, so its own commits never reach `main` and the branch can never fast-forward onto it. Closeout realigns local state instead of integrating anything, unless the worktree and branch existed only to deliver one standalone, non-umbrella issue or task, in which case closeout removes them instead. A worktree kept alive for an umbrella's remaining slices or another follow-up in the same PR series always takes the realign path; when it is unclear whether more work is coming, default to realign and ask before removing anything.
+This repository allows squash merges only. The session branch collapses into one new commit on `upstream/main`, so its own commits never reach `main` and the branch can never fast-forward onto it. Closeout realigns local state instead of integrating anything, unless the worktree and branch existed only to deliver one standalone, non-umbrella issue or task, in which case closeout removes them and their build caches instead. A worktree kept alive for an umbrella's remaining slices or another follow-up in the same PR series always takes the realign path; when it is unclear whether more work is coming, default to realign and ask before removing anything.
 
 Confirm the PR merged before either path, then check that `<main-checkout>` is on `main`, `<worktree>` is on `<session-branch>`, both are clean, and local `main` carries no unpublished `replay` commits (reconcile those first, as described below).
 
@@ -150,6 +150,27 @@ It deliberately skips three things:
 - No head comparison. A merged PR is proof enough.
 
 #### Cleanup
+
+Reclaiming this session's build caches is the mandatory first step. `git worktree remove` deletes the only name that maps the shared lane back to this session, so a lane left behind is orphaned with nothing to attribute it to, and it is routinely the largest artifact the session produced.
+
+A session writes two separate caches:
+
+- `<worktree>/target` holds direct `cargo` and `cargo nextest` output.
+- `<main-checkout>/target/dev/wt-<worktree-name>-<hash>` holds everything routed through `scripts/cargo-local.sh`, which every `mise run test:*` task uses. It sits outside the worktree and is usually the larger of the two.
+
+`mise run clean:lanes` reclaims neither. Its lane pass covers `xcode-derived-lanes/` rather than `target/dev/`, and it always classifies the session's own worktree as one to keep, so it can report dropped lanes and nothing reclaimed while both of these survive in full.
+
+Every other session keeps its own `target/dev/wt-*` lane and builds in it concurrently, so delete only the lane whose suffix matches this worktree, and prove nothing is using it first. A running build in a different worktree is normal and must survive.
+
+```bash
+# assumes: PR merged, <worktree> clean, this session has no build of its own running
+lane=$(ls -d <main-checkout>/target/dev/wt-<worktree-name>-* 2>/dev/null | head -1)
+[ -n "$lane" ] && lsof +D "$lane" | head                                          # must print nothing
+pgrep -f cargo-nextest | xargs -I{} lsof -a -p {} -d cwd -Fn | grep -F <worktree> # must print nothing
+rm -rf <worktree>/target ${lane:+"$lane"}
+```
+
+Then remove the worktree and the branch:
 
 ```bash
 git -C <main-checkout> fetch --prune upstream
