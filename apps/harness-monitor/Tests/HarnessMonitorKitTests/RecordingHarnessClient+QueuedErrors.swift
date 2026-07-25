@@ -37,6 +37,15 @@ extension RecordingHarnessClient {
     }
   }
 
+  func dequeueTaskBoardProjectsError() -> (any Error)? {
+    lock.withLock {
+      guard !queuedTaskBoardProjectsErrors.isEmpty else {
+        return nil
+      }
+      return queuedTaskBoardProjectsErrors.removeFirst()
+    }
+  }
+
   func dequeueTaskBoardItemSnapshot() -> [TaskBoardItem]? {
     lock.withLock {
       guard !queuedTaskBoardItemSnapshots.isEmpty else {

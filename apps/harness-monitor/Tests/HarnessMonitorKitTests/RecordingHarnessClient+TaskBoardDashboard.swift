@@ -22,6 +22,9 @@ extension RecordingHarnessClient {
 
   func taskBoardProjects(status: TaskBoardStatus?) async throws -> [TaskBoardProjectSummary] {
     record(.taskBoardProjects(status: status))
+    if let error = dequeueTaskBoardProjectsError() {
+      throw error
+    }
     return lock.withLock {
       if let summaries = taskBoardProjectSummariesStorage {
         return summaries

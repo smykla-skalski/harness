@@ -77,6 +77,12 @@ extension RecordingHarnessClient {
     }
   }
 
+  func configureTaskBoardProjectsErrors(_ errors: [any Error]) {
+    lock.withLock {
+      queuedTaskBoardProjectsErrors = errors
+    }
+  }
+
   func configureDeliverTaskBoardDispatchErrors(_ errors: [any Error]) {
     lock.withLock {
       queuedDeliverTaskBoardDispatchErrors = errors

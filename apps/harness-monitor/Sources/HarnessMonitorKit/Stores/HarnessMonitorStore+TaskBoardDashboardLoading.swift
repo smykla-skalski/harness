@@ -10,6 +10,7 @@ extension HarnessMonitorStore {
   struct TaskBoardRefreshSnapshot: Sendable {
     let items: TaskBoardSnapshotLoad<[TaskBoardItem]>
     let orchestratorStatus: TaskBoardSnapshotLoad<TaskBoardOrchestratorStatus?>
+    let projects: TaskBoardSnapshotLoad<[TaskBoardProjectSummary]>
     let stepModeConfirmationRevision: UInt64
   }
 
@@ -32,6 +33,27 @@ extension HarnessMonitorStore {
       let description = RefreshSnapshotErrorFormatting.describeUnderlying(error)
       HarnessMonitorLogger.store.debug(
         "task-board snapshot unavailable during refresh: \(description, privacy: .public)"
+      )
+      return TaskBoardSnapshotLoad(measured: nil)
+    }
+  }
+
+  /// The catalog every card's project mark reads. It rides the board refresh
+  /// rather than a screen's own load, so a card is marked before anyone opens
+  /// Settings, and a color changed elsewhere lands on the next refresh.
+  nonisolated static func loadTaskBoardProjectsSnapshot(
+    using client: any HarnessMonitorClientProtocol
+  ) async -> TaskBoardSnapshotLoad<[TaskBoardProjectSummary]> {
+    do {
+      return TaskBoardSnapshotLoad(
+        measured: try await measureOperation {
+          try await client.taskBoardProjects(status: nil)
+        }
+      )
+    } catch {
+      let description = RefreshSnapshotErrorFormatting.describeUnderlying(error)
+      HarnessMonitorLogger.store.debug(
+        "task-board projects snapshot unavailable during refresh: \(description, privacy: .public)"
       )
       return TaskBoardSnapshotLoad(measured: nil)
     }
@@ -73,9 +95,16 @@ extension HarnessMonitorStore {
       } else {
         TaskBoardSnapshotLoad<TaskBoardOrchestratorStatus?>(measured: nil)
       }
+    async let projects =
+      if includeItems {
+        loadTaskBoardProjectsSnapshot(using: client)
+      } else {
+        TaskBoardSnapshotLoad<[TaskBoardProjectSummary]>(measured: nil)
+      }
     return TaskBoardRefreshSnapshot(
       items: await items,
       orchestratorStatus: await orchestratorStatus,
+      projects: await projects,
       stepModeConfirmationRevision: stepModeConfirmationRevision
     )
   }

@@ -46,6 +46,44 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
     #expect(store.contentUI.dashboard.taskBoardSyncSummary?.total == 1)
   }
 
+  @Test("Refreshing the dashboard fills the project catalog the card marks read")
+  func refreshingDashboardFillsProjectCatalog() async {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardItems([
+      sampleTaskBoardItem(
+        id: "board-1", status: .todo, agentMode: .interactive, projectId: "project-1")
+    ])
+    let store = await makeBootstrappedStore(client: client)
+
+    // No Settings visit and no explicit refreshTaskBoardProjects: a card's
+    // project mark has to survive an ordinary board load.
+    await store.refreshTaskBoardDashboard()
+
+    #expect(client.recordedCalls().contains(.taskBoardProjects(status: nil)))
+    #expect(store.globalTaskBoardProjects?.isEmpty == false)
+    #expect(store.contentUI.dashboard.taskBoardProjects?.isEmpty == false)
+  }
+
+  @Test("An unavailable project catalog keeps the marks already on screen")
+  func unavailableProjectCatalogKeepsExistingMarks() async {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardItems([
+      sampleTaskBoardItem(
+        id: "board-1", status: .todo, agentMode: .interactive, projectId: "project-1")
+    ])
+    let store = await makeBootstrappedStore(client: client)
+    await store.refreshTaskBoardDashboard()
+    let loaded = store.globalTaskBoardProjects
+
+    client.configureTaskBoardProjectsErrors([
+      HarnessMonitorAPIError.server(code: 503, message: "projects unavailable")
+    ])
+    await store.refreshTaskBoardDashboard()
+
+    #expect(loaded?.isEmpty == false)
+    #expect(store.globalTaskBoardProjects == loaded)
+  }
+
   @Test("Evaluate task board records the summary and refreshes dashboard state")
   func evaluateTaskBoardRecordsSummaryAndRefreshesDashboardState() async {
     let client = RecordingHarnessClient()
