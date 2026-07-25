@@ -45,9 +45,9 @@ gh api --method POST repos/<owner>/<repo>/issues/<umbrella-number>/sub_issues \
 
 GitHub's issue type field is separate from the `kind/*` label and sits alongside it. Set it after filing:
 
-- A sub-issue attached to an umbrella gets type `Task`.
-- An umbrella whose children are new work gets type `Feature`.
-- Any issue labeled `kind/bug` gets type `Bug`.
+- Any issue labeled `kind/bug` gets type `Bug`, overriding the rules below even on an umbrella or one of its sub-issues.
+- Otherwise, a sub-issue attached to an umbrella gets type `Task`.
+- Otherwise, an umbrella whose children are new work gets type `Feature`.
 
 `gh issue create` and `gh issue edit` have no flag for it, so set it through the GraphQL API. Look up the repo's type ids rather than hardcoding them, since they differ per repo. The mutation takes the issue's GraphQL node id, not the REST database id used earlier for sub-issue attachment:
 
