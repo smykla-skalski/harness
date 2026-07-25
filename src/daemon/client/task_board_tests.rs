@@ -229,6 +229,30 @@ fn task_board_list_walks_every_page_until_the_cursor_runs_out() {
     );
 }
 
+/// A cursor that names the same resume point twice can never drain, so the
+/// walk has to stop and say why instead of fetching that page forever.
+#[test]
+fn task_board_list_refuses_a_cursor_that_never_advances() {
+    let page = serde_json::json!({
+        "items": [item()],
+        "total_matched": 2,
+        "next_cursor": "cursor-stuck",
+    })
+    .to_string();
+    let (endpoint, request_lines, handle) = spawn_mock_sequence(vec![page.clone(), page]);
+
+    let error = client_with(endpoint)
+        .list_task_board_items(&TaskBoardListItemsRequest::default())
+        .expect_err("a stalled cursor must fail rather than loop");
+    handle.join().expect("server");
+
+    assert!(
+        error.to_string().contains("cursor-stuck"),
+        "unexpected: {error}"
+    );
+    assert_eq!(request_lines.lock().expect("request lines").len(), 2);
+}
+
 #[test]
 fn task_board_update_uses_put_item_route() {
     let (endpoint, request_line, handle) =

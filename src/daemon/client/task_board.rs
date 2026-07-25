@@ -90,12 +90,19 @@ impl DaemonClient {
             let page = self.list_task_board_items_page(&request)?;
             let drained = page.items.is_empty();
             items.extend(page.items);
-            match page.next_cursor {
-                // A page that advanced nothing would loop forever, so treat an
-                // empty page as the end whatever cursor came back with it.
-                Some(cursor) if !drained => request.cursor = Some(cursor),
-                _ => return Ok(items),
+            let Some(cursor) = page.next_cursor else {
+                return Ok(items);
+            };
+            // Neither an empty page nor a cursor that names the same resume
+            // point advances the walk, and following either forever would hang
+            // the caller with no way to tell why.
+            if drained {
+                return Ok(items);
             }
+            if request.cursor.as_deref() == Some(cursor.as_str()) {
+                return Err(stalled_task_board_page(&cursor));
+            }
+            request.cursor = Some(cursor);
         }
     }
 
@@ -489,6 +496,14 @@ fn enum_label<T: serde::Serialize>(value: T, label: &str) -> Result<String, CliE
         .ok_or_else(|| {
             CliErrorKind::workflow_serialize(format!("task-board {label} is not a string")).into()
         })
+}
+
+fn stalled_task_board_page(cursor: &str) -> CliError {
+    CliErrorKind::workflow_io(format!(
+        "the daemon returned the same task-board page cursor '{cursor}' twice; \
+         the board read cannot advance"
+    ))
+    .into()
 }
 
 fn task_board_upgrade_required() -> CliError {
