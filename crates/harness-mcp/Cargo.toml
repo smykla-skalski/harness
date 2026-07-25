@@ -10,7 +10,7 @@ path = "src/main.rs"
 
 [dependencies]
 async-trait = "0.1.83"
-base64 = "0.22.1"
+base64 = "0.23.0"
 clap = { version = "4.6.0", features = ["derive", "env"] }
 futures-util = "0.3.31"
 harness-daemon-client = { path = "../harness-daemon-client", version = "50.1.0" }
