@@ -89,6 +89,23 @@ fn rejects_an_upstream_carrying_a_path_or_query() {
 }
 
 #[test]
+fn rejects_an_upstream_carrying_userinfo() {
+    for upstream in [
+        "http://user:pass@127.0.0.1:8787",
+        "http://user@localhost:8787",
+    ] {
+        let Err(error) = config(upstream, "/panel") else {
+            panic!("{upstream} must be refused rather than carried into the origin");
+        };
+
+        assert!(
+            matches!(error, CompanionConfigError::UpstreamHasUserinfo(_)),
+            "{upstream} should report the userinfo rejection, got {error}"
+        );
+    }
+}
+
+#[test]
 fn rejects_a_missing_upstream() {
     let error = config("   ", "/panel").expect_err("blank upstream must be refused");
 

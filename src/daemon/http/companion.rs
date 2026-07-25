@@ -57,6 +57,7 @@ pub enum CompanionConfigError {
     UpstreamSchemeUnsupported(String),
     UpstreamMissingHost,
     UpstreamNotLoopback(String),
+    UpstreamHasUserinfo(String),
     UpstreamHasPathOrQuery(String),
     PrefixEmpty,
     PrefixNotAbsolute(String),
@@ -82,6 +83,11 @@ impl fmt::Display for CompanionConfigError {
                 f,
                 "companion upstream host must be loopback, got {host}; the daemon forwards public \
                  traffic only to a service on its own machine"
+            ),
+            Self::UpstreamHasUserinfo(value) => write!(
+                f,
+                "companion upstream must carry no userinfo, got {value}; the loopback hop \
+                 authenticates nobody and the credentials would ride in every forwarded request"
             ),
             Self::UpstreamHasPathOrQuery(value) => write!(
                 f,
@@ -199,6 +205,15 @@ fn validate_upstream(upstream: &str) -> Result<String, CompanionConfigError> {
     let authority = uri
         .authority()
         .ok_or(CompanionConfigError::UpstreamMissingHost)?;
+    // Checking only `authority.host()` would read straight past userinfo and
+    // accept `user:pass@127.0.0.1`, which the origin then carries into every
+    // forwarded request. The loopback hop authenticates nobody, so userinfo can
+    // only be an accident or a credential left where it does not belong.
+    if authority.as_str().contains('@') {
+        return Err(CompanionConfigError::UpstreamHasUserinfo(
+            upstream.to_owned(),
+        ));
+    }
     if !authority.as_str().is_empty() && !uri.path().is_empty() && uri.path() != "/" {
         return Err(CompanionConfigError::UpstreamHasPathOrQuery(
             uri.path().to_owned(),

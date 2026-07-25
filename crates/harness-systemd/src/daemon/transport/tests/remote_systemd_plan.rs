@@ -421,6 +421,8 @@ fn remote_systemd_plan_refuses_a_companion_the_daemon_would_reject() {
         ("http://panel.internal:8787", "/panel"),
         ("https://127.0.0.1:8787", "/panel"),
         ("http://127.0.0.1:8787/panel", "/panel"),
+        ("http://user:pass@127.0.0.1:8787", "/panel"),
+        ("http://user@localhost:8787", "/panel"),
         ("http://127.0.0.1:8787", "/v1"),
         ("http://127.0.0.1:8787", "/v1/remote"),
         ("http://127.0.0.1:8787", "/"),
