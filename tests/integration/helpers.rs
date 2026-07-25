@@ -27,6 +27,13 @@ mod run;
 
 // Keep lightweight fixtures in testkit and root-coupled fixtures local so
 // integration tests can continue importing everything through `helpers::*`.
+// Both integration targets compile this module, and the daemon half reaches
+// for none of the testkit builders, so this glob being unused there is
+// expected rather than a leftover.
+#[allow(
+    unused_imports,
+    reason = "the daemon integration target uses none of these testkit re-exports"
+)]
 pub use harness_testkit::*;
 pub use hook::*;
 pub use port_lease::*;

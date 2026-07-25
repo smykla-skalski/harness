@@ -81,6 +81,10 @@ A start can replace the descriptor's command with a remote endpoint: `--endpoint
 
 Integration tests live in `tests/integration/` and cover hooks, commands, and workflows end to end. Canonical Rust test tasks use nextest process isolation and parallel scheduling. A test must isolate its environment, filesystem paths, ports, and external resource names instead of requiring runner-wide serialization. Tests that read XDG paths must isolate state with `temp_env::with_vars`, setting both `XDG_DATA_HOME` and `CLAUDE_SESSION_ID`. Avoid mocks; tests use real filesystem state.
 
+That one directory feeds two test targets, which differ in the library they can link rather than in how many tests they hold. `tests/integration.rs` declares the modules that compile without `full-runtime`, and `tests/integration_daemon.rs` declares the ones that reach symbols gated behind it - daemon, bridge, ACP and MCP. Only the second carries `required-features`, so a run that leaves the feature off skips it and links `integration` against a library without axum, sqlx, hyper and rustls, while the full gate enables the feature and builds both. Editing a test rebuilds one target instead of both either way.
+
+Declare a new module in whichever root matches what it imports, and move a module between targets by moving its `mod` line rather than its file. A module that needs `full-runtime` but is declared in `tests/integration.rs` fails to compile with an unresolved daemon path, which is the intended signal. `tests/integration/helpers/` is shared by both roots and must stay free of gated symbols; because each target uses only part of it, the module allows dead code and unused re-exports on purpose.
+
 ## Rust build concurrency
 
 `scripts/cargo-local.sh` sizes `CARGO_BUILD_JOBS` and `NEXTEST_TEST_THREADS` two different ways, and `--print-env` reports which one is live as `JOBSERVER=pool` or `JOBSERVER=reserve`.
