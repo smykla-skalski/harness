@@ -37,6 +37,9 @@ POLL_SECONDS = 5.0
 # AF_UNIX paths are capped near 104 bytes on macOS, so the pool directory has to
 # stay short enough that the socket underneath it still fits.
 MAX_SOCKET_PATH = 100
+# A request is one short line; anything longer is a client that will never
+# terminate its line, so cap what we buffer for it.
+MAX_REQUEST_BYTES = 256
 
 
 def pool_dir(repo_root: str) -> str:
@@ -46,14 +49,11 @@ def pool_dir(repo_root: str) -> str:
 
 
 def prepare_private_dir(path: str) -> None:
-    """Create `path` 0700 and owned by us, refusing anything already unsafe.
+    """Create one level 0700 and owned by us, refusing anything already unsafe.
 
     A plain makedirs adopts a pre-existing directory whatever its owner, and the
     pool path is a deterministic hash of a guessable repository path.
     """
-    parent = os.path.dirname(path)
-    if parent and not os.path.isdir(parent):
-        prepare_private_dir(parent)
     with contextlib.suppress(FileExistsError):
         os.mkdir(path, 0o700)
     info = os.lstat(path)
@@ -63,6 +63,17 @@ def prepare_private_dir(path: str) -> None:
         raise RuntimeError(f"pool path is owned by another user: {path}")
     if info.st_mode & 0o077:
         os.chmod(path, 0o700)
+
+
+def prepare_pool_dir(directory: str) -> None:
+    """Validate every level we own, not just the leaf.
+
+    Checking only the leaf left the parent unguarded, and os.path.isdir follows
+    symlinks, so a pre-planted `/tmp/harness-jobserver-<user>` was adopted
+    silently and the whole pool landed inside someone else's directory.
+    """
+    prepare_private_dir(os.path.dirname(directory))
+    prepare_private_dir(directory)
 
 
 class Pool:
@@ -154,9 +165,11 @@ def serve(pool: Pool, stop: threading.Event) -> None:
     selector = selectors.DefaultSelector()
     selector.register(server, selectors.EVENT_READ, None)
     holdings: dict[socket.socket, int] = {}
+    pending: dict[socket.socket, bytes] = {}
 
     def drop(conn: socket.socket) -> None:
         selector.unregister(conn)
+        pending.pop(conn, None)
         pool.release(holdings.pop(conn, 0))
         with contextlib.suppress(OSError):
             conn.close()
@@ -167,20 +180,35 @@ def serve(pool: Pool, stop: threading.Event) -> None:
                 conn, _ = server.accept()
                 conn.setblocking(True)
                 holdings[conn] = 0
+                pending[conn] = b""
                 selector.register(conn, selectors.EVENT_READ, None)
                 continue
 
             conn = key.fileobj
             try:
-                line = conn.recv(64)
+                chunk = conn.recv(64)
             except OSError:
-                line = b""
-            if not line:
+                chunk = b""
+            if not chunk:
                 # EOF covers a clean close and a SIGKILLed client alike.
                 drop(conn)
                 continue
+
+            # A stream socket keeps no message boundaries, so a request can
+            # arrive split. Parsing whatever one recv returned would reject a
+            # valid ACQUIRE and hand the client a silent zero-width grant.
+            buffered = pending[conn] + chunk
+            if b"\n" not in buffered:
+                if len(buffered) > MAX_REQUEST_BYTES:
+                    drop(conn)
+                else:
+                    pending[conn] = buffered
+                continue
+            raw_line, _, rest = buffered.partition(b"\n")
+            pending[conn] = rest
+
             try:
-                verb, _, raw = line.decode().strip().partition(" ")
+                verb, _, raw = raw_line.decode().strip().partition(" ")
                 want = max(0, int(raw or "0"))
             except ValueError:
                 drop(conn)
@@ -209,8 +237,9 @@ def serve(pool: Pool, stop: threading.Event) -> None:
 
 def supervise(repo_root: str, budget: int) -> int:
     directory = pool_dir(repo_root)
-    prepare_private_dir(directory)
-    lock_fd = os.open(os.path.join(directory, "lock"), os.O_CREAT | os.O_RDWR, 0o600)
+    prepare_pool_dir(directory)
+    lock_fd = os.open(os.path.join(directory, "lock"),
+                      os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     try:
         fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
@@ -244,7 +273,7 @@ def ensure(repo_root: str, budget: int, timeout: float | None = None) -> tuple[s
     directory = pool_dir(repo_root)
     if len(os.path.join(directory, "sock")) > MAX_SOCKET_PATH:
         return None
-    prepare_private_dir(directory)
+    prepare_pool_dir(directory)
     sock_path = os.path.join(directory, "sock")
     fifo_path = os.path.join(directory, "fifo")
 
@@ -293,7 +322,15 @@ def run_with_tokens(repo_root: str, want: int, env_var: str, floor: int, argv: l
         try:
             conn.connect(sock_path)
             conn.sendall(f"ACQUIRE {want}\n".encode())
-            reply = conn.recv(64).decode().strip()
+            # Same stream-boundary problem in reverse: read until the newline
+            # rather than trusting one recv to hold the whole reply.
+            buffered = b""
+            while b"\n" not in buffered and len(buffered) <= MAX_REQUEST_BYTES:
+                chunk = conn.recv(64)
+                if not chunk:
+                    break
+                buffered += chunk
+            reply = buffered.partition(b"\n")[0].decode().strip()
             if reply.startswith("GRANTED"):
                 granted = int(reply.split()[1])
         except (OSError, ValueError, IndexError):
@@ -306,7 +343,14 @@ def run_with_tokens(repo_root: str, want: int, env_var: str, floor: int, argv: l
         # without holding a token, so the usable width is one above the grant.
         env[env_var] = str(max(floor, granted + 1))
     try:
-        return subprocess.call(argv, env=env)
+        status = subprocess.call(argv, env=env)
+        # subprocess reports a signal death as a negative number. Returning it
+        # from a shell wrapper wraps it to 256-n, so an OOM-killed cargo showed
+        # up as 247 instead of the 137 an unwrapped run reports, and the caller
+        # decoded it as some nonexistent signal 119.
+        if status < 0:
+            status = 128 - status
+        return status
     finally:
         if conn is not None:
             with contextlib.suppress(OSError):
@@ -356,6 +400,10 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
+    except KeyboardInterrupt:
+        # Ctrl+C is ordinary teardown here, not a wrapper defect worth a
+        # traceback on top of whatever the child already printed.
+        sys.exit(130)
     except (RuntimeError, OSError) as exc:
         print(f"harness-jobserver: {exc}", file=sys.stderr)
         sys.exit(1)

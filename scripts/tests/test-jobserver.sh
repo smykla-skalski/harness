@@ -281,6 +281,95 @@ scenario_lock_file_holds_only_the_current_pid() {
   pass "$name"
 }
 
+scenario_signal_death_reports_a_shell_signal_status() {
+  local name="a signal-killed child reports the shell's signal status"
+  local root; root="$(fake_root signal)"
+  track_pool "$root"
+  python3 "$JOBSERVER" ensure --repo-root "$root" --budget 2 >/dev/null 2>&1
+
+  # subprocess reports -9; passing that straight out of a shell wrapper wraps to
+  # 247 and decodes as a signal that does not exist.
+  local status=0
+  python3 "$JOBSERVER" run --repo-root "$root" --max 1 --env PROBE -- \
+    sh -c 'kill -9 $$' || status=$?
+  if (( status != 137 )); then
+    fail "$name (expected 137 for SIGKILL, got $status)"
+    return
+  fi
+  status=0
+  python3 "$JOBSERVER" run --repo-root "$root" --max 1 --env PROBE -- \
+    sh -c 'kill -TERM $$' || status=$?
+  if (( status != 143 )); then
+    fail "$name (expected 143 for SIGTERM, got $status)"
+    return
+  fi
+  pass "$name"
+}
+
+scenario_split_request_is_still_granted() {
+  local name="a request split across packets is still granted"
+  local root; root="$(fake_root split)"
+  track_pool "$root"
+  python3 "$JOBSERVER" ensure --repo-root "$root" --budget 4 >/dev/null 2>&1
+  local dir; dir="$(pool_dir_for "$root")"
+
+  # A stream socket keeps no message boundaries, so send the line in pieces.
+  local granted
+  granted="$(python3 - "$dir/sock" <<'PY'
+import socket, sys, time
+c = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+c.connect(sys.argv[1])
+for piece in (b"ACQ", b"UIRE ", b"3", b"\n"):
+    c.sendall(piece)
+    time.sleep(0.05)
+buf = b""
+while b"\n" not in buf:
+    chunk = c.recv(64)
+    if not chunk:
+        break
+    buf += chunk
+print(buf.partition(b"\n")[0].decode().strip())
+PY
+)"
+  if [[ "$granted" != "GRANTED 3" ]]; then
+    fail "$name (expected 'GRANTED 3', got '$granted')"
+    return
+  fi
+  pass "$name"
+}
+
+scenario_symlinked_pool_parent_is_refused() {
+  local name="a symlinked pool parent is refused"
+  local root; root="$(fake_root unsafeparent)"
+  local dir; dir="$(pool_dir_for "$root")"
+  local parent; parent="$(dirname "$dir")"
+  local decoy; decoy="$(mktemp -d)"
+  local saved=""
+
+  # Validating only the leaf let a pre-planted parent stand, and os.path.isdir
+  # follows symlinks, so the whole pool landed inside the attacker's directory.
+  if [[ -d "$parent" && ! -L "$parent" ]]; then
+    saved="$parent.saved.$$"
+    mv "$parent" "$saved"
+  fi
+  rm -rf "$parent"
+  ln -s "$decoy" "$parent"
+
+  local status=0
+  python3 "$JOBSERVER" ensure --repo-root "$root" --budget 4 >/dev/null 2>&1 || status=$?
+  rm -f "$parent"
+  rm -rf "$decoy"
+  if [[ -n "$saved" ]]; then
+    mv "$saved" "$parent"
+  fi
+
+  if (( status == 0 )); then
+    fail "$name (symlinked pool parent was accepted)"
+    return
+  fi
+  pass "$name"
+}
+
 scenario_run_propagates_exit_status() {
   local name="run propagates the command's exit status"
   local root; root="$(fake_root status)"
@@ -306,6 +395,9 @@ scenario_foreign_owned_pool_dir_is_refused
 scenario_missing_pool_still_runs_the_command
 scenario_run_preserves_argument_separators
 scenario_lock_file_holds_only_the_current_pid
+scenario_signal_death_reports_a_shell_signal_status
+scenario_split_request_is_still_granted
+scenario_symlinked_pool_parent_is_refused
 scenario_run_propagates_exit_status
 
 printf 'jobserver tests: %d passed, %d failed\n' "$passed" "$failed"
