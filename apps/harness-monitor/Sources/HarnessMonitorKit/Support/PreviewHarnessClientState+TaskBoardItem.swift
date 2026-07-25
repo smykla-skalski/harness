@@ -54,8 +54,19 @@ extension TaskBoardItem {
     return "project-" + digest.map { String(format: "%02x", $0) }.joined()
   }
 
+  /// The daemon re-resolves attribution on every write, so a patch that moves
+  /// the item to another project must not keep the project it came from.
+  private func retainedSourceProjectId(
+    after request: TaskBoardUpdateItemRequest
+  ) -> String? {
+    guard request.clearProjectId || request.projectId != nil else {
+      return sourceProjectId
+    }
+    return nil
+  }
+
   func applyingPreviewUpdate(_ request: TaskBoardUpdateItemRequest) -> TaskBoardItem {
-    TaskBoardItem(
+    let updated = TaskBoardItem(
       schemaVersion: schemaVersion,
       id: id,
       title: request.title ?? title,
@@ -64,7 +75,7 @@ extension TaskBoardItem {
       priority: request.priority ?? priority,
       tags: request.tags ?? tags,
       projectId: request.clearProjectId ? nil : request.projectId ?? projectId,
-      sourceProjectId: sourceProjectId,
+      sourceProjectId: retainedSourceProjectId(after: request),
       targetProjectTypes: request.targetProjectTypes ?? targetProjectTypes,
       agentMode: request.agentMode ?? agentMode,
       externalRefs: previewExternalRefs(replacingWith: request.externalRefs),
@@ -85,6 +96,7 @@ extension TaskBoardItem {
       updatedAt: PreviewHarnessClientState.mutationTimestamp,
       deletedAt: deletedAt
     )
+    return updated.applyingPreviewAttribution()
   }
 
   private func previewExternalRefs(
