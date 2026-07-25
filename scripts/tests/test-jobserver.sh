@@ -299,6 +299,23 @@ scenario_lock_file_holds_only_the_current_pid() {
   pass "$name"
 }
 
+scenario_ensure_reports_the_running_budget() {
+  local name="ensure reports the running pool's width, not the one asked for"
+  local root; root="$(fake_root budget)"
+  track_pool "$root"
+
+  python3 "$JOBSERVER" ensure --repo-root "$root" --budget 3 >/dev/null 2>&1
+  # A second caller cannot resize a live pool, so echoing its own number back
+  # would advertise a width the FIFO was never filled to.
+  local out; out="$(python3 "$JOBSERVER" ensure --repo-root "$root" --budget 9 2>/dev/null)"
+
+  if [[ "$out" != *"-j3 "* ]]; then
+    fail "$name (expected -j3 from the running pool, got: $out)"
+    return
+  fi
+  pass "$name"
+}
+
 scenario_pool_location_ignores_the_user_variable() {
   local name="the pool location is the same whatever USER says"
   local root; root="$(fake_root userenv)"
@@ -609,6 +626,7 @@ scenario_foreign_owned_pool_dir_is_refused
 scenario_missing_pool_still_runs_the_command
 scenario_run_preserves_argument_separators
 scenario_lock_file_holds_only_the_current_pid
+scenario_ensure_reports_the_running_budget
 scenario_pool_location_ignores_the_user_variable
 scenario_a_non_fifo_at_the_pool_path_is_replaced
 scenario_acquire_surfaces_a_real_read_error

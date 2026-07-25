@@ -278,12 +278,37 @@ def supervise(repo_root: str, budget: int) -> int:
     # leave its tail behind this one and the file would read as two pids.
     os.ftruncate(lock_fd, 0)
     os.write(lock_fd, f"{os.getpid()}\n".encode())
+    # Written before the socket opens, so anything that reaches a live socket
+    # is guaranteed to find the budget that belongs to it.
+    _write_budget(directory, budget)
     pool = Pool(directory, budget)
     stop = threading.Event()
     for sig in (signal.SIGTERM, signal.SIGINT):
         signal.signal(sig, lambda *_: stop.set())
     serve(pool, stop)
     return 0
+
+
+def _write_budget(directory: str, budget: int) -> None:
+    path = os.path.join(directory, "budget")
+    temporary = f"{path}.tmp"
+    with open(temporary, "w", encoding="utf-8") as handle:
+        handle.write(f"{budget}\n")
+    os.replace(temporary, path)
+
+
+def _read_budget(directory: str, fallback: int) -> int:
+    """The budget the running supervisor actually filled the FIFO with.
+
+    Only meaningful once the socket answers, which is the proof a supervisor is
+    alive and therefore that this file is its own rather than a dead one's.
+    """
+    try:
+        with open(os.path.join(directory, "budget"), encoding="utf-8") as handle:
+            value = int(handle.read().strip())
+    except (OSError, ValueError):
+        return fallback
+    return value if value > 0 else fallback
 
 
 def _startup_timeout() -> float:
@@ -296,7 +321,7 @@ def _startup_timeout() -> float:
 
 
 def ensure(repo_root: str, budget: int, timeout: float | None = None) -> tuple[str, int] | None:
-    """Start the supervisor if absent and return (fifo_path, budget)."""
+    """Start the supervisor if absent and return (fifo_path, running budget)."""
     if timeout is None:
         timeout = _startup_timeout()
     directory = pool_dir(repo_root)
@@ -321,7 +346,10 @@ def ensure(repo_root: str, budget: int, timeout: float | None = None) -> tuple[s
 
     if not _connectable(sock_path) or not os.path.exists(fifo_path):
         return None
-    return fifo_path, budget
+    # An already-running supervisor owns the width, and it need not be the one
+    # this caller asked for; reporting the request would advertise a pool that
+    # was never filled that way.
+    return fifo_path, _read_budget(directory, budget)
 
 
 def _connectable(sock_path: str) -> bool:
