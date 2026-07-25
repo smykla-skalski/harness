@@ -7,6 +7,16 @@ extension RecordingHarnessClient {
     calls
   }
 
+  /// Recorded calls without the project-catalog read a board refresh performs
+  /// on its own. A test asserting an exact mutation sequence wants what it
+  /// asked the store to do, not what the refresh behind it loads.
+  func recordedCallsIgnoringProjectCatalogReads() -> [Call] {
+    calls.filter {
+      if case .taskBoardProjects = $0 { return false }
+      return true
+    }
+  }
+
   func clearRecordedCalls() {
     lock.withLock { callsStorage.removeAll() }
   }
