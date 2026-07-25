@@ -254,12 +254,16 @@ configure_tmpdir() {
     return 0
   fi
 
-  repo_fallback="$COMMON_REPO_ROOT/target/.cargo-local/tmp/$tmpdir_id"
-  if ! mkdir -p "$repo_fallback" || ! tmpdir_is_usable "$repo_fallback"; then
-    printf 'failed to prepare writable TMPDIR at %s\n' "$repo_fallback" >&2
+  # Same ownership and symlink guarantees the /tmp fallback gets. A plain
+  # mkdir -p would adopt a pre-existing directory, or follow a symlink out of
+  # the repository, and the per-session isolation above would mean nothing.
+  repo_fallback="$COMMON_REPO_ROOT/target/.cargo-local/tmp"
+  if ! mkdir -p "$repo_fallback" \
+    || ! prepare_private_tmpdir "$repo_fallback/$tmpdir_id"; then
+    printf 'failed to prepare writable TMPDIR at %s\n' "$repo_fallback/$tmpdir_id" >&2
     return 1
   fi
-  export TMPDIR="$repo_fallback/"
+  export TMPDIR="$repo_fallback/$tmpdir_id/"
 }
 
 cleanup_stale_leases() {
@@ -407,9 +411,10 @@ if [[ -n "${SCCACHE_BIN:-}" ]]; then
   # per-worktree value would make path normalization depend on whichever
   # checkout happened to start it. Keep it repo-wide and predictable.
   export SCCACHE_BASEDIRS="${SCCACHE_BASEDIRS:-$COMMON_REPO_ROOT}"
-  if configure_sccache_tmpdir; then
-    configure_sccache_socket || true
-  else
+  # Swallowing a socket failure would leave sccache enabled on whatever default
+  # endpoint it picks, which can be a localhost TCP port any local user can
+  # reach. Losing the cache is the safer trade.
+  if ! configure_sccache_tmpdir || ! configure_sccache_socket; then
     export SCCACHE_BIN=""
     unset SCCACHE_VERSION
   fi

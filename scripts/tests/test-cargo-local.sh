@@ -35,6 +35,18 @@ assert_line() {
   grep -Fxq -- "$line" <<<"$haystack"
 }
 
+# GNU and BSD stat disagree on the format flag, and GNU's -f means something
+# else entirely and still exits 0, so validate the shape before trusting it.
+dir_mode() {
+  local path="$1" mode
+  mode="$(stat -c '%a' "$path" 2>/dev/null || true)"
+  if [[ ! "$mode" =~ ^[0-7]{3,4}$ ]]; then
+    mode="$(stat -f '%Lp' "$path" 2>/dev/null || true)"
+  fi
+  [[ "$mode" =~ ^[0-7]{3,4}$ ]] || return 1
+  printf '%s\n' "$mode"
+}
+
 write_fake_sccache() {
   local path="$1" version="$2"
   cat >"$path" <<EOF
@@ -562,6 +574,30 @@ scenario_sccache_socket_is_shared_across_checkouts() {
   rm -rf "$base"
 }
 
+scenario_unsafe_socket_dir_disables_sccache() {
+  local fake_bin="$SANDBOX/unsafe-sock-bin"
+  local short_tmp="/tmp/hs-$$"
+  local output
+  mkdir -p "$fake_bin" "$short_tmp"
+  write_fake_sccache "$fake_bin/sccache" "0.16.0"
+  # A symlinked socket root is exactly what prepare_private_tmpdir refuses.
+  ln -sfn "$SANDBOX" "$short_tmp/harness-sccache"
+
+  output="$(print_cargo_env "$fake_bin" "$fake_bin/sccache" "$short_tmp")"
+
+  # Leaving sccache enabled here would hand it whatever default endpoint it
+  # picks, which can be a localhost port other local users can reach.
+  if assert_line "SCCACHE_BIN=" "$output" \
+    && assert_line "CACHE_MODE=none" "$output" \
+    && assert_line "SCCACHE_SERVER_UDS=" "$output"; then
+    pass "an unsafe socket directory disables sccache instead of falling back"
+  else
+    fail "sccache stayed enabled without a private socket dir: $output"
+  fi
+
+  rm -rf "$short_tmp"
+}
+
 scenario_repo_tmpdir_fallback_is_session_scoped() {
   local fake_bin="$SANDBOX/no-tmp-bin"
   local real_touch first second first_tmp second_tmp
@@ -586,11 +622,16 @@ EOF
   first_tmp="$(awk -F= '$1 == "TMPDIR" { print substr($0, index($0, "=") + 1) }' <<<"$first")"
   second_tmp="$(awk -F= '$1 == "TMPDIR" { print substr($0, index($0, "=") + 1) }' <<<"$second")"
 
+  # It also has to carry the same ownership and mode guarantees as the /tmp
+  # fallback, or the session scoping above is only skin deep.
   if [[ "$first_tmp" == "$COMMON_REPO_ROOT/target/.cargo-local/tmp/"* ]] \
-    && [[ "$first_tmp" != "$second_tmp" ]]; then
-    pass "in-repo TMPDIR fallback stays session scoped"
+    && [[ "$first_tmp" != "$second_tmp" ]] \
+    && [[ ! -L "${first_tmp%/}" ]] \
+    && [[ -O "${first_tmp%/}" ]] \
+    && [[ "$(dir_mode "${first_tmp%/}")" == "700" ]]; then
+    pass "in-repo TMPDIR fallback stays session scoped and private"
   else
-    fail "in-repo TMPDIR fallback was not session scoped: a=$first_tmp b=$second_tmp"
+    fail "in-repo TMPDIR fallback was not session scoped or not private: a=$first_tmp b=$second_tmp"
   fi
 
   rm -rf "${first_tmp%/}" "${second_tmp%/}"
@@ -646,6 +687,7 @@ scenario_target_dir_is_shared_across_sessions
 scenario_sccache_socket_survives_session_scoped_tmpdir
 scenario_sccache_socket_is_shared_across_checkouts
 scenario_repo_tmpdir_fallback_is_session_scoped
+scenario_unsafe_socket_dir_disables_sccache
 scenario_single_thread_nextest_override_is_rejected
 scenario_noncanonical_nextest_override_is_rejected
 scenario_supported_sccache_is_resolved_once
