@@ -30,6 +30,11 @@ const CREDENTIAL_NAME: &str = "github-client-secret";
 /// `ExecStart` parsing, or when the mount point is not a usable subtree.
 pub fn render_unit(unit: &str, binary_path: &Path, args: &PanelArgs) -> Result<String, PanelError> {
     let exec_start = render_exec_start(&serve_command(unit, binary_path, args)?);
+    // The secret path is the one operator value that never reaches `ExecStart`,
+    // because the command points at the credential systemd re-exposes instead.
+    // It still lands in a directive, so it needs the same refusal.
+    let secret_source = args.github_client_secret_file.display().to_string();
+    refuse_control_characters("the github client secret path", &secret_source)?;
     Ok(format!(
         "[Unit]\n\
          Description=Harness panel\n\
@@ -75,9 +80,22 @@ pub fn render_unit(unit: &str, binary_path: &Path, args: &PanelArgs) -> Result<S
          UMask=0077\n\
          \n\
          [Install]\n\
-         WantedBy=multi-user.target\n",
-        secret_source = args.github_client_secret_file.display()
+         WantedBy=multi-user.target\n"
     ))
+}
+
+/// Refuse a value that would not survive the unit file's line structure.
+///
+/// A newline ends the directive it sits in and lets the rest of the value
+/// become a directive of its own, so every operator-supplied value reaches the
+/// rendered unit through here rather than only the ones on `ExecStart`.
+fn refuse_control_characters(label: &str, value: &str) -> Result<(), PanelError> {
+    if value.chars().any(char::is_control) {
+        return Err(PanelError::config(format!(
+            "{label} contains control characters: {value:?}"
+        )));
+    }
+    Ok(())
 }
 
 /// One `ExecStart` word.
@@ -128,13 +146,7 @@ fn serve_command(
         let value = match argument {
             ExecArgument::Specifier(value) | ExecArgument::Value(value) => value,
         };
-        // A newline would end the ExecStart line and let the rest of the value
-        // become its own unit directive.
-        if value.chars().any(char::is_control) {
-            return Err(PanelError::config(format!(
-                "a systemd ExecStart argument contains control characters: {value:?}"
-            )));
-        }
+        refuse_control_characters("a systemd ExecStart argument", value)?;
     }
     Ok(command)
 }
@@ -151,6 +163,12 @@ fn render_exec_start(command: &[ExecArgument]) -> String {
 }
 
 /// Quote an operator-supplied argument the way systemd parses `ExecStart`.
+///
+/// `%` and `$` both have to be doubled, and neither may take the bare path.
+/// systemd expands variables after it has split the line into words and thrown
+/// the quotes away, so quoting alone does not stop the expansion: a bare `$FOO`
+/// word whose variable is unset expands to *no* argument at all rather than an
+/// empty one, silently deleting a flag and shifting everything after it.
 fn render_exec_value(argument: &str) -> String {
     if !argument.is_empty() && argument.chars().all(is_bare_exec_char) {
         return argument.to_owned();
@@ -163,6 +181,7 @@ fn render_exec_value(argument: &str) -> String {
                 quoted.push('\\');
                 quoted.push(character);
             }
+            '$' => quoted.push_str("$$"),
             '%' => quoted.push_str("%%"),
             _ => quoted.push(character),
         }
@@ -172,7 +191,7 @@ fn render_exec_value(argument: &str) -> String {
 }
 
 fn is_bare_exec_char(character: char) -> bool {
-    !character.is_whitespace() && !matches!(character, '"' | '%' | '\'' | '\\')
+    !character.is_whitespace() && !matches!(character, '"' | '$' | '%' | '\'' | '\\')
 }
 
 #[cfg(test)]
