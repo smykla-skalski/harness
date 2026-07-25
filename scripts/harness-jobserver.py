@@ -74,7 +74,11 @@ def prepare_private_dir(path: str) -> None:
         raise RuntimeError(f"pool path is not a real directory: {path}")
     if info.st_uid != os.getuid():
         raise RuntimeError(f"pool path is owned by another user: {path}")
-    if info.st_mode & 0o077:
+    # Exactly 0700, not merely "nothing for group or other". A directory left
+    # without owner write passes every check above and still cannot hold a fifo,
+    # so the supervisor dies before it serves and the pool degrades to the static
+    # reserve without a word. Both directions are the same one-line repair.
+    if stat.S_IMODE(info.st_mode) != 0o700:
         os.chmod(path, 0o700)
 
 

@@ -91,6 +91,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Asking python keeps this off the GNU/BSD stat format-flag split, which the
+# other suite has to work around because it has no interpreter already in hand.
+dir_mode() {
+  python3 -c 'import os, stat, sys; print(format(stat.S_IMODE(os.lstat(sys.argv[1]).st_mode), "03o"))' "$1"
+}
+
 tokens_in_fifo() {
   python3 - "$1" <<'PY'
 import os, sys
@@ -264,6 +270,41 @@ scenario_foreign_owned_pool_dir_is_refused() {
     fail "$name (symlinked pool directory was accepted)"
     return
   fi
+  pass "$name"
+}
+
+scenario_pool_dir_mode_is_repaired_both_ways() {
+  local name="a pool directory with the wrong mode is repaired"
+  local start dir status mode root
+
+  # 0500 passes every check the guard makes - ours, a real directory, nothing
+  # granted to group or other - yet nothing can be created inside it, so the
+  # supervisor dies before it serves and every build on the machine silently
+  # drops to the static reserve. A stray recursive chmod reaches this state, and
+  # so does a umask that strips the write bit at mkdir time.
+  for start in 500 755; do
+    root="$(fake_root "mode$start")"
+    track_pool "$root"
+    dir="$(pool_dir_for "$root")"
+    rm -rf "$dir"
+    mkdir -p "$dir"
+    chmod "$start" "$dir"
+
+    status=0
+    HARNESS_JOBSERVER_TIMEOUT=3 python3 "$JOBSERVER" ensure \
+      --repo-root "$root" --budget 3 >/dev/null 2>&1 || status=$?
+    mode="$(dir_mode "$dir" 2>/dev/null || echo unknown)"
+    chmod 700 "$dir" 2>/dev/null || true
+
+    if (( status != 0 )); then
+      fail "$name (ensure failed from $start, mode left $mode)"
+      return
+    fi
+    if [[ "$mode" != "700" ]]; then
+      fail "$name (from $start the mode stayed $mode)"
+      return
+    fi
+  done
   pass "$name"
 }
 
@@ -986,6 +1027,7 @@ scenario_cleanup_only_signals_a_supervisor
 scenario_a_client_that_never_reads_cannot_wedge_the_pool
 scenario_pipelined_requests_are_all_answered
 scenario_symlinked_pool_parent_is_refused
+scenario_pool_dir_mode_is_repaired_both_ways
 scenario_stalled_supervisor_does_not_hang_the_command
 scenario_run_propagates_exit_status
 
