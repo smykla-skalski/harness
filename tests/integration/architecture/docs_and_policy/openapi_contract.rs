@@ -14,6 +14,7 @@ use std::collections::BTreeSet;
 
 use harness::daemon::http::openapi::{EXECUTION_OPERATIONS, openapi_json_value};
 use harness::daemon::protocol::HTTP_API_CONTRACT;
+use harness::task_board::TASK_BOARD_LIST_MAX_TAGS;
 
 const HTTP_METHODS: [&str; 4] = ["get", "post", "put", "delete"];
 
@@ -100,6 +101,27 @@ fn documented_operations_match_contract() {
          plus the remote-execution transport; annotate the missing handler, drop the stale \
          annotation, or add an intentional OPENAPI_EXEMPT entry with a reason"
     );
+}
+
+#[test]
+fn task_board_tag_query_documents_the_runtime_bounds() {
+    let doc = openapi_json_value();
+    let parameters = doc
+        .pointer("/paths/~1v1~1task-board~1items/get/parameters")
+        .and_then(serde_json::Value::as_array)
+        .expect("task-board list parameters");
+    let schema = parameters
+        .iter()
+        .find(|parameter| parameter["name"] == "tag")
+        .and_then(|parameter| parameter.get("schema"))
+        .expect("tag parameter schema");
+
+    assert_eq!(
+        schema["maxItems"].as_u64(),
+        Some(TASK_BOARD_LIST_MAX_TAGS as u64)
+    );
+    assert_eq!(schema["items"]["minLength"].as_u64(), Some(1));
+    assert_eq!(schema["items"]["pattern"].as_str(), Some(r"\S"));
 }
 
 #[test]

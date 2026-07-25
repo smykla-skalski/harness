@@ -4,6 +4,8 @@ use super::{
     select_page, validated_limit,
 };
 use crate::task_board::types::{AgentMode, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
+use base64::Engine as _;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 
 fn item(id: &str, title: &str, body: &str) -> TaskBoardItem {
     TaskBoardItem::new(
@@ -99,6 +101,23 @@ fn a_tag_facet_ignores_surrounding_whitespace_on_either_side() {
 }
 
 #[test]
+fn tag_facets_use_unicode_case_folding() {
+    let mut item = item("task-1", "Ship the thing", "body");
+    item.tags = vec!["ΟΣ".to_string()];
+
+    for tag in ["ΟΣ", "οσ", "ος"] {
+        let query = TaskBoardItemQuery {
+            tags: vec![tag.to_string()],
+            ..TaskBoardItemQuery::default()
+        };
+        assert!(
+            query.prepared().matches(&item.query_fields()),
+            "expected {tag} to match"
+        );
+    }
+}
+
+#[test]
 fn text_matches_title_body_and_tags_case_insensitively() {
     let mut item = item("task-1", "Ship the Widget", "the CAUSE was a race");
     item.tags = vec!["release-train".to_string()];
@@ -149,6 +168,27 @@ fn text_matching_walks_the_haystack_without_lowercasing_it() {
 }
 
 #[test]
+fn text_search_uses_unicode_case_folding_for_every_searchable_field() {
+    let mut tag_item = item("tag", "plain", "plain");
+    tag_item.tags = vec!["ΟΣ".to_string()];
+    for (item, text) in [
+        (item("title", "ΟΣ", "plain"), "ΟΣ"),
+        (item("body", "plain", "Straße"), "STRASSE"),
+        (item("fold-expansion", "plain", "Straße"), "SE"),
+        (tag_item, "ος"),
+    ] {
+        let query = TaskBoardItemQuery {
+            text: Some(text.to_string()),
+            ..TaskBoardItemQuery::default()
+        };
+        assert!(
+            query.prepared().matches(&item.query_fields()),
+            "expected {text} to match"
+        );
+    }
+}
+
+#[test]
 fn paging_a_stable_selection_never_repeats_or_skips_an_item() {
     let items = (0..7)
         .map(|index| item(&format!("task-{index}"), "title", "body"))
@@ -158,7 +198,7 @@ fn paging_a_stable_selection_never_repeats_or_skips_an_item() {
     let mut seen = Vec::new();
     let mut cursor = None;
     loop {
-        let page = select_page(&ids, cursor.as_ref(), 3);
+        let page = select_page(&ids, cursor.as_ref(), 3, 7).expect("stable page");
         seen.extend_from_slice(&ids[page.start..page.end]);
         match page.next_cursor {
             Some(next) => cursor = Some(next),
@@ -171,51 +211,54 @@ fn paging_a_stable_selection_never_repeats_or_skips_an_item() {
 
 #[test]
 fn a_cursor_survives_an_encode_and_decode_round_trip() {
-    let cursor = TaskBoardListCursor {
-        offset: 41,
-        item_id: "task-with:colon".to_string(),
-    };
+    let cursor = TaskBoardListCursor::for_page(17, 41);
     assert_eq!(TaskBoardListCursor::decode(&cursor.encode()), Some(cursor));
 }
 
-/// `MTI` is base64url for `12`: well-formed base64 carrying no
-/// `offset:item_id` separator. An over-long cursor is refused before it is
-/// decoded at all, since the daemon never issues one.
 #[test]
 fn a_malformed_cursor_decodes_to_nothing() {
-    let oversized = TaskBoardListCursor {
-        offset: 1,
-        item_id: "x".repeat(TASK_BOARD_LIST_MAX_CURSOR_CHARS),
-    }
-    .encode();
-    assert!(oversized.len() > TASK_BOARD_LIST_MAX_CURSOR_CHARS);
+    let oversized = "x".repeat(TASK_BOARD_LIST_MAX_CURSOR_CHARS + 1);
 
     for raw in ["", "not-base64!!", "MTI", "eDp0YXNrLTE", oversized.as_str()] {
         assert_eq!(TaskBoardListCursor::decode(raw), None, "accepted {raw}");
     }
 }
 
-/// A page whose anchor was deleted between reads resumes at the slot that
-/// anchor held, so the reader still advances instead of replaying the page.
 #[test]
-fn a_cursor_whose_anchor_left_the_selection_resumes_at_its_slot() {
-    let items = (0..5)
-        .map(|index| item(&format!("task-{index}"), "title", "body"))
-        .collect::<Vec<_>>();
-    let ids = ids(&items);
-    let first = select_page(&ids, None, 2);
+fn every_emitted_cursor_is_bounded_and_resumable_after_a_long_id() {
+    let long_id = "x".repeat(TASK_BOARD_LIST_MAX_CURSOR_CHARS * 2);
+    let ids = [long_id.as_str(), "task-next"];
+    let first = select_page(&ids, None, 1, 9).expect("first page");
+    let cursor = first.next_cursor.expect("second page");
+    let encoded = cursor.encode();
+
+    assert!(encoded.len() <= TASK_BOARD_LIST_MAX_CURSOR_CHARS);
+    let decoded = TaskBoardListCursor::decode(&encoded).expect("issued cursor decodes");
+    let second = select_page(&ids, Some(&decoded), 1, 9).expect("second page");
+    assert_eq!(&ids[second.start..second.end], ["task-next"]);
+}
+
+#[test]
+fn a_cursor_refuses_a_changed_board_sequence() {
+    let original = ["task-a", "task-b", "task-c", "task-d", "task-e"];
+    let first = select_page(&original, None, 2, 41).expect("first page");
     let cursor = first.next_cursor.expect("more pages");
+    let reordered = ["task-a", "task-c", "task-d", "task-b", "task-e"];
 
-    let remaining = ["task-0", "task-2", "task-3", "task-4"];
-    let page = select_page(&remaining, Some(&cursor), 2);
+    assert_eq!(select_page(&reordered, Some(&cursor), 2, 42), None);
+}
 
-    assert_eq!(&remaining[page.start..page.end], ["task-2", "task-3"]);
+#[test]
+fn a_legacy_cursor_is_refused_instead_of_resuming_without_a_snapshot() {
+    let legacy = URL_SAFE_NO_PAD.encode("1:task-1");
+
+    assert_eq!(TaskBoardListCursor::decode(&legacy), None);
 }
 
 #[test]
 fn the_last_page_reports_no_further_cursor() {
     let ids = ["task-0", "task-1"];
-    let page = select_page(&ids, None, 2);
+    let page = select_page(&ids, None, 2, 1).expect("last page");
     assert_eq!(page.next_cursor, None);
     assert_eq!(page.end, 2);
 }

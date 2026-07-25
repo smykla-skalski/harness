@@ -54,11 +54,10 @@ fn every_page_folds_into_one_response_that_keeps_the_board_wide_fields() {
     );
 }
 
-/// A cursor whose anchor was deleted between two reads resumes at that anchor's
-/// slot, which can re-serve a row an earlier page already returned. The walk
-/// must not hand the same item to the caller twice.
+/// Sequence-bound cursors prevent overlap in valid responses. If a malformed
+/// daemon still overlaps pages, the walk must not hand an item out twice.
 #[test]
-fn a_row_re_served_after_a_concurrent_delete_is_folded_once() {
+fn an_item_repeated_by_an_overlapping_page_is_folded_once() {
     let mut pages = TaskBoardItemPages::default();
 
     pages
@@ -146,15 +145,14 @@ fn a_page_without_an_items_array_fails_rather_than_reading_as_empty() {
 fn a_page_request_replaces_the_cursor_and_keeps_the_rest_of_the_selection() {
     let selection = json!({ "status": "todo", "tags": ["backend"] });
 
-    let first = page_params(&selection, &None).expect("first page params");
+    let first = page_params(&selection, None).expect("first page params");
     assert_eq!(first, selection);
 
-    let second =
-        page_params(&selection, &Some("cursor-2".to_string())).expect("second page params");
+    let second = page_params(&selection, Some("cursor-2")).expect("second page params");
     assert_eq!(second["cursor"], json!("cursor-2"));
     assert_eq!(second["status"], json!("todo"));
     assert_eq!(second["tags"], json!(["backend"]));
 
-    let third = page_params(&second, &Some("cursor-3".to_string())).expect("third page params");
+    let third = page_params(&second, Some("cursor-3")).expect("third page params");
     assert_eq!(third["cursor"], json!("cursor-3"));
 }

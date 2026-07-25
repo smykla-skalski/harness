@@ -62,8 +62,11 @@ async fn walk_every_page(params: Value) -> Result<ToolResult, ToolError> {
     let mut merged = TaskBoardItemPages::default();
     let mut cursor: Option<String> = None;
     for _ in 0..MAX_PAGES {
-        let page = match task_board_call(ws_methods::TASK_BOARD_LIST, page_params(&params, &cursor)?)
-            .await?
+        let page = match task_board_call(
+            ws_methods::TASK_BOARD_LIST,
+            page_params(&params, cursor.as_deref())?,
+        )
+        .await?
         {
             TaskBoardCallOutcome::Result(page) => page,
             refused @ TaskBoardCallOutcome::Refused(_) => return finish(refused),
@@ -88,13 +91,13 @@ async fn walk_every_page(params: Value) -> Result<ToolResult, ToolError> {
 }
 
 /// One page's params: the caller's selection plus where to resume.
-fn page_params(params: &Value, cursor: &Option<String>) -> Result<Value, ToolError> {
+fn page_params(params: &Value, cursor: Option<&str>) -> Result<Value, ToolError> {
     let mut object = params
         .as_object()
         .ok_or_else(|| ToolError::invalid("arguments must be an object"))?
         .clone();
     match cursor {
-        Some(cursor) => object.insert("cursor".to_string(), Value::String(cursor.clone())),
+        Some(cursor) => object.insert("cursor".to_string(), Value::String(cursor.to_string())),
         None => object.remove("cursor"),
     };
     Ok(Value::Object(object))
@@ -102,10 +105,9 @@ fn page_params(params: &Value, cursor: &Option<String>) -> Result<Value, ToolErr
 
 /// The pages seen so far, folded into one response.
 ///
-/// A cursor whose anchor left the selection between two reads resumes at the
-/// slot that anchor held, which can re-serve a row an earlier page already
-/// returned, so ids are tracked and a repeat is dropped rather than handed to
-/// the caller twice.
+/// The daemon binds each cursor to one board sequence. Ids are still tracked
+/// so a malformed overlapping page cannot put duplicate rows in the merged
+/// response.
 #[derive(Default)]
 struct TaskBoardItemPages {
     items: Vec<Value>,

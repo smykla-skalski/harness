@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::daemon::protocol::{TaskBoardListItemsResponse, TaskBoardListItemsSelection};
 use crate::daemon::service::TaskBoardListSource;
 use crate::task_board::{TaskBoardQueryFields, TaskBoardQueryTarget, select_page};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{
     RemoteViewerTaskBoardItem, RemoteViewerTaskBoardListResponse, TaskBoardReadListResponse,
@@ -29,12 +30,11 @@ impl TaskBoardQueryTarget for RemoteViewerTaskBoardItem {
 /// A remote viewer's selection runs against that viewer's redacted projection
 /// rather than the stored items, so a facet or text search can only ever
 /// distinguish items by text the same viewer could have read back anyway.
-#[must_use]
 pub(crate) fn project_task_board_list(
     source: TaskBoardListSource,
     selection: &TaskBoardListItemsSelection,
     viewer: bool,
-) -> TaskBoardReadListResponse {
+) -> Result<TaskBoardReadListResponse, CliError> {
     let TaskBoardListSource {
         items,
         items_change_seq,
@@ -48,16 +48,19 @@ pub(crate) fn project_task_board_list(
                 .map(RemoteViewerTaskBoardItem::from)
                 .collect(),
             selection,
-        );
-        return TaskBoardReadListResponse::Viewer(RemoteViewerTaskBoardListResponse {
-            item_revisions: revisions_for_page(&page.items, &item_revisions),
-            items: page.items,
             items_change_seq,
-            total_matched: page.total_matched,
-            next_cursor: page.next_cursor,
-        });
+        )?;
+        return Ok(TaskBoardReadListResponse::Viewer(
+            RemoteViewerTaskBoardListResponse {
+                item_revisions: revisions_for_page(&page.items, &item_revisions),
+                items: page.items,
+                items_change_seq,
+                total_matched: page.total_matched,
+                next_cursor: page.next_cursor,
+            },
+        ));
     }
-    let page = select_matching_page(items, selection);
+    let page = select_matching_page(items, selection, items_change_seq)?;
     let mut response = TaskBoardListItemsResponse {
         item_revisions: revisions_for_page(&page.items, &item_revisions),
         items: page.items,
@@ -67,7 +70,7 @@ pub(crate) fn project_task_board_list(
         next_cursor: page.next_cursor,
     };
     drop_cached_provider_text(&mut response);
-    TaskBoardReadListResponse::Full(response)
+    Ok(TaskBoardReadListResponse::Full(response))
 }
 
 struct MatchedPage<T> {
@@ -85,7 +88,8 @@ struct MatchedPage<T> {
 fn select_matching_page<T: TaskBoardQueryTarget>(
     items: Vec<T>,
     selection: &TaskBoardListItemsSelection,
-) -> MatchedPage<T> {
+    items_change_seq: i64,
+) -> Result<MatchedPage<T>, CliError> {
     let query = selection.query.prepared();
     let matched = items
         .iter()
@@ -96,17 +100,30 @@ fn select_matching_page<T: TaskBoardQueryTarget>(
         })
         .collect::<Vec<_>>();
     let matched_ids = matched.iter().map(|(_, id)| *id).collect::<Vec<_>>();
-    let page = select_page(&matched_ids, selection.cursor.as_ref(), selection.limit);
+    let page = select_page(
+        &matched_ids,
+        selection.cursor.as_ref(),
+        selection.limit,
+        items_change_seq,
+    )
+    .ok_or_else(stale_task_board_cursor)?;
     let total_matched = matched.len();
     let window = matched[page.start..page.end]
         .iter()
         .map(|(index, _)| *index)
         .collect::<Vec<_>>();
-    MatchedPage {
+    Ok(MatchedPage {
         items: page_items(items, &window),
         total_matched,
         next_cursor: page.next_cursor.map(|cursor| cursor.encode()),
-    }
+    })
+}
+
+fn stale_task_board_cursor() -> CliError {
+    CliErrorKind::workflow_io(
+        "the task-board list cursor is stale because the board changed; restart without a cursor",
+    )
+    .into()
 }
 
 /// Move out the items at `window`, which is ascending, and drop the rest.

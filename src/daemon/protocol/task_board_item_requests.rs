@@ -313,10 +313,7 @@ mod tests {
 
     #[test]
     fn a_cursor_from_a_previous_page_is_decoded_for_the_read() {
-        let cursor = TaskBoardListCursor {
-            offset: 9,
-            item_id: "task-9".to_string(),
-        };
+        let cursor = TaskBoardListCursor::for_page(3, 9);
         let request = TaskBoardListItemsRequest {
             cursor: Some(cursor.encode()),
             ..TaskBoardListItemsRequest::default()

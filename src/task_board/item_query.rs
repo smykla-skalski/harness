@@ -1,5 +1,6 @@
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use caseless::Caseless as _;
 
 use super::types::{AgentMode, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
 
@@ -73,7 +74,7 @@ impl TaskBoardItemQuery {
     pub fn prepared(&self) -> PreparedTaskBoardItemQuery<'_> {
         PreparedTaskBoardItemQuery {
             query: self,
-            text: self.text.as_deref().map(str::to_lowercase),
+            text: self.text.as_deref().map(FoldedNeedle::new),
             tags: self.tags.iter().map(|tag| canonical_tag(tag)).collect(),
         }
     }
@@ -82,7 +83,7 @@ impl TaskBoardItemQuery {
 /// One query reduced for scanning, borrowed from the selection it came from.
 pub struct PreparedTaskBoardItemQuery<'a> {
     query: &'a TaskBoardItemQuery,
-    text: Option<String>,
+    text: Option<FoldedNeedle>,
     tags: Vec<String>,
 }
 
@@ -120,37 +121,42 @@ impl PreparedTaskBoardItemQuery<'_> {
     }
 
     fn text_matches(&self, fields: &TaskBoardQueryFields<'_>) -> bool {
-        let Some(text) = self.text.as_deref() else {
+        let Some(text) = self.text.as_ref() else {
             return true;
         };
-        contains_ignoring_case(fields.title, text)
-            || contains_ignoring_case(fields.body, text)
-            || fields
-                .tags
-                .iter()
-                .any(|tag| contains_ignoring_case(tag, text))
+        text.is_contained_in(fields.title)
+            || text.is_contained_in(fields.body)
+            || fields.tags.iter().any(|tag| text.is_contained_in(tag))
     }
 }
 
-/// Where a page resumes: the last item the previous page returned, plus the
-/// index it sat at. The id resumes exactly while that item is still matched;
-/// the index is the fallback for an item deleted or edited out of the
-/// selection between two reads.
+const TASK_BOARD_LIST_CURSOR_PREFIX: &str = "v1:";
+
+/// Where a page resumes, bound to the board snapshot that issued it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TaskBoardListCursor {
-    pub offset: usize,
-    pub item_id: String,
+    items_change_seq: i64,
+    offset: usize,
 }
 
 impl TaskBoardListCursor {
     #[must_use]
-    pub fn encode(&self) -> String {
-        URL_SAFE_NO_PAD.encode(format!("{}:{}", self.offset, self.item_id))
+    pub fn for_page(items_change_seq: i64, offset: usize) -> Self {
+        Self {
+            items_change_seq,
+            offset,
+        }
     }
 
-    /// Refuses an over-long cursor before decoding it: the daemon never issues
-    /// one, and decoding is the only step here that scales with what a caller
-    /// sends.
+    #[must_use]
+    pub fn encode(&self) -> String {
+        URL_SAFE_NO_PAD.encode(format!(
+            "{TASK_BOARD_LIST_CURSOR_PREFIX}{}:{}",
+            self.items_change_seq, self.offset
+        ))
+    }
+
+    /// Refuses an over-long cursor before decoding it.
     #[must_use]
     pub fn decode(raw: &str) -> Option<Self> {
         if raw.len() > TASK_BOARD_LIST_MAX_CURSOR_CHARS {
@@ -158,14 +164,16 @@ impl TaskBoardListCursor {
         }
         let decoded = URL_SAFE_NO_PAD.decode(raw).ok()?;
         let decoded = String::from_utf8(decoded).ok()?;
-        let (offset, item_id) = decoded.split_once(':')?;
-        if item_id.is_empty() {
-            return None;
-        }
-        Some(Self {
-            offset: offset.parse().ok()?,
-            item_id: item_id.to_string(),
-        })
+        let versioned = decoded.strip_prefix(TASK_BOARD_LIST_CURSOR_PREFIX)?;
+        let (items_change_seq, offset) = versioned.split_once(':')?;
+        Some(Self::for_page(
+            items_change_seq.parse().ok()?,
+            offset.parse().ok()?,
+        ))
+    }
+
+    fn matches_change_sequence(&self, items_change_seq: i64) -> bool {
+        self.items_change_seq == items_change_seq
     }
 }
 
@@ -179,41 +187,33 @@ pub struct TaskBoardListPage {
 
 /// Cut `limit` items out of an ordered selection, resuming after `cursor`.
 ///
-/// `matched_ids` carries the whole matched selection in response order. Paging
-/// a board nobody is mutating never repeats or skips an item: each cursor
-/// names the last item handed out, and the next page starts at the one after
-/// it.
+/// `None` means the board changed after the cursor was issued. Refusing that
+/// stale continuation prevents a multi-page read from silently mixing two
+/// snapshots and omitting items that moved around its resume point.
 #[must_use]
 pub fn select_page(
     matched_ids: &[&str],
     cursor: Option<&TaskBoardListCursor>,
     limit: u32,
-) -> TaskBoardListPage {
+    items_change_seq: i64,
+) -> Option<TaskBoardListPage> {
+    if cursor.is_some_and(|cursor| !cursor.matches_change_sequence(items_change_seq)) {
+        return None;
+    }
     let start = cursor.map_or(0, |cursor| resume_index(matched_ids, cursor));
     let end = start.saturating_add(limit as usize).min(matched_ids.len());
-    let next_cursor = (end < matched_ids.len() && end > start).then(|| TaskBoardListCursor {
-        offset: end - 1,
-        item_id: matched_ids[end - 1].to_string(),
-    });
-    TaskBoardListPage {
+    let next_cursor = (end < matched_ids.len() && end > start)
+        .then(|| TaskBoardListCursor::for_page(items_change_seq, end - 1));
+    Some(TaskBoardListPage {
         start,
         end,
         next_cursor,
-    }
+    })
 }
 
 /// Resolve a cursor's anchor to the index the next page starts at.
 fn resume_index(matched_ids: &[&str], cursor: &TaskBoardListCursor) -> usize {
-    matched_ids
-        .iter()
-        .position(|id| *id == cursor.item_id)
-        .map_or_else(
-            // The anchor left the selection, so everything after it shifted
-            // down one slot and the first unseen item now sits where the
-            // anchor did.
-            || cursor.offset.min(matched_ids.len()),
-            |index| index.saturating_add(1),
-        )
+    cursor.offset.saturating_add(1).min(matched_ids.len())
 }
 
 /// Resolve a caller's page size, refusing an explicit out-of-range one rather
@@ -235,44 +235,72 @@ pub fn normalize_query_text(text: Option<&str>) -> Option<String> {
     (!text.is_empty()).then(|| text.to_string())
 }
 
-/// Whether `haystack` contains `needle_lowercase`, which is already lowercased.
+/// One case-folded substring needle and its reusable KMP prefix table.
+struct FoldedNeedle {
+    characters: Vec<char>,
+    prefix_lengths: Vec<usize>,
+}
+
+impl FoldedNeedle {
+    fn new(value: &str) -> Self {
+        let characters = value.chars().default_case_fold().collect::<Vec<_>>();
+        let mut prefix_lengths = vec![0; characters.len()];
+        let mut matched = 0;
+        for (index, current) in characters.iter().copied().enumerate().skip(1) {
+            while matched > 0 && current != characters[matched] {
+                matched = prefix_lengths[matched - 1];
+            }
+            if current == characters[matched] {
+                matched += 1;
+            }
+            prefix_lengths[index] = matched;
+        }
+        Self {
+            characters,
+            prefix_lengths,
+        }
+    }
+
+    /// Stream the folded haystack so multi-character folds are searchable at
+    /// every folded position without allocating a copy of each item field.
+    fn is_contained_in(&self, haystack: &str) -> bool {
+        if self.characters.is_empty() {
+            return true;
+        }
+        let mut matched = 0;
+        for current in haystack.chars().default_case_fold() {
+            while matched > 0 && current != self.characters[matched] {
+                matched = self.prefix_lengths[matched - 1];
+            }
+            if current == self.characters[matched] {
+                matched += 1;
+                if matched == self.characters.len() {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+}
+
+/// Reduce one tag to the form a facet compares.
 ///
-/// Scanning a board runs this over every title, body, and tag it looks at, and
-/// a body can be kilobytes, so it walks characters rather than lowercasing the
-/// haystack into a fresh `String` for each of those reads.
-fn contains_ignoring_case(haystack: &str, needle_lowercase: &str) -> bool {
-    needle_lowercase.is_empty()
-        || haystack
-            .char_indices()
-            .any(|(start, _)| starts_with_ignoring_case(&haystack[start..], needle_lowercase))
-}
-
-fn starts_with_ignoring_case(haystack: &str, needle_lowercase: &str) -> bool {
-    let mut lowered = haystack.chars().flat_map(char::to_lowercase);
-    needle_lowercase
-        .chars()
-        .all(|wanted| lowered.next() == Some(wanted))
-}
-
-/// Reduce one tag to the form a facet compares, matching what
-/// [`canonicalize_labels`](super::triage::canonicalize_labels) does per tag.
 /// The write path stores tags exactly as they arrive, so an item really can
-/// hold `"backend "`, and comparing either side raw would leave it
-/// unmatchable.
-/// Whether a stored tag reduces to `canonical`, which is already in that form.
-///
+/// hold `"backend "`. Case folding also keeps contextual lowercase rules from
+/// making two Unicode spellings of the same tag compare differently.
 /// Scanning compares every requested tag against every tag on every item, so
 /// this walks the characters rather than building a canonical `String` for
 /// each of those pairs.
 fn canonical_tag_eq(tag: &str, canonical: &str) -> bool {
-    tag.trim()
-        .chars()
-        .flat_map(char::to_lowercase)
-        .eq(canonical.chars())
+    tag.trim().chars().default_case_fold().eq(canonical.chars())
 }
 
 fn canonical_tag(tag: &str) -> String {
-    tag.trim().to_lowercase()
+    fold_case(tag.trim())
+}
+
+fn fold_case(value: &str) -> String {
+    value.chars().default_case_fold().collect()
 }
 
 #[cfg(test)]

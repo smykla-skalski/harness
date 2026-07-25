@@ -46,7 +46,7 @@ fn projected(viewer: bool) -> TaskBoardReadListResponse {
     let selection = TaskBoardListItemsRequest::default()
         .validated_selection()
         .expect("an unfiltered read is valid");
-    project_task_board_list(list_source(), &selection, viewer)
+    project_task_board_list(list_source(), &selection, viewer).expect("project list")
 }
 
 fn projected_sync_state(viewer: bool) -> Option<ExternalRefSyncState> {

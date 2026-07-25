@@ -17,7 +17,7 @@ use crate::daemon::remote_viewer::is_remote_viewer;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::{
     AgentMode, TASK_BOARD_LIST_MAX_CURSOR_CHARS, TASK_BOARD_LIST_MAX_LIMIT,
-    TASK_BOARD_LIST_MAX_QUERY_CHARS, TaskBoardPriority, TaskBoardStatus,
+    TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS, TaskBoardPriority, TaskBoardStatus,
 };
 
 use super::super::DaemonHttpState;
@@ -68,6 +68,7 @@ pub(super) struct TaskBoardListQuery {
 const _: () = assert!(TASK_BOARD_LIST_MAX_LIMIT == 500);
 const _: () = assert!(TASK_BOARD_LIST_MAX_QUERY_CHARS == 512);
 const _: () = assert!(TASK_BOARD_LIST_MAX_CURSOR_CHARS == 512);
+const _: () = assert!(TASK_BOARD_LIST_MAX_TAGS == 16);
 
 #[derive(Debug, Clone, Deserialize)]
 #[derive(utoipa::ToSchema)]
@@ -152,7 +153,14 @@ pub(super) async fn get_task_board_capabilities(
     description = "List one bounded page of task-board items matching the requested facets and text, with progress rollups over the whole live board. Remote viewers receive a projected response with viewer-restricted fields removed, and their facets and text match that same projection",
     params(
         TaskBoardListQuery,
-        ("tag" = Option<Vec<String>>, Query, description = "Repeatable; an item must carry every requested tag"),
+        (
+            "tag" = Option<Vec<String>>,
+            Query,
+            description = "Repeatable; an item must carry every requested tag",
+            max_items = 16,
+            min_length = 1,
+            pattern = r"\S",
+        ),
     ),
     responses(
         (status = 200, description = "One page of task-board items with progress rollups and the next-page cursor", body = TaskBoardListItemsResponse),

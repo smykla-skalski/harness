@@ -3,7 +3,9 @@ use serde_json::{Value, json};
 use tempfile::tempdir;
 
 use crate::daemon::protocol::{http_paths, ws_methods};
-use crate::task_board::{TASK_BOARD_LIST_DEFAULT_LIMIT, TASK_BOARD_LIST_MAX_LIMIT};
+use crate::task_board::{
+    TASK_BOARD_LIST_DEFAULT_LIMIT, TASK_BOARD_LIST_MAX_CURSOR_CHARS, TASK_BOARD_LIST_MAX_LIMIT,
+};
 
 use super::task_board_route_parity_support::{get_json, post_json, serve_http, ws_result, ws_rpc};
 
@@ -17,6 +19,78 @@ fn task_board_list_filters_by_facet_text_and_page_over_http_and_websocket() {
             .expect("runtime")
             .block_on(run_task_board_query_flow());
     });
+}
+
+#[test]
+fn task_board_cursors_stay_bounded_and_reject_a_changed_board() {
+    let sandbox = tempdir().expect("tempdir");
+    harness_testkit::with_isolated_harness_env(sandbox.path(), || {
+        tokio::runtime::Runtime::new()
+            .expect("runtime")
+            .block_on(run_cursor_boundary_flow());
+    });
+}
+
+async fn run_cursor_boundary_flow() {
+    let state = super::test_http_state_with_db();
+    let (base_url, server) = serve_http(state).await;
+    let client = reqwest::Client::new();
+    let long_id = "a".repeat(TASK_BOARD_LIST_MAX_CURSOR_CHARS * 2);
+    for (id, title) in [(long_id.as_str(), "Long id"), ("z-next", "Next")] {
+        post_json(
+            &client,
+            &base_url,
+            http_paths::TASK_BOARD_ITEMS,
+            json!({ "id": id, "title": title }),
+        )
+        .await;
+    }
+
+    let first = get_json(
+        &client,
+        &base_url,
+        &format!("{}?limit=1", http_paths::TASK_BOARD_ITEMS),
+    )
+    .await;
+    assert_eq!(item_ids(&first), vec![long_id]);
+    let cursor = first["next_cursor"]
+        .as_str()
+        .expect("the first page has a cursor");
+    assert!(cursor.len() <= TASK_BOARD_LIST_MAX_CURSOR_CHARS);
+    let second = get_json(
+        &client,
+        &base_url,
+        &format!("{}?limit=1&cursor={cursor}", http_paths::TASK_BOARD_ITEMS),
+    )
+    .await;
+    assert_eq!(item_ids(&second), vec!["z-next"]);
+
+    post_json(
+        &client,
+        &base_url,
+        http_paths::TASK_BOARD_ITEMS,
+        json!({ "id": "z-new", "title": "Mutation" }),
+    )
+    .await;
+    let stale = client
+        .get(format!(
+            "{base_url}{}?limit=1&cursor={cursor}",
+            http_paths::TASK_BOARD_ITEMS
+        ))
+        .bearer_auth("token")
+        .send()
+        .await
+        .expect("send stale cursor");
+    assert_eq!(stale.status(), StatusCode::BAD_REQUEST);
+    let stale_body = stale.json::<Value>().await.expect("stale cursor body");
+    assert!(
+        stale_body["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("board changed"))
+    );
+
+    server.abort();
+    let _ = server.await;
 }
 
 async fn run_task_board_query_flow() {

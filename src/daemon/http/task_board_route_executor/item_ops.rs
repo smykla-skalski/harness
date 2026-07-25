@@ -54,7 +54,7 @@ pub(crate) async fn list_items(
         .ok_or_else(|| CliError::from(CliErrorKind::workflow_io(TASK_BOARD_LIST_INVALID_PARAMS)))?;
     let source =
         service::read_task_board_items_db(require_async_db(state, "task board list")?).await?;
-    Ok(project_task_board_list(source, &selection, viewer))
+    project_task_board_list(source, &selection, viewer)
 }
 
 pub(crate) async fn get_item(
