@@ -45,13 +45,14 @@ extension TaskBoardItem {
   }
 
   /// Stable across runs and shaped like a real identifier, so preview data
-  /// exercises the same lookup the daemon's ids do.
+  /// exercises the same lookup the daemon's ids do. Truncated to the 16 bytes
+  /// a real id carries; nothing here depends on the hash being hard to invert.
   static func previewProjectId(
     for identity: (source: TaskBoardProjectSource, slug: String)
   ) -> String {
     let seed = Data("\(identity.source.rawValue)/\(identity.slug)".utf8)
-    let digest = Insecure.MD5.hash(data: seed)
-    return "project-" + digest.map { String(format: "%02x", $0) }.joined()
+    let digest = SHA256.hash(data: seed)
+    return "project-" + digest.prefix(16).map { String(format: "%02x", $0) }.joined()
   }
 
   /// The daemon re-resolves attribution on every write, so a patch that moves
