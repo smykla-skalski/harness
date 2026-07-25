@@ -25,7 +25,8 @@ private struct TaskBoardTriageInspectorLoadKey: Hashable {
 enum TaskBoardApprovedAtPickerValue {
   @MainActor
   static func date(fromApprovedAt approvedAt: String, fallback: Date) -> Date {
-    TaskBoardCardDateParsing.parse(approvedAt) ?? fallback
+    guard !approvedAt.isEmpty else { return fallback }
+    return TaskBoardCardDateParsing.parse(approvedAt) ?? fallback
   }
 
   @MainActor
@@ -182,14 +183,6 @@ struct TaskBoardItemManagementPanel: View {
       },
       set: { draft.approvedAt = TaskBoardApprovedAtPickerValue.approvedAtString(from: $0) }
     )
-  }
-
-  /// The value an Approve click submits: the user's explicit selection, or a
-  /// freshly resolved "now" matching what the picker is showing at click time
-  /// when nothing has been picked yet. Always concrete, so the request never
-  /// depends on the daemon's own now-fallback drifting from the displayed value.
-  var approvedAtForApproval: String {
-    TaskBoardApprovedAtPickerValue.approvedAtString(from: approvedAtBinding.wrappedValue)
   }
 
   var projectTypeSuggestionValues: [String] {
@@ -354,7 +347,7 @@ struct TaskBoardItemManagementPanel: View {
         TaskBoardPlanLifecycleActionButtons(
           item: item,
           draft: draft,
-          approvedAtForApproval: approvedAtForApproval,
+          approvedAt: approvedAtBinding,
           metrics: metrics,
           isActionInFlight: isActionInFlight,
           actions: actions

@@ -256,7 +256,7 @@ private struct TaskBoardMarkdownDescriptionContent: View {
 struct TaskBoardPlanLifecycleActionButtons: View {
   let item: TaskBoardItem
   let draft: TaskBoardItemEditorDraft
-  let approvedAtForApproval: String
+  let approvedAt: Binding<Date>
   let metrics: TaskBoardOverviewMetrics
   let isActionInFlight: Bool
   let actions: TaskBoardOverviewActions
@@ -352,7 +352,7 @@ struct TaskBoardPlanLifecycleActionButtons: View {
       actions.approveTaskBoardPlan(
         item,
         approvedBy: approvedBy,
-        approvedAt: approvedAtForApproval
+        approvedAt: TaskBoardApprovedAtPickerValue.approvedAtString(from: approvedAt.wrappedValue)
       )
     } label: {
       Label("Approve Plan", systemImage: "checkmark.seal")
