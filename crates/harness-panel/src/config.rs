@@ -23,6 +23,11 @@ pub const DEFAULT_GITHUB_TOKEN_URL: &str = "https://github.com/login/oauth/acces
 pub const DEFAULT_GITHUB_API_URL: &str = "https://api.github.com";
 pub const DEFAULT_SESSION_TTL_HOURS: u32 = 12;
 
+/// A year. The flag is a `u32`, and a value in the billions makes the expiry
+/// `create_session` computes run off the end of the calendar `chrono` can
+/// represent, which panics mid-request rather than failing to start.
+pub const MAX_SESSION_TTL_HOURS: u32 = 8_760;
+
 /// How long an unfinished sign-in may sit in the store before its state value
 /// stops being accepted.
 pub const OAUTH_STATE_TTL_MINUTES: i64 = 10;
@@ -126,6 +131,12 @@ impl PanelArgs {
             return Err(PanelError::config(
                 "--session-ttl-hours must be at least 1; a zero-length session can never be used",
             ));
+        }
+        if self.session_ttl_hours > MAX_SESSION_TTL_HOURS {
+            return Err(PanelError::config(format!(
+                "--session-ttl-hours must be at most {MAX_SESSION_TTL_HOURS}; a longer session \
+                 expires past the end of the representable calendar"
+            )));
         }
 
         Ok(PanelConfig {

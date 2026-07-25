@@ -1,6 +1,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use chrono::Utc;
+
 use super::{
     DEFAULT_GITHUB_API_URL, DEFAULT_GITHUB_AUTHORIZE_URL, DEFAULT_GITHUB_TOKEN_URL, PanelArgs,
     normalize_base_path, normalize_public_origin,
@@ -104,6 +106,27 @@ fn refuses_a_session_that_expires_immediately() {
     let error = args.resolve().expect_err("a zero TTL must be refused");
 
     assert!(error.to_string().contains("--session-ttl-hours"), "{error}");
+}
+
+/// The flag is a `u32`, so an operator can name a deadline that runs off the
+/// end of the calendar `chrono` represents. Unbounded, that panics inside
+/// `create_session` on the first sign-in instead of refusing to start.
+#[test]
+fn refuses_a_session_longer_than_the_calendar() {
+    let directory = tempfile::tempdir().expect("temp dir");
+    let mut args = args(directory.path());
+    args.session_ttl_hours = u32::MAX;
+
+    let error = args.resolve().expect_err("an unbounded TTL must be refused");
+
+    assert!(error.to_string().contains("--session-ttl-hours"), "{error}");
+
+    args.session_ttl_hours = super::MAX_SESSION_TTL_HOURS;
+    let config = args.resolve().expect("the bound itself is usable");
+    assert!(
+        Utc::now().checked_add_signed(config.session_ttl).is_some(),
+        "a session issued at the bound has to have a representable expiry"
+    );
 }
 
 #[test]
