@@ -156,16 +156,13 @@ Reclaim this session's two build caches first, because `git worktree remove` del
 - `<worktree>/target` - direct `cargo` and `cargo nextest` output.
 - `<main-checkout>/target/dev/wt-<worktree-name>-<hash>` - everything from `scripts/cargo-local.sh`, which every `mise run test:*` task uses. Sits outside the worktree and is usually the larger.
 
-Every other session holds its own `target/dev/wt-*` lane, so derive this session's segment rather than globbing a prefix that can select theirs, and confirm the derived directory exists, because `cargo-local.sh` hashes with `cksum` where `shasum` is missing. A build that owns a segment holds a lease under `target/.cargo-local/leases/` named for its PID, the same signal `clean-build-caches.sh` trusts, so the delete stands down for a live one and ignores a lease whose process is gone.
+Every other session holds its own `target/dev/wt-*` lane, so read the listing and take only the entry carrying this worktree's directory name; a prefix match can select a neighbour's. A lease file names the segment it covers, so an entry matching that lane means a build still owns it: leave the lane and stop there, because removing the worktree while a build holds its lane strands exactly the cache this step exists to reclaim.
 
 ```bash
-# assumes: PR merged, <worktree> clean, <worktree> spelled as its physical path, as `pwd -P` prints it
-lane="<main-checkout>/target/dev/wt-$(printf '%s' "$(basename -- "<worktree>")" | tr -cs '[:alnum:]._-' '-')-$(printf '%s' "<worktree>" | shasum -a 256 | cut -c1-16)"
-[ -d "$lane" ] || ls -d "<main-checkout>"/target/dev/wt-*  # no match: set lane= by hand, then rerun from here
-held=$(for f in "<main-checkout>"/target/.cargo-local/leases/"$(basename "$lane")"-*; do
-  [ -f "$f" ] && kill -0 "$(cat "$f" 2>/dev/null)" 2>/dev/null && echo held; done)
-[ -n "$held" ] && echo "a build still owns $lane - stop, do not remove the worktree"
-[ -d "$lane" ] && [ -z "$held" ] && rm -rf "<worktree>/target" "$lane"
+# assumes: PR merged, <worktree> clean, no build running in this session's lane
+ls -d "<main-checkout>"/target/dev/wt-*              # this session's lane, by worktree directory name
+ls -A "<main-checkout>"/target/.cargo-local/leases/  # an entry naming that lane means stop, not delete
+rm -rf "<worktree>/target" "<main-checkout>/target/dev/<lane>"
 ```
 
 Then remove the worktree and the branch:
