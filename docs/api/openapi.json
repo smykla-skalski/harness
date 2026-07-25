@@ -30986,10 +30986,15 @@
           "project_id",
           "source",
           "slug",
+          "color",
           "created_at",
           "updated_at"
         ],
         "properties": {
+          "color": {
+            "$ref": "#/components/schemas/TaskBoardProjectColor",
+            "description": "Not optional even though the column is. A project with no color is not\na state any caller should have to render, so the store resolves one on\nthe way out rather than passing the gap along."
+          },
           "created_at": {
             "type": "string"
           },
@@ -31013,6 +31018,23 @@
           }
         }
       },
+      "TaskBoardProjectColor": {
+        "type": "string",
+        "description": "The mark a card wears to say which project its work came from. A closed\npalette rather than a free color: the board's guarantee is that two\nprojects look different, and that is only checkable against a known set.\n\nThe names are plain colors rather than the app's theme token names, so the\nwire format does not pin the client to one theme's vocabulary.",
+        "enum": [
+          "blue",
+          "green",
+          "purple",
+          "amber",
+          "teal",
+          "pink",
+          "red",
+          "mint",
+          "sky",
+          "warm",
+          "graphite"
+        ]
+      },
       "TaskBoardProjectSource": {
         "type": "string",
         "description": "Where a project's identity comes from. The source scopes the slug, because\ntwo providers may hand out the same slug for unrelated projects.",
@@ -31028,10 +31050,14 @@
           "project_id",
           "source",
           "slug",
+          "color",
           "item_count",
           "ready_count"
         ],
         "properties": {
+          "color": {
+            "$ref": "#/components/schemas/TaskBoardProjectColor"
+          },
           "display_name": {
             "type": [
               "string",
@@ -31059,7 +31085,7 @@
       },
       "TaskBoardProjectUpdateRequest": {
         "type": "object",
-        "description": "Rename a project or retitle it. `project_id` never changes, so every item\nattached to the project stays attached across the edit.",
+        "description": "Rename a project, retitle it, or recolor it. `project_id` never changes, so\nevery item attached to the project stays attached across the edit.",
         "required": [
           "project_id"
         ],
@@ -31067,6 +31093,16 @@
           "clear_display_name": {
             "type": "boolean",
             "description": "Drop the display name so the project reads by its slug again."
+          },
+          "color": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TaskBoardProjectColor"
+              }
+            ]
           },
           "display_name": {
             "type": [
@@ -31076,6 +31112,10 @@
           },
           "project_id": {
             "type": "string"
+          },
+          "reset_color": {
+            "type": "boolean",
+            "description": "Hand the color back to the allocator instead of naming one. There is no\nclearing it: a project always has a color."
           },
           "slug": {
             "type": [

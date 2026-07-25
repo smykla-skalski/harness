@@ -256,7 +256,7 @@ pub(crate) use imports::{TaskBoardImportMarker, TaskBoardImportResult};
 pub(crate) use items::{TaskBoardItemSnapshot, TaskBoardMutation};
 pub(crate) use triage_escalation_store::ClaimedTaskBoardTriageEscalation;
 pub(crate) use lane_order::{TaskBoardItemsSnapshot, TaskBoardLaneShift};
-pub(crate) use projects::DisplayNameEdit;
+pub(crate) use projects::{ColorEdit, DisplayNameEdit, ProjectEdit};
 pub(crate) use lane_order_api::{
     TaskBoardLaneMutationResult, TaskBoardLanePositionInput, TaskBoardLaneResetInput,
 };

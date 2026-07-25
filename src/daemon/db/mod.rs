@@ -185,7 +185,8 @@ pub(crate) use task_board::{
     status_request as remote_controller_status_request,
 };
 pub(crate) use task_board::{
-    DisplayNameEdit, exact_active_remote_target, parent_points_to_assignment,
+    ColorEdit, DisplayNameEdit, ProjectEdit, exact_active_remote_target,
+    parent_points_to_assignment,
 };
 mod session_data;
 mod signals;

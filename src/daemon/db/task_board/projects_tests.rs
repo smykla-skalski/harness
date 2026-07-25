@@ -2,8 +2,9 @@ use tempfile::tempdir;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::project::TaskBoardProjectSource;
+use crate::task_board::project_color::TaskBoardProjectColor;
 
-use super::DisplayNameEdit;
+use super::{ColorEdit, DisplayNameEdit, ProjectEdit};
 
 async fn database() -> (tempfile::TempDir, AsyncDaemonDb) {
     let directory = tempdir().expect("tempdir");
@@ -87,6 +88,123 @@ async fn concurrent_registration_converges_on_one_identity() {
     assert_eq!(db.list_task_board_projects().await.expect("list").len(), 1);
 }
 
+/// Telling projects apart at a glance is the whole point, so registration has
+/// to spend the palette before it repeats. This is the runtime half of what
+/// the v52 backfill does for projects that were already there.
+#[tokio::test]
+async fn registration_hands_out_a_distinct_color_while_the_palette_has_room() {
+    let (_directory, db) = database().await;
+    let palette = TaskBoardProjectColor::PALETTE;
+
+    for index in 0..palette.len() {
+        db.ensure_task_board_project(TaskBoardProjectSource::Manual, &format!("project-{index}"))
+            .await
+            .expect("register project")
+            .expect("names a project");
+    }
+
+    let mut colors: Vec<TaskBoardProjectColor> = db
+        .list_task_board_projects()
+        .await
+        .expect("list")
+        .iter()
+        .map(|project| project.color)
+        .collect();
+    assert_eq!(colors.len(), palette.len());
+    colors.sort_unstable_by_key(|color| color.as_str());
+    colors.dedup();
+    assert_eq!(
+        colors.len(),
+        palette.len(),
+        "two projects were registered onto the same color with the palette not yet spent"
+    );
+}
+
+/// A color is chosen once. Registering the next project must not disturb it,
+/// or every card on the board changes color whenever a repository is added.
+#[tokio::test]
+async fn a_color_survives_a_later_registration() {
+    let (_directory, db) = database().await;
+    let first = db
+        .ensure_task_board_project(TaskBoardProjectSource::GitHub, "acme/widgets")
+        .await
+        .expect("register project")
+        .expect("names a project");
+    let before = db
+        .get_task_board_project(&first)
+        .await
+        .expect("read project")
+        .expect("registered")
+        .color;
+
+    db.ensure_task_board_project(TaskBoardProjectSource::GitHub, "acme/gadgets")
+        .await
+        .expect("register second project");
+
+    assert_eq!(
+        db.get_task_board_project(&first)
+            .await
+            .expect("read project")
+            .expect("registered")
+            .color,
+        before
+    );
+}
+
+#[tokio::test]
+async fn a_color_can_be_set_and_reset() {
+    let (_directory, db) = database().await;
+    let widgets = db
+        .ensure_task_board_project(TaskBoardProjectSource::GitHub, "acme/widgets")
+        .await
+        .expect("register project")
+        .expect("names a project");
+    db.ensure_task_board_project(TaskBoardProjectSource::GitHub, "acme/gadgets")
+        .await
+        .expect("register second project");
+
+    let chosen = db
+        .update_task_board_project(
+            &widgets,
+            ProjectEdit {
+                color: ColorEdit::Set(TaskBoardProjectColor::Graphite),
+                ..ProjectEdit::default()
+            },
+        )
+        .await
+        .expect("set color");
+    assert_eq!(chosen.color, TaskBoardProjectColor::Graphite);
+    assert_eq!(chosen.slug, "acme/widgets", "the edit touched only the color");
+
+    let reset = db
+        .update_task_board_project(
+            &widgets,
+            ProjectEdit {
+                color: ColorEdit::Reset,
+                ..ProjectEdit::default()
+            },
+        )
+        .await
+        .expect("reset color");
+    let sibling = db
+        .list_task_board_projects()
+        .await
+        .expect("list")
+        .into_iter()
+        .find(|project| project.slug == "acme/gadgets")
+        .expect("second project")
+        .color;
+    assert_ne!(
+        reset.color,
+        TaskBoardProjectColor::Graphite,
+        "a reset that returns the chosen color is not a reset"
+    );
+    assert_ne!(
+        reset.color, sibling,
+        "a reset drops the project's own color from the tally but not the others'"
+    );
+}
+
 #[tokio::test]
 async fn renaming_keeps_the_identifier_and_normalizes_the_new_slug() {
     let (_directory, db) = database().await;
@@ -97,7 +215,13 @@ async fn renaming_keeps_the_identifier_and_normalizes_the_new_slug() {
         .expect("names a project");
 
     let renamed = db
-        .update_task_board_project(&project_id, Some("Acme/Gadgets"), DisplayNameEdit::Keep)
+        .update_task_board_project(
+            &project_id,
+            ProjectEdit {
+                slug: Some("Acme/Gadgets"),
+                ..ProjectEdit::default()
+            },
+        )
         .await
         .expect("rename project");
 
@@ -122,14 +246,26 @@ async fn a_display_name_can_be_set_and_cleared_without_touching_the_slug() {
         .expect("names a project");
 
     let named = db
-        .update_task_board_project(&project_id, None, DisplayNameEdit::Set("Widgets"))
+        .update_task_board_project(
+            &project_id,
+            ProjectEdit {
+                display_name: DisplayNameEdit::Set("Widgets"),
+                ..ProjectEdit::default()
+            },
+        )
         .await
         .expect("set display name");
     assert_eq!(named.label(), "Widgets");
     assert_eq!(named.slug, "acme/widgets");
 
     let cleared = db
-        .update_task_board_project(&project_id, None, DisplayNameEdit::Clear)
+        .update_task_board_project(
+            &project_id,
+            ProjectEdit {
+                display_name: DisplayNameEdit::Clear,
+                ..ProjectEdit::default()
+            },
+        )
         .await
         .expect("clear display name");
     assert_eq!(cleared.display_name, None);
@@ -151,7 +287,13 @@ async fn renaming_onto_an_existing_slug_is_refused() {
     // The collision is a naming conflict, not a store failure, so retrying is
     // pointless and the code has to say so.
     let error = db
-        .update_task_board_project(&widgets, Some("acme/gadgets"), DisplayNameEdit::Keep)
+        .update_task_board_project(
+            &widgets,
+            ProjectEdit {
+                slug: Some("acme/gadgets"),
+                ..ProjectEdit::default()
+            },
+        )
         .await
         .expect_err("two projects of one source cannot share a slug");
     assert_eq!(error.code(), "USAGE", "{error}");
@@ -168,7 +310,13 @@ async fn renaming_to_an_unusable_slug_is_refused() {
 
     // The caller named the slug wrong; an IO code would tell them to retry.
     let error = db
-        .update_task_board_project(&project_id, Some("not-a-repository"), DisplayNameEdit::Keep)
+        .update_task_board_project(
+            &project_id,
+            ProjectEdit {
+                slug: Some("not-a-repository"),
+                ..ProjectEdit::default()
+            },
+        )
         .await
         .expect_err("an unusable slug is refused");
     assert_eq!(error.code(), "USAGE", "{error}");
@@ -181,8 +329,10 @@ async fn renaming_an_unregistered_project_is_a_usage_error() {
     let error = db
         .update_task_board_project(
             "project-00000000000000000000000000000000",
-            None,
-            DisplayNameEdit::Clear,
+            ProjectEdit {
+                display_name: DisplayNameEdit::Clear,
+                ..ProjectEdit::default()
+            },
         )
         .await
         .expect_err("an unknown project is refused");

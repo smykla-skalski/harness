@@ -2,7 +2,7 @@ use std::env;
 
 use uuid::Uuid;
 
-use crate::daemon::db::{AsyncDaemonDb, DisplayNameEdit};
+use crate::daemon::db::{AsyncDaemonDb, ColorEdit, DisplayNameEdit, ProjectEdit};
 use crate::daemon::protocol::{
     TaskBoardAuditRequest, TaskBoardAuditResponse, TaskBoardCatalogRequest,
     TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardGetItemRequest,
@@ -223,8 +223,28 @@ pub(crate) async fn update_task_board_project_db(
         (false, Some(value)) => DisplayNameEdit::Set(value),
         (false, None) => DisplayNameEdit::Keep,
     };
-    db.update_task_board_project(&request.project_id, request.slug.as_deref(), display_name)
-        .await
+    let color = match (request.reset_color, request.color) {
+        // Same trap as the display name: a silent winner would report success
+        // for the edit the caller did not get.
+        (true, Some(_)) => {
+            return Err(CliErrorKind::usage_error(
+                "task-board project update cannot both set and reset color",
+            )
+            .into());
+        }
+        (true, None) => ColorEdit::Reset,
+        (false, Some(color)) => ColorEdit::Set(color),
+        (false, None) => ColorEdit::Keep,
+    };
+    db.update_task_board_project(
+        &request.project_id,
+        ProjectEdit {
+            slug: request.slug.as_deref(),
+            display_name,
+            color,
+        },
+    )
+    .await
 }
 
 pub(crate) async fn list_task_board_machines_db(
