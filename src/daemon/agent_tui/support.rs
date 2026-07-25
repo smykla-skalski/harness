@@ -112,6 +112,33 @@ pub(super) fn agent_id_for_tui(state: &SessionState, tui_id: &str) -> Result<Str
         })
 }
 
+/// Where a terminal agent's starting prompt is recorded: beside the
+/// transcript, so what it ran with and what it did are recoverable together.
+/// A terminal prompt is typed into a PTY rather than persisted on a run row,
+/// and the raw transcript is replayed as terminal bytes, so it cannot carry
+/// the prompt itself.
+#[must_use]
+pub(crate) fn recorded_prompt_path(transcript_path: &Path) -> PathBuf {
+    transcript_path.with_file_name("prompt.txt")
+}
+
+/// Record the prompt before the process starts. A directory that cannot be
+/// written is not a prompt-recording problem the start can shrug off -- the
+/// transcript lands in the same place, so the run would be unobservable
+/// anyway.
+pub(super) fn record_started_prompt(transcript_path: &Path, prompt: &str) -> Result<(), CliError> {
+    let path = recorded_prompt_path(transcript_path);
+    if let Some(parent) = path.parent() {
+        fs_err::create_dir_all(parent).map_err(|error| {
+            CliErrorKind::workflow_io(format!("create terminal agent transcript dir: {error}"))
+        })?;
+    }
+    fs_err::write(&path, prompt).map_err(|error| {
+        CliErrorKind::workflow_io(format!("record terminal agent prompt: {error}"))
+    })?;
+    Ok(())
+}
+
 pub(super) fn transcript_path(context_root: &Path, runtime: &str, tui_id: &str) -> PathBuf {
     context_root
         .join("agents")

@@ -389,3 +389,7 @@ fn exact_head(execution: &TaskBoardWorkflowExecutionRecord) -> Result<&str, CliE
 fn invalid_transition(detail: impl Into<String>) -> CliError {
     CliErrorKind::invalid_transition(detail.into()).into()
 }
+
+#[cfg(test)]
+#[path = "requests_prompt_tests.rs"]
+mod prompt_tests;

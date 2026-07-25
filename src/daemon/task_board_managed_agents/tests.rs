@@ -33,6 +33,9 @@ mod prompt_tests;
 #[path = "prompt_recovery_tests.rs"]
 mod prompt_recovery_tests;
 
+#[path = "prompt_recoverability_tests.rs"]
+mod prompt_recoverability_tests;
+
 #[test]
 fn codex_worker_request_carries_task_board_identity() {
     let applied = applied_task(AgentMode::Headless);

@@ -7,6 +7,7 @@ mod process_exit;
 mod request_wire;
 mod sandboxed;
 mod spawn;
+mod started_prompt;
 mod support;
 
 use std::path::PathBuf;

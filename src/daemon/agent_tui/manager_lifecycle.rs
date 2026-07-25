@@ -18,7 +18,8 @@ use super::spawn::{
     wait_for_readiness,
 };
 use super::support::{
-    ResolvedTuiProject, lock_db, resolve_tui_project, resolve_tui_project_async, transcript_path,
+    ResolvedTuiProject, lock_db, record_started_prompt, resolve_tui_project,
+    resolve_tui_project_async, transcript_path,
 };
 
 impl AgentTuiManagerHandle {
@@ -59,6 +60,9 @@ impl AgentTuiManagerHandle {
         let size = request.size()?;
         let project = self.resolve_project(session_id, request.project_dir.as_deref())?;
         let transcript_path = transcript_path(&project.context_root, &profile.runtime, &tui_id);
+        if let Some(prompt) = request.prompt.as_deref().filter(|value| !value.is_empty()) {
+            record_started_prompt(&transcript_path, prompt)?;
+        }
         let snapshot_context = AgentTuiSnapshotContext {
             session_id,
             agent_id: "",
