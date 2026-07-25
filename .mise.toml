@@ -262,17 +262,21 @@ run = "./scripts/cargo-local.sh run --quiet -- setup bootstrap"
 description = "Run harness-only quality gates (without aff package checks)"
 depends = [
   "harness:check:stale-state",
+  "harness:check:toolchain",
   "harness:check:version",
   "harness:check:scripts",
   "harness:check:binary-contracts",
   "harness:check:source-size",
-  "harness:check:feature-isolation",
   "harness:check:rust",
 ]
 
 [tasks."harness:check:stale-state"]
 hide = true
 run = "./scripts/check-no-stale-state.sh"
+
+[tasks."harness:check:toolchain"]
+hide = true
+run = "./scripts/check-toolchain-pin.sh"
 
 [tasks."harness:check:version"]
 hide = true
@@ -292,19 +296,7 @@ run = "./scripts/check-rust-source-size.sh"
 
 [tasks."harness:check:feature-isolation"]
 hide = true
-run = [
-  "./scripts/cargo-local.sh check --all-targets -p harness-command",
-  "./scripts/cargo-local.sh check --all-targets -p harness-daemon-client",
-  "./scripts/cargo-local.sh check --all-targets -p harness-protocol",
-  "./scripts/cargo-local.sh check --all-targets -p harness-systemd-protocol",
-  "./scripts/cargo-local.sh check --all-targets -p harness-telemetry",
-  "./scripts/cargo-local.sh check -p harness --bin harness",
-  "./scripts/cargo-local.sh check -p harness-hook --bin harness-hook",
-  "./scripts/cargo-local.sh check -p harness-bridge --bin harness-bridge",
-  "./scripts/cargo-local.sh check -p harness-mcp --bin harness-mcp",
-  "./scripts/cargo-local.sh check -p harness-daemon --bin harness-daemon",
-  "./scripts/run-linux-only.sh ./scripts/cargo-local.sh check -p harness-systemd --bin harness-systemd",
-]
+run = "./scripts/cargo-local.sh --with-group-lease ./scripts/check-feature-isolation.sh"
 
 [tasks."harness:check:rust"]
 hide = true
@@ -328,6 +320,10 @@ run = "./scripts/cargo-local.sh run --quiet -p aff -- setup bootstrap"
 [tasks.check]
 description = "Run default harness quality gates; run aff:check manually when needed"
 depends = ["harness:check"]
+
+[tasks."check:full"]
+description = "Pre-push gate: everything in check plus per-crate standalone feature isolation"
+depends = ["harness:check", "harness:check:feature-isolation"]
 
 [tasks."lint:fix"]
 description = "Format and apply clippy fixes"
