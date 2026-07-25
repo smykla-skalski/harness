@@ -543,6 +543,86 @@ PY
   pass "$name"
 }
 
+scenario_oversized_request_cannot_kill_the_pool() {
+  local name="an out-of-range request cannot take the pool down"
+  local root; root="$(fake_root oversized)"
+  track_pool "$root"
+  python3 "$JOBSERVER" ensure --repo-root "$root" --budget 3 >/dev/null 2>&1
+  local dir; dir="$(pool_dir_for "$root")"
+  local pid; pid="$(head -1 "$dir/lock" 2>/dev/null)"
+
+  # os.read raises OverflowError past a C ssize_t, and that is neither OSError
+  # nor RuntimeError, so it escaped every handler and killed the supervisor.
+  python3 - "$dir/sock" <<'PY' >/dev/null 2>&1 || true
+import socket, sys
+c = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+c.settimeout(5.0)
+c.connect(sys.argv[1])
+c.sendall(b"ACQUIRE 100000000000000000000000000000\n")
+try:
+    c.recv(64)
+except OSError:
+    pass
+PY
+
+  if ! kill -0 "$pid" 2>/dev/null; then
+    fail "$name (the supervisor died at pid $pid)"
+    return
+  fi
+  local granted
+  granted="$(python3 "$JOBSERVER" run --repo-root "$root" --max 2 --env PROBE -- "$PROBE_SCRIPT")"
+  if [[ "$granted" != "3" ]]; then
+    fail "$name (pool unusable after the oversized request, granted width '$granted')"
+    return
+  fi
+  pass "$name"
+}
+
+scenario_a_wiped_pool_does_not_wedge_its_successor() {
+  local name="a supervisor whose directory was wiped leaves its successor alone"
+  local root; root="$(fake_root wiped)"
+  track_pool "$root"
+  python3 "$JOBSERVER" ensure --repo-root "$root" --budget 3 >/dev/null 2>&1
+  local dir; dir="$(pool_dir_for "$root")"
+  local first; first="$(head -1 "$dir/lock" 2>/dev/null)"
+
+  # Exactly what this suite's own cleanup does: drop the directory while the
+  # supervisor is still running. The successor then binds a fresh socket at the
+  # same path, well inside the 5s the first one takes to notice.
+  rm -rf "$dir"
+  python3 "$JOBSERVER" ensure --repo-root "$root" --budget 3 >/dev/null 2>&1
+  local second; second="$(head -1 "$dir/lock" 2>/dev/null)"
+
+  if [[ -z "$second" || "$first" == "$second" ]]; then
+    fail "$name (no successor took over: first='$first' second='$second')"
+    return
+  fi
+
+  # Wait out the first supervisor's teardown, which is where it used to remove
+  # a socket that was no longer its own.
+  local waited=0
+  while (( waited < 30 )) && kill -0 "$first" 2>/dev/null; do
+    sleep 0.5
+    waited=$((waited + 1))
+  done
+  if kill -0 "$first" 2>/dev/null; then
+    fail "$name (the wiped supervisor never exited, still holding the lock)"
+    return
+  fi
+  if [[ ! -S "$dir/sock" ]]; then
+    fail "$name (the successor's socket was removed)"
+    return
+  fi
+
+  local status=0
+  python3 "$JOBSERVER" ensure --repo-root "$root" --budget 3 >/dev/null 2>&1 || status=$?
+  if (( status != 0 )); then
+    fail "$name (pool unreachable after the wipe, status=$status)"
+    return
+  fi
+  pass "$name"
+}
+
 scenario_nonsense_widths_are_refused() {
   local name="a width below one is refused instead of building a dead pool"
   local root; root="$(fake_root nonsense)"
@@ -679,31 +759,35 @@ PY
 
 scenario_symlinked_pool_parent_is_refused() {
   local name="a symlinked pool parent is refused"
-  local root; root="$(fake_root unsafeparent)"
-  local dir; dir="$(pool_dir_for "$root")"
-  local parent; parent="$(dirname "$dir")"
-  local decoy; decoy="$(mktemp -d)"
-  local saved=""
+  local out
+  # Checked against a private path, never the real pool root. Moving that root
+  # aside made every other build on the host fail to reach its own pool, and a
+  # concurrent ensure recreating it turned the restore into a nested directory.
+  out="$(python3 - "$JOBSERVER" 2>&1 <<'PY'
+import importlib.util, os, sys, tempfile
 
-  # Validating only the leaf let a pre-planted parent stand, and os.path.isdir
-  # follows symlinks, so the whole pool landed inside the attacker's directory.
-  if [[ -d "$parent" && ! -L "$parent" ]]; then
-    saved="$parent.saved.$$"
-    mv "$parent" "$saved"
-  fi
-  rm -rf "$parent"
-  ln -s "$decoy" "$parent"
+spec = importlib.util.spec_from_file_location("js", sys.argv[1])
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
 
-  local status=0
-  python3 "$JOBSERVER" ensure --repo-root "$root" --budget 4 >/dev/null 2>&1 || status=$?
-  rm -f "$parent"
-  rm -rf "$decoy"
-  if [[ -n "$saved" ]]; then
-    mv "$saved" "$parent"
-  fi
-
-  if (( status == 0 )); then
-    fail "$name (symlinked pool parent was accepted)"
+with tempfile.TemporaryDirectory() as base:
+    decoy = os.path.join(base, "decoy")
+    os.mkdir(decoy)
+    # Validating only the leaf let a pre-planted parent stand, and
+    # os.path.isdir follows symlinks, so the whole pool landed inside it.
+    parent = os.path.join(base, "parent")
+    os.symlink(decoy, parent)
+    try:
+        mod.prepare_pool_dir(os.path.join(parent, "pool"))
+    except RuntimeError:
+        print("REFUSED")
+    else:
+        print("ACCEPTED")
+    print("decoy entries:", len(os.listdir(decoy)))
+PY
+)"
+  if [[ "$out" != "REFUSED"*"decoy entries: 0" ]]; then
+    fail "$name (expected refusal with an untouched decoy, got: $out)"
     return
   fi
   pass "$name"
@@ -785,6 +869,8 @@ scenario_idle_exit_leaves_no_tokens_behind
 scenario_partial_pool_keeps_its_tokens
 scenario_signal_death_reports_a_shell_signal_status
 scenario_split_request_is_still_granted
+scenario_a_wiped_pool_does_not_wedge_its_successor
+scenario_oversized_request_cannot_kill_the_pool
 scenario_nonsense_widths_are_refused
 scenario_cleanup_only_signals_a_supervisor
 scenario_a_client_that_never_reads_cannot_wedge_the_pool

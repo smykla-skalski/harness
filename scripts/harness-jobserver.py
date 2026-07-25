@@ -149,9 +149,14 @@ class Pool:
         del present
 
     def acquire(self, want: int) -> int:
-        """Take up to `want` tokens out of the FIFO for a socket client."""
+        """Take up to `want` tokens out of the FIFO for a socket client.
+
+        The clamp is not politeness: os.read raises OverflowError once the count
+        exceeds a C ssize_t, and that is neither OSError nor RuntimeError, so it
+        escapes every handler here and takes the whole pool down with it.
+        """
         with self.lock:
-            got = self._read_tokens(want)
+            got = self._read_tokens(min(want, self.budget))
             self.granted += got
             self.last_activity = time.monotonic()
             return got
@@ -185,6 +190,14 @@ class Pool:
             return False
 
 
+def _is_same_file(path: str, marker: os.stat_result) -> bool:
+    try:
+        current = os.stat(path)
+    except OSError:
+        return False
+    return (current.st_dev, current.st_ino) == (marker.st_dev, marker.st_ino)
+
+
 def serve(pool: Pool, stop: threading.Event) -> None:
     if os.path.exists(pool.sock_path):
         os.unlink(pool.sock_path)
@@ -193,6 +206,10 @@ def serve(pool: Pool, stop: threading.Event) -> None:
     os.chmod(pool.sock_path, 0o600)
     server.listen(128)
     server.setblocking(False)
+    # Identity of the socket this supervisor owns. It has to come from the path:
+    # fstat on a bound AF_UNIX fd reports a socket-namespace inode with st_dev
+    # -1, which never matches the directory entry.
+    bound = os.stat(pool.sock_path)
 
     selector = selectors.DefaultSelector()
     selector.register(server, selectors.EVENT_READ, None)
@@ -266,6 +283,13 @@ def serve(pool: Pool, stop: threading.Event) -> None:
                 continue
             pending[conn] = buffered
 
+        # Someone wiped the pool directory out from under this supervisor, so
+        # nothing can reach it any more while it still holds the lock. Exiting
+        # frees that lock for the next ensure instead of stranding every build
+        # on the machine until the idle deadline an hour away.
+        if not _is_same_file(pool.sock_path, bound):
+            break
+
         # Deadline first: idle_and_whole drains the FIFO to count it, and doing
         # that every poll would briefly hold every token outside the pipe for no
         # reason. Only pay it once the supervisor is already a candidate to exit.
@@ -274,10 +298,15 @@ def serve(pool: Pool, stop: threading.Event) -> None:
 
     for conn in list(holdings):
         drop(conn)
+    # Only remove the socket while it is still the one bound here. After the
+    # pool directory is wiped, a successor binds its own socket at the same
+    # path, and unlinking by name alone deletes that one - leaving a supervisor
+    # holding the lock that no client can ever reach.
+    if _is_same_file(pool.sock_path, bound):
+        with contextlib.suppress(OSError):
+            os.unlink(pool.sock_path)
     with contextlib.suppress(OSError):
         server.close()
-    with contextlib.suppress(OSError):
-        os.unlink(pool.sock_path)
 
 
 def supervise(repo_root: str, budget: int) -> int:

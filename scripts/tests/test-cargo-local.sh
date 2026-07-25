@@ -477,11 +477,16 @@ print_tmpdir_env() {
     else
       unset TMPDIR
     fi
+    # These scenarios are about TMPDIR, target dirs and sccache, and the pool
+    # key would otherwise fall through to the real repository root - attaching
+    # to, or spawning, a supervisor on the developer's own pool and waiting out
+    # the startup timeout on every call.
     SCCACHE_BIN="$SANDBOX/missing-sccache" \
       RUSTC_WRAPPER='' \
       CODEX_SESSION_ID="$session_id" \
       HARNESS_CARGO_SKIP_LEASE=1 \
       HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+      HARNESS_JOBSERVER=0 \
       "$ROOT/scripts/cargo-local.sh" --print-env
   )
 }
