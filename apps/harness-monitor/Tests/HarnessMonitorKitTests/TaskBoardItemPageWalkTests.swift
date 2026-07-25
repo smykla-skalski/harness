@@ -77,6 +77,39 @@ struct TaskBoardItemPageWalkTests {
     #expect(merged.items.map(\.id) == ["task-1"])
     #expect(merged.nextCursor == "cursor-2")
   }
+
+  /// The stall check above only catches a cursor that names the resume point it
+  /// was just given. A cursor whose anchor was deleted between two reads resumes
+  /// at that anchor's slot, so a page can re-serve a row while still advancing
+  /// to a different cursor - and duplicate ids break `ForEach(..., id: \.id)`.
+  @Test("folds a row a later page re-served under a different cursor")
+  func foldsARowReServedUnderADifferentCursor() async throws {
+    let source = StubTaskBoardPageSource(pages: [
+      page(
+        ids: ["task-1", "task-2", "task-3"], totalMatched: 4, changeSeq: 9,
+        nextCursor: "cursor-2"),
+      page(
+        ids: ["task-2", "task-3", "task-4"], totalMatched: 4, changeSeq: 9,
+        nextCursor: nil),
+    ])
+
+    let merged = try await source.mergedTaskBoardItemPages(status: nil)
+
+    #expect(merged.items.map(\.id) == ["task-1", "task-2", "task-3", "task-4"])
+    #expect(merged.nextCursor == nil)
+  }
+
+  /// A page that repeats a row inside itself must not reach the caller either.
+  @Test("folds a row a single page repeated")
+  func foldsARowRepeatedWithinOnePage() async throws {
+    let source = StubTaskBoardPageSource(pages: [
+      page(ids: ["task-1", "task-1", "task-2"], totalMatched: 2, changeSeq: 9, nextCursor: nil)
+    ])
+
+    let merged = try await source.mergedTaskBoardItemPages(status: nil)
+
+    #expect(merged.items.map(\.id) == ["task-1", "task-2"])
+  }
 }
 
 /// `totalMatched` counts the whole matched selection, not the page, so every
@@ -90,7 +123,9 @@ private func page(
   TaskBoardListItemsResponseWire(
     items: ids.map(item(id:)),
     itemsChangeSeq: changeSeq,
-    itemRevisions: Dictionary(uniqueKeysWithValues: ids.map { ($0, Int64(1)) }),
+    // Tolerates a repeated id so a scenario can script a page that re-serves a
+    // row the walk is expected to fold away.
+    itemRevisions: Dictionary(ids.map { ($0, Int64(1)) }, uniquingKeysWith: { first, _ in first }),
     totalMatched: totalMatched,
     nextCursor: nextCursor
   )
