@@ -3982,6 +3982,8 @@ dependencies = [
  "include_dir",
  "libc",
  "reqwest",
+ "rustls",
+ "rustls-platform-verifier",
  "serde",
  "serde_json",
  "sha2 0.11.0",
@@ -3995,6 +3997,7 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "uuid",
+ "x509-parser",
 ]
 
 [[package]]

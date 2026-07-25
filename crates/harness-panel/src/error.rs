@@ -32,6 +32,9 @@ pub enum PanelError {
     #[error("github sign-in: {0}")]
     GitHub(String),
 
+    #[error("daemon: {0}")]
+    Daemon(String),
+
     /// Carries no path, because this failure is about the host's ability to
     /// start threads and has nothing to do with any file the panel names.
     #[error("starting the panel async runtime: {0}")]
@@ -52,6 +55,10 @@ impl PanelError {
 
     pub fn github(message: impl Into<String>) -> Self {
         Self::GitHub(message.into())
+    }
+
+    pub fn daemon(message: impl Into<String>) -> Self {
+        Self::Daemon(message.into())
     }
 
     #[must_use]

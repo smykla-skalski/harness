@@ -7,6 +7,8 @@
 
 pub mod assets;
 pub mod config;
+pub mod crypto;
+pub mod daemon_client;
 pub mod error;
 pub mod github;
 pub mod http;

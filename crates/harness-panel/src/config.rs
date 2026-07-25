@@ -5,6 +5,7 @@
 //! forwarded headers instead would let whoever can reach the listener choose
 //! where GitHub sends the authorization code.
 
+pub mod daemon;
 mod secret;
 
 use std::net::SocketAddr;
