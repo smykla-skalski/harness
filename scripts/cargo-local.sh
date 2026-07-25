@@ -292,7 +292,7 @@ cleanup_stale_leases() {
 
 register_build_lease() {
   cleanup_stale_leases
-  lease_path="$lease_dir/$(sanitize_segment "${session_id:-local}")-$$"
+  lease_path="$lease_dir/$target_segment-$$"
   printf '%s\n' "$$" >"$lease_path"
   cleanup_stale_leases
   active_build_count="$(find "$lease_dir" -type f | wc -l | tr -d ' ')"
@@ -381,6 +381,17 @@ session_id="$(first_nonempty_env \
   COPILOT_SESSION_ID \
   OPENCODE_SESSION_ID || true)"
 
+# Key the build cache by checkout, not by session. Session keying handed every
+# new agent a cold rebuild of the whole workspace, and Cargo's incremental
+# output is opaque to sccache, so no shared cache could absorb that cost.
+# register_build_lease below keys the lease file the same way, so
+# clean-build-caches.sh can match a target/dev/<segment> directory straight
+# against a lease file instead of reverse-engineering it from a session id.
+target_segment="local"
+if [[ "$ROOT" != "$COMMON_REPO_ROOT" ]]; then
+  target_segment="wt-$(sanitize_segment "$(basename -- "$ROOT")")-$(short_hash "$ROOT")"
+fi
+
 if [[ "$skip_build_lease" == "1" ]]; then
   active_build_count="${HARNESS_CARGO_ACTIVE_BUILD_COUNT:-1}"
   if [[ ! "$active_build_count" =~ ^[0-9]+$ ]] || (( active_build_count < 1 )); then
@@ -391,14 +402,6 @@ if [[ "$skip_build_lease" == "1" ]]; then
 else
   register_build_lease
   trap release_build_lease EXIT
-fi
-
-# Key the build cache by checkout, not by session. Session keying handed every
-# new agent a cold rebuild of the whole workspace, and Cargo's incremental
-# output is opaque to sccache, so no shared cache could absorb that cost.
-target_segment="local"
-if [[ "$ROOT" != "$COMMON_REPO_ROOT" ]]; then
-  target_segment="wt-$(sanitize_segment "$(basename -- "$ROOT")")-$(short_hash "$ROOT")"
 fi
 
 # Capture the socket root before configure_tmpdir can install a session-scoped
