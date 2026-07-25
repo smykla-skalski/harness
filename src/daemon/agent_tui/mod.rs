@@ -41,8 +41,11 @@ const DEFAULT_COLS: u16 = harness_protocol::managed_agents::tui::DEFAULT_AGENT_T
 const LIVE_REFRESH_INTERVAL: Duration = Duration::from_millis(100);
 #[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 pub(super) const READINESS_TIMEOUT: Duration = Duration::from_secs(10);
+// A loaded dev host can starve a freshly spawned PTY child of a CPU slice for
+// several seconds; 5s clipped that margin too closely and produced spurious
+// timeouts under concurrent builds.
 #[cfg(all(test, feature = "daemon-runtime"))]
-const DEFAULT_WAIT_TIMEOUT: Duration = Duration::from_secs(5);
+const DEFAULT_WAIT_TIMEOUT: Duration = Duration::from_secs(20);
 
 pub use harness_protocol::managed_agents::tui::{
     AgentTuiListResponse, AgentTuiResizeRequest, AgentTuiSize, AgentTuiSnapshot,

@@ -432,6 +432,10 @@ pub(super) fn normalized_planning_response(value: &Value) -> Value {
     let mut value = value.clone();
     value["transition"]["board_item_id"] = json!("normalized-item");
     value["item"]["id"] = json!("normalized-item");
+    // The HTTP and WS legs each stamp `updated_at` from their own `utc_now()`
+    // call a moment apart, so it can tick over a second boundary under load
+    // even though the two responses are otherwise structurally equivalent.
+    value["item"]["updated_at"] = json!("normalized-timestamp");
     value
 }
 
