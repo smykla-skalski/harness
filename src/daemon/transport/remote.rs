@@ -1,6 +1,5 @@
 use std::{num::NonZeroU64, str::FromStr};
 
-use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use clap::{Args, Subcommand, ValueEnum};
 use serde::Serialize;
 use uuid::Uuid;
@@ -15,7 +14,9 @@ use crate::daemon::remote::{
     RemoteAccessScope, RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider, RemoteRole,
     validate_remote_serve_config,
 };
-use crate::daemon::remote_pairing::{RemotePairingCode, RemotePairingRecord};
+use crate::daemon::remote_pairing::{
+    RemotePairingCode, RemotePairingCreateParams, create_remote_pairing, pairing_expires_at,
+};
 use crate::daemon::service::DaemonServeConfig;
 use crate::daemon::state;
 use crate::errors::{CliError, CliErrorKind};
@@ -25,7 +26,6 @@ use crate::workspace::utc_now;
 use super::control::{adopt_daemon_root_for_transport_command, print_json};
 use super::remote_doctor::execute_remote_doctor;
 use super::remote_pair_reviews::DaemonRemotePairReviewsArgs;
-use super::remote_pairing_invitation::build_remote_pairing_invitation;
 use super::remote_serve::execute_remote_serve;
 
 #[derive(Debug, Clone, Subcommand)]
@@ -218,51 +218,45 @@ impl DaemonRemotePairCreateArgs {
         code: &RemotePairingCode,
         created_at: &str,
     ) -> Result<DaemonRemotePairCreateResponse, CliError> {
-        let role = RemoteRole::from(self.role);
+        let expires_at = pairing_expires_at(created_at, self.ttl.as_secs())?;
+        let reviews_query = self.reviews_query()?;
         let requested_scopes = self
             .scopes
             .iter()
             .copied()
             .map(RemoteAccessScope::from)
             .collect::<Vec<_>>();
-        let expires_at = expires_at_from_ttl(created_at, self.ttl.as_secs())?;
-        let reviews_query = self.reviews_query()?;
-        let record = RemotePairingRecord::new_with_reviews_query(
-            pairing_id,
-            role,
-            &requested_scopes,
-            code.expose(),
-            created_at,
-            expires_at.as_str(),
-            reviews_query.as_ref(),
-        )
-        .map_err(|error| CliErrorKind::workflow_parse(error.to_string()))?;
-        let role = record.role.as_str().to_string();
-        let scopes = record
-            .scopes
-            .iter()
-            .map(|scope| scope.as_str().to_string())
-            .collect::<Vec<_>>();
-        let invitation = build_remote_pairing_invitation(
+        let created = create_remote_pairing(
             db,
-            code.expose(),
-            role.as_str(),
-            &scopes,
-            record.expires_at.as_str(),
+            &RemotePairingCreateParams {
+                pairing_id,
+                audit_event_id,
+                code,
+                created_at,
+                expires_at: expires_at.as_str(),
+                ttl_seconds: self.ttl.as_secs(),
+                role: RemoteRole::from(self.role),
+                requested_scopes: &requested_scopes,
+                reviews_query: reviews_query.as_ref(),
+                minted_for: None,
+                extra_audit: None,
+            },
         )?;
-        let stored = db.create_remote_pairing_code(&record, audit_event_id)?;
         Ok(DaemonRemotePairCreateResponse {
-            pairing_id: stored.pairing_id,
+            pairing_id: created.pairing_id,
+            // The operator ran this on the host, so the raw code goes back to
+            // the terminal that asked for it. The mint route deliberately does
+            // not do this.
             code: code.expose().to_string(),
-            role,
-            scopes,
-            created_at: stored.created_at,
-            expires_at: stored.expires_at,
-            ttl_seconds: self.ttl.as_secs(),
-            endpoint: invitation.endpoint,
-            server_spki_sha256: invitation.server_spki_sha256,
-            pairing_url: invitation.pairing_url,
-            reviews_query: stored.reviews_query,
+            role: created.role,
+            scopes: created.scopes,
+            created_at: created.created_at,
+            expires_at: created.expires_at,
+            ttl_seconds: created.ttl_seconds,
+            endpoint: created.endpoint,
+            server_spki_sha256: created.server_spki_sha256,
+            pairing_url: created.pairing_url,
+            reviews_query: created.reviews_query,
         })
     }
 }
@@ -286,18 +280,6 @@ pub(crate) struct DaemonRemotePairCreateResponse {
 pub(super) fn open_remote_daemon_db() -> Result<DaemonDb, CliError> {
     state::ensure_daemon_dirs()?;
     DaemonDb::open(&state::daemon_root().join("harness.db"))
-}
-
-fn expires_at_from_ttl(created_at: &str, ttl_seconds: u64) -> Result<String, CliError> {
-    let created_at = DateTime::parse_from_rfc3339(created_at)
-        .map_err(|error| CliErrorKind::workflow_parse(format!("parse pairing time: {error}")))?
-        .with_timezone(&Utc);
-    let ttl_seconds = i64::try_from(ttl_seconds)
-        .map_err(|_| CliErrorKind::workflow_parse("pairing ttl value is too large"))?;
-    let expires_at = created_at
-        .checked_add_signed(ChronoDuration::seconds(ttl_seconds))
-        .ok_or_else(|| CliErrorKind::workflow_parse("pairing ttl value is too large"))?;
-    Ok(expires_at.format("%Y-%m-%dT%H:%M:%SZ").to_string())
 }
 
 #[derive(Debug, Clone, Subcommand)]
@@ -401,6 +383,8 @@ pub enum DaemonRemoteRole {
     Viewer,
     #[value(name = "execution-coordinator")]
     ExecutionCoordinator,
+    #[value(name = "pairing-broker")]
+    PairingBroker,
 }
 
 impl DaemonRemoteRole {
@@ -411,6 +395,7 @@ impl DaemonRemoteRole {
             Self::Operator => "operator",
             Self::Viewer => "viewer",
             Self::ExecutionCoordinator => "execution-coordinator",
+            Self::PairingBroker => "pairing-broker",
         }
     }
 }
@@ -422,6 +407,7 @@ impl From<DaemonRemoteRole> for RemoteRole {
             DaemonRemoteRole::Operator => Self::Operator,
             DaemonRemoteRole::Viewer => Self::Viewer,
             DaemonRemoteRole::ExecutionCoordinator => Self::ExecutionCoordinator,
+            DaemonRemoteRole::PairingBroker => Self::PairingBroker,
         }
     }
 }
@@ -436,6 +422,8 @@ pub enum DaemonRemoteScope {
     Admin,
     #[value(name = "execute")]
     Execute,
+    #[value(name = "pair-mint")]
+    PairMint,
 }
 
 impl DaemonRemoteScope {
@@ -446,6 +434,7 @@ impl DaemonRemoteScope {
             Self::Write => "write",
             Self::Admin => "admin",
             Self::Execute => "execute",
+            Self::PairMint => "pair-mint",
         }
     }
 }
@@ -457,6 +446,7 @@ impl From<DaemonRemoteScope> for RemoteAccessScope {
             DaemonRemoteScope::Write => Self::Write,
             DaemonRemoteScope::Admin => Self::Admin,
             DaemonRemoteScope::Execute => Self::Execute,
+            DaemonRemoteScope::PairMint => Self::PairMint,
         }
     }
 }

@@ -6,10 +6,10 @@ use crate::daemon::db::DaemonDb;
 use crate::daemon::remote_acme::build_remote_acme_runtime_plan;
 use crate::errors::{CliError, CliErrorKind};
 
-pub(super) struct RemotePairingInvitation {
-    pub(super) endpoint: String,
-    pub(super) server_spki_sha256: String,
-    pub(super) pairing_url: String,
+pub(crate) struct RemotePairingInvitation {
+    pub(crate) endpoint: String,
+    pub(crate) server_spki_sha256: String,
+    pub(crate) pairing_url: String,
 }
 
 #[derive(Serialize)]
@@ -23,7 +23,7 @@ struct RemotePairingInvitationPayload<'a> {
     expires_at: &'a str,
 }
 
-pub(super) fn build_remote_pairing_invitation(
+pub(crate) fn build_remote_pairing_invitation(
     db: &DaemonDb,
     code: &str,
     role: &str,

@@ -301,6 +301,10 @@ pub struct RemoteAuditEvent {
     pub outcome: RemoteAuditOutcome,
     pub remote_addr: Option<String>,
     pub error_detail: Option<String>,
+    /// Structured context for events that succeeded. `error_detail` says why
+    /// something failed, so a success that needs to carry detail belongs here
+    /// rather than in a field readers treat as a failure signal.
+    pub metadata_json: Option<String>,
 }
 
 impl RemoteAuditEvent {
@@ -332,12 +336,27 @@ impl RemoteAuditEvent {
             outcome,
             remote_addr: remote_addr.map(ToOwned::to_owned),
             error_detail: error_detail.map(redact_remote_error_detail),
+            metadata_json: None,
         }
+    }
+
+    /// Attach structured success context, serialized by the caller.
+    #[must_use]
+    pub fn with_metadata_json(mut self, metadata_json: impl Into<String>) -> Self {
+        self.metadata_json = Some(metadata_json.into());
+        self
     }
 
     #[must_use]
     pub fn error_detail(&self) -> Option<&str> {
         self.error_detail.as_deref()
+    }
+
+    /// The stored metadata document, defaulting to an empty object so the
+    /// column's NOT NULL contract holds for every writer.
+    #[must_use]
+    pub fn metadata_json(&self) -> &str {
+        self.metadata_json.as_deref().unwrap_or("{}")
     }
 }
 
@@ -406,6 +425,7 @@ pub fn parse_remote_scope(value: &str) -> Option<RemoteAccessScope> {
         "write" => Some(RemoteAccessScope::Write),
         "admin" => Some(RemoteAccessScope::Admin),
         "execute" => Some(RemoteAccessScope::Execute),
+        "pair_mint" => Some(RemoteAccessScope::PairMint),
         _ => None,
     }
 }
@@ -417,6 +437,7 @@ pub fn parse_remote_role(value: &str) -> Option<RemoteRole> {
         "operator" => Some(RemoteRole::Operator),
         "viewer" => Some(RemoteRole::Viewer),
         "execution_coordinator" => Some(RemoteRole::ExecutionCoordinator),
+        "pairing_broker" => Some(RemoteRole::PairingBroker),
         _ => None,
     }
 }

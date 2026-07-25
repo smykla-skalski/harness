@@ -95,10 +95,32 @@ impl DaemonDb {
         record: &RemotePairingRecord,
         audit_event_id: &str,
     ) -> Result<RemoteStoredPairing, CliError> {
+        self.create_remote_pairing_code_with_audit(record, audit_event_id, None)
+    }
+
+    /// The same, plus one caller-supplied audit event written in the same
+    /// transaction as the pairing row.
+    ///
+    /// A caller that records its own event afterwards cannot fail closed: the
+    /// link is already committed and claimable, so a failed second write leaves
+    /// a live credential with no trace of who asked for it, and the error it
+    /// returns invites a retry that mints another one.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or scope serialization failures.
+    pub(crate) fn create_remote_pairing_code_with_audit(
+        &self,
+        record: &RemotePairingRecord,
+        audit_event_id: &str,
+        extra_audit: Option<&RemoteAuditEvent>,
+    ) -> Result<RemoteStoredPairing, CliError> {
         validate_pairing_audit_event_id(audit_event_id)
             .map_err(|error| db_error(error.to_string()))?;
         let scopes_json = scopes_to_json(&record.scopes)?;
-        let metadata_json = encode_remote_pairing_metadata(record.reviews_query.as_ref())?;
+        let metadata_json = encode_remote_pairing_metadata(
+            record.reviews_query.as_ref(),
+            record.minted_for.as_ref(),
+        )?;
         let transaction = self
             .conn
             .unchecked_transaction()
@@ -137,6 +159,9 @@ impl DaemonDb {
                 None,
             ),
         )?;
+        if let Some(event) = extra_audit {
+            record_remote_audit_event_for_pairing(&transaction, event)?;
+        }
         let stored =
             load_remote_pairing_by_hash(&transaction, record.code_hash.as_storage_value())?
                 .ok_or_else(|| db_error("remote pairing insert did not persist row"))?;
@@ -390,7 +415,7 @@ fn remote_pairing_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RemoteSt
     let code_hash = RemotePairingCodeHash::try_from_storage_value(row.get::<_, String>(1)?)
         .map_err(|error| rusqlite::Error::FromSqlConversionFailure(1, Type::Text, error.into()))?;
     let metadata_json = row.get::<_, String>(9)?;
-    let reviews_query = decode_remote_pairing_metadata(&metadata_json)
+    let metadata = decode_remote_pairing_metadata(&metadata_json)
         .map_err(|error| rusqlite::Error::FromSqlConversionFailure(9, Type::Text, error.into()))?;
     Ok(RemoteStoredPairing {
         pairing_id: row.get(0)?,
@@ -402,7 +427,8 @@ fn remote_pairing_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RemoteSt
         claimed_at: row.get(6)?,
         claimed_client_id: row.get(7)?,
         claim_remote_addr: row.get(8)?,
-        reviews_query,
+        reviews_query: metadata.reviews_query,
+        minted_for: metadata.minted_for,
     })
 }
 

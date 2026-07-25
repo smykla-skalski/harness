@@ -20,6 +20,11 @@ mod rate_limit;
 pub use rate_limit::RemotePairingRateLimiter;
 mod status_rate_limit;
 pub use status_rate_limit::{RemotePairingStatusRateLimitDecision, RemotePairingStatusRateLimiter};
+mod subject;
+pub use subject::RemotePairingSubject;
+mod create;
+mod invitation;
+pub(crate) use create::{RemotePairingCreateParams, create_remote_pairing, pairing_expires_at};
 
 #[cfg(test)]
 #[path = "remote_pairing_tests.rs"]
@@ -43,6 +48,7 @@ pub enum RemotePairingError {
     AlreadyClaimed,
     UnknownCode,
     InvalidReviewsQuery(String),
+    InvalidSubject(String),
     Identity(RemoteIdentityError),
 }
 
@@ -68,6 +74,7 @@ impl fmt::Display for RemotePairingError {
             Self::InvalidReviewsQuery(detail) => {
                 write!(f, "remote pairing reviews query is invalid: {detail}")
             }
+            Self::InvalidSubject(detail) => write!(f, "{detail}"),
             Self::Identity(error) => write!(f, "{error}"),
         }
     }
@@ -90,7 +97,8 @@ impl Error for RemotePairingError {
             | Self::Expired
             | Self::AlreadyClaimed
             | Self::UnknownCode
-            | Self::InvalidReviewsQuery(_) => None,
+            | Self::InvalidReviewsQuery(_)
+            | Self::InvalidSubject(_) => None,
         }
     }
 }
@@ -193,9 +201,19 @@ pub struct RemotePairingRecord {
     pub created_at: String,
     pub expires_at: String,
     pub reviews_query: Option<ReviewsQueryRequest>,
+    /// Set only for links minted on someone else's behalf. A link created on
+    /// the host has no external identity behind it.
+    pub minted_for: Option<RemotePairingSubject>,
 }
 
 impl RemotePairingRecord {
+    /// Attach the external identity this link was minted for.
+    #[must_use]
+    pub fn minted_for(mut self, subject: Option<RemotePairingSubject>) -> Self {
+        self.minted_for = subject;
+        self
+    }
+
     /// Build a durable one-time pairing record without retaining the raw code.
     ///
     /// # Errors
@@ -252,6 +270,7 @@ pub struct RemoteStoredPairing {
     pub claimed_client_id: Option<String>,
     pub claim_remote_addr: Option<String>,
     pub reviews_query: Option<ReviewsQueryRequest>,
+    pub minted_for: Option<RemotePairingSubject>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

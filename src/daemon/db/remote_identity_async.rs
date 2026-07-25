@@ -52,6 +52,7 @@ impl AsyncDaemonDb {
             .bind(audit.outcome.as_str())
             .bind(audit.remote_addr.as_deref())
             .bind(audit.error_detail())
+            .bind(audit.metadata_json())
             .execute(transaction.as_mut())
             .await
             .map_err(|error| {
@@ -92,6 +93,7 @@ impl AsyncDaemonDb {
             .bind(event.outcome.as_str())
             .bind(event.remote_addr.as_deref())
             .bind(event.error_detail())
+            .bind(event.metadata_json())
             .execute(transaction.as_mut())
             .await
             .map_err(|error| {

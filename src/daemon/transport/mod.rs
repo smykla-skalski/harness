@@ -5,7 +5,6 @@ mod remote_acme;
 mod remote_clients;
 mod remote_doctor;
 mod remote_pair_reviews;
-mod remote_pairing_invitation;
 mod remote_serve;
 mod remote_serve_startup;
 mod systemd_state;

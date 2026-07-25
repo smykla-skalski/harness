@@ -116,13 +116,22 @@ impl MatrixClients {
             RemoteAccessScope::Write => &self.operator,
             RemoteAccessScope::Admin => &self.admin,
             RemoteAccessScope::Execute => &self.executor,
+            // No websocket method maps to pair_mint: minting is an HTTP-only
+            // route so a broker never opens an RPC session. If that changes,
+            // this fixture needs a broker connection before the matrix can
+            // say anything about it.
+            RemoteAccessScope::PairMint => {
+                panic!("no websocket method should require the pair_mint scope")
+            }
         }
     }
 
     fn denied(&self, scope: RemoteAccessScope) -> &Arc<Mutex<ConnectionState>> {
         match scope {
             RemoteAccessScope::Read | RemoteAccessScope::Admin => &self.write_only,
-            RemoteAccessScope::Write | RemoteAccessScope::Execute => &self.viewer,
+            RemoteAccessScope::Write | RemoteAccessScope::Execute | RemoteAccessScope::PairMint => {
+                &self.viewer
+            }
         }
     }
 }

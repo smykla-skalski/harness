@@ -25,6 +25,17 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
+        path: http_paths::REMOTE_PAIR_MINT,
+        parity: HttpRouteParity::Exempt {
+            kind: WsExemptionKind::StandingDecision,
+            reason: "mints a credential for a third party from a service that holds only the \
+                     pair_mint scope; kept off the RPC channel so a broker never opens an \
+                     authenticated session it has no scope to use",
+        },
+        swift_client_exposed: false,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
         path: http_paths::REMOTE_CLIENT_SELF_REVOKE,
         parity: HttpRouteParity::Exempt {
             kind: WsExemptionKind::StandingDecision,

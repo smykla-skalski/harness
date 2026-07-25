@@ -55,7 +55,7 @@ pub(super) const INSERT_REMOTE_AUDIT_EVENT_SQL: &str = "
 INSERT INTO remote_audit_events (
     event_id, recorded_at, request_id, client_id, route_or_method, scope,
     scope_decision, outcome, remote_addr, error_detail, metadata_json
-) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, '{}')";
+) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)";
 
 pub(super) const MARK_REMOTE_AUDIT_EVENT_FAILED_SQL: &str = "
 UPDATE remote_audit_events
@@ -348,6 +348,7 @@ fn insert_remote_audit_event(conn: &Connection, event: &RemoteAuditEvent) -> Res
             event.outcome.as_str(),
             event.remote_addr,
             event.error_detail,
+            event.metadata_json(),
         ],
     )
     .map_err(|error| {
