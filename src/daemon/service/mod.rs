@@ -385,8 +385,8 @@ pub use status::{
 pub use task_board::{
     approve_task_board_plan, audit_task_board, begin_task_board_planning, create_task_board_item,
     delete_task_board_item, dispatch_task_board, get_task_board_item, list_task_board_items,
-    list_task_board_machines, list_task_board_projects, revoke_task_board_plan,
-    submit_task_board_plan, sync_task_board, sync_task_board_async, update_task_board_item,
+    list_task_board_machines, revoke_task_board_plan, submit_task_board_plan, sync_task_board,
+    sync_task_board_async, update_task_board_item,
 };
 pub(crate) use task_board::{
     audit_policy_pipeline, create_policy_canvas, create_policy_scenario, delete_policy_canvas,
@@ -416,7 +416,7 @@ pub(crate) use task_board_db::{
     save_task_board_triage_rules_draft_db, set_task_board_item_position_db,
     set_task_board_triage_override_db, submit_task_board_plan_db, sync_task_board_db,
     task_board_host_list_db, task_board_host_local_db, task_board_host_set_project_types_db,
-    touch_task_board_host_local_db, update_task_board_item_db,
+    touch_task_board_host_local_db, update_task_board_item_db, update_task_board_project_db,
 };
 #[cfg(test)]
 pub use task_board_evaluation::evaluate_task_board;

@@ -118,6 +118,7 @@ mod schema_v47;
 mod schema_v48;
 mod schema_v49;
 mod schema_v50;
+mod schema_v51;
 #[allow(dead_code)]
 mod task_board;
 #[cfg(test)]
@@ -182,7 +183,9 @@ pub(crate) use task_board::{
     running_status as remote_controller_running_status,
     status_request as remote_controller_status_request,
 };
-pub(crate) use task_board::{exact_active_remote_target, parent_points_to_assignment};
+pub(crate) use task_board::{
+    DisplayNameEdit, exact_active_remote_target, parent_points_to_assignment,
+};
 mod session_data;
 mod signals;
 mod summaries;
@@ -193,6 +196,8 @@ mod timeline;
 mod timeline_store;
 mod writes;
 
+#[cfg(test)]
+pub(crate) use async_bootstrap::all_migration_versions;
 pub(crate) use async_pool::AsyncDaemonDb;
 #[allow(unused_imports)]
 use conversation::{
@@ -377,7 +382,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-pub(crate) const SCHEMA_VERSION: &str = "50";
+pub(crate) const SCHEMA_VERSION: &str = "51";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]

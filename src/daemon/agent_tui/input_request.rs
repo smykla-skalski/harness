@@ -138,6 +138,9 @@ impl From<AgentTuiInputRequest> for RawAgentTuiInputRequest {
 /// through `RawAgentTuiInputRequest`. Exactly one of `input` or `sequence` is
 /// accepted; the validation lives in the handler, so the schema documents both
 /// as optional.
+// Documentation-only: the daemon names it from a `utoipa::path` annotation,
+// but crates that include this file without serving HTTP never reach it.
+#[allow(dead_code)]
 #[derive(serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[allow(dead_code)]
 pub struct AgentTuiInputRequestSchema {

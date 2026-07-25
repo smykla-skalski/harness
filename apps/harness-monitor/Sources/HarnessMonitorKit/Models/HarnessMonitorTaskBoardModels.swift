@@ -278,6 +278,9 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
   public let priority: TaskBoardPriority
   public let tags: [String]
   public let projectId: String?
+  /// The registered project this item's work came from. Stable across a rename
+  /// of that project, and the only attribution the card should trust.
+  public let sourceProjectId: String?
   /// GitHub-imported items leave `projectId` empty and carry their source repository here.
   public let executionRepository: String?
   public let targetProjectTypes: [String]
@@ -308,6 +311,7 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
     priority: TaskBoardPriority,
     tags: [String],
     projectId: String?,
+    sourceProjectId: String? = nil,
     executionRepository: String? = nil,
     targetProjectTypes: [String] = [],
     agentMode: TaskBoardAgentMode,
@@ -336,6 +340,7 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
     self.priority = priority
     self.tags = tags
     self.projectId = projectId
+    self.sourceProjectId = sourceProjectId
     self.executionRepository = executionRepository
     self.targetProjectTypes = targetProjectTypes
     self.agentMode = agentMode
@@ -368,6 +373,7 @@ extension TaskBoardItem {
     case priority
     case tags
     case projectId
+    case sourceProjectId
     case executionRepository
     case targetProjectTypes
     case agentMode
@@ -399,6 +405,7 @@ extension TaskBoardItem {
     self.priority = try container.decode(TaskBoardPriority.self, forKey: .priority)
     self.tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
     self.projectId = try container.decodeIfPresent(String.self, forKey: .projectId)
+    self.sourceProjectId = try container.decodeIfPresent(String.self, forKey: .sourceProjectId)
     self.executionRepository =
       try container.decodeIfPresent(String.self, forKey: .executionRepository)
     self.targetProjectTypes =

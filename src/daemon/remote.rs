@@ -357,6 +357,7 @@ const WRITE_WS_METHODS: &[&str] = &[
     ws_methods::TASK_BOARD_DISPATCH,
     ws_methods::TASK_BOARD_DISPATCH_DELIVER,
     ws_methods::TASK_BOARD_EVALUATE,
+    ws_methods::TASK_BOARD_PROJECTS_UPDATE,
     ws_methods::TASK_BOARD_HOST_SET_PROJECT_TYPES,
     ws_methods::TASK_BOARD_ORCHESTRATOR_START,
     ws_methods::TASK_BOARD_ORCHESTRATOR_STOP,

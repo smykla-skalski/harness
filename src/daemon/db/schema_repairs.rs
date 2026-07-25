@@ -149,6 +149,17 @@ pub(super) fn current_schema_shape_needs_repair(
     if super::schema_repairs_triage_override::shape_needs_repair(conn)? {
         return Ok(true);
     }
+    // A missing index answers every query correctly, just slowly, so nothing
+    // else here would ever notice it had gone. Both v51 indexes belong in the
+    // list: checking only one leaves the other unrepairable.
+    for index in [
+        "task_board_items_source_project",
+        "task_board_projects_source_slug",
+    ] {
+        if !index_exists(conn, index)? {
+            return Ok(true);
+        }
+    }
     Ok(false)
 }
 
@@ -197,6 +208,7 @@ fn current_schema_objects_missing(conn: &super::Connection) -> Result<bool, CliE
         "task_board_remote_host_quarantines",
         "task_board_orchestrator_wake_events",
         "task_board_reconciliation_cursors",
+        "task_board_projects",
     ] {
         if !table_exists(conn, table)? {
             return Ok(true);
@@ -275,6 +287,9 @@ pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError>
     super::schema_v46::run(&db.conn)?;
     super::schema_v47::run(&db.conn)?;
     super::schema_v48::run(&db.conn)?;
+    super::schema_v49::run(&db.conn)?;
+    super::schema_v50::run(&db.conn)?;
+    super::schema_v51::run(&db.conn)?;
     super::schema_repairs_external_creates::require_complete_shape(&db.conn)?;
     super::schema_repairs_wake_events::require_complete_shape(&db.conn)?;
     super::schema_repairs_admission::require_complete_shape(&db.conn)?;
@@ -419,6 +434,16 @@ fn table_exists(conn: &super::Connection, table_name: &str) -> Result<bool, CliE
     .map_err(|error| db_error(format!("check {table_name} table existence: {error}")))
 }
 
+fn index_exists(conn: &super::Connection, index_name: &str) -> Result<bool, CliError> {
+    conn.query_row(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = ?1",
+        [index_name],
+        |row| row.get::<_, i64>(0),
+    )
+    .map(|count| count > 0)
+    .map_err(|error| db_error(format!("check {index_name} index existence: {error}")))
+}
+
 fn trigger_exists(conn: &super::Connection, trigger_name: &str) -> Result<bool, CliError> {
     conn.query_row(
         "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name = ?1",
@@ -456,3 +481,7 @@ fn column_exists(
     .map(|count| count > 0)
     .map_err(|error| db_error(format!("check {table_name}.{column_name}: {error}")))
 }
+
+#[cfg(test)]
+#[path = "schema_repairs_tests.rs"]
+mod tests;

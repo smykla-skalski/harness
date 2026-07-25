@@ -136,7 +136,8 @@ impl DaemonDb {
         self.apply_pending_migrations_v47(version_number)?;
         self.apply_pending_migrations_v48(version_number)?;
         self.apply_pending_migrations_v49(version_number)?;
-        self.apply_pending_migrations_v50(version_number)
+        self.apply_pending_migrations_v50(version_number)?;
+        self.apply_pending_migrations_v51(version_number)
     }
 
     #[expect(
@@ -303,6 +304,14 @@ impl DaemonDb {
         }
         Ok(())
     }
+
+    fn apply_pending_migrations_v51(&self, version_number: u8) -> Result<(), CliError> {
+        if version_number <= 50 {
+            super::schema_v51::run(&self.conn)?;
+        }
+        Ok(())
+    }
+
 
     fn migrate_v7_to_v8(&self) -> Result<(), CliError> {
         // v7 databases created before the backfill shipped have empty ledger

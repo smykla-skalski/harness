@@ -94,6 +94,7 @@ extension TaskBoardItem {
       priority: wire.priority,
       tags: wire.tags,
       projectId: wire.projectId,
+      sourceProjectId: wire.sourceProjectId,
       executionRepository: wire.executionRepository,
       targetProjectTypes: wire.targetProjectTypes,
       agentMode: wire.agentMode,

@@ -7,7 +7,7 @@ extension PreviewHarnessClientState {
       item.deletedAt == nil
         && (expectedStatus == nil || item.status.canonicalPersistedStatus == expectedStatus)
     }
-    return canonicalMaterializedTaskBoardItems(items)
+    return canonicalMaterializedTaskBoardItems(items).map { $0.applyingPreviewAttribution() }
   }
 
   func materializedLanePosition(for item: TaskBoardItem, in status: TaskBoardStatus) -> UInt32? {
@@ -251,15 +251,19 @@ extension PreviewHarnessClientState {
 
   func taskBoardProjects(status: TaskBoardStatus?) -> [TaskBoardProjectSummary] {
     let grouped = Dictionary(
-      grouping: currentTaskBoardItems(status: status).filter { $0.projectId != nil },
-      by: \.projectId
+      grouping: currentTaskBoardItems(status: status).filter { $0.sourceProjectId != nil },
+      by: \.sourceProjectId
     )
     return grouped.compactMap { key, items in
       guard let projectId = key else {
         return nil
       }
+      let identity = items.first.flatMap(TaskBoardProjectSummary.inferredIdentity(from:))
       return TaskBoardProjectSummary(
         projectId: projectId,
+        source: identity?.source ?? .manual,
+        slug: identity?.slug ?? "unnamed project",
+        displayName: nil,
         itemCount: items.count,
         readyCount: items.count { $0.status == .todo }
       )

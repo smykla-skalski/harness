@@ -71,6 +71,7 @@ pub const TASK_BOARD_DISPATCH_PICK: &str = "task_board.dispatch_pick";
 pub const TASK_BOARD_EVALUATE: &str = "task_board.evaluate";
 pub const TASK_BOARD_AUDIT: &str = "task_board.audit";
 pub const TASK_BOARD_PROJECTS: &str = "task_board.projects";
+pub const TASK_BOARD_PROJECTS_UPDATE: &str = "task_board.projects_update";
 pub const TASK_BOARD_MACHINES: &str = "task_board.machines";
 pub const TASK_BOARD_HOST_LOCAL: &str = "task_board.host_local";
 pub const TASK_BOARD_HOST_LIST: &str = "task_board.host_list";
@@ -275,6 +276,7 @@ pub const ALL: &[&str] = &[
     TASK_BOARD_EVALUATE,
     TASK_BOARD_AUDIT,
     TASK_BOARD_PROJECTS,
+    TASK_BOARD_PROJECTS_UPDATE,
     TASK_BOARD_MACHINES,
     TASK_BOARD_HOST_LOCAL,
     TASK_BOARD_HOST_LIST,

@@ -17,7 +17,7 @@ pub(super) async fn dispatch_task_board_dispatch(
     let Ok(body) = parse_control_plane_params::<TaskBoardDispatchRequest>(request) else {
         return invalid_params(request);
     };
-    let result = task_board_route_executor::dispatch(state, body).await;
+    let result = Box::pin(task_board_route_executor::dispatch(state, body)).await;
     record_task_board_audit_result(
         state,
         "task_board.dispatch",

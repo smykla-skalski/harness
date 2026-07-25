@@ -54,8 +54,8 @@ fn websocket_task_board_catalog_routes_use_real_state() {
             )
             .await;
             let projects = response_result(&projects_response);
-            assert_project_summary(projects, "project-alpha", 2, 1);
-            assert_project_summary(projects, "project-beta", 1, 1);
+            assert_project_summary(projects, "manual", "project-alpha", 2, 1);
+            assert_project_summary(projects, "manual", "project-beta", 1, 1);
 
             let todo_projects_response = dispatch(
                 &request(
@@ -68,8 +68,8 @@ fn websocket_task_board_catalog_routes_use_real_state() {
             )
             .await;
             let todo_projects = response_result(&todo_projects_response);
-            assert_project_summary(todo_projects, "project-alpha", 1, 1);
-            assert_project_summary(todo_projects, "project-beta", 1, 1);
+            assert_project_summary(todo_projects, "manual", "project-alpha", 1, 1);
+            assert_project_summary(todo_projects, "manual", "project-beta", 1, 1);
 
             let machines_response = dispatch(
                 &request(
@@ -128,15 +128,34 @@ async fn seed_catalog_board_item(
         .expect("create item");
 }
 
-fn assert_project_summary(value: &Value, project_id: &str, item_count: u64, ready_count: u64) {
-    let summary = value
+/// Finds the summary by source and slug, the pair the catalog is unique on.
+/// `project_id` is assigned, so the caller cannot know it, and a slug alone
+/// names a different project under each source.
+fn assert_project_summary(
+    value: &Value,
+    source: &str,
+    slug: &str,
+    item_count: u64,
+    ready_count: u64,
+) {
+    let matches: Vec<_> = value
         .as_array()
-        .and_then(|projects| {
+        .map(|projects| {
             projects
                 .iter()
-                .find(|summary| summary["project_id"].as_str() == Some(project_id))
+                .filter(|summary| {
+                    summary["source"].as_str() == Some(source)
+                        && summary["slug"].as_str() == Some(slug)
+                })
+                .collect()
         })
-        .unwrap_or_else(|| panic!("missing project summary {project_id}: {value}"));
+        .unwrap_or_default();
+    assert_eq!(
+        matches.len(),
+        1,
+        "expected exactly one project summary for {source}/{slug}: {value}"
+    );
+    let summary = matches[0];
     assert_eq!(summary["item_count"].as_u64(), Some(item_count));
     assert_eq!(summary["ready_count"].as_u64(), Some(ready_count));
 }

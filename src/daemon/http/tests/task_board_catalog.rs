@@ -49,8 +49,8 @@ async fn run_task_board_http_catalog_flow() {
     .await;
 
     let projects = get_json(&client, &base_url, http_paths::TASK_BOARD_PROJECTS).await;
-    assert_project_summary(&projects, "project-alpha", 2, 1);
-    assert_project_summary(&projects, "project-beta", 1, 1);
+    assert_project_summary(&projects, "manual", "project-alpha", 2, 1);
+    assert_project_summary(&projects, "manual", "project-beta", 1, 1);
 
     let todo_projects = get_json(
         &client,
@@ -58,8 +58,8 @@ async fn run_task_board_http_catalog_flow() {
         &format!("{}?status=todo", http_paths::TASK_BOARD_PROJECTS),
     )
     .await;
-    assert_project_summary(&todo_projects, "project-alpha", 1, 1);
-    assert_project_summary(&todo_projects, "project-beta", 1, 1);
+    assert_project_summary(&todo_projects, "manual", "project-alpha", 1, 1);
+    assert_project_summary(&todo_projects, "manual", "project-beta", 1, 1);
 
     let machines = get_json(&client, &base_url, http_paths::TASK_BOARD_MACHINES).await;
     assert_machine_summary(&machines, "planning", 2, 1);

@@ -182,20 +182,34 @@ pub(super) async fn seed_catalog_board_item(
         .expect("create item");
 }
 
+/// Finds the summary by source and slug, the pair the catalog is unique on.
+/// `project_id` is assigned, so the caller cannot know it, and a slug alone
+/// names a different project under each source.
 pub(super) fn assert_project_summary(
     value: &Value,
-    project_id: &str,
+    source: &str,
+    slug: &str,
     item_count: u64,
     ready_count: u64,
 ) {
-    let summary = value
+    let matches: Vec<_> = value
         .as_array()
-        .and_then(|projects| {
+        .map(|projects| {
             projects
                 .iter()
-                .find(|summary| summary["project_id"].as_str() == Some(project_id))
+                .filter(|summary| {
+                    summary["source"].as_str() == Some(source)
+                        && summary["slug"].as_str() == Some(slug)
+                })
+                .collect()
         })
-        .unwrap_or_else(|| panic!("missing project summary {project_id}: {value}"));
+        .unwrap_or_default();
+    assert_eq!(
+        matches.len(),
+        1,
+        "expected exactly one project summary for {source}/{slug}: {value}"
+    );
+    let summary = matches[0];
     assert_eq!(summary["item_count"].as_u64(), Some(item_count));
     assert_eq!(summary["ready_count"].as_u64(), Some(ready_count));
 }

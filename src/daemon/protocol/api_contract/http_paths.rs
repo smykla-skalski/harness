@@ -74,6 +74,7 @@ pub const TASK_BOARD_DISPATCH_PICK: &str = "/v1/task-board/dispatch/pick";
 pub const TASK_BOARD_EVALUATE: &str = "/v1/task-board/evaluate";
 pub const TASK_BOARD_AUDIT: &str = "/v1/task-board/audit";
 pub const TASK_BOARD_PROJECTS: &str = "/v1/task-board/projects";
+pub const TASK_BOARD_PROJECTS_UPDATE: &str = "/v1/task-board/projects/update";
 pub const TASK_BOARD_MACHINES: &str = "/v1/task-board/machines";
 pub const TASK_BOARD_HOST_LOCAL: &str = "/v1/task-board/host/local";
 pub const TASK_BOARD_HOST_LIST: &str = "/v1/task-board/host/list";

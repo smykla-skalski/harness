@@ -18,7 +18,8 @@ extension TaskBoardOverviewBehaviorTests {
         snapshot: TaskBoardInboxSnapshot(),
         taskBoardItems: [scoped, other],
         decisionItems: [],
-        scopeSessionID: "sess-current"
+        scopeSessionID: "sess-current",
+        taskBoardProjects: []
       )
     )
 
@@ -38,7 +39,8 @@ extension TaskBoardOverviewBehaviorTests {
         snapshot: TaskBoardInboxSnapshot(),
         taskBoardItems: [openUmbrella, closedUmbrella, plainTodo],
         decisionItems: [],
-        scopeSessionID: nil
+        scopeSessionID: nil,
+        taskBoardProjects: []
       )
     )
 
@@ -59,7 +61,8 @@ extension TaskBoardOverviewBehaviorTests {
         snapshot: TaskBoardInboxSnapshot(),
         taskBoardItems: [closedUmbrella],
         decisionItems: [],
-        scopeSessionID: nil
+        scopeSessionID: nil,
+        taskBoardProjects: []
       )
     )
 
@@ -80,7 +83,8 @@ extension TaskBoardOverviewBehaviorTests {
         snapshot: TaskBoardInboxSnapshot(),
         taskBoardItems: [backlog, todo, laterHigherPriority],
         decisionItems: [],
-        scopeSessionID: nil
+        scopeSessionID: nil,
+        taskBoardProjects: []
       )
     )
     #expect(presentation.apiItems(in: .todo).map(\.id) == ["ready-low", "later-critical"])
@@ -91,7 +95,8 @@ extension TaskBoardOverviewBehaviorTests {
         snapshot: TaskBoardInboxSnapshot(),
         taskBoardItems: [backlog],
         decisionItems: [],
-        scopeSessionID: nil
+        scopeSessionID: nil,
+        taskBoardProjects: []
       )
     )
     #expect(backlogOnly.stepRailTargetItem == nil)

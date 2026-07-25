@@ -347,17 +347,25 @@ extension RecordingHarnessClient {
       if let summaries = taskBoardProjectSummariesStorage {
         return summaries
       }
+      // Fixtures predate the attribution column, so derive it the way the
+      // daemon's backfill does rather than dropping every item from the
+      // catalog.
       let grouped = Dictionary(
         grouping: filteredTaskBoardItems(status: status, itemId: nil)
-          .filter { $0.projectId != nil },
-        by: \.projectId
+          .map { $0.applyingPreviewAttribution() }
+          .filter { $0.sourceProjectId != nil },
+        by: \.sourceProjectId
       )
       return grouped.compactMap { key, items in
         guard let projectId = key else {
           return nil
         }
+        let identity = items.first.flatMap(TaskBoardProjectSummary.inferredIdentity(from:))
         return TaskBoardProjectSummary(
           projectId: projectId,
+          source: identity?.source ?? .manual,
+          slug: identity?.slug ?? "unnamed project",
+          displayName: nil,
           itemCount: items.count,
           readyCount: items.count { $0.status == .todo }
         )

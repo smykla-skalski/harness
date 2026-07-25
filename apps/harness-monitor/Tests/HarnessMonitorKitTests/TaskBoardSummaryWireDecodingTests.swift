@@ -36,16 +36,40 @@ struct TaskBoardSummaryWireDecodingTests {
   func decodesProjectSummary() throws {
     let wire = try decoder.decode(
       TaskBoardProjectSummaryWire.self,
-      from: Data(#"{"project_id": "owner/repo", "item_count": 7, "ready_count": 3}"#.utf8)
+      from: Data(
+        #"""
+        {"project_id": "project-0123456789abcdef0123456789abcdef", "source": "github",
+         "slug": "owner/repo", "item_count": 7, "ready_count": 3}
+        """#.utf8)
     )
-    #expect(wire.projectId == "owner/repo")
+    #expect(wire.projectId == "project-0123456789abcdef0123456789abcdef")
+    #expect(wire.source == .gitHub)
+    #expect(wire.slug == "owner/repo")
+    #expect(wire.displayName == nil)
     #expect(wire.itemCount == 7)
 
     let summary = TaskBoardProjectSummary(wire: wire)
-    #expect(summary.projectId == "owner/repo")
+    #expect(summary.projectId == "project-0123456789abcdef0123456789abcdef")
+    #expect(summary.source == .gitHub)
     #expect(summary.itemCount == 7)
     #expect(summary.readyCount == 3)
-    #expect(summary.id == "owner/repo")
+    #expect(summary.id == "project-0123456789abcdef0123456789abcdef")
+    // The identifier is opaque, so the slug is what a person reads.
+    #expect(summary.label == "owner/repo")
+  }
+
+  @Test("a renamed project reads by its display name")
+  func decodesProjectSummaryWithDisplayName() throws {
+    let wire = try decoder.decode(
+      TaskBoardProjectSummaryWire.self,
+      from: Data(
+        #"""
+        {"project_id": "project-0123456789abcdef0123456789abcdef", "source": "github",
+         "slug": "owner/repo", "display_name": "Widgets", "item_count": 1, "ready_count": 0}
+        """#.utf8)
+    )
+
+    #expect(TaskBoardProjectSummary(wire: wire).label == "Widgets")
   }
 
   @Test("decodes a machine summary with the adopted agent mode")

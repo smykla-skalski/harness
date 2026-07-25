@@ -29,6 +29,7 @@ pub(super) fn item_from_rows(
         priority: parse_label(&row.priority, "task board priority")?,
         tags: parse_json(&row.tags_json, "task board tags")?,
         project_id: row.project_id,
+        source_project_id: row.source_project_id,
         target_project_types: parse_json(
             &row.target_project_types_json,
             "task board project types",

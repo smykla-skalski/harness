@@ -17,6 +17,7 @@ use crate::task_board::{
     PolicyPipelineSimulationResult, PolicyScenario, TaskBoardAuditSummary,
     TaskBoardAutomationSnapshot, TaskBoardEvaluationSummary, TaskBoardGitIdentityDefaults,
     TaskBoardItem, TaskBoardMachineSummary, TaskBoardProgressRollup, TaskBoardProjectSummary,
+    project::TaskBoardProject,
     TaskBoardStatus, TaskBoardSyncSummary, planning::PlanningTransition,
 };
 
@@ -148,6 +149,21 @@ impl Default for TaskBoardSyncRequest {
 pub struct TaskBoardCatalogRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status: Option<TaskBoardStatus>,
+}
+
+/// Rename a project or retitle it. `project_id` never changes, so every item
+/// attached to the project stays attached across the edit.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(utoipa::ToSchema)]
+pub struct TaskBoardProjectUpdateRequest {
+    pub project_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slug: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    /// Drop the display name so the project reads by its slug again.
+    #[serde(default)]
+    pub clear_display_name: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -356,6 +372,7 @@ pub struct PolicyScenarioResetRequest {}
 
 pub type TaskBoardSyncResponse = TaskBoardSyncSummary;
 pub type TaskBoardProjectsResponse = Vec<TaskBoardProjectSummary>;
+pub type TaskBoardProjectUpdateResponse = TaskBoardProject;
 pub type TaskBoardMachinesResponse = Vec<TaskBoardMachineSummary>;
 pub type TaskBoardHostListResponse = Vec<Machine>;
 pub type TaskBoardHostLocalResponse = Machine;

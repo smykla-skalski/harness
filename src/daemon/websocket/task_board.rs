@@ -7,7 +7,8 @@ use crate::daemon::protocol::{
     TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardEvaluateRequest,
     TaskBoardGitSigningVerifyRequest, TaskBoardHostSetProjectTypesRequest,
     TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest,
-    TaskBoardPlanSubmitRequest, TaskBoardResetItemPositionRequest, TaskBoardSetItemPositionRequest,
+    TaskBoardPlanSubmitRequest, TaskBoardProjectUpdateRequest,
+    TaskBoardResetItemPositionRequest, TaskBoardSetItemPositionRequest,
     TaskBoardSyncRequest, TaskBoardUpdateItemRequest, WsRequest, WsResponse, ws_methods,
 };
 use crate::errors::CliError;
@@ -41,6 +42,9 @@ pub(crate) async fn dispatch_task_board_method(
         return Some(response);
     }
     if let Some(response) = super::task_board_working_copies::dispatch_method(request).await {
+        return Some(response);
+    }
+    if let Some(response) = dispatch_git_method(request, state).await {
         return Some(response);
     }
     match request.method.as_str() {
@@ -96,7 +100,7 @@ pub(crate) async fn dispatch_task_board_method(
             Some(Box::pin(dispatch::dispatch_task_board_dispatch(request, state)).await)
         }
         ws_methods::TASK_BOARD_DISPATCH_DELIVER => {
-            Some(dispatch::dispatch_task_board_dispatch_deliver(request, state).await)
+            Some(Box::pin(dispatch::dispatch_task_board_dispatch_deliver(request, state)).await)
         }
         ws_methods::TASK_BOARD_DISPATCH_PICK => {
             Some(dispatch::dispatch_task_board_dispatch_pick(request, state).await)
@@ -104,6 +108,9 @@ pub(crate) async fn dispatch_task_board_method(
         ws_methods::TASK_BOARD_EVALUATE => Some(dispatch_task_board_evaluate(request, state).await),
         ws_methods::TASK_BOARD_AUDIT => Some(dispatch_task_board_audit(request, state).await),
         ws_methods::TASK_BOARD_PROJECTS => Some(dispatch_task_board_projects(request, state).await),
+        ws_methods::TASK_BOARD_PROJECTS_UPDATE => {
+            Some(dispatch_task_board_projects_update(request, state).await)
+        }
         ws_methods::TASK_BOARD_MACHINES => Some(dispatch_task_board_machines(request, state).await),
         ws_methods::TASK_BOARD_HOST_LOCAL => {
             Some(dispatch_task_board_host_local(request, state).await)
@@ -114,6 +121,14 @@ pub(crate) async fn dispatch_task_board_method(
         ws_methods::TASK_BOARD_HOST_SET_PROJECT_TYPES => {
             Some(dispatch_task_board_host_set_project_types(request, state).await)
         }
+        _ => Box::pin(policy::dispatch_policy_method(request, state)).await,
+    }
+}
+
+/// Claim the git identity, signing, and secret-handoff methods, leaving every
+/// other method to the caller.
+async fn dispatch_git_method(request: &WsRequest, state: &DaemonHttpState) -> Option<WsResponse> {
+    match request.method.as_str() {
         ws_methods::TASK_BOARD_GIT_IDENTITY_DEFAULTS => {
             Some(dispatch_task_board_git_identity_defaults(request).await)
         }
@@ -129,7 +144,7 @@ pub(crate) async fn dispatch_task_board_method(
         ws_methods::TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_ACK => {
             Some(secret_handoff::dispatch_ack(request, state).await)
         }
-        _ => Box::pin(policy::dispatch_policy_method(request, state)).await,
+        _ => None,
     }
 }
 
@@ -344,6 +359,19 @@ async fn dispatch_task_board_projects(request: &WsRequest, state: &DaemonHttpSta
     dispatch_query_result(
         &request.id,
         task_board_route_executor::projects(state, &body).await,
+    )
+}
+
+async fn dispatch_task_board_projects_update(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Ok(body) = parse_control_plane_params::<TaskBoardProjectUpdateRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::update_project(state, &body).await,
     )
 }
 

@@ -169,7 +169,8 @@ public struct TaskBoardOverviewView: View {
       snapshot: snapshot,
       taskBoardItems: taskBoardItems,
       decisionItems: decisionItems,
-      scopeSessionID: taskBoardSessionID
+      scopeSessionID: taskBoardSessionID,
+      taskBoardProjects: store?.globalTaskBoardProjects ?? []
     )
   }
 

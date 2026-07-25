@@ -202,7 +202,8 @@ struct TaskBoardOverviewBehaviorTests {
         snapshot: snapshot,
         taskBoardItems: [],
         decisionItems: [],
-        scopeSessionID: nil
+        scopeSessionID: nil,
+        taskBoardProjects: []
       )
     )
     let cardID = TaskBoardCardID.inbox(
@@ -254,7 +255,8 @@ struct TaskBoardOverviewBehaviorTests {
         snapshot: TaskBoardInboxSnapshot(items: [inbox]),
         taskBoardItems: [ready, deleted, needsYou],
         decisionItems: [criticalDecision, dismissedDecision].map(DecisionPresentationItem.init),
-        scopeSessionID: nil
+        scopeSessionID: nil,
+        taskBoardProjects: []
       )
     )
 

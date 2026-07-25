@@ -456,6 +456,25 @@ struct PreviewHarnessClientTaskBoardTests {
     #expect(cleared.externalRefs.isEmpty)
   }
 
+  @Test("A preview update re-resolves the item's project")
+  func previewUpdateReresolvesTheItemsProject() {
+    let original = taskBoardItem(externalRefs: []).applyingPreviewAttribution()
+    let origin: String? = original.sourceProjectId
+    #expect(origin != nil)
+
+    let move = TaskBoardUpdateItemRequest(projectId: "acme/gadgets")
+    let moved: String? = original.applyingPreviewUpdate(move).sourceProjectId
+    #expect(moved != nil)
+    #expect(moved != origin, "the item kept the project it left")
+
+    let clear = TaskBoardUpdateItemRequest(clearProjectId: true)
+    #expect(original.applyingPreviewUpdate(clear).sourceProjectId == nil)
+
+    // A patch that leaves the project alone keeps the attribution it had.
+    let rename = TaskBoardUpdateItemRequest(title: "Renamed")
+    #expect(original.applyingPreviewUpdate(rename).sourceProjectId == origin)
+  }
+
   private func taskBoardItem(
     externalRefs: [TaskBoardExternalRef],
     lanePosition: UInt32? = nil,

@@ -24,6 +24,7 @@ mod lane_order_tests;
 mod mapper;
 mod policy_queues;
 mod policy_runs;
+mod projects;
 mod provider_exclusion;
 mod provider_external_create_evidence;
 mod provider_external_create_finalize;
@@ -255,6 +256,7 @@ pub(crate) use imports::{TaskBoardImportMarker, TaskBoardImportResult};
 pub(crate) use items::{TaskBoardItemSnapshot, TaskBoardMutation};
 pub(crate) use triage_escalation_store::ClaimedTaskBoardTriageEscalation;
 pub(crate) use lane_order::{TaskBoardItemsSnapshot, TaskBoardLaneShift};
+pub(crate) use projects::DisplayNameEdit;
 pub(crate) use lane_order_api::{
     TaskBoardLaneMutationResult, TaskBoardLanePositionInput, TaskBoardLaneResetInput,
 };

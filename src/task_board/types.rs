@@ -32,6 +32,11 @@ pub struct TaskBoardItem {
     pub tags: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project_id: Option<String>,
+    /// The registered project this item's work came from. Assigned by the
+    /// write path from whichever origin the item carries, and stable across a
+    /// rename of that project.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_project_id: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub target_project_types: Vec<String>,
     #[serde(default)]
@@ -102,6 +107,7 @@ impl TaskBoardItem {
             priority: TaskBoardPriority::Medium,
             tags: Vec::new(),
             project_id: None,
+            source_project_id: None,
             target_project_types: Vec::new(),
             agent_mode: AgentMode::Headless,
             workflow_kind: TaskBoardWorkflowKind::DefaultTask,

@@ -7,7 +7,8 @@ use crate::daemon::protocol::{
     TaskBoardItemPositionSnapshot, TaskBoardListItemsRequest, TaskBoardListItemsResponse,
     TaskBoardMachinesResponse, TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest,
     TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse,
-    TaskBoardProjectsResponse, TaskBoardResetItemPositionRequest, TaskBoardSetItemPositionRequest,
+    TaskBoardProjectUpdateRequest, TaskBoardProjectUpdateResponse, TaskBoardProjectsResponse,
+    TaskBoardResetItemPositionRequest, TaskBoardSetItemPositionRequest,
     TaskBoardSetTriageOverrideRequest, TaskBoardSyncRequest, TaskBoardSyncResponse,
     TaskBoardTriageCurrentResponse, TaskBoardTriageHistoryResponse,
     TaskBoardTriageOverrideMutationResponse, TaskBoardUpdateItemRequest,
@@ -215,6 +216,17 @@ pub(crate) async fn projects(
 ) -> Result<TaskBoardProjectsResponse, CliError> {
     service::list_task_board_projects_db(require_async_db(state, "task board projects")?, request)
         .await
+}
+
+pub(crate) async fn update_project(
+    state: &DaemonHttpState,
+    request: &TaskBoardProjectUpdateRequest,
+) -> Result<TaskBoardProjectUpdateResponse, CliError> {
+    service::update_task_board_project_db(
+        require_async_db(state, "task board project update")?,
+        request,
+    )
+    .await
 }
 
 pub(crate) async fn machines(

@@ -2,22 +2,23 @@ use std::env;
 
 use uuid::Uuid;
 
-use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::{AsyncDaemonDb, DisplayNameEdit};
 use crate::daemon::protocol::{
     TaskBoardAuditRequest, TaskBoardAuditResponse, TaskBoardCatalogRequest,
     TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardGetItemRequest,
     TaskBoardHostListResponse, TaskBoardHostLocalResponse, TaskBoardHostSetProjectTypesRequest,
     TaskBoardHostSetProjectTypesResponse, TaskBoardMachinesResponse, TaskBoardPlanApproveRequest,
     TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest,
-    TaskBoardPlanningResponse, TaskBoardProjectsResponse, TaskBoardSyncRequest,
+    TaskBoardPlanningResponse, TaskBoardProjectUpdateRequest, TaskBoardProjectUpdateResponse,
+    TaskBoardProjectsResponse, TaskBoardSyncRequest,
     TaskBoardSyncResponse, TaskBoardUpdateItemRequest,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::planning::PlanningTransition;
 use crate::task_board::{
-    ExternalRef, ExternalSyncConfig, Machine, PlanningState, SpawnGateSwitches, TaskBoardItem,
-    TaskBoardWorkflowState, approve_plan, begin_planning, build_audit_summary_with_policy,
-    build_machine_summaries, build_project_summaries, revoke_plan, submit_plan,
+    ExternalSyncConfig, Machine, SpawnGateSwitches, TaskBoardItem, approve_plan, begin_planning,
+    build_audit_summary_with_policy, build_machine_summaries, build_project_summaries, revoke_plan,
+    submit_plan,
 };
 use crate::workspace::utc_now;
 
@@ -41,8 +42,10 @@ mod sync_audit;
 mod sync_run_context;
 mod triage_reads;
 mod triage_rules_reads;
+mod update_request;
 
 use estimate_validation::{validate_estimate, validate_update_estimates};
+use update_request::{apply_update_request, replacement_external_refs};
 pub(crate) use list_items::list_task_board_items_db;
 pub(crate) use positions::{
     get_task_board_item_position_snapshot_db, reset_task_board_item_position_db,
@@ -199,7 +202,29 @@ pub(crate) async fn list_task_board_projects_db(
     request: &TaskBoardCatalogRequest,
 ) -> Result<TaskBoardProjectsResponse, CliError> {
     let items = db.list_task_board_items(request.status).await?;
-    Ok(build_project_summaries(&items))
+    let projects = db.list_task_board_projects().await?;
+    Ok(build_project_summaries(&items, &projects))
+}
+
+pub(crate) async fn update_task_board_project_db(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardProjectUpdateRequest,
+) -> Result<TaskBoardProjectUpdateResponse, CliError> {
+    let display_name = match (request.clear_display_name, request.display_name.as_deref()) {
+        // Letting the clear quietly win would report success for a rename the
+        // caller never got, and the name it sent would be the thing erased.
+        (true, Some(_)) => {
+            return Err(CliErrorKind::usage_error(
+                "task-board project update cannot both set and clear display_name",
+            )
+            .into());
+        }
+        (true, None) => DisplayNameEdit::Clear,
+        (false, Some(value)) => DisplayNameEdit::Set(value),
+        (false, None) => DisplayNameEdit::Keep,
+    };
+    db.update_task_board_project(&request.project_id, request.slug.as_deref(), display_name)
+        .await
 }
 
 pub(crate) async fn list_task_board_machines_db(
@@ -357,132 +382,6 @@ async fn apply_planning_transition_db(
     })
 }
 
-fn apply_update_request(
-    item: &mut TaskBoardItem,
-    request: &TaskBoardUpdateItemRequest,
-) -> Result<(), CliError> {
-    validate_update_estimates(request)?;
-    assign_if_some(&mut item.title, request.title.as_ref());
-    assign_if_some(&mut item.body, request.body.as_ref());
-    assign_copy_if_some(&mut item.status, request.status);
-    assign_copy_if_some(&mut item.priority, request.priority);
-    assign_copy_if_some(&mut item.agent_mode, request.agent_mode);
-    assign_copy_if_some(&mut item.workflow_kind, request.workflow_kind);
-    assign_if_some(&mut item.kind, request.kind.as_ref());
-    assign_if_some(&mut item.tags, request.tags.as_ref());
-    assign_if_some(
-        &mut item.target_project_types,
-        request.target_project_types.as_ref(),
-    );
-    if let Some(replacements) = request.external_refs.as_deref() {
-        item.external_refs = replacement_external_refs(&item.external_refs, replacements);
-    }
-    apply_optional_string(
-        &mut item.project_id,
-        request.project_id.as_ref(),
-        request.clear_identity.clear_project_id,
-    );
-    apply_optional_string(
-        &mut item.execution_repository,
-        request.execution_repository.as_ref(),
-        request.clear_identity.clear_execution_repository,
-    );
-    apply_optional_copy(
-        &mut item.estimated_tokens,
-        request.estimated_tokens,
-        request.clear_estimates.clear_estimated_tokens,
-    );
-    apply_optional_copy(
-        &mut item.estimated_cost_microusd,
-        request.estimated_cost_microusd,
-        request.clear_estimates.clear_estimated_cost_microusd,
-    );
-    apply_optional_string(
-        &mut item.session_id,
-        request.session_id.as_ref(),
-        request.clear_identity.clear_session_id,
-    );
-    apply_optional_string(
-        &mut item.work_item_id,
-        request.work_item_id.as_ref(),
-        request.clear_identity.clear_work_item_id,
-    );
-    apply_optional_string(
-        &mut item.parent_item_id,
-        request.parent_item_id.as_ref(),
-        request.clear_identity.clear_parent_item_id,
-    );
-    apply_update_state(item, request);
-    Ok(())
-}
-
-fn replacement_external_refs(
-    current: &[ExternalRef],
-    replacements: &[ExternalRef],
-) -> Vec<ExternalRef> {
-    replacements
-        .iter()
-        .map(|replacement| ExternalRef {
-            provider: replacement.provider,
-            external_id: replacement.external_id.clone(),
-            url: replacement.url.clone(),
-            sync_state: current
-                .iter()
-                .find(|candidate| {
-                    candidate.provider == replacement.provider
-                        && candidate.external_id == replacement.external_id
-                })
-                .and_then(|candidate| candidate.sync_state.clone()),
-        })
-        .collect()
-}
-
-fn apply_update_state(item: &mut TaskBoardItem, request: &TaskBoardUpdateItemRequest) {
-    if request.clear_state.clear_planning {
-        item.planning = PlanningState::default();
-    } else if let Some(planning) = &request.planning {
-        if planning.summary.is_some() {
-            item.planning.clone_from(planning);
-        } else if planning.approved_by.is_some() {
-            item.planning.approved_by.clone_from(&planning.approved_by);
-            item.planning.approved_at.clone_from(&planning.approved_at);
-        }
-    }
-    if request.clear_state.clear_workflow {
-        item.workflow = TaskBoardWorkflowState::default();
-    } else if let Some(workflow) = &request.workflow {
-        item.workflow.clone_from(workflow);
-    }
-}
-
-fn assign_if_some<T: Clone>(target: &mut T, value: Option<&T>) {
-    if let Some(value) = value {
-        target.clone_from(value);
-    }
-}
-
-fn assign_copy_if_some<T: Copy>(target: &mut T, value: Option<T>) {
-    if let Some(value) = value {
-        *target = value;
-    }
-}
-
-fn apply_optional_copy<T: Copy>(target: &mut Option<T>, value: Option<T>, clear: bool) {
-    if clear {
-        *target = None;
-    } else if let Some(value) = value {
-        *target = Some(value);
-    }
-}
-
-fn apply_optional_string(target: &mut Option<String>, value: Option<&String>, clear: bool) {
-    if clear {
-        *target = None;
-    } else if let Some(value) = value {
-        *target = Some(value.clone());
-    }
-}
-
 async fn ensure_local_machine(db: &AsyncDaemonDb) -> Result<Machine, CliError> {
     if let Some(id) = db.task_board_local_machine_id().await? {
         if let Some(machine) = db
@@ -517,3 +416,7 @@ fn non_empty(value: &str) -> Option<String> {
     let value = value.trim();
     (!value.is_empty()).then(|| value.to_owned())
 }
+
+#[cfg(test)]
+#[path = "task_board_db_tests.rs"]
+mod tests;

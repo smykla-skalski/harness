@@ -11,6 +11,7 @@ use super::{
     TaskBoardActivateTriageRulesRequest, TaskBoardAutomationForceCancelRequest,
     TaskBoardClearTriageOverrideRequest, TaskBoardDispatchRequest, TaskBoardEvaluateRequest,
     TaskBoardOrchestratorRunOnceRequest, TaskBoardPlanApproveRequest, TaskBoardPlanRevokeRequest,
+    TaskBoardProjectUpdateRequest,
     TaskBoardResetItemPositionRequest, TaskBoardSaveTriageRulesDraftRequest,
     TaskBoardSetItemPositionRequest, TaskBoardSetTriageOverrideRequest, TaskCheckpointRequest,
     TaskClaimReviewRequest, TaskCreateRequest, TaskDeleteRequest, TaskDropRequest,
@@ -289,6 +290,12 @@ impl ControlPlaneActorRequest for TaskBoardActivateTriageRulesRequest {
 impl ControlPlaneActorRequest for TaskBoardEvaluateRequest {
     fn bind_control_plane_actor(&mut self) {
         // Evaluate carries no actor; authorize via the trait for parity.
+    }
+}
+
+impl ControlPlaneActorRequest for TaskBoardProjectUpdateRequest {
+    fn bind_control_plane_actor(&mut self) {
+        // A project edit carries no actor; authorize via the trait for parity.
     }
 }
 
