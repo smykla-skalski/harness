@@ -39,9 +39,9 @@ if ! source "$ROOT/scripts/lib/common-repo-root.sh"; then
   printf 'clean-build-caches: failed to source scripts/lib/common-repo-root.sh\n' >&2
   exit 1
 fi
-# shellcheck source=scripts/lib/build-lease.sh
-if ! source "$ROOT/scripts/lib/build-lease.sh"; then
-  printf 'clean-build-caches: failed to source scripts/lib/build-lease.sh\n' >&2
+# shellcheck source=scripts/lib/cargo-lane.sh
+if ! source "$ROOT/scripts/lib/cargo-lane.sh"; then
+  printf 'clean-build-caches: failed to source scripts/lib/cargo-lane.sh\n' >&2
   exit 1
 fi
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$ROOT")"
@@ -150,7 +150,7 @@ section() {
 # A segment (target/dev/local or target/dev/wt-<worktree>-<hash>) is leased
 # when a cargo-local.sh lease file names it with a PID that's still alive.
 segment_is_leased() {
-  build_lease_segment_is_leased "$LEASE_DIR" "$1"
+  cargo_lane_segment_is_leased "$LEASE_DIR" "$1"
 }
 
 # Sweeps the shared target/ tree at the common repo root: each entry

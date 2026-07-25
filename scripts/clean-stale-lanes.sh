@@ -19,10 +19,19 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 readonly SCRIPT_DIR
 CHECKOUT_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 readonly CHECKOUT_ROOT
+# Guarded because this script runs without `set -e`: an unnoticed source failure
+# leaves the lease reader undefined, which reads as "no lease" and deletes the
+# lane of a running build.
 # shellcheck source=scripts/lib/common-repo-root.sh
-source "$CHECKOUT_ROOT/scripts/lib/common-repo-root.sh"
-# shellcheck source=scripts/lib/build-lease.sh
-source "$CHECKOUT_ROOT/scripts/lib/build-lease.sh"
+if ! source "$CHECKOUT_ROOT/scripts/lib/common-repo-root.sh"; then
+  printf 'clean-stale-lanes: failed to source scripts/lib/common-repo-root.sh\n' >&2
+  exit 1
+fi
+# shellcheck source=scripts/lib/cargo-lane.sh
+if ! source "$CHECKOUT_ROOT/scripts/lib/cargo-lane.sh"; then
+  printf 'clean-stale-lanes: failed to source scripts/lib/cargo-lane.sh\n' >&2
+  exit 1
+fi
 
 COMMON_ROOT="${_HARNESS_INTERNAL_TEST_ONLY_CLEAN_LANES_COMMON_ROOT:-$(resolve_common_repo_root "$CHECKOUT_ROOT")}"
 readonly COMMON_ROOT
@@ -242,24 +251,11 @@ process_lane() {
   drop_lane "lane" "$lane" "$path"
 }
 
-# Mirrors cargo-local.sh's target_segment. A test pins this against
-# `cargo-local.sh --print-target-dir`, because a derivation that drifts stops
-# matching live lanes and starts reclaiming them out from under their worktree.
 dev_segment_for_worktree() {
-  local path="$1" resolved name digest
+  local path="$1" resolved
   resolved="$(CDPATH='' cd -- "$path" 2>/dev/null && pwd -P)" || return 1
   [[ "$resolved" == "$MAIN_WORKTREE_ROOT" ]] && { printf 'local\n'; return 0; }
-  name="$(printf '%s' "$(basename -- "$resolved")" | tr -cs '[:alnum:]._-' '-')"
-  if command -v shasum >/dev/null 2>&1; then
-    digest="$(printf '%s' "$resolved" | shasum -a 256)"
-    digest="${digest%% *}"
-  elif command -v cksum >/dev/null 2>&1; then
-    digest="$(printf '%s' "$resolved" | cksum)"
-    digest="${digest//[^[:alnum:]]/}"
-  else
-    digest="$(printf '%s' "$resolved" | tr -cs '[:alnum:]._-' '-')"
-  fi
-  printf 'wt-%s-%s\n' "$name" "${digest:0:16}"
+  cargo_lane_segment_for_path "$resolved"
 }
 
 # A cargo lane outlives the worktree that owns it: `git worktree remove` takes
@@ -277,7 +273,7 @@ process_dev_segment() {
     record_keep "dev" "forced" "$segment" "$path"
     return 0
   fi
-  if build_lease_segment_is_leased "$LEASE_DIR" "$segment"; then
+  if cargo_lane_segment_is_leased "$LEASE_DIR" "$segment"; then
     record_keep "dev" "active" "$segment" "$path"
     return 0
   fi

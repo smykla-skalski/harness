@@ -122,7 +122,7 @@ make_shared_target_fixture() {
   mkdir -p "$repo/fake-home"
   cp "$SCRIPT" "$repo/scripts/clean-build-caches.sh"
   cp "$ROOT/scripts/lib/common-repo-root.sh" "$repo/scripts/lib/common-repo-root.sh"
-  cp "$ROOT/scripts/lib/build-lease.sh" "$repo/scripts/lib/build-lease.sh"
+  cp "$ROOT/scripts/lib/cargo-lane.sh" "$repo/scripts/lib/cargo-lane.sh"
 
   mkdir -p "$repo/target/dev/local/debug"
   mkdir -p "$repo/target/dev/wt-live-0e4eb0f4/debug"

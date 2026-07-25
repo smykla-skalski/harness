@@ -103,14 +103,14 @@ run_cleanup() {
   )
 }
 
-# Mirrors cargo-local.sh's target_segment. scenario_dev_segment_derivation_
-# matches_cargo_local pins it against the real script so a drift in either
-# shows up as a failure instead of a lane nobody reclaims.
+# Uses the same derivation the script does, rather than a copy that could agree
+# with a bug. scenario_dev_segment_derivation_matches_cargo_local pins that
+# shared implementation against cargo-local.sh, which is the real authority.
+# shellcheck source=scripts/lib/cargo-lane.sh
+source "$ROOT/scripts/lib/cargo-lane.sh"
+
 dev_segment_for_path() {
-  local path="$1" name digest
-  name="$(printf '%s' "$(basename -- "$path")" | tr -cs '[:alnum:]._-' '-')"
-  digest="$(printf '%s' "$path" | shasum -a 256)"
-  printf 'wt-%s-%s\n' "$name" "${digest:0:16}"
+  cargo_lane_segment_for_path "$1"
 }
 
 scenario_dev_lanes_follow_their_worktree() {
