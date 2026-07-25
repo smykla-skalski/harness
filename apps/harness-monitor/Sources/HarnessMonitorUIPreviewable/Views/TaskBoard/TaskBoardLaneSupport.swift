@@ -168,9 +168,11 @@ struct TaskBoardCardFooter<Badges: View>: View {
     HStack(alignment: .center, spacing: metrics.rowTextSpacing) {
       // The mark and the name are one unit: the color is a faster way to spot
       // a project you already know, never the only way to tell which it is.
-      HStack(alignment: .center, spacing: metrics.rowTextSpacing) {
+      // They align on the name's baseline, not on two centre guides that do not
+      // agree, and the pair then meets the rest of the row optically centred.
+      HStack(alignment: .firstTextBaseline, spacing: metrics.rowTextSpacing) {
         if let projectColor {
-          TaskBoardProjectColorMark(color: projectColor)
+          TaskBoardProjectColorMark(color: projectColor, alignsWith: .caption1)
         }
         Text(repository)
           .font(repositoryFont)
@@ -178,8 +180,8 @@ struct TaskBoardCardFooter<Badges: View>: View {
           .lineLimit(1)
           .truncationMode(.middle)
           .multilineTextAlignment(.leading)
-          .harnessOpticalTextCenter()
       }
+      .harnessOpticalTextCenter()
       .layoutPriority(2)
       HarnessMonitorWrapLayout(
         spacing: metrics.rowTextSpacing,

@@ -1,3 +1,4 @@
+import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
@@ -67,19 +68,31 @@ extension TaskBoardProjectColor {
 /// decorative to VoiceOver rather than a second, colour-only label.
 struct TaskBoardProjectColorMark: View {
   let color: TaskBoardProjectColor
+  /// The text style the mark sits beside. A dot carries no baseline of its own,
+  /// so it borrows this font's x-height to find the middle of the lowercase
+  /// letters. A plain centre guide lands on the middle of the line box instead,
+  /// which the descenders drag a quarter point below where the eye reads the
+  /// row, and the dot then floats above the name it belongs to.
+  var alignsWith: NSFont.TextStyle = .body
   @Environment(\.fontScale)
   private var fontScale
 
   private var diameter: CGFloat { 7 * fontScale }
 
   var body: some View {
-    Circle()
+    // Read outside the guide: its closure is `@Sendable`, so it cannot reach
+    // back into the view's MainActor state.
+    let diameter = diameter
+    let baseline = diameter / 2
+      + NSFont.preferredFont(forTextStyle: alignsWith).xHeight * fontScale / 2
+    return Circle()
       .fill(color.color)
       .overlay {
         // Keeps a light mark from vanishing on the card's own light fill.
         Circle().strokeBorder(HarnessMonitorTheme.ink.opacity(0.18), lineWidth: 0.5)
       }
       .frame(width: diameter, height: diameter)
+      .alignmentGuide(.firstTextBaseline) { _ in baseline }
       .accessibilityHidden(true)
   }
 }

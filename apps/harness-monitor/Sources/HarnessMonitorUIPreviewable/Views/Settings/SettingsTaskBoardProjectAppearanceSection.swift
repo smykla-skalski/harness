@@ -39,12 +39,16 @@ struct SettingsTaskBoardProjectAppearanceSection: View {
 
   private func projectRow(_ project: TaskBoardProjectSummary) -> some View {
     HStack(spacing: HarnessMonitorTheme.spacingMD) {
-      TaskBoardProjectColorMark(color: project.color)
+      // Same pairing as the card footer: the mark sits on the name's baseline
+      // rather than beside it on a guide of its own.
+      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
+        TaskBoardProjectColorMark(color: project.color, alignsWith: .body)
 
-      Text(project.label)
-        .scaledFont(.body.weight(.medium))
-        .lineLimit(1)
-        .truncationMode(.middle)
+        Text(project.label)
+          .scaledFont(.body.weight(.medium))
+          .lineLimit(1)
+          .truncationMode(.middle)
+      }
 
       Spacer(minLength: HarnessMonitorTheme.spacingMD)
 
