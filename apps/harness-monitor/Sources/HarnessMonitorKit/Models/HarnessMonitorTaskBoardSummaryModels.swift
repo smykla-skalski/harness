@@ -149,6 +149,30 @@ public struct TaskBoardProjectSummary: Codable, Equatable, Identifiable, Sendabl
     }
     return displayName
   }
+
+  /// How the daemon decides which project an item belongs to, mirrored for
+  /// fixtures and previews. `projectId` is read before `executionRepository`,
+  /// an `owner/name` value is a GitHub repository, a Todoist import keeps its
+  /// provider, and anything else is a manual project. A fixture that pins one
+  /// source instead hides every per-source difference in the UI.
+  public static func inferredIdentity(
+    from item: TaskBoardItem
+  ) -> (source: TaskBoardProjectSource, slug: String)? {
+    let trimmed = [item.projectId, item.executionRepository]
+      .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+    guard let raw = trimmed.first(where: { !$0.isEmpty }) else {
+      return nil
+    }
+    let halves = raw.split(separator: "/", omittingEmptySubsequences: false)
+    if halves.count == 2 {
+      let owner = halves[0].trimmingCharacters(in: .whitespacesAndNewlines)
+      let name = halves[1].trimmingCharacters(in: .whitespacesAndNewlines)
+      if !owner.isEmpty, !name.isEmpty {
+        return (.gitHub, "\(owner)/\(name)".lowercased())
+      }
+    }
+    return (item.importedFromProvider == .todoist ? .todoist : .manual, raw)
+  }
 }
 
 public struct TaskBoardMachineSummary: Codable, Equatable, Identifiable, Sendable {

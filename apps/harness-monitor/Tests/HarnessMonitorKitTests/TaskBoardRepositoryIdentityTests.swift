@@ -86,6 +86,48 @@ struct TaskBoardRepositoryIdentityTests {
     #expect(review.agentMode == .headless)
   }
 
+  @Test("Project identity follows the daemon's classification")
+  func projectIdentityFollowsTheDaemonClassification() {
+    let repository = TaskBoardProjectSummary.inferredIdentity(
+      from: item(projectId: nil, executionRepository: "Acme/Widgets")
+    )
+    #expect(repository?.source == .gitHub)
+    #expect(repository?.slug == "acme/widgets")
+
+    // `projectId` wins over `executionRepository`, the order the backfill reads.
+    let preferred = TaskBoardProjectSummary.inferredIdentity(
+      from: item(projectId: "acme/gadgets", executionRepository: "acme/widgets")
+    )
+    #expect(preferred?.slug == "acme/gadgets")
+
+    let todoist = TaskBoardProjectSummary.inferredIdentity(
+      from: item(
+        projectId: "2334Ab",
+        executionRepository: nil,
+        importedFromProvider: .todoist
+      )
+    )
+    #expect(todoist?.source == .todoist)
+    #expect(todoist?.slug == "2334Ab")
+
+    let manual = TaskBoardProjectSummary.inferredIdentity(
+      from: item(projectId: "kitchen sink", executionRepository: nil)
+    )
+    #expect(manual?.source == .manual)
+
+    // A second separator is not a repository, matching the migration's rule.
+    let nested = TaskBoardProjectSummary.inferredIdentity(
+      from: item(projectId: "acme/team/widgets", executionRepository: nil)
+    )
+    #expect(nested?.source == .manual)
+
+    #expect(
+      TaskBoardProjectSummary.inferredIdentity(
+        from: item(projectId: "   ", executionRepository: nil)
+      ) == nil
+    )
+  }
+
   private func item(
     id: String = "identity-item",
     projectId: String?,
