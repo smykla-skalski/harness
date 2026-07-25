@@ -24,6 +24,7 @@ mod lane_order_tests;
 mod mapper;
 mod policy_queues;
 mod policy_runs;
+mod project_shapes;
 mod projects;
 mod provider_exclusion;
 mod provider_external_create_evidence;

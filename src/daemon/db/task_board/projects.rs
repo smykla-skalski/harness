@@ -6,6 +6,7 @@ use crate::task_board::project::{
     ItemProjectAttribution, TaskBoardProject, TaskBoardProjectSource, item_attribution,
 };
 use crate::task_board::project_color::{self, TaskBoardProjectColor};
+use crate::task_board::project_shape::TaskBoardProjectShape;
 use crate::task_board::{TaskBoardItem, TaskBoardOrchestratorSettings};
 use crate::workspace::utc_now;
 
@@ -48,6 +49,7 @@ struct ProjectRow {
     slug: String,
     display_name: Option<String>,
     color: Option<String>,
+    shape: Option<String>,
     created_at: String,
     updated_at: String,
 }
@@ -68,12 +70,21 @@ impl TryFrom<ProjectRow> for TaskBoardProject {
             .as_deref()
             .and_then(TaskBoardProjectColor::parse)
             .unwrap_or_else(|| TaskBoardProjectColor::derived(&row.project_id));
+        // Null while the palette still covers the board, and unreadable for the
+        // same reason a color can be, so both land on the default rather than
+        // failing a read that has nothing wrong with it.
+        let shape = row
+            .shape
+            .as_deref()
+            .and_then(TaskBoardProjectShape::parse)
+            .unwrap_or(TaskBoardProjectShape::DEFAULT);
         Ok(Self {
             project_id: row.project_id,
             source,
             slug: row.slug,
             display_name: row.display_name,
             color,
+            shape,
             created_at: row.created_at,
             updated_at: row.updated_at,
         })
@@ -148,6 +159,10 @@ pub(crate) async fn ensure_project_in_tx(
     .execute(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("register task board project '{slug}': {error}")))?;
+
+    // The board may have just crossed the palette, which is the moment the
+    // outline starts carrying the organization for every project at once.
+    super::project_shapes::assign_shapes_in_tx(transaction).await?;
 
     read_project_id_in_tx(transaction, source, &slug)
         .await?
@@ -244,7 +259,7 @@ impl AsyncDaemonDb {
     /// Returns [`CliError`] when the registry cannot be read.
     pub(crate) async fn list_task_board_projects(&self) -> Result<Vec<TaskBoardProject>, CliError> {
         query_as::<_, ProjectRow>(
-            "SELECT project_id, source, slug, display_name, color, created_at, updated_at
+            "SELECT project_id, source, slug, display_name, color, shape, created_at, updated_at
              FROM task_board_projects
              ORDER BY source ASC, slug ASC",
         )
@@ -265,7 +280,7 @@ impl AsyncDaemonDb {
         project_id: &str,
     ) -> Result<Option<TaskBoardProject>, CliError> {
         query_as::<_, ProjectRow>(
-            "SELECT project_id, source, slug, display_name, color, created_at, updated_at
+            "SELECT project_id, source, slug, display_name, color, shape, created_at, updated_at
              FROM task_board_projects WHERE project_id = ?1",
         )
         .bind(project_id)

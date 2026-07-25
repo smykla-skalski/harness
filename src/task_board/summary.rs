@@ -11,6 +11,7 @@ use super::external::{ExternalProvider, ExternalSyncConfig, ExternalSyncOperatio
 use super::policy::PolicyApprovalGrant;
 use super::project::{TaskBoardProject, TaskBoardProjectSource};
 use super::project_color::TaskBoardProjectColor;
+use super::project_shape::TaskBoardProjectShape;
 use super::types::{AgentMode, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -59,6 +60,7 @@ pub struct TaskBoardProjectSummary {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
     pub color: TaskBoardProjectColor,
+    pub shape: TaskBoardProjectShape,
     pub item_count: usize,
     pub ready_count: usize,
 }
@@ -148,6 +150,7 @@ pub fn build_project_summaries(
             slug: project.slug.clone(),
             display_name: project.display_name.clone(),
             color: project.color,
+            shape: project.shape,
             item_count: 0,
             ready_count: 0,
         })

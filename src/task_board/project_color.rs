@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 /// projects look different, and that is only checkable against a known set.
 ///
 /// The names are plain colors rather than the app's theme token names, so the
-/// wire format does not pin the client to one theme's vocabulary.
+/// wire format does not pin the client to one theme's vocabulary. Each family
+/// carries a `_deep` tier as well, which is what takes the palette past the
+/// dozen hues a person can still tell apart on their own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[derive(utoipa::ToSchema)]
@@ -16,29 +18,56 @@ pub enum TaskBoardProjectColor {
     Amber,
     Teal,
     Pink,
-    Red,
     Mint,
     Sky,
     Warm,
+    Olive,
     Graphite,
+    Red,
+    BlueDeep,
+    GreenDeep,
+    PurpleDeep,
+    AmberDeep,
+    TealDeep,
+    PinkDeep,
+    MintDeep,
+    SkyDeep,
+    WarmDeep,
+    OliveDeep,
+    GraphiteDeep,
+    RedDeep,
 }
 
 impl TaskBoardProjectColor {
-    /// Allocation order, not merely the set. The first projects on a board get
-    /// the most separable colors, and red arrives late because a red mark on
-    /// a card reads as a warning before it reads as an identity.
-    pub const PALETTE: [Self; 11] = [
+    /// Allocation order, not merely the set. The base tier goes out first
+    /// because those entries stay legible at the size of a card mark, and red
+    /// closes each tier because a red mark reads as a warning before it reads
+    /// as an identity.
+    pub const PALETTE: [Self; 24] = [
         Self::Blue,
         Self::Green,
         Self::Purple,
         Self::Amber,
         Self::Teal,
         Self::Pink,
-        Self::Red,
         Self::Mint,
         Self::Sky,
         Self::Warm,
+        Self::Olive,
         Self::Graphite,
+        Self::Red,
+        Self::BlueDeep,
+        Self::GreenDeep,
+        Self::PurpleDeep,
+        Self::AmberDeep,
+        Self::TealDeep,
+        Self::PinkDeep,
+        Self::MintDeep,
+        Self::SkyDeep,
+        Self::WarmDeep,
+        Self::OliveDeep,
+        Self::GraphiteDeep,
+        Self::RedDeep,
     ];
 
     #[must_use]
@@ -50,11 +79,24 @@ impl TaskBoardProjectColor {
             Self::Amber => "amber",
             Self::Teal => "teal",
             Self::Pink => "pink",
-            Self::Red => "red",
             Self::Mint => "mint",
             Self::Sky => "sky",
             Self::Warm => "warm",
+            Self::Olive => "olive",
             Self::Graphite => "graphite",
+            Self::Red => "red",
+            Self::BlueDeep => "blue_deep",
+            Self::GreenDeep => "green_deep",
+            Self::PurpleDeep => "purple_deep",
+            Self::AmberDeep => "amber_deep",
+            Self::TealDeep => "teal_deep",
+            Self::PinkDeep => "pink_deep",
+            Self::MintDeep => "mint_deep",
+            Self::SkyDeep => "sky_deep",
+            Self::WarmDeep => "warm_deep",
+            Self::OliveDeep => "olive_deep",
+            Self::GraphiteDeep => "graphite_deep",
+            Self::RedDeep => "red_deep",
         }
     }
 
