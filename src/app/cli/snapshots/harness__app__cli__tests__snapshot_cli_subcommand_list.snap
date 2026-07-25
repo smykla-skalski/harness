@@ -3,10 +3,8 @@ source: src/app/cli/tests.rs
 expression: "names.join(\"\\n\")"
 ---
 bridge
-create
 daemon
 observe
-run
 session
 setup
 task-board

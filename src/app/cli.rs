@@ -5,18 +5,8 @@ use clap::{Parser, Subcommand};
 use tracing::field::{Empty, display};
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::create::{
-    ApprovalBeginArgs, CreateBeginArgs, CreateResetArgs, CreateSaveArgs, CreateShowArgs,
-    CreateValidateArgs,
-};
 use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::observe::ObserveArgs;
-use crate::run::{
-    ApplyArgs, CaptureArgs, CloseoutArgs, ClusterCheckArgs, DiffArgs, DoctorArgs, EnvoyArgs,
-    FinishArgs, InitArgs, KumaArgs, LogsArgs, PreflightArgs, RecordArgs, RepairArgs, ReportArgs,
-    RestartNamespaceArgs, ResumeArgs, RunnerStateArgs, StartArgs, StatusArgs, TaskArgs,
-    ValidateArgs,
-};
 use crate::session::transport::SessionCommand;
 use crate::setup::{BootstrapArgs, CapabilitiesArgs, GatewayArgs, KumaSetupArgs, SecretsArgs};
 use crate::task_board::transport::TaskBoardCommand;
@@ -37,46 +27,6 @@ pub struct Cli {
     pub command: Command,
 }
 
-/// Grouped `run` commands.
-#[derive(Debug, Clone, Subcommand)]
-#[non_exhaustive]
-pub enum RunCommand {
-    Start(StartArgs),
-    Init(InitArgs),
-    Preflight(PreflightArgs),
-    Capture(CaptureArgs),
-    Record(RecordArgs),
-    RestartNamespace(RestartNamespaceArgs),
-    Apply(ApplyArgs),
-    Validate(ValidateArgs),
-    Doctor(DoctorArgs),
-    Repair(RepairArgs),
-    RunnerState(RunnerStateArgs),
-    Resume(ResumeArgs),
-    Finish(FinishArgs),
-    Closeout(CloseoutArgs),
-    Report(ReportArgs),
-    Diff(DiffArgs),
-    Envoy(EnvoyArgs),
-    Kuma(KumaArgs),
-    Status(StatusArgs),
-    Logs(LogsArgs),
-    ClusterCheck(ClusterCheckArgs),
-    Task(TaskArgs),
-}
-
-/// Grouped `create` commands.
-#[derive(Debug, Clone, Subcommand)]
-#[non_exhaustive]
-pub enum CreateCommand {
-    Begin(CreateBeginArgs),
-    Save(CreateSaveArgs),
-    Show(CreateShowArgs),
-    Reset(CreateResetArgs),
-    Validate(CreateValidateArgs),
-    ApprovalBegin(ApprovalBeginArgs),
-}
-
 /// Grouped `setup` commands.
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]
@@ -93,18 +43,6 @@ pub enum SetupCommand {
 #[derive(Debug, Subcommand)]
 #[non_exhaustive]
 pub enum Command {
-    /// Suite:run commands grouped by domain.
-    Run {
-        #[command(subcommand)]
-        command: Box<RunCommand>,
-    },
-
-    /// Suite:create commands grouped by domain.
-    Create {
-        #[command(subcommand)]
-        command: CreateCommand,
-    },
-
     /// Setup environment and cluster commands.
     Setup {
         #[command(subcommand)]
@@ -150,8 +88,6 @@ pub fn dispatch(command: &Command) -> Result<i32, CliError> {
 
     let ctx = AppContext::production();
     match command {
-        Command::Run { command } => dispatch_run(&ctx, command),
-        Command::Create { command } => dispatch_create(&ctx, command),
         Command::Setup { command } => dispatch_setup(&ctx, command),
         Command::Observe(args) => args.execute(&ctx),
         Command::Session { command } => command.execute(&ctx),
@@ -163,8 +99,6 @@ pub fn dispatch(command: &Command) -> Result<i32, CliError> {
 
 fn command_name(command: &Command) -> &'static str {
     match command {
-        Command::Run { .. } => "run",
-        Command::Create { .. } => "create",
         Command::Setup { .. } => "setup",
         Command::Observe(_) => "observe",
         Command::Session { .. } => "session",
@@ -182,44 +116,6 @@ fn delegate(route: &str, worker: &str) -> Result<i32, CliError> {
 
 fn worker_error(error: &harness_command::WorkerError) -> CliError {
     CliErrorKind::workflow_io(error.to_string()).into()
-}
-
-fn dispatch_run(ctx: &AppContext, command: &RunCommand) -> Result<i32, CliError> {
-    match command {
-        RunCommand::Start(args) => args.execute(ctx),
-        RunCommand::Init(args) => args.execute(ctx),
-        RunCommand::Preflight(args) => args.execute(ctx),
-        RunCommand::Capture(args) => args.execute(ctx),
-        RunCommand::Record(args) => args.execute(ctx),
-        RunCommand::RestartNamespace(args) => args.execute(ctx),
-        RunCommand::Apply(args) => args.execute(ctx),
-        RunCommand::Validate(args) => args.execute(ctx),
-        RunCommand::Doctor(args) => args.execute(ctx),
-        RunCommand::Repair(args) => args.execute(ctx),
-        RunCommand::RunnerState(args) => args.execute(ctx),
-        RunCommand::Resume(args) => args.execute(ctx),
-        RunCommand::Finish(args) => args.execute(ctx),
-        RunCommand::Closeout(args) => args.execute(ctx),
-        RunCommand::Report(args) => args.execute(ctx),
-        RunCommand::Diff(args) => args.execute(ctx),
-        RunCommand::Envoy(args) => args.execute(ctx),
-        RunCommand::Kuma(args) => args.execute(ctx),
-        RunCommand::Status(args) => args.execute(ctx),
-        RunCommand::Logs(args) => args.execute(ctx),
-        RunCommand::ClusterCheck(args) => args.execute(ctx),
-        RunCommand::Task(args) => args.execute(ctx),
-    }
-}
-
-fn dispatch_create(ctx: &AppContext, command: &CreateCommand) -> Result<i32, CliError> {
-    match command {
-        CreateCommand::Begin(args) => args.execute(ctx),
-        CreateCommand::Save(args) => args.execute(ctx),
-        CreateCommand::Show(args) => args.execute(ctx),
-        CreateCommand::Reset(args) => args.execute(ctx),
-        CreateCommand::Validate(args) => args.execute(ctx),
-        CreateCommand::ApprovalBegin(args) => args.execute(ctx),
-    }
 }
 
 fn dispatch_setup(ctx: &AppContext, command: &SetupCommand) -> Result<i32, CliError> {

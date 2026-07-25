@@ -2,7 +2,6 @@ use std::fs;
 use std::path::Path;
 
 use harness::kernel::topology::{ClusterMember, ClusterMode, ClusterSpec, HelmSetting, Platform};
-use harness::run::ValidateArgs;
 use harness::run::context::{CommandEnv, RunContext, RunLayout};
 
 use super::helpers::*;
@@ -10,7 +9,6 @@ use super::helpers::*;
 mod cluster_spec_tests;
 mod context_tests;
 mod platform_tests;
-mod validation_tests;
 
 fn assert_universal_cluster_roundtrip(spec: &ClusterSpec) {
     assert_eq!(spec.platform, Platform::Universal);

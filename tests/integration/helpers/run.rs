@@ -135,15 +135,6 @@ pub fn init_run(tmp_path: &Path, run_id: &str, profile: &str) -> PathBuf {
         .build_run_dir()
 }
 
-/// Initialize a run and return `(run_dir, suite_dir)`.
-/// Drop-in replacement for `helpers::init_run_with_suite`.
-#[must_use]
-pub fn init_run_with_suite(tmp_path: &Path, run_id: &str, profile: &str) -> (PathBuf, PathBuf) {
-    RunDirBuilder::new(tmp_path, run_id)
-        .profile(profile)
-        .build()
-}
-
 /// Read a `RunStatus` from a run directory.
 ///
 /// # Panics
@@ -163,37 +154,6 @@ pub fn write_run_status(run_dir: &Path, status: &RunStatus) {
     let path = run_dir.join("run-status.json");
     let json = serde_json::to_string_pretty(status).expect("serialize status");
     fs::write(&path, format!("{json}\n")).expect("write run-status.json");
-}
-
-/// Seed a minimal cluster.json in a run directory's state folder.
-///
-/// Creates the file that `RunServices::cluster_runtime()` loads, giving
-/// the run a synthetic cluster context so that capture/apply commands work
-/// without running `harness cluster`.
-///
-/// # Panics
-/// Panics if directory creation or file write fails.
-pub fn seed_cluster_state(run_dir: &Path, kubeconfig: &str) {
-    let state_dir = run_dir.join("state");
-    fs::create_dir_all(&state_dir).expect("create state dir");
-    let payload = serde_json::json!({
-        "mode": "single-up",
-        "platform": "kubernetes",
-        "members": [{
-            "name": "kuma-test",
-            "role": "primary",
-            "kubeconfig": kubeconfig,
-        }],
-        "mode_args": ["kuma-test"],
-        "helm_settings": [],
-        "restart_namespaces": [],
-        "repo_root": "/tmp",
-    });
-    fs::write(
-        state_dir.join("cluster.json"),
-        serde_json::to_string_pretty(&payload).unwrap(),
-    )
-    .expect("write cluster.json");
 }
 
 /// Seed kubectl-validate state for tests.

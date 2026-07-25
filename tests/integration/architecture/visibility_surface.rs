@@ -65,12 +65,6 @@ fn transport_command_modules_stay_internal_to_domains() {
         "tests/integration/helpers.rs",
         "tests/integration/cluster/mod.rs",
         "tests/integration/cluster/orchestration.rs",
-        "tests/integration/commands/api.rs",
-        "tests/integration/commands/init_run.rs",
-        "tests/integration/commands/record.rs",
-        "tests/integration/commands/report.rs",
-        "tests/integration/commands/runner_state.rs",
-        "tests/integration/commands/service.rs",
         "tests/integration/preflight.rs",
         "tests/integration/universal.rs",
     ] {

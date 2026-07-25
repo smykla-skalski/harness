@@ -1,27 +1,17 @@
-use std::path::Path;
-
 use clap::{CommandFactory, error::ErrorKind};
 
 use super::*;
 use crate::hooks::adapters::HookAgent;
 use crate::observe::{ObserveArgs, ObserveMode};
-use crate::run::{
-    ApiArgs, ApiMethod, DoctorArgs, EnvoyCommand, FinishArgs, KumaCommand, KumactlArgs,
-    KumactlCommand, RepairArgs, ReportCommand, ResumeArgs, StartArgs,
-};
 use crate::session::transport::{SessionCommand, SessionObserveArgs};
 use crate::setup::{CapabilitiesArgs, ClusterArgs, GatewayArgs, KumaSetupCommand};
 use crate::task_board::transport::{TaskBoardCommand, TaskBoardOrchestratorCommand};
 use crate::task_board::types::{ExternalRefProvider, TaskBoardStatus, TaskBoardWorkflowStatus};
 
-#[path = "tests/create.rs"]
-mod create;
 #[path = "tests/daemon.rs"]
 mod daemon;
 #[path = "tests/observe.rs"]
 mod observe;
-#[path = "tests/run.rs"]
-mod run;
 #[path = "tests/session.rs"]
 mod session;
 #[path = "tests/session_adopt.rs"]
@@ -90,10 +80,8 @@ fn all_expected_subcommands_registered() {
     let names: Vec<&str> = cmd.get_subcommands().map(clap::Command::get_name).collect();
     for expected in [
         "bridge",
-        "create",
         "daemon",
         "observe",
-        "run",
         "session",
         "setup",
         "task-board",
