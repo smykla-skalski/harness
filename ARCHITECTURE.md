@@ -24,10 +24,8 @@ flowchart LR
     Infra["infra\ngeneric side effects"]
     Errors["errors\ntyped error families"]
 
-    App --> Run
     App --> Agents
     App --> Session
-    App --> Create
     App --> Observe
     App --> Setup
     App --> Hooks
@@ -95,8 +93,8 @@ flowchart LR
 | `src/agents/`    | shared agent lifecycle commands, canonical agent ledger/session storage, project-scoped agent state, runtime adapters for log discovery, signal delivery, and liveness detection |
 | `src/session/`   | multi-agent orchestration: session lifecycle, role-based permissions, work items, cross-agent observation with periodic sweep |
 | `src/app/`       | Clap CLI, top-level command grouping, transport mapping, domain wiring             |
-| `src/run/`       | tracked runs, run workflow, prepared artifacts, reporting, run diagnostics, repair, provider-aware run checks |
-| `src/create/`    | `suite:create` workflow, approval state, create validation, create session state   |
+| `src/run/`       | retired suite execution; no CLI command reaches it and it is being removed         |
+| `src/create/`    | retired suite authoring; no CLI command reaches it and it is being removed         |
 | `src/observe/`   | live session inspection, doctor diagnostics, classifiers, dump/scan/watch flows, and fix routing for improving skills and suites |
 | `src/setup/`     | environment bootstrap, capabilities/readiness evaluation, wrapper/session lifecycle, provider-aware cluster setup entrypoints, remote kubeconfig materialization, setup install-state tracking |
 | `src/hooks/`     | hook payload handling, guard policy, protocol normalization, hook effects          |

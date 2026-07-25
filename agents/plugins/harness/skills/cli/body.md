@@ -14,7 +14,6 @@ Use this skill to answer `harness` CLI questions from checked-in references back
 ## Reference map
 
 - `references/top-level-and-hidden.md` — visible top-level commands, hidden top-level commands, global `--delay`
-- `references/setup-create.md` — `setup` and `create` command surfaces, key flags, bootstrap/generate shortcuts
-- `references/run.md` — `run`, especially resume / status / doctor / repair recovery work.
+- `references/setup.md` — the `setup` command surface, key flags, and bootstrap shortcuts
 - `references/observe-session.md` — `observe`, `session`, and `session start` flag surfaces.
 - `references/agents-daemon-bridge.md` — `harness-hook`, daemon, bridge, and wrapper lifecycle command shapes.

@@ -2,7 +2,7 @@
 
 Harness is a local control plane for running multiple AI coding agents as a coordinated swarm. It works with Claude, Codex, Gemini, Copilot, Vibe, and OpenCode, and manages session state, roles, task assignment, review, and live inspection across them.
 
-It also carries tracked Kubernetes/Kuma suite workflows for disposable test environments.
+A background daemon holds that state and serves it to the CLI and to the macOS Harness Monitor app.
 
 For the internal module map, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
@@ -22,32 +22,33 @@ The installer reconciles stale Harness binaries on your `PATH`, including old `~
 # 1. bootstrap agent wiring and runtime hook configs
 mise run setup:bootstrap
 
-# 2. point harness at a cluster
-harness setup kuma cluster single-up dev --repo-root "$PWD"
+# 2. open a session and bring agents into it with roles
+harness session start --context "fix the retry backoff" --title "retry backoff"
+harness session join <session-id> --role leader --runtime claude
+harness session join <session-id> --role worker --runtime codex
 
-# 3. run a suite against it
-harness run start --suite ./suites/my-feature --run-id my-feature-001 --profile single-zone
-harness run apply --manifest manifests/app.yaml
-harness run record -- kubectl get pods -A
-harness run finish
+# 3. watch the swarm work
+harness session observe <session-id> --poll-interval 3 --json --actor <leader-agent-id>
 ```
 
 ## Concepts
 
-- **Suite** — an authored, version-tracked set of steps and checks for a feature or scenario.
-- **Run** — one tracked execution of a suite against a real cluster. State persists to disk, so you can resume interrupted runs.
 - **Session** — a shared workspace where several agents work together with assigned roles.
+- **Role** — leader, worker, observer, reviewer, or improver. Each carries a permission set that controls which commands the agent may run.
+- **Task board** — cross-project work items, assigned to agents and tracked to completion.
 - **Observe** — live inspection of agent sessions: scan logs, classify issues, watch events, dump raw output.
+- **Daemon** — the local service that owns session and task state and serves the Harness Monitor app.
 
 ## Commands at a glance
 
 | Command group | What it does |
 | --- | --- |
-| `harness setup` | Bootstrap agent wiring, create or attach to a cluster, report capabilities. |
-| `harness create` | Guided authoring of new suites. |
-| `harness run` | Tracked execution: `start`, `apply`, `record`, `validate`, `doctor`, `resume`, `finish`. |
-| `harness observe` | Inspect live sessions: `scan`, `watch`, `dump`, `doctor`. |
+| `harness setup` | Bootstrap agent wiring, report capabilities, inspect task-board secrets. |
 | `harness session` | Orchestrate multiple agents with roles, tasks, and cross-agent observation. |
+| `harness observe` | Inspect live sessions: `scan`, `watch`, `dump`, `doctor`. |
+| `harness task-board` | Track cross-project work items and their assignment. |
+| `harness daemon` | Run the local daemon that serves session and task state. |
+| `harness bridge` | Supervise host capabilities for sandboxed Codex and terminal agent flows. |
 | `harness-hook` | Cross-agent lifecycle entrypoints, called by generated hooks. |
 
 Run any command with `--help` for the full flag reference.
@@ -56,27 +57,25 @@ Run any command with `--help` for the full flag reference.
 
 ```mermaid
 flowchart LR
-    Setup["setup\nbootstrap, cluster"] --> Create["create\nauthor suites"]
-    Create --> Run["run\ntracked execution"]
-    Run --> Observe["observe\nscan, watch, dump"]
-    Observe -->|"route fixes"| Create
-    Observe -->|"route fixes"| Run
-    Session["session\norchestrate agents"] --> Observe
-    Session -->|"assign work"| Run
+    Setup["setup\nbootstrap, capabilities"] --> Session["session\nroles, tasks"]
+    Session --> Observe["observe\nscan, watch, dump"]
+    Observe -->|"route fixes"| Session
+    Session --> Board["task-board\ncross-project work"]
+    Session --> Daemon["daemon\nowns state"]
+    Daemon --> Monitor["Harness Monitor\nmacOS app"]
 ```
 
-1. `harness setup` — bootstrap agent wiring and cluster access.
-2. `harness create` — author a suite, or skip if you have one.
-3. `harness run` — execute the suite against a real cluster.
-4. `harness observe` — inspect sessions, classify issues, route fixes.
-5. `harness session` — coordinate several agents with roles and tasks.
+1. `harness setup` — bootstrap agent wiring and check what this machine supports.
+2. `harness session` — open a session and give each agent a role.
+3. `harness observe` — inspect sessions, classify issues, route fixes.
+4. `harness task-board` — track the work items the swarm is assigned.
 
 ## Multi-agent sessions
 
 Agents join a session with a role — leader, worker, observer, reviewer, or improver. Each role has a permission set that controls which commands it can run. One observer scans every agent's log through the same classifier pipeline as `harness observe`.
 
 ```bash
-harness session start --context "fix mesh retry feature" --title "mesh retry"
+harness session start --context "fix the retry backoff" --title "retry backoff"
 harness session join <session-id> --role leader  --runtime claude
 harness session join <session-id> --role worker  --runtime codex
 harness session join <session-id> --role observer --runtime gemini
@@ -92,64 +91,32 @@ mise run setup:bootstrap -- --agents codex
 harness observe --agent codex scan <session-id>
 ```
 
-## Running a suite
+## The daemon and Harness Monitor
 
-### Local k3d cluster
-
-```bash
-REPO=/path/to/repo
-SUITE=$REPO/suites/my-feature
-RUN_ID=my-feature-001
-
-harness setup kuma cluster single-up dev --repo-root "$REPO"
-harness run start --suite "$SUITE" --run-id "$RUN_ID" --profile single-zone --repo-root "$REPO"
-harness run apply --manifest manifests/app.yaml
-harness run record -- kubectl get pods -A
-harness run finish
-```
-
-For local k3d, prefer `--no-build` and `--no-load` flags over raw build/load env vars. Harness translates them internally.
-
-### Remote cluster
+The daemon owns session, agent, and task-board state and serves it over a local HTTP API described by [docs/api/openapi.json](docs/api/openapi.json). The macOS Harness Monitor app is a client of that API and gives the swarm a live window: sessions, agents, tasks, and reviews as they change.
 
 ```bash
-harness setup kuma cluster \
-  --provider remote \
-  --remote name=dev,kubeconfig=/path/to/dev.yaml \
-  --push-prefix ghcr.io/acme/kuma \
-  --push-tag branch-dev \
-  single-up dev
+harness daemon --help    # lifecycle and control routes
 ```
 
-Harness materializes tracked kubeconfigs, pushes branch images, and deploys Kuma. It never creates or deletes the remote cluster itself.
-
-### Resuming a run
-
-```bash
-harness run resume --run-id <id> --run-root <path>
-```
-
-Run state persists to disk, so you can pick up an interrupted run later. The command history stays attached.
+For production installation, upgrades, and rollback of the daemon, see [docs/remote-systemd-upgrades.md](docs/remote-systemd-upgrades.md).
 
 ## Hook guards
 
-Harness intercepts agent tool use through hooks that enforce tracked workflows.
+Harness intercepts agent tool use through hooks generated by `setup:bootstrap`.
 
-- **`tool-guard`** blocks direct use of cluster binaries (`kubectl`, `docker`, `k3d`, `helm`, `kumactl`, and others), `gh` during active runs, inline Python, legacy wrapper scripts, and out-of-surface writes. All cluster access goes through harness commands. The one escape hatch is `harness run record -- kubectl ...`, which routes through the tracked runner.
-- **`tool-result`** validates tool outcomes and runner-state transitions after each tool completes.
+- **`tool-guard`** inspects a tool call before it runs and can deny it.
+- **`tool-result`** validates tool outcomes after each tool completes.
 
-## Runtime backends
+Every generated registration claims the `suite:run` skill, and the guard body returns early unless the session confirms that skill. That confirmation required state the retired suite-run workflow created, so the bash guards currently allow every command in an ordinary session. Treat `tool-guard` as wiring that is in place rather than as an enforcement boundary you can rely on today.
 
-Harness picks sensible defaults and abstracts over the backends underneath.
-
-- **Container runtime** defaults to Bollard (the Docker API client). The Docker CLI is not required. Set `HARNESS_CONTAINER_RUNTIME=docker-cli` for the CLI fallback.
-- **Kubernetes runtime** defaults to the native kube client. The `kubectl` binary is not required for `validate`, `apply`, `capture`, or readiness checks. Set `HARNESS_KUBERNETES_RUNTIME=kubectl-cli` for the CLI fallback. `kubectl` is still required for `harness run record -- kubectl ...`.
+## Capabilities
 
 ```bash
 harness setup capabilities   # what is supported and ready on this machine right now
 ```
 
-The output separates `available` (harness supports it), `readiness` (your machine is ready now), and `providers` (which cluster backends exist and are usable).
+The output separates `available` (harness supports it) from `readiness` (your machine is ready now).
 
 ## Where harness stores things
 
@@ -157,30 +124,19 @@ Harness uses XDG-style state directories. The data root is `$XDG_DATA_HOME/harne
 
 ```
 $XDG_DATA_HOME/harness/
-  suites/                    # suite library
-  runs/<run-id>/             # tracked runs
-    artifacts/               # collected output
-    commands/                # recorded command logs
-    manifests/               # prepared manifests
-    suite-run-state.json     # runner state
-    run-report.md            # human-readable report
+  sessions/                  # session workspaces
   contexts/<session-hash>/   # session context
   projects/project-<digest>/ # cross-agent state: agent ledger, signals, orchestration
 ```
 
-Do not edit run state or create-approval files by hand. Use the harness commands instead.
+Use the harness commands to change this state rather than editing the files by hand.
 
 ## When you get stuck
 
-- `harness observe doctor` — check wiring, lifecycle commands, run pointers, compact handoff.
-- `harness setup capabilities` — see which profiles and features are ready right now.
+- `harness observe doctor` — check wiring, lifecycle commands, and compact handoff.
+- `harness setup capabilities` — see which features are ready right now.
 - `harness observe scan` — classify problems in a session log.
-- `harness run doctor` — inspect one tracked run and its pointer state.
-- `harness run repair` — apply safe repairs to broken run metadata, status, or pointers.
-- `run-report.md` in the run directory — the high-level result.
-- `commands/` in the run directory — the exact command history.
-
-If `harness run repair` still leaves blocking findings, start a fresh run with `harness run start` rather than editing state files by hand.
+- `harness observe dump` — read the raw agent output behind a classification.
 
 ## For contributors
 
