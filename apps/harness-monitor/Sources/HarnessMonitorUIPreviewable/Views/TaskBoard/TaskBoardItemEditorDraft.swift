@@ -50,10 +50,6 @@ struct TaskBoardItemEditorDraft: Equatable {
     normalized(approvedBy)
   }
 
-  var approvalTimestampForRequest: String? {
-    normalized(approvedAt)
-  }
-
   var createRequest: TaskBoardCreateItemRequest {
     TaskBoardCreateItemRequest(
       title: normalized(title) ?? "",
