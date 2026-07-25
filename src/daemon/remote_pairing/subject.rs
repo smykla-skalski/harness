@@ -61,6 +61,15 @@ impl RemotePairingSubject {
                     "pairing subject {label} is required"
                 )));
             }
+            // The mint route deserializes this type straight from the request
+            // body and validates it, so `new`'s trimming never runs there.
+            // Accepting " github " would file the same person under two
+            // spellings in the audit trail.
+            if value != value.trim() {
+                return Err(RemotePairingError::InvalidSubject(format!(
+                    "pairing subject {label} must not have leading or trailing whitespace"
+                )));
+            }
             if value.chars().count() > MAX_SUBJECT_FIELD_CHARS {
                 return Err(RemotePairingError::InvalidSubject(format!(
                     "pairing subject {label} exceeds {MAX_SUBJECT_FIELD_CHARS} characters"
@@ -117,6 +126,37 @@ mod tests {
                 "error should name {expected}, got {error}"
             );
         }
+    }
+
+    /// `new` trims, but the mint route deserializes and calls `validate`
+    /// directly, so only `validate` rejecting untrimmed input keeps one
+    /// external identity from having several spellings.
+    #[test]
+    fn validate_rejects_untrimmed_fields_that_new_would_have_trimmed() {
+        let padded = RemotePairingSubject {
+            provider: " github ".to_owned(),
+            subject_id: "4242".to_owned(),
+            display_name: "Ada".to_owned(),
+        };
+
+        let error = padded
+            .validate()
+            .expect_err("untrimmed provider must be refused");
+
+        assert!(error.to_string().contains("provider"), "{error}");
+        assert!(error.to_string().contains("whitespace"), "{error}");
+    }
+
+    /// Whatever `new` accepts must survive its own validation, or the two
+    /// construction paths disagree about what a valid subject is.
+    #[test]
+    fn a_subject_built_by_new_always_revalidates() {
+        let subject = RemotePairingSubject::new(" github ", " 4242 ", " Ada Lovelace ")
+            .expect("complete subject");
+
+        subject
+            .validate()
+            .expect("new must produce a valid subject");
     }
 
     /// A newline in any field would otherwise forge extra lines in the audit

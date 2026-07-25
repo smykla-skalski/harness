@@ -239,6 +239,7 @@ impl DaemonRemotePairCreateArgs {
                 requested_scopes: &requested_scopes,
                 reviews_query: reviews_query.as_ref(),
                 minted_for: None,
+                extra_audit: None,
             },
         )?;
         Ok(DaemonRemotePairCreateResponse {

@@ -14,6 +14,7 @@ use super::subject::RemotePairingSubject;
 use super::{RemotePairingCode, RemotePairingRecord};
 use crate::daemon::db::DaemonDb;
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
+use crate::daemon::remote_identity::RemoteAuditEvent;
 use crate::errors::{CliError, CliErrorKind};
 use crate::reviews::ReviewsQueryRequest;
 
@@ -45,6 +46,9 @@ pub(crate) struct RemotePairingCreateParams<'a> {
     pub requested_scopes: &'a [RemoteAccessScope],
     pub reviews_query: Option<&'a ReviewsQueryRequest>,
     pub minted_for: Option<&'a RemotePairingSubject>,
+    /// Written in the same transaction as the pairing row, so a caller never
+    /// ends up with a committed link whose audit trail failed to record.
+    pub extra_audit: Option<&'a RemoteAuditEvent>,
 }
 
 pub(crate) struct RemotePairingCreated {
@@ -102,7 +106,11 @@ pub(crate) fn create_remote_pairing(
         &scopes,
         record.expires_at.as_str(),
     )?;
-    let stored = db.create_remote_pairing_code(&record, params.audit_event_id)?;
+    let stored = db.create_remote_pairing_code_with_audit(
+        &record,
+        params.audit_event_id,
+        params.extra_audit,
+    )?;
     Ok(RemotePairingCreated {
         pairing_id: stored.pairing_id,
         role,

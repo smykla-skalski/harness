@@ -16,7 +16,6 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 use uuid::Uuid;
 
-use crate::daemon::db::DaemonDb;
 use crate::daemon::protocol::http_paths;
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 use crate::daemon::remote_identity::{
@@ -27,7 +26,7 @@ use crate::daemon::remote_pairing::{
     RemotePairingCode, RemotePairingCreateParams, RemotePairingSubject, create_remote_pairing,
     pairing_expires_at,
 };
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 use super::super::DaemonHttpState;
@@ -145,6 +144,14 @@ fn mint_remote_pairing(
         .map_err(|_| RemotePairMintHttpError::InvalidTtl)?;
     let pairing_id = format!("pairing-{}", Uuid::new_v4());
     let audit_event_id = format!("remote-pair-mint-{}", Uuid::new_v4());
+    let mint_audit = mint_audit_event(
+        request_id,
+        client,
+        &request.subject,
+        pairing_id.as_str(),
+        created_at.as_str(),
+    )
+    .map_err(RemotePairMintHttpError::Create)?;
     let db = state
         .db
         .get()
@@ -164,15 +171,8 @@ fn mint_remote_pairing(
             requested_scopes: &plan.scopes,
             reviews_query: None,
             minted_for: Some(&request.subject),
+            extra_audit: Some(&mint_audit),
         },
-    )
-    .map_err(RemotePairMintHttpError::Create)?;
-    record_mint_audit_event(
-        &db,
-        request_id,
-        client,
-        &request.subject,
-        &created.pairing_id,
     )
     .map_err(RemotePairMintHttpError::Create)?;
     drop(db);
@@ -206,34 +206,39 @@ fn log_remote_pairing_minted(request_id: &str, pairing_id: &str) {
 /// The context rides `metadata_json`, not `error_detail`. This event is a
 /// success, and every other writer sets `error_detail` only on failure, so a
 /// reader treating it as a failure signal would misclassify every mint.
-fn record_mint_audit_event(
-    db: &DaemonDb,
+///
+/// It is built before the pairing row is written and handed to the creation
+/// path, which commits both together.
+fn mint_audit_event(
     request_id: &str,
     client: Option<&RemoteStoredClient>,
     subject: &RemotePairingSubject,
     pairing_id: &str,
-) -> Result<(), CliError> {
+    recorded_at: &str,
+) -> Result<RemoteAuditEvent, CliError> {
     let event_id = format!("remote-pair-mint-audit-{}", Uuid::new_v4());
-    let metadata = serde_json::json!({
+    let metadata = serde_json::to_string(&serde_json::json!({
         "pairing_id": pairing_id,
         "minted_for": subject,
-    })
-    .to_string();
-    db.record_remote_audit_event(
-        &RemoteAuditEvent::new(
-            event_id.as_str(),
-            utc_now().as_str(),
-            Some(request_id),
-            client.map(|client| client.client_id.as_str()),
-            "remote.pair.mint",
-            RemoteAccessScope::PairMint,
-            RemoteAuditScopeDecision::Allowed,
-            RemoteAuditOutcome::Success,
-            None,
-            None,
-        )
-        .with_metadata_json(metadata),
+    }))
+    .map_err(|error| {
+        CliErrorKind::workflow_parse(format!(
+            "encode remote pairing mint audit metadata: {error}"
+        ))
+    })?;
+    Ok(RemoteAuditEvent::new(
+        event_id.as_str(),
+        recorded_at,
+        Some(request_id),
+        client.map(|client| client.client_id.as_str()),
+        "remote.pair.mint",
+        RemoteAccessScope::PairMint,
+        RemoteAuditScopeDecision::Allowed,
+        RemoteAuditOutcome::Success,
+        None,
+        None,
     )
+    .with_metadata_json(metadata))
 }
 
 struct MintPlan {
