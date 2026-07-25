@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 use std::path::Path;
+#[cfg(feature = "helm")]
 use std::sync::Arc;
 
 use super::*;
+#[cfg(feature = "helm")]
 use crate::infra::blocks::StdProcessExecutor;
 
 #[test]
@@ -57,6 +59,7 @@ fn fake_package_deployer_uninstall_removes_release() {
 fn helm_types_are_send_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
 
+    #[cfg(feature = "helm")]
     assert_send_sync::<HelmDeployer>();
     assert_send_sync::<FakePackageDeployer>();
 }
@@ -64,6 +67,7 @@ fn helm_types_are_send_sync() {
 mod contracts {
     use super::*;
 
+    #[cfg(feature = "helm")]
     fn production_deployer() -> HelmDeployer {
         HelmDeployer::new(Arc::new(StdProcessExecutor))
     }
@@ -108,6 +112,7 @@ mod contracts {
         contract_run_target_returns_result(&FakePackageDeployer::new());
     }
 
+    #[cfg(feature = "helm")]
     #[test]
     #[ignore = "needs Helm on PATH"]
     fn production_satisfies_uninstall_nonexistent() {

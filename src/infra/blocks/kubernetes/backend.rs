@@ -12,7 +12,8 @@ use super::{KUBERNETES_RUNTIME_ENV, KubectlRuntime, KubernetesRuntime};
 #[cfg(feature = "kubernetes")]
 const ACCEPTED_BACKENDS: &str = "`kube` or `kubectl-cli`";
 #[cfg(not(feature = "kubernetes"))]
-const ACCEPTED_BACKENDS: &str = "`kubectl-cli`, the only backend this build was compiled with";
+const ACCEPTED_BACKENDS: &str =
+    "`kubectl-cli`; the `kube` backend needs a build with the `kubernetes` feature";
 
 /// The `Kube` variant stays in the enum whether or not the `kubernetes` feature
 /// is on, because callers outside this block match on it exhaustively. Only the
