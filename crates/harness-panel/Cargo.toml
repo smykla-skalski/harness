@@ -28,7 +28,7 @@ sqlx = { version = "0.9.0", default-features = false, features = ["sqlite", "sql
 thiserror = "2.0.19"
 # `axum-extra`'s cookie builder takes durations from `time`, not `std`.
 time = "0.3.54"
-tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "net", "signal"] }
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "net", "signal", "time"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 url = "2.5.8"
