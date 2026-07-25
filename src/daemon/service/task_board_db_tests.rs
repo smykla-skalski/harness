@@ -1,10 +1,69 @@
 use tempfile::tempdir;
 
 use crate::daemon::db::{AsyncDaemonDb, DisplayNameEdit};
-use crate::daemon::protocol::TaskBoardProjectUpdateRequest;
+use crate::daemon::protocol::{
+    TaskBoardCreateItemRequest, TaskBoardProjectUpdateRequest, TaskBoardUpdateIdentityClears,
+    TaskBoardUpdateItemRequest,
+};
 use crate::task_board::project::TaskBoardProjectSource;
 
-use super::update_task_board_project_db;
+use super::{create_task_board_item_db, update_task_board_item_db, update_task_board_project_db};
+
+/// Moving an item to another project has to re-resolve its attribution.
+/// `resolve_item_project_in_tx` treats an assigned project as settled, so a
+/// stale one survives every later write and the card keeps naming the project
+/// the item left.
+#[tokio::test]
+async fn moving_an_item_re_resolves_its_project() {
+    let directory = tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&directory.path().join("harness.db"))
+        .await
+        .expect("database");
+    let create: TaskBoardCreateItemRequest = serde_json::from_value(serde_json::json!({
+        "title": "Move me",
+        "project_id": "acme/widgets",
+    }))
+    .expect("create request");
+
+    let created = create_task_board_item_db(&db, &create)
+        .await
+        .expect("create item");
+    let first = created
+        .source_project_id
+        .clone()
+        .expect("attributed on create");
+
+    let moved = update_task_board_item_db(
+        &db,
+        &created.id,
+        &TaskBoardUpdateItemRequest {
+            project_id: Some("acme/gadgets".to_string()),
+            ..Default::default()
+        },
+    )
+    .await
+    .expect("move the item");
+    let second = moved
+        .source_project_id
+        .clone()
+        .expect("attributed after the move");
+    assert_ne!(second, first, "the item kept the project it left");
+
+    let cleared = update_task_board_item_db(
+        &db,
+        &created.id,
+        &TaskBoardUpdateItemRequest {
+            clear_identity: TaskBoardUpdateIdentityClears {
+                clear_project_id: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    )
+    .await
+    .expect("clear the project");
+    assert_eq!(cleared.source_project_id, None);
+}
 
 /// Setting and clearing in one request is a caller bug, not a precedence
 /// question. Whichever side won silently, the other half of the request was

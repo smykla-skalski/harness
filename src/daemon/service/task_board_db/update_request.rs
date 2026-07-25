@@ -34,6 +34,17 @@ pub(super) fn apply_update_request(
         request.execution_repository.as_ref(),
         request.clear_identity.clear_execution_repository,
     );
+    // `resolve_item_project_in_tx` treats an assigned project as settled and
+    // returns without looking at the origin fields, so a patch that moves the
+    // item has to drop the old attribution or the card keeps naming the
+    // project the item just left.
+    if request.project_id.is_some()
+        || request.clear_identity.clear_project_id
+        || request.execution_repository.is_some()
+        || request.clear_identity.clear_execution_repository
+    {
+        item.source_project_id = None;
+    }
     apply_optional_copy(
         &mut item.estimated_tokens,
         request.estimated_tokens,
