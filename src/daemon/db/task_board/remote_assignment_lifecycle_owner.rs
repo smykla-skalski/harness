@@ -60,6 +60,10 @@ impl AsyncDaemonDb {
             .map(|claim| claim.owner))
     }
 
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "fenced transaction guard chain; each guard settles the transaction before returning"
+    )]
     pub(crate) async fn claim_task_board_remote_executor_lifecycle_owner_with_settings(
         &self,
         assignment_id: &str,

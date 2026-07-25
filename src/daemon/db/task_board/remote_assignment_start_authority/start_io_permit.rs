@@ -67,6 +67,10 @@ impl TaskBoardRemoteExecutorStartIoPermitOutcome {
 }
 
 impl AsyncDaemonDb {
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "fenced transaction guard chain; each guard settles the transaction before returning"
+    )]
     pub(crate) async fn claim_task_board_remote_executor_start_io_permit(
         &self,
         authority: &TaskBoardRemoteExecutorStartAuthority,

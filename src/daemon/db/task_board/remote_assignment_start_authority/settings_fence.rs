@@ -84,6 +84,10 @@ pub(super) async fn revoke_unpermitted_start_in_tx(
 impl AsyncDaemonDb {
     /// Revalidates frozen executor settings while provisioning remains reversible.
     /// The caller must still claim the distinct durable Start-I/O permit after provisioning.
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "fenced transaction guard chain; each guard settles the transaction before returning"
+    )]
     pub(crate) async fn authorize_task_board_remote_executor_provisioning(
         &self,
         authority: &TaskBoardRemoteExecutorStartAuthority,
@@ -131,6 +135,10 @@ impl AsyncDaemonDb {
         Ok(None)
     }
 
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "fenced transaction guard chain; each guard settles the transaction before returning"
+    )]
     pub(crate) async fn revoke_task_board_remote_executor_start_after_cleanup(
         &self,
         authority: &TaskBoardRemoteExecutorStartAuthority,
