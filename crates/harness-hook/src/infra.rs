@@ -2,8 +2,7 @@ use std::sync::LazyLock;
 
 #[path = "../../../src/infra/blocks/error.rs"]
 mod error;
-#[path = "../../../src/infra/io/mod.rs"]
-pub mod io;
+pub use harness_kernel::io;
 #[path = "../../../src/infra/persistence/mod.rs"]
 pub mod persistence;
 #[path = "../../../src/infra/blocks/registry.rs"]

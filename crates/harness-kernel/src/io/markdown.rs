@@ -2,7 +2,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::errors::{CliError, CliErrorKind};
 
 use super::{read_text, write_text};
 

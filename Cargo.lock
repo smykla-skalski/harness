@@ -3925,11 +3925,14 @@ dependencies = [
 name = "harness-kernel"
 version = "51.0.1"
 dependencies = [
+ "fs-err",
+ "gray_matter",
  "insta",
  "regex",
  "serde",
  "serde_json",
  "shell-words",
+ "tempfile",
  "thiserror 2.0.19",
 ]
 

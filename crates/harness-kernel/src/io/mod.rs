@@ -10,7 +10,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use harness_kernel::errors::{CliError, CliErrorKind, io_for};
+use crate::errors::{CliError, CliErrorKind, io_for};
 
 pub use self::markdown::{append_markdown_row, as_list, as_mapping, drill, format_markdown_table};
 pub use self::yaml::{FrontmatterDocument, parse_frontmatter};

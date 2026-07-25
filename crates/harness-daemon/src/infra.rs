@@ -11,8 +11,7 @@ pub mod exec {
     });
 }
 
-#[path = "../../../src/infra/io/mod.rs"]
-pub mod io;
+pub use harness_kernel::io;
 
 #[path = "../../../src/infra/persistence/mod.rs"]
 pub mod persistence;
