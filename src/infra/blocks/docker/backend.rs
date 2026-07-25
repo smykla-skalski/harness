@@ -2,7 +2,9 @@ use std::env;
 use std::sync::Arc;
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::infra::blocks::compose::{BollardComposeOrchestrator, DockerComposeOrchestrator};
+#[cfg(feature = "compose")]
+use crate::infra::blocks::compose::BollardComposeOrchestrator;
+use crate::infra::blocks::compose::DockerComposeOrchestrator;
 use crate::infra::blocks::{ComposeOrchestrator, ProcessExecutor};
 
 use super::{BollardContainerRuntime, ContainerRuntime, DockerContainerRuntime};
@@ -82,8 +84,15 @@ pub fn container_backends_from_env(
         ContainerRuntimeBackend::Bollard => {
             let container_runtime: Arc<dyn ContainerRuntime> =
                 Arc::new(BollardContainerRuntime::new()?);
+            // Only the engine-native orchestrator needs `compose_spec`. Without
+            // the `compose` feature the docker CLI drives compose instead, so
+            // callers still get a working orchestrator here.
+            #[cfg(feature = "compose")]
             let compose_orchestrator: Arc<dyn ComposeOrchestrator> =
                 Arc::new(BollardComposeOrchestrator::new(container_runtime.clone()));
+            #[cfg(not(feature = "compose"))]
+            let compose_orchestrator: Arc<dyn ComposeOrchestrator> =
+                Arc::new(DockerComposeOrchestrator::new(process));
             Ok(SelectedContainerBackends {
                 backend,
                 container_runtime,

@@ -1,3 +1,4 @@
+#[cfg(feature = "kubernetes")]
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
@@ -20,6 +21,7 @@ fn success_result(args: &[&str], stdout: &str) -> CommandResult {
     }
 }
 
+#[cfg(feature = "kubernetes")]
 fn write_dead_kubeconfig() -> (tempfile::TempDir, std::path::PathBuf) {
     let temp_dir = tempfile::tempdir().expect("expected temp dir");
     let kubeconfig = temp_dir.path().join("dead-kubeconfig.yaml");
@@ -155,6 +157,7 @@ fn pod_snapshots_from_json_keeps_container_counts() {
     assert_eq!(pods[0].node.as_deref(), Some("node-x"));
 }
 
+#[cfg(feature = "k3d")]
 #[test]
 fn k3d_cluster_manager_detects_existing_cluster() {
     let fake_process = Arc::new(FakeProcessExecutor::new(vec![FakeResponse {
@@ -210,10 +213,12 @@ fn kubernetes_block_types_are_send_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
 
     assert_send_sync::<KubectlRuntime>();
+    #[cfg(feature = "k3d")]
     assert_send_sync::<K3dClusterManager>();
     assert_send_sync::<PodSnapshot>();
 }
 
+#[cfg(feature = "kubernetes")]
 #[test]
 fn kube_runtime_dead_kubeconfig_returns_error_without_panicking() {
     let (_temp_dir, kubeconfig) = write_dead_kubeconfig();
@@ -229,6 +234,7 @@ fn kube_runtime_dead_kubeconfig_returns_error_without_panicking() {
     );
 }
 
+#[cfg(feature = "kubernetes")]
 #[test]
 fn kube_runtime_cluster_server_reads_kubeconfig_server() {
     let (_temp_dir, kubeconfig) = write_dead_kubeconfig();
@@ -240,12 +246,36 @@ fn kube_runtime_cluster_server_reads_kubeconfig_server() {
     assert_eq!(server, "https://127.0.0.1:65535/");
 }
 
+#[cfg(feature = "kubernetes")]
 #[test]
 fn kubernetes_backend_defaults_to_kube() {
     with_vars([(KUBERNETES_RUNTIME_ENV, None::<&str>)], || {
         assert_eq!(
             kubernetes_backend_from_env().expect("expected default backend"),
             KubernetesRuntimeBackend::Kube
+        );
+    });
+}
+
+#[cfg(not(feature = "kubernetes"))]
+#[test]
+fn kubernetes_backend_defaults_to_kubectl_cli() {
+    with_vars([(KUBERNETES_RUNTIME_ENV, None::<&str>)], || {
+        assert_eq!(
+            kubernetes_backend_from_env().expect("expected default backend"),
+            KubernetesRuntimeBackend::KubectlCli
+        );
+    });
+}
+
+#[cfg(not(feature = "kubernetes"))]
+#[test]
+fn kubernetes_backend_rejects_kube_without_the_feature() {
+    with_vars([(KUBERNETES_RUNTIME_ENV, Some("kube"))], || {
+        let error = kubernetes_backend_from_env().expect_err("expected kube to be rejected");
+        assert!(
+            error.to_string().contains("`kubernetes` feature"),
+            "unexpected error: {error}"
         );
     });
 }

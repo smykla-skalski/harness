@@ -12,14 +12,12 @@ use crate::infra::exec::CommandResult;
 mod fake;
 #[cfg(feature = "compose")]
 mod runtime_bollard;
-#[cfg(feature = "compose")]
 mod runtime_cli;
 #[cfg(test)]
 mod tests;
 
 #[cfg(feature = "compose")]
 pub use runtime_bollard::BollardComposeOrchestrator;
-#[cfg(feature = "compose")]
 pub use runtime_cli::DockerComposeOrchestrator;
 
 #[cfg(test)]

@@ -245,6 +245,7 @@ impl MeshControlPlane for KumaControlPlane {
     }
 }
 
-#[cfg(test)]
+// Every test here builds a KumaControlPlane, which the `kuma` feature owns.
+#[cfg(all(test, feature = "kuma"))]
 #[path = "tests.rs"]
 mod tests;

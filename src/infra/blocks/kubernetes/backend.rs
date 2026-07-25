@@ -4,22 +4,37 @@ use std::sync::Arc;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::ProcessExecutor;
 
-use super::{KUBERNETES_RUNTIME_ENV, KubeRuntime, KubectlRuntime, KubernetesRuntime};
+#[cfg(feature = "kubernetes")]
+use super::KubeRuntime;
+use super::{KUBERNETES_RUNTIME_ENV, KubectlRuntime, KubernetesRuntime};
 
+/// Backend names `HARNESS_KUBERNETES_RUNTIME` accepts in this build.
+#[cfg(feature = "kubernetes")]
+const ACCEPTED_BACKENDS: &str = "`kube` or `kubectl-cli`";
+#[cfg(not(feature = "kubernetes"))]
+const ACCEPTED_BACKENDS: &str =
+    "`kubectl-cli`; the `kube` backend needs a build with the `kubernetes` feature";
+
+/// The `Kube` variant stays in the enum whether or not the `kubernetes` feature
+/// is on, because callers outside this block match on it exhaustively. Only the
+/// backend it selects is conditional.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum KubernetesRuntimeBackend {
+    #[cfg_attr(not(feature = "kubernetes"), default)]
     KubectlCli,
-    #[default]
+    #[cfg_attr(feature = "kubernetes", default)]
     Kube,
 }
 
 impl KubernetesRuntimeBackend {
     fn parse(raw: &str) -> Result<Self, CliError> {
         match raw.trim() {
-            "" | "kube" => Ok(Self::Kube),
+            "" => Ok(Self::default()),
+            #[cfg(feature = "kubernetes")]
+            "kube" => Ok(Self::Kube),
             "kubectl-cli" => Ok(Self::KubectlCli),
             other => Err(CliErrorKind::usage_error(format!(
-                "invalid {KUBERNETES_RUNTIME_ENV} value `{other}`; expected `kube` or `kubectl-cli`"
+                "invalid {KUBERNETES_RUNTIME_ENV} value `{other}`; expected {ACCEPTED_BACKENDS}"
             ))
             .into()),
         }
@@ -65,7 +80,15 @@ pub fn kubernetes_backends_from_env(
     let backend = kubernetes_backend_from_env()?;
     let kubernetes_runtime: Arc<dyn KubernetesRuntime> = match backend {
         KubernetesRuntimeBackend::KubectlCli => Arc::new(KubectlRuntime::new(process)),
+        #[cfg(feature = "kubernetes")]
         KubernetesRuntimeBackend::Kube => Arc::new(KubeRuntime::new()),
+        #[cfg(not(feature = "kubernetes"))]
+        KubernetesRuntimeBackend::Kube => {
+            return Err(CliErrorKind::usage_error(format!(
+                "the `kube` Kubernetes backend was compiled out; rebuild with the `kubernetes` feature or set {KUBERNETES_RUNTIME_ENV} to `kubectl-cli`"
+            ))
+            .into());
+        }
     };
     Ok(SelectedKubernetesBackends {
         backend,

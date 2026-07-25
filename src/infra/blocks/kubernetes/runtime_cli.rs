@@ -5,6 +5,7 @@ use std::time::Duration;
 use crate::infra::blocks::{BlockError, ProcessExecutor};
 use crate::infra::exec::CommandResult;
 
+#[cfg(feature = "kubernetes")]
 use super::kubeconfig::flatten_selected_kubeconfig;
 use super::{ExecRequest, KubernetesRuntime, ManifestDiff, PodSnapshot, pods};
 
@@ -156,6 +157,9 @@ impl KubernetesRuntime for KubectlRuntime {
         kubeconfig: &Path,
         context: Option<&str>,
     ) -> Result<String, BlockError> {
+        // Without the `kubernetes` feature the typed kubeconfig model is compiled
+        // out, so every case falls through to `kubectl config view --raw --flatten`.
+        #[cfg(feature = "kubernetes")]
         if context.is_none() {
             return flatten_selected_kubeconfig(kubeconfig, None);
         }

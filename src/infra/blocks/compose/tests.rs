@@ -2,9 +2,11 @@ use std::path::Path;
 use std::sync::Arc;
 
 use super::*;
+#[cfg(feature = "compose")]
+use crate::infra::blocks::{BollardContainerRuntime, ContainerRuntime, FakeContainerRuntime};
 use crate::infra::blocks::{
-    BollardContainerRuntime, ContainerRuntime, FakeComposeOrchestrator, FakeContainerRuntime,
-    FakeProcessExecutor, FakeProcessMethod, FakeResponse, StdProcessExecutor,
+    FakeComposeOrchestrator, FakeProcessExecutor, FakeProcessMethod, FakeResponse,
+    StdProcessExecutor,
 };
 
 fn success_result(args: &[&str]) -> CommandResult {
@@ -287,6 +289,7 @@ fn fake_compose_orchestrator_tracks_project_state() {
 fn compose_types_are_send_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
 
+    #[cfg(feature = "compose")]
     assert_send_sync::<BollardComposeOrchestrator>();
     assert_send_sync::<ComposeFile>();
     assert_send_sync::<ComposeTopology>();
@@ -294,6 +297,7 @@ fn compose_types_are_send_sync() {
     assert_send_sync::<FakeComposeOrchestrator>();
 }
 
+#[cfg(feature = "compose")]
 #[test]
 fn bollard_compose_orchestrator_up_and_down_use_container_runtime() {
     let docker = Arc::new(FakeContainerRuntime::new());
@@ -337,6 +341,7 @@ fn bollard_compose_orchestrator_up_and_down_use_container_runtime() {
     );
 }
 
+#[cfg(feature = "compose")]
 #[test]
 fn bollard_compose_orchestrator_down_project_is_idempotent() {
     let orchestrator = BollardComposeOrchestrator::new(Arc::new(FakeContainerRuntime::new()));
@@ -357,6 +362,7 @@ mod contracts {
         DockerComposeOrchestrator::new(Arc::new(StdProcessExecutor))
     }
 
+    #[cfg(feature = "compose")]
     fn production_bollard_orchestrator() -> BollardComposeOrchestrator {
         let docker = Arc::new(BollardContainerRuntime::new().expect("expected Docker engine"));
         BollardComposeOrchestrator::new(docker)
@@ -406,6 +412,7 @@ mod contracts {
         contract_down_project_is_idempotent(&production_orchestrator());
     }
 
+    #[cfg(feature = "compose")]
     #[test]
     #[ignore = "needs Docker daemon"]
     fn production_bollard_satisfies_down_project_is_idempotent() {

@@ -32,10 +32,12 @@ pub use helm::{HelmSetting, PackageDeployResult, PackageDeployer};
 pub use http::{HttpClient, HttpMethod, HttpResponse, ReqwestHttpClient};
 #[cfg(feature = "k3d")]
 pub use kubernetes::K3dClusterManager;
+#[cfg(feature = "kubernetes")]
+pub use kubernetes::KubeRuntime;
 pub use kubernetes::{
-    ExecRequest, KubeRuntime, KubectlRuntime, KubernetesRuntime, KubernetesRuntimeBackend,
-    LocalClusterManager, ManifestDiff, PodSnapshot, SelectedKubernetesBackends,
-    kubernetes_backend_from_env, kubernetes_backends_from_env, kubernetes_runtime_from_env,
+    ExecRequest, KubectlRuntime, KubernetesRuntime, KubernetesRuntimeBackend, LocalClusterManager,
+    ManifestDiff, PodSnapshot, SelectedKubernetesBackends, kubernetes_backend_from_env,
+    kubernetes_backends_from_env, kubernetes_runtime_from_env,
 };
 #[cfg(feature = "kuma")]
 pub use kuma::KumaControlPlane;
