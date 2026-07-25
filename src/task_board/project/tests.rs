@@ -211,6 +211,30 @@ fn a_column_wins_over_an_external_ref() {
 }
 
 #[test]
+fn a_query_or_fragment_never_reaches_the_slug() {
+    // A slug carrying one would name a project no repository can match.
+    for reference in [
+        "https://github.com/Acme/Widgets?tab=readme",
+        "https://github.com/Acme/Widgets#readme",
+        "Acme/Widgets?tab=readme",
+    ] {
+        let mut item = item();
+        item.external_refs.push(ExternalRef {
+            provider: ExternalRefProvider::GitHub,
+            external_id: reference.to_owned(),
+            url: None,
+            sync_state: None,
+        });
+
+        assert_eq!(
+            item_attribution(&item),
+            ItemProjectAttribution::Register(TaskBoardProjectSource::GitHub, "acme/widgets".into()),
+            "reference {reference}"
+        );
+    }
+}
+
+#[test]
 fn a_ref_that_names_no_repository_leaves_the_item_unattributed() {
     let mut item = item();
     item.external_refs.push(ExternalRef {

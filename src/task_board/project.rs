@@ -212,14 +212,15 @@ fn slug_from_github_url(raw: &str) -> Option<String> {
 
 fn slug_from_reference_id(raw: &str) -> Option<String> {
     let trimmed = raw.trim();
-    if let Some(slug) = slug_from_github_url(trimmed) {
-        return Some(slug);
-    }
-    let without_number = trimmed.split_once('#').map_or(trimmed, |(head, _)| head);
-    slug_from_segments(without_number)
+    slug_from_github_url(trimmed).or_else(|| slug_from_segments(trimmed))
 }
 
+/// The owner and repository at the front of a path, with everything a URL can
+/// hang off the end cut away first. `owner/repo#42` and `owner/repo?tab=readme`
+/// both name `owner/repo`, and a slug that kept the suffix would name a project
+/// no repository can ever match.
 fn slug_from_segments(path: &str) -> Option<String> {
+    let path = path.split_once(['?', '#']).map_or(path, |(head, _)| head);
     let mut segments = path.split('/').filter(|segment| !segment.is_empty());
     let owner = segments.next()?;
     let repository = segments.next()?;
