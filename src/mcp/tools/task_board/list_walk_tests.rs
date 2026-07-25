@@ -68,6 +68,21 @@ fn a_row_re_served_after_a_concurrent_delete_is_folded_once() {
     );
 }
 
+/// The walk folds on ids, so an item without one cannot be deduplicated and
+/// would be free to arrive twice.
+#[test]
+fn an_item_without_an_id_fails_the_page() {
+    let mut pages = TaskBoardItemPages::default();
+
+    let error = pages
+        .absorb(&json!({ "items": [{ "title": "no id here" }] }))
+        .expect_err("an item without an id must not reach the merged response");
+    assert!(
+        format!("{error:?}").contains("no id"),
+        "unexpected: {error:?}"
+    );
+}
+
 /// A drained board is the one legitimate empty page, and it carries no cursor.
 #[test]
 fn a_drained_page_ends_the_walk() {

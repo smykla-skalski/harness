@@ -124,11 +124,13 @@ impl TaskBoardItemPages {
             ToolError::internal("the daemon returned a task-board page with no items array")
         })?;
         for item in items {
-            let fresh = match item.get("id").and_then(Value::as_str) {
-                Some(id) => self.seen.insert(id.to_string()),
-                None => true,
-            };
-            if fresh {
+            // Every id the walk folds on comes from here, so an item without
+            // one cannot be deduplicated or resumed past: it would ride into
+            // the merged response and could arrive twice.
+            let id = item.get("id").and_then(Value::as_str).ok_or_else(|| {
+                ToolError::internal("the daemon returned a task-board item with no id")
+            })?;
+            if self.seen.insert(id.to_string()) {
                 self.items.push(item.clone());
             }
         }
