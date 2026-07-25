@@ -52,11 +52,11 @@ public struct TaskBoardWorkingCopyProgress: Equatable, Sendable, Codable {
     self.message = message
   }
 
-  // Note: no explicit CodingKeys because `StreamEvent.decodePayload` runs its
-  // decoder with `keyDecodingStrategy = .convertFromSnakeCase`. The default
-  // member-name keys map `repoFullName` <- `repo_full_name` automatically; an
-  // explicit `case repoFullName = "repo_full_name"` would *break* that mapping
-  // by replacing the converted lookup key.
+  // Note: the daemon payload never decodes into this type directly. The
+  // transport decodes `WorkingCopyProgressEventPayloadWire`, which spells its
+  // snake_case keys explicitly, and `init(wire:)` flattens it. The `Codable`
+  // conformance here is for callers that persist or replay a value, and uses
+  // plain member-name keys.
 }
 
 extension TaskBoardWorkingCopyProgress {

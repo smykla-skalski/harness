@@ -37,6 +37,16 @@ public struct TaskBoardWorkingCopyProgressView: View {
     return entry.progress.phaseLabel ?? "Cloning"
   }
 
+  private var accessibilityValue: String {
+    if isStalled {
+      return "Stalled"
+    }
+    guard let fraction = entry.progress.fractionCompleted else {
+      return "In progress"
+    }
+    return "\(Int((fraction * 100).rounded())) percent"
+  }
+
   public var body: some View {
     HStack(spacing: 6) {
       indicator
@@ -48,6 +58,9 @@ public struct TaskBoardWorkingCopyProgressView: View {
     .accessibilityElement(children: .combine)
     .accessibilityIdentifier("taskBoardWorkingCopyProgress-\(repository)")
     .accessibilityLabel(Text("\(label) for \(repository)"))
+    // Combining children drops the bar's own value, so state the completion
+    // here or VoiceOver announces a determinate clone with no progress at all.
+    .accessibilityValue(Text(accessibilityValue))
   }
 
   @ViewBuilder private var indicator: some View {

@@ -18,10 +18,12 @@ struct TaskBoardWorkingCopyProgressTests {
     }
     """
 
+  /// Decodes exactly as `StreamEvent.decodePayloadWire` does. The generated wire
+  /// type spells its snake_case keys explicitly, so a `.convertFromSnakeCase`
+  /// decoder would rewrite `repo_full_name` to `repoFullName` and then fail to
+  /// find it.
   private func decode(_ json: String) throws -> TaskBoardWorkingCopyProgress {
-    let decoder = JSONDecoder()
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
-    let wire = try decoder.decode(
+    let wire = try PolicyWireCoding.decoder.decode(
       WorkingCopyProgressEventPayloadWire.self,
       from: Data(json.utf8)
     )
