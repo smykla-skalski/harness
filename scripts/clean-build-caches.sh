@@ -12,6 +12,13 @@
 #   - Tool caches:           JetBrains, Homebrew prune, swiftpm
 #                            (ms-playwright is reported but NOT removed; pass --force/-f to remove it)
 #
+# target/ is shared across every worktree via cargo-local.sh's
+# CARGO_TARGET_DIR (one target/dev/agent-<session> segment per concurrent
+# agent build, rooted at the common repo). Segments with a live
+# target/.cargo-local/leases/ entry are actively building and are kept,
+# not deleted, so this script never rips a build out from under a running
+# session; everything else under target/ is swept as usual.
+#
 # --aggressive also wipes Xcode UI HarnessMonitor-* DerivedData (slow regen,
 # loses SourcePackages cache - only use when truly desperate for space).
 #
@@ -23,6 +30,14 @@ set -uo pipefail
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 readonly ROOT
+# shellcheck source=scripts/lib/common-repo-root.sh
+source "$ROOT/scripts/lib/common-repo-root.sh"
+COMMON_REPO_ROOT="$(resolve_common_repo_root "$ROOT")"
+readonly COMMON_REPO_ROOT
+SHARED_TARGET_ROOT="$COMMON_REPO_ROOT/target"
+readonly SHARED_TARGET_ROOT
+LEASE_DIR="$SHARED_TARGET_ROOT/.cargo-local/leases"
+readonly LEASE_DIR
 
 DRY_RUN=0
 AGGRESSIVE=0
@@ -104,6 +119,54 @@ section() {
   printf '\n[%s]\n' "$1"
 }
 
+# A segment (target/dev/local or target/dev/agent-<session>) is leased when
+# a cargo-local.sh lease file names it with a PID that's still alive. The PID
+# comes from the lease file's content (the source of truth), not parsed out
+# of the filename, so session ids containing dashes or digits can't confuse
+# the match.
+segment_is_leased() {
+  local segment="$1" key lease_file base pid
+  key="$segment"
+  [[ "$key" == agent-* ]] && key="${key#agent-}"
+  [[ -d "$LEASE_DIR" ]] || return 1
+  for lease_file in "$LEASE_DIR"/*; do
+    [[ -f "$lease_file" ]] || continue
+    pid="$(cat "$lease_file" 2>/dev/null || true)"
+    [[ "$pid" =~ ^[0-9]+$ ]] || continue
+    base="$(basename "$lease_file")"
+    [[ "$base" == "$key-$pid" ]] && kill -0 "$pid" 2>/dev/null && return 0
+  done
+  return 1
+}
+
+# Sweeps the shared target/ tree at the common repo root: per-agent build
+# segments with a live lease are kept (not counted as reclaimed), every
+# other segment and any other top-level entry under target/ is removed.
+clean_shared_target() {
+  if [[ ! -d "$SHARED_TARGET_ROOT" ]]; then
+    printf '  · %-46s %8s  (absent, skip)\n' 'repo target/' '-'
+    return
+  fi
+
+  local seg_dir seg entry base
+  if [[ -d "$SHARED_TARGET_ROOT/dev" ]]; then
+    while IFS= read -r -d '' seg_dir; do
+      seg=$(basename "$seg_dir")
+      if segment_is_leased "$seg"; then
+        printf '  · %-46s %8s  (active build, kept)\n' "target/dev/$seg" "$(bytes_to_human "$(path_size_kb "$seg_dir")")"
+      else
+        remove_path "target/dev/$seg" "$seg_dir"
+      fi
+    done < <(find "$SHARED_TARGET_ROOT/dev" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null)
+  fi
+
+  while IFS= read -r -d '' entry; do
+    base=$(basename "$entry")
+    [[ "$base" == "dev" || "$base" == ".cargo-local" ]] && continue
+    remove_path "target/$base" "$entry"
+  done < <(find "$SHARED_TARGET_ROOT" -mindepth 1 -maxdepth 1 -print0 2>/dev/null)
+}
+
 disk_free_g() {
   df -k / | awk 'NR==2 {printf "%.1fG free of %.1fG (%s used)", $4/1024/1024, $2/1024/1024, $5}'
 }
@@ -114,7 +177,7 @@ printf '== clean-build-caches =='
 printf '\nbefore: %s\n' "$(disk_free_g)"
 
 section 'Rust artifacts'
-remove_path 'repo target/'                          "$ROOT/target"
+clean_shared_target
 remove_path 'daemon cargo target'                   "$ROOT/.cache/harness-monitor-xcode-daemon"
 while IFS= read -r -d '' tdir; do
   rel=${tdir#"$ROOT/"}
