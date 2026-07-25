@@ -69,13 +69,7 @@ cargo fmt --check
 cargo clippy --lib
 ```
 
-Unit tests are in-crate `#[test]` blocks. Integration tests live in
-`tests/integration/`. Canonical Rust test tasks use nextest process isolation
-and parallel scheduling. Tests must not require runner-wide serialization;
-isolate their environment, filesystem paths, ports, and external resource
-names instead. Tests that read XDG paths must isolate state with
-`temp_env::with_vars`, setting both `XDG_DATA_HOME` and `CLAUDE_SESSION_ID`.
-Tests use real filesystem state.
+Unit tests are in-crate `#[test]` blocks. Integration tests live in `tests/integration/`. Canonical Rust test tasks use nextest process isolation and parallel scheduling. Tests must not require runner-wide serialization; isolate their environment, filesystem paths, ports, and external resource names instead. Tests that read XDG paths must isolate state with `temp_env::with_vars`, setting both `XDG_DATA_HOME` and `CLAUDE_SESSION_ID`. Tests use real filesystem state.
 
 Pre-commit gate: `mise run check`. Add `mise run aff:check` when the task touches `aff` or aff-owned runtime hooks.
 
@@ -88,21 +82,9 @@ Validation should match risk:
 
 ## OpenAPI schema
 
-The daemon HTTP API is described by an OpenAPI 3.1 document at
-`docs/api/openapi.json`, generated from `#[utoipa::path]` annotations on the
-handlers plus `#[derive(utoipa::ToSchema)]` on their wire types. Registering a
-route in the `utoipa-axum` router (`.routes(routes!(handler))`) also produces
-its OpenAPI path, so `utoipa` is a permanent dependency with no `openapi`
-feature to gate. Regenerate the document with `mise run openapi:generate`
-after changing an annotated handler or wire type; `mise run openapi:check`
-fails on drift and runs inside `mise run test`. Never edit the generated file
-by hand. What stays manual and why is audited in `docs/api/openapi-upkeep.md`.
+The daemon HTTP API is described by an OpenAPI 3.1 document at `docs/api/openapi.json`, generated from `#[utoipa::path]` annotations on the handlers plus `#[derive(utoipa::ToSchema)]` on their wire types. Registering a route in the `utoipa-axum` router (`.routes(routes!(handler))`) also produces its OpenAPI path, so `utoipa` is a permanent dependency with no `openapi` feature to gate. Regenerate the document with `mise run openapi:generate` after changing an annotated handler or wire type; `mise run openapi:check` fails on drift and runs inside `mise run test`. Never edit the generated file by hand. What stays manual and why is audited in `docs/api/openapi-upkeep.md`.
 
-Coverage is complete: every non-exempt daemon HTTP route is annotated, and the
-`documented_operations_match_contract` integration test fails if a new handler
-ships without a schema entry. A genuinely non-documentable route - a WebSocket
-upgrade or a server-sent event stream - must instead be listed in
-`OPENAPI_EXEMPT` with a reason.
+Coverage is complete: every non-exempt daemon HTTP route is annotated, and the `documented_operations_match_contract` integration test fails if a new handler ships without a schema entry. A genuinely non-documentable route - a WebSocket upgrade or a server-sent event stream - must instead be listed in `OPENAPI_EXEMPT` with a reason.
 
 ## Runtime bootstrap
 
@@ -152,6 +134,7 @@ Hook landing rule: a new hook lands with observable handler behavior, or behind 
 - Diagnostic output uses `tracing` macros. Default filter: `RUST_LOG=harness=info`. Do not add `eprintln!` diagnostics.
 - Comment only what the code cannot say: a non-obvious reason, a surprising constraint, a trap the next reader would otherwise walk into. Restating what the line already does, narrating control flow, or listing parameters adds noise the reader has to skip, so write those comments as nothing at all. Keep the ones that survive short and plainly worded, in the voice of one engineer warning another.
 - Keep Rust files under 520 lines and functions under 100 lines.
+- Write markdown prose as one line per paragraph; do not hard-wrap at a fixed column. Code blocks, tables, and list items keep their own line structure.
 - Commit messages: `{type}({scope}): {message}` with `feat`, `fix`, `refactor`, `chore`, `docs`, `style`, `test`, or `perf`. PRs squash-merge, so the PR title uses the same format and becomes the commit title on `main`.
 - Never create merge commits or rewrite local `main`. In `replay`, perform the final rebase onto local `main` in the worktree and integrate only by fast-forward. In `pr`, base the branch on `upstream/main`; after publication, prefer additive commits and use `--force-with-lease` only for an unavoidable rewrite of the dedicated session branch. Never plain-force or rewrite a shared branch.
 
