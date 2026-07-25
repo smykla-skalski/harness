@@ -65,12 +65,6 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
         return false
       } == false
     )
-    #expect(
-      newCalls.contains { call in
-        if case .syncTaskBoardTodoistToken = call { return true }
-        return false
-      } == false
-    )
     let failureMessage = store.currentFailureFeedbackMessage ?? ""
     #expect(failureMessage.contains("Partial save"))
     #expect(failureMessage.contains("runtime config did not"))
@@ -247,9 +241,6 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
     try credentialPersistence.github.save(
       TaskBoardGitHubCredentialSnapshot(globalToken: "stored-github-token")
     )
-    try credentialPersistence.todoist.save(
-      TaskBoardTodoistCredentialSnapshot(token: "stored-todoist-token")
-    )
     try credentialPersistence.openRouter.save(
       TaskBoardOpenRouterCredentialSnapshot(token: "stored-openrouter-token")
     )
@@ -263,8 +254,7 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
 
     let syncCalls = client.recordedCalls().filter { call in
       switch call {
-      case .syncTaskBoardGitHubTokens, .syncTaskBoardTodoistToken,
-        .syncTaskBoardOpenRouterToken:
+      case .syncTaskBoardGitHubTokens, .syncTaskBoardOpenRouterToken:
         return true
       default:
         return false
@@ -280,9 +270,6 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
     try credentialPersistence.github.save(
       TaskBoardGitHubCredentialSnapshot(globalToken: "stored-github-token")
     )
-    try credentialPersistence.todoist.save(
-      TaskBoardTodoistCredentialSnapshot(token: "stored-todoist-token")
-    )
     try credentialPersistence.openRouter.save(
       TaskBoardOpenRouterCredentialSnapshot(token: "stored-openrouter-token")
     )
@@ -297,14 +284,13 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
 
     let syncCalls = replacementClient.recordedCalls().filter { call in
       switch call {
-      case .syncTaskBoardGitHubTokens, .syncTaskBoardTodoistToken,
-        .syncTaskBoardOpenRouterToken:
+      case .syncTaskBoardGitHubTokens, .syncTaskBoardOpenRouterToken:
         return true
       default:
         return false
       }
     }
-    #expect(syncCalls.count == 3)
+    #expect(syncCalls.count == 2)
   }
 
   @Test("Stored service credentials are isolated by database identity")
@@ -329,11 +315,29 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
     #expect(second.isEmpty)
   }
 
+  @Test("Loading credentials purges the retired Todoist Keychain entry")
+  func loadingCredentialsPurgesRetiredTodoistEntry() async throws {
+    let persistence = InMemoryTaskBoardCredentialBundle()
+    let worker = TaskBoardSettingsWorker(credentialPersistence: persistence.persistence)
+
+    _ = try await worker.loadStoredCredentials(
+      instanceID: "database-one",
+      ownership: .external
+    )
+    _ = try await worker.loadStoredCredentials(
+      instanceID: "database-one",
+      ownership: .external
+    )
+
+    // Every load re-attempts the delete rather than latching a "done" flag, so
+    // a Keychain restored from backup still gets cleaned on the next launch.
+    #expect(persistence.retiredTodoistPurge.attemptCount == 2)
+  }
+
   @Test("Managed legacy service credentials move once and cannot reappear after clearing")
   func managedLegacyServiceCredentialsMoveThenClear() async throws {
     let persistence = InMemoryTaskBoardCredentialBundle()
     try persistence.github.save(TaskBoardGitHubCredentialSnapshot(globalToken: "legacy-github"))
-    try persistence.todoist.save(TaskBoardTodoistCredentialSnapshot(token: "legacy-todoist"))
     try persistence.openRouter.save(
       TaskBoardOpenRouterCredentialSnapshot(token: "legacy-openrouter")
     )
@@ -344,10 +348,8 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
       ownership: .managed
     )
     #expect(migrated.githubCredentials.globalToken == "legacy-github")
-    #expect(migrated.todoistCredentials.token == "legacy-todoist")
     #expect(migrated.openRouterCredentials.token == "legacy-openrouter")
     #expect(try persistence.github.load().isEmpty)
-    #expect(try persistence.todoist.load().isEmpty)
     #expect(try persistence.openRouter.load().isEmpty)
 
     let baseline = makeSettingsSnapshot()
@@ -394,8 +396,7 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
       githubCredentials: TaskBoardGitHubCredentialSnapshot(
         globalToken: "new-token",
         repositoryTokens: []
-      ),
-      todoistCredentials: TaskBoardTodoistCredentialSnapshot(token: nil)
+      )
     )
   }
 

@@ -15,7 +15,6 @@ struct TaskBoardGitSettingsDraft: Equatable {
   var githubInboxRepositoryOwnerInput = ""
   var githubInboxRepositoryNameInput = ""
   var githubInboxLabelInput = ""
-  var todoistInboxProjectFilterText = ""
   var defaultBranch = "main"
   var branchPrefix = "c/"
   var mergeMethod: TaskBoardGitHubMergeMethod = .squash
@@ -41,7 +40,6 @@ struct TaskBoardGitSettingsDraft: Equatable {
   var gpgPrivateKey: TaskBoardSecretField = .notConfigured
   var gpgPrivateKeyPassphrase: TaskBoardSecretField = .notConfigured
   var globalToken: TaskBoardSecretField = .notConfigured
-  var todoistToken: TaskBoardSecretField = .notConfigured
   var openRouterToken: TaskBoardSecretField = .notConfigured
   var repositoryOverrides: [TaskBoardRepositoryOverrideDraft] = []
   var policyVersion = ""
@@ -67,7 +65,6 @@ struct TaskBoardGitSettingsDraft: Equatable {
     checkoutPath = project.checkoutPath
     githubInboxRepositoriesText = orchestrator.githubInbox.repositories.joined(separator: "\n")
     githubInboxLabelFilterText = orchestrator.githubInbox.labelFilter.joined(separator: "\n")
-    todoistInboxProjectFilterText = orchestrator.todoistInbox.projectFilter.joined(separator: "\n")
     defaultBranch = project.defaultBranch
     branchPrefix = project.branchPrefix
     mergeMethod = project.mergeMethod
@@ -95,7 +92,6 @@ struct TaskBoardGitSettingsDraft: Equatable {
     gpgPrivateKey = .secretFromLoaded(runtime.global.signing.gpgPrivateKey)
     gpgPrivateKeyPassphrase = .secretFromLoaded(runtime.global.signing.gpgPrivateKeyPassphrase)
     globalToken = .secretFromLoaded(snapshot.githubCredentials.globalToken)
-    todoistToken = .secretFromLoaded(snapshot.todoistCredentials.token)
     openRouterToken = .secretFromLoaded(snapshot.openRouterCredentials.token)
     policyVersion = orchestrator.policyVersion
     identityDefaults = snapshot.identityDefaults
@@ -188,7 +184,6 @@ struct TaskBoardGitSettingsDraft: Equatable {
           repositories: githubInboxRepositoryEntries,
           labelFilter: githubInboxLabelEntries
         ),
-        todoistInbox: TaskBoardTodoistInboxConfig(projectFilter: todoistInboxProjects),
         policyVersion: policyVersion
       ),
       runtimeConfig: TaskBoardGitRuntimeConfig(
@@ -228,9 +223,6 @@ struct TaskBoardGitSettingsDraft: Equatable {
       githubCredentials: TaskBoardGitHubCredentialSnapshot(
         globalToken: globalToken.materialized(loaded: loadedSecrets.globalGitHubToken),
         repositoryTokens: repositoryTokens
-      ),
-      todoistCredentials: TaskBoardTodoistCredentialSnapshot(
-        token: todoistToken.materialized(loaded: loadedSecrets.todoistToken)
       ),
       openRouterCredentials: TaskBoardOpenRouterCredentialSnapshot(
         token: openRouterToken.materialized(loaded: loadedSecrets.openRouterToken)
@@ -303,10 +295,6 @@ struct TaskBoardGitSettingsDraft: Equatable {
       githubInboxLabelEntries
       .filter { $0.lowercased() != target }
       .joined(separator: "\n")
-  }
-
-  private var todoistInboxProjects: [String] {
-    normalizedFilterEntries(from: todoistInboxProjectFilterText)
   }
 
   private func normalizedFilterEntries(from value: String) -> [String] {

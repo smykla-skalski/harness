@@ -23,7 +23,7 @@ async fn push_precondition_failure_persists_three_way_conflict() {
     );
     db.create_task_board_item(item).await.expect("create item");
     let client = UpdateFakeSyncClient::new(
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         vec![ExternalSyncField::Title],
         Vec::new(),
     )
@@ -74,7 +74,7 @@ async fn prefer_remote_supersedes_existing_open_conflict() {
     db.create_task_board_item(item).await.expect("create item");
     record_open_title_conflict(&db, "task-prefer-remote").await;
     let client = UpdateFakeSyncClient::new(
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         vec![ExternalSyncField::Title],
         vec![remote_task(
             "remote-1",
@@ -123,7 +123,7 @@ async fn pull_report_supersedes_only_converged_known_conflict_fields() {
     db.create_task_board_item(item).await.expect("create item");
     record_open_title_and_future_conflicts(&db, "task-pull-report").await;
     let client = UpdateFakeSyncClient::new(
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         vec![ExternalSyncField::Title],
         vec![remote_task(
             "remote-1",
@@ -168,7 +168,7 @@ async fn prefer_local_supersedes_conflict_after_remote_and_local_state_converge(
     db.create_task_board_item(item).await.expect("create item");
     record_open_title_conflict(&db, "task-prefer-local").await;
     let client = UpdateFakeSyncClient::new(
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         vec![ExternalSyncField::Title],
         vec![remote_task(
             "remote-1",
@@ -219,7 +219,7 @@ async fn remote_update_with_failed_local_persistence_records_conflict_evidence()
     );
     let store = FailingPersistenceStore::new(item);
     let client = UpdateFakeSyncClient::new(
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         vec![ExternalSyncField::Title],
         Vec::new(),
     );
@@ -261,7 +261,7 @@ async fn prefer_local_still_records_a_hierarchy_only_applied_change_despite_a_co
     );
     db.create_task_board_item(item).await.expect("create item");
     let client = UpdateFakeSyncClient::new(
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         vec![ExternalSyncField::Title],
         vec![ExternalTask {
             labels: vec!["urgent".into()],
@@ -278,7 +278,7 @@ async fn prefer_local_still_records_a_hierarchy_only_applied_change_despite_a_co
     let operations = sync_external_tasks(
         &db,
         ExternalSyncOptions {
-            provider: Some(ExternalProvider::Todoist),
+            provider: Some(ExternalProvider::GitHub),
             direction: ExternalSyncDirection::Pull,
             conflict_policy: ExternalSyncConflictPolicy::PreferLocal,
             dry_run: false,
@@ -309,7 +309,7 @@ async fn prefer_local_still_records_a_hierarchy_only_applied_change_despite_a_co
 
 fn push_options() -> ExternalSyncOptions {
     ExternalSyncOptions {
-        provider: Some(ExternalProvider::Todoist),
+        provider: Some(ExternalProvider::GitHub),
         direction: ExternalSyncDirection::Push,
         conflict_policy: ExternalSyncConflictPolicy::Report,
         dry_run: false,
@@ -319,7 +319,7 @@ fn push_options() -> ExternalSyncOptions {
 
 fn both_options(conflict_policy: ExternalSyncConflictPolicy) -> ExternalSyncOptions {
     ExternalSyncOptions {
-        provider: Some(ExternalProvider::Todoist),
+        provider: Some(ExternalProvider::GitHub),
         direction: ExternalSyncDirection::Both,
         conflict_policy,
         dry_run: false,
@@ -329,7 +329,7 @@ fn both_options(conflict_policy: ExternalSyncConflictPolicy) -> ExternalSyncOpti
 
 fn pull_report_options() -> ExternalSyncOptions {
     ExternalSyncOptions {
-        provider: Some(ExternalProvider::Todoist),
+        provider: Some(ExternalProvider::GitHub),
         direction: ExternalSyncDirection::Pull,
         conflict_policy: ExternalSyncConflictPolicy::Report,
         dry_run: false,
@@ -357,7 +357,7 @@ async fn record_open_conflicts(db: &AsyncDaemonDb, item_id: &str, fields: &[&str
         .collect::<Vec<_>>();
     db.replace_open_task_board_sync_conflicts(
         item_id,
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         "remote-1",
         revision,
         &conflicts,
@@ -370,7 +370,7 @@ fn open_conflict(item_id: &str, field: &str, revision: i64) -> TaskBoardSyncConf
     TaskBoardSyncConflict {
         conflict_id: format!("conflict-{item_id}-{field}"),
         item_id: item_id.into(),
-        provider: ExternalRefProvider::Todoist,
+        provider: ExternalRefProvider::GitHub,
         external_ref: "remote-1".into(),
         field: field.into(),
         base_value: serde_json::json!("Old value"),

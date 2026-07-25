@@ -239,7 +239,6 @@ public struct ExternalRefWire: Codable, Equatable, Sendable {
 
 public enum ExternalRefProviderWire: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
   case gitHub = "github"
-  case todoist = "todoist"
 
   public var id: String { rawValue }
 
@@ -248,7 +247,6 @@ public enum ExternalRefProviderWire: String, Codable, Equatable, Sendable, CaseI
     let rawValue = try container.decode(String.self)
     switch rawValue {
     case "github", "git_hub": self = .gitHub
-    case "todoist": self = .todoist
     default: throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot initialize ExternalRefProviderWire from invalid String value \(rawValue)")
     }
   }

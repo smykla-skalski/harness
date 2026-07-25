@@ -100,15 +100,17 @@ struct TaskBoardRepositoryIdentityTests {
     )
     #expect(preferred?.slug == "acme/gadgets")
 
-    let todoist = TaskBoardProjectSummary.inferredIdentity(
+    // An import provenance no longer changes the source: only the slug shape
+    // does. A non-repository slug stays manual and keeps the case it was given.
+    let imported = TaskBoardProjectSummary.inferredIdentity(
       from: item(
         projectId: "2334Ab",
         executionRepository: nil,
-        importedFromProvider: .todoist
+        importedFromProvider: .gitHub
       )
     )
-    #expect(todoist?.source == .todoist)
-    #expect(todoist?.slug == "2334Ab")
+    #expect(imported?.source == .manual)
+    #expect(imported?.slug == "2334Ab")
 
     let manual = TaskBoardProjectSummary.inferredIdentity(
       from: item(projectId: "kitchen sink", executionRepository: nil)

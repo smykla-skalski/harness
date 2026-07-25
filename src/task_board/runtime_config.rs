@@ -392,19 +392,6 @@ pub struct TaskBoardGitHubTokensSyncResponse {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[derive(utoipa::ToSchema)]
-pub struct TaskBoardTodoistTokenSyncRequest {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub token: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
-pub struct TaskBoardTodoistTokenSyncResponse {
-    pub token_configured: bool,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[derive(utoipa::ToSchema)]
 pub struct TaskBoardOpenRouterTokenSyncRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub token: Option<String>,

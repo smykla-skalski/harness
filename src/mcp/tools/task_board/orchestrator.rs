@@ -55,11 +55,6 @@ pub(super) fn register(registry: &mut ToolRegistry) {
                 input_schema: github_tokens_schema,
             },
             TaskBoardToolDescriptor {
-                name: ws_methods::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN_SYNC,
-                description: "Sync the task-board Todoist token into daemon runtime state.",
-                input_schema: todoist_token_schema,
-            },
-            TaskBoardToolDescriptor {
                 name: ws_methods::TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN_SYNC,
                 description: "Sync the task-board OpenRouter token into daemon runtime state.",
                 input_schema: openrouter_token_schema,
@@ -146,7 +141,6 @@ fn settings_update_schema() -> Value {
             "clear_project_dir": { "type": "boolean" },
             "github_project": open_object_schema(),
             "github_inbox": open_object_schema(),
-            "todoist_inbox": open_object_schema(),
             "scheduling": open_object_schema(),
             "retry": open_object_schema(),
             "reviewers": open_object_schema(),
@@ -320,16 +314,6 @@ fn github_tokens_schema() -> Value {
                     "additionalProperties": false
                 }
             }
-        },
-        "additionalProperties": false
-    })
-}
-
-fn todoist_token_schema() -> Value {
-    json!({
-        "type": "object",
-        "properties": {
-            "token": { "type": "string" }
         },
         "additionalProperties": false
     })

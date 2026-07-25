@@ -116,8 +116,8 @@ struct TaskBoardOperationsSyncCard: View, TaskBoardOperationsHost {
       }
 
       if let summary = dashboard.taskBoardSyncSummary {
-        let visibleProviders = summary.monitorVisibleProviders
-        let visibleOperations = summary.monitorVisibleOperations
+        let visibleProviders = summary.providers
+        let visibleOperations = summary.operations
         summaryPillRow {
           TaskBoardSummaryPill(value: "\(summary.total)", label: "Items")
           TaskBoardSummaryPill(value: "\(visibleProviders.count)", label: "Providers")

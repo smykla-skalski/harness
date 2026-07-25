@@ -42,7 +42,7 @@ struct TaskBoardGitHubURLTests {
     #expect(item.taskBoardGitHubURL?.absoluteString == pullRequestURL)
   }
 
-  @Test("Non-secure, lookalike, and mismatched provider URLs are rejected")
+  @Test("Non-secure and lookalike host URLs are rejected")
   func invalidGitHubURLsAreRejected() {
     let item = taskBoardItem(
       externalRefs: [
@@ -55,11 +55,6 @@ struct TaskBoardGitHubURLTests {
           provider: .gitHub,
           externalId: "example/project#2",
           url: "https://github.com.example/project/issues/2"
-        ),
-        TaskBoardExternalRef(
-          provider: .todoist,
-          externalId: "external-3",
-          url: "https://github.com/example/project/issues/3"
         ),
       ],
       workflow: TaskBoardWorkflowState(prUrl: "file://github.com/example/project/pull/4")

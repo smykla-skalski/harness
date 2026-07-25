@@ -14,9 +14,9 @@ extension PersistenceOfflineDurabilityTests {
       provider: .gitHub,
       externalId: "123"
     )
-    let todoistItem = makeTaskBoardItem(
-      id: "board-todoist",
-      provider: .todoist,
+    let secondItem = makeTaskBoardItem(
+      id: "board-second",
+      provider: .gitHub,
       externalId: "456"
     )
     let orchestratorStatus = makeTaskBoardOrchestratorStatus()
@@ -27,7 +27,7 @@ extension PersistenceOfflineDurabilityTests {
         modelContainer: previewContainer
       )
       await liveStore.cacheTaskBoardSnapshot(
-        items: [githubItem, todoistItem],
+        items: [githubItem, secondItem],
         orchestratorStatus: orchestratorStatus
       )
     }
@@ -45,10 +45,10 @@ extension PersistenceOfflineDurabilityTests {
       relaunchedStore.connectionState
         == .offline(DaemonControlError.daemonOffline.localizedDescription)
     )
-    #expect(relaunchedStore.globalTaskBoardItems.map(\.id) == ["board-github", "board-todoist"])
+    #expect(relaunchedStore.globalTaskBoardItems.map(\.id) == ["board-github", "board-second"])
     #expect(
-      relaunchedStore.globalTaskBoardItems.map(\.externalRefs.first?.provider)
-        == [.gitHub, .todoist]
+      relaunchedStore.globalTaskBoardItems.map(\.externalRefs.first?.externalId)
+        == ["123", "456"]
     )
     #expect(relaunchedStore.globalTaskBoardOrchestratorStatus == orchestratorStatus)
   }
@@ -296,7 +296,7 @@ extension PersistenceOfflineDurabilityTests {
     )
     let liveItem = makeTaskBoardItem(
       id: "board-live",
-      provider: .todoist,
+      provider: .gitHub,
       externalId: "live"
     )
     let store = makeStore()
@@ -310,7 +310,7 @@ extension PersistenceOfflineDurabilityTests {
     await store.restorePersistedSessionState()
 
     #expect(store.globalTaskBoardItems.map(\.id) == ["board-live"])
-    #expect(store.globalTaskBoardItems.first?.externalRefs.first?.provider == .todoist)
+    #expect(store.globalTaskBoardItems.first?.externalRefs.first?.externalId == "live")
   }
 
   @Test("Offline mode keeps local bookmarks notes filters and search history editable")

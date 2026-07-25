@@ -21,11 +21,11 @@ struct FenceClient {
 #[async_trait]
 impl ExternalSyncClient for FenceClient {
     fn provider(&self) -> ExternalProvider {
-        ExternalProvider::Todoist
+        ExternalProvider::GitHub
     }
 
     fn scope_id(&self) -> String {
-        "provider-project".into()
+        "acme/widgets".into()
     }
 
     fn scope_for_item(&self, _item: &TaskBoardItem) -> String {
@@ -76,7 +76,7 @@ impl ExternalSyncClient for FenceClient {
 async fn coordinator_cancellation_stops_pull_before_provider_call() {
     let (store, calls, batch) = cancelled_sync(
         unlinked_item("task-pull-fence"),
-        pull_options(ExternalProvider::Todoist),
+        pull_options(ExternalProvider::GitHub),
     )
     .await;
 
@@ -88,7 +88,7 @@ async fn coordinator_cancellation_stops_pull_before_provider_call() {
 async fn coordinator_cancellation_stops_linked_update_before_provider_call() {
     let (store, calls, batch) = cancelled_sync(
         linked_item("task-update-fence", false),
-        push_options(ExternalProvider::Todoist),
+        push_options(ExternalProvider::GitHub),
     )
     .await;
 
@@ -101,7 +101,7 @@ async fn coordinator_cancellation_stops_linked_update_before_provider_call() {
 async fn coordinator_cancellation_stops_delete_before_provider_call() {
     let (store, calls, batch) = cancelled_sync(
         linked_item("task-delete-fence", true),
-        push_options(ExternalProvider::Todoist),
+        push_options(ExternalProvider::GitHub),
     )
     .await;
 
@@ -111,7 +111,7 @@ async fn coordinator_cancellation_stops_delete_before_provider_call() {
 
 #[tokio::test]
 async fn dry_run_pull_checks_coordinator_without_provider_attempt() {
-    let mut options = pull_options(ExternalProvider::Todoist);
+    let mut options = pull_options(ExternalProvider::GitHub);
     options.dry_run = true;
     let (store, calls, batch) = cancelled_sync(unlinked_item("task-dry-run-fence"), options).await;
 
@@ -164,15 +164,15 @@ fn linked_item(id: &str, deleted: bool) -> TaskBoardItem {
         String::new(),
         "2026-07-16T10:00:00Z".into(),
     );
-    item.project_id = Some("provider-project".into());
+    item.project_id = Some("acme/widgets".into());
     item.deleted_at = deleted.then(|| "2026-07-16T12:00:00Z".into());
-    let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-task");
+    let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "remote-task");
     let mut core_reference = reference.into_core_ref();
     core_reference.sync_state = Some(ExternalRefSyncState {
         title: Some("Previous title".into()),
         body: Some(String::new()),
         status: Some(TaskBoardStatus::Backlog),
-        project_id: Some("provider-project".into()),
+        project_id: Some("acme/widgets".into()),
         updated_at: Some("provider-revision-1".into()),
         synced_at: Some("2026-07-16T10:00:00Z".into()),
         labels: Vec::new(),

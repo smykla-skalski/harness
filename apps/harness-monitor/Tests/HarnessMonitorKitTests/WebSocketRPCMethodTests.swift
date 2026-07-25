@@ -53,10 +53,6 @@ struct WebSocketRPCMethodTests {
       WebSocketRPCMethod.taskBoardOrchestratorGitHubTokensSync.rawValue
         == "task_board.orchestrator_github_tokens_sync"
     )
-    #expect(
-      WebSocketRPCMethod.taskBoardOrchestratorTodoistTokenSync.rawValue
-        == "task_board.orchestrator_todoist_token_sync"
-    )
   }
 
   @Test("WebSocket RPC catalog carries policy and review method names")

@@ -107,14 +107,6 @@ struct TaskBoardItemEditorDraft: Equatable {
     return currentIdentities == initialExternalRefIdentities ? nil : materialized
   }
 
-  var monitorVisibleExternalRefs: [TaskBoardExternalRef] {
-    materializedExternalRefs.filter { $0.provider.isVisibleInMonitorUI }
-  }
-
-  var monitorVisibleExternalRefIDs: [UUID] {
-    externalRefs.filter { $0.provider.isVisibleInMonitorUI }.map(\.id)
-  }
-
   var planningState: TaskBoardPlanningState {
     TaskBoardPlanningState(
       summary: normalized(planningSummary),

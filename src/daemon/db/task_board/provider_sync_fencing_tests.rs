@@ -228,10 +228,10 @@ async fn neutral_release_preserves_failure_count_without_backoff() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
-    let scope_id = "v1:todoist:write:7:scope-a";
+    let scope_id = "v1:github:write:7:scope-a";
     let initial = start_attempt_for(
         &db,
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         scope_id,
         "2026-07-16T13:00:00Z",
     )
@@ -242,7 +242,7 @@ async fn neutral_release_preserves_failure_count_without_backoff() {
     query(
         "UPDATE task_board_provider_scope_state
          SET backoff_until = '2000-01-01T00:00:00Z'
-         WHERE provider = 'todoist' AND scope_id = ?1",
+         WHERE provider = 'github' AND scope_id = ?1",
     )
     .bind(scope_id)
     .execute(db.pool())
@@ -250,7 +250,7 @@ async fn neutral_release_preserves_failure_count_without_backoff() {
     .expect("expire backoff");
     let current = start_attempt_for(
         &db,
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         scope_id,
         "2026-07-16T13:10:01Z",
     )
@@ -265,7 +265,7 @@ async fn neutral_release_preserves_failure_count_without_backoff() {
         .expect("release attempt");
 
     let state = db
-        .task_board_provider_scope_state(ExternalProvider::Todoist, scope_id)
+        .task_board_provider_scope_state(ExternalProvider::GitHub, scope_id)
         .await
         .expect("scope state");
     assert_eq!(state.health, ExternalProviderScopeHealth::Healthy);
@@ -285,10 +285,10 @@ async fn neutral_release_removes_a_new_attempt_row() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
-    let scope_id = "v1:todoist:write:7:scope-b";
+    let scope_id = "v1:github:write:7:scope-b";
     let attempt = start_attempt_for(
         &db,
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         scope_id,
         "2026-07-16T14:00:00Z",
     )
@@ -300,7 +300,7 @@ async fn neutral_release_removes_a_new_attempt_row() {
 
     let rows = query_as::<_, (i64,)>(
         "SELECT COUNT(*) FROM task_board_provider_scope_state
-         WHERE provider = 'todoist' AND scope_id = ?1",
+         WHERE provider = 'github' AND scope_id = ?1",
     )
     .bind(scope_id)
     .fetch_one(db.pool())

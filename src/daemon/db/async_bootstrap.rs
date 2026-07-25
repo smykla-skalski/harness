@@ -173,6 +173,10 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         48..=49 => 52,
         // v53 adds the second half of the mark the same way round.
         50..=51 => 53,
+        // Schema v54 ships as two files: the Todoist row cleanup and the
+        // task_board_projects rebuild that drops 'todoist' from its source
+        // check.
+        52..=53 => 54,
         _ => u64::MAX,
     }
 }
@@ -314,9 +318,37 @@ fn baseline_migration() -> Result<&'static Migration, CliError> {
         .ok_or_else(|| db_error("missing daemon async baseline migration"))
 }
 
+/// Migrations that rebuild a referenced table have to rename it, and SQLite
+/// rewrites every REFERENCES clause pointing at a renamed table while
+/// enforcement is on - which turns the rename into a dangling foreign key once
+/// the temp table is dropped. The pragma is ignored inside a transaction and
+/// sqlx wraps each migration in one, so enforcement is suspended around the
+/// whole run on a single connection instead.
 async fn run_daemon_migrator(pool: &SqlitePool) -> Result<(), CliError> {
-    DAEMON_DB_MIGRATOR
-        .run(pool)
+    let mut conn = pool
+        .acquire()
         .await
-        .map_err(|error| db_error(format!("run async daemon migrations: {error}")))
+        .map_err(|error| db_error(format!("acquire async migration connection: {error}")))?;
+    query("PRAGMA foreign_keys = OFF")
+        .execute(&mut *conn)
+        .await
+        .map_err(|error| db_error(format!("suspend foreign keys for async migrations: {error}")))?;
+    query("PRAGMA legacy_alter_table = ON")
+        .execute(&mut *conn)
+        .await
+        .map_err(|error| db_error(format!("suspend alter-table fixups: {error}")))?;
+    let migrated = DAEMON_DB_MIGRATOR
+        .run_direct(None, &mut *conn, false)
+        .await
+        .map_err(|error| db_error(format!("run async daemon migrations: {error}")));
+    let restored = query("PRAGMA legacy_alter_table = OFF; PRAGMA foreign_keys = ON")
+        .execute(&mut *conn)
+        .await
+        .map(|_| ())
+        .map_err(|error| {
+            db_error(format!(
+                "restore foreign keys after async migrations: {error}"
+            ))
+        });
+    migrated.and(restored)
 }

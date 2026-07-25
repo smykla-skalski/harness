@@ -1317,7 +1317,6 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "SessionExtensionsPayload",
     // task_board orchestrator credential responses (runtime_config.rs): thin hand mirrors.
     "TaskBoardGitHubTokensSyncResponse",
-    "TaskBoardTodoistTokenSyncResponse",
     "TaskBoardOpenRouterTokenSyncResponse",
     // host-bridge reconfigure response (bridge/types.rs): nests the daemon-state capability wire.
     "BridgeStatusReport",
@@ -1333,12 +1332,11 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "GitHubAutomationToggles",
     "ProtectedPathRule",
     // task_board orchestrator settings + status tree (orchestrator/types.rs). The settings nest
-    // the GitHubProjectConfigWire (via TYPE_RENAMES on the Rust alias) plus the two inbox configs;
+    // the GitHubProjectConfigWire (via TYPE_RENAMES on the Rust alias) plus the inbox config;
     // the status nests the run summary (sync/audit/dispatch/evaluation wires) and tick info. The
     // Workflow/TickPhase/RunStatus enums + TaskBoardStatus/TaskBoardWorkflowStatus ride bare.
     "TaskBoardOrchestratorSettings",
     "TaskBoardGitHubInboxConfig",
-    "TaskBoardTodoistInboxConfig",
     "TaskBoardOrchestratorTickInfo",
     "TaskBoardOrchestratorRunSummary",
     "TaskBoardWorkflowExecutionCount",
@@ -2927,12 +2925,11 @@ const AGENT_REGISTRATION_EMIT_ONLY: &[&str] = &[
 ];
 const TASK_BOARD_CREDENTIAL_SOURCE: &str = include_str!("../src/task_board/runtime_config.rs");
 const TASK_BOARD_CREDENTIAL_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardCredentialWireTypes.generated.swift";
-// The three token-sync response bodies (GitHub/Todoist/OpenRouter) the orchestrator credential
+// The two token-sync response bodies (GitHub/OpenRouter) the orchestrator credential
 // endpoints return - tiny bool/count structs. The big git-runtime-config tree and the request
 // bodies in this file stay out of the allow-list (requests are encode-only).
 const TASK_BOARD_CREDENTIAL_EMIT_ONLY: &[&str] = &[
     "TaskBoardGitHubTokensSyncResponse",
-    "TaskBoardTodoistTokenSyncResponse",
     "TaskBoardOpenRouterTokenSyncResponse",
 ];
 const BRIDGE_STATUS_SOURCE: &str = include_str!("../src/daemon/bridge/types.rs");
@@ -2977,7 +2974,6 @@ const ORCHESTRATOR_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKi
 const ORCHESTRATOR_EMIT_ONLY: &[&str] = &[
     "TaskBoardOrchestratorSettings",
     "TaskBoardGitHubInboxConfig",
-    "TaskBoardTodoistInboxConfig",
     "TaskBoardOrchestratorTickInfo",
     "TaskBoardOrchestratorRunSummary",
     "TaskBoardWorkflowExecutionCount",
@@ -3847,7 +3843,7 @@ pub struct Drop { pub other: String }
     #[test]
     fn variant_rename_is_canonical_and_alias_is_decode_only() {
         let item: ItemEnum = syn::parse_str(
-            "#[serde(rename_all = \"snake_case\")] enum Provider { #[serde(rename = \"github\", alias = \"git_hub\")] GitHub, Todoist }",
+            "#[serde(rename_all = \"snake_case\")] enum Provider { #[serde(rename = \"github\", alias = \"git_hub\")] GitHub, Manual }",
         )
         .expect("enum parses");
         let spec = build_string_enum(&item);
@@ -3859,7 +3855,7 @@ pub struct Drop { pub other: String }
                     raw_value: "github".to_string(),
                     aliases: vec!["git_hub".to_string()],
                 },
-                string_enum_case("todoist", "todoist"),
+                string_enum_case("manual", "manual"),
             ]
         );
 

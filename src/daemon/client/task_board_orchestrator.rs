@@ -6,8 +6,7 @@ use crate::daemon::protocol::{
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitHubTokensSyncResponse, TaskBoardGitRuntimeConfig,
     TaskBoardGitRuntimeConfigResponse, TaskBoardOrchestratorRunOnceRequest,
     TaskBoardOrchestratorRunOnceResponse, TaskBoardOrchestratorSettingsResponse,
-    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorStatusResponse,
-    TaskBoardTodoistTokenSyncRequest, TaskBoardTodoistTokenSyncResponse, http_paths,
+    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorStatusResponse, http_paths,
 };
 use crate::errors::CliError;
 
@@ -104,12 +103,6 @@ impl DaemonClient {
         self.put(http_paths::TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS, request)
     }
 
-    pub fn sync_task_board_todoist_token(
-        &self,
-        request: &TaskBoardTodoistTokenSyncRequest,
-    ) -> Result<TaskBoardTodoistTokenSyncResponse, CliError> {
-        self.put(http_paths::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN, request)
-    }
 }
 
 fn automation_run_detail_path(run_id: &str) -> String {

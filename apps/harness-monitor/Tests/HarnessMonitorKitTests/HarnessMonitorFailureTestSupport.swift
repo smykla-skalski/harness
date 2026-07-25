@@ -285,14 +285,14 @@ func clearRecordedCallsIfNeeded(for client: any HarnessMonitorClientProtocol) {
 @MainActor
 final class InMemoryTaskBoardCredentialBundle {
   let github = InMemoryTaskBoardGitHubCredentialStore()
-  let todoist = InMemoryTaskBoardTodoistCredentialStore()
   let openRouter = InMemoryTaskBoardOpenRouterCredentialStore()
+  let retiredTodoistPurge = RecordingTaskBoardTodoistCredentialPurge()
 
   var persistence: TaskBoardCredentialPersistence {
     TaskBoardCredentialPersistence(
       github: github,
-      todoist: todoist,
-      openRouter: openRouter
+      openRouter: openRouter,
+      retiredTodoistPurge: retiredTodoistPurge.purge
     )
   }
 }

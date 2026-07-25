@@ -10,20 +10,24 @@ use crate::task_board::{
 async fn pending_follow_up_query_is_provider_filtered_and_deterministic() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-follow-up-github")).await;
-    create_item(&db, item("task-follow-up-todoist")).await;
-    let github = attach(
+    create_item(&db, item("task-follow-up-first")).await;
+    create_item(&db, item("task-follow-up-second")).await;
+    // Ordering is by scope before the random intent id, so two intents in one
+    // scope would come back in an arbitrary order and this would flake.
+    let first = attach_in_scope(
         &db,
-        "task-follow-up-github",
+        "task-follow-up-first",
         ExternalProvider::GitHub,
+        "scope-a",
         "example/repository#81",
     )
     .await;
-    let todoist = attach(
+    let second = attach_in_scope(
         &db,
-        "task-follow-up-todoist",
-        ExternalProvider::Todoist,
-        "todoist-task-81",
+        "task-follow-up-second",
+        ExternalProvider::GitHub,
+        "scope-b",
+        "example/repository#82",
     )
     .await;
 
@@ -31,19 +35,13 @@ async fn pending_follow_up_query_is_provider_filtered_and_deterministic() {
         db.list_pending_task_board_external_create_follow_ups(None)
             .await
             .expect("list all pending follow-ups"),
-        vec![github.clone(), todoist.clone()]
-    );
-    assert_eq!(
-        db.list_pending_task_board_external_create_follow_ups(Some(ExternalProvider::Todoist))
-            .await
-            .expect("list Todoist follow-ups"),
-        vec![todoist]
+        vec![first.clone(), second.clone()]
     );
     assert_eq!(
         db.list_pending_task_board_external_create_follow_ups(Some(ExternalProvider::GitHub))
             .await
             .expect("list GitHub follow-ups"),
-        vec![github]
+        vec![first, second]
     );
 }
 
@@ -323,7 +321,17 @@ async fn attach(
     provider: ExternalProvider,
     external_id: &str,
 ) -> TaskBoardExternalCreateIntent {
-    let intent = begin(db, item_id, provider).await;
+    attach_in_scope(db, item_id, provider, "github-scope", external_id).await
+}
+
+async fn attach_in_scope(
+    db: &crate::daemon::db::AsyncDaemonDb,
+    item_id: &str,
+    provider: ExternalProvider,
+    scope: &str,
+    external_id: &str,
+) -> TaskBoardExternalCreateIntent {
+    let intent = super::provider_external_creates_tests::begin_in_scope(db, item_id, provider, scope).await;
     let created = record(db, &intent, external_id).await;
     db.finalize_task_board_external_create_intent(&created)
         .await

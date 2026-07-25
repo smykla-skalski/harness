@@ -25,13 +25,6 @@ pub struct TaskBoardGitHubInboxConfig {
     pub label_filter: Vec<String>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
-pub struct TaskBoardTodoistInboxConfig {
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub project_filter: Vec<String>,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[derive(utoipa::ToSchema)]
 pub struct TaskBoardOrchestratorSettings {
@@ -49,8 +42,6 @@ pub struct TaskBoardOrchestratorSettings {
     pub github_project: TaskBoardGitHubProjectConfig,
     #[serde(default)]
     pub github_inbox: TaskBoardGitHubInboxConfig,
-    #[serde(default)]
-    pub todoist_inbox: TaskBoardTodoistInboxConfig,
     #[serde(default)]
     pub scheduling: TaskBoardAutomationSchedulingSettings,
     #[serde(default)]
@@ -90,8 +81,6 @@ pub struct TaskBoardOrchestratorSettingsUpdateRequest {
     pub github_project: Option<TaskBoardGitHubProjectConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub github_inbox: Option<TaskBoardGitHubInboxConfig>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub todoist_inbox: Option<TaskBoardTodoistInboxConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scheduling: Option<TaskBoardAutomationSchedulingSettings>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -273,7 +262,6 @@ impl Default for TaskBoardOrchestratorSettings {
             project_dir: None,
             github_project: TaskBoardGitHubProjectConfig::default(),
             github_inbox: TaskBoardGitHubInboxConfig::default(),
-            todoist_inbox: TaskBoardTodoistInboxConfig::default(),
             scheduling: TaskBoardAutomationSchedulingSettings::default(),
             retry: TaskBoardAutomationRetrySettings::default(),
             reviewers: TaskBoardReviewerSettings::default(),

@@ -27,7 +27,7 @@ use super::items::{
     post,
     path = "/v1/task-board/sync",
     tag = "task-board",
-    description = "Sync task-board items against configured external providers (GitHub, Todoist) in the requested direction. Runs as a dry-run preview unless the request explicitly disables it",
+    description = "Sync task-board items against configured external providers (GitHub) in the requested direction. Runs as a dry-run preview unless the request explicitly disables it",
     request_body = TaskBoardSyncRequest,
     responses(
         (status = 200, description = "Per-provider sync summary", body = TaskBoardSyncSummary),

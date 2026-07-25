@@ -137,7 +137,6 @@ private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
   .taskBoardOrchestratorRuntimeConfigGet: .object(sampleTaskBoardGitRuntimeConfigJSON),
   .taskBoardOrchestratorRuntimeConfigUpdate: .object(sampleTaskBoardGitRuntimeConfigJSON),
   .taskBoardOrchestratorGitHubTokensSync: .object(sampleGitHubTokensSyncJSON),
-  .taskBoardOrchestratorTodoistTokenSync: .object(sampleTodoistTokenSyncJSON),
   .taskBoardGitRuntimeSecretHandoffPrepare: .object([
     "prepared": .bool(true),
     "migration_id": .string("migration-1"),
@@ -268,7 +267,6 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
       sampleTaskBoardAutomationForceCancelText,
     Route("/v1/task-board/orchestrator/runtime-config"): sampleTaskBoardGitRuntimeConfigText,
     Route("/v1/task-board/orchestrator/github-tokens"): sampleGitHubTokensSyncText,
-    Route("/v1/task-board/orchestrator/todoist-token"): sampleTodoistTokenSyncText,
     Route("/v1/task-board/git/runtime/secret-handoff/prepare"):
       sampleSecretHandoffPrepareText,
     Route("/v1/task-board/git/runtime/secret-handoff/ack"):

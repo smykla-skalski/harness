@@ -67,9 +67,9 @@ extension PersistenceOfflineDurabilityTests {
       provider: .gitHub,
       externalId: "321"
     )
-    let todoistItem = makeTaskBoardItem(
-      id: "board-live-todoist",
-      provider: .todoist,
+    let secondItem = makeTaskBoardItem(
+      id: "board-live-second",
+      provider: .gitHub,
       externalId: "654"
     )
     let orchestratorStatus = makeTaskBoardOrchestratorStatus()
@@ -81,7 +81,7 @@ extension PersistenceOfflineDurabilityTests {
         modelContainer: firstContainer
       )
       await firstStore.cacheTaskBoardSnapshot(
-        items: [githubItem, todoistItem],
+        items: [githubItem, secondItem],
         orchestratorStatus: orchestratorStatus
       )
     }
@@ -94,8 +94,8 @@ extension PersistenceOfflineDurabilityTests {
 
     let cached = await reopenedStore.loadCachedTaskBoardSnapshot()
 
-    #expect(cached?.items.map(\.id) == ["board-live-github", "board-live-todoist"])
-    #expect(cached?.items.map(\.externalRefs.first?.provider) == [.gitHub, .todoist])
+    #expect(cached?.items.map(\.id) == ["board-live-github", "board-live-second"])
+    #expect(cached?.items.map(\.externalRefs.first?.externalId) == ["321", "654"])
     #expect(cached?.orchestratorStatus == orchestratorStatus)
     #expect(cached?.cachedAt != nil)
   }

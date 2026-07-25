@@ -81,7 +81,7 @@ async fn create_remote_item(
     operations: &mut Vec<ExternalSyncOperation>,
     follow_ups: &mut Vec<TaskBoardExternalCreateIntent>,
 ) -> Result<bool, SyncClientError> {
-    let changed_fields = push_create_fields(item, client.provider());
+    let changed_fields = push_create_fields(item);
     if options.dry_run {
         operations.push(push_operation(
             client.provider(),

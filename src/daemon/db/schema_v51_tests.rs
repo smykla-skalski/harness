@@ -26,9 +26,9 @@ INSERT INTO task_board_items (
      '[]', 'headless', 'default_task', NULL,
      NULL, '{}', '{}', '{}', 0,
      '2026-07-24T00:00:00Z', '2026-07-24T00:00:00Z', 1, 'task'),
-    ('todoist-item', 1, 'Todoist', '', 'todo', 'medium', '[]', '2334Ab',
+    ('cased-slug', 1, 'Hand-named project', '', 'todo', 'medium', '[]', '2334Ab',
      '[]', 'headless', 'default_task', NULL,
-     'todoist', '{}', '{}', '{}', 0,
+     NULL, '{}', '{}', '{}', 0,
      '2026-07-24T00:00:00Z', '2026-07-24T00:00:00Z', 1, 'task'),
     ('spaced-slug', 1, 'Padded slug', '', 'todo', 'medium', '[]', 'Acme / Widgets',
      '[]', 'headless', 'default_task', NULL,
@@ -159,7 +159,7 @@ fn backfill_gives_every_attributed_item_a_project_identifier() {
     let imported =
         source_project_of(connection, "imported-github").expect("imported item attributed");
     let legacy = source_project_of(connection, "legacy-slug").expect("legacy slug item attributed");
-    let todoist = source_project_of(connection, "todoist-item").expect("todoist item attributed");
+    let cased = source_project_of(connection, "cased-slug").expect("cased slug item attributed");
 
     assert!(is_project_id(&imported), "{imported} is an assigned id");
     assert_eq!(
@@ -172,11 +172,11 @@ fn backfill_gives_every_attributed_item_a_project_identifier() {
         "the same repository under either legacy column is one project"
     );
     assert_eq!(
-        slug_of(connection, &todoist),
-        ("todoist".into(), "2334Ab".into()),
-        "a provider slug keeps its case"
+        slug_of(connection, &cased),
+        ("manual".into(), "2334Ab".into()),
+        "a slug that is not a repository keeps its case"
     );
-    assert_ne!(todoist, imported);
+    assert_ne!(cased, imported);
     assert_eq!(
         source_project_of(connection, "spaced-slug"),
         Some(imported),

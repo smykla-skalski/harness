@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::item_fields::ExternalRefProvider;
 use super::project_color::TaskBoardProjectColor;
 use super::project_shape::TaskBoardProjectShape;
 use super::runtime_config::normalize_repository_slug;
@@ -27,7 +26,6 @@ pub enum TaskBoardProjectSource {
     // `as_str` stores nor what the column's CHECK constraint accepts.
     #[serde(rename = "github")]
     GitHub,
-    Todoist,
     Manual,
 }
 
@@ -38,9 +36,10 @@ impl TaskBoardProjectSource {
     pub fn normalize_slug(self, raw: &str) -> Option<String> {
         let normalized = match self {
             Self::GitHub => normalize_repository_slug(Some(raw)),
-            // The provider owns these, so case is significant and the only
-            // reshaping that is safe is trimming transport whitespace.
-            Self::Todoist | Self::Manual => {
+            // A hand-entered name is whatever the user typed, so case is
+            // significant and the only reshaping that is safe is trimming
+            // transport whitespace.
+            Self::Manual => {
                 let trimmed = raw.trim();
                 (!trimmed.is_empty()).then(|| trimmed.to_owned())
             }
@@ -52,7 +51,6 @@ impl TaskBoardProjectSource {
     pub fn parse(value: &str) -> Option<Self> {
         match value {
             "github" => Some(Self::GitHub),
-            "todoist" => Some(Self::Todoist),
             "manual" => Some(Self::Manual),
             _ => None,
         }
@@ -62,7 +60,6 @@ impl TaskBoardProjectSource {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::GitHub => "github",
-            Self::Todoist => "todoist",
             Self::Manual => "manual",
         }
     }
@@ -146,10 +143,10 @@ pub fn item_attribution(item: &super::types::TaskBoardItem) -> ItemProjectAttrib
     {
         return ItemProjectAttribution::Assigned;
     }
-    // `project_id` is the provider's own project value: a repository slug on
-    // some rows, a Todoist project id on others. GitHub imports name their
-    // repository only in `execution_repository`, which is why it is the
-    // fallback rather than the first choice.
+    // `project_id` is the provider's own project value, a repository slug on
+    // rows that carry one. GitHub imports name their repository only in
+    // `execution_repository`, which is why it is the fallback rather than the
+    // first choice.
     let raw = item
         .project_id
         .as_deref()
@@ -167,11 +164,7 @@ pub fn item_attribution(item: &super::types::TaskBoardItem) -> ItemProjectAttrib
     if let Some(slug) = TaskBoardProjectSource::GitHub.normalize_slug(raw) {
         return ItemProjectAttribution::Register(TaskBoardProjectSource::GitHub, slug);
     }
-    let source = if item.imported_from_provider == Some(ExternalRefProvider::Todoist) {
-        TaskBoardProjectSource::Todoist
-    } else {
-        TaskBoardProjectSource::Manual
-    };
+    let source = TaskBoardProjectSource::Manual;
     source.normalize_slug(raw).map_or(
         ItemProjectAttribution::Unattributed,
         |slug| ItemProjectAttribution::Register(source, slug),

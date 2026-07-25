@@ -74,7 +74,7 @@ mod tests {
             operations: Vec::new(),
             external_create_follow_ups: Vec::new(),
             scope_outcomes: vec![ExternalSyncScopeOutcome::failed(
-                ExternalProvider::Todoist,
+                ExternalProvider::GitHub,
                 "scope-neutral".into(),
                 &error,
             )],

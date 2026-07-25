@@ -71,7 +71,7 @@ async fn run_flow() {
         &client,
         &base_url,
         http_paths::TASK_BOARD_SYNC,
-        json!({ "provider": "todoist", "direction": "pull", "dry_run": true }),
+        json!({ "provider": "github", "direction": "pull", "dry_run": true }),
     )
     .await;
     assert_eq!(sync_status, StatusCode::BAD_REQUEST);
@@ -228,15 +228,6 @@ async fn run_flow() {
     .await;
     assert_eq!(tokens["global_token_configured"].as_bool(), Some(true));
     assert_eq!(tokens["repository_token_count"].as_u64(), Some(1));
-    let todoist_token = put_json(
-        &client,
-        &base_url,
-        http_paths::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN,
-        json!({ "token": "todoist-token" }),
-    )
-    .await;
-    assert_eq!(todoist_token["token_configured"].as_bool(), Some(true));
-    assert_eq!(todoist_token["token"].as_str(), None);
     assert_eq!(
         post_json(
             &client,
@@ -309,7 +300,7 @@ async fn assert_task_board_sync_audit(client: &reqwest::Client, base_url: &str) 
     }));
     assert!(sync_events.iter().any(|event| {
         event["outcome"].as_str() == Some("failure")
-            && event["payload_json"]["provider"].as_str() == Some("todoist")
+            && event["payload_json"]["provider"].as_str() == Some("github")
     }));
     assert!(sync_events.iter().all(|event| {
         event["source"].as_str() == Some("taskBoard")

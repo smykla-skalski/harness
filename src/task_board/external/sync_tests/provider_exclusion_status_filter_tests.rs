@@ -32,7 +32,7 @@ async fn todo_filtered_pull_restores_an_open_provider_exclusion_tombstone() {
         created.item_revision,
         TaskBoardItemPatch::default(),
         &ProviderExclusionAuditContext {
-            provider: ExternalRefProvider::Todoist,
+            provider: ExternalRefProvider::GitHub,
             incoming_external_ref: "remote-1".into(),
             stored_external_ref: "remote-1".into(),
             matched_label: "duplicate".into(),
@@ -43,7 +43,7 @@ async fn todo_filtered_pull_restores_an_open_provider_exclusion_tombstone() {
     .expect("hide call")
     .expect("item is hidden");
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(UpdateFakeSyncClient::new(
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         Vec::new(),
         vec![remote_task(
             "remote-1",
@@ -56,7 +56,7 @@ async fn todo_filtered_pull_restores_an_open_provider_exclusion_tombstone() {
     let operations = sync_external_tasks(
         &db,
         ExternalSyncOptions {
-            provider: Some(ExternalProvider::Todoist),
+            provider: Some(ExternalProvider::GitHub),
             direction: ExternalSyncDirection::Pull,
             conflict_policy: ExternalSyncConflictPolicy::Report,
             dry_run: false,

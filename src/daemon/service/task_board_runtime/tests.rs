@@ -5,8 +5,7 @@ use super::{
     TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
     TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig,
     TaskBoardGitRuntimeKeyMaterialSyncRequest, TaskBoardGitRuntimeSecretHandoffAckRequest,
-    TaskBoardTodoistTokenSyncRequest, update_task_board_git_runtime_config,
-    validate_repository_tokens,
+    update_task_board_git_runtime_config, validate_repository_tokens,
 };
 
 #[test]
@@ -258,21 +257,22 @@ fn sync_tokens_replace_existing_snapshot() {
 }
 
 #[test]
-fn external_sync_config_uses_app_configured_todoist_token_when_env_missing() {
+fn external_sync_config_uses_app_configured_github_token_when_env_missing() {
     let tmp = tempdir().expect("tempdir");
     with_isolated_harness_env(tmp.path(), || {
-        let _ = super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest::default());
-        let _ = super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest {
-            token: Some(" todoist-token ".into()),
+        let _ = super::sync_task_board_github_tokens(&TaskBoardGitHubTokensSyncRequest::default());
+        let _ = super::sync_task_board_github_tokens(&TaskBoardGitHubTokensSyncRequest {
+            global_token: Some(" github-token ".into()),
+            repository_tokens: Vec::new(),
         });
 
         let config = super::external_sync_config_for_repository(Some("owner/repo"), &[]);
 
         assert_eq!(
-            config.token_for(crate::task_board::ExternalProvider::Todoist),
-            Some("todoist-token")
+            config.token_for(crate::task_board::ExternalProvider::GitHub),
+            Some("github-token")
         );
-        let _ = super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest::default());
+        let _ = super::sync_task_board_github_tokens(&TaskBoardGitHubTokensSyncRequest::default());
     });
 }
 
@@ -493,22 +493,23 @@ fn runtime_config_persist_failure_keeps_in_memory_secrets() {
 }
 
 #[test]
-fn external_sync_config_keeps_todoist_env_precedence() {
+fn external_sync_config_keeps_github_env_precedence() {
     let tmp = tempdir().expect("tempdir");
     with_isolated_harness_env(tmp.path(), || {
-        let _ = super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest::default());
-        temp_env::with_var("HARNESS_TODOIST_TOKEN", Some("env-token"), || {
-            let _ = super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest {
-                token: Some("app-token".into()),
+        let _ = super::sync_task_board_github_tokens(&TaskBoardGitHubTokensSyncRequest::default());
+        temp_env::with_var("HARNESS_GITHUB_TOKEN", Some("env-token"), || {
+            let _ = super::sync_task_board_github_tokens(&TaskBoardGitHubTokensSyncRequest {
+                global_token: Some("app-token".into()),
+                repository_tokens: Vec::new(),
             });
 
             let config = super::external_sync_config_for_repository(Some("owner/repo"), &[]);
 
             assert_eq!(
-                config.token_for(crate::task_board::ExternalProvider::Todoist),
+                config.token_for(crate::task_board::ExternalProvider::GitHub),
                 Some("env-token")
             );
         });
-        let _ = super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest::default());
+        let _ = super::sync_task_board_github_tokens(&TaskBoardGitHubTokensSyncRequest::default());
     });
 }

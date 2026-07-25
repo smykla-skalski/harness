@@ -56,7 +56,6 @@ extension HarnessMonitorStore {
       orchestratorSettings: try orchestratorSettings,
       runtimeConfig: hydratedRuntime,
       githubCredentials: credentials.githubCredentials,
-      todoistCredentials: credentials.todoistCredentials,
       openRouterCredentials: credentials.openRouterCredentials,
       identityDefaults: identityDefaults
     )
@@ -234,18 +233,14 @@ extension HarnessMonitorStore {
       async let githubTokens = client.syncTaskBoardGitHubTokens(
         request: snapshot.githubCredentials.syncRequest
       )
-      async let todoistToken = client.syncTaskBoardTodoistToken(
-        request: snapshot.todoistCredentials.syncRequest
-      )
       async let openRouterToken = client.syncTaskBoardOpenRouterToken(
         request: snapshot.openRouterCredentials.syncRequest
       )
-      _ = try await (githubTokens, todoistToken, openRouterToken)
+      _ = try await (githubTokens, openRouterToken)
       lastTaskBoardCredentialSync = TaskBoardCredentialSyncState(
         instanceID: instanceID,
         credentials: TaskBoardStoredCredentialSnapshot(
           githubCredentials: snapshot.githubCredentials,
-          todoistCredentials: snapshot.todoistCredentials,
           openRouterCredentials: snapshot.openRouterCredentials
         ),
         syncedAt: Date()
@@ -314,9 +309,6 @@ extension HarnessMonitorStore {
       }
       _ = try await client.syncTaskBoardGitHubTokens(
         request: credentials.githubCredentials.syncRequest
-      )
-      _ = try await client.syncTaskBoardTodoistToken(
-        request: credentials.todoistCredentials.syncRequest
       )
       _ = try await client.syncTaskBoardOpenRouterToken(
         request: credentials.openRouterCredentials.syncRequest

@@ -17,14 +17,6 @@ final class HarnessMonitorSettingsTaskBoardUITests: HarnessMonitorUITestCase {
       in: app,
       identifier: Accessibility.settingsTaskBoardRepositoriesButton
     )
-    let todoistTokenField = element(
-      in: app,
-      identifier: Accessibility.settingsTaskBoardTodoistTokenField
-    )
-    let todoistProjectField = element(
-      in: app,
-      identifier: "harness.settings.task-board.todoist-inbox.project-filter"
-    )
     let status = element(in: app, identifier: Accessibility.settingsTaskBoardStatus)
 
     XCTAssertTrue(saveButton.waitForExistence(timeout: Self.actionTimeout))
@@ -38,16 +30,12 @@ final class HarnessMonitorSettingsTaskBoardUITests: HarnessMonitorUITestCase {
       "Task Board settings should link monitored repositories to the shared Repositories section"
     )
     XCTAssertFalse(
-      todoistTokenField.exists,
+      element(in: app, identifier: Accessibility.settingsTaskBoardGlobalTokenField).exists,
       "Task Board settings should keep shared secrets in the dedicated Secrets section"
     )
     XCTAssertFalse(
       element(in: app, identifier: Accessibility.settingsTaskBoardInboxRepositoriesField).exists,
       "Task Board settings should not edit inbox repositories inline anymore"
-    )
-    XCTAssertFalse(
-      todoistProjectField.exists,
-      "Task Board settings should hide Todoist inbox controls while the integration is disabled"
     )
     XCTAssertFalse(status.exists, "Task Board preview should not settle on a status error")
   }
@@ -112,10 +100,6 @@ final class HarnessMonitorSettingsDepsUITests: HarnessMonitorUITestCase {
     let reloadButton = element(in: app, identifier: Accessibility.settingsSecretsReloadButton)
     let githubTokenField = element(
       in: app, identifier: Accessibility.settingsTaskBoardGlobalTokenField)
-    let todoistTokenField = element(
-      in: app,
-      identifier: "\(Accessibility.settingsTaskBoardGlobalTokenField).todoist"
-    )
     let sshKeyPathField = element(
       in: app, identifier: Accessibility.settingsTaskBoardSSHKeyPathField)
     let status = element(in: app, identifier: Accessibility.settingsSecretsStatus)
@@ -123,7 +107,6 @@ final class HarnessMonitorSettingsDepsUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(saveButton.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(reloadButton.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(githubTokenField.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(todoistTokenField.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(sshKeyPathField.exists)
     XCTAssertFalse(status.exists, "Secrets preview should not settle on a status error")
   }

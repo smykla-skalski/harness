@@ -196,18 +196,6 @@ mod tests {
             !requested_github_read(
                 &requested,
                 ExternalSyncOptions {
-                    provider: Some(ExternalProvider::Todoist),
-                    direction: ExternalSyncDirection::Pull,
-                    ..ExternalSyncOptions::default()
-                },
-                &github,
-            ),
-            "a Todoist-only pull must not refresh GitHub even with a token set"
-        );
-        assert!(
-            !requested_github_read(
-                &requested,
-                ExternalSyncOptions {
                     direction: ExternalSyncDirection::Push,
                     ..ExternalSyncOptions::default()
                 },
@@ -239,19 +227,19 @@ mod tests {
         assert!(metrics.operations()[0].applied);
         assert_eq!(
             metrics.operations()[0].external_id.as_deref(),
-            Some("remote-config-recovery")
+            Some("acme/widgets#41")
         );
         assert!(
             db.task_board_external_create_receipt(
                 "task-config-recovery",
-                ExternalProvider::Todoist,
+                ExternalProvider::GitHub,
             )
             .await
             .expect("create receipt")
             .is_some()
         );
         assert!(
-            db.list_pending_task_board_external_create_follow_ups(Some(ExternalProvider::Todoist))
+            db.list_pending_task_board_external_create_follow_ups(Some(ExternalProvider::GitHub))
                 .await
                 .expect("pending follow-ups")
                 .is_empty()
@@ -344,7 +332,7 @@ mod tests {
         assert!(metrics.operations().is_empty());
         assert!(follow_up_events(&db).await.is_empty());
         assert_eq!(
-            db.list_pending_task_board_external_create_follow_ups(Some(ExternalProvider::Todoist))
+            db.list_pending_task_board_external_create_follow_ups(Some(ExternalProvider::GitHub))
                 .await
                 .expect("pending follow-ups")
                 .len(),
@@ -363,32 +351,32 @@ mod tests {
             "Create body".into(),
             "2026-07-16T10:00:00Z".into(),
         );
-        item.project_id = Some("provider-project".into());
+        item.project_id = Some("acme/widgets".into());
         db.create_task_board_item(item).await.expect("create item");
         let started = db
             .begin_task_board_external_create_intent(
                 "task-config-recovery",
-                ExternalProvider::Todoist,
-                "todoist:scope",
-                "provider-project",
+                ExternalProvider::GitHub,
+                "acme/widgets",
+                "acme/widgets",
             )
             .await
             .expect("begin create");
         let TaskBoardExternalCreateBegin::Started(intent) = started else {
             panic!("expected started create intent");
         };
-        let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-config-recovery");
+        let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "acme/widgets#41");
         let outcome = ExternalCreateOutcome {
             reference: reference.clone(),
             provider_revision: None,
-            provider_project_id: Some("provider-project".into()),
+            provider_project_id: Some("acme/widgets".into()),
         };
         let mut baseline = reference.into_core_ref();
         baseline.sync_state = Some(ExternalRefSyncState {
             title: Some("Create title".into()),
             body: Some("Create body".into()),
             status: Some(TaskBoardStatus::Backlog),
-            project_id: Some("provider-project".into()),
+            project_id: Some("acme/widgets".into()),
             updated_at: None,
             synced_at: Some("2026-07-16T10:00:00Z".into()),
             labels: Vec::new(),
@@ -404,7 +392,7 @@ mod tests {
         .await
         .expect("corrupt settings");
         let request = TaskBoardSyncRequest {
-            provider: Some(ExternalProvider::Todoist),
+            provider: Some(ExternalProvider::GitHub),
             direction: ExternalSyncDirection::Pull,
             dry_run: false,
             ..TaskBoardSyncRequest::default()

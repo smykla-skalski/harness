@@ -178,7 +178,6 @@ extension HarnessMonitorStore {
       clearProjectDir: settings.projectDir == nil,
       githubProject: settings.githubProject,
       githubInbox: settings.githubInbox,
-      todoistInbox: settings.todoistInbox,
       policyVersion: settings.policyVersion
     )
   }

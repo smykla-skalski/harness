@@ -6,8 +6,8 @@ use crate::daemon::protocol::{
     TaskBoardAutomationForceCancelRequest, TaskBoardAutomationHistoryRequest,
     TaskBoardAutomationRunDetailRequest, TaskBoardGitHubTokensSyncRequest,
     TaskBoardGitRuntimeConfig, TaskBoardOpenRouterTokenSyncRequest,
-    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
-    TaskBoardTodoistTokenSyncRequest, WsRequest, WsResponse, ws_methods,
+    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest, WsRequest,
+    WsResponse, ws_methods,
 };
 
 use super::super::mutations::dispatch_query_result;
@@ -58,9 +58,6 @@ pub(super) async fn dispatch_method(
         }
         ws_methods::TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS_SYNC => {
             Some(dispatch_task_board_orchestrator_github_tokens_sync(request, state).await)
-        }
-        ws_methods::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN_SYNC => {
-            Some(dispatch_task_board_orchestrator_todoist_token_sync(request, state).await)
         }
         ws_methods::TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN_SYNC => {
             Some(dispatch_task_board_orchestrator_openrouter_token_sync(request, state).await)
@@ -216,7 +213,6 @@ pub(super) async fn dispatch_task_board_orchestrator_settings_update(
             "clear_project_dir": body.clear_project_dir,
             "has_github_project": body.github_project.is_some(),
             "has_github_inbox": body.github_inbox.is_some(),
-            "has_todoist_inbox": body.todoist_inbox.is_some(),
             "has_admission_policy": body.admission_policy.is_some(),
             "has_policy_version": body.policy_version.is_some(),
         }),
@@ -276,26 +272,6 @@ pub(super) async fn dispatch_task_board_orchestrator_github_tokens_sync(
             "global_token_configured": body.global_token.is_some(),
             "repository_token_count": body.repository_tokens.len(),
         }),
-        &result,
-    )
-    .await;
-    dispatch_query_result(&request.id, result)
-}
-
-pub(super) async fn dispatch_task_board_orchestrator_todoist_token_sync(
-    request: &WsRequest,
-    state: &DaemonHttpState,
-) -> WsResponse {
-    let Ok(body) = parse_params::<TaskBoardTodoistTokenSyncRequest>(request) else {
-        return invalid_params(request);
-    };
-    let result = task_board_route_executor::sync_todoist_token(&body).await;
-    super::record_task_board_audit_result(
-        state,
-        "task_board.orchestrator_todoist_token_sync",
-        "Sync task-board Todoist token",
-        None,
-        serde_json::json!({ "token_configured": body.token.is_some() }),
         &result,
     )
     .await;

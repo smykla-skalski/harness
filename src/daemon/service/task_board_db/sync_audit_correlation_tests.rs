@@ -17,7 +17,7 @@ async fn each_orchestrator_run_keeps_its_correlated_sync_evidence() {
         operations: Vec::new(),
         external_create_follow_ups: Vec::new(),
         scope_outcomes: vec![ExternalSyncScopeOutcome::failed(
-            ExternalProvider::Todoist,
+            ExternalProvider::GitHub,
             "scope-a".into(),
             &provider_error,
         )],
@@ -93,7 +93,7 @@ async fn correlated_failure_seeds_scope_recovery_tracking() {
         operations: Vec::new(),
         external_create_follow_ups: Vec::new(),
         scope_outcomes: vec![ExternalSyncScopeOutcome::failed(
-            ExternalProvider::Todoist,
+            ExternalProvider::GitHub,
             "scope-a".into(),
             &provider_error,
         )],
@@ -120,7 +120,7 @@ async fn correlated_failure_seeds_scope_recovery_tracking() {
         operations: Vec::new(),
         external_create_follow_ups: Vec::new(),
         scope_outcomes: vec![ExternalSyncScopeOutcome::success(
-            ExternalProvider::Todoist,
+            ExternalProvider::GitHub,
             "scope-a".into(),
         )],
         first_provider_failure: None,

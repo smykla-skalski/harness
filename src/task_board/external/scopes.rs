@@ -270,14 +270,12 @@ fn normalize_resource_id(provider: ExternalProvider, resource_id: &str) -> Strin
     let resource_id = resource_id.trim();
     match provider {
         ExternalProvider::GitHub => resource_id.to_ascii_lowercase(),
-        ExternalProvider::Todoist => resource_id.to_owned(),
     }
 }
 
 const fn provider_label(provider: ExternalProvider) -> &'static str {
     match provider {
         ExternalProvider::GitHub => "github",
-        ExternalProvider::Todoist => "todoist",
     }
 }
 
@@ -302,16 +300,8 @@ mod tests {
             allows_push: false,
             authoritative_review_inbox: false,
         };
-        let todoist = ScopeClient {
-            provider: ExternalProvider::Todoist,
-            scope_id: "acme/widgets",
-            allows_push: true,
-            authoritative_review_inbox: false,
-        };
-
         let repository_scope = ExternalProviderScopeIdentity::for_client(&repository_sync);
         let inbox_scope = ExternalProviderScopeIdentity::for_client(&inbox);
-        let todoist_scope = ExternalProviderScopeIdentity::for_client(&todoist);
 
         assert_eq!(
             repository_scope.scope_id(),
@@ -319,7 +309,6 @@ mod tests {
         );
         assert_eq!(inbox_scope.scope_id(), "v1:github:read:12:acme/widgets");
         assert_ne!(repository_scope, inbox_scope);
-        assert_ne!(repository_scope, todoist_scope);
     }
 
     #[test]

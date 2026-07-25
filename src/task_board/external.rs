@@ -16,7 +16,6 @@ mod github;
 mod scopes;
 mod sync;
 mod targeting;
-mod todoist;
 
 pub use capabilities::{
     ExternalProviderCapabilities, ExternalRevisionUpdate, ExternalSyncConflictPolicy,
@@ -52,11 +51,9 @@ pub(crate) use sync::{
     load_external_create_recovery_work, prepare_external_create_recovery, sync_external_tasks,
     sync_external_tasks_scoped_with_recovery,
 };
-pub use todoist::TodoistSyncClient;
 
 pub const HARNESS_GITHUB_TOKEN_ENV: &str = "HARNESS_GITHUB_TOKEN";
 pub const GH_TOKEN_ENV: &str = "GH_TOKEN";
-pub const HARNESS_TODOIST_TOKEN_ENV: &str = "HARNESS_TODOIST_TOKEN";
 pub const HARNESS_GITHUB_REPOSITORY_ENV: &str = "HARNESS_GITHUB_REPOSITORY";
 pub const GITHUB_REPOSITORY_ENV: &str = "GITHUB_REPOSITORY";
 
@@ -68,7 +65,6 @@ pub enum ExternalProvider {
     #[value(name = "github", alias = "git_hub")]
     #[serde(rename = "github", alias = "git_hub")]
     GitHub,
-    Todoist,
 }
 
 impl ExternalProvider {
@@ -76,7 +72,6 @@ impl ExternalProvider {
     pub const fn token_env_names(self) -> &'static [&'static str] {
         match self {
             Self::GitHub => &[HARNESS_GITHUB_TOKEN_ENV, GH_TOKEN_ENV],
-            Self::Todoist => &[HARNESS_TODOIST_TOKEN_ENV],
         }
     }
 }
@@ -85,7 +80,6 @@ impl fmt::Display for ExternalProvider {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::GitHub => formatter.write_str("github"),
-            Self::Todoist => formatter.write_str("todoist"),
         }
     }
 }
@@ -94,7 +88,6 @@ impl From<ExternalRefProvider> for ExternalProvider {
     fn from(provider: ExternalRefProvider) -> Self {
         match provider {
             ExternalRefProvider::GitHub => Self::GitHub,
-            ExternalRefProvider::Todoist => Self::Todoist,
         }
     }
 }
@@ -103,7 +96,6 @@ impl From<ExternalProvider> for ExternalRefProvider {
     fn from(provider: ExternalProvider) -> Self {
         match provider {
             ExternalProvider::GitHub => Self::GitHub,
-            ExternalProvider::Todoist => Self::Todoist,
         }
     }
 }
@@ -326,9 +318,9 @@ pub trait ExternalSyncClient: Send + Sync {
         Ok(ExternalCreateOutcome {
             reference: self.push_task(item).await?,
             provider_revision: None,
-            provider_project_id: (self.provider() != ExternalProvider::GitHub)
-                .then(|| item.project_id.clone())
-                .flatten(),
+            // A GitHub task's project is its repository, which the client
+            // reports from its own create outcome rather than the board item.
+            provider_project_id: None,
         })
     }
 

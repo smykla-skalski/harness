@@ -363,6 +363,5 @@ fn parse_timestamp(value: &str) -> Result<DateTime<chrono::FixedOffset>, CliErro
 const fn provider_label(provider: ExternalProvider) -> &'static str {
     match provider {
         ExternalProvider::GitHub => "github",
-        ExternalProvider::Todoist => "todoist",
     }
 }

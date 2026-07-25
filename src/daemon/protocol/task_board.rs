@@ -30,8 +30,6 @@ pub use crate::task_board::{
     TaskBoardOpenRouterTokenSyncResponse as TaskBoardOpenRouterTokenSyncOutcome,
     TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettings,
     TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorStatus,
-    TaskBoardTodoistTokenSyncRequest,
-    TaskBoardTodoistTokenSyncResponse as TaskBoardTodoistTokenSyncOutcome,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -468,7 +466,6 @@ pub struct TaskBoardGitRuntimeKeyMaterialSyncResponse {
 }
 
 pub type TaskBoardGitHubTokensSyncResponse = TaskBoardGitHubTokensSyncOutcome;
-pub type TaskBoardTodoistTokenSyncResponse = TaskBoardTodoistTokenSyncOutcome;
 pub type TaskBoardOpenRouterTokenSyncResponse = TaskBoardOpenRouterTokenSyncOutcome;
 pub type PolicyPipelineResponse = PolicyPipelineDocument;
 pub type PolicyPipelineSaveDraftResponse = PolicyPipelineSaveResponse;

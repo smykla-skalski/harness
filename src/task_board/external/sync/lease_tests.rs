@@ -60,16 +60,16 @@ async fn stale_lease_stops_before_remote_create() {
 async fn capability_lease_io_failure_remains_a_terminal_local_error() {
     let calls = Arc::new(AtomicUsize::new(0));
     let mut item = unlinked_item("task-lease-io");
-    item.project_id = Some("provider-project".into());
+    item.project_id = Some("acme/widgets".into());
     let store = DurableCreateStore::io_lease_failure(item);
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(DurableCreateClient::new(
-        ExternalProvider::Todoist,
-        "provider-project",
+        ExternalProvider::GitHub,
+        "acme/widgets",
         Arc::clone(&calls),
     ))];
 
     let batch =
-        sync_external_tasks_scoped(&store, push_options(ExternalProvider::Todoist), &clients)
+        sync_external_tasks_scoped(&store, push_options(ExternalProvider::GitHub), &clients)
             .await
             .expect("local lease failure must retain scope evidence");
 
@@ -90,16 +90,16 @@ async fn capability_lease_io_failure_remains_a_terminal_local_error() {
 async fn coordinator_cancellation_releases_scope_without_failure_backoff() {
     let calls = Arc::new(AtomicUsize::new(0));
     let mut item = unlinked_item("task-coordinator-cancel");
-    item.project_id = Some("provider-project".into());
+    item.project_id = Some("acme/widgets".into());
     let store = DurableCreateStore::coordinator_cancelled(item);
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(DurableCreateClient::new(
-        ExternalProvider::Todoist,
-        "provider-project",
+        ExternalProvider::GitHub,
+        "acme/widgets",
         Arc::clone(&calls),
     ))];
 
     let batch =
-        sync_external_tasks_scoped(&store, push_options(ExternalProvider::Todoist), &clients)
+        sync_external_tasks_scoped(&store, push_options(ExternalProvider::GitHub), &clients)
             .await
             .expect("coordinator cancellation retains scope evidence");
 
@@ -123,15 +123,15 @@ async fn coordinator_cancellation_releases_scope_without_failure_backoff() {
 async fn create_then_close_uses_the_finalized_current_item_status() {
     let calls = Arc::new(AtomicUsize::new(0));
     let mut item = unlinked_item("task-finalized-done");
-    item.project_id = Some("provider-project".into());
+    item.project_id = Some("acme/widgets".into());
     let store = DurableCreateStore::done_during_finalize(item);
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(DurableCreateClient::new(
-        ExternalProvider::Todoist,
-        "provider-project",
+        ExternalProvider::GitHub,
+        "acme/widgets",
         Arc::clone(&calls),
     ))];
 
-    let operations = sync_external_tasks(&store, push_options(ExternalProvider::Todoist), &clients)
+    let operations = sync_external_tasks(&store, push_options(ExternalProvider::GitHub), &clients)
         .await
         .expect("finalized Done item");
 
@@ -147,16 +147,16 @@ async fn create_then_close_uses_the_finalized_current_item_status() {
 async fn conflict_cleanup_failure_keeps_exact_create_evidence_unattached() {
     let calls = Arc::new(AtomicUsize::new(0));
     let mut item = unlinked_item("task-create-cleanup");
-    item.project_id = Some("provider-project".into());
+    item.project_id = Some("acme/widgets".into());
     let store = DurableCreateStore::cleanup_failure(item);
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(DurableCreateClient::new(
-        ExternalProvider::Todoist,
-        "provider-project",
+        ExternalProvider::GitHub,
+        "acme/widgets",
         Arc::clone(&calls),
     ))];
 
     let batch =
-        sync_external_tasks_scoped(&store, push_options(ExternalProvider::Todoist), &clients)
+        sync_external_tasks_scoped(&store, push_options(ExternalProvider::GitHub), &clients)
             .await
             .expect("cleanup failure must retain exact create evidence");
 
@@ -177,16 +177,16 @@ async fn conflict_cleanup_failure_keeps_exact_create_evidence_unattached() {
 async fn remote_create_with_failed_local_link_retains_created_reference_evidence() {
     let calls = Arc::new(AtomicUsize::new(0));
     let mut item = unlinked_item("task-create-cas");
-    item.project_id = Some("provider-project".into());
+    item.project_id = Some("acme/widgets".into());
     let store = DurableCreateStore::finalize_failure(item);
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(DurableCreateClient::new(
-        ExternalProvider::Todoist,
-        "provider-project",
+        ExternalProvider::GitHub,
+        "acme/widgets",
         Arc::clone(&calls),
     ))];
 
     let batch =
-        sync_external_tasks_scoped(&store, push_options(ExternalProvider::Todoist), &clients)
+        sync_external_tasks_scoped(&store, push_options(ExternalProvider::GitHub), &clients)
             .await
             .expect("finalization failure must retain recorded provider evidence");
 
@@ -196,14 +196,14 @@ async fn remote_create_with_failed_local_link_retains_created_reference_evidence
     let TaskBoardExternalCreateIntentState::Created(evidence) = intent.state else {
         panic!("provider evidence must remain Created");
     };
-    assert_eq!(evidence.outcome.reference.external_id, "remote-created");
+    assert_eq!(evidence.outcome.reference.external_id, "acme/widgets#17");
     assert_eq!(
         evidence.outcome.provider_revision.as_deref(),
         Some("provider-revision-1")
     );
     assert_eq!(
         evidence.outcome.provider_project_id.as_deref(),
-        Some("provider-project")
+        Some("acme/widgets")
     );
     let baseline = evidence
         .provider_baseline
@@ -213,7 +213,7 @@ async fn remote_create_with_failed_local_link_retains_created_reference_evidence
     assert_eq!(baseline.title.as_deref(), Some("Task"));
     assert_eq!(baseline.body.as_deref(), Some(""));
     assert_eq!(baseline.status, Some(TaskBoardStatus::Backlog));
-    assert_eq!(baseline.project_id.as_deref(), Some("provider-project"));
+    assert_eq!(baseline.project_id.as_deref(), Some("acme/widgets"));
     assert_eq!(baseline.updated_at.as_deref(), Some("provider-revision-1"));
     let error = batch
         .into_completed()
@@ -225,14 +225,14 @@ async fn remote_create_with_failed_local_link_retains_created_reference_evidence
 async fn attached_receipt_causes_no_preflight_scan_or_repeat_create_operation() {
     let calls = Arc::new(AtomicUsize::new(0));
     let mut item = unlinked_item("task-attached-retry");
-    item.project_id = Some("provider-project".into());
+    item.project_id = Some("acme/widgets".into());
     let store = successful_store(item);
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(DurableCreateClient::new(
-        ExternalProvider::Todoist,
-        "provider-project",
+        ExternalProvider::GitHub,
+        "acme/widgets",
         Arc::clone(&calls),
     ))];
-    let first = sync_external_tasks(&store, push_options(ExternalProvider::Todoist), &clients)
+    let first = sync_external_tasks(&store, push_options(ExternalProvider::GitHub), &clients)
         .await
         .expect("attach provider create");
     assert_eq!(first.len(), 1);
@@ -242,7 +242,7 @@ async fn attached_receipt_causes_no_preflight_scan_or_repeat_create_operation() 
     let before_cleanup = store.supersede_calls.load(Ordering::SeqCst);
     let work = super::create_recovery::load_external_create_recovery_work(
         &store,
-        Some(ExternalProvider::Todoist),
+        Some(ExternalProvider::GitHub),
     )
     .await
     .expect("load active recovery");
@@ -250,14 +250,14 @@ async fn attached_receipt_causes_no_preflight_scan_or_repeat_create_operation() 
     assert_eq!(store.tombstone_list_calls.load(Ordering::SeqCst), 0);
     let prepared = super::create_recovery::prepare_external_create_recovery(
         &store,
-        pull_options(ExternalProvider::Todoist),
+        pull_options(ExternalProvider::GitHub),
         work,
     )
     .await
     .expect("prepare active recovery");
     assert!(prepared.is_empty());
 
-    let second = sync_external_tasks(&store, push_options(ExternalProvider::Todoist), &clients)
+    let second = sync_external_tasks(&store, push_options(ExternalProvider::GitHub), &clients)
         .await
         .expect("repeat sync");
 
@@ -270,34 +270,34 @@ async fn attached_receipt_causes_no_preflight_scan_or_repeat_create_operation() 
 #[tokio::test]
 async fn created_preflight_suppresses_pull_base_revision_persistence() {
     let mut item = unlinked_item("task-recovery-base");
-    item.project_id = Some("provider-project".into());
+    item.project_id = Some("acme/widgets".into());
     let store = successful_store(item);
     let client = RecoveryPullClient;
     let scope = ExternalProviderScopeIdentity::for_client(&client);
     let started = store
         .begin_external_create_intent(
             "task-recovery-base",
-            ExternalProvider::Todoist,
+            ExternalProvider::GitHub,
             scope.scope_id(),
-            "provider-project",
+            "acme/widgets",
         )
         .await
         .expect("begin create");
     let TaskBoardExternalCreateBegin::Started(intent) = started else {
         panic!("expected started intent");
     };
-    let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-created");
+    let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "acme/widgets#17");
     let outcome = ExternalCreateOutcome {
         reference: reference.clone(),
         provider_revision: Some("provider-revision-1".into()),
-        provider_project_id: Some("provider-project".into()),
+        provider_project_id: Some("acme/widgets".into()),
     };
     let mut baseline = reference.into_core_ref();
     baseline.sync_state = Some(ExternalRefSyncState {
         title: Some("Task".into()),
         body: Some(String::new()),
         status: Some(TaskBoardStatus::Backlog),
-        project_id: Some("provider-project".into()),
+        project_id: Some("acme/widgets".into()),
         updated_at: Some("provider-revision-1".into()),
         synced_at: Some("2026-07-16T10:00:00Z".into()),
         labels: Vec::new(),
@@ -308,13 +308,13 @@ async fn created_preflight_suppresses_pull_base_revision_persistence() {
         .expect("record create outcome");
     let work = super::create_recovery::load_external_create_recovery_work(
         &store,
-        Some(ExternalProvider::Todoist),
+        Some(ExternalProvider::GitHub),
     )
     .await
     .expect("load created receipt");
     let prepared = super::create_recovery::prepare_external_create_recovery(
         &store,
-        pull_options(ExternalProvider::Todoist),
+        pull_options(ExternalProvider::GitHub),
         work,
     )
     .await
@@ -325,7 +325,7 @@ async fn created_preflight_suppresses_pull_base_revision_persistence() {
 
     sync_external_tasks_scoped_with_recovery(
         &store,
-        pull_options(ExternalProvider::Todoist),
+        pull_options(ExternalProvider::GitHub),
         &recovery_clients,
         plan,
     )
@@ -343,7 +343,7 @@ struct RecoveryPullClient;
 #[async_trait::async_trait]
 impl ExternalSyncClient for RecoveryPullClient {
     fn provider(&self) -> ExternalProvider {
-        ExternalProvider::Todoist
+        ExternalProvider::GitHub
     }
 
     fn external_create_recovery(&self) -> Option<&dyn ExternalCreateRecoveryClient> {
@@ -351,16 +351,16 @@ impl ExternalSyncClient for RecoveryPullClient {
     }
 
     fn scope_id(&self) -> String {
-        "provider-project".into()
+        "acme/widgets".into()
     }
 
     async fn pull_tasks(&self) -> Result<Vec<ExternalTask>, CliError> {
         Ok(vec![ExternalTask {
-            reference: ExternalTaskRef::new(ExternalProvider::Todoist, "remote-created"),
+            reference: ExternalTaskRef::new(ExternalProvider::GitHub, "acme/widgets#17"),
             title: "Task".into(),
             body: String::new(),
             status: TaskBoardStatus::Backlog,
-            project_id: Some("provider-project".into()),
+            project_id: Some("acme/widgets".into()),
             updated_at: Some("provider-revision-1".into()),
             ..ExternalTask::default()
         }])
@@ -374,11 +374,11 @@ impl ExternalSyncClient for RecoveryPullClient {
 #[async_trait::async_trait]
 impl ExternalCreateRecoveryClient for RecoveryPullClient {
     fn provider(&self) -> ExternalProvider {
-        ExternalProvider::Todoist
+        ExternalProvider::GitHub
     }
 
     fn supports_target(&self, provider_target: &str) -> bool {
-        provider_target == "provider-project"
+        provider_target == "acme/widgets"
     }
 
     async fn create_started(

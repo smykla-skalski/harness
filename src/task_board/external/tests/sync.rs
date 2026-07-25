@@ -14,13 +14,13 @@ use crate::task_board::{
 #[tokio::test]
 async fn fake_client_pulls_tasks_without_network() {
     let client = FakeSyncClient::new(
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         vec![external_task("remote-1", "Remote task")],
     );
 
     let tasks = client.pull_tasks().await.expect("fake pull should succeed");
 
-    assert_eq!(client.provider(), ExternalProvider::Todoist);
+    assert_eq!(client.provider(), ExternalProvider::GitHub);
     assert_eq!(tasks.len(), 1);
     assert_eq!(tasks[0].title, "Remote task");
     assert_eq!(tasks[0].status, TaskBoardStatus::Backlog);
@@ -65,14 +65,14 @@ async fn sync_external_tasks_uses_injected_clients_without_network() {
         .await
         .expect("create local task");
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient::new(
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         vec![external_task("remote-1", "Remote task")],
     ))];
 
     let operations = sync_external_tasks(
         &board,
         ExternalSyncOptions {
-            provider: Some(ExternalProvider::Todoist),
+            provider: Some(ExternalProvider::GitHub),
             direction: ExternalSyncDirection::Both,
             conflict_policy: ExternalSyncConflictPolicy::Report,
             dry_run: false,
@@ -84,19 +84,24 @@ async fn sync_external_tasks_uses_injected_clients_without_network() {
     .expect("sync external tasks");
 
     assert_eq!(operations.len(), 2);
-    assert!(operations.iter().any(|operation| {
-        operation.action == ExternalSyncAction::Pull
-            && operation.board_item_id.as_deref() == Some("todoist-remote-1")
-            && operation.applied
-    }));
+    // The imported item id is derived from the provider and the remote id, so
+    // it is read back off the operation rather than spelled out here.
+    let pulled_id = operations
+        .iter()
+        .find(|operation| operation.action == ExternalSyncAction::Pull)
+        .filter(|operation| {
+            operation.applied && operation.external_id.as_deref() == Some("remote-1")
+        })
+        .and_then(|operation| operation.board_item_id.clone())
+        .expect("applied pull carries the imported item id");
     assert!(operations.iter().any(|operation| {
         operation.action == ExternalSyncAction::Push
             && operation.board_item_id.as_deref() == Some("local-1")
-            && operation.external_id.as_deref() == Some("local-1")
+            && operation.external_id.as_deref() == Some("acme/widgets#local-1")
             && operation.applied
     }));
     let pulled = board
-        .task_board_item("todoist-remote-1")
+        .task_board_item(&pulled_id)
         .await
         .expect("load pulled task");
     assert_eq!(pulled.title, "Remote task");
@@ -105,7 +110,8 @@ async fn sync_external_tasks_uses_injected_clients_without_network() {
         .await
         .expect("load pushed task");
     assert!(pushed.external_refs.iter().any(|reference| {
-        reference.provider == ExternalRefProvider::Todoist && reference.external_id == "local-1"
+        reference.provider == ExternalRefProvider::GitHub
+            && reference.external_id == "acme/widgets#local-1"
     }));
 }
 
@@ -123,14 +129,14 @@ async fn sync_external_tasks_dry_run_does_not_write_board() {
         .create("Local task", "", local)
         .expect("create local task");
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient::new(
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         vec![external_task("remote-2", "Remote task")],
     ))];
 
     let operations = sync_external_tasks(
         &board,
         ExternalSyncOptions {
-            provider: Some(ExternalProvider::Todoist),
+            provider: Some(ExternalProvider::GitHub),
             direction: ExternalSyncDirection::Both,
             conflict_policy: ExternalSyncConflictPolicy::Report,
             dry_run: true,
@@ -143,18 +149,20 @@ async fn sync_external_tasks_dry_run_does_not_write_board() {
 
     assert_eq!(operations.len(), 2);
     assert!(operations.iter().all(|operation| !operation.applied));
-    assert!(operations.iter().any(|operation| {
-        operation.action == ExternalSyncAction::Pull
-            && operation.board_item_id.as_deref() == Some("todoist-remote-2")
-            && operation.external_id.as_deref() == Some("remote-2")
-            && operation.dry_run
-    }));
+    let planned_id = operations
+        .iter()
+        .find(|operation| operation.action == ExternalSyncAction::Pull)
+        .filter(|operation| {
+            operation.dry_run && operation.external_id.as_deref() == Some("remote-2")
+        })
+        .and_then(|operation| operation.board_item_id.clone())
+        .expect("dry-run pull carries the item id it would have created");
     assert!(operations.iter().any(|operation| {
         operation.action == ExternalSyncAction::Push
             && operation.board_item_id.as_deref() == Some("local-1")
             && operation.dry_run
     }));
-    assert!(board.get("todoist-remote-2").is_err());
+    assert!(board.get(&planned_id).is_err());
     assert!(
         board
             .get("local-1")
@@ -176,7 +184,7 @@ async fn sync_external_tasks_reconciles_closed_existing_provider_ref() {
     );
     local.status = TaskBoardStatus::Todo;
     local.external_refs.push(
-        ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1")
+        ExternalTaskRef::new(ExternalProvider::GitHub, "remote-1")
             .with_url("https://example.test/old")
             .into_core_ref(),
     );
@@ -184,7 +192,7 @@ async fn sync_external_tasks_reconciles_closed_existing_provider_ref() {
         .create("Old title", "Old body", local)
         .expect("create local task");
     let remote = ExternalTask {
-        reference: ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1")
+        reference: ExternalTaskRef::new(ExternalProvider::GitHub, "remote-1")
             .with_url("https://example.test/new"),
         title: "New title".to_owned(),
         body: "New body".to_owned(),
@@ -194,14 +202,14 @@ async fn sync_external_tasks_reconciles_closed_existing_provider_ref() {
         ..ExternalTask::default()
     };
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient::new(
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         vec![remote],
     ))];
 
     let operations = sync_external_tasks(
         &board,
         ExternalSyncOptions {
-            provider: Some(ExternalProvider::Todoist),
+            provider: Some(ExternalProvider::GitHub),
             direction: ExternalSyncDirection::Pull,
             conflict_policy: ExternalSyncConflictPolicy::Report,
             dry_run: false,
@@ -220,9 +228,15 @@ async fn sync_external_tasks_reconciles_closed_existing_provider_ref() {
     assert_eq!(updated.title, "New title");
     assert_eq!(updated.body, "New body");
     assert_eq!(updated.status, TaskBoardStatus::Done);
-    assert_eq!(updated.project_id.as_deref(), Some("provider/project"));
+    // A GitHub project is a repository, so it lands in `execution_repository`
+    // and never becomes a board project.
+    assert_eq!(updated.project_id, None);
+    assert_eq!(
+        updated.execution_repository.as_deref(),
+        Some("provider/project")
+    );
     assert!(updated.external_refs.iter().any(|reference| {
-        reference.provider == ExternalRefProvider::Todoist
+        reference.provider == ExternalRefProvider::GitHub
             && reference.external_id == "remote-1"
             && reference.url.as_deref() == Some("https://example.test/new")
     }));
@@ -240,19 +254,19 @@ async fn sync_external_tasks_dry_run_reports_reconciliation_without_writing() {
     );
     local
         .external_refs
-        .push(ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1").into_core_ref());
+        .push(ExternalTaskRef::new(ExternalProvider::GitHub, "remote-1").into_core_ref());
     board
         .create("Old title", "", local)
         .expect("create local task");
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient::new(
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         vec![external_task("remote-1", "New title")],
     ))];
 
     let operations = sync_external_tasks(
         &board,
         ExternalSyncOptions {
-            provider: Some(ExternalProvider::Todoist),
+            provider: Some(ExternalProvider::GitHub),
             direction: ExternalSyncDirection::Pull,
             conflict_policy: ExternalSyncConflictPolicy::Report,
             dry_run: true,

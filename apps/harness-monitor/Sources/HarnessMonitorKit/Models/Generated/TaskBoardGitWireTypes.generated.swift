@@ -90,15 +90,12 @@ public struct TaskBoardSshKeyDiscovery: Codable, Equatable, Sendable {
 
 public struct TaskBoardEnvDefaults: Codable, Equatable, Sendable {
   public var harnessGithubTokenPresent: Bool
-  public var harnessTodoistTokenPresent: Bool
 
-  public init(harnessGithubTokenPresent: Bool = false, harnessTodoistTokenPresent: Bool = false) {
+  public init(harnessGithubTokenPresent: Bool = false) {
     self.harnessGithubTokenPresent = harnessGithubTokenPresent
-    self.harnessTodoistTokenPresent = harnessTodoistTokenPresent
   }
 
   enum CodingKeys: String, CodingKey {
     case harnessGithubTokenPresent = "harness_github_token_present"
-    case harnessTodoistTokenPresent = "harness_todoist_token_present"
   }
 }

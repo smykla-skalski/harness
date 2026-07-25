@@ -96,7 +96,6 @@ public struct TaskBoardMachineSummaryWire: Codable, Equatable, Sendable {
 
 public enum TaskBoardProjectSource: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
   case gitHub = "github"
-  case todoist = "todoist"
   case manual = "manual"
 
   public var id: String { rawValue }

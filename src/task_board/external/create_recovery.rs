@@ -85,11 +85,11 @@ pub(crate) trait ExternalCreateLease: Send + Sync {
 /// Provider capability for crash-safe external-create admission and recovery.
 ///
 /// Only a durable `Started` decision may call [`Self::create_started`].
-/// `recover_existing` never grants fresh create admission: GitHub recovery is
-/// scan-only and an [`ExternalCreateProbe::Absent`] result remains blocked,
-/// while Todoist may replay the identical request with the persisted create key.
-/// Implementations can renew the supplied lease before every remote page or
-/// side effect.
+/// `recover_existing` never grants fresh create admission: an
+/// [`ExternalCreateProbe::Absent`] result stays blocked, whether the provider
+/// recovers by scanning for the persisted marker or by replaying the identical
+/// request under its create key. Implementations can renew the supplied lease
+/// before every remote page or side effect.
 #[async_trait]
 pub(crate) trait ExternalCreateRecoveryClient: Send + Sync {
     #[must_use]
@@ -110,8 +110,9 @@ pub(crate) trait ExternalCreateRecoveryClient: Send + Sync {
 
     /// Recover an existing durable create attempt without widening admission.
     ///
-    /// GitHub implementations only scan for the persisted marker. Todoist
-    /// implementations may replay with `request.create_key()` as `X-Request-Id`.
+    /// GitHub implementations only scan for the persisted marker. A provider
+    /// with idempotent creates may instead replay the request under
+    /// `request.create_key()`.
     ///
     /// # Errors
     /// Returns provider, transport, parsing, or lease errors.
@@ -184,7 +185,7 @@ mod tests {
         let mut marked = created.clone();
         marked.body.push_str("\n<!-- create-key:create-key-1 -->");
 
-        assert_eq!(recovery.provider(), ExternalProvider::Todoist);
+        assert_eq!(recovery.provider(), ExternalProvider::GitHub);
         assert!(recovery.supports_target(request.provider_target()));
         assert_eq!(created.reference.external_id, request.item_id());
         assert_eq!(created.title, request.title());
@@ -219,7 +220,7 @@ mod tests {
     #[async_trait]
     impl ExternalCreateRecoveryClient for FakeRecoveryClient {
         fn provider(&self) -> ExternalProvider {
-            ExternalProvider::Todoist
+            ExternalProvider::GitHub
         }
 
         fn supports_target(&self, provider_target: &str) -> bool {
@@ -297,7 +298,7 @@ mod tests {
 
     fn task_from_request(request: &ExternalCreateRequest) -> ExternalTask {
         ExternalTask {
-            reference: ExternalTaskRef::new(ExternalProvider::Todoist, request.item_id()),
+            reference: ExternalTaskRef::new(ExternalProvider::GitHub, request.item_id()),
             title: request.title().to_owned(),
             body: request.body().to_owned(),
             status: TaskBoardStatus::Backlog,
@@ -331,7 +332,7 @@ mod tests {
     #[async_trait]
     impl ExternalSyncClient for CapableSyncClient {
         fn provider(&self) -> ExternalProvider {
-            ExternalProvider::Todoist
+            ExternalProvider::GitHub
         }
 
         fn external_create_recovery(&self) -> Option<&dyn ExternalCreateRecoveryClient> {

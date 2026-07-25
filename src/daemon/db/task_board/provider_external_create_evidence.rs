@@ -52,15 +52,6 @@ pub(super) fn normalized_evidence_target(
         ExternalProvider::GitHub => {
             normalized_github_repository(intent, &outcome.reference.external_id).map(Some)
         }
-        ExternalProvider::Todoist => {
-            if outcome.reference.external_id.trim().is_empty() {
-                return Err(create_conflict(
-                    intent,
-                    "Todoist create outcome has no external identity",
-                ));
-            }
-            normalized_optional_project(intent, outcome.provider_project_id.as_deref())
-        }
     }
 }
 

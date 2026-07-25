@@ -15,8 +15,7 @@ use crate::task_board::{
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitHubTokensSyncResponse,
     TaskBoardGitIdentityDefaults, TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig,
     TaskBoardGitRuntimeProfile, TaskBoardOpenRouterTokenSyncRequest,
-    TaskBoardOpenRouterTokenSyncResponse, TaskBoardTodoistTokenSyncRequest,
-    TaskBoardTodoistTokenSyncResponse, discover_git_identity_defaults, normalize_repository_slug,
+    TaskBoardOpenRouterTokenSyncResponse, discover_git_identity_defaults, normalize_repository_slug,
 };
 
 /// Load the persisted task-board git runtime config.
@@ -225,17 +224,6 @@ pub fn sync_task_board_github_tokens(
     Ok(state::replace_task_board_github_tokens(request))
 }
 
-/// Replace the in-memory Todoist token snapshot used by the daemon.
-///
-/// # Errors
-/// This function is currently infallible but returns a `Result` to keep the
-/// daemon route signatures aligned with `sync_task_board_github_tokens`.
-pub fn sync_task_board_todoist_token(
-    request: &TaskBoardTodoistTokenSyncRequest,
-) -> Result<TaskBoardTodoistTokenSyncResponse, CliError> {
-    Ok(state::replace_task_board_todoist_token(request))
-}
-
 /// Replace the in-memory `OpenRouter` API key snapshot used by the daemon's
 /// `OpenRouter` managed-agent backend.
 ///
@@ -271,11 +259,6 @@ pub(crate) fn external_sync_config_for_repository(
         config = config.with_github_repository_override(Some(repository));
     }
     config = config.with_github_inbox_repositories_override(inbox_repositories);
-    if config.token_for(ExternalProvider::Todoist).is_none()
-        && let Some(token) = state::task_board_todoist_token()
-    {
-        config = config.with_todoist_token_override(Some(token.as_str()));
-    }
     config
 }
 

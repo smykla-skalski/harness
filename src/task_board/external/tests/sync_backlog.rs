@@ -12,14 +12,14 @@ async fn todo_filtered_sync_does_not_import_new_backlog_tasks() {
     let temp = tempdir().expect("tempdir");
     let board = TaskBoardStore::new(temp.path().join("board"));
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient::new(
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         vec![external_task("remote-backlog", "Unprocessed task")],
     ))];
 
     let operations = sync_external_tasks(
         &board,
         ExternalSyncOptions {
-            provider: Some(ExternalProvider::Todoist),
+            provider: Some(ExternalProvider::GitHub),
             direction: ExternalSyncDirection::Pull,
             conflict_policy: ExternalSyncConflictPolicy::Report,
             dry_run: false,

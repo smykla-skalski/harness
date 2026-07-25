@@ -119,14 +119,12 @@ extension TaskBoardAgentMode {
 
 public enum TaskBoardExternalRefProvider: String, Codable, Sendable {
   case gitHub = "github"
-  case todoist
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.singleValueContainer()
     let rawValue = try container.decode(String.self)
     switch rawValue {
     case "github", "git_hub": self = .gitHub
-    case "todoist": self = .todoist
     default:
       throw DecodingError.dataCorruptedError(
         in: container,

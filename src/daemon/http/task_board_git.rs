@@ -7,12 +7,11 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 use crate::daemon::protocol::{
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
     TaskBoardGitRuntimeKeyMaterialSyncRequest, TaskBoardGitRuntimeSecretHandoffAckRequest,
-    TaskBoardGitSigningVerifyRequest, TaskBoardOpenRouterTokenSyncRequest,
-    TaskBoardTodoistTokenSyncRequest, http_paths,
+    TaskBoardGitSigningVerifyRequest, TaskBoardOpenRouterTokenSyncRequest, http_paths,
 };
 use crate::task_board::{
     TaskBoardGitHubTokensSyncResponse, TaskBoardGitIdentityDefaults,
-    TaskBoardOpenRouterTokenSyncResponse, TaskBoardTodoistTokenSyncResponse,
+    TaskBoardOpenRouterTokenSyncResponse,
 };
 
 use super::DaemonHttpState;
@@ -38,7 +37,6 @@ pub(super) fn merge_git_routes(
             put_task_board_orchestrator_runtime_config
         ))
         .routes(routes!(put_task_board_orchestrator_github_tokens))
-        .routes(routes!(put_task_board_orchestrator_todoist_token))
         .routes(routes!(put_task_board_orchestrator_openrouter_token))
         .routes(routes!(get_task_board_git_identity_defaults))
         .routes(routes!(post_task_board_git_signing_verify))
@@ -129,35 +127,6 @@ async fn put_task_board_orchestrator_github_tokens(
         &request_id,
         start,
         task_board_route_executor::sync_github_tokens(&request).await,
-    )
-}
-
-#[utoipa::path(
-    put,
-    path = "/v1/task-board/orchestrator/todoist-token",
-    tag = "task-board",
-    description = "Replace the in-memory Todoist API token used by the task-board orchestrator's Todoist inbox sync. The token is held in process memory only; the response reports whether a token is configured, never the token itself",
-    request_body = TaskBoardTodoistTokenSyncRequest,
-    responses(
-        (status = 200, description = "Outcome of syncing the Todoist token", body = TaskBoardTodoistTokenSyncResponse),
-        (status = 400, description = "Request error", body = DaemonErrorBody),
-    ),
-)]
-async fn put_task_board_orchestrator_todoist_token(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardTodoistTokenSyncRequest>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    timed_json(
-        "PUT",
-        http_paths::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN,
-        &request_id,
-        start,
-        task_board_route_executor::sync_todoist_token(&request).await,
     )
 }
 

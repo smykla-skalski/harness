@@ -196,10 +196,6 @@ async fn record_rejects_provider_revision_project_and_identity_mismatch() {
     project_mismatch.provider_project_id = Some("other/repository".into());
     assert_record_conflict(&db, &intent, &project_mismatch, &baseline).await;
 
-    let mut provider_mismatch = outcome;
-    provider_mismatch.reference.provider = ExternalProvider::Todoist;
-    assert_record_conflict(&db, &intent, &provider_mismatch, &baseline).await;
-
     let (identity_mismatch, identity_baseline) =
         create_evidence(&intent, "other/repository#42", "revision-1");
     assert_record_conflict(&db, &intent, &identity_mismatch, &identity_baseline).await;
@@ -211,37 +207,37 @@ async fn created_recovery_is_global_and_hard_delete_retains_active_evidence() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
     create_item(&db, item("task-create-github")).await;
-    let mut todoist = item("task-create-todoist");
-    todoist.project_id = Some("todoist-project".into());
-    create_item(&db, todoist).await;
+    create_item(&db, item("task-create-github-edited")).await;
     let github = begin(&db, "task-create-github", ExternalProvider::GitHub).await;
-    let todoist = begin(&db, "task-create-todoist", ExternalProvider::Todoist).await;
+    let edited = begin(&db, "task-create-github-edited", ExternalProvider::GitHub).await;
     let github = record(&db, &github, "example/repository#43").await;
-    let todoist = record(&db, &todoist, "todoist-task-43").await;
+    let edited = record(&db, &edited, "example/repository#44").await;
     db.delete_task_board_item("task-create-github")
         .await
         .expect("tombstone created GitHub item");
-    db.update_task_board_item("task-create-todoist", |current| {
-        current.title = "Concurrent Todoist title".into();
-        current.project_id = Some("todoist-project-concurrent".into());
+    db.update_task_board_item("task-create-github-edited", |current| {
+        current.title = "Concurrent title".into();
         Ok(true)
     })
     .await
-    .expect("edit Todoist item after create");
-    let todoist_recovery = db
+    .expect("edit item after create");
+    // Recovery keys on the persisted create intent, so a later call under a
+    // different scope still finds the created attempt rather than starting a
+    // second one.
+    let recovery = db
         .begin_task_board_external_create_intent(
-            "task-create-todoist",
-            ExternalProvider::Todoist,
+            "task-create-github-edited",
+            ExternalProvider::GitHub,
             "replacement-scope",
-            "todoist-project-concurrent",
+            "example/repository",
         )
         .await
-        .expect("recover Todoist create");
+        .expect("recover create");
     assert!(matches!(
-        todoist_recovery,
+        recovery,
         TaskBoardExternalCreateBegin::Existing(TaskBoardExternalCreateExisting::Finalize(
             ref recovered
-        )) if recovered == &todoist
+        )) if recovered == &edited
     ));
 
     let mut recovered = db
@@ -249,7 +245,7 @@ async fn created_recovery_is_global_and_hard_delete_retains_active_evidence() {
         .await
         .expect("global created recovery");
     recovered.sort_by(|left, right| left.item_id.cmp(&right.item_id));
-    let mut expected = vec![github.clone(), todoist];
+    let mut expected = vec![github.clone(), edited];
     expected.sort_by(|left, right| left.item_id.cmp(&right.item_id));
     assert_eq!(recovered, expected);
     let delete_error =
@@ -367,9 +363,22 @@ pub(super) async fn begin(
     item_id: &str,
     provider: ExternalProvider,
 ) -> TaskBoardExternalCreateIntent {
-    let (target, scope) = match provider {
-        ExternalProvider::GitHub => ("example/repository", "github-scope"),
-        ExternalProvider::Todoist => ("todoist-project", "todoist-scope"),
+    let scope = match provider {
+        ExternalProvider::GitHub => "github-scope",
+    };
+    begin_in_scope(db, item_id, provider, scope).await
+}
+
+/// Listings order by scope before the intent id, so a test that pins an order
+/// needs its intents in named scopes rather than tied on a random id.
+pub(super) async fn begin_in_scope(
+    db: &AsyncDaemonDb,
+    item_id: &str,
+    provider: ExternalProvider,
+    scope: &str,
+) -> TaskBoardExternalCreateIntent {
+    let target = match provider {
+        ExternalProvider::GitHub => "example/repository",
     };
     match db
         .begin_task_board_external_create_intent(item_id, provider, scope, target)

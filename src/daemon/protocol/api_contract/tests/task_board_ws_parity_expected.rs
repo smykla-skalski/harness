@@ -194,12 +194,6 @@ pub(super) fn expected_task_board_ws_parity() -> Vec<(HttpRouteMethod, &'static 
         ),
         (
             HttpRouteMethod::Put,
-            http_paths::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN,
-            ws_methods::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN_SYNC,
-            true,
-        ),
-        (
-            HttpRouteMethod::Put,
             http_paths::TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN,
             ws_methods::TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN_SYNC,
             true,

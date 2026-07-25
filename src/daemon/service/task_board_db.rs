@@ -384,8 +384,7 @@ pub(crate) async fn active_external_sync_config_db(
             repository.as_deref(),
             &settings.github_inbox.repositories,
         )
-        .with_github_import_labels_override(&settings.github_inbox.label_filter)
-        .with_todoist_import_project_ids_override(&settings.todoist_inbox.project_filter),
+        .with_github_import_labels_override(&settings.github_inbox.label_filter),
     )
 }
 

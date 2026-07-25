@@ -13,7 +13,6 @@ extension TaskBoardExternalRefProvider {
     self =
       switch wire {
       case .gitHub: .gitHub
-      case .todoist: .todoist
       }
   }
 }

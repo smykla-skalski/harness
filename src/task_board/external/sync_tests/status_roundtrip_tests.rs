@@ -12,12 +12,12 @@ async fn no_baseline_workflow_status_push_records_canonical_backlog_truth() {
     );
     item.status = TaskBoardStatus::InProgress;
     item.external_refs =
-        vec![ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1").into_core_ref()];
+        vec![ExternalTaskRef::new(ExternalProvider::GitHub, "remote-1").into_core_ref()];
     board
         .create("Local task", "", item)
         .expect("create local task");
     let client = UpdateFakeSyncClient::new(
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         vec![ExternalSyncField::Status],
         Vec::new(),
     );
@@ -27,7 +27,7 @@ async fn no_baseline_workflow_status_push_records_canonical_backlog_truth() {
     sync_external_tasks(
         &board,
         ExternalSyncOptions {
-            provider: Some(ExternalProvider::Todoist),
+            provider: Some(ExternalProvider::GitHub),
             direction: ExternalSyncDirection::Push,
             conflict_policy: ExternalSyncConflictPolicy::Report,
             dry_run: false,
@@ -68,7 +68,7 @@ async fn remote_completion_does_not_reopen_an_active_workflow_lane() {
         )
         .expect("create local task");
     let client = UpdateFakeSyncClient::new(
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         vec![ExternalSyncField::Status],
         vec![remote_task(
             "remote-1",
@@ -83,7 +83,7 @@ async fn remote_completion_does_not_reopen_an_active_workflow_lane() {
     let operations = sync_external_tasks(
         &board,
         ExternalSyncOptions {
-            provider: Some(ExternalProvider::Todoist),
+            provider: Some(ExternalProvider::GitHub),
             direction: ExternalSyncDirection::Both,
             conflict_policy: ExternalSyncConflictPolicy::Report,
             dry_run: false,
@@ -122,7 +122,7 @@ async fn local_todo_reopen_survives_pull_and_pushes_remote_open() {
         .create("Old title", "Old body", item)
         .expect("create local task");
     let client = UpdateFakeSyncClient::new(
-        ExternalProvider::Todoist,
+        ExternalProvider::GitHub,
         vec![ExternalSyncField::Status],
         vec![remote_task(
             "remote-1",
@@ -137,7 +137,7 @@ async fn local_todo_reopen_survives_pull_and_pushes_remote_open() {
     let operations = sync_external_tasks(
         &board,
         ExternalSyncOptions {
-            provider: Some(ExternalProvider::Todoist),
+            provider: Some(ExternalProvider::GitHub),
             direction: ExternalSyncDirection::Both,
             conflict_policy: ExternalSyncConflictPolicy::Report,
             dry_run: false,

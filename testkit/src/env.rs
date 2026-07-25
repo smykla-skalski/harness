@@ -195,6 +195,10 @@ impl CommandEnvExt for Command {
 /// Harness data and host-home discovery into the temp tree and clears daemon
 /// root overrides so unit and integration tests cannot touch live app state.
 ///
+/// The external-sync credentials are cleared for the same reason: a developer
+/// shell with `GH_TOKEN` exported would otherwise give a test a configured
+/// provider it never asked for, and the result depends on who runs it.
+///
 /// # Panics
 ///
 /// Panics if the isolated home directory cannot be created.
@@ -218,6 +222,10 @@ pub fn with_isolated_harness_env<T>(base: &Path, action: impl FnOnce() -> T) -> 
             ("GEMINI_SESSION_ID", None::<&Path>),
             ("COPILOT_SESSION_ID", None::<&Path>),
             ("OPENCODE_SESSION_ID", None::<&Path>),
+            ("HARNESS_GITHUB_TOKEN", None::<&Path>),
+            ("GH_TOKEN", None::<&Path>),
+            ("HARNESS_GITHUB_REPOSITORY", None::<&Path>),
+            ("GITHUB_REPOSITORY", None::<&Path>),
         ],
         action,
     )

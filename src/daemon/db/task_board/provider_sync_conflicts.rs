@@ -351,14 +351,12 @@ async fn insert_open_conflict(
 const fn provider_label(provider: ExternalProvider) -> &'static str {
     match provider {
         ExternalProvider::GitHub => "github",
-        ExternalProvider::Todoist => "todoist",
     }
 }
 
 const fn ref_provider_label(provider: ExternalRefProvider) -> &'static str {
     match provider {
         ExternalRefProvider::GitHub => "github",
-        ExternalRefProvider::Todoist => "todoist",
     }
 }
 

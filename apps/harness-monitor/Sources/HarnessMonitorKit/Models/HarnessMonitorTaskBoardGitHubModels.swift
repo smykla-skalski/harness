@@ -23,25 +23,6 @@ public struct TaskBoardGitHubInboxConfig: Codable, Equatable, Sendable {
   }
 }
 
-public struct TaskBoardTodoistInboxConfig: Codable, Equatable, Sendable {
-  public let projectFilter: [String]
-
-  public init(projectFilter: [String] = []) {
-    self.projectFilter = projectFilter
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case projectFilter
-  }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    self.init(
-      projectFilter: try container.decodeIfPresent([String].self, forKey: .projectFilter) ?? []
-    )
-  }
-}
-
 public struct TaskBoardGitHubProjectConfig: Codable, Equatable, Sendable {
   public let owner: String
   public let repo: String

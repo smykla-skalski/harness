@@ -32,7 +32,7 @@ async fn pull_report_is_remote_authoritative_but_prefer_local_is_explicit() {
         .await
         .expect("create local task");
         let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(UpdateFakeSyncClient::new(
-            ExternalProvider::Todoist,
+            ExternalProvider::GitHub,
             vec![ExternalSyncField::Title],
             vec![remote_task(
                 "remote-1",
@@ -45,7 +45,7 @@ async fn pull_report_is_remote_authoritative_but_prefer_local_is_explicit() {
         let operations = sync_external_tasks(
             &db,
             ExternalSyncOptions {
-                provider: Some(ExternalProvider::Todoist),
+                provider: Some(ExternalProvider::GitHub),
                 direction: ExternalSyncDirection::Pull,
                 conflict_policy: policy,
                 dry_run: false,

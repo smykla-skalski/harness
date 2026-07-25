@@ -78,15 +78,15 @@ impl ExternalCreateRecoveryClient for DurableCreateClient {
         self.calls.fetch_add(1, Ordering::SeqCst);
         let external_id = match self.provider {
             ExternalProvider::GitHub => format!("{}#17", request.provider_target()),
-            ExternalProvider::Todoist => "remote-created".into(),
         };
         Ok(ExternalTask {
             reference: ExternalTaskRef::new(self.provider, external_id),
             title: request.title().into(),
             body: request.body().into(),
             status: TaskBoardStatus::Backlog,
-            project_id: (self.provider == ExternalProvider::Todoist)
-                .then(|| request.provider_target().into()),
+            // The real GitHub client reports the repository it created in, and
+            // the evidence records that provider-side project verbatim.
+            project_id: Some(request.provider_target().into()),
             updated_at: Some("provider-revision-1".into()),
             ..ExternalTask::default()
         })

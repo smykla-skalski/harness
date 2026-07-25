@@ -64,6 +64,12 @@ impl ExternalSyncClient for FakeSyncClient {
         Some(self)
     }
 
+    // The default scope is the provider name, which is not a repository slug
+    // and so cannot pass validation as a GitHub create target.
+    fn scope_id(&self) -> String {
+        "acme/widgets".into()
+    }
+
     fn allows_delete(&self) -> bool {
         self.allows_delete
     }
@@ -137,7 +143,12 @@ fn task_from_create_request(
     request: &ExternalCreateRequest,
 ) -> ExternalTask {
     ExternalTask {
-        reference: ExternalTaskRef::new(provider, request.item_id()),
+        // A GitHub create outcome is rejected unless its identity is
+        // `owner/repo#something`, so the item id becomes the fragment.
+        reference: ExternalTaskRef::new(
+            provider,
+            format!("{}#{}", request.provider_target(), request.item_id()),
+        ),
         title: request.title().into(),
         body: request.body().into(),
         status: TaskBoardStatus::Backlog,
@@ -149,7 +160,7 @@ fn task_from_create_request(
 
 pub(super) fn external_task(external_id: &str, title: &str) -> ExternalTask {
     ExternalTask {
-        reference: ExternalTaskRef::new(ExternalProvider::Todoist, external_id),
+        reference: ExternalTaskRef::new(ExternalProvider::GitHub, external_id),
         title: title.to_owned(),
         body: String::new(),
         status: TaskBoardStatus::Backlog,

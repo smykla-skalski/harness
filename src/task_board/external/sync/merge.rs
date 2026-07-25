@@ -5,7 +5,6 @@ use crate::task_board::types::{
 };
 use crate::workspace::utc_now;
 
-use crate::task_board::external::targeting::provider_project_maps_to_board;
 use crate::task_board::external::{
     ExternalProvider, ExternalProviderCapabilities, ExternalRevisionUpdate, ExternalSyncAction,
     ExternalSyncField, ExternalSyncOperation, ExternalTask, ExternalTaskRef,
@@ -33,7 +32,7 @@ pub(super) fn pull_conflict_fields(
     };
     match &reference.sync_state {
         Some(state) => {
-            let local = local_fields_changed_since_sync(item, state, task.reference.provider);
+            let local = local_fields_changed_since_sync(item, state);
             let remote = remote_fields_changed_since_sync(task, state);
             intersect_fields(local, &remote)
         }
@@ -50,7 +49,7 @@ pub(super) fn local_update_fields(
         .and_then(|reference| reference.sync_state.as_ref())
         .map_or_else(
             || capabilities.update_fields.clone(),
-            |state| local_fields_changed_since_sync(item, state, reference.provider),
+            |state| local_fields_changed_since_sync(item, state),
         )
 }
 
@@ -108,38 +107,25 @@ pub(super) fn pull_create_fields(task: &ExternalTask) -> Vec<ExternalSyncField> 
         ExternalSyncField::Body,
         ExternalSyncField::Status,
     ];
-    if provider_project_maps_to_board(task.reference.provider) && task.project_id.is_some() {
-        fields.push(ExternalSyncField::Project);
-    }
     if task.reference.url.is_some() {
         fields.push(ExternalSyncField::Url);
     }
     fields
 }
 
-pub(super) fn pull_resolution_fields(task: &ExternalTask) -> Vec<ExternalSyncField> {
-    let mut fields = vec![
+pub(super) fn pull_resolution_fields() -> Vec<ExternalSyncField> {
+    vec![
         ExternalSyncField::Title,
         ExternalSyncField::Body,
         ExternalSyncField::Status,
         ExternalSyncField::Url,
-    ];
-    if provider_project_maps_to_board(task.reference.provider) {
-        fields.push(ExternalSyncField::Project);
-    }
-    fields
+    ]
 }
 
-pub(super) fn push_create_fields(
-    item: &TaskBoardItem,
-    provider: ExternalProvider,
-) -> Vec<ExternalSyncField> {
+pub(super) fn push_create_fields(item: &TaskBoardItem) -> Vec<ExternalSyncField> {
     let mut fields = vec![ExternalSyncField::Title, ExternalSyncField::Body];
     if canonical_external_status(item.status) != TaskBoardStatus::Done {
         fields.push(ExternalSyncField::Status);
-    }
-    if provider_project_maps_to_board(provider) && item.project_id.is_some() {
-        fields.push(ExternalSyncField::Project);
     }
     fields
 }
@@ -202,19 +188,12 @@ fn item_remote_diff_fields(item: &TaskBoardItem, task: &ExternalTask) -> Vec<Ext
         local_status_differs_from_remote(item.status, task.status),
         ExternalSyncField::Status,
     );
-    push_if(
-        &mut fields,
-        provider_project_maps_to_board(task.reference.provider)
-            && item.project_id != task.project_id,
-        ExternalSyncField::Project,
-    );
     fields
 }
 
 fn local_fields_changed_since_sync(
     item: &TaskBoardItem,
     state: &ExternalRefSyncState,
-    provider: ExternalProvider,
 ) -> Vec<ExternalSyncField> {
     let mut fields = Vec::new();
     push_if(
@@ -231,11 +210,6 @@ fn local_fields_changed_since_sync(
         &mut fields,
         local_status_changed(item.status, state.status),
         ExternalSyncField::Status,
-    );
-    push_if(
-        &mut fields,
-        provider_project_maps_to_board(provider) && state.project_id != item.project_id,
-        ExternalSyncField::Project,
     );
     fields
 }
@@ -259,12 +233,6 @@ fn remote_fields_changed_since_sync(
         &mut fields,
         remote_status_changed(task.status, state.status),
         ExternalSyncField::Status,
-    );
-    push_if(
-        &mut fields,
-        provider_project_maps_to_board(task.reference.provider)
-            && state.project_id != task.project_id,
-        ExternalSyncField::Project,
     );
     fields
 }
@@ -419,7 +387,7 @@ mod tests {
             "2026-07-16T10:00:00Z".into(),
         );
         item.status = TaskBoardStatus::Done;
-        let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1");
+        let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "remote-1");
         let mut core_reference = reference.clone().into_core_ref();
         core_reference.sync_state = Some(ExternalRefSyncState {
             title: Some("Title".into()),

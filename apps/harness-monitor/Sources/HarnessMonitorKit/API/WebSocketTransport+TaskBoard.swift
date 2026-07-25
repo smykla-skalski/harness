@@ -249,15 +249,6 @@ extension WebSocketTransport {
     return TaskBoardOpenRouterTokenSyncResponse(wire: wire)
   }
 
-  public func syncTaskBoardTodoistToken(
-    request: TaskBoardTodoistTokenSyncRequest
-  ) async throws -> TaskBoardTodoistTokenSyncResponse {
-    let params = try encodeParams(request, extra: [:])
-    let value = try await rpc(method: .taskBoardOrchestratorTodoistTokenSync, params: params)
-    let wire: TaskBoardTodoistTokenSyncResponseWire = try decodePolicyWire(value)
-    return TaskBoardTodoistTokenSyncResponse(wire: wire)
-  }
-
   public func taskBoardGitIdentityDefaults() async throws -> TaskBoardGitIdentityDefaults {
     let value = try await rpc(method: .taskBoardGitIdentityDefaults)
     return try decodePolicyWire(value)

@@ -330,15 +330,6 @@ fn apply_provider_identity(
             })?;
             apply_github_identity(item, intent, provider_target)
         }
-        ExternalProvider::Todoist => {
-            let recovered_project = provider_target.map(ToOwned::to_owned);
-            if item.project_id == intent.snapshot.project_id && item.project_id != recovered_project
-            {
-                item.project_id = recovered_project;
-                return Ok(true);
-            }
-            Ok(false)
-        }
     }
 }
 

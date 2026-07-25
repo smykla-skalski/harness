@@ -447,7 +447,7 @@ pub(crate) use task_board_runtime::{
     verify_task_board_git_signing_db,
 };
 pub use task_board_runtime::{
-    sync_task_board_github_tokens, sync_task_board_openrouter_token, sync_task_board_todoist_token,
+    sync_task_board_github_tokens, sync_task_board_openrouter_token,
     task_board_git_identity_defaults,
 };
 #[cfg(test)]

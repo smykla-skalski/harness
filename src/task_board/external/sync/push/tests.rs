@@ -11,8 +11,6 @@ use crate::task_board::external::{
 use crate::task_board::store::apply_patch;
 use crate::task_board::{ExternalRefSyncState, TaskBoardSyncConflict};
 
-mod revision_lifecycle_tests;
-
 #[tokio::test]
 async fn linked_push_is_not_applied_when_required_local_persistence_fails() {
     let item = linked_item();
@@ -27,7 +25,7 @@ async fn linked_push_is_not_applied_when_required_local_persistence_fails() {
         conflict_error: None,
     };
     let client = UpdateClient;
-    let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1");
+    let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "remote-1");
     let mut operations = Vec::new();
 
     let error = persist_linked_update(
@@ -60,7 +58,7 @@ async fn linked_push_is_not_applied_when_required_local_persistence_fails() {
 async fn remote_update_evidence_survives_conflict_persistence_failure() {
     let item = linked_item();
     let store = failing_store(&item, false, Some("conflict persistence failed"));
-    let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1");
+    let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "remote-1");
     let mut operations = Vec::new();
 
     let error = persist_linked_update(
@@ -88,7 +86,7 @@ async fn remote_update_evidence_survives_conflict_persistence_failure() {
 async fn applied_remote_update_evidence_survives_cleanup_failure() {
     let item = linked_item();
     let store = failing_store(&item, true, Some("conflict cleanup failed"));
-    let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1");
+    let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "remote-1");
     let mut operations = Vec::new();
 
     let error = persist_linked_update(
@@ -116,7 +114,7 @@ async fn applied_remote_update_evidence_survives_cleanup_failure() {
 async fn missing_provider_revision_stays_unknown_in_conflict_evidence() {
     let item = linked_item();
     let store = failing_store(&item, false, None);
-    let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1");
+    let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "remote-1");
     let mut operations = Vec::new();
 
     persist_linked_update(
@@ -144,7 +142,7 @@ async fn missing_provider_revision_stays_unknown_in_conflict_evidence() {
 async fn successful_local_sync_preserves_known_revision_when_requested() {
     let item = linked_item();
     let store = failing_store(&item, true, None);
-    let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1");
+    let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "remote-1");
     let mut operations = Vec::new();
 
     let result = persist_linked_update(
@@ -178,7 +176,7 @@ fn linked_item() -> TaskBoardItem {
         "Body".into(),
         "2026-07-16T10:00:00Z".into(),
     );
-    let mut reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1").into_core_ref();
+    let mut reference = ExternalTaskRef::new(ExternalProvider::GitHub, "remote-1").into_core_ref();
     reference.sync_state = Some(ExternalRefSyncState {
         title: Some("Base title".into()),
         body: Some("Body".into()),
@@ -197,7 +195,7 @@ struct UpdateClient;
 #[async_trait]
 impl ExternalSyncClient for UpdateClient {
     fn provider(&self) -> ExternalProvider {
-        ExternalProvider::Todoist
+        ExternalProvider::GitHub
     }
 
     async fn pull_tasks(&self) -> Result<Vec<ExternalTask>, CliError> {

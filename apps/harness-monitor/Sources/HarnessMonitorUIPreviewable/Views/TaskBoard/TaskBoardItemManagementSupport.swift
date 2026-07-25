@@ -17,17 +17,6 @@ extension TaskBoardExternalRefProvider {
     switch self {
     case .gitHub:
       "GitHub"
-    case .todoist:
-      "Todoist"
-    }
-  }
-
-  var isVisibleInMonitorUI: Bool {
-    switch self {
-    case .gitHub:
-      true
-    case .todoist:
-      false
     }
   }
 }

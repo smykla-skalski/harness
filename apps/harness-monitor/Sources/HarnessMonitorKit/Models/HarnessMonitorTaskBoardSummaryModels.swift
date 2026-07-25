@@ -7,14 +7,12 @@ public struct TaskBoardStatusCount: Codable, Equatable, Sendable {
 
 public enum TaskBoardExternalProvider: String, Codable, Sendable {
   case gitHub = "github"
-  case todoist
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.singleValueContainer()
     let rawValue = try container.decode(String.self)
     switch rawValue {
     case "github", "git_hub": self = .gitHub
-    case "todoist": self = .todoist
     default:
       throw DecodingError.dataCorruptedError(
         in: container,
@@ -158,9 +156,9 @@ public struct TaskBoardProjectSummary: Codable, Equatable, Identifiable, Sendabl
 
   /// How the daemon decides which project an item belongs to, mirrored for
   /// fixtures and previews. `projectId` is read before `executionRepository`,
-  /// an `owner/name` value is a GitHub repository, a Todoist import keeps its
-  /// provider, and anything else is a manual project. A fixture that pins one
-  /// source instead hides every per-source difference in the UI.
+  /// an `owner/name` value is a GitHub repository, and anything else is a
+  /// manual project. A fixture that pins one source instead hides every
+  /// per-source difference in the UI.
   public static func inferredIdentity(
     from item: TaskBoardItem
   ) -> (source: TaskBoardProjectSource, slug: String)? {
@@ -177,7 +175,7 @@ public struct TaskBoardProjectSummary: Codable, Equatable, Identifiable, Sendabl
         return (.gitHub, "\(owner)/\(name)".lowercased())
       }
     }
-    return (item.importedFromProvider == .todoist ? .todoist : .manual, raw)
+    return (.manual, raw)
   }
 }
 

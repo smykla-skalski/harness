@@ -1,6 +1,4 @@
-use crate::task_board::external::targeting::{
-    execution_repository_for_task, provider_project_maps_to_board,
-};
+use crate::task_board::external::targeting::execution_repository_for_task;
 use crate::task_board::external::{ExternalTask, ExternalTaskRef};
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::types::{
@@ -54,21 +52,6 @@ pub(in crate::task_board::external::sync) fn reconciliation_patch(
     let status = reconciled_status(item, task);
     if item.status != status {
         patch.status = Some(status);
-    }
-    if provider_project_maps_to_board(task.reference.provider)
-        && item.project_id != task.project_id
-        && should_apply_remote(
-            sync_state.map(|state| &state.project_id),
-            &item.project_id,
-            &task.project_id,
-            prefer_remote,
-            true,
-        )
-    {
-        patch.project_id = task
-            .project_id
-            .clone()
-            .map_or(OptionalFieldPatch::Clear, OptionalFieldPatch::Set);
     }
     if item.execution_repository.is_none()
         && let Some(repository) = execution_repository_for_task(task)

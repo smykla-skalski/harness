@@ -33,38 +33,6 @@ public struct TaskBoardGitHubTokensSyncResponse: Codable, Equatable, Sendable {
   }
 }
 
-public struct TaskBoardTodoistTokenSyncRequest: Codable, Equatable, Sendable {
-  public let token: String?
-
-  public init(token: String? = nil) {
-    self.token = token
-  }
-}
-
-public struct TaskBoardTodoistTokenSyncResponse: Codable, Equatable, Sendable {
-  public let tokenConfigured: Bool
-
-  public init(tokenConfigured: Bool) {
-    self.tokenConfigured = tokenConfigured
-  }
-}
-
-public struct TaskBoardTodoistCredentialSnapshot: Codable, Equatable, Sendable {
-  public let token: String?
-
-  public init(token: String? = nil) {
-    self.token = token
-  }
-
-  public var syncRequest: TaskBoardTodoistTokenSyncRequest {
-    TaskBoardTodoistTokenSyncRequest(token: token)
-  }
-
-  public var isEmpty: Bool {
-    token == nil
-  }
-}
-
 public struct TaskBoardOpenRouterTokenSyncRequest: Codable, Equatable, Sendable {
   public let token: String?
 
@@ -125,7 +93,6 @@ public struct TaskBoardGitSettingsSnapshot: Equatable, Sendable {
   public let orchestratorSettings: TaskBoardOrchestratorSettings
   public let runtimeConfig: TaskBoardGitRuntimeConfig
   public let githubCredentials: TaskBoardGitHubCredentialSnapshot
-  public let todoistCredentials: TaskBoardTodoistCredentialSnapshot
   public let openRouterCredentials: TaskBoardOpenRouterCredentialSnapshot
   public let identityDefaults: TaskBoardGitIdentityDefaults
 
@@ -133,7 +100,6 @@ public struct TaskBoardGitSettingsSnapshot: Equatable, Sendable {
     orchestratorSettings: TaskBoardOrchestratorSettings,
     runtimeConfig: TaskBoardGitRuntimeConfig,
     githubCredentials: TaskBoardGitHubCredentialSnapshot,
-    todoistCredentials: TaskBoardTodoistCredentialSnapshot = TaskBoardTodoistCredentialSnapshot(),
     openRouterCredentials: TaskBoardOpenRouterCredentialSnapshot =
       TaskBoardOpenRouterCredentialSnapshot(),
     identityDefaults: TaskBoardGitIdentityDefaults = TaskBoardGitIdentityDefaults()
@@ -141,7 +107,6 @@ public struct TaskBoardGitSettingsSnapshot: Equatable, Sendable {
     self.orchestratorSettings = orchestratorSettings
     self.runtimeConfig = runtimeConfig
     self.githubCredentials = githubCredentials
-    self.todoistCredentials = todoistCredentials
     self.openRouterCredentials = openRouterCredentials
     self.identityDefaults = identityDefaults
   }

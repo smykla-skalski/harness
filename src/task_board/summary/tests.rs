@@ -45,41 +45,40 @@ fn registered_project(slug: &str) -> TaskBoardProject {
 
 #[test]
 fn sync_summary_counts_provider_readiness() {
-    let mut item = ready_item("task-1", "project-owner-repo", AgentMode::Headless);
     // GitHub push readiness reads the provider-side project, not the board
-    // attribution, so this fixture has to carry both.
-    item.project_id = Some("owner/repo".into());
-    item.external_refs.push(super::super::types::ExternalRef {
-        provider: ExternalRefProvider::Todoist,
-        external_id: "remote-1".into(),
+    // attribution, so these fixtures have to carry both.
+    let mut linked = ready_item("task-1", "project-owner-repo", AgentMode::Headless);
+    linked.project_id = Some("owner/repo".into());
+    linked.external_refs.push(super::super::types::ExternalRef {
+        provider: ExternalRefProvider::GitHub,
+        external_id: "owner/repo#1".into(),
         url: None,
         sync_state: None,
     });
+
+    // An item is counted as linked or pushable, never both, so proving the two
+    // counters apart needs a second item that has a target but no reference.
+    let mut pushable = ready_item("task-2", "project-owner-repo", AgentMode::Headless);
+    pushable.project_id = Some("owner/repo".into());
+
     let config = ExternalSyncConfig {
         github_token: Some("token".into()),
         github_repository: None,
         github_inbox_repositories: Vec::new(),
         github_import_labels: Vec::new(),
-        todoist_token: None,
-        todoist_import_project_ids: Vec::new(),
     };
 
-    let summary = build_sync_summary(&[item], &config);
+    let summary = build_sync_summary(&[linked, pushable], &config);
     let github = summary
         .providers
         .iter()
         .find(|entry| entry.provider == ExternalProvider::GitHub)
         .expect("github summary");
-    let todoist = summary
-        .providers
-        .iter()
-        .find(|entry| entry.provider == ExternalProvider::Todoist)
-        .expect("todoist summary");
 
     assert!(github.configured);
+    assert_eq!(github.linked, 1);
     assert_eq!(github.pushable, 1);
-    assert!(!todoist.configured);
-    assert_eq!(todoist.linked, 1);
+    assert_eq!(github.blocked, 0);
 }
 
 #[test]
@@ -90,8 +89,6 @@ fn sync_summary_counts_github_repository_fallback_as_pushable() {
         github_repository: Some("owner/repo".into()),
         github_inbox_repositories: Vec::new(),
         github_import_labels: Vec::new(),
-        todoist_token: None,
-        todoist_import_project_ids: Vec::new(),
     };
 
     let summary = build_sync_summary(&[item], &config);

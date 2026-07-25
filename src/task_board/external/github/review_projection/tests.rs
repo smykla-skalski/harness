@@ -279,9 +279,9 @@ fn candidate_projection_reloads_refs_edited_after_listing() {
     let candidate_id = board.list(None).expect("list")[0].id.clone();
     let mut latest_refs = board.get(&candidate_id).expect("item").external_refs;
     latest_refs.push(ExternalRef {
-        provider: ExternalRefProvider::Todoist,
-        external_id: "user-added".into(),
-        url: Some("https://todoist.com/showTask?id=user-added".into()),
+        provider: ExternalRefProvider::GitHub,
+        external_id: "acme/widgets#99".into(),
+        url: Some("https://example.invalid/acme/widgets/issues/99".into()),
         sync_state: None,
     });
     board
@@ -306,7 +306,7 @@ fn candidate_projection_reloads_refs_edited_after_listing() {
     let updated = board.get(&candidate_id).expect("updated");
     assert_eq!(updated.status, TaskBoardStatus::Done);
     assert_eq!(updated.external_refs.len(), 2);
-    assert_eq!(updated.external_refs[1].external_id, "user-added");
+    assert_eq!(updated.external_refs[1].external_id, "acme/widgets#99");
 }
 
 #[test]

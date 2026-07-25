@@ -171,44 +171,6 @@ async fn finalize_same_identity_preserves_newer_local_reference() {
 }
 
 #[tokio::test]
-async fn finalize_existing_todoist_identity_normalizes_provider_project() {
-    let dir = tempdir().expect("tempdir");
-    let db = connect(&dir).await;
-    create_item(&db, item("task-finalize-todoist-existing")).await;
-    let intent = begin(
-        &db,
-        "task-finalize-todoist-existing",
-        ExternalProvider::Todoist,
-    )
-    .await;
-    let created = record(&db, &intent, "todoist-task-52").await;
-    let baseline = created
-        .created_evidence()
-        .expect("created evidence")
-        .provider_baseline
-        .clone();
-    db.update_task_board_item("task-finalize-todoist-existing", |current| {
-        current.external_refs.push(baseline.clone());
-        Ok(true)
-    })
-    .await
-    .expect("link Todoist reference");
-    let before = sequence(&db).await;
-
-    let finalized = db
-        .finalize_task_board_external_create_intent(&created)
-        .await
-        .expect("finalize existing Todoist identity");
-
-    assert_eq!(finalized.item_revision, Some(3));
-    assert_eq!(
-        finalized.item.expect("linked item").project_id.as_deref(),
-        Some("todoist-project")
-    );
-    assert_published(&db, before, ITEMS_CHANGE_SCOPE).await;
-}
-
-#[tokio::test]
 async fn finalize_rejects_cross_item_or_different_same_provider_identity() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
@@ -340,7 +302,7 @@ async fn finalize_accepts_concurrent_github_target_normalization() {
 }
 
 #[tokio::test]
-async fn finalize_fails_on_github_target_divergence_but_preserves_todoist_project_edit() {
+async fn finalize_fails_on_github_target_divergence() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
     create_item(&db, item("task-finalize-github-target")).await;
@@ -359,31 +321,6 @@ async fn finalize_fails_on_github_target_divergence_but_preserves_todoist_projec
         .expect_err("GitHub target divergence must fail");
     assert_eq!(github_error.code(), "WORKFLOW_CONCURRENT");
     assert_eq!(sequence(&db).await, before_github);
-
-    let mut todoist_item = item("task-finalize-todoist-target");
-    todoist_item.project_id = Some("todoist-project".into());
-    create_item(&db, todoist_item).await;
-    let todoist = begin(
-        &db,
-        "task-finalize-todoist-target",
-        ExternalProvider::Todoist,
-    )
-    .await;
-    let todoist = record(&db, &todoist, "todoist-task-55").await;
-    db.update_task_board_item("task-finalize-todoist-target", |current| {
-        current.project_id = Some("todoist-project-concurrent".into());
-        Ok(true)
-    })
-    .await
-    .expect("change Todoist project");
-    let finalized = db
-        .finalize_task_board_external_create_intent(&todoist)
-        .await
-        .expect("finalize Todoist target");
-    assert_eq!(
-        finalized.item.expect("Todoist item").project_id.as_deref(),
-        Some("todoist-project-concurrent")
-    );
 }
 
 #[tokio::test]
