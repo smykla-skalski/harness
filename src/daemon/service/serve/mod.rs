@@ -11,6 +11,7 @@ mod machine_heartbeat_loop;
 mod manifest;
 mod open_db;
 mod policy_bootstrap;
+mod reconciliation;
 mod remote;
 mod shutdown_signals;
 mod task_board_automation_startup;
@@ -22,6 +23,15 @@ pub(crate) use shutdown_signals::ShutdownSignalGuard;
 
 pub(crate) use config::{http_auth_mode, validate_serve_config};
 pub(crate) use open_db::{open_daemon_async_db, open_daemon_db};
+use reconciliation::spawn_background_reconciliation;
+#[cfg(test)]
+pub(crate) use reconciliation::test_gate as reconciliation_test_gate;
+#[cfg(test)]
+pub(crate) use reconciliation::{
+    discover_background_reconciliation_inputs, prepare_background_session_import,
+    prepared_session_import_required, session_import_required,
+    sync_background_projects_and_collect_candidates,
+};
 pub(crate) use remote::serve_remote_https;
 
 use super::{
@@ -193,7 +203,7 @@ pub(crate) async fn initialize_startup_state(
             task_board_migration::migrate_task_board(async_db).await?;
             policy_bootstrap::bootstrap_policy_storage(async_db).await?;
         }
-        run_background_reconciliation(&db);
+        spawn_background_reconciliation(&db);
         spawn_startup_background_tasks(
             Arc::clone(&db),
             Arc::clone(async_db_slot),
@@ -249,259 +259,6 @@ fn startup_span() -> tracing::Span {
         error_message = Empty,
         trace_id = Empty
     )
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion; tokio-rs/tracing#553"
-)]
-pub(crate) fn run_background_reconciliation(db: &Arc<Mutex<super::db::DaemonDb>>) {
-    let (projects, sessions) = match discover_background_reconciliation_inputs() {
-        Ok(inputs) => inputs,
-        Err(error) => {
-            tracing::warn!(%error, "background file reconciliation failed");
-            let _ = state::append_event(
-                "warn",
-                &format!("background file reconciliation failed: {error}"),
-            );
-            return;
-        }
-    };
-
-    let mut result = super::db::ReconcileResult::default();
-    let sessions_to_prepare = match sync_background_projects_and_collect_candidates(
-        db,
-        &projects,
-        &sessions,
-        &mut result,
-    ) {
-        Ok(sessions) => sessions,
-        Err(error) => {
-            tracing::warn!(%error, "background file reconciliation failed");
-            let _ = state::append_event(
-                "warn",
-                &format!("background file reconciliation failed: {error}"),
-            );
-            return;
-        }
-    };
-
-    for resolved in &sessions_to_prepare {
-        match apply_background_session_import(db, resolved) {
-            BackgroundSessionImportOutcome::Imported => result.sessions_imported += 1,
-            BackgroundSessionImportOutcome::Skipped => result.sessions_skipped += 1,
-            BackgroundSessionImportOutcome::Failed => {}
-        }
-    }
-    let message = format!(
-        "background reconciliation: {} projects, {} sessions imported, {} skipped",
-        result.projects, result.sessions_imported, result.sessions_skipped
-    );
-    tracing::info!("{message}");
-    let _ = state::append_event("info", &message);
-}
-
-pub(crate) fn discover_background_reconciliation_inputs() -> Result<
-    (
-        Vec<super::index::DiscoveredProject>,
-        Vec<super::index::ResolvedSession>,
-    ),
-    CliError,
-> {
-    let projects = index::discover_projects()?;
-    let mut sessions = index::discover_sessions_for(&projects, true)?;
-    sessions.sort_by(|left, right| {
-        let left_active = left.state.status == SessionStatus::Active;
-        let right_active = right.state.status == SessionStatus::Active;
-        right_active
-            .cmp(&left_active)
-            .then(right.state.updated_at.cmp(&left.state.updated_at))
-            .then(left.state.session_id.cmp(&right.state.session_id))
-    });
-    Ok((projects, sessions))
-}
-
-pub(crate) fn sync_background_projects_and_collect_candidates(
-    db: &Arc<Mutex<super::db::DaemonDb>>,
-    projects: &[super::index::DiscoveredProject],
-    sessions: &[super::index::ResolvedSession],
-    result: &mut super::db::ReconcileResult,
-) -> Result<Vec<super::index::ResolvedSession>, CliError> {
-    let Ok(db_guard) = db.lock() else {
-        return Ok(Vec::new());
-    };
-    sync_background_projects(&db_guard, projects, result)?;
-    Ok(collect_background_session_candidates(
-        &db_guard, sessions, result,
-    ))
-}
-
-enum BackgroundSessionImportOutcome {
-    Failed,
-    Imported,
-    Skipped,
-}
-
-enum BackgroundSessionCandidate {
-    Failed,
-    Prepare,
-    Skip,
-}
-
-fn apply_background_session_import(
-    db: &Arc<Mutex<super::db::DaemonDb>>,
-    resolved: &super::index::ResolvedSession,
-) -> BackgroundSessionImportOutcome {
-    let Some(prepared) = prepare_background_session_import(resolved) else {
-        return BackgroundSessionImportOutcome::Failed;
-    };
-    let Ok(db_guard) = db.lock() else {
-        return BackgroundSessionImportOutcome::Failed;
-    };
-    apply_prepared_background_session_import(&db_guard, &prepared)
-}
-
-pub(crate) fn sync_background_projects(
-    db: &super::db::DaemonDb,
-    projects: &[super::index::DiscoveredProject],
-    result: &mut super::db::ReconcileResult,
-) -> Result<(), CliError> {
-    for project in projects {
-        db.sync_project(project).map_err(|error| {
-            CliError::from(CliErrorKind::workflow_io(format!(
-                "sync project {}: {error}",
-                project.project_id
-            )))
-        })?;
-        result.projects += 1;
-    }
-    Ok(())
-}
-
-pub(crate) fn collect_background_session_candidates(
-    db: &super::db::DaemonDb,
-    sessions: &[super::index::ResolvedSession],
-    result: &mut super::db::ReconcileResult,
-) -> Vec<super::index::ResolvedSession> {
-    let mut sessions_to_prepare = Vec::new();
-    for resolved in sessions {
-        match background_session_candidate(db, resolved) {
-            BackgroundSessionCandidate::Prepare => sessions_to_prepare.push(resolved.clone()),
-            BackgroundSessionCandidate::Skip | BackgroundSessionCandidate::Failed => {
-                result.sessions_skipped += 1;
-            }
-        }
-    }
-    sessions_to_prepare
-}
-
-pub(crate) fn prepare_background_session_import(
-    resolved: &super::index::ResolvedSession,
-) -> Option<super::db::PreparedSessionResync> {
-    super::db::DaemonDb::prepare_session_import_from_resolved(resolved)
-        .inspect_err(|error| log_background_session_prepare_error(error, resolved))
-        .ok()
-}
-
-fn apply_prepared_background_session_import(
-    db: &super::db::DaemonDb,
-    prepared: &super::db::PreparedSessionResync,
-) -> BackgroundSessionImportOutcome {
-    let Some(import_required) = prepared_session_import_required(db, prepared) else {
-        return BackgroundSessionImportOutcome::Failed;
-    };
-    if !import_required {
-        return BackgroundSessionImportOutcome::Skipped;
-    }
-    import_prepared_background_session(db, prepared)
-}
-
-pub(crate) fn session_import_required(
-    db: &super::db::DaemonDb,
-    resolved: &super::index::ResolvedSession,
-) -> Result<bool, CliError> {
-    let db_version = db.session_state_version(&resolved.state.session_id)?;
-    let file_version = i64::try_from(resolved.state.state_version).unwrap_or(i64::MAX);
-    Ok(db_version.is_none_or(|version| version < file_version))
-}
-
-fn background_session_candidate(
-    db: &super::db::DaemonDb,
-    resolved: &super::index::ResolvedSession,
-) -> BackgroundSessionCandidate {
-    match session_import_required(db, resolved) {
-        Ok(false) => BackgroundSessionCandidate::Skip,
-        Ok(true) => BackgroundSessionCandidate::Prepare,
-        Err(error) => {
-            log_background_session_version_check_error(&error, resolved);
-            BackgroundSessionCandidate::Failed
-        }
-    }
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-)]
-pub(crate) fn log_background_session_prepare_error(
-    error: &CliError,
-    resolved: &super::index::ResolvedSession,
-) {
-    tracing::warn!(
-        %error,
-        session_id = %resolved.state.session_id,
-        "background session prepare failed"
-    );
-}
-
-pub(crate) fn prepared_session_import_required(
-    db: &super::db::DaemonDb,
-    prepared: &super::db::PreparedSessionResync,
-) -> Option<bool> {
-    session_import_required(db, &prepared.resolved)
-        .inspect_err(|error| log_background_session_version_check_error(error, &prepared.resolved))
-        .ok()
-}
-
-fn import_prepared_background_session(
-    db: &super::db::DaemonDb,
-    prepared: &super::db::PreparedSessionResync,
-) -> BackgroundSessionImportOutcome {
-    if let Err(error) = db.apply_prepared_session_resync(prepared) {
-        log_background_session_import_error(&error, prepared);
-        return BackgroundSessionImportOutcome::Failed;
-    }
-    BackgroundSessionImportOutcome::Imported
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-)]
-pub(crate) fn log_background_session_version_check_error(
-    error: &CliError,
-    resolved: &super::index::ResolvedSession,
-) {
-    tracing::warn!(
-        %error,
-        session_id = %resolved.state.session_id,
-        "background session version check failed"
-    );
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-)]
-pub(crate) fn log_background_session_import_error(
-    error: &CliError,
-    prepared: &super::db::PreparedSessionResync,
-) {
-    tracing::warn!(
-        %error,
-        session_id = %prepared.resolved.state.session_id,
-        "background session import failed"
-    );
 }
 
 #[expect(
