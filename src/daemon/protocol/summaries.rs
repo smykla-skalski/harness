@@ -19,7 +19,7 @@ use harness_protocol::managed_agents::acp::AcpRuntimeProbeResponse;
 
 /// Daemon HTTP/WS wire-protocol version. Increment on a breaking schema
 /// change so the Mac app can detect version skew on connect.
-pub const DAEMON_WIRE_VERSION: u32 = 2;
+pub const DAEMON_WIRE_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[derive(utoipa::ToSchema)]
