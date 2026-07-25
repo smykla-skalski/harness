@@ -66,6 +66,10 @@ print_cargo_env() {
   )
 }
 
+agent_build_share() {
+  awk -F= '/^AGENT_BUILD_SHARE=/ { print $2; exit }' "$ROOT/scripts/cargo-local.sh"
+}
+
 print_cargo_env_without_tmpdir() {
   local fake_bin="$1" sccache_bin="$2" session="$3"
   (
@@ -229,11 +233,12 @@ scenario_usable_tmpdir_is_preserved() {
 scenario_agent_build_jobs_leave_room_for_later_arrivals() {
   local fake_bin="$SANDBOX/cpu-bin"
   local agent_output local_output
-  local cpu_count=24 expected_agent_jobs
+  local cpu_count=24 share expected_agent_jobs
   # An agent that starts alone still has to leave room for agents that join
   # later, because the lease count it saw can only shrink its share, never
   # grow it back.
-  expected_agent_jobs=$(((cpu_count + 3) / 4))
+  share="$(agent_build_share)"
+  expected_agent_jobs=$(((cpu_count + share - 1) / share))
   mkdir -p "$fake_bin"
   cat >"$fake_bin/getconf" <<EOF
 #!/usr/bin/env bash
@@ -274,7 +279,8 @@ EOF
 
 scenario_agent_jobs_hold_their_reserved_share() {
   local fake_bin="$SANDBOX/curve-bin"
-  local cpu_count=24 share=4 reserved n jobs observed="" expected=""
+  local cpu_count=24 share reserved n jobs observed="" expected=""
+  share="$(agent_build_share)"
   reserved=$(((cpu_count + share - 1) / share))
   mkdir -p "$fake_bin"
   cat >"$fake_bin/getconf" <<EOF
