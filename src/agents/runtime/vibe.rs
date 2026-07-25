@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::workspace::project_context_dir;
 
 use super::claude::{last_activity_from_log, parse_common_jsonl};

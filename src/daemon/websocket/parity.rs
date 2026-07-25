@@ -24,7 +24,7 @@ use crate::daemon::service;
 use crate::daemon::voice::{
     append_audio_chunk, append_transcript_async, finish_session_async, start_session_async,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 #[cfg(target_os = "macos")]
 use crate::sandbox;
 use crate::session::adopter::AdoptionOutcome;

@@ -2,7 +2,7 @@ use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::protocol::TaskBoardTriageEscalationVerdictRequest;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::transport::{daemon_client, print_json};
 use crate::task_board::{TriageVerdict, is_canonical_reason_detail};
 

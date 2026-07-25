@@ -6,7 +6,7 @@ use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::protocol::{
     TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::types::TaskBoardStatus;
 use crate::task_board::{
     TaskBoardAutomationPolicy, TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig,

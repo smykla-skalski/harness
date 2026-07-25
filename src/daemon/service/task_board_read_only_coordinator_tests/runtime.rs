@@ -8,7 +8,7 @@ use tokio::sync::Semaphore;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{CodexRunRequest, CodexRunSnapshot, CodexRunStatus};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::{
     TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardAttemptResultArtifact,
     TaskBoardEvaluationResult, TaskBoardImplementationResult, TaskBoardLifecycleOutcome,

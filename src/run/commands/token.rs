@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::kuma::token::parse_token_response;
 use crate::infra::exec;
 use crate::run::args::RunDirArgs;

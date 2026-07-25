@@ -7,11 +7,11 @@ mod config;
 mod runtime;
 
 use crate::app::command_context::resolve_repo_root;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::{
     ComposeOrchestrator, ContainerRuntime, StdProcessExecutor, container_backends_from_env,
 };
-use crate::kernel::topology::{ClusterSpec, Platform};
+use harness_kernel::kernel::topology::{ClusterSpec, Platform};
 use crate::setup::services::cluster::persist_cluster_spec;
 
 use super::ClusterArgs;

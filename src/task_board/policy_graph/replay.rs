@@ -14,7 +14,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::decisions::RecordedPolicyDecision;
 use super::store::active_canvas_for_request;

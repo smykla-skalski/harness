@@ -8,7 +8,7 @@ use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::TaskBoardSyncRequest;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::github_api::stable_data_revision_guard;
 use crate::reviews::{ReviewItem, ReviewPullRequestState, ReviewsQueryRequest};
 use crate::task_board::{

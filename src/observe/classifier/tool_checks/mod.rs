@@ -11,7 +11,7 @@ use self::questions::check_ask_user_question;
 use self::write_checks::{
     check_managed_file_writes, check_manifest_created_during_run, check_write_edit_tool_use,
 };
-use crate::kernel::tooling::{ToolContext, legacy_tool_context};
+use harness_kernel::kernel::tooling::{ToolContext, legacy_tool_context};
 use crate::observe::types::{Issue, ScanState, ToolUseRecord};
 
 /// Check a `tool_use` block for issues.

@@ -9,7 +9,7 @@ use crate::daemon::protocol::{
 };
 use crate::daemon::service;
 use crate::daemon::task_board_managed_agents::rendered_worker_prompt;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::feature_flags::task_board_automation_v2_enabled_from_env;
 #[cfg(test)]
 use crate::task_board::DispatchFailureKind;

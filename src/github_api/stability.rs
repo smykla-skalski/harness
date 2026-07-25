@@ -2,7 +2,7 @@ use std::error::Error;
 use std::fmt;
 use std::future::Future;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::state::global_state;
 

@@ -8,7 +8,7 @@ use fs_err as fs;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, validate_safe_segment};
 use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use crate::infra::persistence::versioned_json::VersionedJsonRepository;

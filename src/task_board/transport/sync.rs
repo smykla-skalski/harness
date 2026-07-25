@@ -1,6 +1,6 @@
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::protocol::TaskBoardSyncRequest;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::summary::TaskBoardSyncSummary;
 
 use super::{TaskBoardSyncArgs, daemon_client, print_json};

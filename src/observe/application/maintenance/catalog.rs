@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::observe::types::{FOCUS_PRESETS, IssueCategory};
 
 pub(in crate::observe::application) fn execute_list_categories() -> Result<i32, CliError> {

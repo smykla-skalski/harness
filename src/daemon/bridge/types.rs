@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::daemon::agent_tui::{AgentTuiLaunchProfile, AgentTuiSize};
 use crate::daemon::state::HostBridgeCapabilityManifest;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::bridge_state::read_bridge_config;
 use super::core::ResolvedBridgeConfig;

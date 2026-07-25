@@ -1,7 +1,7 @@
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::infra::io::validate_safe_segment;
 use crate::run::args::RunDirArgs;
 

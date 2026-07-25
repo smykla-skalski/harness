@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::persistence::flock::{
     FlockErrorContext, TryAcquireFlockError, flock_is_held_at as shared_flock_is_held_at,
     try_acquire_exclusive_flock,

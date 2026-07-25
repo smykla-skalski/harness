@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use crate::daemon::protocol::TaskBoardOrchestratorSettingsUpdateRequest;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::{
     TaskBoardGitHubInboxConfig, TaskBoardOrchestratorSettings, normalize_repository_slug,
 };

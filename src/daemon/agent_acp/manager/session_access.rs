@@ -17,7 +17,7 @@ use crate::agents::runtime::signal::{AckResult, SignalAck, acknowledge_signal};
 use crate::daemon::sandboxed_from_env;
 #[cfg(feature = "daemon-runtime")]
 use crate::daemon::service::{WakeEventLevel, record_wake_event};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 #[cfg(feature = "daemon-runtime")]
 use crate::workspace::utc_now;
 

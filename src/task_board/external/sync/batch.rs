@@ -1,4 +1,4 @@
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::TaskBoardExternalCreateIntent;
 use crate::task_board::external::{
     ExternalProvider, ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,

@@ -5,7 +5,7 @@ use crate::daemon::protocol::{
     TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorStatusResponse,
     TaskBoardSyncRequest, TaskBoardSyncResponse,
 };
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::github::GitHubAutomation;
 use crate::task_board::orchestrator::TaskBoardOrchestratorPreparedRun;
 use crate::task_board::{

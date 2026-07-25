@@ -12,7 +12,7 @@ use crate::daemon::protocol::{
     SessionMutationResponse, SessionStartRequest, SessionTitleRequest, http_paths,
 };
 use crate::daemon::service;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::session::types::SessionState;
 
 use super::auth::{authorize_control_request, require_auth};

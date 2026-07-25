@@ -1,5 +1,5 @@
 use crate::hooks::application::GuardContext;
-use crate::kernel::tooling::ToolCategory;
+use harness_kernel::kernel::tooling::ToolCategory;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ToolDispatch {

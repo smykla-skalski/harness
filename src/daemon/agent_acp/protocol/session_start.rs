@@ -11,7 +11,7 @@ use super::{
     AcpAgentManagerHandle, AcpSessionSupervisor, send_initialize, send_load_session,
     send_new_session, send_resume_session,
 };
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 /// Where a session route points, for the two places that register it.
 ///

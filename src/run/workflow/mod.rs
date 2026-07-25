@@ -5,7 +5,7 @@ mod types;
 use std::fmt;
 use std::path::Path;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::run::audit::append_runner_state_audit;
 
 pub use persistence::{

@@ -13,7 +13,7 @@ use crate::daemon::protocol::{
     CodexRunSnapshot, CodexRunStatus, CodexTranscriptResponse, StreamEvent,
 };
 use crate::daemon::state;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::validate_safe_segment;
 use crate::session::types::ManagedAgentRef;
 use crate::workspace::utc_now;

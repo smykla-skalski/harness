@@ -5,7 +5,7 @@ use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::daemon::protocol::{CodexApprovalDecision, CodexRunSnapshot};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 const STARTUP_WAIT_TIMEOUT: Duration = Duration::from_secs(30);
 

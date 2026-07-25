@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::agents::acp::permission::recording_log_path_for_session;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::rollback::rollback_registration_best_effort;
 use super::snapshots::{ReusedSnapshotInput, reused_snapshot};

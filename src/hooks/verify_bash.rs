@@ -1,10 +1,10 @@
 use std::fs;
 use std::path::Path;
 
-use crate::errors::{CliError, HookMessage};
+use harness_kernel::errors::{CliError, HookMessage};
 use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
-use crate::kernel::topology::ClusterMode;
+use harness_kernel::kernel::topology::ClusterMode;
 use crate::run::context::RunContext;
 use crate::run::workflow::{PreflightStatus, RunnerPhase, RunnerWorkflowState, SuiteFixState};
 

@@ -4,7 +4,7 @@ use std::time::Duration;
 use crate::daemon::bridge;
 use crate::daemon::codex_transport::{self, CodexTransportKind};
 use crate::daemon::state;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::handle::CodexControllerHandle;
 

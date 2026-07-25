@@ -1,7 +1,7 @@
 use serde_json::json;
 
 use crate::daemon::protocol::{CodexApprovalDecision, CodexResolvedApproval, CodexRunStatus};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 use super::active_runs::CodexControlMessage;

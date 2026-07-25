@@ -11,7 +11,7 @@ use serde_json::Value;
 
 use super::super::db_error;
 use super::rows::{CanvasRow, EdgeRow, GroupNodeRow, GroupRow, NodeRow, WorkspaceRow};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::policy_graph::{
     PolicyCanvasPoint, PolicyCanvasRecord, PolicyCanvasRect, PolicyCanvasWorkspace, PolicyGraph,
     PolicyGraphEdge, PolicyGraphGroup, PolicyGraphLayout, PolicyGraphMode, PolicyGraphNode,

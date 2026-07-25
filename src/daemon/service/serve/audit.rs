@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::daemon::audit_events::{AuditEventRecordDraft, record_audit_event};
 use crate::daemon::db::AsyncDaemonDb;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 pub(super) async fn record_daemon_started(
     async_db: Option<&Arc<AsyncDaemonDb>>,

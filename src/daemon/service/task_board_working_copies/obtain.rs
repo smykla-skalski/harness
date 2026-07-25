@@ -1,6 +1,6 @@
 //! Obtain (clone-or-reuse) a task-board working copy.
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::external::ExternalProvider;
 use crate::task_board::runtime_config::normalize_repository_slug;
 use crate::task_board::working_copy::{WorkingCopyKey, WorkingCopyListEntry};

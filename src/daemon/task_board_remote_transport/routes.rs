@@ -23,7 +23,7 @@ use super::wire_limits::{
 use crate::daemon::db::utc_now;
 use crate::daemon::http::{DaemonHttpState, require_async_db, require_execution_remote_client};
 use crate::daemon::http::openapi::DaemonErrorBody;
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 use super::wire::{
     RemoteArtifactFetchResponse, RemoteClaimResponse, RemoteHostAdvertisement, RemoteOfferResponse,
     RemoteSettledResponse, RemoteSourceBundleUploadResponse, RemoteStatusResponse,

@@ -1,7 +1,7 @@
 use std::cell::Cell;
 use std::path::{Path, PathBuf};
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::session::service as session_service;
 use crate::session::types::SessionRole;
 

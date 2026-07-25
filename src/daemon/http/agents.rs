@@ -10,7 +10,7 @@ use crate::daemon::protocol::{
     AgentRemoveRequest, LeaderTransferRequest, RoleChangeRequest, SessionDetail, http_paths,
 };
 use crate::daemon::service;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::DaemonHttpState;
 use super::auth::authorize_control_request;

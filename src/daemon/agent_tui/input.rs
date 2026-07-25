@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 /// Named keyboard input supported by the headless TUI steering API.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

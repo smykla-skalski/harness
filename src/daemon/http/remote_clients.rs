@@ -14,7 +14,7 @@ use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_identity::{
     RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision,
 };
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::workspace::utc_now;
 
 use super::response::{extract_request_id, timed_response};

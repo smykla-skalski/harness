@@ -9,7 +9,7 @@
 //! [`crate::daemon::service::reviews::comment_on_reviews`].
 
 use crate::daemon::service::task_board_runtime::external_sync_config_for_repository;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::review_thread_resolve::{
     ReviewsReviewThreadResolveRequest, ReviewsReviewThreadResolveResponse,
     execute_review_thread_resolve_mutation,

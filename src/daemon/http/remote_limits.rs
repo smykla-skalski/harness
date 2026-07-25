@@ -27,7 +27,7 @@ use crate::daemon::task_board_remote_transport::routes::{
     DEFAULT_EXECUTION_HTTP_BODY_LIMIT_BYTES, MAX_EXECUTION_HTTP_BODY_LIMIT_BYTES,
     execution_http_body_limit,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 const REMOTE_LIMIT_ERROR_CODE: &str = "REMOTE_LIMITS";
 pub(crate) const DEFAULT_REMOTE_NON_BULK_HTTP_BODY_LIMIT_BYTES: usize =

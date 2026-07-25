@@ -2,7 +2,7 @@ use std::io::{BufRead, BufReader, Write as _};
 use std::path::PathBuf;
 use std::thread;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{
     Arc, AtomicBool, BTreeMap, BridgeClient, BridgeEnvelope, BridgeRequest, BridgeResponse,

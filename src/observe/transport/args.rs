@@ -1,7 +1,7 @@
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::hooks::adapters::HookAgent;
 
 use super::super::application::execute;

@@ -3,7 +3,7 @@ use std::path::Path;
 
 use rayon::prelude::*;
 
-use crate::errors::{CliError, io_for};
+use harness_kernel::errors::{CliError, io_for};
 use crate::infra::io::{read_text, write_json_pretty};
 use crate::workspace::{session_scope_key, utc_now};
 

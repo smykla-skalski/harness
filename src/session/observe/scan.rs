@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use fs_err as fs;
 
 use crate::agents::runtime;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::observe::classifier::classify_line;
 use crate::observe::types::{Issue, ScanState};
 use crate::session::service;

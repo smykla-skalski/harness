@@ -19,7 +19,7 @@ use super::runtime::PreparedRemoteWorkerAction;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{CodexRunSnapshot, CodexRunStatus};
 use crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 static START_CALLS: AtomicUsize = AtomicUsize::new(0);

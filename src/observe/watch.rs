@@ -8,7 +8,7 @@ use serde::Serialize;
 use tokio::sync::mpsc;
 use tokio::time::sleep;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::exec::RUNTIME;
 
 use super::application::ObserveFilter;

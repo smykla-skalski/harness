@@ -14,7 +14,7 @@ use crate::daemon::protocol::{
     TaskBoardTriageOverrideMutationResponse, TaskBoardUpdateItemRequest,
 };
 use crate::daemon::service;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::TaskBoardItem;
 
 use super::super::{DaemonHttpState, require_async_db};

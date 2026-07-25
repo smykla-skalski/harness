@@ -11,7 +11,7 @@ use std::time::Duration;
 use fs_err as fs;
 
 use crate::daemon::state::{self, HostBridgeCapabilityManifest};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::bridge_state::{
     LivenessMode, acquire_bridge_lock_exclusive, bridge_lock_path, clear_bridge_state,

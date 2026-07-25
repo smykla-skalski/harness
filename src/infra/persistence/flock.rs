@@ -4,7 +4,7 @@ use std::path::Path;
 
 use fs2::FileExt;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 /// Error-message context shared by flock-backed persistence helpers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

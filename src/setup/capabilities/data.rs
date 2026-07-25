@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::kernel::topology::{ClusterProvider, Platform};
+use harness_kernel::kernel::topology::{ClusterProvider, Platform};
 
 use super::model::{
     ClusterTopology, CreateInfo, Feature, FeatureInfo, PlatformInfo, ProviderInfo, TopologyMode,

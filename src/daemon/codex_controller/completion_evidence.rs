@@ -1,7 +1,7 @@
 use serde_json::json;
 
 use crate::daemon::protocol::CodexRunSnapshot;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::git::GitRepository;
 use crate::session::types::{SessionState, TaskStatus};
 

@@ -8,7 +8,7 @@ use fs_err as fs;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::validate_safe_segment;
 use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use crate::workspace::harness_data_root;

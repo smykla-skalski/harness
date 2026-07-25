@@ -9,7 +9,7 @@ use crate::daemon::agent_tui::{
     deliver_deferred_prompts, snapshot_from_process, spawn_agent_tui_process,
 };
 use crate::daemon::state::HostBridgeCapabilityManifest;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::core::{
     BridgeActiveTui, BridgeAgentTuiMetadata, BridgeSnapshotContext, BridgeTuiExitInfo,

@@ -21,7 +21,7 @@ use super::remote_redaction::redact_secret_detail;
 use super::remote_tls::{
     RemoteTlsConfigError, RemoteTlsConfigHandle, build_remote_tls_server_config,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 const REMOTE_ACME_RENEWAL_WINDOW: ChronoDuration = ChronoDuration::days(30);
 const REMOTE_ACME_CHECK_INTERVAL: Duration = Duration::from_hours(1);

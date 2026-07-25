@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::kernel::skills::{SKILL_CREATE, SKILL_RUN};
+use harness_kernel::kernel::skills::{SKILL_CREATE, SKILL_RUN};
 
 use super::handoff::{CompactHandoff, CreateHandoff, RunnerHandoff};
 use super::{CHAR_LIMIT, SECTION_CHAR_LIMIT, SECTION_LINE_LIMIT};

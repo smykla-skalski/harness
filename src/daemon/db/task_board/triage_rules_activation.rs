@@ -6,7 +6,7 @@ use super::triage_rules_store::{
     is_canonical_triage_rule_set_actor, record_triage_rule_set_audit_in_tx,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 use crate::task_board::{
     TriageRuleSetActivationResult, TriageRuleSetAuditKind, TriageRuleSetV1,
     validate_triage_rule_set,

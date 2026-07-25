@@ -5,7 +5,7 @@ use crate::daemon::protocol::{
     TaskBoardOrchestratorSettingsResponse, TaskBoardOrchestratorSettingsUpdateRequest,
     TaskBoardOrchestratorStatusResponse,
 };
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::feature_flags::task_board_automation_v2_enabled_from_env;
 use crate::task_board::{
     TaskBoardAutomationAdmissionState, TaskBoardAutomationDesiredMode,

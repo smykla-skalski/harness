@@ -2,7 +2,7 @@ use std::cmp::Reverse;
 
 use crate::daemon::agent_acp::AcpAgentInspectResponse;
 use crate::daemon::protocol::{ManagedAgentListResponse, ManagedAgentSnapshot};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::super::DaemonHttpState;
 use super::run_terminal_agent_blocking;

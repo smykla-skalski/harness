@@ -4,7 +4,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 /// SHA256 digest of a source file.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

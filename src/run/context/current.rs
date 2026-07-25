@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::kernel::topology::ClusterSpec;
+use harness_kernel::kernel::topology::ClusterSpec;
 
 use super::{RunLayout, RunMetadata};
 

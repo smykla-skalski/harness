@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::hooks::adapters::HookAgent;
 
 /// Liveness status for an agent session.

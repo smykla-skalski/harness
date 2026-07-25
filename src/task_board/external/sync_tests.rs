@@ -6,6 +6,7 @@ use tempfile::tempdir;
 use super::*;
 use crate::task_board::store::TaskBoardStore;
 use crate::task_board::types::{ExternalRefSyncState, TaskBoardItem, TaskBoardStatus};
+use harness_kernel::errors::CliErrorKind;
 
 mod conflict_correctness_tests;
 mod provider_exclusion_status_filter_tests;
@@ -366,7 +367,7 @@ impl ExternalSyncClient for ScopedPullClient {
     async fn pull_tasks(&self) -> Result<Vec<ExternalTask>, CliError> {
         self.result
             .clone()
-            .map_err(|message| crate::errors::CliErrorKind::workflow_io(message).into())
+            .map_err(|message| CliErrorKind::workflow_io(message).into())
     }
 
     async fn push_task(&self, _item: &TaskBoardItem) -> Result<ExternalTaskRef, CliError> {

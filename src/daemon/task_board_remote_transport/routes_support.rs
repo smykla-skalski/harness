@@ -11,7 +11,7 @@ use crate::daemon::db::{
     TaskBoardRemoteOfferReceipt, TaskBoardRemoteOfferReceiptDisposition,
 };
 use crate::daemon::http::{DaemonHttpState, require_async_db, require_execution_remote_client};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::{
     TaskBoardLocalExecutionHostConfig, TaskBoardOrchestratorSettings,
     TaskBoardRemoteAssignmentState, validate_local_execution_host_config,

@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 #[cfg(test)]
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 #[cfg(test)]
 use crate::infra::persistence::versioned_json::VersionedJsonRepository;
 use crate::workspace::utc_now;

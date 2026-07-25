@@ -1,7 +1,7 @@
 use std::env;
 use std::sync::Arc;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 #[cfg(feature = "compose")]
 use crate::infra::blocks::compose::BollardComposeOrchestrator;
 use crate::infra::blocks::compose::DockerComposeOrchestrator;

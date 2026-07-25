@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use fs_err as fs;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::storage;
 use crate::workspace::layout::sessions_root as workspace_sessions_root;
 use crate::workspace::{

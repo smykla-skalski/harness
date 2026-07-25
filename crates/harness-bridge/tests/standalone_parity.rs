@@ -1,18 +1,18 @@
 use std::path::Path;
 
-use harness_bridge::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_bridge::feature_flags::RuntimeHookFlags;
 use harness_bridge::hooks::adapters::HookAgent;
 
 #[test]
 fn bridge_uses_canonical_runner_state_name() {
     assert_eq!(
-        harness_bridge::kernel::skills::dirs::RUN_STATE_FILE,
+        harness_kernel::kernel::skills::dirs::RUN_STATE_FILE,
         "suite-run-state.json"
     );
     assert_eq!(
-        harness_bridge::kernel::skills::dirs::RUN_STATE_FILE,
-        harness_hook::kernel::skills::dirs::RUN_STATE_FILE
+        harness_kernel::kernel::skills::dirs::RUN_STATE_FILE,
+        harness_kernel::kernel::skills::dirs::RUN_STATE_FILE
     );
 }
 

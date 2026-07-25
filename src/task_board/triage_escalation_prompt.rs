@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::prompt_catalog::{PromptId, render_prompt};
 use super::types::TaskBoardItem;

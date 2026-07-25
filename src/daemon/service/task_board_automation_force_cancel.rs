@@ -11,7 +11,7 @@ use crate::daemon::protocol::{
     HarnessMonitorAuditEvent, TaskBoardAutomationForceCancelDisposition,
     TaskBoardAutomationForceCancelRequest, TaskBoardAutomationForceCancelResponse,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::feature_flags::task_board_automation_v2_enabled_from_env;
 use crate::infra::io::validate_safe_segment;
 use crate::task_board::TaskBoardExecutionAttemptRecord;

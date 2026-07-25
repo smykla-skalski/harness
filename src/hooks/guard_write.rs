@@ -2,11 +2,11 @@ use std::path::Path;
 
 use crate::agents::policy::{DeniedBinaries, WriteDecision, WriteSurfaceContext, evaluate_write};
 use crate::create::{can_write, suite_create_path_allowed};
-use crate::errors::{CliError, HookMessage};
+use harness_kernel::errors::{CliError, HookMessage};
 use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
 use crate::hooks::runner_policy::managed_cluster_binaries;
-use crate::kernel::run_surface::{RunDir, RunFile};
+use harness_kernel::kernel::run_surface::{RunDir, RunFile};
 
 use super::{control_file_hint, is_command_owned_run_file, normalize_path};
 

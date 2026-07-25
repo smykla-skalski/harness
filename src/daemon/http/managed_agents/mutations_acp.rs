@@ -12,7 +12,7 @@ use axum::response::Response;
 use crate::daemon::agent_acp::AcpPermissionDecision;
 use crate::daemon::protocol::{ManagedAgentSnapshot, http_paths};
 use crate::daemon::protocol::ManagedAgentSnapshotSchema;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::super::DaemonHttpState;
 use super::super::auth::require_auth;

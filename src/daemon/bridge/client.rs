@@ -9,7 +9,7 @@ use fs_err as fs;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::daemon::agent_tui::{AgentTuiInputRequest, AgentTuiResizeRequest, AgentTuiSnapshot};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::bridge_state::{LivenessMode, resolve_running_bridge};
 use super::core::{BridgeEnvelope, BridgeReconfigureSpec, BridgeRequest, BridgeResponse};

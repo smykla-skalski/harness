@@ -2,7 +2,7 @@ use std::env;
 use std::io;
 use std::path::{Path, PathBuf};
 
-pub use crate::kernel::naming::HARNESS_PREFIX;
+pub use harness_kernel::kernel::naming::HARNESS_PREFIX;
 
 #[allow(
     dead_code,

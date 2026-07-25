@@ -1,4 +1,4 @@
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 pub trait Execute {
     /// Execute the command in the supplied application context.

@@ -6,7 +6,7 @@ use tokio::time::Instant;
 use super::{AcpAgentManagerHandle, AcpAgentSnapshot, ActiveAcpSession, PROCESS_KEY_BACKOFF};
 use crate::agents::kind::DisconnectReason;
 use crate::daemon::protocol::StreamEvent;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::types::AgentStatus;
 
 const ACP_PROCESS_FAULT_POLICY_ENV: &str = "HARNESS_ACP_PROCESS_FAULT_POLICY";

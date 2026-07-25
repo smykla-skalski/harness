@@ -12,7 +12,7 @@ use std::collections::BTreeSet;
 use std::io;
 use std::path::{Component, Path, PathBuf};
 
-use crate::kernel::run_surface::{RunDir, RunFile};
+use harness_kernel::kernel::run_surface::{RunDir, RunFile};
 
 /// Result of evaluating a write request against the run surface.
 #[derive(Debug, Clone, PartialEq, Eq)]

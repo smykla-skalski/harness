@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use crate::kernel::topology::{ClusterProvider, ClusterSpec};
+use harness_kernel::kernel::topology::{ClusterProvider, ClusterSpec};
 use crate::run::RunStatus;
 use crate::run::context::{RunLayout, RunMetadata};
 use crate::run::workflow::{PreflightStatus, RunnerPhase, RunnerWorkflowState, runner_state_path};

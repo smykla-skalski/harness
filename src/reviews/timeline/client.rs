@@ -11,7 +11,7 @@ use super::queries::{
     LIST_PR_REVIEW_COMMENTS_QUERY, LIST_PR_REVIEW_THREAD_COMMENTS_QUERY, PR_TIMELINE_PAGE_QUERY,
 };
 use super::{TimelineClient, TimelineError};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(crate) struct TimelineGitHubClient {
     client: GitHubProtectedClient,

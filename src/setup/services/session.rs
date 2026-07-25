@@ -1,7 +1,7 @@
 use std::env;
 use std::path::Path;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::run::application::RunApplication;
 use crate::setup::wrapper;
 use crate::workspace::compact;

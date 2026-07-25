@@ -1,5 +1,5 @@
 use crate::daemon::protocol::{TaskBoardSyncRequest, TaskBoardSyncResponse};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 #[cfg(test)]
 use crate::task_board::TaskBoardStore;
 use crate::task_board::{

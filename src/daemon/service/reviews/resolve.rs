@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::reviews::{
     ReviewItem, ReviewRepositoryLabel, ReviewsGitHubClient, ReviewsPullRequestReference,
     ReviewsPullRequestResolveRequest, ReviewsPullRequestResolveResponse,

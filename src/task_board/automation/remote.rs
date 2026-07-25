@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use chrono::{DateTime, Duration, SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::remote_spki_pin;
 use crate::task_board::{
     TaskBoardExecutionHostConfig, TaskBoardExecutionPhase, TaskBoardPhaseCapabilityProfile,

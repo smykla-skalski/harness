@@ -5,7 +5,7 @@ pub(crate) mod universal;
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::setup::services::cluster::execute_cluster;
 
 impl Execute for ClusterArgs {

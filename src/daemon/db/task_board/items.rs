@@ -12,7 +12,7 @@ use super::triage_audit::{
 use super::triage_escalation_enqueue::maybe_enqueue_triage_escalation_in_tx;
 use super::triage_override::triage_override_from_item_row;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 use crate::infra::io;
 use crate::task_board::TaskBoardTombstoneCause;
 use crate::task_board::types::{CURRENT_TASK_BOARD_ITEM_VERSION, MAX_TASK_BOARD_ESTIMATE};

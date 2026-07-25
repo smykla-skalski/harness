@@ -1,9 +1,9 @@
 use std::path::{Path, PathBuf};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_text, write_json_pretty};
 use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
-use crate::kernel::skills::dirs as skill_dirs;
+use harness_kernel::kernel::skills::dirs as skill_dirs;
 use crate::run::audit::append_runner_state_audit;
 
 use super::types::{PreflightState, PreflightStatus, RunnerPhase, RunnerWorkflowState};

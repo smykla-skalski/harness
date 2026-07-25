@@ -14,9 +14,9 @@ use crate::daemon::db::DaemonDb;
 #[cfg(test)]
 use crate::daemon::service::session_detail_core;
 use crate::daemon::service::session_detail_core_async;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 #[cfg(test)]
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 use crate::task_board::github::{
     GitHubAutomation, GitHubAutomationClient, GitHubCreatePullRequest, GitHubProjectConfig,
     GitHubPullRequestHandle,

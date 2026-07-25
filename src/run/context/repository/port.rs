@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::super::CurrentRunPointer;
 use super::super::aggregate::RunAggregate;

@@ -18,7 +18,7 @@ use super::triage_override_audit::{
     record_triage_override_cleared_audit_in_tx, record_triage_override_set_audit_in_tx,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 use crate::task_board::{
     BUILTIN_V1_EVALUATOR_IDENTITY, OVERRIDE_PLACEMENT_PRODUCER, TaskBoardItem,
     TaskBoardTriageEffectiveOutcome, TaskBoardTriageOverride, TriageVerdict,

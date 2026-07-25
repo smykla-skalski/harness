@@ -7,11 +7,11 @@ use clap::Args;
 use tracing::warn;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::kuma::manifest::resource_api_path;
 use crate::infra::exec;
 use crate::infra::io::{ensure_dir, validate_safe_segment, write_text};
-use crate::kernel::topology::Platform;
+use harness_kernel::kernel::topology::Platform;
 use crate::platform::runtime::{ClusterRuntime, ControlPlaneAccess};
 use crate::run::args::RunDirArgs;
 use crate::run::resolve::resolve_manifest_path;

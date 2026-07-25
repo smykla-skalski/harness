@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use crate::daemon::db::{AsyncDaemonDb, TaskBoardImportMarker};
 use crate::daemon::state::{self, DaemonManifest, DaemonOwnership, FlockGuard};
-use crate::errors::{CliError, CliErrorKind, io_for};
+use harness_kernel::errors::{CliError, CliErrorKind, io_for};
 use crate::infra::io::read_json_typed;
 use crate::task_board::legacy_import::LegacyTaskBoardSnapshot;
 use crate::task_board::{TaskBoardGitRuntimeConfig, default_board_root};

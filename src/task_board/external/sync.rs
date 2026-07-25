@@ -3,7 +3,7 @@ use std::slice;
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::TaskBoardExternalCreateIntent;
 use crate::task_board::matched_exclusion_label;
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};

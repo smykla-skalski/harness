@@ -3744,6 +3744,7 @@ dependencies = [
  "fs-err",
  "fs2",
  "harness-hook",
+ "harness-kernel",
  "harness-protocol",
  "harness-telemetry",
  "hex",
@@ -3914,6 +3915,7 @@ name = "harness-kernel"
 version = "51.0.1"
 dependencies = [
  "insta",
+ "regex",
  "serde",
  "serde_json",
  "shell-words",

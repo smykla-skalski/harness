@@ -27,7 +27,7 @@ use crate::daemon::protocol::{
     TaskBoardTriageRulesDraftResponse, TaskBoardTriageRulesRevisionsResponse,
     TaskBoardUpdateItemRequest, http_paths,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io;
 use crate::task_board::{
     TaskBoardItem, TaskBoardStatus, TriageRuleSetActivationResult, TriageRuleSetDraftSaveResult,

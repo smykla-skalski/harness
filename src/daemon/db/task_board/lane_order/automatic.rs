@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use super::LaneEntry;
 use crate::daemon::db::{CliError, db_error};
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 use crate::task_board::{
     TaskBoardItem, TaskBoardLaneOrigin, TaskBoardStatus, sort_task_board_items,
 };

@@ -10,7 +10,7 @@ use crate::daemon::protocol::{
     TaskSubmitForReviewRequest, TaskSubmitReviewRequest, http_paths,
 };
 use crate::daemon::service;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::super::DaemonHttpState;
 use super::super::auth::authorize_control_request;

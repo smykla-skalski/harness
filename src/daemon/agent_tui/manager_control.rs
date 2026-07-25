@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use crate::daemon::bridge::{BridgeCapability, BridgeClient};
 use crate::daemon::ordering::sort_agent_tui_snapshots;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 use super::input_request::AgentTuiInputRequest;

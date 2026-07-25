@@ -8,7 +8,7 @@ use crate::daemon::protocol::{
     TaskBoardOrchestratorRunOnceResponse, TaskBoardOrchestratorSettingsResponse,
     TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorStatusResponse, http_paths,
 };
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::DaemonClient;
 

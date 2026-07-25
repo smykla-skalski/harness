@@ -19,7 +19,7 @@ use super::{
     i64_from_u64, normalize_change_scope, session_status_db_label, stored_timeline_entry,
     u64_from_i64, utc_now,
 };
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 use crate::session::service::{agent_status_db_label, canonicalize_persisted_session_state};
 use crate::session::storage;
 use crate::session::types::ManagedAgentKind;

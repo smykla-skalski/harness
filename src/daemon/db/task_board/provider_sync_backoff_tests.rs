@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use tempfile::tempdir;
 
 use crate::daemon::db::AsyncDaemonDb;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::external::ExternalProviderScopeAttemptDecision;
 use crate::task_board::{
     ExternalProvider, ExternalSyncClient, ExternalSyncConflictPolicy, ExternalSyncDirection,

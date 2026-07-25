@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use gix::ObjectId;
 use tokio::task::spawn_blocking;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::git::GitRepository;
 use crate::task_board::{
     TaskBoardImplementationResult, TaskBoardWorkflowExecutionRecord,

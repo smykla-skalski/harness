@@ -16,7 +16,7 @@ use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, db_error
 use crate::daemon::protocol::SessionStartRequest;
 use crate::daemon::service::start_session_direct_async;
 use crate::daemon::task_board_remote_transport::wire::{RemoteOfferRequest, RemoteSourceMaterial};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::git::GitError;
 use crate::git::GitRepository;
 use crate::session::types::SessionState;

@@ -2,7 +2,7 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::super::application::ObserveFilter;
 use super::super::types::Issue;

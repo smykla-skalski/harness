@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::path::{Component, Path, PathBuf};
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::{
     TaskBoardExecutionHostConfig, TaskBoardLocalExecutionHostConfig,
     TaskBoardLocalExecutionRepositoryConfig, TaskBoardRepositoryAutomationConfig,

@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use bollard::Docker;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::exec::RUNTIME;
 
 /// Production container runtime backed by the Docker Engine API via Bollard.

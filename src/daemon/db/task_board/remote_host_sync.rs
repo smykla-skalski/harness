@@ -2,7 +2,7 @@ use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 use crate::daemon::db::utc_now;
 use crate::daemon::db::{CliError, db_error};
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 use crate::task_board::{
     TaskBoardExecutionHostConfig, TaskBoardLocalExecutionHostConfig, TaskBoardOrchestratorSettings,
     validate_execution_host_configs, validate_local_execution_host_config,

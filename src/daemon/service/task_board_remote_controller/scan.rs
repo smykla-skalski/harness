@@ -4,7 +4,7 @@ use super::{
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteControllerScanItem, TaskBoardRemoteControllerScanStep,
 };
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 pub(super) async fn progress_existing_assignments(
     db: &AsyncDaemonDb,

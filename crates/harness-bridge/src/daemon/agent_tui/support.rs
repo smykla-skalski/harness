@@ -2,7 +2,7 @@ use std::io::Write as _;
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(super) type Shared<T> = Arc<Mutex<T>>;
 

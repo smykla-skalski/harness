@@ -7,9 +7,9 @@ pub mod adapters {
 
 pub mod protocol {
     // Re-exported rather than re-included so this crate has a single
-    // `HookResult` type shared with `crate::errors`.
+    // `HookResult` type shared with harness-kernel.
     pub mod hook_result {
-        pub use crate::errors::hook_result::*;
+        pub use harness_kernel::errors::hook_result::*;
     }
 
     pub mod payloads {

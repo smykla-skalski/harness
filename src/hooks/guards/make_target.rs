@@ -1,4 +1,4 @@
-use crate::errors::HookMessage;
+use harness_kernel::errors::HookMessage;
 use crate::hooks::application::GuardContext;
 use crate::hooks::guard_bash::predicates::make_target;
 use crate::hooks::protocol::result::NormalizedHookResult;

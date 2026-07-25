@@ -11,7 +11,7 @@ use crate::daemon::protocol::{
     SessionDetail, SignalAckRequest, SignalCancelRequest, SignalSendRequest, http_paths,
 };
 use crate::daemon::service;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::DaemonHttpState;
 use super::auth::{authorize_control_request, require_auth};

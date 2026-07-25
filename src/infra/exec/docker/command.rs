@@ -1,5 +1,5 @@
 use super::super::k3d;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 /// Check if a k3d cluster exists.
 ///

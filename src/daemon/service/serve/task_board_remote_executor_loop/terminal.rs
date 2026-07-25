@@ -14,7 +14,7 @@ use crate::daemon::task_board_remote_transport::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteAssignmentWireState, RemoteLease,
     RemoteStatusResponse, RemoteTypedResult, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::git::bundle_export::GitBundleExportPlan;
 use crate::task_board::{
     TaskBoardExecutionPhase, TaskBoardFailureClass, TaskBoardLocalAttemptResult,

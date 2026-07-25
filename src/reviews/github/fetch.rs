@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use serde_json::json;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::github_api::{GitHubCachePolicy, GitHubPriority, GitHubRequestDescriptor};
 use crate::reviews::backports::BackportDetector;
 

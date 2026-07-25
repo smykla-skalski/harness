@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 use std::sync::Arc;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::{
     BlockError, BlockRequirement, ContainerRuntime, KubernetesRuntime, StdProcessExecutor,
     container_runtime_from_env, kubernetes_runtime_from_env,

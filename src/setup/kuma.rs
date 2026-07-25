@@ -1,7 +1,7 @@
 use clap::{Args, Subcommand};
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::ClusterArgs;
 

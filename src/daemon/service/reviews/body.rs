@@ -1,4 +1,4 @@
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::github_api::GitHubProtectedClient;
 use crate::reviews::{
     ReviewsBodyRequest, ReviewsBodyResponse, ReviewsBodyUpdateOutcome, ReviewsBodyUpdateRequest,

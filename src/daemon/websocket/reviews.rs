@@ -12,7 +12,7 @@ use crate::daemon::protocol::{
     ReviewsTimelineRequest, WsRequest, WsResponse, ws_methods,
 };
 use crate::daemon::service;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use serde::de::DeserializeOwned;
 
 use super::frames::error_response;

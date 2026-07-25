@@ -9,10 +9,10 @@ use std::borrow::Cow;
 use std::fmt;
 use std::path::Path;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::{ContainerRuntime, KubernetesRuntime};
 use crate::infra::exec::{self, HttpMethod};
-use crate::kernel::topology::ClusterSpec;
+use harness_kernel::kernel::topology::ClusterSpec;
 use crate::platform::runtime::{ClusterRuntime, ControlPlaneAccess, XdsAccess};
 use crate::run::RunStatus;
 use crate::run::application::dependencies::RunDependencies;

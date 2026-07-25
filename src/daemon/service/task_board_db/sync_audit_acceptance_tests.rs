@@ -5,7 +5,7 @@ use super::*;
 use crate::daemon::protocol::{
     HarnessMonitorAuditEvent, HarnessMonitorAuditEventsRequest, TaskBoardSyncRequest,
 };
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{ExternalSyncBatch, ExternalSyncScopeOutcome};
 use crate::task_board::{
     ExternalProvider, ExternalSyncAction, ExternalSyncOperation, TaskBoardSyncSummary,
@@ -457,7 +457,7 @@ async fn sync_events(db: &AsyncDaemonDb) -> Vec<HarnessMonitorAuditEvent> {
 fn batch(
     operations: Vec<ExternalSyncOperation>,
     scope_outcomes: Vec<ExternalSyncScopeOutcome>,
-    first_provider_failure: Option<crate::errors::CliError>,
+    first_provider_failure: Option<CliError>,
 ) -> ExternalSyncBatch {
     ExternalSyncBatch {
         operations,

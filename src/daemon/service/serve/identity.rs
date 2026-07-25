@@ -1,5 +1,5 @@
 use crate::daemon::state;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 /// Resolve the identity at startup rather than on the first client read, so a
 /// host that cannot mint one fails while the operator is still watching.

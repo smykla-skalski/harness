@@ -5,7 +5,7 @@ use std::sync::MutexGuard;
 use std::sync::atomic::Ordering;
 
 use crate::daemon::state::{self, HostBridgeCapabilityManifest};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::write_text;
 
 use super::codex_process::{spawn_codex_monitor, spawn_codex_process};

@@ -2,7 +2,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::infra::blocks::{StdProcessExecutor, container_backends_from_env};
 
 use super::super::CommandResult;

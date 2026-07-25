@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::infra::blocks::{StdProcessExecutor, container_runtime_from_env};
 
 /// Create a Docker network if it does not already exist.

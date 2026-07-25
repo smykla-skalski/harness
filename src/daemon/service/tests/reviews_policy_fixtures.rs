@@ -18,6 +18,7 @@ use crate::task_board::policy_graph::{
     PolicyGraphNodeKind, PolicyGraphNodeLayout, PolicyWaitCondition, PolicyWaitStep,
     PolicyWorkflowEntry, store_gate_policy,
 };
+use harness_kernel::errors::CliError;
 use crate::task_board::policy_runtime::models::{
     PolicyActionDescriptor, PolicyRunRequest, PolicyRunStep, PolicyRunSubject,
 };
@@ -239,7 +240,7 @@ pub(super) struct TestReviewsPolicyExecutor {
 
 #[async_trait]
 impl ReviewsPolicyActionExecutor for TestReviewsPolicyExecutor {
-    async fn approve(&self, _target: &ReviewTarget) -> Result<(), crate::errors::CliError> {
+    async fn approve(&self, _target: &ReviewTarget) -> Result<(), CliError> {
         self.recorded_actions
             .lock()
             .expect("lock recorded actions")
@@ -251,7 +252,7 @@ impl ReviewsPolicyActionExecutor for TestReviewsPolicyExecutor {
         &self,
         _target: &ReviewTarget,
         _method: GitHubMergeMethod,
-    ) -> Result<(), crate::errors::CliError> {
+    ) -> Result<(), CliError> {
         self.recorded_actions
             .lock()
             .expect("lock recorded actions")

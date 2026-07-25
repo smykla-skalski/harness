@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 use std::path::Path;
 
-use crate::errors::{CliError, CliErrorKind};
-use crate::kernel::topology::ClusterSpec;
+use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_kernel::kernel::topology::ClusterSpec;
 
 /// Borrowed Kubernetes runtime details for a tracked run.
 #[derive(Debug, Clone, Copy, PartialEq)]

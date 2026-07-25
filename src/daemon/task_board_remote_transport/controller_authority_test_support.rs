@@ -20,7 +20,7 @@ use crate::daemon::db::{
     RemoteControllerFixture, TaskBoardRemoteHostTrustFence, TaskBoardRemoteOfferOutcome,
     remote_controller_fixture,
 };
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::{
     TASK_BOARD_REMOTE_PROTOCOL_VERSION, TaskBoardExecutionAttemptCas,
     TaskBoardExecutionHostAdvertisement, TaskBoardExecutionHostConfig,

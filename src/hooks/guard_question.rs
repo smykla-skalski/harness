@@ -1,5 +1,5 @@
 use crate::create::{ApprovalMode, can_request_gate};
-use crate::errors::{CliError, HookMessage};
+use harness_kernel::errors::{CliError, HookMessage};
 use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
 use crate::hooks::protocol::payloads::AskUserQuestionPrompt;

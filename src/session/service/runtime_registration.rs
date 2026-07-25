@@ -2,7 +2,7 @@ use std::path::Path;
 
 use crate::daemon::client::DaemonClient;
 use crate::daemon::protocol;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::session::types::{HarnessSessionId, ManagedAgentId, ManagedAgentRef, RuntimeSessionId};
 
 use super::{apply_register_agent_runtime_session, ensure_known_runtime, storage, utc_now};

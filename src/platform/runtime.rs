@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 use std::path::Path;
 
-use crate::errors::{CliError, CliErrorKind};
-use crate::kernel::topology::{ClusterSpec, Platform};
+use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_kernel::kernel::topology::{ClusterSpec, Platform};
 
 #[path = "runtime/access.rs"]
 mod access;

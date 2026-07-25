@@ -1,10 +1,10 @@
 use std::borrow::Cow;
 use std::path::Path;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::infra::blocks::KubernetesRuntime;
 use crate::infra::exec::HttpMethod;
-use crate::kernel::topology::ClusterSpec;
+use harness_kernel::kernel::topology::ClusterSpec;
 use crate::platform::runtime::{ClusterRuntime, ControlPlaneAccess, XdsAccess};
 use crate::run::RunStatus;
 use crate::run::context::{RunContext, RunLayout, RunMetadata};

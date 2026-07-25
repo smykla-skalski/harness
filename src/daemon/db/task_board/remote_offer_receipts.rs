@@ -6,7 +6,7 @@ use crate::daemon::task_board_remote_transport::wire::{
     RemoteLease, RemoteOfferDisposition, RemoteOfferRequest, RemoteOfferResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TaskBoardRemoteOfferReceiptDisposition {

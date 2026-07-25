@@ -6,7 +6,7 @@ use crate::daemon::task_board_managed_agents::{
     maintain_task_board_dispatch_claim, managed_worker_id, resume_worker_compensation,
     settle_claimed_task_board_worker,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::{DispatchAppliedTask, DispatchFailure, DispatchFailureKind};
 
 use super::DaemonHttpState;

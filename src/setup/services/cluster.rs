@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::exec::{run_command, run_command_streaming};
-use crate::kernel::topology::{ClusterSpec, Platform};
+use harness_kernel::kernel::topology::{ClusterSpec, Platform};
 use crate::run::application::RunApplication;
 use crate::setup::cluster::ClusterArgs;
 use crate::setup::cluster::kubernetes::cluster_k8s;

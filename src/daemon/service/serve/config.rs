@@ -2,7 +2,7 @@ use crate::daemon::http::DaemonHttpAuthMode;
 use crate::daemon::service::{
     CodexTransportKind, DaemonServeConfig, is_local_websocket_endpoint, is_loopback_host,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(crate) const fn http_auth_mode(config: &DaemonServeConfig) -> DaemonHttpAuthMode {
     config.auth_mode

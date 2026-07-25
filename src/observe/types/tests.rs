@@ -1,5 +1,5 @@
 use super::*;
-use crate::kernel::tooling::legacy_tool_context;
+use harness_kernel::kernel::tooling::legacy_tool_context;
 
 fn sample_issue() -> Issue {
     Issue {

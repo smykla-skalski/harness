@@ -5,7 +5,7 @@ use std::path::Path;
 use fs_err as fs;
 use serde::de::DeserializeOwned;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(super) fn read_json_lines<T>(path: &Path, label: &str) -> Result<Vec<T>, CliError>
 where

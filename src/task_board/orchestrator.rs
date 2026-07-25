@@ -2,7 +2,7 @@
 use std::path::PathBuf;
 
 #[cfg(test)]
-use crate::errors::CliError;
+use harness_kernel::errors::{CliError, CliErrorKind};
 #[cfg(test)]
 use crate::infra::io::write_json_pretty;
 #[cfg(test)]
@@ -81,7 +81,7 @@ impl TaskBoardOrchestrator {
         update: &TaskBoardOrchestratorSettingsUpdateRequest,
     ) -> Result<TaskBoardOrchestratorSettings, CliError> {
         update.validate_admission_policy().map_err(|error| {
-            crate::errors::CliErrorKind::workflow_parse(format!(
+            CliErrorKind::workflow_parse(format!(
                 "invalid task-board admission policy: {error}"
             ))
         })?;

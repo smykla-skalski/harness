@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::http::{DaemonHttpState, run_codex_agent_blocking};
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest, CodexRunSnapshot};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::{
     ReviewActionKind, ReviewActionOutcome, ReviewItem, ReviewPullRequestState,
     ReviewsActionResponse, ReviewsApproveRequest, ReviewsApproveRequestSource,

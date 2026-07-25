@@ -4,7 +4,7 @@ use super::acp_inspect_coalesce::{
 use crate::daemon::agent_acp::{AcpAgentInspectResponse, AcpAgentManagerHandle};
 use crate::daemon::service::protocol::{StreamEvent, WsAcpInspect};
 use crate::daemon::service::{broadcast, tokio_watch, utc_now};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use std::collections::{BTreeMap, BTreeSet};
 use std::future;
 use tokio::task::JoinHandle;

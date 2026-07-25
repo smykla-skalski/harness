@@ -15,7 +15,7 @@ use crate::daemon::task_board_remote_transport::wire::{
     RemoteArtifactManifest, RemoteAssignmentWireState, RemoteLease, RemoteOfferRequest,
     RemoteStatusResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::{TaskBoardFailureClass, TaskBoardRemoteAssignmentState};
 use crate::workspace::utc_now;
 

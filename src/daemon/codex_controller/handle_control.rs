@@ -13,7 +13,7 @@ use crate::daemon::protocol::{
     CodexApprovalDecisionRequest, CodexApprovalRequest, CodexApprovalRequestedPayload,
     CodexRunSnapshot, CodexRunStatus, CodexSteerRequest,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 use super::active_runs::{ActiveRun, ActiveRunRegistration, CodexControlAck, CodexControlMessage};

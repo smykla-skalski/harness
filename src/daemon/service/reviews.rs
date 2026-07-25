@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::service::observe_async_db;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::github_api::retry_stable_read;
 use crate::reviews::{
     ReviewActionPreviewKind, ReviewItem, ReviewRepositoryLabel, ReviewsActionPreviewRequest,

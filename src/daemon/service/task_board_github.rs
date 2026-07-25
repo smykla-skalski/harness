@@ -8,7 +8,7 @@ use crate::daemon::db::DaemonDb;
 #[cfg(test)]
 use crate::daemon::state::load_task_board_git_runtime_config;
 use crate::daemon::state::overlay_task_board_git_runtime_secrets;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 #[cfg(test)]
 use crate::github_api::{GitHubProtectedClient, republish_current_data_change};
 use crate::task_board::github::{

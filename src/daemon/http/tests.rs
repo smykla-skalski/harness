@@ -4,7 +4,7 @@ use std::time::Instant;
 
 use crate::daemon::protocol::{ObserveSessionRequest, SessionEndRequest};
 use crate::daemon::state::{ScopedDaemonRootOverride, ensure_daemon_identity};
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use axum::Json;
 use axum::extract::{Query, State};

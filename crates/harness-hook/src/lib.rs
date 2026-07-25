@@ -1,6 +1,5 @@
 #![deny(unsafe_code)]
 
-pub use harness_kernel::{errors, kernel};
 
 #[path = "../../../src/hooks/mod.rs"]
 pub mod hooks;

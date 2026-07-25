@@ -16,7 +16,7 @@ use crate::daemon::service::{
     broadcast_session_snapshot, broadcast_session_snapshot_async, disconnect_agent_direct,
     disconnect_agent_direct_async,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 use super::LIVE_REFRESH_INTERVAL;

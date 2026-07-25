@@ -20,7 +20,7 @@ use crate::daemon::db::{AsyncDaemonDb, DaemonDb, session_id_from_change_scope};
 use crate::daemon::index;
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::service;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 pub(super) const CHANGE_TRACKING_POLL_SQL: &str = "SELECT scope, version, change_seq
      FROM change_tracking

@@ -9,7 +9,7 @@ use portable_pty::CommandBuilder;
 use crate::agents::runtime::{
     AgentRuntime, InitialPromptDelivery, hook_agent_for_runtime_name, runtime_for_name,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::feature_flags::RuntimeHookFlags;
 #[cfg(feature = "daemon-runtime")]
 use crate::session::types::SessionRole;

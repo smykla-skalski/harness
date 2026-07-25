@@ -6,7 +6,7 @@ use reqwest::Url;
 use reqwest::header;
 use serde::{Deserialize, Serialize};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 const AVATAR_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);

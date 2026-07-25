@@ -4,9 +4,9 @@ use std::sync::Arc;
 use std::thread;
 use std::thread::ScopedJoinHandle;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::{StdProcessExecutor, kubernetes_runtime_from_env};
-use crate::kernel::topology::{ClusterMode, ClusterSpec};
+use harness_kernel::kernel::topology::{ClusterMode, ClusterSpec};
 
 use super::address::resolve_kds_address;
 use super::deploy::{cluster_stop, start_and_deploy};

@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::kernel::topology::{
+use harness_kernel::kernel::topology::{
     ClusterMember, ClusterMode, ClusterProvider, ClusterSpec, HelmSetting, Platform,
 };
 

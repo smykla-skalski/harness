@@ -5,7 +5,7 @@ use std::{fs, io};
 
 use serde::{Deserialize, Serialize};
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::infra::io::append_markdown_row;
 
 /// Filesystem layout for a single run.

@@ -13,7 +13,7 @@ use crate::daemon::protocol::{
     WsErrorPayload, WsRequest, WsResponse, bind_control_plane_actor_value,
 };
 use crate::daemon::service;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::frames::{error_response, error_response_with_payload, ok_response};
 use super::params::{extract_session_agent_id, extract_session_id};

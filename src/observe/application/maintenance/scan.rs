@@ -1,4 +1,4 @@
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
 use crate::observe::application::ObserveFilter;
 use crate::observe::application::maintenance::{load_observer_state, save_observer_state};

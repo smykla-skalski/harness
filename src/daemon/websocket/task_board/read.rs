@@ -9,7 +9,7 @@ use crate::daemon::remote_task_board::{
     project_task_board_item, project_task_board_list, project_task_board_position_snapshot,
     project_task_board_triage_current, project_task_board_triage_history,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::connection::ConnectionState;
 use super::super::dispatch::remote_viewer_projection_required;

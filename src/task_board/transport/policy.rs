@@ -7,7 +7,7 @@ use crate::daemon::protocol::{
     PolicyApprovalGrantsListResponse, PolicyCanvasSetSpawnKillSwitchRequest,
     PolicyCanvasSetSpawnRequiresLivePolicyRequest, PolicyCanvasWorkspaceResponse,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::{PolicyApprovalGrant, PolicyApprovalState};
 
 use super::policy_io::{TaskBoardPolicyDumpArgs, TaskBoardPolicyImportArgs};

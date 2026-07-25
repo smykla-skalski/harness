@@ -2,7 +2,7 @@
 
 use std::fs;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::reviews::{LocalCloneRegistry, LocalCloneRoot, RegistryEntry, RepoKey};
 
 use super::clones::{clones_root, load_registry, save_registry};

@@ -9,7 +9,7 @@ use crate::daemon::protocol::{
     PolicyApprovalGrantsListResponse, PolicyCanvasSetSpawnKillSwitchRequest,
     PolicyCanvasSetSpawnRequiresLivePolicyRequest, PolicyCanvasWorkspaceResponse,
 };
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::policy_graph;
 
 use super::policy_canvas::{bump_change_policy, feed_gate_cache};

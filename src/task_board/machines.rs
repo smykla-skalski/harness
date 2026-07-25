@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[cfg(test)]
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 #[cfg(test)]
 use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::workspace::utc_now;

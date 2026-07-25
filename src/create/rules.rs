@@ -1,7 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-use crate::kernel::gate::Gate;
+use harness_kernel::kernel::gate::Gate;
 
 pub const SKILL_NAME: &str = "suite:create";
 

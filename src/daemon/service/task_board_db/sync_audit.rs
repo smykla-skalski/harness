@@ -2,7 +2,7 @@ use serde_json::{Value, json};
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{TaskBoardSyncRequest, TaskBoardSyncResponse};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::{
     ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncDirection, ExternalSyncOperation,
 };

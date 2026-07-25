@@ -3,7 +3,7 @@ use crate::daemon::protocol::{
     TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorRunOnceResponse,
 };
 use crate::daemon::service;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::{
     TaskBoardAutomationRunOutcome, TaskBoardAutomationRunTrigger, TaskBoardAutomationScope,
     TaskBoardOrchestratorSettings, TaskBoardStatus,

@@ -12,7 +12,7 @@ use crate::daemon::protocol::{
 use crate::daemon::remote_task_board::{
     project_task_board_triage_current, project_task_board_triage_history,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::DaemonHttpState;
 use super::super::openapi::DaemonErrorBody;

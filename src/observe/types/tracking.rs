@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::ops::Index;
 
-use crate::kernel::tooling::ToolContext;
+use harness_kernel::kernel::tooling::ToolContext;
 
 use super::IssueCode;
 

@@ -1,6 +1,6 @@
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::infra::io::read_json_typed;
-use crate::kernel::topology::ClusterSpec;
+use harness_kernel::kernel::topology::ClusterSpec;
 use crate::run::RunStatus;
 use crate::run::context::{RunLayout, RunMetadata};
 use crate::run::workflow::{RunnerWorkflowState, read_runner_state, runner_state_path};

@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use tokio::time::sleep;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::observe::types::Issue;
 use crate::session::service::{self, TaskSpec};
 use crate::session::types::{SessionState, TaskSeverity, TaskSource};

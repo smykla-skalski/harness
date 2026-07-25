@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 #[cfg(feature = "daemon-runtime")]
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::types::{ManagedAgentRef, SessionState};
 #[cfg(feature = "daemon-runtime")]
 use crate::workspace::project_context_dir;

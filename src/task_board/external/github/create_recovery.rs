@@ -5,7 +5,7 @@ use reqwest::header::{HeaderMap, LINK};
 use reqwest::{Method, Url};
 use serde::Deserialize;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::github_api::{
     GitHubCachePolicy, GitHubPriority, GitHubRequestDescriptor, retry_stable_read,
 };

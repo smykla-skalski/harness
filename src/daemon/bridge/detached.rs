@@ -9,7 +9,7 @@ use fs_err as fs;
 
 use crate::daemon::sandboxed_from_env;
 use crate::daemon::state;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::bridge_state::{
     BridgeProof, LivenessMode, ResolvedRunningBridge, bridge_lock_is_held, pid_alive,

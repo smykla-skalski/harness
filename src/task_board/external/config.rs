@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::{env, fmt};
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::{
     ExternalProvider, GH_TOKEN_ENV, GITHUB_REPOSITORY_ENV, HARNESS_GITHUB_REPOSITORY_ENV,

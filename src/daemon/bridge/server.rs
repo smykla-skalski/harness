@@ -14,7 +14,7 @@ use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiResizeRequestExt;
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::state::{self, HostBridgeCapabilityManifest};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 use super::acp_rpc::{

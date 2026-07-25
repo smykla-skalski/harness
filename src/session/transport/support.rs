@@ -5,7 +5,7 @@ use serde::Serialize;
 
 use crate::app::command_context::resolve_project_dir as resolve_project_path;
 use crate::daemon::client::DaemonClient;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
 
 pub(super) fn resolve_project_dir(hint: Option<&str>) -> String {

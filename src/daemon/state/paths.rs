@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::{
     dirs_home, ensure_non_indexable, harness_data_root, host_home_dir, normalized_env_value,
 };

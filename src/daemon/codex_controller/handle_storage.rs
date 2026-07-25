@@ -11,7 +11,7 @@ use tokio::task::block_in_place;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ensure_shared_db};
 use crate::daemon::index;
 use crate::daemon::protocol::{CodexAgentInspectSnapshot, CodexRunSnapshot, CodexRunStatus};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 use super::events::codex_event;

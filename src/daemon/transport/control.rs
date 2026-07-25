@@ -5,7 +5,7 @@ use std::sync::LazyLock;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::exec::RUNTIME;
 
 use super::super::discovery::{self, AdoptionOutcome};

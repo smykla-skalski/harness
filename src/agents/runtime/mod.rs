@@ -23,7 +23,7 @@ mod vibe;
 
 use std::path::{Path, PathBuf};
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::hooks::adapters::HookAgent;
 
 use self::claude::ClaudeRuntime;

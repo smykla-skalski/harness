@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::id as process_id;
 
 use crate::daemon::db::TaskBoardImportMarker;
-use crate::errors::{CliError, io_for};
+use harness_kernel::errors::{CliError, io_for};
 use fs_err as fs;
 
 use super::{ARCHIVE_PREFIX, STAGE_PREFIX, digest_prefix, migration_error};

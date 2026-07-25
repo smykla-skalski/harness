@@ -1,7 +1,7 @@
 use std::fs;
 use std::io::{BufRead, BufReader};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
 
 use super::super::session;

@@ -9,7 +9,7 @@ use tokio::sync::broadcast;
 
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::service;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::auth::require_auth;
 use super::response::map_json;

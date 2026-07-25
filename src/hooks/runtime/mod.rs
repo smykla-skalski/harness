@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use crate::agents::runtime;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::service as session_service;
 use crate::workspace::utc_now;
 use tracing::callsite::Identifier as CallsiteIdentifier;

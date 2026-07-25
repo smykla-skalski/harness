@@ -6,7 +6,7 @@ use serde_json::Value;
 use crate::hooks::protocol::context::{
     NormalizedEvent, NormalizedHookContext, RawPayload, SessionContext, SkillContext,
 };
-use crate::kernel::skills::SKILL_RUN;
+use harness_kernel::kernel::skills::SKILL_RUN;
 
 use super::GuardContext;
 

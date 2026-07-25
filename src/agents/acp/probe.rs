@@ -13,7 +13,7 @@ use tracing::warn;
 #[cfg(feature = "daemon-runtime")]
 use crate::daemon::sandboxed_from_env;
 #[cfg(feature = "daemon-runtime")]
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::workspace::{account_home_dir, dirs_home, normalized_env_value, utc_now};
 
 use super::catalog::{AcpAgentDescriptor, acp_agents};

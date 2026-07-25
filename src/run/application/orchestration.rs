@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::run::args::RunDirArgs;
 use crate::run::commands::closeout::closeout_run;
 use crate::run::commands::init::{default_run_id, init_run_internal};

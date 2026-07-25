@@ -59,7 +59,7 @@ impl TaskBoardSyncRunContext {
 
 #[cfg(test)]
 mod tests {
-    use crate::errors::CliErrorKind;
+    use harness_kernel::errors::CliErrorKind;
     use crate::task_board::ExternalProvider;
     use crate::task_board::external::{ExternalSyncBatch, ExternalSyncScopeOutcome};
 

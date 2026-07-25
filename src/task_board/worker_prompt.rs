@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::prompt_catalog::{PromptId, render_prompt};
 use super::{ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};

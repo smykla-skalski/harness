@@ -2,7 +2,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use crate::kernel::command_intent::ObservedCommand;
+use harness_kernel::kernel::command_intent::ObservedCommand;
 use crate::observe::classifier::emitter::{Guidance, IssueBlueprint, IssueEmitter};
 use crate::observe::types::{
     Confidence, FixSafety, Issue, IssueCode, MessageRole, ScanState, SourceTool,

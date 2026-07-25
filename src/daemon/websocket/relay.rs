@@ -7,7 +7,7 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::http::{DaemonHttpState, require_async_db};
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::service;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 
 use super::broadcast::{PreparedBroadcast, ReplayBuffer, build_prepared};
 use super::connection::ConnectionState;

@@ -1,5 +1,5 @@
 use super::*;
-use crate::kernel::tooling::legacy_tool_context;
+use harness_kernel::kernel::tooling::legacy_tool_context;
 use crate::observe::output;
 use crate::observe::types::{
     Confidence, FixSafety, FocusPreset, IssueCategory, IssueCode, IssueSeverity, MessageRole,

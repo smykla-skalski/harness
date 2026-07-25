@@ -1,5 +1,5 @@
 use super::*;
-use crate::kernel::topology::Platform;
+use harness_kernel::kernel::topology::Platform;
 
 #[test]
 fn apply_universal_up_result_persists_runtime_network_name() {

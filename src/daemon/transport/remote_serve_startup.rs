@@ -13,7 +13,7 @@ use crate::daemon::remote_acme::{
 use crate::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use crate::daemon::remote_acme_issuer::SystemRemoteAcmeIssuer;
 use crate::daemon::remote_identity::RemoteAuditOutcome;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::remote_acme::record_remote_acme_audit;
 

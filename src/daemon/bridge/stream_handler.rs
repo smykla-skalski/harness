@@ -7,7 +7,7 @@ use std::thread;
 use tokio::runtime;
 use tokio::sync::broadcast;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::core::{BridgeEnvelope, BridgeHandleResult, BridgeResponse};
 use super::server::BridgeServer;

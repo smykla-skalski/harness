@@ -5,7 +5,7 @@ use crate::agents::acp::connection::SpawnConfig;
 use crate::agents::runtime::{AgentRuntime, runtime_for_name};
 use crate::daemon::agent_acp::protocol::AcpSessionRequestConfig;
 use crate::daemon::agent_acp::spawn_credential::SpawnCredential;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 const OPENROUTER_DESCRIPTOR_ID: &str = "openrouter";
 

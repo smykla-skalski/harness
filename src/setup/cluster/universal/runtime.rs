@@ -1,12 +1,12 @@
 use std::time::Duration;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::infra::blocks::ContainerPort;
 use crate::infra::blocks::kuma::defaults;
 use crate::infra::blocks::kuma::token;
 use crate::infra::blocks::{ComposeOrchestrator, ContainerConfig, ContainerRuntime};
 use crate::infra::exec::wait_for_http;
-use crate::kernel::topology::{ClusterMode, ClusterSpec, UNIVERSAL_PUBLISHED_HOST};
+use harness_kernel::kernel::topology::{ClusterMode, ClusterSpec, UNIVERSAL_PUBLISHED_HOST};
 use crate::workspace::HARNESS_PREFIX;
 
 #[path = "runtime/compose.rs"]

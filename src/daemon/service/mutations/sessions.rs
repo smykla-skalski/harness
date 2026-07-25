@@ -5,7 +5,7 @@ use super::super::{
     session_detail, session_detail_from_daemon_db, session_not_found, session_service, utc_now,
 };
 use crate::daemon::protocol::{SessionArchiveRequest, SessionArchiveResponse};
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 
 /// Transfer session leadership through the shared session service.
 ///

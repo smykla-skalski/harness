@@ -22,7 +22,7 @@ use crate::daemon::service::reviews::policy_plan::{
     authored_database_reviews_policy_plan, preview_database_reviews_policy,
     preview_database_reviews_policy_plan,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::feature_flags;
 #[cfg(test)]
 use crate::reviews::policy::authored_reviews_policy_plan;

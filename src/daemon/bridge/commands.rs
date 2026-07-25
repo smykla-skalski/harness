@@ -9,7 +9,7 @@ use serde_json::json;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::discovery::{self, AdoptionOutcome};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::write_text;
 
 /// When this env var is set the bridge is being launched against a

@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::observe::types::Issue;
 use crate::session::service;
 

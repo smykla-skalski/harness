@@ -12,7 +12,7 @@ pub mod runtime;
 
 pub mod service {
     use super::Path;
-    use crate::errors::{CliError, CliErrorKind};
+    use harness_kernel::errors::{CliError, CliErrorKind};
     use crate::hooks::adapters::HookAgent;
 
     /// Resolve the canonical session identifier for a known agent.

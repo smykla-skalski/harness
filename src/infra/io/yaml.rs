@@ -2,7 +2,7 @@ use gray_matter::engine::YAML;
 use gray_matter::{Matter, ParsedEntity};
 use serde::de::DeserializeOwned;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FrontmatterDocument<T> {

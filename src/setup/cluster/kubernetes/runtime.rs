@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use crate::app::command_context::resolve_repo_root;
-use crate::errors::{CliError, CliErrorKind};
-use crate::kernel::topology::{ClusterProvider, ClusterSpec, HelmSetting, Platform};
+use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_kernel::kernel::topology::{ClusterProvider, ClusterSpec, HelmSetting, Platform};
 use crate::setup::build_info::resolve_build_info;
 use crate::setup::cluster::ClusterArgs;
 use crate::setup::services::cluster::persist_cluster_spec;

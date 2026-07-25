@@ -3,7 +3,7 @@ use std::path::Path;
 #[cfg(test)]
 use tracing::info;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{CommandResult, run_command};
 

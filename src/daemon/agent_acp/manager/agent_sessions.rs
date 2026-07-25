@@ -7,7 +7,7 @@
 use std::path::PathBuf;
 
 use super::{AcpAgentManagerHandle, AcpSessionListPage};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 impl AcpAgentManagerHandle {
     /// List the sessions the agent itself knows about.

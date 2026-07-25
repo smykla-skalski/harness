@@ -17,7 +17,7 @@ use crate::daemon::service::reviews::policy_executor::{
 };
 use crate::daemon::service::reviews::policy_mapping::map_run_response;
 use crate::daemon::service::reviews::policy_plan::enforced_database_reviews_policy_active;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::policy::ReviewsPolicyActionExecutor;
 use crate::reviews::{ReviewsPolicyRunResponse, ReviewsPolicySubject};
 #[cfg(test)]

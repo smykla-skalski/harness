@@ -12,7 +12,6 @@ pub mod app;
 #[allow(dead_code, unused_imports)]
 #[path = "../../../src/daemon/mod.rs"]
 pub mod daemon;
-pub use harness_kernel::errors;
 #[path = "../../../src/feature_flags.rs"]
 pub mod feature_flags;
 pub(crate) mod git;
@@ -20,11 +19,9 @@ pub(crate) mod git;
 pub(crate) mod github_api;
 pub mod hooks;
 pub mod infra;
-pub mod kernel;
 pub mod observe;
 #[path = "../../../src/reviews/mod.rs"]
 pub mod reviews;
-pub mod run;
 #[path = "../../../src/sandbox/mod.rs"]
 pub mod sandbox;
 pub mod session;

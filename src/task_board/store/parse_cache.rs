@@ -6,7 +6,7 @@ use std::time::SystemTime;
 
 use fs_err as fs;
 
-use crate::errors::{CliError, io_for};
+use harness_kernel::errors::{CliError, io_for};
 use crate::task_board::types::TaskBoardItem;
 
 use super::read_path;

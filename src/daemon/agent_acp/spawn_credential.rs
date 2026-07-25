@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use tempfile::TempDir;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 const OPENROUTER_TEMP_PREFIX: &str = "harness-openrouter-";
 const OPENROUTER_KEY_FILE: &str = "api-key";

@@ -1,5 +1,5 @@
 use crate::daemon::protocol::{CodexRunSnapshot, CodexRunStatus};
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::session::service as session_service;
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionState, TaskStatus};
 

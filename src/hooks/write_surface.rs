@@ -1,6 +1,6 @@
 use std::path::{Component, Path, PathBuf};
 
-use crate::kernel::run_surface::RunFile;
+use harness_kernel::kernel::run_surface::RunFile;
 
 /// Normalize a path by resolving `.` and `..` segments without touching the
 /// filesystem. Unlike `std::fs::canonicalize`, this works on paths that do not

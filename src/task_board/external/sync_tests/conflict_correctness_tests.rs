@@ -5,7 +5,7 @@ use tempfile::tempdir;
 
 use super::*;
 use crate::daemon::db::AsyncDaemonDb;
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::{ExternalRefProvider, TaskBoardConflictState, TaskBoardSyncConflict};
 

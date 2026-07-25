@@ -1,5 +1,6 @@
 use super::workflow_executions::{NOW, create_execution, workflow_database};
 use super::*;
+use harness_kernel::errors::CliError;
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptRecord,
     TaskBoardExecutionState, TaskBoardOrchestratorSettings, TaskBoardWorkflowExecutionCas,
@@ -148,7 +149,7 @@ async fn seed_starting_report(
 async fn claim_report(
     db: &AsyncDaemonDb,
     execution: &crate::task_board::TaskBoardWorkflowExecutionRecord,
-) -> Result<Option<TaskBoardExecutionAttemptRecord>, crate::errors::CliError> {
+) -> Result<Option<TaskBoardExecutionAttemptRecord>, CliError> {
     let current = &execution.attempts[0];
     let mut claimed = current.clone();
     claimed.state = TaskBoardAttemptState::Running;

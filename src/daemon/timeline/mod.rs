@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashSet};
 
 use serde_json::{Map, Value, to_value};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::types::{SessionLogEntry, SessionState, SessionTransition, TaskCheckpoint};
 
 use super::index;

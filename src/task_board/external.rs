@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::types::{ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 

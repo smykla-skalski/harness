@@ -4,7 +4,7 @@ use chrono::Utc;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::http::DaemonHttpState;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::TaskBoardWorkflowExecutionRecord;
 use crate::task_board::task_board_remote_execution_target;
 

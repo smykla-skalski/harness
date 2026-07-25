@@ -7,7 +7,7 @@ use crate::hooks::protocol::context::{
     AgentContext, NormalizedEvent, NormalizedHookContext, SessionContext, SkillContext, SkillKind,
 };
 use crate::hooks::protocol::payloads::{AskUserAnswer, AskUserQuestionPrompt, HookEnvelopePayload};
-use crate::kernel::tooling::ToolContext;
+use harness_kernel::kernel::tooling::ToolContext;
 use crate::run::context::RunContext;
 use crate::run::workflow::RunnerWorkflowState;
 

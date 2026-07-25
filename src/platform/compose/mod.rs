@@ -6,7 +6,7 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::write_text;
 
 pub use builders::{GlobalTwoZonesConfig, ZoneConfig, global_two_zones, global_zone, single_zone};

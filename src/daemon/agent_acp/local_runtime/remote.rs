@@ -13,7 +13,7 @@ use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 
 use crate::agents::acp::permission::recording_log_path_for_session;
 use crate::agents::acp::supervision::{AcpSessionSupervisor, SupervisedProcess, SupervisionConfig};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::active::{
     ActiveAcpProcess, ActiveAcpTasks, SharedStderrTail, spawn_event_forwarder,

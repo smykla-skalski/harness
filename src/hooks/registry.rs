@@ -1,4 +1,4 @@
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::hooks::application::GuardContext;
 use crate::hooks::effects::{HookOutcome, apply_effects};
 use crate::hooks::protocol::context::NormalizedHookContext;

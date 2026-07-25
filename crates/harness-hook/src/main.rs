@@ -6,12 +6,12 @@ use std::time::Duration;
 use clap::{Args, Parser, Subcommand};
 use harness_hook::agents::service;
 use harness_hook::app::resolve_project_dir;
-use harness_hook::errors::{self, CliError, CliErrorKind};
+use harness_kernel::errors::{self, CliError, CliErrorKind};
 use harness_hook::hooks::{
     AuditTurnArgs, HookAgent, HookCommand, SessionStartHookOutput, run_hook_command,
 };
 use harness_hook::infra::exec::RUNTIME;
-use harness_hook::kernel::skills::SKILL_NAMES;
+use harness_kernel::kernel::skills::SKILL_NAMES;
 use harness_hook::setup::PreCompactArgs;
 use harness_hook::telemetry::{RuntimeService, TelemetryGuard, init_tracing_subscriber_for};
 

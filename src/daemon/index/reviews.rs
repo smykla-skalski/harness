@@ -3,7 +3,7 @@
 //! Split out from `sessions.rs` so the file-review surface has a stable home
 //! and so `sessions.rs` stays under the repo-wide file-length budget.
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::session::storage;
 use crate::session::types::Review;
 

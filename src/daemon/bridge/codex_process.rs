@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 
 use crate::agents::acp::supervision::kill_process_group;
 use crate::daemon::state;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::core::{BridgeCodexMetadata, BridgeCodexProcess, CodexEndpointScheme};
 use super::helpers::detect_codex_version;

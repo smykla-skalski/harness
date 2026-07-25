@@ -1,4 +1,4 @@
-use crate::kernel::topology::{ClusterSpec, Platform};
+use harness_kernel::kernel::topology::{ClusterSpec, Platform};
 use crate::platform::runtime::ClusterRuntime;
 
 #[test]

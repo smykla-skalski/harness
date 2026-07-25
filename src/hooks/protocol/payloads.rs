@@ -2,7 +2,7 @@ use std::io;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 

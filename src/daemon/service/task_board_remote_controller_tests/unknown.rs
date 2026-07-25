@@ -12,7 +12,7 @@ use crate::daemon::task_board_remote_transport::wire::{
 use crate::daemon::task_board_remote_transport::wire_cleanup::{
     RemoteCleanupObservationRequest, RemoteCleanupObservationResponse,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionState, TaskBoardStatus, TaskBoardWorkflowStatus,
 };

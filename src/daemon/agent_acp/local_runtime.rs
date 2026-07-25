@@ -17,7 +17,7 @@ use crate::agents::acp::supervision::{AcpSessionSupervisor, SupervisionConfig};
 #[cfg(feature = "daemon-runtime")]
 use crate::daemon::index;
 use crate::daemon::protocol::StreamEvent;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::active::{
     ActiveAcpProcess, ActiveAcpSession, ActiveAcpTasks, LiveEventPersistence, SharedStderrTail,

@@ -7,7 +7,7 @@ use crate::daemon::protocol::{
     TaskBoardDispatchDeliverRequest, TaskBoardDispatchDeliverResponse,
     TaskBoardDispatchPickResponse, TaskBoardDispatchRequest,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::dispatch::{DispatchExecutionSummary, DispatchReadiness};
 
 use super::{TaskBoardDispatchArgs, daemon_client, print_json};

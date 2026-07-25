@@ -8,7 +8,7 @@ use crate::daemon::remote_acme::{RemoteAcmeRuntimePlan, build_remote_acme_runtim
 use crate::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use crate::daemon::remote_acme_issuer::SystemRemoteAcmeIssuer;
 use crate::daemon::service::{self, DaemonServeConfig, ShutdownSignalGuard};
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 use tokio::runtime::{Handle, Runtime};
 use tokio::sync::watch as tokio_watch;

@@ -9,7 +9,7 @@ use harness_protocol::session::{
 };
 
 use crate::agents::runtime;
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::{project_context_dir, utc_now};
 
 use super::storage;

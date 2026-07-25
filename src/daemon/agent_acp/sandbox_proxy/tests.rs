@@ -12,7 +12,7 @@ use crate::daemon::agent_acp::{
     AcpAgentReconcileResponse,
 };
 use crate::daemon::protocol::StreamEvent;
-use crate::errors::CliErrorKind;
+use harness_kernel::errors::CliErrorKind;
 use crate::session::types::AgentStatus;
 
 #[test]

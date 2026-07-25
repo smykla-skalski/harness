@@ -1,7 +1,7 @@
 use clap::Args;
 
 use crate::app::resolve_project_dir;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::workspace::compact::{build_compact_handoff, save_compact_handoff};
 
 #[path = "../../../src/setup/wrapper/mod.rs"]

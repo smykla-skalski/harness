@@ -26,6 +26,7 @@ use crate::task_board::policy_runtime::models::{
 use crate::task_board::policy_runtime::providers::PolicyProviderRegistry;
 use crate::task_board::policy_runtime::repository::PolicyRuntimeRepository;
 use crate::task_board::{PolicyAction, PolicyEvidence, PolicyInput, PolicySubject};
+use harness_kernel::errors::CliError;
 
 #[test]
 fn review_target_maps_into_policy_evidence() {
@@ -439,7 +440,7 @@ struct TestReviewsActionExecutor {
 
 #[async_trait]
 impl ReviewsPolicyActionExecutor for TestReviewsActionExecutor {
-    async fn approve(&self, _target: &ReviewTarget) -> Result<(), crate::errors::CliError> {
+    async fn approve(&self, _target: &ReviewTarget) -> Result<(), CliError> {
         self.executed_actions
             .lock()
             .expect("lock executed actions")
@@ -451,7 +452,7 @@ impl ReviewsPolicyActionExecutor for TestReviewsActionExecutor {
         &self,
         _target: &ReviewTarget,
         _method: GitHubMergeMethod,
-    ) -> Result<(), crate::errors::CliError> {
+    ) -> Result<(), CliError> {
         self.executed_actions
             .lock()
             .expect("lock executed actions")

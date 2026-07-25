@@ -1,4 +1,4 @@
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::persistence::versioned_json::VersionedJsonRepository;
 use crate::session::types::{CURRENT_VERSION, SessionState};
 use crate::workspace::layout::SessionLayout;

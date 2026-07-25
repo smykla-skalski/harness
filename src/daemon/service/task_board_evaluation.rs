@@ -8,7 +8,7 @@ use crate::daemon::index::ResolvedSession;
 use crate::daemon::protocol::{
     SessionDetail, TaskBoardEvaluateRequest, TaskBoardEvaluationResponse,
 };
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::service as session_service;
 #[cfg(test)]
 use crate::session::storage as session_storage;

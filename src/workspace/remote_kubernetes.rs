@@ -3,9 +3,9 @@ use std::path::{Path, PathBuf};
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::infra::io::{read_json_typed, write_json_pretty};
-use crate::kernel::topology::{ClusterMode, ClusterSpec};
+use harness_kernel::kernel::topology::{ClusterMode, ClusterSpec};
 
 use super::project_context_dir;
 

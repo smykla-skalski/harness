@@ -11,7 +11,7 @@ use crate::daemon::protocol::{
     TaskBoardResetItemPositionRequest, TaskBoardSetItemPositionRequest,
     TaskBoardSyncRequest, TaskBoardUpdateItemRequest, WsRequest, WsResponse, ws_methods,
 };
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use serde::de::DeserializeOwned;
 
 use super::connection::ConnectionState;

@@ -2,14 +2,14 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::kuma::repo::{
     REMOTE_IMAGE_BUILD_TARGET, REMOTE_IMAGE_MANIFEST_TARGET, REMOTE_IMAGE_PUSH_TARGET,
 };
 use crate::infra::blocks::{KubernetesRuntime, StdProcessExecutor, kubernetes_runtime_from_env};
 use crate::infra::exec::run_command;
 use crate::infra::io::write_text;
-use crate::kernel::topology::{ClusterSpec, HelmSetting};
+use harness_kernel::kernel::topology::{ClusterSpec, HelmSetting};
 use crate::setup::cluster::{ClusterArgs, RemoteClusterTarget};
 use crate::setup::services::cluster::make_target_live;
 use crate::workspace::{

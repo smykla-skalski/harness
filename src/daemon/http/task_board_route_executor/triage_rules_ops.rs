@@ -4,7 +4,7 @@ use crate::daemon::protocol::{
     TaskBoardTriageRulesDraftResponse, TaskBoardTriageRulesRevisionsResponse,
 };
 use crate::daemon::service;
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::task_board::{
     TriageRuleSetActivationResult, TriageRuleSetDraftSaveResult, TriageRuleSetPreviewResult,
 };

@@ -1,6 +1,6 @@
 use std::mem;
 
-use crate::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{
     ExternalProviderScopeIdentity, ExternalSyncBatch, ExternalSyncClient, ExternalSyncScopeOutcome,
 };

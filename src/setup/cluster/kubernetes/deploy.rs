@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::env;
 use std::path::Path;
 
-use crate::errors::CliError;
+use harness_kernel::errors::CliError;
 use crate::infra::exec::cluster_exists;
 use crate::setup::services::cluster::{make_target, make_target_live};
 
