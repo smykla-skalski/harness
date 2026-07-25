@@ -29,7 +29,11 @@ build_lease_segment_is_leased() {
   for lease_file in "$lease_dir"/*; do
     [[ -f "$lease_file" ]] || continue
     pid="$(cat "$lease_file" 2>/dev/null || true)"
-    [[ "$pid" =~ ^[0-9]+$ ]] || continue
+    # Rejecting 0 matters: kill -0 0 signals the caller's own process group and
+    # succeeds, so a truncated lease would read as a live build and pin its
+    # segment forever. cargo-local.sh only ever writes $$, so anything that is
+    # not a plain positive integer is a corrupt lease and protects nothing.
+    [[ "$pid" =~ ^[1-9][0-9]*$ ]] || continue
     base="$(basename -- "$lease_file")"
     [[ "$base" == "$segment-$pid" ]] && build_lease_pid_is_alive "$pid" && return 0
   done

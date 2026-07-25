@@ -173,6 +173,29 @@ scenario_leased_dev_lane_survives_even_when_orphaned() {
   pass
 }
 
+scenario_corrupt_lease_does_not_pin_a_lane() {
+  start_test "a lease holding 0 or junk is corrupt, not a live build"
+  reset_tmp_root
+  local repo="$TEST_TMP_ROOT/repo"
+  local zero_seg="wt-zero-00000000000000aa"
+  local junk_seg="wt-junk-00000000000000bb"
+
+  make_repo "$repo"
+  mkdir -p "$repo/target/dev/$zero_seg" "$repo/target/dev/$junk_seg" \
+    "$repo/target/.cargo-local/leases"
+  echo x > "$repo/target/dev/$zero_seg/a"
+  echo x > "$repo/target/dev/$junk_seg/a"
+  # kill -0 0 succeeds against the caller's own process group, so an unguarded
+  # numeric check would read this as a running build and keep the lane for good.
+  printf '0\n' > "$repo/target/.cargo-local/leases/$zero_seg-0"
+  printf 'not-a-pid\n' > "$repo/target/.cargo-local/leases/$junk_seg-not-a-pid"
+
+  run_cleanup "$repo" "$repo" >/dev/null
+  assert_absent "$repo/target/dev/$zero_seg"
+  assert_absent "$repo/target/dev/$junk_seg"
+  pass
+}
+
 scenario_dev_segment_derivation_matches_cargo_local() {
   start_test "the lane segment this script derives matches cargo-local.sh"
   local printed derived
@@ -302,6 +325,7 @@ scenario_apply_cleans_stale_lane_and_worktree
 scenario_worktrees_default_to_longer_window_than_lanes
 scenario_dev_lanes_follow_their_worktree
 scenario_leased_dev_lane_survives_even_when_orphaned
+scenario_corrupt_lease_does_not_pin_a_lane
 scenario_dev_segment_derivation_matches_cargo_local
 
 log "clean-stale-lanes tests: $PASS_COUNT passed, $FAIL_COUNT failed"
