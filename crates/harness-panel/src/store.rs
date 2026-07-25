@@ -144,17 +144,26 @@ pub fn to_unix_seconds(value: DateTime<Utc>) -> i64 {
 /// A row written by this crate always round-trips; a value outside the range
 /// `chrono` can represent could only come from a hand-edited database, and
 /// clamping is more useful there than refusing to serve the page.
+///
+/// The clamp is to the end of the representable range it fell off, never to the
+/// current time. Substituting "now" would make one stored row render as a
+/// different instant on every read, so the same account would appear to have
+/// been seen at a new moment each time anyone loaded the page.
 #[must_use]
 pub fn from_unix_seconds(value: i64) -> DateTime<Utc> {
-    Utc.timestamp_opt(value, 0)
-        .single()
-        .unwrap_or_else(Utc::now)
+    Utc.timestamp_opt(value, 0).single().unwrap_or({
+        if value.is_negative() {
+            DateTime::<Utc>::MIN_UTC
+        } else {
+            DateTime::<Utc>::MAX_UTC
+        }
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::{Store, from_unix_seconds, to_unix_seconds};
-    use chrono::{Duration, Utc};
+    use chrono::{DateTime, Duration, Utc};
 
     #[tokio::test]
     async fn opening_creates_and_migrates_the_schema() {
@@ -194,6 +203,19 @@ mod tests {
             from_unix_seconds(to_unix_seconds(now)).timestamp(),
             now.timestamp()
         );
+    }
+
+    /// A hand-edited row must render as the same instant every time it is read.
+    /// Falling back to the current time instead would make one stored value
+    /// look like a new sighting on every page load.
+    #[test]
+    fn an_unrepresentable_timestamp_clamps_to_a_stable_bound() {
+        for value in [i64::MIN, i64::MAX] {
+            assert_eq!(from_unix_seconds(value), from_unix_seconds(value));
+        }
+
+        assert_eq!(from_unix_seconds(i64::MIN), DateTime::<Utc>::MIN_UTC);
+        assert_eq!(from_unix_seconds(i64::MAX), DateTime::<Utc>::MAX_UTC);
     }
 
     #[tokio::test]

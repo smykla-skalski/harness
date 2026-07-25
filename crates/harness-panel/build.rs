@@ -53,10 +53,15 @@ fn main() {
     }
 }
 
-/// `npm install` is skipped once the tree matches the lockfile, because the
-/// build runs on every source change and a reinstall each time would dominate
-/// it. The stamp lives beside `node_modules` so it is invalidated together with
-/// the tree it describes.
+/// Install exactly what the lockfile pins, and only when the installed tree no
+/// longer matches it.
+///
+/// `npm ci` rather than `npm install`: `install` is free to resolve a different
+/// tree and to rewrite `package-lock.json`, so an ordinary `cargo build` could
+/// leave the working tree dirty and produce a binary nobody can reproduce.
+/// The stamp lives beside `node_modules` so it is invalidated together with the
+/// tree it describes, which keeps the reinstall off the common path where the
+/// build already runs on every source change.
 fn install_dependencies(frontend: &Path) {
     let lockfile = frontend.join("package-lock.json");
     let stamp = frontend.join("node_modules").join(".harness-panel-stamp");
@@ -68,7 +73,7 @@ fn install_dependencies(frontend: &Path) {
         return;
     }
 
-    run_npm(frontend, &["install", "--no-audit", "--no-fund"]);
+    run_npm(frontend, &["ci", "--no-audit", "--no-fund"]);
     if !expected.is_empty() {
         fs::write(&stamp, expected).expect("recording the installed lockfile digest");
     }
