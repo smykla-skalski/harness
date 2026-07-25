@@ -256,6 +256,7 @@ private struct TaskBoardMarkdownDescriptionContent: View {
 struct TaskBoardPlanLifecycleActionButtons: View {
   let item: TaskBoardItem
   let draft: TaskBoardItemEditorDraft
+  let approvedAtForApproval: String
   let metrics: TaskBoardOverviewMetrics
   let isActionInFlight: Bool
   let actions: TaskBoardOverviewActions
@@ -351,7 +352,7 @@ struct TaskBoardPlanLifecycleActionButtons: View {
       actions.approveTaskBoardPlan(
         item,
         approvedBy: approvedBy,
-        approvedAt: draft.approvalTimestampForRequest
+        approvedAt: approvedAtForApproval
       )
     } label: {
       Label("Approve Plan", systemImage: "checkmark.seal")
