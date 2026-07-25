@@ -45,6 +45,11 @@ pub(super) fn register(registry: &mut ToolRegistry) {
                 input_schema: status_filter_schema,
             },
             TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_PROJECTS_UPDATE,
+                description: "Rename, retitle, or recolor a registered task-board project.",
+                input_schema: projects_update_schema,
+            },
+            TaskBoardToolDescriptor {
                 name: ws_methods::TASK_BOARD_MACHINES,
                 description: "List task-board machine summaries from the daemon.",
                 input_schema: status_filter_schema,
@@ -84,6 +89,22 @@ fn host_set_project_types_schema() -> Value {
                 "items": { "type": "string" }
             }
         },
+        "additionalProperties": false
+    })
+}
+
+fn projects_update_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "project_id": { "type": "string" },
+            "slug": { "type": "string" },
+            "display_name": { "type": "string" },
+            "clear_display_name": { "type": "boolean" },
+            "color": { "type": "string" },
+            "reset_color": { "type": "boolean" }
+        },
+        "required": ["project_id"],
         "additionalProperties": false
     })
 }
