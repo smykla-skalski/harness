@@ -1,5 +1,24 @@
 import Foundation
 
+/// The editable half of a preview project. Everything else about a project is
+/// derived from the items that name it, so only what a person can change here
+/// needs storing; `nil` means "still whatever the derivation says".
+public struct TaskBoardProjectEdit: Equatable, Sendable {
+  public var slug: String?
+  public var displayName: String?
+  public var color: TaskBoardProjectColor?
+
+  public init(
+    slug: String? = nil,
+    displayName: String? = nil,
+    color: TaskBoardProjectColor? = nil
+  ) {
+    self.slug = slug
+    self.displayName = displayName
+    self.color = color
+  }
+}
+
 extension PreviewHarnessClientState {
   func currentTaskBoardItems(status: TaskBoardStatus?) -> [TaskBoardItem] {
     let expectedStatus = status?.canonicalPersistedStatus
@@ -267,12 +286,13 @@ extension PreviewHarnessClientState {
         return nil
       }
       let identity = items.first.flatMap(TaskBoardProjectSummary.inferredIdentity(from:))
+      let edit = taskBoardProjectEditsByID[projectId]
       return TaskBoardProjectSummary(
         projectId: projectId,
         source: identity?.source ?? .manual,
-        slug: identity?.slug ?? "unnamed project",
-        displayName: nil,
-        color: colorsByProject[projectId] ?? .blue,
+        slug: edit?.slug ?? identity?.slug ?? "unnamed project",
+        displayName: edit?.displayName,
+        color: edit?.color ?? colorsByProject[projectId] ?? .blue,
         itemCount: items.count,
         readyCount: items.count { $0.status == .todo }
       )
@@ -283,6 +303,59 @@ extension PreviewHarnessClientState {
       }
       return lhs.readyCount > rhs.readyCount
     }
+  }
+
+  /// Mirrors the daemon's edit rules, including the two refusals: a request
+  /// that both sets and clears, or both sets and resets, is a caller bug and a
+  /// fixture that quietly picked a winner would hide it from the UI under test.
+  func updateTaskBoardProject(
+    request: TaskBoardProjectUpdateRequest
+  ) throws -> TaskBoardProject {
+    guard !(request.clearDisplayName && request.displayName != nil) else {
+      throw HarnessMonitorAPIError.server(
+        code: 400,
+        message: "task-board project update cannot both set and clear display_name"
+      )
+    }
+    guard !(request.resetColor && request.color != nil) else {
+      throw HarnessMonitorAPIError.server(
+        code: 400,
+        message: "task-board project update cannot both set and reset color"
+      )
+    }
+    guard
+      let current = taskBoardProjects(status: nil)
+        .first(where: { $0.projectId == request.projectId })
+    else {
+      throw HarnessMonitorAPIError.server(
+        code: 400,
+        message: "task board project '\(request.projectId)' is not registered"
+      )
+    }
+
+    var edit = taskBoardProjectEditsByID[request.projectId] ?? TaskBoardProjectEdit()
+    edit.slug = request.slug ?? edit.slug
+    if request.clearDisplayName {
+      edit.displayName = nil
+    } else if let displayName = request.displayName {
+      edit.displayName = displayName
+    }
+    // A reset drops the override and lets the derived allocation show through,
+    // which is what the daemon does by re-allocating around the others.
+    edit.color = request.resetColor ? nil : (request.color ?? edit.color)
+    taskBoardProjectEditsByID[request.projectId] = edit
+
+    let updated = taskBoardProjects(status: nil)
+      .first { $0.projectId == request.projectId } ?? current
+    return TaskBoardProject(
+      projectId: updated.projectId,
+      source: updated.source,
+      slug: updated.slug,
+      displayName: updated.displayName,
+      color: updated.color,
+      createdAt: "2026-07-25T00:00:00Z",
+      updatedAt: "2026-07-25T00:00:00Z"
+    )
   }
 
   func taskBoardMachines(status: TaskBoardStatus?) -> [TaskBoardMachineSummary] {

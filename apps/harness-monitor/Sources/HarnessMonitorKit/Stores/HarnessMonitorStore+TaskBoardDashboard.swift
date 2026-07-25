@@ -321,6 +321,33 @@ extension HarnessMonitorStore {
   }
 
   @discardableResult
+  public func updateTaskBoardProject(
+    request: TaskBoardProjectUpdateRequest
+  ) async -> Bool {
+    guard let client else {
+      return false
+    }
+    beginDaemonAction()
+    beginTaskBoardAction()
+    defer {
+      endDaemonAction()
+      endTaskBoardAction()
+    }
+
+    do {
+      let updated = try await client.updateTaskBoardProject(request: request)
+      recordRequestSuccess()
+      presentSuccessFeedback("Updated \(updated.displayName ?? updated.slug)")
+    } catch {
+      presentFailureFeedback(error.localizedDescription)
+      return false
+    }
+    // Refreshed rather than patched in place: the daemon owns which color a
+    // reset lands on, and every card reads the same catalog this fills.
+    return await refreshTaskBoardProjects()
+  }
+
+  @discardableResult
   public func refreshTaskBoardMachines(status: TaskBoardStatus? = nil) async -> Bool {
     guard let client else {
       return false

@@ -66,6 +66,7 @@ enum WebSocketRPCMethod: String, CaseIterable, Equatable, Sendable {
   case taskBoardEvaluate = "task_board.evaluate"
   case taskBoardAudit = "task_board.audit"
   case taskBoardProjects = "task_board.projects"
+  case taskBoardProjectsUpdate = "task_board.projects_update"
   case taskBoardMachines = "task_board.machines"
   case taskBoardHostLocal = "task_board.host_local"
   case taskBoardHostList = "task_board.host_list"

@@ -159,6 +159,14 @@ extension HarnessMonitorAPIClient {
     return wire.map(TaskBoardProjectSummary.init(wire:))
   }
 
+  public func updateTaskBoardProject(
+    request: TaskBoardProjectUpdateRequest
+  ) async throws -> TaskBoardProject {
+    try await post(
+      "/v1/task-board/projects/update", body: request, decoder: PolicyWireCoding.decoder
+    )
+  }
+
   public func taskBoardMachines(status: TaskBoardStatus? = nil) async throws
     -> [TaskBoardMachineSummary]
   {

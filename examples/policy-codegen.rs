@@ -2604,6 +2604,8 @@ const TASK_BOARD_SUMMARY_EMIT_ONLY: &[&str] = &[
     "TaskBoardProjectSummary",
     "TaskBoardProjectSource",
     "TaskBoardProjectColor",
+    "TaskBoardProject",
+    "TaskBoardProjectUpdateRequest",
     "TaskBoardMachineSummary",
 ];
 const TASK_BOARD_ITEM_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardItemWireTypes.generated.swift";
@@ -3242,12 +3244,14 @@ fn modules() -> Vec<GeneratedModule> {
         },
         GeneratedModule {
             output: TASK_BOARD_SUMMARY_OUTPUT,
-            description: "the Rust task-board audit, project and machine summaries",
-            defaults: &[],
+            description:
+                "the Rust task-board audit, project and machine summaries plus the project edit",
+            defaults: &[TASK_BOARD_PROTOCOL_SOURCE],
             sources: &[
                 TASK_BOARD_SUMMARY_SOURCE,
                 TASK_BOARD_PROJECT_SOURCE,
                 TASK_BOARD_PROJECT_COLOR_SOURCE,
+                TASK_BOARD_PROTOCOL_SOURCE,
             ],
         },
         GeneratedModule {

@@ -42,6 +42,7 @@ struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
           TaskBoardWorkflowSection(store: store, taskBoardFormState: $taskBoardFormState)
           SettingsTaskBoardCardsSection()
           SettingsTaskBoardLaneAppearanceSection()
+          SettingsTaskBoardProjectAppearanceSection(store: store)
           TaskBoardProjectSection(store: store, taskBoardFormState: $taskBoardFormState)
             .id(SettingsTaskBoardAnchor.githubProject)
           TaskBoardMonitoredReposSection(
