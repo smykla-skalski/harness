@@ -133,6 +133,28 @@ fn a_remote_attempt_names_its_executor_checkout_instead_of_a_worktree() {
     assert!(!request.prompt.contains("/tmp/task-worktree"));
 }
 
+/// Startup recovery re-seals remote offers, and it runs before the background
+/// tasks. When the catalog was installed with those tasks, recovery sealed the
+/// shipped prompt while every later offer used the configured one, and nothing
+/// said so. This pins the renderer recovery goes through against an installed
+/// catalog; the serve paths install it ahead of recovery.
+#[test]
+fn the_remote_offer_renderer_uses_the_installed_catalog() {
+    let _lock = PROMPT_CATALOG_TEST_LOCK.lock().expect("catalog test lock");
+    let _installed = scoped_prompt_catalog(
+        PromptCatalog::from_json(br#"{"read_only_review": "Review {{ board_item_id }}"}"#)
+            .expect("parse overrides"),
+    );
+
+    let request = remote_codex_attempt_request(
+        &execution(TaskBoardExecutionPhase::Review),
+        &attempt("review:default-code-reviewer"),
+    )
+    .expect("remote review request");
+
+    assert_eq!(request.prompt, "Review item-1");
+}
+
 #[test]
 fn a_configured_evaluation_prompt_replaces_the_shipped_one() {
     let _lock = PROMPT_CATALOG_TEST_LOCK.lock().expect("catalog test lock");
