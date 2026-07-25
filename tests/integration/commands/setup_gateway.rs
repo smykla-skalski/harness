@@ -1,8 +1,8 @@
 // Coverage for `harness setup gateway`. This test lived among the retired
-// record command tests, which were its only home; it moved here so deleting
-// that directory would not silently delete the adapter's only coverage. The
-// name is unchanged from that directory on purpose, so the removal and the
-// re-addition line up as one relocation in the test-name diff.
+// record command tests, which were its only home, so it moved here rather
+// than disappearing when that directory went. It was called
+// `bootstrap_command_runs_gateway_api_crd_install` there, a name that named
+// neither the command it drives nor the check-only path it takes.
 
 use std::env;
 use std::fs;
@@ -15,7 +15,7 @@ use super::super::helpers::*;
 
 #[test]
 #[ignore = "slow: spawns fake toolchain processes"]
-fn bootstrap_command_runs_gateway_api_crd_install() {
+fn setup_gateway_check_finds_gateway_api_crds() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let tmp = tempfile::tempdir().unwrap();
     let repo_root = tmp.path().join("repo");
