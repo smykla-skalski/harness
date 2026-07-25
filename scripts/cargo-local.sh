@@ -382,6 +382,11 @@ configure_jobserver() {
   local line
 
   jobserver_mode="reserve"
+  # Reserve means this script sizes the build, so an inherited jobserver must
+  # not silently govern instead. A stale one - the pool this very script
+  # exported before it died - pins cargo to its implicit slot while
+  # CARGO_BUILD_JOBS still advertises a full share.
+  unset MAKEFLAGS
   if [[ "${HARNESS_JOBSERVER:-1}" == "0" ]]; then
     return 0
   fi

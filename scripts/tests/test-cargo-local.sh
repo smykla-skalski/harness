@@ -406,6 +406,27 @@ scenario_jobserver_pool_takes_over_build_sizing() {
   pass "an available pool widens build jobs and exports a jobserver"
 }
 
+scenario_reserve_drops_an_inherited_jobserver() {
+  local key="pool-inherited-$$"
+  local output
+  # A stale endpoint is the reachable case: this script exports exactly this
+  # shape, and a child inheriting one whose pool has died would attach, get no
+  # tokens, and build serially while CARGO_BUILD_JOBS advertised a full share.
+  output="$(print_cargo_env_with_pool_key "$key" \
+    env HARNESS_JOBSERVER=0 "MAKEFLAGS=-j9 --jobserver-auth=fifo:$SANDBOX/not-a-pool")"
+  stop_pool_for_key "$key"
+
+  if ! assert_line "JOBSERVER=reserve" "$output"; then
+    fail "inherited jobserver did not fall back: $(grep '^JOBSERVER=' <<<"$output")"
+    return
+  fi
+  if ! assert_line "MAKEFLAGS=" "$output"; then
+    fail "reserve kept an inherited jobserver: $(grep '^MAKEFLAGS=' <<<"$output")"
+    return
+  fi
+  pass "the reserve drops an inherited jobserver"
+}
+
 scenario_jobserver_absent_falls_back_to_the_reserve() {
   local key="pool-absent-$$"
   local output share cpu expected
@@ -1085,6 +1106,7 @@ EOF
 
 scenario_jobserver_pool_takes_over_build_sizing
 scenario_jobserver_absent_falls_back_to_the_reserve
+scenario_reserve_drops_an_inherited_jobserver
 scenario_explicit_job_override_beats_the_pool
 scenario_nextest_build_phase_keeps_the_whole_pool
 scenario_build_only_flag_precedes_a_separator
