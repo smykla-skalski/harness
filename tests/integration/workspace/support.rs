@@ -11,7 +11,8 @@ use harness::session::types::SessionState;
 use harness::workspace::layout::SessionLayout;
 use harness::workspace::{harness_data_root, layout::sessions_root};
 use harness_testkit::{
-    git_branches_matching as helper_git_branches_matching, git_head_sha as helper_git_head_sha,
+    CommandEnvExt, git_branches_matching as helper_git_branches_matching,
+    git_head_sha as helper_git_head_sha,
 };
 use serde_json::{Value, json};
 use tokio::runtime::Runtime;
@@ -55,7 +56,7 @@ pub fn run_harness(home: &Path, xdg: &Path, args: &[&str]) -> Output {
 fn configure_isolated_daemon_env(command: &mut Command, home: &Path, xdg: &Path) {
     command
         .env("HARNESS_HOST_HOME", home)
-        .env("HOME", home)
+        .env_isolated_home(home)
         .env("XDG_DATA_HOME", xdg)
         .env("HARNESS_DAEMON_DATA_HOME", xdg)
         .env_remove("HARNESS_APP_GROUP_ID")

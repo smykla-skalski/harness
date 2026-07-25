@@ -148,6 +148,44 @@ pub fn shared_agent_probe_home() -> PathBuf {
     home
 }
 
+/// The environment a spawned child needs to treat `home` as its home without
+/// reaching the real account home.
+///
+/// `with_isolated_harness_env` only covers children that inherit the test
+/// process environment. A child given an explicit `HOME` needs this instead: it
+/// is not a `cfg(test)` build, so its probe home falls back to the account home
+/// and agent package downloads land there regardless of `HOME`.
+///
+/// Prefer [`CommandEnvExt::env_isolated_home`]. This lower-level form exists for
+/// spawners that are not [`Command`], such as `portable_pty::CommandBuilder`,
+/// which testkit deliberately does not depend on.
+///
+/// # Panics
+///
+/// Panics if the shared probe home cannot be created.
+#[must_use]
+pub fn isolated_home_vars(home: &Path) -> [(&'static str, PathBuf); 2] {
+    [
+        ("HOME", home.to_path_buf()),
+        (AGENT_PROBE_HOME_ENV, shared_agent_probe_home()),
+    ]
+}
+
+/// Point a spawned child at an isolated home.
+pub trait CommandEnvExt {
+    /// Set both the child `HOME` and the agent probe home.
+    fn env_isolated_home(&mut self, home: impl AsRef<Path>) -> &mut Self;
+}
+
+impl CommandEnvExt for Command {
+    fn env_isolated_home(&mut self, home: impl AsRef<Path>) -> &mut Self {
+        for (key, value) in isolated_home_vars(home.as_ref()) {
+            self.env(key, value);
+        }
+        self
+    }
+}
+
 /// Run a closure inside an isolated Harness filesystem scope.
 ///
 /// Tests often set `XDG_DATA_HOME` to a temp dir but still accidentally see a

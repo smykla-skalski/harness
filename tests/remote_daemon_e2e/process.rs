@@ -7,6 +7,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use fs2::FileExt as _;
+use harness_testkit::CommandEnvExt;
 use serde_json::Value;
 use tempfile::TempDir;
 
@@ -92,7 +93,7 @@ impl RemoteDaemonEnvironment {
 
     fn apply(&self, command: &mut Command, directory_url: &str) {
         command
-            .env("HOME", &self.home)
+            .env_isolated_home(&self.home)
             .env("HARNESS_HOST_HOME", &self.home)
             .env("XDG_DATA_HOME", &self.xdg)
             .env("HARNESS_DAEMON_DATA_HOME", &self.data_home)
@@ -318,7 +319,7 @@ impl RemoteDaemonProcess {
 
     fn apply_environment(&self, command: &mut Command) {
         command
-            .env("HOME", &self.home)
+            .env_isolated_home(&self.home)
             .env("HARNESS_HOST_HOME", &self.home)
             .env("XDG_DATA_HOME", &self.xdg)
             .env("HARNESS_DAEMON_DATA_HOME", &self.data_home)

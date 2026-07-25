@@ -41,7 +41,7 @@ fn sandboxed_recovery_prompt_routes_through_bridge() {
             .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
             .env("XDG_DATA_HOME", tmp.path())
             .env("HARNESS_HOST_HOME", &host_home)
-            .env("HOME", &host_home)
+            .env_isolated_home(&host_home)
             .env("PATH", &path_env)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())

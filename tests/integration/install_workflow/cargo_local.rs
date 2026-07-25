@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use harness_testkit::CommandEnvExt;
 use tempfile::tempdir;
 
 use super::support::{parse_env_output, write_fake_shell_tool};
@@ -16,7 +17,7 @@ fn cargo_local_script_uses_short_external_tmpdir_when_tmpdir_is_missing() {
         .arg(repo.join("scripts/cargo-local.sh"))
         .arg("--print-env")
         .current_dir(&repo)
-        .env("HOME", tmp.path().join("home"))
+        .env_isolated_home(tmp.path().join("home"))
         .env("SCCACHE_BIN", &missing_sccache)
         .env_remove("TMPDIR")
         .env("CODEX_SESSION_ID", session_id)
@@ -93,7 +94,7 @@ fn cargo_local_script_preserves_explicit_writable_tmpdir() {
         .arg(repo.join("scripts/cargo-local.sh"))
         .arg("--print-env")
         .current_dir(&repo)
-        .env("HOME", tmp.path().join("home"))
+        .env_isolated_home(tmp.path().join("home"))
         .env("TMPDIR", &explicit_tmpdir)
         .env_remove("CODEX_SESSION_ID")
         .env_remove("CODEX_THREAD_ID")
@@ -131,7 +132,7 @@ fn cargo_local_script_uses_short_external_tmpdir_when_tmpdir_is_unusable() {
         .arg(repo.join("scripts/cargo-local.sh"))
         .arg("--print-env")
         .current_dir(&repo)
-        .env("HOME", tmp.path().join("home"))
+        .env_isolated_home(tmp.path().join("home"))
         .env("SCCACHE_BIN", &missing_sccache)
         .env("TMPDIR", &unusable_tmpdir)
         .env("CODEX_SESSION_ID", session_id)
@@ -186,7 +187,7 @@ fn cargo_local_script_isolates_sccache_server_socket() {
         .arg(repo.join("scripts/cargo-local.sh"))
         .arg("--print-env")
         .current_dir(&repo)
-        .env("HOME", tmp.path().join("home"))
+        .env_isolated_home(tmp.path().join("home"))
         .env("PATH", format!("{}:/usr/bin:/bin", fake_bin.display()))
         .env("TMPDIR", &explicit_tmpdir)
         .env_remove("RUSTC_WRAPPER")
@@ -257,7 +258,7 @@ fn install_script_resolves_build_binary_from_cargo_local_target_dir() {
         .arg(repo.join("scripts/install-harness-release.sh"))
         .arg("--print-build-binary")
         .current_dir(&repo)
-        .env("HOME", tmp.path().join("home"))
+        .env_isolated_home(tmp.path().join("home"))
         .env("HARNESS_CARGO_TARGET_DIR", &expected_target)
         .env_remove("CARGO_TARGET_DIR")
         .env_remove("CODEX_SESSION_ID")
@@ -298,7 +299,7 @@ fn install_script_prefers_explicit_cargo_target_dir_when_present() {
         .arg(repo.join("scripts/install-harness-release.sh"))
         .arg("--print-build-binary")
         .current_dir(&repo)
-        .env("HOME", tmp.path().join("home"))
+        .env_isolated_home(tmp.path().join("home"))
         .env("CARGO_TARGET_DIR", &explicit_target)
         .env("HARNESS_CARGO_TARGET_DIR", &fallback_target)
         .output()
@@ -340,7 +341,7 @@ fn cargo_local_script_uses_cargo_for_supported_subcommands() {
         .arg("--lib")
         .current_dir(&repo)
         .env("FAKE_SCRIPT_LOG", &log_path)
-        .env("HOME", tmp.path().join("home"))
+        .env_isolated_home(tmp.path().join("home"))
         .env("PATH", format!("{}:/usr/bin:/bin", fake_bin.display()))
         .output()
         .expect("run cargo-local test wrapper");
@@ -377,7 +378,7 @@ fn cargo_local_script_uses_cargo_for_run_subcommand() {
         .arg("serve")
         .current_dir(&repo)
         .env("FAKE_SCRIPT_LOG", &log_path)
-        .env("HOME", tmp.path().join("home"))
+        .env_isolated_home(tmp.path().join("home"))
         .env("PATH", format!("{}:/usr/bin:/bin", fake_bin.display()))
         .output()
         .expect("run cargo-local run wrapper");
@@ -410,7 +411,7 @@ fn cargo_local_script_uses_cargo_for_fmt_subcommand() {
         .arg("fmt")
         .current_dir(&repo)
         .env("FAKE_SCRIPT_LOG", &log_path)
-        .env("HOME", tmp.path().join("home"))
+        .env_isolated_home(tmp.path().join("home"))
         .env("PATH", format!("{}:/usr/bin:/bin", fake_bin.display()))
         .output()
         .expect("run cargo-local fmt wrapper");

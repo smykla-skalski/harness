@@ -14,6 +14,7 @@ use harness::daemon::db::DaemonDb;
 use harness::daemon::protocol::{SessionStartRequest, StreamEvent};
 use harness::daemon::service as daemon_service;
 use harness::session::types::SessionRole;
+use harness_testkit::CommandEnvExt;
 use tempfile::tempdir;
 use tokio::sync::broadcast;
 

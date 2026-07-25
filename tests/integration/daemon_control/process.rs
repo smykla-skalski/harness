@@ -60,7 +60,7 @@ pub(super) fn configure_app_group_daemon_env(
 fn configure_common_daemon_env(command: &mut Command, home: &Path, xdg: &Path) {
     command
         .env("HARNESS_HOST_HOME", home)
-        .env("HOME", home)
+        .env_isolated_home(home)
         .env("XDG_DATA_HOME", xdg)
         .env_remove("HARNESS_DAEMON_OWNERSHIP")
         .env_remove("HARNESS_SANDBOXED")

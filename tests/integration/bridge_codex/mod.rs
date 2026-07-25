@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 
 use harness::daemon::bridge::{BridgeState, BridgeStatusReport};
 use harness::daemon::state::DaemonOwnership;
+use harness_testkit::CommandEnvExt;
 use tempfile::tempdir;
 
 use super::helpers::{ManagedChild, TcpPortLease};
@@ -58,7 +59,7 @@ fn bridge_start_refuses_when_sandboxed() {
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
         .env("HARNESS_HOST_HOME", &host_home)
-        .env("HOME", &host_home)
+        .env_isolated_home(&host_home)
         .output()
         .expect("run harness-bridge");
     assert!(!output.status.success());
@@ -94,7 +95,7 @@ fn bridge_start_with_mock_codex_publishes_codex_capability() {
             .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
             .env("XDG_DATA_HOME", tmp.path())
             .env("HARNESS_HOST_HOME", &host_home)
-            .env("HOME", &host_home)
+            .env_isolated_home(&host_home)
             .env_remove("HARNESS_APP_GROUP_ID")
             .env_remove("HARNESS_SANDBOXED")
             .stdin(Stdio::null())
@@ -163,7 +164,7 @@ fn bridge_start_without_capability_flag_enables_all_compiled_capabilities() {
             .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
             .env("XDG_DATA_HOME", tmp.path())
             .env("HARNESS_HOST_HOME", &host_home)
-            .env("HOME", &host_home)
+            .env_isolated_home(&host_home)
             .env_remove("HARNESS_APP_GROUP_ID")
             .env_remove("HARNESS_SANDBOXED")
             .stdin(Stdio::null())
@@ -218,7 +219,7 @@ fn bridge_install_launch_agent_refuses_when_sandboxed() {
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
         .env("HARNESS_HOST_HOME", &host_home)
-        .env("HOME", &host_home)
+        .env_isolated_home(&host_home)
         .output()
         .expect("run harness-bridge");
     assert!(!output.status.success());
@@ -239,7 +240,7 @@ fn bridge_remove_launch_agent_is_idempotent() {
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
         .env("HARNESS_HOST_HOME", &host_home)
-        .env("HOME", &host_home)
+        .env_isolated_home(&host_home)
         .output()
         .expect("run harness-bridge");
     assert!(output.status.success(), "remove: {}", output_text(&output));
