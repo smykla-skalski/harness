@@ -174,6 +174,34 @@ fn refuses_a_mount_point_that_is_not_a_plain_path() {
     }
 }
 
+/// The mount point is substituted into quoted HTML attributes, reused as a
+/// cookie Path, and registered as an Axum route. Refuse delimiters and raw
+/// characters a browser would reinterpret before the request reaches Axum.
+#[test]
+fn refuses_html_cookie_and_browser_delimiters_inside_the_mount_point() {
+    for raw in [
+        "/panel\"onload=alert(1)",
+        "/panel'onload=alert(1)",
+        "/panel<svg",
+        "/panel>tail",
+        "/panel&amp/rest",
+        "/panel;SameSite=None",
+        "/panel`name",
+        "/panel^v2",
+        "/café",
+    ] {
+        assert!(
+            normalize_base_path(raw).is_err(),
+            "{raw:?} should be refused"
+        );
+    }
+
+    assert_eq!(
+        normalize_base_path("/caf%C3%A9").expect("encoded UTF-8 stays byte-stable"),
+        "/caf%C3%A9"
+    );
+}
+
 /// Axum interprets a segment beginning with `:` as legacy capture syntax and
 /// panics while constructing the router. Accepted configuration must never
 /// make startup panic.

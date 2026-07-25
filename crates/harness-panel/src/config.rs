@@ -224,7 +224,10 @@ pub fn normalize_base_path(raw: &str) -> Result<String, PanelError> {
             "--base-path must start with '/', got {trimmed:?}"
         )));
     }
-    if trimmed.contains(['?', '#', '{', '}', '*', '\\'])
+    if !trimmed.is_ascii()
+        || trimmed.contains([
+            '?', '#', '{', '}', '*', '\\', '"', '\'', '<', '>', '&', ';', '`', '^',
+        ])
         || trimmed
             .chars()
             .any(|character| character.is_whitespace() || character.is_control())
