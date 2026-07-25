@@ -196,6 +196,41 @@ fn refuses_a_public_origin_carrying_a_path() {
     }
 }
 
+/// `host_str` returns a v6 address without its brackets, so rebuilding the
+/// origin from it yields `http://::1:8787`, which is not a URL. Every absolute
+/// URL the panel builds starts from this value, the OAuth `redirect_uri`
+/// included.
+#[test]
+fn an_ipv6_origin_keeps_its_brackets() {
+    assert_eq!(
+        normalize_public_origin("http://[::1]:8787").expect("valid v6 loopback origin"),
+        "http://[::1]:8787"
+    );
+    assert_eq!(
+        normalize_public_origin("https://[2606:4700::1111]").expect("valid v6 origin"),
+        "https://[2606:4700::1111]"
+    );
+}
+
+/// Loopback is decided from the parsed address, so the forms nobody thinks to
+/// spell out are covered too.
+#[test]
+fn loopback_is_recognised_in_every_form_it_is_written() {
+    for raw in [
+        "http://127.0.0.1",
+        "http://127.0.0.2:9000",
+        "http://localhost:8787",
+        "http://LOCALHOST",
+        "http://[::1]",
+        "http://[0:0:0:0:0:0:0:1]:8787",
+    ] {
+        assert!(
+            normalize_public_origin(raw).is_ok(),
+            "{raw} should be accepted over plain http"
+        );
+    }
+}
+
 /// A `Secure` cookie is dropped over plain HTTP, so a public HTTP origin would
 /// hand every session token to the network instead.
 #[test]

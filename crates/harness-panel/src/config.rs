@@ -11,7 +11,7 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 
 use chrono::Duration;
-use url::Url;
+use url::{Host, Url};
 
 use crate::error::PanelError;
 pub use secret::ClientSecret;
@@ -267,9 +267,9 @@ pub fn normalize_public_origin(raw: &str) -> Result<String, PanelError> {
         )));
     }
     let host = parsed
-        .host_str()
+        .host()
         .ok_or_else(|| PanelError::config(format!("--public-origin {raw:?} has no host")))?;
-    if parsed.scheme() == "http" && !is_loopback_host(host) {
+    if parsed.scheme() == "http" && !is_loopback_host(&host) {
         // The session cookie cannot carry `Secure` over plain HTTP, so a
         // non-loopback HTTP origin would hand every session to the network.
         return Err(PanelError::config(format!(
@@ -277,6 +277,10 @@ pub fn normalize_public_origin(raw: &str) -> Result<String, PanelError> {
         )));
     }
 
+    // `Host` rather than `host_str`, because the latter hands back a v6 address
+    // without its brackets and the origin would come out as `http://::1:8787`,
+    // which is not a URL. Every absolute URL the panel builds starts here,
+    // including the OAuth `redirect_uri`.
     let mut origin = format!("{}://{host}", parsed.scheme());
     if let Some(port) = parsed.port() {
         origin.push(':');
@@ -285,8 +289,17 @@ pub fn normalize_public_origin(raw: &str) -> Result<String, PanelError> {
     Ok(origin)
 }
 
-fn is_loopback_host(host: &str) -> bool {
-    matches!(host, "localhost" | "127.0.0.1" | "[::1]" | "::1")
+/// Whether the panel is reached over the loopback interface, and so may be
+/// served without TLS.
+///
+/// Asked of the parsed host rather than its text, so `127.0.0.2` and an
+/// abbreviated v6 loopback count without needing to be spelled out.
+fn is_loopback_host(host: &Host<&str>) -> bool {
+    match host {
+        Host::Domain(domain) => domain.eq_ignore_ascii_case("localhost"),
+        Host::Ipv4(address) => address.is_loopback(),
+        Host::Ipv6(address) => address.is_loopback(),
+    }
 }
 
 fn parse_endpoint(flag: &str, raw: &str) -> Result<Url, PanelError> {
