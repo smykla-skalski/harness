@@ -5,6 +5,7 @@ use std::time::Instant;
 
 use harness::daemon::bridge::BridgeState;
 use harness::daemon::state::DaemonOwnership;
+use harness_testkit::CommandEnvExt;
 
 use super::super::helpers::ManagedChild;
 use super::{BRIDGE_POLL_INTERVAL, BRIDGE_WAIT_TIMEOUT};
@@ -56,7 +57,7 @@ pub(super) fn run_bridge_with_data_home(data_home: &Path, args: &[&str]) -> Outp
         .env("HARNESS_DAEMON_DATA_HOME", data_home)
         .env("XDG_DATA_HOME", data_home)
         .env("HARNESS_HOST_HOME", &host_home)
-        .env("HOME", &host_home)
+        .env_isolated_home(&host_home)
         .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_SANDBOXED")
         .output()

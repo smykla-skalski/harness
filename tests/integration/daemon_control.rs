@@ -11,6 +11,7 @@ use harness::daemon::protocol::{
 use harness::daemon::service::DaemonStatusReport;
 use harness::daemon::transport::HARNESS_MONITOR_APP_GROUP_ID;
 use harness::session::types::SessionState;
+use harness_testkit::{CommandEnvExt, isolated_home_vars};
 use serde_json::{Value, json};
 use tempfile::tempdir;
 use tokio::runtime::Runtime;

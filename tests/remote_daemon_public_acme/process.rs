@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
+use harness_testkit::CommandEnvExt;
 use serde_json::Value;
 use tempfile::TempDir;
 
@@ -217,7 +218,7 @@ fn apply_environment(
     data_home: &Path,
 ) {
     command
-        .env("HOME", home)
+        .env_isolated_home(home)
         .env("HARNESS_HOST_HOME", home)
         .env("XDG_DATA_HOME", xdg)
         .env("HARNESS_DAEMON_DATA_HOME", data_home)

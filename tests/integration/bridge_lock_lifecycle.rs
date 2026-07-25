@@ -17,6 +17,7 @@ use std::time::{Duration, Instant};
 
 use harness::daemon::bridge::{self, BridgeState};
 use harness::daemon::state::HostBridgeCapabilityManifest;
+use harness_testkit::CommandEnvExt;
 
 use super::helpers::ManagedChild;
 
@@ -236,7 +237,7 @@ fn bridge_start_holds_exclusive_bridge_lock_while_serving() {
             .args(["start", "--capability", "agent-tui"])
             .env("HARNESS_DAEMON_DATA_HOME", &daemon_data_home)
             .env("HARNESS_HOST_HOME", &host_home)
-            .env("HOME", &host_home)
+            .env_isolated_home(&host_home)
             .env_remove("HARNESS_APP_GROUP_ID")
             .env_remove("HARNESS_SANDBOXED")
             .stdin(Stdio::null())
@@ -277,7 +278,7 @@ fn bridge_start_holds_exclusive_bridge_lock_while_serving() {
         .args(["start", "--capability", "agent-tui"])
         .env("HARNESS_DAEMON_DATA_HOME", &daemon_data_home)
         .env("HARNESS_HOST_HOME", &host_home)
-        .env("HOME", &host_home)
+        .env_isolated_home(&host_home)
         .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_SANDBOXED")
         .stdin(Stdio::null())
@@ -357,7 +358,7 @@ fn bridge_json_survives_synthetic_watcher_trigger() {
         .arg("status")
         .env("HARNESS_DAEMON_DATA_HOME", &daemon_data_home)
         .env("HARNESS_HOST_HOME", &host_home)
-        .env("HOME", &host_home)
+        .env_isolated_home(&host_home)
         .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_SANDBOXED")
         .stdin(Stdio::null())
@@ -381,7 +382,7 @@ fn bridge_json_survives_synthetic_watcher_trigger() {
         .arg("status")
         .env("HARNESS_DAEMON_DATA_HOME", &daemon_data_home)
         .env("HARNESS_HOST_HOME", &host_home)
-        .env("HOME", &host_home)
+        .env_isolated_home(&host_home)
         .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_SANDBOXED")
         .stdin(Stdio::null())

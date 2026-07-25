@@ -1,3 +1,4 @@
+mod agent_probe_home;
 mod docs_and_policy;
 mod helpers;
 mod hooks_and_observe;

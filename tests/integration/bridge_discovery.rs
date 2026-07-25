@@ -22,6 +22,7 @@ use std::time::{Duration, Instant};
 
 use fs2::FileExt;
 use harness::daemon::bridge::BridgeState;
+use harness_testkit::CommandEnvExt;
 use tempfile::tempdir;
 
 use super::helpers::{ManagedChild, TcpPortLease};
@@ -60,7 +61,7 @@ fn bridge_start_adopts_group_container_when_xdg_is_empty() {
             ])
             .arg(&mock_codex)
             .env("XDG_DATA_HOME", &xdg)
-            .env("HOME", home)
+            .env_isolated_home(home)
             .env("HARNESS_HOST_HOME", home)
             .env("RUST_LOG", "harness=info")
             .env_remove("HARNESS_APP_GROUP_ID")
@@ -144,7 +145,7 @@ fn bridge_start_personal_profile_adopts_group_container_when_profile_root_is_emp
         ])
         .arg(&mock_codex)
         .env("XDG_DATA_HOME", &xdg)
-        .env("HOME", home)
+        .env_isolated_home(home)
         .env("HARNESS_HOST_HOME", home)
         .env("RUST_LOG", "harness=info")
         .env("HARNESS_MONITOR_RUNTIME_PROFILE", profile)
@@ -210,7 +211,7 @@ fn bridge_start_personal_profile_keeps_profile_root_when_no_running_daemon_exist
         ])
         .arg(&mock_codex)
         .env("XDG_DATA_HOME", &xdg)
-        .env("HOME", home)
+        .env_isolated_home(home)
         .env("HARNESS_HOST_HOME", home)
         .env("RUST_LOG", "harness=info")
         .env("HARNESS_MONITOR_RUNTIME_PROFILE", profile)
@@ -277,7 +278,7 @@ fn bridge_start_agent_profile_keeps_profile_root_when_group_daemon_is_running() 
         ])
         .arg(&mock_codex)
         .env("XDG_DATA_HOME", &xdg)
-        .env("HOME", home)
+        .env_isolated_home(home)
         .env("HARNESS_HOST_HOME", home)
         .env("RUST_LOG", "harness=info")
         .env("HARNESS_MONITOR_RUNTIME_PROFILE", profile)
@@ -439,7 +440,7 @@ fn run_bridge(home: &Path, xdg: &Path, args: &[&str]) -> Output {
     Command::new(bridge_binary())
         .args(args)
         .env("XDG_DATA_HOME", xdg)
-        .env("HOME", home)
+        .env_isolated_home(home)
         .env("HARNESS_HOST_HOME", home)
         .env("RUST_LOG", "harness=info")
         .env_remove("HARNESS_APP_GROUP_ID")
@@ -460,7 +461,7 @@ fn run_bridge_with_profile(
     Command::new(bridge_binary())
         .args(args)
         .env("XDG_DATA_HOME", xdg)
-        .env("HOME", home)
+        .env_isolated_home(home)
         .env("HARNESS_HOST_HOME", home)
         .env("RUST_LOG", "harness=info")
         .env("HARNESS_MONITOR_RUNTIME_PROFILE", profile)

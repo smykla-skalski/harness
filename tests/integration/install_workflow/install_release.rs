@@ -2,6 +2,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::process::Command;
 
+use harness_testkit::CommandEnvExt;
 use tempfile::tempdir;
 
 use super::support::{
@@ -26,7 +27,7 @@ fn install_script_reconciles_shadowed_harness_binary_for_stale_shell_paths() {
     let output = Command::new("/bin/bash")
         .arg(repo.join("scripts/install-harness-release.sh"))
         .current_dir(&repo)
-        .env("HOME", &home)
+        .env_isolated_home(&home)
         .env("CARGO_HOME", &cargo_home)
         .env("CARGO_TARGET_DIR", &target_dir)
         .env("HARNESS_INSTALL_SKIP_CODESIGN", "1")
@@ -78,7 +79,7 @@ fn install_script_installs_managed_codex_adapter_binary() {
     let output = Command::new("/bin/bash")
         .arg(repo.join("scripts/install-harness-release.sh"))
         .current_dir(&repo)
-        .env("HOME", &home)
+        .env_isolated_home(&home)
         .env("CARGO_TARGET_DIR", &target_dir)
         .env("HARNESS_INSTALL_SKIP_CODESIGN", "1")
         .env("PATH", format!("{}:/usr/bin:/bin", install_dir.display()))
@@ -141,7 +142,7 @@ fn install_script_reconciles_shadowed_cargo_harness_binary_in_place() {
     let output = Command::new("/bin/bash")
         .arg(repo.join("scripts/install-harness-release.sh"))
         .current_dir(&repo)
-        .env("HOME", &home)
+        .env_isolated_home(&home)
         .env("CARGO_HOME", &cargo_home)
         .env("CARGO_TARGET_DIR", &target_dir)
         .env("HARNESS_INSTALL_SKIP_CODESIGN", "1")
@@ -202,7 +203,7 @@ fn install_script_fails_when_shadowed_harness_binary_cannot_be_reconciled() {
     let output = Command::new("/bin/bash")
         .arg(repo.join("scripts/install-harness-release.sh"))
         .current_dir(&repo)
-        .env("HOME", &home)
+        .env_isolated_home(&home)
         .env("CARGO_TARGET_DIR", &target_dir)
         .env("HARNESS_INSTALL_SKIP_CODESIGN", "1")
         .env(

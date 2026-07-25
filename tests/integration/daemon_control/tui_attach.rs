@@ -251,7 +251,9 @@ impl AttachedTuiSession {
         command.arg("attach");
         command.arg(tui_id);
         command.env("HARNESS_HOST_HOME", home);
-        command.env("HOME", home);
+        for (key, value) in isolated_home_vars(home) {
+            command.env(key, value);
+        }
         command.env("XDG_DATA_HOME", xdg);
         command.env("HARNESS_DAEMON_DATA_HOME", xdg);
         command.env_remove("HARNESS_APP_GROUP_ID");
