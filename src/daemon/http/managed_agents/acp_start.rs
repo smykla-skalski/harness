@@ -20,6 +20,7 @@ use super::{ensure_acp_enabled, run_acp_agent_blocking};
     post,
     path = "/v1/sessions/{session_id}/managed-agents/acp",
     tag = "managed-agents",
+    description = "Start an ACP-backed managed agent within the given session. Requires the ACP feature flag to be enabled",
     params(
         ("session_id" = String, Path, description = "Session identifier"),
     ),

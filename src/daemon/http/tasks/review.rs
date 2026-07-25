@@ -23,6 +23,7 @@ use super::super::openapi::DaemonErrorBody;
     post,
     path = "/v1/sessions/{session_id}/tasks/{task_id}/submit-for-review",
     tag = "tasks",
+    description = "Submit a task for review and broadcast the updated session snapshot",
     params(
         ("session_id" = String, Path, description = "Session identifier"),
         ("task_id" = String, Path, description = "Task identifier"),
@@ -61,6 +62,7 @@ pub(in crate::daemon::http) async fn post_task_submit_for_review(
     post,
     path = "/v1/sessions/{session_id}/tasks/{task_id}/claim-review",
     tag = "tasks",
+    description = "Claim a pending review on behalf of the calling agent and broadcast the updated session snapshot",
     params(
         ("session_id" = String, Path, description = "Session identifier"),
         ("task_id" = String, Path, description = "Task identifier"),
@@ -99,6 +101,7 @@ pub(in crate::daemon::http) async fn post_task_claim_review(
     post,
     path = "/v1/sessions/{session_id}/tasks/{task_id}/submit-review",
     tag = "tasks",
+    description = "Record a reviewer's verdict on a task under review and broadcast the updated session snapshot",
     params(
         ("session_id" = String, Path, description = "Session identifier"),
         ("task_id" = String, Path, description = "Task identifier"),
@@ -137,6 +140,7 @@ pub(in crate::daemon::http) async fn post_task_submit_review(
     post,
     path = "/v1/sessions/{session_id}/tasks/{task_id}/respond-review",
     tag = "tasks",
+    description = "Record the task author's response to review points and broadcast the updated session snapshot",
     params(
         ("session_id" = String, Path, description = "Session identifier"),
         ("task_id" = String, Path, description = "Task identifier"),
@@ -175,6 +179,7 @@ pub(in crate::daemon::http) async fn post_task_respond_review(
     post,
     path = "/v1/sessions/{session_id}/tasks/{task_id}/arbitrate",
     tag = "tasks",
+    description = "Arbitrate a disputed review to a final verdict and broadcast the updated session snapshot",
     params(
         ("session_id" = String, Path, description = "Session identifier"),
         ("task_id" = String, Path, description = "Task identifier"),

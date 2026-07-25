@@ -34,6 +34,7 @@ pub(super) fn voice_routes() -> OpenApiRouter<DaemonHttpState> {
     post,
     path = "/v1/sessions/{session_id}/voice-sessions",
     tag = "voice",
+    description = "Start a new voice session bound to the given Harness session",
     params(("session_id" = String, Path, description = "Session identifier")),
     request_body = VoiceSessionStartRequest,
     responses(
@@ -65,6 +66,7 @@ async fn post_voice_session(
     post,
     path = "/v1/voice-sessions/{voice_session_id}/audio",
     tag = "voice",
+    description = "Append an audio chunk to an in-progress voice session",
     params(("voice_session_id" = String, Path, description = "Voice session identifier")),
     request_body = VoiceAudioChunkRequest,
     responses(
@@ -96,6 +98,7 @@ async fn post_voice_audio_chunk(
     post,
     path = "/v1/voice-sessions/{voice_session_id}/transcript",
     tag = "voice",
+    description = "Append a transcript segment to an in-progress voice session",
     params(("voice_session_id" = String, Path, description = "Voice session identifier")),
     request_body = VoiceTranscriptUpdateRequest,
     responses(
@@ -127,6 +130,7 @@ async fn post_voice_transcript(
     post,
     path = "/v1/voice-sessions/{voice_session_id}/finish",
     tag = "voice",
+    description = "Mark a voice session as finished and finalize its recorded state",
     params(("voice_session_id" = String, Path, description = "Voice session identifier")),
     request_body = VoiceSessionFinishRequest,
     responses(

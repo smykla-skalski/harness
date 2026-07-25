@@ -24,6 +24,7 @@ pub(super) struct AcpTranscriptQuery {
     get,
     path = "/v1/managed-agents/acp/transcript",
     tag = "managed-agents",
+    description = "Read the recorded ACP agent transcript entries for a session. The session_id query parameter is required; omitting it returns a 400 usage error",
     params(
         ("session_id" = String, Query, description = "Session whose ACP transcript to read (required)"),
     ),

@@ -23,6 +23,7 @@ use super::super::openapi::DaemonErrorBody;
     post,
     path = "/v1/sessions/{session_id}/task",
     tag = "tasks",
+    description = "Create a new task within a session and broadcast the updated session snapshot",
     params(("session_id" = String, Path, description = "Session identifier")),
     request_body = TaskCreateRequest,
     responses(
@@ -58,6 +59,7 @@ pub(in crate::daemon::http) async fn post_task_create(
     post,
     path = "/v1/sessions/{session_id}/tasks/{task_id}/assign",
     tag = "tasks",
+    description = "Assign a task to an agent, wake the dispatch loop, and broadcast the updated session snapshot",
     params(
         ("session_id" = String, Path, description = "Session identifier"),
         ("task_id" = String, Path, description = "Task identifier"),
@@ -96,6 +98,7 @@ pub(in crate::daemon::http) async fn post_task_assign(
     post,
     path = "/v1/sessions/{session_id}/tasks/{task_id}",
     tag = "tasks",
+    description = "Delete a task from a session, wake the dispatch loop, and broadcast the updated session snapshot",
     params(
         ("session_id" = String, Path, description = "Session identifier"),
         ("task_id" = String, Path, description = "Task identifier"),
@@ -134,6 +137,7 @@ pub(in crate::daemon::http) async fn post_task_delete(
     post,
     path = "/v1/sessions/{session_id}/tasks/{task_id}/drop",
     tag = "tasks",
+    description = "Drop a task from its assigned target's queue without deleting the task, wake the dispatch loop, and broadcast the updated session snapshot",
     params(
         ("session_id" = String, Path, description = "Session identifier"),
         ("task_id" = String, Path, description = "Task identifier"),
@@ -172,6 +176,7 @@ pub(in crate::daemon::http) async fn post_task_drop(
     post,
     path = "/v1/sessions/{session_id}/tasks/{task_id}/queue-policy",
     tag = "tasks",
+    description = "Update a task's queue policy, wake the dispatch loop, and broadcast the updated session snapshot",
     params(
         ("session_id" = String, Path, description = "Session identifier"),
         ("task_id" = String, Path, description = "Task identifier"),
@@ -210,6 +215,7 @@ pub(in crate::daemon::http) async fn post_task_queue_policy(
     post,
     path = "/v1/sessions/{session_id}/tasks/{task_id}/status",
     tag = "tasks",
+    description = "Update a task's status, wake the dispatch loop, and broadcast the updated session snapshot",
     params(
         ("session_id" = String, Path, description = "Session identifier"),
         ("task_id" = String, Path, description = "Task identifier"),
@@ -248,6 +254,7 @@ pub(in crate::daemon::http) async fn post_task_update(
     post,
     path = "/v1/sessions/{session_id}/tasks/{task_id}/checkpoint",
     tag = "tasks",
+    description = "Record a checkpoint for a task and broadcast the updated session snapshot",
     params(
         ("session_id" = String, Path, description = "Session identifier"),
         ("task_id" = String, Path, description = "Task identifier"),

@@ -46,6 +46,7 @@ pub(super) fn merge_orchestrator_routes(
     get,
     path = "/v1/task-board/orchestrator/status",
     tag = "task-board",
+    description = "Read the task-board orchestrator's current status, including whether its background automation loop is running and the outcome of the most recent run",
     responses(
         (status = 200, description = "Current orchestrator status", body = TaskBoardOrchestratorStatus),
         (status = 400, description = "Request error", body = DaemonErrorBody),
@@ -72,6 +73,7 @@ async fn get_task_board_orchestrator_status(
     post,
     path = "/v1/task-board/orchestrator/start",
     tag = "task-board",
+    description = "Start the task-board orchestrator's background automation loop and return its status immediately after starting",
     responses(
         (status = 200, description = "Orchestrator status after starting the loop", body = TaskBoardOrchestratorStatus),
         (status = 400, description = "Request error", body = DaemonErrorBody),
@@ -98,6 +100,7 @@ async fn post_task_board_orchestrator_start(
     post,
     path = "/v1/task-board/orchestrator/stop",
     tag = "task-board",
+    description = "Stop the task-board orchestrator's background automation loop and return its status immediately after stopping",
     responses(
         (status = 200, description = "Orchestrator status after stopping the loop", body = TaskBoardOrchestratorStatus),
         (status = 400, description = "Request error", body = DaemonErrorBody),
@@ -124,6 +127,7 @@ async fn post_task_board_orchestrator_stop(
     post,
     path = "/v1/task-board/orchestrator/run-once",
     tag = "task-board",
+    description = "Run a single manual tick of the task-board orchestrator loop (evaluate, dispatch, and start eligible workers) outside its regular schedule. The request's actor attribution is rebound to the authenticated control-plane principal, overriding any client-supplied value",
     request_body = TaskBoardOrchestratorRunOnceRequest,
     responses(
         (status = 200, description = "Orchestrator status after one manual tick", body = TaskBoardOrchestratorStatus),
@@ -157,6 +161,7 @@ async fn post_task_board_orchestrator_run_once(
     get,
     path = "/v1/task-board/orchestrator/runs",
     tag = "task-board",
+    description = "List past task-board orchestrator automation runs, paginated and filterable via query parameters",
     params(TaskBoardAutomationHistoryRequest),
     responses(
         (status = 200, description = "Paged automation run history", body = TaskBoardAutomationHistoryResponse),
@@ -185,6 +190,7 @@ async fn get_task_board_automation_runs(
     get,
     path = "/v1/task-board/orchestrator/runs/{run_id}",
     tag = "task-board",
+    description = "Read a single automation run's full detail, including its per-stage history. Returns an error if the run identifier does not exist",
     params(("run_id" = String, Path, description = "Automation run identifier")),
     responses(
         (status = 200, description = "Automation run detail with stage history", body = TaskBoardAutomationRunDetail),
@@ -213,6 +219,7 @@ async fn get_task_board_automation_run_detail(
     get,
     path = "/v1/task-board/orchestrator/metrics",
     tag = "task-board",
+    description = "Read aggregate task-board automation-run metrics: counts by outcome (running, completed, noop, partial, failed, cancelled), open conflicts, and when the snapshot was captured",
     responses(
         (status = 200, description = "Aggregate automation-run metrics", body = TaskBoardAutomationMetrics),
         (status = 400, description = "Request error", body = DaemonErrorBody),
@@ -239,6 +246,7 @@ async fn get_task_board_automation_metrics(
     post,
     path = "/v1/task-board/orchestrator/force-cancel",
     tag = "task-board",
+    description = "Force-cancel an in-progress task-board automation run. Requires the automation v2 feature flag to be enabled, returning an error otherwise, and every attempt (success or rejection) is recorded as an audit event",
     request_body = TaskBoardAutomationForceCancelRequest,
     responses(
         (status = 200, description = "Disposition of the force-cancel request", body = TaskBoardAutomationForceCancelResponse),
@@ -268,6 +276,7 @@ async fn post_task_board_automation_force_cancel(
     get,
     path = "/v1/task-board/orchestrator/settings",
     tag = "task-board",
+    description = "Read the task-board orchestrator's current settings: enabled workflows, scheduling, retry policy, reviewer config, repository and execution-host configuration, and admission policy",
     responses(
         (status = 200, description = "Current orchestrator settings", body = TaskBoardOrchestratorSettings),
         (status = 400, description = "Request error", body = DaemonErrorBody),
@@ -294,6 +303,7 @@ async fn get_task_board_orchestrator_settings(
     put,
     path = "/v1/task-board/orchestrator/settings",
     tag = "task-board",
+    description = "Apply a partial update to the task-board orchestrator settings; only the fields present in the request body are changed. The admission policy, if included, is validated before the update is persisted and a validation failure rejects the whole request",
     request_body = TaskBoardOrchestratorSettingsUpdateRequest,
     responses(
         (status = 200, description = "Orchestrator settings after the update", body = TaskBoardOrchestratorSettings),

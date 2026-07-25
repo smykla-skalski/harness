@@ -26,6 +26,7 @@ pub(super) struct DeleteAcpAgentQuery {
     delete,
     path = "/v1/managed-agents/{managed_agent_id}",
     tag = "managed-agents",
+    description = "Stop and delete an ACP-backed managed agent. When session_id is given, the delete is rejected unless the agent belongs to that session",
     params(
         ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
         ("session_id" = Option<String>, Query, description = "Reject the delete unless the agent belongs to this session"),

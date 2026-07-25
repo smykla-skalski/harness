@@ -51,6 +51,7 @@ pub(super) fn merge_git_routes(
     get,
     path = "/v1/task-board/orchestrator/runtime-config",
     tag = "task-board",
+    description = "Read the task-board git runtime configuration (author identity, signing mode, per-repository overrides). Secret fields are never returned; only *_configured presence flags are included",
     responses(
         (status = 200, description = "Current git runtime configuration", body = TaskBoardGitRuntimeConfig),
         (status = 400, description = "Request error", body = DaemonErrorBody),
@@ -77,6 +78,7 @@ async fn get_task_board_orchestrator_runtime_config(
     put,
     path = "/v1/task-board/orchestrator/runtime-config",
     tag = "task-board",
+    description = "Replace the task-board git runtime configuration. Submitted secret fields (SSH/GPG keys, passphrases) are normalized and retained in process memory only; the persisted config and the response strip them down to *_configured flags",
     request_body = TaskBoardGitRuntimeConfig,
     responses(
         (status = 200, description = "Git runtime configuration after the update", body = TaskBoardGitRuntimeConfig),
@@ -105,6 +107,7 @@ async fn put_task_board_orchestrator_runtime_config(
     put,
     path = "/v1/task-board/orchestrator/github-tokens",
     tag = "task-board",
+    description = "Replace the in-memory GitHub token snapshot used for task-board git and API operations, including per-repository token overrides. Tokens are held in process memory only; the response reports configured state and counts, never the token values",
     request_body = TaskBoardGitHubTokensSyncRequest,
     responses(
         (status = 200, description = "Outcome of syncing GitHub repository tokens", body = TaskBoardGitHubTokensSyncResponse),
@@ -133,6 +136,7 @@ async fn put_task_board_orchestrator_github_tokens(
     put,
     path = "/v1/task-board/orchestrator/todoist-token",
     tag = "task-board",
+    description = "Replace the in-memory Todoist API token used by the task-board orchestrator's Todoist inbox sync. The token is held in process memory only; the response reports whether a token is configured, never the token itself",
     request_body = TaskBoardTodoistTokenSyncRequest,
     responses(
         (status = 200, description = "Outcome of syncing the Todoist token", body = TaskBoardTodoistTokenSyncResponse),
@@ -161,6 +165,7 @@ async fn put_task_board_orchestrator_todoist_token(
     put,
     path = "/v1/task-board/orchestrator/openrouter-token",
     tag = "task-board",
+    description = "Replace the in-memory OpenRouter API key used by the task-board orchestrator's OpenRouter-backed managed-agent runtime. The key is held in process memory only; the response reports whether a key is configured, never the key itself",
     request_body = TaskBoardOpenRouterTokenSyncRequest,
     responses(
         (status = 200, description = "Outcome of syncing the OpenRouter token", body = TaskBoardOpenRouterTokenSyncResponse),
@@ -189,6 +194,7 @@ async fn put_task_board_orchestrator_openrouter_token(
     get,
     path = "/v1/task-board/git/identity-defaults",
     tag = "task-board",
+    description = "Discover placeholder git identity and signing defaults from the local git config, gh CLI, SSH keys under ~/.ssh, and environment variables, for pre-filling the runtime-config form. Never returns secret material",
     responses(
         (status = 200, description = "Discovered git identity and signing defaults", body = TaskBoardGitIdentityDefaults),
         (status = 400, description = "Request error", body = DaemonErrorBody),
@@ -215,6 +221,7 @@ async fn get_task_board_git_identity_defaults(
     post,
     path = "/v1/task-board/git/signing/verify",
     tag = "task-board",
+    description = "Run a dry-run signature check against the git signing profile resolved for the given (or default) repository, so the UI can confirm key, passphrase, and mode line up before saving. Signing failures are reported as a Failed variant in the 200 response rather than as an HTTP error",
     request_body = TaskBoardGitSigningVerifyRequest,
     responses(
         (status = 200, description = "Result of verifying git commit signing", body = TaskBoardGitSigningVerifyResponse),
@@ -243,6 +250,7 @@ async fn post_task_board_git_signing_verify(
     put,
     path = "/v1/task-board/git/runtime/key-material",
     tag = "task-board",
+    description = "Replace the process-only SSH/GPG key material used for git signing and pushes, without mutating the durable database-backed runtime configuration. Key material lives only in daemon process memory and is lost on restart",
     request_body = TaskBoardGitRuntimeKeyMaterialSyncRequest,
     responses(
         (status = 200, description = "Outcome of syncing git runtime key material", body = TaskBoardGitRuntimeKeyMaterialSyncResponse),
@@ -271,6 +279,7 @@ async fn put_task_board_git_runtime_key_material(
     post,
     path = "/v1/task-board/git/runtime/secret-handoff/prepare",
     tag = "task-board",
+    description = "Prepare a non-destructive handoff of pending legacy plaintext git secrets to the Monitor secure store. If a handoff is pending, the response includes the full runtime config with plaintext SSH/GPG key and passphrase values so Monitor can migrate them into the Keychain; otherwise it returns prepared=false with no runtime data",
     responses(
         (status = 200, description = "Prepared secret-handoff envelope", body = TaskBoardGitRuntimeSecretHandoffPrepareResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
@@ -297,6 +306,7 @@ async fn post_task_board_git_runtime_secret_handoff_prepare(
     post,
     path = "/v1/task-board/git/runtime/secret-handoff/ack",
     tag = "task-board",
+    description = "Acknowledge that the Monitor secure store received a prepared secret handoff, verified by migration ID and digest. The first acknowledgement for a pending handoff replaces in-memory git secrets from the handoff payload and deletes the legacy plaintext config file; a stale or digest-mismatched migration ID is rejected",
     request_body = TaskBoardGitRuntimeSecretHandoffAckRequest,
     responses(
         (status = 200, description = "Result of acknowledging the secret handoff", body = TaskBoardGitRuntimeSecretHandoffAckResponse),

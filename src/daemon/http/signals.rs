@@ -30,6 +30,7 @@ pub(super) fn signal_routes() -> OpenApiRouter<DaemonHttpState> {
     post,
     path = "/v1/sessions/{session_id}/signal",
     tag = "sessions",
+    description = "Send a signal to the agent running in the given session, broadcasting the updated session snapshot to observers when delivery succeeds",
     params(("session_id" = String, Path, description = "Session identifier")),
     request_body = SignalSendRequest,
     responses(
@@ -95,6 +96,7 @@ async fn send_signal_response(
     post,
     path = "/v1/sessions/{session_id}/signal-cancel",
     tag = "sessions",
+    description = "Cancel a previously sent signal for the given session, broadcasting the updated session snapshot to observers when cancellation succeeds",
     params(("session_id" = String, Path, description = "Session identifier")),
     request_body = SignalCancelRequest,
     responses(
@@ -127,6 +129,7 @@ pub(super) async fn post_cancel_signal(
     post,
     path = "/v1/sessions/{session_id}/signal-ack",
     tag = "sessions",
+    description = "Record acknowledgment of a signal for the given session, broadcasting the updated session snapshot to observers when the acknowledgment is recorded",
     params(("session_id" = String, Path, description = "Session identifier")),
     request_body = SignalAckRequest,
     responses(

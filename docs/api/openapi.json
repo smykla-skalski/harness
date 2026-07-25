@@ -2,18 +2,40 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Harness daemon API",
-    "description": "REST API served by the Harness daemon (harness-daemon). The API is dual-transport: most endpoints mirror a WebSocket JSON-RPC method, recorded per operation as the `x-websocket-method` extension. Generated from annotated handlers - do not edit docs/api/openapi.json by hand; regenerate with `mise run openapi:generate`.",
+    "description": "REST API served by the Harness daemon (harness-daemon). The API is dual-transport: most endpoints mirror a WebSocket JSON-RPC method, recorded per operation as the `x-websocket-method` extension. Generated from annotated handlers - do not edit docs/api/openapi.json by hand; regenerate with `mise run openapi:generate`",
+    "contact": {
+      "name": "Bart Smykla",
+      "url": "https://github.com/smykla-skalski/harness",
+      "email": "bartek@smykla.com"
+    },
     "license": {
       "name": "MIT"
     },
     "version": "50.1.0"
   },
+  "servers": [
+    {
+      "url": "http://{host}:{port}",
+      "description": "Local per-project daemon HTTP listener. The daemon binds an OS-assigned ephemeral port per instance; discover the live host and port from the daemon manifest rather than assuming a fixed value",
+      "variables": {
+        "host": {
+          "default": "127.0.0.1",
+          "description": "Loopback host the daemon binds by default"
+        },
+        "port": {
+          "default": "0",
+          "description": "OS-assigned ephemeral port, resolved per daemon instance"
+        }
+      }
+    }
+  ],
   "paths": {
     "/v1/audit/events": {
       "get": {
         "tags": [
           "daemon"
         ],
+        "description": "Return a filtered, paginated page of Harness Monitor audit events. The page is redacted before being returned when the authenticated caller is a paired remote viewer client",
         "operationId": "get_audit_events",
         "parameters": [
           {
@@ -155,6 +177,7 @@
         "tags": [
           "daemon"
         ],
+        "description": "Enable or disable specific host bridge projects and return the resulting bridge status. The outcome is also recorded as a bridgeLifecycle audit event",
         "operationId": "post_bridge_reconfigure",
         "requestBody": {
           "content": {
@@ -217,6 +240,7 @@
         "tags": [
           "daemon"
         ],
+        "description": "Return the initial configuration payload for newly connecting clients: personas, per-runtime model catalogs, ACP agents, and the ACP runtime probe",
         "operationId": "get_config",
         "responses": {
           "200": {
@@ -256,6 +280,7 @@
         "tags": [
           "daemon"
         ],
+        "description": "Return the daemon's current tracing log level",
         "operationId": "get_log_level",
         "responses": {
           "200": {
@@ -303,6 +328,7 @@
         "tags": [
           "daemon"
         ],
+        "description": "Update the daemon's tracing log level at runtime and record the change as an audit event",
         "operationId": "put_log_level",
         "requestBody": {
           "content": {
@@ -365,6 +391,7 @@
         "tags": [
           "daemon"
         ],
+        "description": "Shut down all active ACP agent sessions, then request daemon shutdown",
         "operationId": "post_stop_daemon",
         "responses": {
           "200": {
@@ -414,6 +441,7 @@
         "tags": [
           "daemon"
         ],
+        "description": "Record a client-submitted telemetry event, persisting it to the daemon database when one is configured",
         "operationId": "post_daemon_telemetry",
         "requestBody": {
           "content": {
@@ -475,6 +503,7 @@
         "tags": [
           "daemon"
         ],
+        "description": "Return the daemon diagnostics report. The report is redacted before being returned when the authenticated caller is a paired remote viewer client",
         "operationId": "get_diagnostics",
         "responses": {
           "200": {
@@ -524,6 +553,7 @@
         "tags": [
           "daemon"
         ],
+        "description": "Return current GitHub API usage diagnostics tracked by the daemon, such as rate-limit and request counters",
         "operationId": "get_github_status",
         "responses": {
           "200": {
@@ -563,6 +593,7 @@
         "tags": [
           "daemon"
         ],
+        "description": "Report the daemon's health snapshot, combining build and version metadata from the manifest with a live database connectivity check",
         "operationId": "get_health",
         "responses": {
           "200": {
@@ -612,6 +643,7 @@
         "tags": [
           "managed-agents"
         ],
+        "description": "Inspect ACP-backed managed agent state across the daemon, optionally scoped to one session. Requires the ACP feature flag to be enabled",
         "operationId": "get_acp_inspect",
         "parameters": [
           {
@@ -672,6 +704,7 @@
         "tags": [
           "managed-agents"
         ],
+        "description": "Read the recorded ACP agent transcript entries for a session. The session_id query parameter is required; omitting it returns a 400 usage error",
         "operationId": "get_acp_transcript",
         "parameters": [
           {
@@ -732,6 +765,7 @@
         "tags": [
           "managed-agents"
         ],
+        "description": "Inspect Codex-backed managed agent run state across the daemon, optionally scoped to one session",
         "operationId": "get_codex_inspect",
         "parameters": [
           {
@@ -792,6 +826,7 @@
         "tags": [
           "managed-agents"
         ],
+        "description": "Read the recorded Codex agent transcript entries for a session. The session_id query parameter is required; omitting it returns a 400 usage error",
         "operationId": "get_codex_transcript",
         "parameters": [
           {
@@ -852,6 +887,7 @@
         "tags": [
           "managed-agents"
         ],
+        "description": "Fetch the current snapshot of a managed agent by its identifier",
         "operationId": "get_managed_agent",
         "parameters": [
           {
@@ -910,6 +946,7 @@
         "tags": [
           "managed-agents"
         ],
+        "description": "Stop and delete an ACP-backed managed agent. When session_id is given, the delete is rejected unless the agent belongs to that session",
         "operationId": "delete_acp_agent",
         "parameters": [
           {
@@ -979,6 +1016,7 @@
         "tags": [
           "managed-agents"
         ],
+        "description": "Resolve a pending Codex approval request (for example an exec or patch approval) with the caller's decision",
         "operationId": "post_codex_agent_approval",
         "parameters": [
           {
@@ -1061,6 +1099,7 @@
         "tags": [
           "managed-agents"
         ],
+        "description": "Send input bytes to a running terminal-backed managed agent's PTY and return the updated snapshot",
         "operationId": "post_terminal_agent_input",
         "parameters": [
           {
@@ -1134,6 +1173,7 @@
         "tags": [
           "managed-agents"
         ],
+        "description": "Interrupt the current turn of a running Codex-backed managed agent run",
         "operationId": "post_codex_agent_interrupt",
         "parameters": [
           {
@@ -1194,6 +1234,7 @@
         "tags": [
           "managed-agents"
         ],
+        "description": "Log an ACP-backed managed agent out of its connected provider account",
         "operationId": "post_acp_agent_logout",
         "parameters": [
           {
@@ -1254,6 +1295,7 @@
         "tags": [
           "managed-agents"
         ],
+        "description": "Resolve a pending ACP permission batch, a group of tool-call permission requests, with the caller's decision",
         "operationId": "post_acp_permission",
         "parameters": [
           {
@@ -1336,6 +1378,7 @@
         "tags": [
           "managed-agents"
         ],
+        "description": "Send a prompt to a running ACP-backed managed agent and return its snapshot after dispatch",
         "operationId": "post_acp_agent_prompt",
         "parameters": [
           {
@@ -1409,6 +1452,7 @@
         "tags": [
           "managed-agents"
         ],
+        "description": "Signal that a terminal-backed managed agent has finished its startup sequence and is ready for input",
         "operationId": "post_terminal_agent_ready",
         "parameters": [
           {
@@ -1469,6 +1513,7 @@
         "tags": [
           "managed-agents"
         ],
+        "description": "Resize a running terminal-backed managed agent's PTY and return the updated snapshot",
         "operationId": "post_terminal_agent_resize",
         "parameters": [
           {
@@ -1542,6 +1587,7 @@
         "tags": [
           "managed-agents"
         ],
+        "description": "List one page of sessions the ACP agent itself reports, optionally filtered by working directory. These session ids are owned by the agent, not harness, and are not reconciled against the harness session index",
         "operationId": "get_acp_sessions",
         "parameters": [
           {
@@ -1620,6 +1666,7 @@
         "tags": [
           "managed-agents"
         ],
+        "description": "Delete an agent-owned session from the ACP agent's own session store",
         "operationId": "delete_acp_session",
         "parameters": [
           {
@@ -1689,6 +1736,7 @@
         "tags": [
           "managed-agents"
         ],
+        "description": "Close an agent-owned session in the ACP agent's own session store without deleting it",
         "operationId": "post_acp_session_close",
         "parameters": [
           {
@@ -1758,6 +1806,7 @@
         "tags": [
           "managed-agents"
         ],
+        "description": "Send an additional steering prompt to a running Codex-backed managed agent run",
         "operationId": "post_codex_agent_steer",
         "parameters": [
           {
@@ -1831,6 +1880,7 @@
         "tags": [
           "managed-agents"
         ],
+        "description": "Stop a managed agent, probing the Codex, ACP, and terminal agent managers in turn to locate which backend owns the given identifier",
         "operationId": "post_terminal_agent_stop",
         "parameters": [
           {
@@ -1891,6 +1941,7 @@
         "tags": [
           "daemon"
         ],
+        "description": "Return the catalog of models available through OpenRouter",
         "operationId": "get_openrouter_models",
         "responses": {
           "200": {
@@ -1940,6 +1991,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Dump every policy canvas with full workspace metadata, or a selected subset of policies without workspace metadata, as an exact transfer bundle",
         "operationId": "post_policy_dump",
         "requestBody": {
           "content": {
@@ -2001,6 +2053,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Validate and atomically merge or replace policy canvas records from a transfer bundle. Merge mode upserts by canvas ID while preserving unrelated canvases; replace-all mode requires workspace metadata and replaces the entire workspace",
         "operationId": "post_policy_import_batch",
         "requestBody": {
           "content": {
@@ -2062,6 +2115,7 @@
         "tags": [
           "policy"
         ],
+        "description": "List the pending approval grants awaiting a human decision",
         "operationId": "get_policy_approval_grants",
         "responses": {
           "200": {
@@ -2111,6 +2165,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Resolve a pending approval grant to approved or denied. Fails when the grant is missing or already resolved",
         "operationId": "post_policy_approval_grant_resolve",
         "requestBody": {
           "content": {
@@ -2173,6 +2228,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Revoke a live pending or approved approval grant. Fails when the grant is missing, terminal, consumed, or expired",
         "operationId": "post_policy_approval_grant_revoke",
         "requestBody": {
           "content": {
@@ -2235,6 +2291,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Return the full policy-canvas workspace snapshot, seeding a default workspace with built-in automation canvases and scenarios on first use",
         "operationId": "get_policy_canvas_workspace",
         "responses": {
           "200": {
@@ -2284,6 +2341,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Switch the authoritative active policy canvas and return the updated workspace snapshot",
         "operationId": "post_policy_canvas_set_active",
         "requestBody": {
           "content": {
@@ -2346,6 +2404,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Create a new policy canvas and return the updated workspace snapshot",
         "operationId": "post_policy_canvas_create",
         "requestBody": {
           "content": {
@@ -2408,6 +2467,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Delete an existing policy canvas and return the updated workspace snapshot",
         "operationId": "post_policy_canvas_delete",
         "requestBody": {
           "content": {
@@ -2470,6 +2530,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Duplicate an existing policy canvas under a new title and return the updated workspace snapshot",
         "operationId": "post_policy_canvas_duplicate",
         "requestBody": {
           "content": {
@@ -2532,6 +2593,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Serialize the active (or a named) policy canvas document to a portable JSON export",
         "operationId": "post_policy_export",
         "requestBody": {
           "content": {
@@ -2594,6 +2656,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Toggle the global policy enforcement gate without mutating any policy canvas, and return the updated workspace snapshot",
         "operationId": "post_policy_canvas_set_global_enforcement",
         "requestBody": {
           "content": {
@@ -2656,6 +2719,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Validate an external policy graph document, create a new canvas from it, and make that canvas active",
         "operationId": "post_policy_import",
         "requestBody": {
           "content": {
@@ -2718,6 +2782,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Rename an existing policy canvas and return the updated workspace snapshot",
         "operationId": "post_policy_canvas_rename",
         "requestBody": {
           "content": {
@@ -2780,6 +2845,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Toggle the emergency spawn kill switch that blocks all new agent spawns, and return the updated workspace snapshot",
         "operationId": "post_policy_canvas_set_spawn_kill_switch",
         "requestBody": {
           "content": {
@@ -2842,6 +2908,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Toggle the fail-closed switch that requires a live enforced policy before an agent spawn is permitted, and return the updated workspace snapshot",
         "operationId": "post_policy_canvas_set_spawn_requires_live_policy",
         "requestBody": {
           "content": {
@@ -2904,6 +2971,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Load the V2 policy pipeline draft document for the active canvas, or for a specific canvas when `canvas_id` is provided",
         "operationId": "get_policy_pipeline",
         "parameters": [
           {
@@ -2961,6 +3029,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Validate and persist a policy pipeline draft for a canvas, returning the validation outcome and, when valid, the persisted draft. The request requires `canvas_id`; omitting it fails with an invalid-transition error",
         "operationId": "put_policy_pipeline_draft",
         "requestBody": {
           "content": {
@@ -3023,6 +3092,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Summarize the active-revision status, latest simulation, and pending approval grant count for the V2 policy pipeline",
         "operationId": "get_policy_audit",
         "parameters": [
           {
@@ -3082,6 +3152,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Diff a candidate draft against the currently live enforced policy across every scenario without mutating any durable state",
         "operationId": "post_policy_go_live_diff",
         "requestBody": {
           "content": {
@@ -3144,6 +3215,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Make a policy pipeline draft the canvas's live enforced document: refresh its simulation, promote it to enforced mode, and enable global policy enforcement in one transaction",
         "operationId": "post_policy_make_live",
         "requestBody": {
           "content": {
@@ -3206,6 +3278,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Promote a policy pipeline draft to the canvas's enforced live document and return the resulting document and trace ID. Internally this runs the same live-promotion path as `make-live`, including enabling global enforcement, but the response omits the enforcement flag and refreshed workspace",
         "operationId": "post_policy_promote",
         "requestBody": {
           "content": {
@@ -3268,6 +3341,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Replay the active draft against a window of recently recorded real policy decisions for the canvas, without mutating any durable state",
         "operationId": "post_policy_replay",
         "requestBody": {
           "content": {
@@ -3330,6 +3404,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Simulate a policy pipeline draft against the confidence scenario set and return per-scenario decisions without promoting the draft to live",
         "operationId": "post_policy_simulate",
         "requestBody": {
           "content": {
@@ -3392,6 +3467,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Create a new editable policy scenario used for confidence simulation and return the updated workspace snapshot. Scenarios feed only the simulation and never affect the live enforcement gate",
         "operationId": "post_policy_scenario_create",
         "requestBody": {
           "content": {
@@ -3454,6 +3530,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Delete a policy scenario and return the updated workspace snapshot",
         "operationId": "post_policy_scenario_delete",
         "requestBody": {
           "content": {
@@ -3516,6 +3593,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Restore the built-in seeded scenario set, discarding any custom scenarios, and return the updated workspace snapshot",
         "operationId": "post_policy_scenario_reset",
         "responses": {
           "200": {
@@ -3565,6 +3643,7 @@
         "tags": [
           "policy"
         ],
+        "description": "Update an existing policy scenario's name and input, and return the updated workspace snapshot",
         "operationId": "post_policy_scenario_update",
         "requestBody": {
           "content": {
@@ -3627,6 +3706,7 @@
         "tags": [
           "daemon"
         ],
+        "description": "List known projects along with their registered worktrees",
         "operationId": "get_projects",
         "responses": {
           "200": {
@@ -3679,6 +3759,7 @@
         "tags": [
           "daemon"
         ],
+        "description": "Report whether the daemon's async database connection is ready to serve requests, along with the current daemon epoch",
         "operationId": "get_ready",
         "responses": {
           "200": {
@@ -3727,7 +3808,7 @@
         "tags": [
           "pairing"
         ],
-        "description": "Revoke the remote client credential bound to the authenticated caller. Error bodies use an ad-hoc error object carrying code and message but no details field.",
+        "description": "Revoke the remote client credential bound to the authenticated caller. Error bodies use an ad-hoc error object carrying code and message but no details field",
         "operationId": "post_remote_client_self_revoke",
         "responses": {
           "200": {
@@ -3776,7 +3857,7 @@
         "tags": [
           "pairing"
         ],
-        "description": "Claim a one-time pairing code to mint a remote client credential. Public: no daemon credentials, guarded by domain, TTL, and rate limits. Error bodies use an ad-hoc error object carrying code and message but no details field.",
+        "description": "Claim a one-time pairing code to mint a remote client credential. Public: no daemon credentials, guarded by domain, TTL, and rate limits. Error bodies use an ad-hoc error object carrying code and message but no details field",
         "operationId": "post_remote_pair_claim",
         "requestBody": {
           "content": {
@@ -3868,7 +3949,7 @@
         "tags": [
           "pairing"
         ],
-        "description": "Check the lifecycle status of a pairing request by its opaque id. Public: no daemon credentials, rate limited, output redacted. Error bodies use an ad-hoc error object carrying code and message but no details field.",
+        "description": "Check the lifecycle status of a pairing request by its opaque id. Public: no daemon credentials, rate limited, output redacted. Error bodies use an ad-hoc error object carrying code and message but no details field",
         "operationId": "post_remote_pair_status",
         "requestBody": {
           "content": {
@@ -3930,6 +4011,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Preview per-target eligibility for a review action before it is applied, recording the preview to the audit database when configured",
         "operationId": "post_review_action_preview",
         "requestBody": {
           "content": {
@@ -3992,6 +4074,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Approve the given review targets and report the outcome of applying each approval",
         "operationId": "post_approve_reviews",
         "requestBody": {
           "content": {
@@ -4054,6 +4137,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Run the automatic approve-and-merge pass over the given targets and report the outcome",
         "operationId": "post_auto_reviews",
         "requestBody": {
           "content": {
@@ -4116,6 +4200,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Fetch and proxy a user's avatar image from GitHub, returned base64-encoded",
         "operationId": "post_review_avatar",
         "requestBody": {
           "content": {
@@ -4178,6 +4263,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Fetch the current body text of a pull request",
         "operationId": "post_review_body",
         "requestBody": {
           "content": {
@@ -4240,6 +4326,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Update a pull request body, detecting drift if the body changed upstream since it was last read",
         "operationId": "post_review_body_update",
         "requestBody": {
           "content": {
@@ -4302,6 +4389,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Clear all cached review data, including the timeline cache, and report the number of entries removed",
         "operationId": "delete_reviews_cache",
         "responses": {
           "200": {
@@ -4351,6 +4439,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Return the feature flags that gate review tooling capabilities for the authenticated caller",
         "operationId": "get_review_capabilities",
         "responses": {
           "200": {
@@ -4400,6 +4489,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Post a comment on the given review targets and report the outcome",
         "operationId": "post_comment_reviews",
         "requestBody": {
           "content": {
@@ -4462,6 +4552,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Fetch a base64-encoded image blob for a file in a pull request, along with its metadata",
         "operationId": "post_review_files_blob",
         "requestBody": {
           "content": {
@@ -4524,6 +4615,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Post a line comment on a file or reply to an existing review thread",
         "operationId": "post_review_files_comment",
         "requestBody": {
           "content": {
@@ -4586,6 +4678,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "List the files changed in a pull request",
         "operationId": "post_review_files_list",
         "requestBody": {
           "content": {
@@ -4648,6 +4741,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "List the entries in the local bare-clone registry used to serve review file content",
         "operationId": "post_review_files_local_clones",
         "responses": {
           "200": {
@@ -4700,6 +4794,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Delete a local bare clone by its repository key segment and return the registry state after removal",
         "operationId": "post_review_files_local_clones_delete",
         "requestBody": {
           "content": {
@@ -4762,6 +4857,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Fetch the per-path patches for a pull request, detecting drift against the current upstream state",
         "operationId": "post_review_files_patch",
         "requestBody": {
           "content": {
@@ -4824,6 +4920,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Fetch line-limited previews of the per-path patches for a pull request, detecting drift against upstream",
         "operationId": "post_review_files_preview",
         "requestBody": {
           "content": {
@@ -4886,6 +4983,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Mark the given files as viewed or unviewed and report the outcome for each path",
         "operationId": "post_review_files_viewed",
         "requestBody": {
           "content": {
@@ -4948,6 +5046,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Add a label to the given review targets and report the outcome for each",
         "operationId": "post_label_reviews",
         "requestBody": {
           "content": {
@@ -5010,6 +5109,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Merge the given pull requests and report the outcome for each target",
         "operationId": "post_merge_reviews",
         "requestBody": {
           "content": {
@@ -5072,6 +5172,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Return historical policy runs for a subject along with aggregate metrics",
         "operationId": "post_reviews_policy_history",
         "requestBody": {
           "content": {
@@ -5134,6 +5235,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Preview the policy workflow steps that would run for a target, recording the preview to the audit database when configured",
         "operationId": "post_reviews_policy_preview",
         "requestBody": {
           "content": {
@@ -5196,6 +5298,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Start a policy workflow run for a target, or resume an existing in-progress run",
         "operationId": "post_reviews_policy_start",
         "requestBody": {
           "content": {
@@ -5258,6 +5361,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Return the active and recent policy runs for a subject",
         "operationId": "post_reviews_policy_status",
         "requestBody": {
           "content": {
@@ -5320,6 +5424,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Resolve pull request references to review items, reporting any that could not be found",
         "operationId": "post_resolve_review_pull_requests",
         "requestBody": {
           "content": {
@@ -5382,6 +5487,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Query reviews matching the given filters and return each with its summary",
         "operationId": "post_query_reviews",
         "requestBody": {
           "content": {
@@ -5444,6 +5550,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Refresh the given review items from the upstream provider and return their updated state",
         "operationId": "post_refresh_reviews",
         "requestBody": {
           "content": {
@@ -5506,6 +5613,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "List the repositories the organization exposes for review, based on the request filters",
         "operationId": "post_review_repositories",
         "requestBody": {
           "content": {
@@ -5568,6 +5676,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Re-request review from the assigned reviewers on the given targets",
         "operationId": "post_request_review",
         "requestBody": {
           "content": {
@@ -5630,6 +5739,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Re-run the failed status checks for the given targets and report the outcome",
         "operationId": "post_rerun_reviews_checks",
         "requestBody": {
           "content": {
@@ -5692,6 +5802,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Mark a review thread as resolved or unresolved and confirm the resulting state",
         "operationId": "post_review_review_threads_resolve",
         "requestBody": {
           "content": {
@@ -5754,6 +5865,7 @@
         "tags": [
           "reviews"
         ],
+        "description": "Fetch a page of a pull request's timeline events",
         "operationId": "post_review_timeline",
         "requestBody": {
           "content": {
@@ -5816,6 +5928,7 @@
         "tags": [
           "daemon"
         ],
+        "description": "Resolve a runtime-specific session identifier to the Harness session it belongs to, given the runtime name and runtime session id as query parameters",
         "operationId": "get_runtime_session_resolution",
         "parameters": [
           {
@@ -5883,6 +5996,7 @@
         "tags": [
           "daemon"
         ],
+        "description": "Return the cached probe of ACP coding-agent runtime availability. Results reflect the last periodic probe rather than a live check performed on this request",
         "operationId": "get_runtimes_probe",
         "responses": {
           "200": {
@@ -5922,6 +6036,7 @@
         "tags": [
           "sessions"
         ],
+        "description": "List all sessions across projects, including archived and otherwise-excluded sessions",
         "operationId": "get_sessions",
         "responses": {
           "200": {
@@ -5972,6 +6087,7 @@
         "tags": [
           "sessions"
         ],
+        "description": "Start a new session and broadcast the updated sessions list to subscribers",
         "operationId": "post_session_start",
         "requestBody": {
           "content": {
@@ -6034,6 +6150,7 @@
         "tags": [
           "sessions"
         ],
+        "description": "Adopt an externally created session directory into daemon tracking. On macOS when running sandboxed, the session root is resolved through a security-scoped bookmark identifier instead of a raw path",
         "operationId": "post_session_adopt",
         "requestBody": {
           "content": {
@@ -6106,6 +6223,7 @@
         "tags": [
           "sessions"
         ],
+        "description": "Fetch detail for a single session. Pass `scope=core` to receive the reduced core view instead of the full detail",
         "operationId": "get_session",
         "parameters": [
           {
@@ -6173,6 +6291,7 @@
         "tags": [
           "sessions"
         ],
+        "description": "Delete a session and broadcast the updated sessions list. Returns 404 with an ad-hoc `{\"error\": \"session not found\"}` body rather than the standard error schema when the session does not exist",
         "operationId": "delete_session",
         "parameters": [
           {
@@ -6236,6 +6355,7 @@
         "tags": [
           "agents"
         ],
+        "description": "Remove an agent from a session and broadcast the updated session snapshot",
         "operationId": "post_remove_agent",
         "parameters": [
           {
@@ -6318,6 +6438,7 @@
         "tags": [
           "agents"
         ],
+        "description": "Change the role of an agent within a session and broadcast the updated session snapshot",
         "operationId": "post_role_change",
         "parameters": [
           {
@@ -6400,6 +6521,7 @@
         "tags": [
           "sessions"
         ],
+        "description": "Archive a session. This also stops any running ACP agents attached to the session and broadcasts the updated sessions list",
         "operationId": "post_session_archive",
         "parameters": [
           {
@@ -6473,6 +6595,7 @@
         "tags": [
           "sessions"
         ],
+        "description": "End a session and broadcast the resulting session snapshot to observers",
         "operationId": "post_end_session",
         "parameters": [
           {
@@ -6546,6 +6669,7 @@
         "tags": [
           "agents"
         ],
+        "description": "Apply or preview an improver-generated patch for the given session, returning the outcome of whichever mode the request specifies",
         "operationId": "post_improver_apply",
         "parameters": [
           {
@@ -6619,6 +6743,7 @@
         "tags": [
           "sessions"
         ],
+        "description": "Join an agent to an existing session and broadcast the updated session snapshot",
         "operationId": "post_session_join",
         "parameters": [
           {
@@ -6692,6 +6817,7 @@
         "tags": [
           "agents"
         ],
+        "description": "Transfer session leadership to another agent and broadcast the updated session snapshot",
         "operationId": "post_transfer_leader",
         "parameters": [
           {
@@ -6765,6 +6891,7 @@
         "tags": [
           "sessions"
         ],
+        "description": "Remove the calling agent from the session and broadcast the updated session snapshot",
         "operationId": "post_leave_session",
         "parameters": [
           {
@@ -6838,6 +6965,7 @@
         "tags": [
           "managed-agents"
         ],
+        "description": "List the managed agents currently running within the given session",
         "operationId": "get_managed_agents",
         "parameters": [
           {
@@ -6898,6 +7026,7 @@
         "tags": [
           "managed-agents"
         ],
+        "description": "Start an ACP-backed managed agent within the given session. Requires the ACP feature flag to be enabled",
         "operationId": "post_acp_agent_start",
         "parameters": [
           {
@@ -6971,6 +7100,7 @@
         "tags": [
           "managed-agents"
         ],
+        "description": "Start a Codex-backed managed agent run within the given session. Uses control-request authorization rather than the standard bearer check, since the run request itself carries control metadata",
         "operationId": "post_codex_agent_start",
         "parameters": [
           {
@@ -7044,6 +7174,7 @@
         "tags": [
           "managed-agents"
         ],
+        "description": "Start a terminal-backed managed agent (a PTY session) within the given session",
         "operationId": "post_terminal_agent_start",
         "parameters": [
           {
@@ -7117,6 +7248,7 @@
         "tags": [
           "sessions"
         ],
+        "description": "Attach an observer to the session and broadcast the updated session snapshot. The request body is optional and may be omitted entirely",
         "operationId": "post_observe_session",
         "parameters": [
           {
@@ -7191,6 +7323,7 @@
         "tags": [
           "sessions"
         ],
+        "description": "Register a runtime-specific session identifier against a Harness session, broadcasting an updated session snapshot to observers when the registration is newly recorded",
         "operationId": "post_runtime_session",
         "parameters": [
           {
@@ -7264,6 +7397,7 @@
         "tags": [
           "sessions"
         ],
+        "description": "Send a signal to the agent running in the given session, broadcasting the updated session snapshot to observers when delivery succeeds",
         "operationId": "post_send_signal",
         "parameters": [
           {
@@ -7337,6 +7471,7 @@
         "tags": [
           "sessions"
         ],
+        "description": "Record acknowledgment of a signal for the given session, broadcasting the updated session snapshot to observers when the acknowledgment is recorded",
         "operationId": "post_signal_ack",
         "parameters": [
           {
@@ -7410,6 +7545,7 @@
         "tags": [
           "sessions"
         ],
+        "description": "Cancel a previously sent signal for the given session, broadcasting the updated session snapshot to observers when cancellation succeeds",
         "operationId": "post_cancel_signal",
         "parameters": [
           {
@@ -7483,6 +7619,7 @@
         "tags": [
           "tasks"
         ],
+        "description": "Create a new task within a session and broadcast the updated session snapshot",
         "operationId": "post_task_create",
         "parameters": [
           {
@@ -7556,6 +7693,7 @@
         "tags": [
           "tasks"
         ],
+        "description": "Delete a task from a session, wake the dispatch loop, and broadcast the updated session snapshot",
         "operationId": "post_task_delete",
         "parameters": [
           {
@@ -7638,6 +7776,7 @@
         "tags": [
           "tasks"
         ],
+        "description": "Arbitrate a disputed review to a final verdict and broadcast the updated session snapshot",
         "operationId": "post_task_arbitrate",
         "parameters": [
           {
@@ -7720,6 +7859,7 @@
         "tags": [
           "tasks"
         ],
+        "description": "Assign a task to an agent, wake the dispatch loop, and broadcast the updated session snapshot",
         "operationId": "post_task_assign",
         "parameters": [
           {
@@ -7802,6 +7942,7 @@
         "tags": [
           "tasks"
         ],
+        "description": "Record a checkpoint for a task and broadcast the updated session snapshot",
         "operationId": "post_task_checkpoint",
         "parameters": [
           {
@@ -7884,6 +8025,7 @@
         "tags": [
           "tasks"
         ],
+        "description": "Claim a pending review on behalf of the calling agent and broadcast the updated session snapshot",
         "operationId": "post_task_claim_review",
         "parameters": [
           {
@@ -7966,6 +8108,7 @@
         "tags": [
           "tasks"
         ],
+        "description": "Drop a task from its assigned target's queue without deleting the task, wake the dispatch loop, and broadcast the updated session snapshot",
         "operationId": "post_task_drop",
         "parameters": [
           {
@@ -8048,6 +8191,7 @@
         "tags": [
           "tasks"
         ],
+        "description": "Update a task's queue policy, wake the dispatch loop, and broadcast the updated session snapshot",
         "operationId": "post_task_queue_policy",
         "parameters": [
           {
@@ -8130,6 +8274,7 @@
         "tags": [
           "tasks"
         ],
+        "description": "Record the task author's response to review points and broadcast the updated session snapshot",
         "operationId": "post_task_respond_review",
         "parameters": [
           {
@@ -8212,6 +8357,7 @@
         "tags": [
           "tasks"
         ],
+        "description": "Update a task's status, wake the dispatch loop, and broadcast the updated session snapshot",
         "operationId": "post_task_update",
         "parameters": [
           {
@@ -8294,6 +8440,7 @@
         "tags": [
           "tasks"
         ],
+        "description": "Submit a task for review and broadcast the updated session snapshot",
         "operationId": "post_task_submit_for_review",
         "parameters": [
           {
@@ -8376,6 +8523,7 @@
         "tags": [
           "tasks"
         ],
+        "description": "Record a reviewer's verdict on a task under review and broadcast the updated session snapshot",
         "operationId": "post_task_submit_review",
         "parameters": [
           {
@@ -8458,6 +8606,7 @@
         "tags": [
           "sessions"
         ],
+        "description": "Fetch a cursor-paginated window of the session timeline. Pass `scope=summary` to receive summary-only entries instead of full payloads",
         "operationId": "get_timeline",
         "parameters": [
           {
@@ -8576,6 +8725,7 @@
         "tags": [
           "sessions"
         ],
+        "description": "Update the session title and broadcast the updated session snapshot",
         "operationId": "post_session_title",
         "parameters": [
           {
@@ -8649,6 +8799,7 @@
         "tags": [
           "voice"
         ],
+        "description": "Start a new voice session bound to the given Harness session",
         "operationId": "post_voice_session",
         "parameters": [
           {
@@ -8722,6 +8873,7 @@
         "tags": [
           "task-board-execution"
         ],
+        "description": "Advertise the local execution host's identity and its active assignment bindings to a remote-executor client. Requires a remote-executor client credential and fails if the local execution host is disabled",
         "operationId": "advertise",
         "responses": {
           "200": {
@@ -8770,7 +8922,7 @@
         "tags": [
           "task-board-execution"
         ],
-        "description": "Fetch a stored result artifact for an assignment. Responds 503 with the REMOTE_ARTIFACT_UNAVAILABLE code when the executor's artifact storage is unavailable.",
+        "description": "Fetch a stored result artifact for an assignment. Responds 503 with the REMOTE_ARTIFACT_UNAVAILABLE code when the executor's artifact storage is unavailable",
         "operationId": "fetch_artifact",
         "requestBody": {
           "content": {
@@ -8832,6 +8984,7 @@
         "tags": [
           "task-board-execution"
         ],
+        "description": "Cancel a claimed assignment, returning the terminal cancellation record for it",
         "operationId": "cancel",
         "requestBody": {
           "content": {
@@ -8893,6 +9046,7 @@
         "tags": [
           "task-board-execution"
         ],
+        "description": "Claim an offered assignment, returning its immutable claim receipt. A claim against a stale daemon epoch is rejected unless the assignment already has a receipt, so a retry against an already-claimed assignment can still succeed idempotently",
         "operationId": "claim",
         "requestBody": {
           "content": {
@@ -8954,7 +9108,7 @@
         "tags": [
           "task-board-execution"
         ],
-        "description": "Read exact executor cleanup completion evidence for a settled assignment. Responds 503 with the REMOTE_CLEANUP_PENDING code when cleanup has not yet completed.",
+        "description": "Read exact executor cleanup completion evidence for a settled assignment. Responds 503 with the REMOTE_CLEANUP_PENDING code when cleanup has not yet completed",
         "operationId": "observe_cleanup",
         "requestBody": {
           "content": {
@@ -9016,6 +9170,7 @@
         "tags": [
           "task-board-execution"
         ],
+        "description": "Renew the lease on a claimed assignment, extending its expiry so the remote executor can keep working it",
         "operationId": "renew_lease",
         "requestBody": {
           "content": {
@@ -9077,6 +9232,7 @@
         "tags": [
           "task-board-execution"
         ],
+        "description": "Accept or reject an assignment offer for a remote executor, returning the disposition and, when accepted, the assignment lease",
         "operationId": "offer",
         "requestBody": {
           "content": {
@@ -9138,6 +9294,7 @@
         "tags": [
           "task-board-execution"
         ],
+        "description": "Report final settlement for a completed assignment, returning its settlement record",
         "operationId": "settled",
         "requestBody": {
           "content": {
@@ -9199,6 +9356,7 @@
         "tags": [
           "task-board-execution"
         ],
+        "description": "Abandon a source bundle for an assignment, returning its abandonment record",
         "operationId": "abandon_source_bundle",
         "requestBody": {
           "content": {
@@ -9260,6 +9418,7 @@
         "tags": [
           "task-board-execution"
         ],
+        "description": "Verify that a previously stored source-bundle receipt matches the given upload request",
         "operationId": "verify_source_bundle_receipt",
         "requestBody": {
           "content": {
@@ -9321,6 +9480,7 @@
         "tags": [
           "task-board-execution"
         ],
+        "description": "Store a source-bundle upload for a claimed assignment. Requires a remote-executor client credential whose client id matches the assignment binding's host id",
         "operationId": "upload_source_bundle",
         "requestBody": {
           "content": {
@@ -9382,6 +9542,7 @@
         "tags": [
           "task-board-execution"
         ],
+        "description": "Report the authoritative status of a claimed assignment, after verifying the request's lease id and offer hash match the stored assignment record",
         "operationId": "status",
         "requestBody": {
           "content": {
@@ -9443,6 +9604,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Return an audit summary of task-board items with per-status counts, optionally filtered by status",
         "operationId": "get_task_board_audit",
         "parameters": [
           {
@@ -9502,6 +9664,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Return the task-board storage backend, current revision, and instance identifier",
         "operationId": "get_task_board_capabilities",
         "responses": {
           "200": {
@@ -9551,6 +9714,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Plan and apply dispatch of ready task-board items, starting worker agents for tasks that were successfully claimed. Requires a control-plane actor bound to the request",
         "operationId": "post_task_board_dispatch",
         "requestBody": {
           "content": {
@@ -9613,6 +9777,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Deliver a held dispatch for a task-board item, claiming it and starting the worker agent. When the request sets dry_run, returns the rendered prompt for the held dispatch without claiming or starting anything",
         "operationId": "post_task_board_dispatch_deliver",
         "requestBody": {
           "content": {
@@ -9675,6 +9840,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Pick the next ready held dispatch, if any, without claiming or starting it",
         "operationId": "post_task_board_dispatch_pick",
         "responses": {
           "200": {
@@ -9724,6 +9890,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Evaluate task-board items against configured signals and apply any resulting status transitions. Requires a control-plane actor bound to the request; broadcasts a session update when any item changes",
         "operationId": "post_task_board_evaluate",
         "requestBody": {
           "content": {
@@ -9786,6 +9953,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Discover placeholder git identity and signing defaults from the local git config, gh CLI, SSH keys under ~/.ssh, and environment variables, for pre-filling the runtime-config form. Never returns secret material",
         "operationId": "get_task_board_git_identity_defaults",
         "responses": {
           "200": {
@@ -9835,6 +10003,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Replace the process-only SSH/GPG key material used for git signing and pushes, without mutating the durable database-backed runtime configuration. Key material lives only in daemon process memory and is lost on restart",
         "operationId": "put_task_board_git_runtime_key_material",
         "requestBody": {
           "content": {
@@ -9897,6 +10066,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Acknowledge that the Monitor secure store received a prepared secret handoff, verified by migration ID and digest. The first acknowledgement for a pending handoff replaces in-memory git secrets from the handoff payload and deletes the legacy plaintext config file; a stale or digest-mismatched migration ID is rejected",
         "operationId": "post_task_board_git_runtime_secret_handoff_ack",
         "requestBody": {
           "content": {
@@ -9959,6 +10129,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Prepare a non-destructive handoff of pending legacy plaintext git secrets to the Monitor secure store. If a handoff is pending, the response includes the full runtime config with plaintext SSH/GPG key and passphrase values so Monitor can migrate them into the Keychain; otherwise it returns prepared=false with no runtime data",
         "operationId": "post_task_board_git_runtime_secret_handoff_prepare",
         "responses": {
           "200": {
@@ -10008,6 +10179,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Run a dry-run signature check against the git signing profile resolved for the given (or default) repository, so the UI can confirm key, passphrase, and mode line up before saving. Signing failures are reported as a Failed variant in the 200 response rather than as an HTTP error",
         "operationId": "post_task_board_git_signing_verify",
         "requestBody": {
           "content": {
@@ -10070,6 +10242,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "List execution-host machine records for all registered hosts",
         "operationId": "get_task_board_host_list",
         "responses": {
           "200": {
@@ -10122,6 +10295,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Return the execution-host machine record for the local host",
         "operationId": "get_task_board_host_local",
         "responses": {
           "200": {
@@ -10171,6 +10345,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Set the project types the local execution host accepts work for, and return the updated host record",
         "operationId": "put_task_board_host_set_project_types",
         "requestBody": {
           "content": {
@@ -10233,6 +10408,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "List task-board items with per-status counts and progress rollups, optionally filtered by status. Remote viewers receive a projected response with viewer-restricted fields removed",
         "operationId": "get_task_board_items",
         "parameters": [
           {
@@ -10290,6 +10466,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Create a new task-board item and return it as persisted",
         "operationId": "post_task_board_item",
         "requestBody": {
           "content": {
@@ -10352,6 +10529,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Return a single task-board item by id. Remote viewers receive a projected response with viewer-restricted fields removed",
         "operationId": "get_task_board_item",
         "parameters": [
           {
@@ -10410,6 +10588,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Update an existing task-board item's editable fields and return it as persisted",
         "operationId": "put_task_board_item",
         "parameters": [
           {
@@ -10481,6 +10660,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Delete a task-board item by tombstoning it rather than removing it outright, and return the tombstoned item",
         "operationId": "delete_task_board_item",
         "parameters": [
           {
@@ -10541,6 +10721,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Approve the submitted plan for a task-board item and return the resulting planning state. Requires a control-plane actor bound to the request",
         "operationId": "post_task_board_plan_approve",
         "parameters": [
           {
@@ -10614,6 +10795,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Transition a task-board item into the planning phase and return the resulting planning state",
         "operationId": "post_task_board_plan_begin",
         "parameters": [
           {
@@ -10674,6 +10856,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Revoke a previously approved plan for a task-board item and return the resulting planning state. Requires a control-plane actor bound to the request",
         "operationId": "post_task_board_plan_revoke",
         "parameters": [
           {
@@ -10748,6 +10931,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Submit a plan summary for a task-board item and return the resulting planning state",
         "operationId": "post_task_board_plan_submit",
         "parameters": [
           {
@@ -10821,6 +11005,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Fetch the lane position snapshot for a task-board item, projected for the authenticated viewer",
         "operationId": "get_task_board_item_position_snapshot",
         "parameters": [
           {
@@ -10879,6 +11064,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Move a task-board item to a new lane position, returning the resulting position and any revisions shifted to make room",
         "operationId": "put_task_board_item_position",
         "parameters": [
           {
@@ -10952,6 +11138,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Reset a task-board item's lane position back to default ordering",
         "operationId": "post_task_board_item_position_reset",
         "parameters": [
           {
@@ -11025,6 +11212,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Fetch the current effective triage outcome for a task-board item, projected for the authenticated viewer",
         "operationId": "get_task_board_item_triage",
         "parameters": [
           {
@@ -11085,6 +11273,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Fetch the paged triage decision history for a task-board item, newest first. Returns 400 when the before_generation/limit pagination parameters fail validation",
         "operationId": "get_task_board_item_triage_history",
         "parameters": [
           {
@@ -11165,6 +11354,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Set a manual triage override for a task-board item, returning the effective triage outcome after applying it",
         "operationId": "put_task_board_item_triage_override",
         "parameters": [
           {
@@ -11238,6 +11428,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Clear a manual triage override for a task-board item, returning the effective triage outcome after removing it",
         "operationId": "post_task_board_item_triage_override_clear",
         "parameters": [
           {
@@ -11311,6 +11502,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "List machine summaries derived from the task board, optionally filtered by status",
         "operationId": "get_task_board_machines",
         "parameters": [
           {
@@ -11373,6 +11565,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Force-cancel an in-progress task-board automation run. Requires the automation v2 feature flag to be enabled, returning an error otherwise, and every attempt (success or rejection) is recorded as an audit event",
         "operationId": "post_task_board_automation_force_cancel",
         "requestBody": {
           "content": {
@@ -11435,6 +11628,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Replace the in-memory GitHub token snapshot used for task-board git and API operations, including per-repository token overrides. Tokens are held in process memory only; the response reports configured state and counts, never the token values",
         "operationId": "put_task_board_orchestrator_github_tokens",
         "requestBody": {
           "content": {
@@ -11497,6 +11691,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Read aggregate task-board automation-run metrics: counts by outcome (running, completed, noop, partial, failed, cancelled), open conflicts, and when the snapshot was captured",
         "operationId": "get_task_board_automation_metrics",
         "responses": {
           "200": {
@@ -11546,6 +11741,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Replace the in-memory OpenRouter API key used by the task-board orchestrator's OpenRouter-backed managed-agent runtime. The key is held in process memory only; the response reports whether a key is configured, never the key itself",
         "operationId": "put_task_board_orchestrator_openrouter_token",
         "requestBody": {
           "content": {
@@ -11608,6 +11804,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Run a single manual tick of the task-board orchestrator loop (evaluate, dispatch, and start eligible workers) outside its regular schedule. The request's actor attribution is rebound to the authenticated control-plane principal, overriding any client-supplied value",
         "operationId": "post_task_board_orchestrator_run_once",
         "requestBody": {
           "content": {
@@ -11670,6 +11867,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "List past task-board orchestrator automation runs, paginated and filterable via query parameters",
         "operationId": "get_task_board_automation_runs",
         "parameters": [
           {
@@ -11739,6 +11937,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Read a single automation run's full detail, including its per-stage history. Returns an error if the run identifier does not exist",
         "operationId": "get_task_board_automation_run_detail",
         "parameters": [
           {
@@ -11799,6 +11998,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Read the task-board git runtime configuration (author identity, signing mode, per-repository overrides). Secret fields are never returned; only *_configured presence flags are included",
         "operationId": "get_task_board_orchestrator_runtime_config",
         "responses": {
           "200": {
@@ -11846,6 +12046,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Replace the task-board git runtime configuration. Submitted secret fields (SSH/GPG keys, passphrases) are normalized and retained in process memory only; the persisted config and the response strip them down to *_configured flags",
         "operationId": "put_task_board_orchestrator_runtime_config",
         "requestBody": {
           "content": {
@@ -11908,6 +12109,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Read the task-board orchestrator's current settings: enabled workflows, scheduling, retry policy, reviewer config, repository and execution-host configuration, and admission policy",
         "operationId": "get_task_board_orchestrator_settings",
         "responses": {
           "200": {
@@ -11955,6 +12157,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Apply a partial update to the task-board orchestrator settings; only the fields present in the request body are changed. The admission policy, if included, is validated before the update is persisted and a validation failure rejects the whole request",
         "operationId": "put_task_board_orchestrator_settings",
         "requestBody": {
           "content": {
@@ -12017,6 +12220,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Start the task-board orchestrator's background automation loop and return its status immediately after starting",
         "operationId": "post_task_board_orchestrator_start",
         "responses": {
           "200": {
@@ -12066,6 +12270,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Read the task-board orchestrator's current status, including whether its background automation loop is running and the outcome of the most recent run",
         "operationId": "get_task_board_orchestrator_status",
         "responses": {
           "200": {
@@ -12115,6 +12320,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Stop the task-board orchestrator's background automation loop and return its status immediately after stopping",
         "operationId": "post_task_board_orchestrator_stop",
         "responses": {
           "200": {
@@ -12164,6 +12370,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Replace the in-memory Todoist API token used by the task-board orchestrator's Todoist inbox sync. The token is held in process memory only; the response reports whether a token is configured, never the token itself",
         "operationId": "put_task_board_orchestrator_todoist_token",
         "requestBody": {
           "content": {
@@ -12226,6 +12433,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "List project summaries derived from the task board, optionally filtered by status",
         "operationId": "get_task_board_projects",
         "parameters": [
           {
@@ -12288,6 +12496,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Update a task-board project's editable fields and return the project as persisted. Requires a control-plane actor bound to the request",
         "operationId": "post_task_board_projects_update",
         "requestBody": {
           "content": {
@@ -12350,6 +12559,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Sync task-board items against configured external providers (GitHub, Todoist) in the requested direction. Runs as a dry-run preview unless the request explicitly disables it",
         "operationId": "post_task_board_sync",
         "requestBody": {
           "content": {
@@ -12413,6 +12623,7 @@
           "task-board"
         ],
         "summary": "No control-plane session auth: the caller is the daemon's own spawned\nescalation worker, authenticated entirely by `verdict_token` matching the\nrow this escalation's executor claim minted. See the route catalog's\n`Exempt` entry for this path for the full rationale.",
+        "description": "Record the accept/reject verdict for a triage escalation. Authenticated by the request's verdict_token matching the escalation's executor claim rather than a control-plane session, since the caller is the daemon's own spawned escalation worker",
         "operationId": "post_task_board_triage_escalation_verdict",
         "parameters": [
           {
@@ -12485,6 +12696,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Activate a validated triage rule set, making it the new active revision and re-evaluating existing items against it",
         "operationId": "post_task_board_triage_rules_activate",
         "requestBody": {
           "content": {
@@ -12547,6 +12759,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "List recent triage rule-set audit entries, newest first",
         "operationId": "get_task_board_triage_rules_audit",
         "parameters": [
           {
@@ -12608,6 +12821,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Fetch the pending triage rule-set draft, if one has been saved but not yet activated",
         "operationId": "get_task_board_triage_rules_draft",
         "responses": {
           "200": {
@@ -12655,6 +12869,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Validate and persist a triage rule-set draft, returning the validation outcome and, when valid, the persisted revision",
         "operationId": "put_task_board_triage_rules_draft",
         "requestBody": {
           "content": {
@@ -12717,6 +12932,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Validate a candidate triage rule set and compute its placement diff against current items without persisting anything",
         "operationId": "post_task_board_triage_rules_preview",
         "requestBody": {
           "content": {
@@ -12779,6 +12995,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "List recent triage rule-set revisions, newest first",
         "operationId": "get_task_board_triage_rules_revisions",
         "parameters": [
           {
@@ -12840,6 +13057,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "List the daemon-owned working-copy registry entries for imported task-board item repositories",
         "operationId": "post_task_board_working_copies",
         "responses": {
           "200": {
@@ -12892,6 +13110,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Delete a working copy identified by its repo key segment, returning the working-copy registry after removal",
         "operationId": "post_task_board_working_copies_delete",
         "requestBody": {
           "content": {
@@ -12954,6 +13173,7 @@
         "tags": [
           "task-board"
         ],
+        "description": "Obtain or reuse the working copy for a repository. When allow_clone is false the copy is only resolved if it already exists; when true, a missing copy is cloned",
         "operationId": "post_task_board_working_copies_obtain",
         "requestBody": {
           "content": {
@@ -13016,6 +13236,7 @@
         "tags": [
           "voice"
         ],
+        "description": "Append an audio chunk to an in-progress voice session",
         "operationId": "post_voice_audio_chunk",
         "parameters": [
           {
@@ -13089,6 +13310,7 @@
         "tags": [
           "voice"
         ],
+        "description": "Mark a voice session as finished and finalize its recorded state",
         "operationId": "post_voice_finish",
         "parameters": [
           {
@@ -13162,6 +13384,7 @@
         "tags": [
           "voice"
         ],
+        "description": "Append a transcript segment to an in-progress voice session",
         "operationId": "post_voice_transcript",
         "parameters": [
           {

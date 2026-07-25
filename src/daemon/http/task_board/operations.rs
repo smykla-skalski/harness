@@ -27,6 +27,7 @@ use super::items::{
     post,
     path = "/v1/task-board/sync",
     tag = "task-board",
+    description = "Sync task-board items against configured external providers (GitHub, Todoist) in the requested direction. Runs as a dry-run preview unless the request explicitly disables it",
     request_body = TaskBoardSyncRequest,
     responses(
         (status = 200, description = "Per-provider sync summary", body = TaskBoardSyncSummary),
@@ -55,6 +56,7 @@ pub(super) async fn post_task_board_sync(
     post,
     path = "/v1/task-board/dispatch",
     tag = "task-board",
+    description = "Plan and apply dispatch of ready task-board items, starting worker agents for tasks that were successfully claimed. Requires a control-plane actor bound to the request",
     request_body = TaskBoardDispatchRequest,
     responses(
         (status = 200, description = "Dispatch plans, applied tasks, and failures", body = DispatchExecutionSummary),
@@ -85,6 +87,7 @@ pub(super) async fn post_task_board_dispatch(
     post,
     path = "/v1/task-board/dispatch/deliver",
     tag = "task-board",
+    description = "Deliver a held dispatch for a task-board item, claiming it and starting the worker agent. When the request sets dry_run, returns the rendered prompt for the held dispatch without claiming or starting anything",
     request_body = TaskBoardDispatchDeliverRequest,
     responses(
         (status = 200, description = "Delivered dispatch with the optionally started agent", body = TaskBoardDispatchDeliverResponse),
@@ -113,6 +116,7 @@ pub(super) async fn post_task_board_dispatch_deliver(
     post,
     path = "/v1/task-board/dispatch/pick",
     tag = "task-board",
+    description = "Pick the next ready held dispatch, if any, without claiming or starting it",
     responses(
         (status = 200, description = "The picked dispatch selection, if any is ready", body = TaskBoardDispatchPickResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
@@ -139,6 +143,7 @@ pub(super) async fn post_task_board_dispatch_pick(
     post,
     path = "/v1/task-board/evaluate",
     tag = "task-board",
+    description = "Evaluate task-board items against configured signals and apply any resulting status transitions. Requires a control-plane actor bound to the request; broadcasts a session update when any item changes",
     request_body = TaskBoardEvaluateRequest,
     responses(
         (status = 200, description = "Evaluation records and signal outcomes", body = TaskBoardEvaluationSummary),
@@ -169,6 +174,7 @@ pub(super) async fn post_task_board_evaluate(
     get,
     path = "/v1/task-board/audit",
     tag = "task-board",
+    description = "Return an audit summary of task-board items with per-status counts, optionally filtered by status",
     params(TaskBoardListQuery),
     responses(
         (status = 200, description = "Audit summary with per-status counts", body = TaskBoardAuditSummary),
@@ -200,6 +206,7 @@ pub(super) async fn get_task_board_audit(
     get,
     path = "/v1/task-board/projects",
     tag = "task-board",
+    description = "List project summaries derived from the task board, optionally filtered by status",
     params(TaskBoardListQuery),
     responses(
         (status = 200, description = "Project summaries derived from the board", body = Vec<TaskBoardProjectSummary>),
@@ -231,6 +238,7 @@ pub(super) async fn get_task_board_projects(
     post,
     path = "/v1/task-board/projects/update",
     tag = "task-board",
+    description = "Update a task-board project's editable fields and return the project as persisted. Requires a control-plane actor bound to the request",
     request_body = TaskBoardProjectUpdateRequest,
     responses(
         (status = 200, description = "The project after the edit", body = TaskBoardProject),
@@ -260,6 +268,7 @@ pub(super) async fn post_task_board_projects_update(
     get,
     path = "/v1/task-board/machines",
     tag = "task-board",
+    description = "List machine summaries derived from the task board, optionally filtered by status",
     params(TaskBoardListQuery),
     responses(
         (status = 200, description = "Machine summaries derived from the board", body = Vec<TaskBoardMachineSummary>),
@@ -291,6 +300,7 @@ pub(super) async fn get_task_board_machines(
     get,
     path = "/v1/task-board/host/local",
     tag = "task-board",
+    description = "Return the execution-host machine record for the local host",
     responses(
         (status = 200, description = "The local execution-host machine record", body = Machine),
         (status = 400, description = "Request error", body = DaemonErrorBody),
@@ -317,6 +327,7 @@ pub(super) async fn get_task_board_host_local(
     get,
     path = "/v1/task-board/host/list",
     tag = "task-board",
+    description = "List execution-host machine records for all registered hosts",
     responses(
         (status = 200, description = "All registered execution-host machine records", body = Vec<Machine>),
         (status = 400, description = "Request error", body = DaemonErrorBody),
@@ -343,6 +354,7 @@ pub(super) async fn get_task_board_host_list(
     put,
     path = "/v1/task-board/host/project-types",
     tag = "task-board",
+    description = "Set the project types the local execution host accepts work for, and return the updated host record",
     request_body = TaskBoardHostSetProjectTypesRequest,
     responses(
         (status = 200, description = "The updated local execution-host machine record", body = Machine),

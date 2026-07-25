@@ -38,6 +38,7 @@ pub(super) fn merge_policy_spawn_gate_routes(
     post,
     path = "/v1/policy-canvases/spawn-requires-live-policy",
     tag = "policy",
+    description = "Toggle the fail-closed switch that requires a live enforced policy before an agent spawn is permitted, and return the updated workspace snapshot",
     request_body = PolicyCanvasSetSpawnRequiresLivePolicyRequest,
     responses(
         (status = 200, description = "Workspace after toggling the spawn-requires-live-policy switch", body = PolicyCanvasWorkspaceResponse),
@@ -73,6 +74,7 @@ pub(super) async fn post_policy_canvas_set_spawn_requires_live_policy(
     post,
     path = "/v1/policy-canvases/spawn-kill-switch",
     tag = "policy",
+    description = "Toggle the emergency spawn kill switch that blocks all new agent spawns, and return the updated workspace snapshot",
     request_body = PolicyCanvasSetSpawnKillSwitchRequest,
     responses(
         (status = 200, description = "Workspace after toggling the spawn kill switch", body = PolicyCanvasWorkspaceResponse),
@@ -107,6 +109,7 @@ pub(super) async fn post_policy_canvas_set_spawn_kill_switch(
     get,
     path = "/v1/policy-approval-grants",
     tag = "policy",
+    description = "List the pending approval grants awaiting a human decision",
     responses(
         (status = 200, description = "All durable spawn-gate approval grants", body = PolicyApprovalGrantsListResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
@@ -137,6 +140,7 @@ pub(super) async fn get_policy_approval_grants(
     post,
     path = "/v1/policy-approval-grants/resolve",
     tag = "policy",
+    description = "Resolve a pending approval grant to approved or denied. Fails when the grant is missing or already resolved",
     request_body = PolicyApprovalGrantResolveRequest,
     responses(
         (status = 200, description = "The approval grant after approve or deny", body = PolicyApprovalGrantResolveResponse),
@@ -169,6 +173,7 @@ pub(super) async fn post_policy_approval_grant_resolve(
     post,
     path = "/v1/policy-approval-grants/revoke",
     tag = "policy",
+    description = "Revoke a live pending or approved approval grant. Fails when the grant is missing, terminal, consumed, or expired",
     request_body = PolicyApprovalGrantRevokeRequest,
     responses(
         (status = 200, description = "The approval grant after revocation", body = PolicyApprovalGrantRevokeResponse),

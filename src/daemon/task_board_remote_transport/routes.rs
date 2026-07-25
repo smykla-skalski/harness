@@ -154,6 +154,7 @@ pub fn execution_operation(method: &Method, path: &str) -> Option<&'static str> 
     post,
     path = "/v1/task-board-execution/source-bundles/upload",
     tag = "task-board-execution",
+    description = "Store a source-bundle upload for a claimed assignment. Requires a remote-executor client credential whose client id matches the assignment binding's host id",
     request_body = RemoteSourceBundleUploadRequest,
     responses(
         (status = 200, description = "Stored source-bundle receipt", body = RemoteSourceBundleUploadResponse),
@@ -193,6 +194,7 @@ async fn upload_source_bundle(
     get,
     path = "/v1/task-board-execution/advertise",
     tag = "task-board-execution",
+    description = "Advertise the local execution host's identity and its active assignment bindings to a remote-executor client. Requires a remote-executor client credential and fails if the local execution host is disabled",
     responses(
         (status = 200, description = "Execution host identity and its active assignment bindings", body = RemoteHostAdvertisement),
         (status = 400, description = "Request error", body = DaemonErrorBody),
@@ -222,6 +224,7 @@ async fn advertise(headers: HeaderMap, State(state): State<DaemonHttpState>) -> 
     post,
     path = "/v1/task-board-execution/offers",
     tag = "task-board-execution",
+    description = "Accept or reject an assignment offer for a remote executor, returning the disposition and, when accepted, the assignment lease",
     request_body = RemoteOfferRequest,
     responses(
         (status = 200, description = "Offer disposition and, when accepted, the assignment lease", body = RemoteOfferResponse),
@@ -256,6 +259,7 @@ async fn offer(
     post,
     path = "/v1/task-board-execution/claims",
     tag = "task-board-execution",
+    description = "Claim an offered assignment, returning its immutable claim receipt. A claim against a stale daemon epoch is rejected unless the assignment already has a receipt, so a retry against an already-claimed assignment can still succeed idempotently",
     request_body = RemoteClaimRequest,
     responses(
         (status = 200, description = "Immutable claim receipt for the assignment", body = RemoteClaimResponse),
@@ -289,6 +293,7 @@ async fn claim(
     post,
     path = "/v1/task-board-execution/leases/renew",
     tag = "task-board-execution",
+    description = "Renew the lease on a claimed assignment, extending its expiry so the remote executor can keep working it",
     request_body = RemoteLeaseRenewRequest,
     responses(
         (status = 200, description = "Renewed lease for the claimed assignment", body = RemoteLeaseRenewResponse),
@@ -324,6 +329,7 @@ async fn renew_lease(
     post,
     path = "/v1/task-board-execution/status",
     tag = "task-board-execution",
+    description = "Report the authoritative status of a claimed assignment, after verifying the request's lease id and offer hash match the stored assignment record",
     request_body = RemoteStatusRequest,
     responses(
         (status = 200, description = "Authoritative status of the claimed assignment", body = RemoteStatusResponse),
@@ -358,6 +364,7 @@ async fn status(
     post,
     path = "/v1/task-board-execution/cancel",
     tag = "task-board-execution",
+    description = "Cancel a claimed assignment, returning the terminal cancellation record for it",
     request_body = RemoteCancelRequest,
     responses(
         (status = 200, description = "Terminal cancellation record for the assignment", body = RemoteCancelResponse),
@@ -400,6 +407,7 @@ async fn cancel(
     post,
     path = "/v1/task-board-execution/settled",
     tag = "task-board-execution",
+    description = "Report final settlement for a completed assignment, returning its settlement record",
     request_body = RemoteSettledRequest,
     responses(
         (status = 200, description = "Settlement record for the completed assignment", body = RemoteSettledResponse),
@@ -429,7 +437,7 @@ async fn settled(
     post,
     path = "/v1/task-board-execution/artifacts/fetch",
     tag = "task-board-execution",
-    description = "Fetch a stored result artifact for an assignment. Responds 503 with the REMOTE_ARTIFACT_UNAVAILABLE code when the executor's artifact storage is unavailable.",
+    description = "Fetch a stored result artifact for an assignment. Responds 503 with the REMOTE_ARTIFACT_UNAVAILABLE code when the executor's artifact storage is unavailable",
     request_body = RemoteArtifactFetchRequest,
     responses(
         (status = 200, description = "Requested result artifact", body = RemoteArtifactFetchResponse),

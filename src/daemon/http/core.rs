@@ -68,6 +68,7 @@ pub(crate) struct RuntimeSessionResolutionQuery {
     get,
     path = "/v1/health",
     tag = "daemon",
+    description = "Report the daemon's health snapshot, combining build and version metadata from the manifest with a live database connectivity check",
     responses(
         (status = 200, description = "Daemon health snapshot", body = HealthResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
@@ -93,6 +94,7 @@ pub(super) async fn get_health(
     get,
     path = "/v1/ready",
     tag = "daemon",
+    description = "Report whether the daemon's async database connection is ready to serve requests, along with the current daemon epoch",
     responses(
         (status = 200, description = "Readiness probe", body = ReadinessResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
@@ -118,6 +120,7 @@ pub(super) async fn get_ready(
     get,
     path = "/v1/runtime-sessions/resolve",
     tag = "daemon",
+    description = "Resolve a runtime-specific session identifier to the Harness session it belongs to, given the runtime name and runtime session id as query parameters",
     params(RuntimeSessionResolutionQuery),
     responses(
         (status = 200, description = "Runtime-session resolution outcome", body = RuntimeSessionResolutionResponse),
@@ -157,6 +160,7 @@ pub(super) async fn get_runtime_session_resolution(
     get,
     path = "/v1/diagnostics",
     tag = "daemon",
+    description = "Return the daemon diagnostics report. The report is redacted before being returned when the authenticated caller is a paired remote viewer client",
     responses(
         (status = 200, description = "Daemon diagnostics report", body = DaemonDiagnosticsReport),
         (status = 400, description = "Request error", body = DaemonErrorBody),
@@ -186,6 +190,7 @@ pub(super) async fn get_diagnostics(
     get,
     path = "/v1/github/status",
     tag = "daemon",
+    description = "Return current GitHub API usage diagnostics tracked by the daemon, such as rate-limit and request counters",
     responses(
         (status = 200, description = "GitHub API usage diagnostics", body = GitHubApiDiagnostics),
     ),
@@ -207,6 +212,7 @@ pub(super) async fn get_github_status(
     get,
     path = "/v1/config",
     tag = "daemon",
+    description = "Return the initial configuration payload for newly connecting clients: personas, per-runtime model catalogs, ACP agents, and the ACP runtime probe",
     responses(
         (status = 200, description = "Initial configuration payload: personas, per-runtime model catalogs, ACP agents, and the ACP runtime probe", body = WsConfigPayload),
     ),
@@ -233,6 +239,7 @@ pub(super) async fn get_config(
     get,
     path = "/v1/runtimes/probe",
     tag = "daemon",
+    description = "Return the cached probe of ACP coding-agent runtime availability. Results reflect the last periodic probe rather than a live check performed on this request",
     responses(
         (status = 200, description = "ACP runtime availability probe", body = AcpRuntimeProbeResponse),
     ),
@@ -259,6 +266,7 @@ pub(super) async fn get_runtimes_probe(
     post,
     path = "/v1/daemon/stop",
     tag = "daemon",
+    description = "Shut down all active ACP agent sessions, then request daemon shutdown",
     responses(
         (status = 200, description = "Daemon shutdown acknowledged", body = DaemonControlResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
@@ -284,6 +292,7 @@ pub(super) async fn post_stop_daemon(
     post,
     path = "/v1/daemon/telemetry",
     tag = "daemon",
+    description = "Record a client-submitted telemetry event, persisting it to the daemon database when one is configured",
     request_body = DaemonTelemetryRequest,
     responses(
         (status = 200, description = "Telemetry recorded", body = DaemonTelemetryResponse),
@@ -324,6 +333,7 @@ pub(super) async fn post_daemon_telemetry(
     post,
     path = "/v1/bridge/reconfigure",
     tag = "daemon",
+    description = "Enable or disable specific host bridge projects and return the resulting bridge status. The outcome is also recorded as a bridgeLifecycle audit event",
     request_body = HostBridgeReconfigureRequest,
     responses(
         (status = 200, description = "Host bridge status after reconfiguration", body = BridgeStatusReport),
@@ -374,6 +384,7 @@ async fn post_bridge_reconfigure(
     get,
     path = "/v1/daemon/log-level",
     tag = "daemon",
+    description = "Return the daemon's current tracing log level",
     responses(
         (status = 200, description = "Current daemon log level", body = LogLevelResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
@@ -401,6 +412,7 @@ pub(super) async fn get_log_level(
     put,
     path = "/v1/daemon/log-level",
     tag = "daemon",
+    description = "Update the daemon's tracing log level at runtime and record the change as an audit event",
     request_body = SetLogLevelRequest,
     responses(
         (status = 200, description = "Updated daemon log level", body = LogLevelResponse),
@@ -447,6 +459,7 @@ pub(super) async fn put_log_level(
     get,
     path = "/v1/projects",
     tag = "daemon",
+    description = "List known projects along with their registered worktrees",
     responses(
         (status = 200, description = "Projects and their worktrees", body = Vec<ProjectSummary>),
         (status = 400, description = "Request error", body = DaemonErrorBody),

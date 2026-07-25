@@ -25,6 +25,7 @@ use super::openapi::{DaemonErrorBody, SessionAdHocError};
     post,
     path = "/v1/sessions/{session_id}/end",
     tag = "sessions",
+    description = "End a session and broadcast the resulting session snapshot to observers",
     params(("session_id" = String, Path, description = "Session identifier")),
     request_body = SessionEndRequest,
     responses(
@@ -54,6 +55,7 @@ pub(super) async fn post_end_session(
     post,
     path = "/v1/sessions/{session_id}/archive",
     tag = "sessions",
+    description = "Archive a session. This also stops any running ACP agents attached to the session and broadcasts the updated sessions list",
     params(("session_id" = String, Path, description = "Session identifier")),
     request_body = SessionArchiveRequest,
     responses(
@@ -113,6 +115,7 @@ fn log_archive_acp_stop_failure(error: &CliError, session_id: &str) {
     post,
     path = "/v1/sessions/{session_id}/leave",
     tag = "sessions",
+    description = "Remove the calling agent from the session and broadcast the updated session snapshot",
     params(("session_id" = String, Path, description = "Session identifier")),
     request_body = SessionLeaveRequest,
     responses(
@@ -148,6 +151,7 @@ pub(super) async fn post_leave_session(
     post,
     path = "/v1/sessions/{session_id}/observe",
     tag = "sessions",
+    description = "Attach an observer to the session and broadcast the updated session snapshot. The request body is optional and may be omitted entirely",
     params(("session_id" = String, Path, description = "Session identifier")),
     request_body(content = ObserveSessionRequest, description = "Optional observe options; the body may be omitted"),
     responses(
@@ -215,6 +219,7 @@ pub(super) async fn broadcast_observe_session(state: &DaemonHttpState, session_i
     post,
     path = "/v1/sessions",
     tag = "sessions",
+    description = "Start a new session and broadcast the updated sessions list to subscribers",
     request_body = SessionStartRequest,
     responses(
         (status = 200, description = "Session started", body = SessionMutationResponse),
@@ -242,6 +247,7 @@ pub(super) async fn post_session_start(
     post,
     path = "/v1/sessions/{session_id}/join",
     tag = "sessions",
+    description = "Join an agent to an existing session and broadcast the updated session snapshot",
     params(("session_id" = String, Path, description = "Session identifier")),
     request_body = SessionJoinRequest,
     responses(
@@ -271,6 +277,7 @@ pub(super) async fn post_session_join(
     post,
     path = "/v1/sessions/{session_id}/title",
     tag = "sessions",
+    description = "Update the session title and broadcast the updated session snapshot",
     params(("session_id" = String, Path, description = "Session identifier")),
     request_body = SessionTitleRequest,
     responses(
@@ -436,6 +443,7 @@ fn session_mutation_response(session_state: SessionState) -> SessionMutationResp
     delete,
     path = "/v1/sessions/{session_id}",
     tag = "sessions",
+    description = "Delete a session and broadcast the updated sessions list. Returns 404 with an ad-hoc `{\"error\": \"session not found\"}` body rather than the standard error schema when the session does not exist",
     params(("session_id" = String, Path, description = "Session identifier")),
     responses(
         (status = 204, description = "Session deleted"),

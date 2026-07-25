@@ -29,6 +29,7 @@ pub(super) fn agent_routes() -> OpenApiRouter<DaemonHttpState> {
     post,
     path = "/v1/sessions/{session_id}/agents/{session_agent_id}/role",
     tag = "agents",
+    description = "Change the role of an agent within a session and broadcast the updated session snapshot",
     params(
         ("session_id" = String, Path, description = "Session identifier"),
         ("session_agent_id" = String, Path, description = "Session-scoped agent identifier"),
@@ -67,6 +68,7 @@ pub(super) async fn post_role_change(
     post,
     path = "/v1/sessions/{session_id}/agents/{session_agent_id}/remove",
     tag = "agents",
+    description = "Remove an agent from a session and broadcast the updated session snapshot",
     params(
         ("session_id" = String, Path, description = "Session identifier"),
         ("session_agent_id" = String, Path, description = "Session-scoped agent identifier"),
@@ -105,6 +107,7 @@ pub(super) async fn post_remove_agent(
     post,
     path = "/v1/sessions/{session_id}/leader",
     tag = "agents",
+    description = "Transfer session leadership to another agent and broadcast the updated session snapshot",
     params(("session_id" = String, Path, description = "Session identifier")),
     request_body = LeaderTransferRequest,
     responses(

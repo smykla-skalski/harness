@@ -21,6 +21,7 @@ use super::items::{authenticated_task_board_read, authorized_control_request_par
     get,
     path = "/v1/task-board/items/{item_id}/position",
     tag = "task-board",
+    description = "Fetch the lane position snapshot for a task-board item, projected for the authenticated viewer",
     params(("item_id" = String, Path, description = "Task-board item identifier")),
     responses(
         (status = 200, description = "Lane position snapshot for the item", body = TaskBoardItemPositionSnapshot),
@@ -52,6 +53,7 @@ pub(super) async fn get_task_board_item_position_snapshot(
     put,
     path = "/v1/task-board/items/{item_id}/position",
     tag = "task-board",
+    description = "Move a task-board item to a new lane position, returning the resulting position and any revisions shifted to make room",
     params(("item_id" = String, Path, description = "Task-board item identifier")),
     request_body = TaskBoardSetItemPositionRequest,
     responses(
@@ -83,6 +85,7 @@ pub(super) async fn put_task_board_item_position(
     post,
     path = "/v1/task-board/items/{item_id}/position/reset",
     tag = "task-board",
+    description = "Reset a task-board item's lane position back to default ordering",
     params(("item_id" = String, Path, description = "Task-board item identifier")),
     request_body = TaskBoardResetItemPositionRequest,
     responses(

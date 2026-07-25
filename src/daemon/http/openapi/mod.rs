@@ -71,8 +71,17 @@ pub struct OkResponse {
 #[openapi(
     info(
         title = "Harness daemon API",
-        description = "REST API served by the Harness daemon (harness-daemon). The API is dual-transport: most endpoints mirror a WebSocket JSON-RPC method, recorded per operation as the `x-websocket-method` extension. Generated from annotated handlers - do not edit docs/api/openapi.json by hand; regenerate with `mise run openapi:generate`.",
+        description = "REST API served by the Harness daemon (harness-daemon). The API is dual-transport: most endpoints mirror a WebSocket JSON-RPC method, recorded per operation as the `x-websocket-method` extension. Generated from annotated handlers - do not edit docs/api/openapi.json by hand; regenerate with `mise run openapi:generate`",
+        contact(name = "Bart Smykla", email = "bartek@smykla.com", url = "https://github.com/smykla-skalski/harness"),
         license(name = "MIT")
+    ),
+    servers(
+        (url = "http://{host}:{port}", description = "Local per-project daemon HTTP listener. The daemon binds an OS-assigned ephemeral port per instance; discover the live host and port from the daemon manifest rather than assuming a fixed value",
+            variables(
+                ("host" = (default = "127.0.0.1", description = "Loopback host the daemon binds by default")),
+                ("port" = (default = "0", description = "OS-assigned ephemeral port, resolved per daemon instance"))
+            )
+        )
     ),
     components(schemas(DaemonErrorBody, DaemonErrorDetail, OkResponse))
 )]

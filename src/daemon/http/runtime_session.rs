@@ -38,6 +38,7 @@ async fn runtime_session_response(
     post,
     path = "/v1/sessions/{session_id}/runtime-session",
     tag = "sessions",
+    description = "Register a runtime-specific session identifier against a Harness session, broadcasting an updated session snapshot to observers when the registration is newly recorded",
     params(("session_id" = String, Path, description = "Session identifier")),
     request_body = AgentRuntimeSessionRegistrationRequest,
     responses(

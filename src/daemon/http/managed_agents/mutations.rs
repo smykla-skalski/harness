@@ -28,6 +28,7 @@ use super::{
     post,
     path = "/v1/sessions/{session_id}/managed-agents/terminal",
     tag = "managed-agents",
+    description = "Start a terminal-backed managed agent (a PTY session) within the given session",
     params(
         ("session_id" = String, Path, description = "Session identifier"),
     ),
@@ -66,6 +67,7 @@ pub(super) async fn post_terminal_agent_start(
     post,
     path = "/v1/sessions/{session_id}/managed-agents/codex",
     tag = "managed-agents",
+    description = "Start a Codex-backed managed agent run within the given session. Uses control-request authorization rather than the standard bearer check, since the run request itself carries control metadata",
     params(
         ("session_id" = String, Path, description = "Session identifier"),
     ),
@@ -108,6 +110,7 @@ pub(super) async fn post_codex_agent_start(
     post,
     path = "/v1/managed-agents/{managed_agent_id}/input",
     tag = "managed-agents",
+    description = "Send input bytes to a running terminal-backed managed agent's PTY and return the updated snapshot",
     params(
         ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
     ),
@@ -152,6 +155,7 @@ pub(super) async fn post_terminal_agent_input(
     post,
     path = "/v1/managed-agents/{managed_agent_id}/resize",
     tag = "managed-agents",
+    description = "Resize a running terminal-backed managed agent's PTY and return the updated snapshot",
     params(
         ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
     ),
@@ -196,6 +200,7 @@ pub(super) async fn post_terminal_agent_resize(
     post,
     path = "/v1/managed-agents/{managed_agent_id}/stop",
     tag = "managed-agents",
+    description = "Stop a managed agent, probing the Codex, ACP, and terminal agent managers in turn to locate which backend owns the given identifier",
     params(
         ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
     ),
@@ -267,6 +272,7 @@ pub(super) async fn post_terminal_agent_stop(
     post,
     path = "/v1/managed-agents/{managed_agent_id}/ready",
     tag = "managed-agents",
+    description = "Signal that a terminal-backed managed agent has finished its startup sequence and is ready for input",
     params(
         ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
     ),
@@ -309,6 +315,7 @@ pub(super) async fn post_terminal_agent_ready(
     post,
     path = "/v1/managed-agents/{managed_agent_id}/steer",
     tag = "managed-agents",
+    description = "Send an additional steering prompt to a running Codex-backed managed agent run",
     params(
         ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
     ),
@@ -356,6 +363,7 @@ pub(super) async fn post_codex_agent_steer(
     post,
     path = "/v1/managed-agents/{managed_agent_id}/interrupt",
     tag = "managed-agents",
+    description = "Interrupt the current turn of a running Codex-backed managed agent run",
     params(
         ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
     ),
@@ -401,6 +409,7 @@ pub(super) async fn post_codex_agent_interrupt(
     post,
     path = "/v1/managed-agents/{managed_agent_id}/approvals/{approval_id}",
     tag = "managed-agents",
+    description = "Resolve a pending Codex approval request (for example an exec or patch approval) with the caller's decision",
     params(
         ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
         ("approval_id" = String, Path, description = "Pending approval identifier"),

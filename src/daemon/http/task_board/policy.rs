@@ -38,6 +38,7 @@ pub(super) fn merge_policy_routes(
     get,
     path = "/v1/policy-canvases",
     tag = "policy",
+    description = "Return the full policy-canvas workspace snapshot, seeding a default workspace with built-in automation canvases and scenarios on first use",
     responses(
         (status = 200, description = "The full policy-canvas workspace", body = PolicyCanvasWorkspaceResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
@@ -68,6 +69,7 @@ pub(super) async fn get_policy_canvas_workspace(
     post,
     path = "/v1/policy-canvases/create",
     tag = "policy",
+    description = "Create a new policy canvas and return the updated workspace snapshot",
     request_body = PolicyCanvasCreateRequest,
     responses(
         (status = 200, description = "Workspace after creating the canvas", body = PolicyCanvasWorkspaceResponse),
@@ -100,6 +102,7 @@ pub(super) async fn post_policy_canvas_create(
     post,
     path = "/v1/policy-canvases/duplicate",
     tag = "policy",
+    description = "Duplicate an existing policy canvas under a new title and return the updated workspace snapshot",
     request_body = PolicyCanvasDuplicateRequest,
     responses(
         (status = 200, description = "Workspace after duplicating the canvas", body = PolicyCanvasWorkspaceResponse),
@@ -132,6 +135,7 @@ pub(super) async fn post_policy_canvas_duplicate(
     post,
     path = "/v1/policy-canvases/rename",
     tag = "policy",
+    description = "Rename an existing policy canvas and return the updated workspace snapshot",
     request_body = PolicyCanvasRenameRequest,
     responses(
         (status = 200, description = "Workspace after renaming the canvas", body = PolicyCanvasWorkspaceResponse),
@@ -164,6 +168,7 @@ pub(super) async fn post_policy_canvas_rename(
     post,
     path = "/v1/policy-canvases/active",
     tag = "policy",
+    description = "Switch the authoritative active policy canvas and return the updated workspace snapshot",
     request_body = PolicyCanvasSetActiveRequest,
     responses(
         (status = 200, description = "Workspace after selecting the active canvas", body = PolicyCanvasWorkspaceResponse),
@@ -196,6 +201,7 @@ pub(super) async fn post_policy_canvas_set_active(
     post,
     path = "/v1/policy-canvases/delete",
     tag = "policy",
+    description = "Delete an existing policy canvas and return the updated workspace snapshot",
     request_body = PolicyCanvasDeleteRequest,
     responses(
         (status = 200, description = "Workspace after deleting the canvas", body = PolicyCanvasWorkspaceResponse),
@@ -228,6 +234,7 @@ pub(super) async fn post_policy_canvas_delete(
     post,
     path = "/v1/policy-canvases/global-enforcement",
     tag = "policy",
+    description = "Toggle the global policy enforcement gate without mutating any policy canvas, and return the updated workspace snapshot",
     request_body = PolicyCanvasSetGlobalEnforcementRequest,
     responses(
         (status = 200, description = "Workspace after toggling global enforcement", body = PolicyCanvasWorkspaceResponse),
@@ -262,6 +269,7 @@ pub(super) async fn post_policy_canvas_set_global_enforcement(
     post,
     path = "/v1/policy-scenarios/create",
     tag = "policy",
+    description = "Create a new editable policy scenario used for confidence simulation and return the updated workspace snapshot. Scenarios feed only the simulation and never affect the live enforcement gate",
     request_body = PolicyScenarioCreateRequest,
     responses(
         (status = 200, description = "Workspace after creating the scenario", body = PolicyCanvasWorkspaceResponse),
@@ -294,6 +302,7 @@ pub(super) async fn post_policy_scenario_create(
     post,
     path = "/v1/policy-scenarios/update",
     tag = "policy",
+    description = "Update an existing policy scenario's name and input, and return the updated workspace snapshot",
     request_body = PolicyScenarioUpdateRequest,
     responses(
         (status = 200, description = "Workspace after updating the scenario", body = PolicyCanvasWorkspaceResponse),
@@ -326,6 +335,7 @@ pub(super) async fn post_policy_scenario_update(
     post,
     path = "/v1/policy-scenarios/delete",
     tag = "policy",
+    description = "Delete a policy scenario and return the updated workspace snapshot",
     request_body = PolicyScenarioDeleteRequest,
     responses(
         (status = 200, description = "Workspace after deleting the scenario", body = PolicyCanvasWorkspaceResponse),
@@ -358,6 +368,7 @@ pub(super) async fn post_policy_scenario_delete(
     post,
     path = "/v1/policy-scenarios/reset",
     tag = "policy",
+    description = "Restore the built-in seeded scenario set, discarding any custom scenarios, and return the updated workspace snapshot",
     responses(
         (status = 200, description = "Workspace after resetting scenarios to the built-in set", body = PolicyCanvasWorkspaceResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),

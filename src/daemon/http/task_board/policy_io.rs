@@ -55,6 +55,7 @@ pub(in crate::daemon::http) fn policy_transfer_http_body_limit(
     post,
     path = "/v1/policies/dump",
     tag = "policy",
+    description = "Dump every policy canvas with full workspace metadata, or a selected subset of policies without workspace metadata, as an exact transfer bundle",
     request_body = PolicyTransferDumpRequest,
     responses(
         (status = 200, description = "Exact transfer bundle for the selected policies", body = PolicyTransferBundle),
@@ -81,6 +82,7 @@ pub(super) async fn post_policy_dump(
     post,
     path = "/v1/policy-canvases/export",
     tag = "policy",
+    description = "Serialize the active (or a named) policy canvas document to a portable JSON export",
     request_body = PolicyCanvasExportRequest,
     responses(
         (status = 200, description = "The exported canvas document", body = PolicyCanvasExportResponse),
@@ -113,6 +115,7 @@ pub(super) async fn post_policy_export(
     post,
     path = "/v1/policy-canvases/import",
     tag = "policy",
+    description = "Validate an external policy graph document, create a new canvas from it, and make that canvas active",
     request_body = PolicyCanvasImportRequest,
     responses(
         (status = 200, description = "Workspace after importing the canvas document", body = PolicyCanvasImportResponse),
@@ -145,6 +148,7 @@ pub(super) async fn post_policy_import(
     post,
     path = "/v1/policies/import",
     tag = "policy",
+    description = "Validate and atomically merge or replace policy canvas records from a transfer bundle. Merge mode upserts by canvas ID while preserving unrelated canvases; replace-all mode requires workspace metadata and replaces the entire workspace",
     request_body = PolicyTransferImportRequest,
     responses(
         (status = 200, description = "Workspace after importing the transfer bundle", body = PolicyCanvasWorkspaceResponse),

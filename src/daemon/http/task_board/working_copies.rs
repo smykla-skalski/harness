@@ -54,6 +54,7 @@ pub(super) struct DeleteWorkingCopyResponseBody {
     post,
     path = "/v1/task-board/working-copies",
     tag = "task-board",
+    description = "List the daemon-owned working-copy registry entries for imported task-board item repositories",
     responses(
         (status = 200, description = "Working-copy registry entries", body = Vec<crate::task_board::working_copy::WorkingCopyListEntry>),
         (status = 400, description = "Request error", body = DaemonErrorBody),
@@ -82,6 +83,7 @@ pub(super) async fn post_task_board_working_copies(
     post,
     path = "/v1/task-board/working-copies/obtain",
     tag = "task-board",
+    description = "Obtain or reuse the working copy for a repository. When allow_clone is false the copy is only resolved if it already exists; when true, a missing copy is cloned",
     request_body = ObtainWorkingCopyPayload,
     responses(
         (status = 200, description = "Obtained (or reused) working copy, if present", body = ObtainWorkingCopyResponseBody),
@@ -117,6 +119,7 @@ pub(super) async fn post_task_board_working_copies_obtain(
     post,
     path = "/v1/task-board/working-copies/delete",
     tag = "task-board",
+    description = "Delete a working copy identified by its repo key segment, returning the working-copy registry after removal",
     request_body = DeleteWorkingCopyPayload,
     responses(
         (status = 200, description = "Working-copy registry after the deletion", body = DeleteWorkingCopyResponseBody),

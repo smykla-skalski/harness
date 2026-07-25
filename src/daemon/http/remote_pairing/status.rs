@@ -50,7 +50,7 @@ struct RemotePairStatusHttpResponse {
     path = "/v1/remote/pair/status",
     tag = "pairing",
     request_body = RemotePairStatusHttpRequest,
-    description = "Check the lifecycle status of a pairing request by its opaque id. Public: no daemon credentials, rate limited, output redacted. Error bodies use an ad-hoc error object carrying code and message but no details field.",
+    description = "Check the lifecycle status of a pairing request by its opaque id. Public: no daemon credentials, rate limited, output redacted. Error bodies use an ad-hoc error object carrying code and message but no details field",
     responses(
         (status = 200, description = "Current pairing status", body = RemotePairStatusHttpResponse),
         (status = 400, description = "Malformed status request", body = DaemonErrorBody),

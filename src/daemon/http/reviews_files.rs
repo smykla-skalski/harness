@@ -38,6 +38,7 @@ pub(super) fn merge_files_routes(
     post,
     path = "/v1/reviews/files/list",
     tag = "reviews",
+    description = "List the files changed in a pull request",
     request_body = ReviewsFilesListRequest,
     responses(
         (status = 200, description = "Changed files for a pull request", body = crate::daemon::protocol::ReviewsFilesListResponse),
@@ -68,6 +69,7 @@ pub(super) async fn post_review_files_list(
     post,
     path = "/v1/reviews/files/patch",
     tag = "reviews",
+    description = "Fetch the per-path patches for a pull request, detecting drift against the current upstream state",
     request_body = ReviewsFilesPatchRequest,
     responses(
         (status = 200, description = "Per-path patches with drift detection", body = crate::daemon::protocol::ReviewsFilesPatchResponse),
@@ -98,6 +100,7 @@ pub(super) async fn post_review_files_patch(
     post,
     path = "/v1/reviews/files/preview",
     tag = "reviews",
+    description = "Fetch line-limited previews of the per-path patches for a pull request, detecting drift against upstream",
     request_body = ReviewsFilesPreviewRequest,
     responses(
         (status = 200, description = "Line-limited patch previews with drift detection", body = crate::daemon::protocol::ReviewsFilesPreviewResponse),
@@ -128,6 +131,7 @@ pub(super) async fn post_review_files_preview(
     post,
     path = "/v1/reviews/files/viewed",
     tag = "reviews",
+    description = "Mark the given files as viewed or unviewed and report the outcome for each path",
     request_body = ReviewsFilesViewedRequest,
     responses(
         (status = 200, description = "Per-path viewed-state outcomes", body = crate::daemon::protocol::ReviewsFilesViewedResponse),
@@ -158,6 +162,7 @@ pub(super) async fn post_review_files_viewed(
     post,
     path = "/v1/reviews/files/blob",
     tag = "reviews",
+    description = "Fetch a base64-encoded image blob for a file in a pull request, along with its metadata",
     request_body = ReviewsFilesBlobRequest,
     responses(
         (status = 200, description = "Base64-encoded image blob with metadata", body = crate::daemon::protocol::ReviewsFilesBlobResponse),
@@ -188,6 +193,7 @@ pub(super) async fn post_review_files_blob(
     post,
     path = "/v1/reviews/files/comment",
     tag = "reviews",
+    description = "Post a line comment on a file or reply to an existing review thread",
     request_body = ReviewsFileCommentRequest,
     responses(
         (status = 200, description = "Result of posting the file comment or thread reply", body = crate::daemon::protocol::ReviewsFileCommentResponse),
@@ -218,6 +224,7 @@ pub(super) async fn post_review_files_comment(
     post,
     path = "/v1/reviews/files/local-clones",
     tag = "reviews",
+    description = "List the entries in the local bare-clone registry used to serve review file content",
     responses(
         (status = 200, description = "Local bare-clone registry entries", body = Vec<crate::reviews::LocalCloneListEntry>),
         (status = 400, description = "Request error", body = DaemonErrorBody),
@@ -258,6 +265,7 @@ pub(super) struct DeleteLocalCloneResponseBody {
     post,
     path = "/v1/reviews/files/local-clones/delete",
     tag = "reviews",
+    description = "Delete a local bare clone by its repository key segment and return the registry state after removal",
     request_body = DeleteLocalClonePayload,
     responses(
         (status = 200, description = "Local bare-clone registry after the deletion", body = DeleteLocalCloneResponseBody),

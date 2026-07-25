@@ -67,7 +67,7 @@ pub(crate) struct RemotePairClaimHttpResponse {
     path = "/v1/remote/pair/claim",
     tag = "pairing",
     request_body = RemotePairClaimHttpRequest,
-    description = "Claim a one-time pairing code to mint a remote client credential. Public: no daemon credentials, guarded by domain, TTL, and rate limits. Error bodies use an ad-hoc error object carrying code and message but no details field.",
+    description = "Claim a one-time pairing code to mint a remote client credential. Public: no daemon credentials, guarded by domain, TTL, and rate limits. Error bodies use an ad-hoc error object carrying code and message but no details field",
     responses(
         (status = 200, description = "Pairing claimed; issued client credential", body = RemotePairClaimHttpResponse),
         (status = 400, description = "Malformed claim request", body = DaemonErrorBody),

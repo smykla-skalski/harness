@@ -34,6 +34,7 @@ pub(super) struct ListAcpSessionsQuery {
     get,
     path = "/v1/managed-agents/{managed_agent_id}/sessions",
     tag = "managed-agents",
+    description = "List one page of sessions the ACP agent itself reports, optionally filtered by working directory. These session ids are owned by the agent, not harness, and are not reconciled against the harness session index",
     params(
         ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
         ("cwd" = Option<String>, Query, description = "Working directory the agent scopes its session list to"),
@@ -80,6 +81,7 @@ pub(super) async fn get_acp_sessions(
     delete,
     path = "/v1/managed-agents/{managed_agent_id}/sessions/{agent_session_id}",
     tag = "managed-agents",
+    description = "Delete an agent-owned session from the ACP agent's own session store",
     params(
         ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
         ("agent_session_id" = String, Path, description = "Agent-owned session identifier"),
@@ -123,6 +125,7 @@ pub(super) async fn delete_acp_session(
     post,
     path = "/v1/managed-agents/{managed_agent_id}/sessions/{agent_session_id}/close",
     tag = "managed-agents",
+    description = "Close an agent-owned session in the ACP agent's own session store without deleting it",
     params(
         ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
         ("agent_session_id" = String, Path, description = "Agent-owned session identifier"),
