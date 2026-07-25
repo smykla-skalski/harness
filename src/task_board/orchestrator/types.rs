@@ -16,6 +16,10 @@ pub use crate::task_board::github::GitHubProjectConfig as TaskBoardGitHubProject
 
 pub const CURRENT_ORCHESTRATOR_STATE_VERSION: u32 = 1;
 
+#[cfg(test)]
+#[path = "types_tests.rs"]
+mod tests;
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[derive(utoipa::ToSchema)]
 pub struct TaskBoardGitHubInboxConfig {
@@ -191,8 +195,32 @@ pub struct TaskBoardOrchestratorState {
     pub running: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_tick: Option<TaskBoardOrchestratorTickInfo>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "readable_last_run",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub last_run: Option<TaskBoardOrchestratorRunSummary>,
+}
+
+/// A finished run is history, so it can name a provider or status that a later
+/// build no longer has a variant for. Parsing it strictly makes one stale row
+/// fatal to daemon startup, which is how removing the Todoist provider left
+/// existing installs crash-looping before they could publish a manifest.
+fn readable_last_run<'de, D>(
+    deserializer: D,
+) -> Result<Option<TaskBoardOrchestratorRunSummary>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let Some(recorded) = Option::<serde_json::Value>::deserialize(deserializer)? else {
+        return Ok(None);
+    };
+    Ok(serde_json::from_value(recorded)
+        .inspect_err(|error| {
+            tracing::warn!(%error, "dropping an unreadable task board last-run record");
+        })
+        .ok())
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

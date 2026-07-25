@@ -43,6 +43,12 @@ fn main() -> ExitCode {
     }
     harness_daemon::app::run_startup_migrations();
     let result = cli.command.execute(&AppContext::production());
+    // launchd runs the daemon with no StandardErrorPath, so the rendered error
+    // below goes nowhere. Record it while the file layer is still installed,
+    // or a failure that aborts startup leaves a log that simply stops.
+    if let Err(error) = &result {
+        tracing::error!(code = error.code(), %error, "daemon command failed");
+    }
     drop(telemetry_guard);
     match result {
         Ok(code) => exit_code(code),
