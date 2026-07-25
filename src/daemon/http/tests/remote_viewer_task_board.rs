@@ -136,17 +136,20 @@ async fn assert_viewer_search_cannot_probe_redacted_text(client: &reqwest::Clien
     );
 }
 
+/// Encodes the probe properly rather than patching spaces: a probe carrying a
+/// reserved character would otherwise reach the daemon mangled, and this test
+/// reads "no match" as proof the viewer cannot see the text.
 async fn search_items(
     client: &reqwest::Client,
     base_url: &str,
     client_id: &str,
     text: &str,
 ) -> Vec<String> {
-    let encoded = text.replace(' ', "%20");
+    let query = serde_urlencoded::to_string([("query", text)]).expect("encode search query");
     let response = get_http_json(
         client,
         base_url,
-        &format!("{}?query={encoded}", http_paths::TASK_BOARD_ITEMS),
+        &format!("{}?{query}", http_paths::TASK_BOARD_ITEMS),
         client_id,
     )
     .await;
