@@ -381,25 +381,12 @@ public final class HarnessMonitorStore {
       reviewFilePatchStore
     )
     self.modelContext = modelContainer?.mainContext
-    self.userDataService = modelContainer.map {
-      UserDataPersistenceService(
-        modelContainer: $0,
-        maxRecentSearches: Self.maxRecentSearches
-      )
-    }
+    self.userDataService = Self.makeUserDataService(modelContainer: modelContainer)
     self.supervisorPolicyConfigRepository = modelContainer.map(
       SupervisorPolicyConfigRepository.init)
     self.supervisorAuditRepository = modelContainer.map(SupervisorAuditRepository.init)
-    if let cacheService {
-      self.cacheService = cacheService
-    } else if let modelContainer {
-      self.cacheService = SessionCacheService(
-        modelContainer: modelContainer,
-        databaseURL: HarnessMonitorPaths.cacheStoreURL()
-      )
-    } else {
-      self.cacheService = nil
-    }
+    self.cacheService = Self.resolveCacheService(
+      explicit: cacheService, modelContainer: modelContainer)
     self.persistenceError = persistenceError
     applyEnvironmentConfigurationAndStartInitialWork()
   }

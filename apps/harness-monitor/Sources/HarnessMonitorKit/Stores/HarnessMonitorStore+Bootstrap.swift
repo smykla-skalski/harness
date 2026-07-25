@@ -126,6 +126,33 @@ extension HarnessMonitorStore {
     #endif
   }
 
+  static func makeUserDataService(
+    modelContainer: ModelContainer?
+  ) -> UserDataPersistenceService? {
+    modelContainer.map {
+      UserDataPersistenceService(
+        modelContainer: $0,
+        maxRecentSearches: Self.maxRecentSearches
+      )
+    }
+  }
+
+  static func resolveCacheService(
+    explicit cacheService: SessionCacheService?,
+    modelContainer: ModelContainer?
+  ) -> SessionCacheService? {
+    if let cacheService {
+      return cacheService
+    }
+    guard let modelContainer else {
+      return nil
+    }
+    return SessionCacheService(
+      modelContainer: modelContainer,
+      databaseURL: HarnessMonitorPaths.cacheStoreURL()
+    )
+  }
+
   #if DEBUG
     static func debugBookmarkStoreContainerURL() -> URL {
       SandboxPaths.debugBookmarkFallbackContainerURL()
