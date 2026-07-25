@@ -139,8 +139,13 @@ print(mod.pool_dir(sys.argv[2]))
 PY
 )" || return 0
   pid="$(head -1 "$dir/lock" 2>/dev/null || true)"
+  # The lock file outlives the process that wrote it, and a dead supervisor's
+  # pid gets recycled - on a box also running other agents' builds, signalling
+  # it blind can kill something unrelated to this suite.
   if [[ "$pid" =~ ^[0-9]+$ ]]; then
-    kill "$pid" 2>/dev/null || true
+    case "$(ps -p "$pid" -o command= 2>/dev/null)" in
+      *harness-jobserver.py*supervise*) kill "$pid" 2>/dev/null || true ;;
+    esac
   fi
   rm -rf "$dir" 2>/dev/null || true
 }

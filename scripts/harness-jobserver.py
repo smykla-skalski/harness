@@ -43,6 +43,9 @@ MAX_REQUEST_BYTES = 256
 # Ceiling on the grant handshake. It is local IPC, so anything slower than this
 # means the supervisor is wedged and the command should just run without a grant.
 HANDSHAKE_TIMEOUT = 5.0
+# A reply is a dozen bytes to a local peer. Anything slower is a client that has
+# stopped reading, and a blocking send would stall every other build behind it.
+SEND_TIMEOUT = 2.0
 
 
 def pool_dir(repo_root: str) -> str:
@@ -216,15 +219,19 @@ def serve(pool: Pool, stop: threading.Event) -> None:
             return False
         granted = pool.acquire(want)
         holdings[conn] += granted
-        with contextlib.suppress(OSError):
+        try:
             conn.sendall(f"GRANTED {granted}\n".encode())
+        except OSError:
+            # The grant never reached it, so drop returning the tokens is right.
+            drop(conn)
+            return False
         return True
 
     while not stop.is_set():
         for key, _ in selector.select(timeout=POLL_SECONDS):
             if key.fileobj is server:
                 conn, _ = server.accept()
-                conn.setblocking(True)
+                conn.settimeout(SEND_TIMEOUT)
                 holdings[conn] = 0
                 pending[conn] = b""
                 selector.register(conn, selectors.EVENT_READ, None)

@@ -56,14 +56,31 @@ track_pool() {
   started_pools+=("$(pool_dir_for "$1")")
 }
 
+# The lock file outlives the process that wrote it, and a dead supervisor's pid
+# gets recycled - on a box also running other agents' builds, signalling it
+# blind can kill something that has nothing to do with this suite.
+is_supervisor_pid() {
+  local pid="$1"
+  [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+  case "$(ps -p "$pid" -o command= 2>/dev/null)" in
+    *harness-jobserver.py*supervise*) return 0 ;;
+  esac
+  return 1
+}
+
+kill_supervisor() {
+  if is_supervisor_pid "$1"; then
+    kill "$1" 2>/dev/null || true
+  fi
+  return 0
+}
+
 cleanup() {
   local dir pid
   for dir in "${started_pools[@]:-}"; do
     [[ -n "$dir" ]] || continue
     pid="$(head -1 "$dir/lock" 2>/dev/null || true)"
-    if [[ "$pid" =~ ^[0-9]+$ ]]; then
-      kill "$pid" 2>/dev/null || true
-    fi
+    kill_supervisor "$pid"
     rm -rf "$dir" 2>/dev/null || true
   done
   rm -rf "$PROBE_DIR" 2>/dev/null || true
@@ -526,6 +543,74 @@ PY
   pass "$name"
 }
 
+scenario_cleanup_only_signals_a_supervisor() {
+  local name="cleanup tells a live supervisor apart from any other pid"
+  local root; root="$(fake_root killguard)"
+  track_pool "$root"
+  python3 "$JOBSERVER" ensure --repo-root "$root" --budget 2 >/dev/null 2>&1
+  local dir; dir="$(pool_dir_for "$root")"
+  local pid; pid="$(head -1 "$dir/lock" 2>/dev/null || true)"
+
+  if ! is_supervisor_pid "$pid"; then
+    fail "$name (did not recognise the running supervisor at pid '$pid')"
+    return
+  fi
+  # The lock file outlives its writer, so a recycled pid is any live process
+  # that is not ours - this shell stands in for one.
+  if is_supervisor_pid "$$"; then
+    fail "$name (would have signalled this test shell at pid $$)"
+    return
+  fi
+  pass "$name"
+}
+
+scenario_a_client_that_never_reads_cannot_wedge_the_pool() {
+  local name="a client that stops reading does not stall the other clients"
+  local root; root="$(fake_root deafclient)"
+  track_pool "$root"
+  python3 "$JOBSERVER" ensure --repo-root "$root" --budget 4 >/dev/null 2>&1
+  local dir; dir="$(pool_dir_for "$root")"
+
+  local answer
+  answer="$(python3 - "$dir/sock" <<'PY'
+import socket, sys
+
+path = sys.argv[1]
+# Ask for zero so the flood cannot exhaust the pool; the point is the replies
+# piling up in the server's send buffer, not the tokens.
+deaf = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+# Bounded: a wedged server stops reading too, and an unbounded send here would
+# hang this test instead of failing it.
+deaf.settimeout(10.0)
+deaf.connect(path)
+try:
+    deaf.sendall(b"ACQUIRE 0\n" * 4000)
+except OSError:
+    pass
+
+other = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+other.settimeout(20.0)
+try:
+    other.connect(path)
+    other.sendall(b"ACQUIRE 2\n")
+    buf = b""
+    while b"\n" not in buf:
+        chunk = other.recv(64)
+        if not chunk:
+            break
+        buf += chunk
+    print(buf.partition(b"\n")[0].decode().strip() or "EMPTY")
+except OSError as exc:
+    print(f"BLOCKED {exc.__class__.__name__}")
+PY
+)"
+  if [[ "$answer" != "GRANTED 2" ]]; then
+    fail "$name (second client got '$answer')"
+    return
+  fi
+  pass "$name"
+}
+
 scenario_pipelined_requests_are_all_answered() {
   local name="every request in one packet is answered, not just the first"
   local root; root="$(fake_root pipelined)"
@@ -669,6 +754,8 @@ scenario_idle_exit_leaves_no_tokens_behind
 scenario_partial_pool_keeps_its_tokens
 scenario_signal_death_reports_a_shell_signal_status
 scenario_split_request_is_still_granted
+scenario_cleanup_only_signals_a_supervisor
+scenario_a_client_that_never_reads_cannot_wedge_the_pool
 scenario_pipelined_requests_are_all_answered
 scenario_symlinked_pool_parent_is_refused
 scenario_stalled_supervisor_does_not_hang_the_command
