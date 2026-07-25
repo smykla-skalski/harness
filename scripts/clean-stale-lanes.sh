@@ -61,7 +61,11 @@ dev_keeps=0
 lanes_touched=0
 worktrees_touched=0
 dev_segments_touched=0
-declare -A live_dev_segments=()
+# Newline-delimited rather than an associative array: `declare -A` needs bash 4
+# and macOS still ships 3.2 at /bin/bash, which rejects it with an error that
+# says nothing about the real problem. One entry per worktree, so a linear
+# match costs nothing.
+live_dev_segments=""
 
 usage() {
   cat <<EOF
@@ -251,6 +255,13 @@ process_lane() {
   drop_lane "lane" "$lane" "$path"
 }
 
+dev_segment_has_worktree() {
+  case $'\n'"$live_dev_segments" in
+    *$'\n'"$1"$'\n'*) return 0 ;;
+  esac
+  return 1
+}
+
 dev_segment_for_worktree() {
   local path="$1" resolved
   resolved="$(CDPATH='' cd -- "$path" 2>/dev/null && pwd -P)" || return 1
@@ -277,7 +288,7 @@ process_dev_segment() {
     record_keep "dev" "active" "$segment" "$path"
     return 0
   fi
-  if [[ -n "${live_dev_segments[$segment]:-}" ]]; then
+  if dev_segment_has_worktree "$segment"; then
     record_keep "dev" "worktree" "$segment" "$path"
     return 0
   fi
@@ -328,7 +339,7 @@ printf 'lane-window: %sh | worktree-window: %sh\n' "$STALENESS_HOURS" "$WORKTREE
 printf '\n[lanes]\n'
 if [[ -d "$LANE_ROOT" ]]; then
   while IFS= read -r -d '' lane_dir; do
-    process_lane "$(basename "$lane_dir")" "$lane_dir"
+    process_lane "$(basename -- "$lane_dir")" "$lane_dir"
   done < <(find "$LANE_ROOT" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null)
 fi
 
@@ -362,12 +373,12 @@ printf '\n[cargo lanes]\n'
 while IFS= read -r worktree_path; do
   [[ -n "$worktree_path" ]] || continue
   segment="$(dev_segment_for_worktree "$worktree_path")" || continue
-  live_dev_segments["$segment"]=1
+  live_dev_segments+="$segment"$'\n'
 done < <(git -C "$COMMON_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree /{ print substr($0, 10) }')
 
 if [[ -d "$DEV_ROOT" ]]; then
   while IFS= read -r -d '' dev_dir; do
-    process_dev_segment "$(basename "$dev_dir")" "$dev_dir"
+    process_dev_segment "$(basename -- "$dev_dir")" "$dev_dir"
   done < <(find "$DEV_ROOT" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null)
 fi
 
