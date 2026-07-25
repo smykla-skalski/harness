@@ -128,7 +128,7 @@ gh api 'users/copilot-pull-request-reviewer%5Bbot%5D' --jq '.id'
 
 ### Close out
 
-This repository allows squash merges only. The session branch collapses into one new commit on `upstream/main`, so its own commits never reach `main` and the branch can never fast-forward onto it. Closeout realigns local state instead of integrating anything, unless the worktree and branch existed only to deliver one standalone, non-umbrella issue or task, in which case closeout removes them instead. A worktree kept alive for an umbrella's remaining slices or another follow-up in the same PR series always takes the realign path; when it is unclear whether more work is coming, default to realign and ask before removing anything.
+This repository allows squash merges only. The session branch collapses into one new commit on `upstream/main`, so its own commits never reach `main` and the branch can never fast-forward onto it. Closeout realigns local state instead of integrating anything, unless the worktree and branch existed only to deliver one standalone, non-umbrella issue or task, in which case closeout removes them and their build caches instead. A worktree kept alive for an umbrella's remaining slices or another follow-up in the same PR series always takes the realign path; when it is unclear whether more work is coming, default to realign and ask before removing anything.
 
 Confirm the PR merged before either path, then check that `<main-checkout>` is on `main`, `<worktree>` is on `<session-branch>`, both are clean, and local `main` carries no unpublished `replay` commits (reconcile those first, as described below).
 
@@ -150,6 +150,27 @@ It deliberately skips three things:
 - No head comparison. A merged PR is proof enough.
 
 #### Cleanup
+
+Reclaim this session's two build caches first, because `git worktree remove` deletes the only name that maps the shared lane back to this session. `mise run clean:lanes` reclaims neither: it covers `xcode-derived-lanes/` and always keeps the current worktree.
+
+- `<worktree>/target` - direct `cargo` and `cargo nextest` output.
+- `<main-checkout>/target/dev/wt-<worktree-name>-<hash>` - everything from `scripts/cargo-local.sh`, which every `mise run test:*` task uses. Sits outside the worktree and is usually the larger.
+
+Every other session holds its own `target/dev/wt-*` lane, so ask `cargo-local.sh` for this one rather than matching a name by eye, and clear any target-dir override first, since the script honours one and would otherwise answer with the redirect. A lease is named `<segment>-<pid>` and holds that PID inside, and a running build's lane must survive, so the delete stands down while one of those PIDs is alive. Mirror `segment_is_leased` in `clean-build-caches.sh`: require the filename to match the PID it carries, and count a PID that fails `kill -0` but still appears in `ps` as alive, since a build owned by another user cannot be signalled. Judging by the file alone instead would let a lease from a crashed build block reclamation for good, stranding the lane just as surely as never running this step.
+
+```bash
+# assumes: PR merged, <worktree> clean
+lane=$(env -u CARGO_TARGET_DIR -u HARNESS_CARGO_TARGET_DIR \
+  "<worktree>/scripts/cargo-local.sh" --print-target-dir)
+held=$(for f in "<main-checkout>"/target/.cargo-local/leases/"$(basename "$lane")"-*; do
+  pid=$(cat "$f" 2>/dev/null) || continue
+  [ "${f##*/}" = "$(basename "$lane")-$pid" ] || continue
+  kill -0 "$pid" 2>/dev/null || ps -p "$pid" >/dev/null 2>&1 && echo held
+done)
+[ -z "$held" ] && rm -rf "<worktree>/target" "$lane"   # a running build keeps its lane
+```
+
+Then remove the worktree and the branch:
 
 ```bash
 git -C <main-checkout> fetch --prune upstream

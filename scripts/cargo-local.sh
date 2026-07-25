@@ -480,6 +480,15 @@ target_segment="local"
 if [[ "$ROOT" != "$COMMON_REPO_ROOT" ]]; then
   target_segment="wt-$(sanitize_segment "$(basename -- "$ROOT")")-$(short_hash "$ROOT")"
 fi
+target_dir="${CARGO_TARGET_DIR:-${HARNESS_CARGO_TARGET_DIR:-$COMMON_REPO_ROOT/target/dev/$target_segment}}"
+
+# Answered before the lease is taken, because closeout reads this to find the
+# lane it has to reclaim and then checks that same lane for a live lease. A
+# lease registered by the query would report the lane as busy to its own caller.
+if [[ "${1:-}" == "--print-target-dir" ]]; then
+  printf '%s\n' "$target_dir"
+  exit 0
+fi
 
 if [[ "$skip_build_lease" == "1" ]]; then
   active_build_count="${HARNESS_CARGO_ACTIVE_BUILD_COUNT:-1}"
@@ -519,7 +528,7 @@ if [[ -n "${SCCACHE_BIN:-}" ]]; then
   fi
 fi
 
-export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${HARNESS_CARGO_TARGET_DIR:-$COMMON_REPO_ROOT/target/dev/$target_segment}}"
+export CARGO_TARGET_DIR="$target_dir"
 # An explicit thread count is the caller's decision, so record that before the
 # default lands on top of it - the pool must not renegotiate a chosen width.
 nextest_threads_explicit=0
