@@ -51,7 +51,14 @@ struct HarnessMonitorStoreTaskBoardAutomationTests {
     let succeeded = await store.forceCancelTaskBoardAutomation(request: request)
 
     #expect(succeeded)
-    #expect(client.recordedCalls() == [.forceCancelTaskBoardAutomation(request: request)])
+    // Scoped to the cancel itself: the refresh this triggers is free to load
+    // whatever else the board needs, and asserting the whole call list made
+    // that an unrelated failure.
+    let forceCancels = client.recordedCalls().filter {
+      if case .forceCancelTaskBoardAutomation = $0 { return true }
+      return false
+    }
+    #expect(forceCancels == [.forceCancelTaskBoardAutomation(request: request)])
     #expect(client.readCallCount(.taskBoardOrchestratorStatus) > initialStatusReads)
   }
 
