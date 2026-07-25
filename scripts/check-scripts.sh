@@ -212,7 +212,11 @@ if [[ "$mode" != "--lint" ]]; then
   run_quiet_step "run-unit-tests shell tests" "$ROOT/scripts/tests/test-run-unit-tests.sh"
   run_quiet_step "Linux-only command shell tests" "$ROOT/scripts/tests/test-run-linux-only.sh"
   run_quiet_step "run-step shell tests" "$ROOT/scripts/tests/test-run-step.sh"
-  run_quiet_step "release install shell tests" "$ROOT/scripts/tests/test-release-install.sh"
+  # The suite spawns real install/lock/retention subprocesses (including a
+  # 120s "live worker" simulation) and takes ~6 real minutes even with zero
+  # host contention, well past the shared 90s/180s step default.
+  HARNESS_CHECK_SCRIPTS_STEP_TIMEOUT_SECONDS="${HARNESS_CHECK_SCRIPTS_RELEASE_INSTALL_TIMEOUT_SECONDS:-600}" \
+    run_quiet_step "release install shell tests" "$ROOT/scripts/tests/test-release-install.sh"
   run_quiet_step "remote-daemon-deploy shell tests" "$ROOT/scripts/tests/test-remote-daemon-deploy.sh"
   run_quiet_step "clean-build-caches shell tests" "$ROOT/scripts/tests/test-clean-build-caches.sh"
   run_quiet_step "clean-stale-lanes shell tests" "$ROOT/scripts/tests/test-clean-stale-lanes.sh"
