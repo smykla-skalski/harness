@@ -59,7 +59,7 @@ reset_tmp_root() {
 
 assert_output_line_contains() {
   local haystack="$1" path_needle="$2" marker="$3" line
-  line="$(grep -F -- "$path_needle" <<<"$haystack")" || {
+  line="$(grep -m 1 -F -- "$path_needle" <<<"$haystack")" || {
     fail "expected output to contain a line for: $path_needle"
     return 1
   }
