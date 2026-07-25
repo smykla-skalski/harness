@@ -383,9 +383,7 @@ fn approval_graph(revision: u64) -> PolicyGraph {
 /// cannot render has to refuse while the dispatch is still merely held.
 #[tokio::test]
 async fn an_unrenderable_prompt_leaves_the_dispatch_held_and_the_grant_live() {
-    let _lock = crate::task_board::prompt_catalog::PROMPT_CATALOG_TEST_LOCK
-        .lock()
-        .expect("catalog test lock");
+    let _lock = crate::task_board::prompt_catalog::prompt_catalog_test_lock();
     let fixture = held_fixture().await;
     let _installed = crate::task_board::prompt_catalog::scoped_prompt_catalog(
         crate::task_board::prompt_catalog::PromptCatalog::from_json(

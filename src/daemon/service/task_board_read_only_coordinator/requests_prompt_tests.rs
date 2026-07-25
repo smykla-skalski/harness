@@ -14,7 +14,7 @@ use crate::task_board::{
 };
 
 use crate::task_board::prompt_catalog::{
-    PROMPT_CATALOG_TEST_LOCK, PromptCatalog, scoped_prompt_catalog,
+    prompt_catalog_test_lock, PromptCatalog, scoped_prompt_catalog,
 };
 
 use super::{codex_attempt_request, remote_codex_attempt_request};
@@ -140,7 +140,7 @@ fn a_remote_attempt_names_its_executor_checkout_instead_of_a_worktree() {
 /// catalog; the serve paths install it ahead of recovery.
 #[test]
 fn the_remote_offer_renderer_uses_the_installed_catalog() {
-    let _lock = PROMPT_CATALOG_TEST_LOCK.lock().expect("catalog test lock");
+    let _lock = prompt_catalog_test_lock();
     let _installed = scoped_prompt_catalog(
         PromptCatalog::from_json(br#"{"read_only_review": "Review {{ board_item_id }}"}"#)
             .expect("parse overrides"),
@@ -157,7 +157,7 @@ fn the_remote_offer_renderer_uses_the_installed_catalog() {
 
 #[test]
 fn a_configured_evaluation_prompt_replaces_the_shipped_one() {
-    let _lock = PROMPT_CATALOG_TEST_LOCK.lock().expect("catalog test lock");
+    let _lock = prompt_catalog_test_lock();
     let _installed = scoped_prompt_catalog(
         PromptCatalog::from_json(
             br#"{"evaluation": "Judge {{ board_item_id }} at {{ exact_head_revision }}"}"#,
@@ -176,7 +176,7 @@ fn a_configured_evaluation_prompt_replaces_the_shipped_one() {
 
 #[test]
 fn a_remote_attempt_refuses_a_prompt_naming_a_worktree_it_does_not_have() {
-    let _lock = PROMPT_CATALOG_TEST_LOCK.lock().expect("catalog test lock");
+    let _lock = prompt_catalog_test_lock();
     let _installed = scoped_prompt_catalog(
         PromptCatalog::from_json(br#"{"read_only_review": "Review in {{ worktree }}"}"#)
             .expect("parse overrides"),

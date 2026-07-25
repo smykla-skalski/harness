@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use super::{
-    PROMPT_CATALOG_TEST_LOCK as CATALOG_TEST_LOCK, PromptCatalog, PromptId, active_prompt_catalog,
+    prompt_catalog_test_lock, PromptCatalog, PromptId, active_prompt_catalog,
     render_prompt, scoped_prompt_catalog,
 };
 
@@ -213,7 +213,7 @@ fn an_override_naming_an_unknown_variable_fails_only_its_own_prompt() {
 
 #[test]
 fn rendering_reports_a_variable_this_item_does_not_have() {
-    let _guard = CATALOG_TEST_LOCK.lock().expect("catalog test lock");
+    let _guard = prompt_catalog_test_lock();
     let catalog = PromptCatalog::from_json(br#"{"worker": "Review {{ pull_request }}"}"#)
         .expect("parse overrides");
     let _installed = scoped_prompt_catalog(catalog);
@@ -229,7 +229,7 @@ fn rendering_reports_a_variable_this_item_does_not_have() {
 
 #[test]
 fn the_active_catalog_is_builtin_until_one_is_installed() {
-    let _guard = CATALOG_TEST_LOCK.lock().expect("catalog test lock");
+    let _guard = prompt_catalog_test_lock();
 
     assert!(active_prompt_catalog().is_builtin());
     assert_eq!(
@@ -240,7 +240,7 @@ fn the_active_catalog_is_builtin_until_one_is_installed() {
 
 #[test]
 fn a_scoped_catalog_replaces_the_active_one_and_restores_it_on_drop() {
-    let _guard = CATALOG_TEST_LOCK.lock().expect("catalog test lock");
+    let _guard = prompt_catalog_test_lock();
     let catalog = PromptCatalog::from_json(br#"{"triage_escalation": "Decide on {{ title }}"}"#)
         .expect("parse overrides");
 

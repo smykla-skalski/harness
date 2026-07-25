@@ -1,6 +1,6 @@
 use super::render_triage_escalation_prompt;
 use crate::task_board::prompt_catalog::{
-    PROMPT_CATALOG_TEST_LOCK, PromptCatalog, scoped_prompt_catalog,
+    prompt_catalog_test_lock, PromptCatalog, scoped_prompt_catalog,
 };
 use crate::task_board::types::{TaskBoardItem, TaskBoardItemKind, TaskBoardPriority};
 
@@ -64,7 +64,7 @@ fn prompt_handles_empty_body_and_no_tags() {
 
 #[test]
 fn a_configured_prompt_replaces_the_shipped_one() {
-    let _lock = PROMPT_CATALOG_TEST_LOCK.lock().expect("catalog test lock");
+    let _lock = prompt_catalog_test_lock();
     let catalog = PromptCatalog::from_json(
         br#"{"triage_escalation": ["Judge {{ title }} ({{ priority }}).", "Report with {{ escalation_id }} and {{ verdict_token }}."]}"#,
     )
@@ -84,7 +84,7 @@ fn a_configured_prompt_replaces_the_shipped_one() {
 
 #[test]
 fn a_prompt_naming_an_unknown_variable_fails_before_the_agent_starts() {
-    let _lock = PROMPT_CATALOG_TEST_LOCK.lock().expect("catalog test lock");
+    let _lock = prompt_catalog_test_lock();
     let catalog = PromptCatalog::from_json(br#"{"triage_escalation": "Judge {{ titel }}"}"#)
         .expect("parse overrides");
     let _installed = scoped_prompt_catalog(catalog);
@@ -99,7 +99,7 @@ fn a_prompt_naming_an_unknown_variable_fails_before_the_agent_starts() {
 
 #[test]
 fn a_prompt_naming_a_fact_this_item_lacks_fails_before_the_agent_starts() {
-    let _lock = PROMPT_CATALOG_TEST_LOCK.lock().expect("catalog test lock");
+    let _lock = prompt_catalog_test_lock();
     let catalog =
         PromptCatalog::from_json(br#"{"triage_escalation": "Judge {{ title }} in {{ project_id }}"}"#)
             .expect("parse overrides");

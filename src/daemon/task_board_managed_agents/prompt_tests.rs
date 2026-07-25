@@ -5,7 +5,7 @@
 
 use crate::task_board::AgentMode;
 use crate::task_board::prompt_catalog::{
-    PROMPT_CATALOG_TEST_LOCK, PromptCatalog, scoped_prompt_catalog,
+    prompt_catalog_test_lock, PromptCatalog, scoped_prompt_catalog,
 };
 
 use super::super::test_support::applied_task;
@@ -60,7 +60,7 @@ fn the_worker_prompt_renders_the_shipped_bytes_on_both_transports() {
 
 #[test]
 fn a_configured_review_prompt_replaces_the_shipped_one() {
-    let _lock = PROMPT_CATALOG_TEST_LOCK.lock().expect("catalog test lock");
+    let _lock = prompt_catalog_test_lock();
     let _installed = scoped_prompt_catalog(
         PromptCatalog::from_json(
             br#"{"read_only_review": "Review {{ board_item_id }} at {{ exact_head_revision }} as {{ profile_id }}"}"#,
@@ -81,7 +81,7 @@ fn a_configured_review_prompt_replaces_the_shipped_one() {
 
 #[test]
 fn a_configured_write_prompt_replaces_the_shipped_one() {
-    let _lock = PROMPT_CATALOG_TEST_LOCK.lock().expect("catalog test lock");
+    let _lock = prompt_catalog_test_lock();
     let _installed = scoped_prompt_catalog(
         PromptCatalog::from_json(
             br#"{"write_implementation": "Implement {{ board_item_id }} from {{ base_head_revision }}"}"#,
@@ -99,7 +99,7 @@ fn a_configured_write_prompt_replaces_the_shipped_one() {
 
 #[test]
 fn a_configured_worker_prompt_replaces_the_shipped_one_on_both_transports() {
-    let _lock = PROMPT_CATALOG_TEST_LOCK.lock().expect("catalog test lock");
+    let _lock = prompt_catalog_test_lock();
     let _installed = scoped_prompt_catalog(
         PromptCatalog::from_json(br#"{"worker": "Do {{ board_item_id }} in {{ worktree }}"}"#)
             .expect("parse overrides"),
@@ -122,7 +122,7 @@ fn a_configured_worker_prompt_replaces_the_shipped_one_on_both_transports() {
 
 #[test]
 fn a_review_prompt_naming_an_absent_pull_request_refuses_the_spawn() {
-    let _lock = PROMPT_CATALOG_TEST_LOCK.lock().expect("catalog test lock");
+    let _lock = prompt_catalog_test_lock();
     let _installed = scoped_prompt_catalog(
         PromptCatalog::from_json(br#"{"read_only_review": "Review {{ pull_request }}"}"#)
             .expect("parse overrides"),
@@ -142,7 +142,7 @@ fn a_review_prompt_naming_an_absent_pull_request_refuses_the_spawn() {
 
 #[test]
 fn a_worker_prompt_naming_an_absent_fact_refuses_the_spawn() {
-    let _lock = PROMPT_CATALOG_TEST_LOCK.lock().expect("catalog test lock");
+    let _lock = prompt_catalog_test_lock();
     let _installed = scoped_prompt_catalog(
         PromptCatalog::from_json(br#"{"worker": "Do {{ board_item_id }} for {{ project_id }}"}"#)
             .expect("parse overrides"),

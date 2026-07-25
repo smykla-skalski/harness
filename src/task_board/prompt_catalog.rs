@@ -206,7 +206,18 @@ static ACTIVE_PROMPT_CATALOG: Mutex<Option<Arc<PromptCatalog>>> = Mutex::new(Non
 /// a scoped catalog holds this first. Under nextest each test already runs in
 /// its own process and the lock is uncontended.
 #[cfg(test)]
-pub(crate) static PROMPT_CATALOG_TEST_LOCK: Mutex<()> = Mutex::new(());
+static PROMPT_CATALOG_TEST_LOCK_SLOT: Mutex<()> = Mutex::new(());
+
+/// Recovers from poisoning the way the production slot does. Sixteen call
+/// sites take this lock, so panicking on a poisoned mutex turns one real test
+/// failure into fifteen misleading ones.
+#[cfg(test)]
+pub(crate) fn prompt_catalog_test_lock() -> MutexGuard<'static, ()> {
+    match PROMPT_CATALOG_TEST_LOCK_SLOT.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    }
+}
 
 fn active_catalog_slot() -> MutexGuard<'static, Option<Arc<PromptCatalog>>> {
     match ACTIVE_PROMPT_CATALOG.lock() {

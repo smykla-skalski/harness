@@ -8,7 +8,7 @@
 use crate::daemon::protocol::{CodexRunStatus, ManagedAgentSnapshot};
 use crate::task_board::AgentMode;
 use crate::task_board::prompt_catalog::{
-    PROMPT_CATALOG_TEST_LOCK, PromptCatalog, scoped_prompt_catalog,
+    prompt_catalog_test_lock, PromptCatalog, scoped_prompt_catalog,
 };
 
 use super::super::test_support::{applied_task, codex_snapshot};
@@ -41,7 +41,7 @@ fn running_review_worker() -> (crate::task_board::DispatchAppliedTask, ManagedAg
 
 #[test]
 fn a_worker_launched_before_the_prompt_changed_still_recovers() {
-    let _lock = PROMPT_CATALOG_TEST_LOCK.lock().expect("catalog test lock");
+    let _lock = prompt_catalog_test_lock();
     let (applied, snapshot) = running_review_worker();
 
     let _installed = scoped_prompt_catalog(
@@ -55,7 +55,7 @@ fn a_worker_launched_before_the_prompt_changed_still_recovers() {
 
 #[test]
 fn a_prompt_change_does_not_excuse_a_different_worktree() {
-    let _lock = PROMPT_CATALOG_TEST_LOCK.lock().expect("catalog test lock");
+    let _lock = prompt_catalog_test_lock();
     let (applied, snapshot) = running_review_worker();
     let ManagedAgentSnapshot::Codex(mut run) = snapshot else {
         panic!("codex snapshot");
@@ -80,7 +80,7 @@ fn a_prompt_change_does_not_excuse_a_different_worktree() {
 /// looked like.
 #[test]
 fn a_worker_recovers_even_when_the_configured_prompt_cannot_render() {
-    let _lock = PROMPT_CATALOG_TEST_LOCK.lock().expect("catalog test lock");
+    let _lock = prompt_catalog_test_lock();
     let (applied, snapshot) = running_review_worker();
 
     let _installed = scoped_prompt_catalog(

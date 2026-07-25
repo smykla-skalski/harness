@@ -1,6 +1,6 @@
 use super::{WorkerPromptContext, plan_worker_prompt, render_worker_prompt};
 use crate::task_board::prompt_catalog::{
-    PROMPT_CATALOG_TEST_LOCK, PromptCatalog, scoped_prompt_catalog,
+    prompt_catalog_test_lock, PromptCatalog, scoped_prompt_catalog,
 };
 use crate::task_board::{TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
 
@@ -58,7 +58,7 @@ fn an_item_without_optional_facts_renders_the_shipped_bytes() {
 
 #[test]
 fn a_configured_prompt_may_name_a_fact_the_item_has() {
-    let _lock = PROMPT_CATALOG_TEST_LOCK.lock().expect("catalog test lock");
+    let _lock = prompt_catalog_test_lock();
     let _installed = scoped_prompt_catalog(
         PromptCatalog::from_json(br#"{"worker": "Do {{ title }} ({{ priority }})"}"#)
             .expect("parse overrides"),
@@ -71,7 +71,7 @@ fn a_configured_prompt_may_name_a_fact_the_item_has() {
 
 #[test]
 fn the_dispatch_preview_shows_why_a_prompt_cannot_be_rendered() {
-    let _lock = PROMPT_CATALOG_TEST_LOCK.lock().expect("catalog test lock");
+    let _lock = prompt_catalog_test_lock();
     let _installed = scoped_prompt_catalog(
         PromptCatalog::from_json(br#"{"worker": "Do {{ title }} for {{ project_id }}"}"#)
             .expect("parse overrides"),
