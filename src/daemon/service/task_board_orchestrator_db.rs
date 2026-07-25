@@ -47,6 +47,10 @@ pub(crate) async fn run_task_board_orchestrator_once_with_session_db(
     run_task_board_orchestrator_once_inner(db, request, Some(session)).await
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "sequential prepare/execute/complete-or-fail pipeline, each already its own helper"
+)]
 async fn run_task_board_orchestrator_once_inner(
     db: &AsyncDaemonDb,
     request: &TaskBoardOrchestratorRunOnceRequest,

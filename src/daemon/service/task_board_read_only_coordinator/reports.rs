@@ -125,6 +125,10 @@ where
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 async fn reconcile_report_start_error<R>(
     db: &AsyncDaemonDb,
     runtime: &R,

@@ -15,6 +15,10 @@ use crate::task_board::{
 };
 use crate::workspace::utc_now;
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "sequential import/adopt/cleanup steps, each already its own helper"
+)]
 pub(crate) async fn import_and_adopt_task_board_remote_implementation_result(
     db: &AsyncDaemonDb,
     assignment_id: &str,

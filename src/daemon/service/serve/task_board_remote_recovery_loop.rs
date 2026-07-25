@@ -41,6 +41,10 @@ pub(super) fn spawn_task_board_remote_recovery_loop(
     ))
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tokio::select! shutdown/wake loop is clearer as its two explicit branches"
+)]
 async fn run_remote_recovery_loop(
     state: DaemonHttpState,
     fallback_interval: Duration,
@@ -128,6 +132,10 @@ pub(crate) async fn recover_remote_assignments_at_startup(
     Ok(())
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 pub(crate) async fn recover_remote_assignments_at_startup_with_controller(
     _state: &DaemonHttpState,
     db: &AsyncDaemonDb,
@@ -153,6 +161,10 @@ pub(crate) async fn recover_remote_assignments_at_startup_with_controller(
     Ok(())
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 async fn maintain_remote_recovery_after_controller(
     _state: &DaemonHttpState,
     db: &AsyncDaemonDb,
@@ -208,6 +220,10 @@ async fn maintain_remote_recovery_after_coverage(
     );
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 async fn maintain_remote_recovery(db: &AsyncDaemonDb, schedule: &mut RecoverySchedule) {
     let result = Box::pin(async {
         let now = utc_now();
@@ -227,12 +243,20 @@ async fn maintain_remote_recovery(db: &AsyncDaemonDb, schedule: &mut RecoverySch
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 async fn prune_startup_evidence(db: &AsyncDaemonDb, now: &str) {
     if let Err(error) = db.prune_task_board_remote_execution_evidence(now).await {
         tracing::warn!(%error, "task-board remote evidence startup pruning failed");
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 fn log_recovery_failures(batch: &TaskBoardRemoteRecoveryBatch) {
     for failure in &batch.failures {
         tracing::warn!(
@@ -263,6 +287,10 @@ impl RecoverySchedule {
         self.record_batch_at(batch, deadline, Instant::now());
     }
 
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+    )]
     fn record_batch_at(
         &mut self,
         batch: &TaskBoardRemoteRecoveryBatch,

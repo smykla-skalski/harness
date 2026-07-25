@@ -71,13 +71,26 @@ pub(crate) async fn drive_task_board_remote_controller(
         return Ok(report);
     }
     if !report.scan_incomplete {
-        refresh_hosts(db, &mut report).await?;
-        let _driver = CONTROLLER_DRIVER.lock().await;
-        offer_remote_candidates(db, &mut report).await?;
+        refresh_hosts_and_offer(db, &mut report).await?;
     }
     Ok(report)
 }
 
+/// Re-takes the driver lock for the offer step alone. The scan above releases
+/// it first so a blocked scan can still refresh hosts without holding it.
+async fn refresh_hosts_and_offer(
+    db: &AsyncDaemonDb,
+    report: &mut TaskBoardRemoteControllerReport,
+) -> Result<(), CliError> {
+    refresh_hosts(db, report).await?;
+    let _driver = CONTROLLER_DRIVER.lock().await;
+    offer_remote_candidates(db, report).await
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 pub(crate) async fn drive_task_board_remote_controller_before_local_work(
     db: &AsyncDaemonDb,
 ) -> Result<TaskBoardRemoteControllerReport, CliError> {
@@ -375,6 +388,10 @@ async fn offer_remote_candidates(
     Ok(())
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 async fn prepare_candidate_source(
     execution: &TaskBoardWorkflowExecutionRecord,
     phase: TaskBoardExecutionPhase,

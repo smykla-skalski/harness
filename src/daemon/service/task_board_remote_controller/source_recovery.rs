@@ -17,6 +17,10 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionRecord,
 };
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "flat match over source-bundle recovery outcome; each arm delegates to one helper"
+)]
 pub(super) async fn progress_unclaimed_offer(
     db: &AsyncDaemonDb,
     client: &RemoteExecutionControllerClient,

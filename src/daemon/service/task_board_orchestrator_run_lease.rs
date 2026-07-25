@@ -161,6 +161,10 @@ async fn check_fence(
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tokio::select! shutdown/tick loop is clearer as its two explicit branches"
+)]
 async fn run_heartbeat(
     db: AsyncDaemonDb,
     lease: TaskBoardAutomationRunLease,

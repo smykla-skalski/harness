@@ -63,6 +63,10 @@ async fn run_task_board_triage_escalation_loop(
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 async fn drain_tick(state: &DaemonHttpState, db: &AsyncDaemonDb, config: &TaskBoardTriageEscalationConfig) {
     match db
         .sweep_stale_task_board_triage_escalations(config.timeout_seconds)
@@ -124,6 +128,10 @@ async fn drain_tick(state: &DaemonHttpState, db: &AsyncDaemonDb, config: &TaskBo
 /// Best-effort: a hung report-mode process that already timed out is not
 /// worth failing the tick over if it cannot be reached (already exited,
 /// bridge unavailable, etc.) -- the DB row is already terminal either way.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 async fn stop_escalation_worker(state: &DaemonHttpState, managed_run_id: &str) {
     let run_id = managed_run_id.to_string();
     if let Err(error) =

@@ -23,6 +23,8 @@ mod adoption;
 mod cleanup;
 #[path = "task_board_remote_executor_loop/fences.rs"]
 mod fences;
+#[path = "task_board_remote_executor_loop/fresh_start.rs"]
+mod fresh_start;
 #[path = "task_board_remote_executor_loop/recovery.rs"]
 mod recovery;
 #[path = "task_board_remote_executor_loop/runtime.rs"]
@@ -87,6 +89,10 @@ pub(super) fn spawn_task_board_remote_executor_loop(
     })
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 async fn reconcile_remote_executor_assignments(
     state: &DaemonHttpState,
     shutdown_rx: Option<&watch::Receiver<bool>>,
@@ -269,74 +275,16 @@ async fn prepare_active_remote_worker(
         return prepare_recovery(db, record, identity, action, persisted_permit).await;
     }
     // Only this no-permit, no-run path may provision and Start.
-    if shutdown_observed(shutdown_rx) {
-        return Ok(None);
-    }
-    let persisted_authority = executor_start_authority(record)?;
-    if abandon_predecessor_claim(db, record, identity, daemon_epoch).await? {
-        return Ok(None);
-    }
-    // Wall-clock gates fresh claims; authorized generations still reconcile after expiry.
-    if persisted_authority.is_none()
-        && !start_window_is_open(
-            record.lease_expires_at.as_deref().unwrap_or_default(),
-            record.deadline_at.as_deref().unwrap_or_default(),
-            &utc_now(),
-        )?
-    {
-        return Ok(None);
-    }
-    let Some(authority) = start_authority_for_action(
+    fresh_start::prepare_fresh_remote_worker_start(
         db,
         record,
+        offer,
         identity,
         action,
-        persisted_authority,
         daemon_epoch,
+        shutdown_rx,
     )
-    .await?
-    else {
-        return Ok(None);
-    };
-    if shutdown_observed(shutdown_rx) {
-        return Ok(None);
-    }
-    if record.claimed_host_instance_id.as_deref() != Some(daemon_epoch) {
-        cleanup_predecessor_remote_start(db, Some(&authority), daemon_epoch).await?;
-        return Ok(None);
-    }
-    let Some(authority) = authorize_or_cleanup_remote_provisioning(db, Some(&authority)).await?
-    else {
-        return Ok(None);
-    };
-    if shutdown_observed(shutdown_rx) {
-        return Ok(None);
-    }
-    let workspace = match prepare_remote_workspace(db, record, offer, identity, true).await {
-        Ok(workspace) => workspace,
-        Err(error) => {
-            if authorize_or_cleanup_remote_provisioning(db, Some(&authority))
-                .await?
-                .is_none()
-            {
-                return Ok(None);
-            }
-            return Err(error);
-        }
-    };
-    if shutdown_observed(shutdown_rx) {
-        return Ok(None);
-    }
-    match claim_or_cleanup_remote_start_io(db, Some(&authority), &workspace).await? {
-        TaskBoardRemoteExecutorStartIoPermitOutcome::Acquired(permit) => {
-            Ok(Some(PreparedRemoteWorker {
-                workspace,
-                action: PreparedRemoteWorkerAction::Start(permit),
-            }))
-        }
-        TaskBoardRemoteExecutorStartIoPermitOutcome::Replayed(_)
-        | TaskBoardRemoteExecutorStartIoPermitOutcome::Stale => Ok(None),
-    }
+    .await
 }
 
 async fn authorize_or_cleanup_remote_provisioning(

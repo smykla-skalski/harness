@@ -37,6 +37,13 @@ fn apply_optional_fields(
     } else if let Some(project_dir) = &update.project_dir {
         settings.project_dir = Some(project_dir.clone());
     }
+    apply_github_fields(settings, update);
+}
+
+fn apply_github_fields(
+    settings: &mut TaskBoardOrchestratorSettings,
+    update: &TaskBoardOrchestratorSettingsUpdateRequest,
+) {
     if let Some(github_project) = &update.github_project {
         settings.github_project.clone_from(github_project);
     }
@@ -61,6 +68,13 @@ fn apply_automation_fields(
     if let Some(reviewers) = &update.reviewers {
         settings.reviewers.clone_from(reviewers);
     }
+    apply_execution_target_fields(settings, update);
+}
+
+fn apply_execution_target_fields(
+    settings: &mut TaskBoardOrchestratorSettings,
+    update: &TaskBoardOrchestratorSettingsUpdateRequest,
+) {
     if let Some(repositories) = &update.repositories {
         settings.repositories.clone_from(repositories);
     }
