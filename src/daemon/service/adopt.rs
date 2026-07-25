@@ -1,6 +1,6 @@
 use crate::errors::CliError;
 use crate::session::{service as session_service, storage as session_storage};
-use crate::workspace::adopter::AdoptionOutcome;
+use crate::session::adopter::AdoptionOutcome;
 
 use super::{build_log_entry, index};
 

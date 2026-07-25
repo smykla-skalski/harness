@@ -9,7 +9,7 @@ use crate::daemon::index::{
 };
 use crate::daemon::{db::DaemonDb, service::adopt_session_record};
 use crate::session::types::CURRENT_VERSION;
-use crate::workspace::adopter::SessionAdopter;
+use crate::session::adopter::SessionAdopter;
 
 fn write_text(path: &Path, contents: &str) {
     if let Some(parent) = path.parent() {

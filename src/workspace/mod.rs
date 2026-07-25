@@ -1,4 +1,3 @@
-pub mod adopter;
 pub mod compact;
 pub mod ids;
 pub mod layout;

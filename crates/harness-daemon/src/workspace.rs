@@ -1,5 +1,3 @@
-#[path = "../../../src/workspace/adopter.rs"]
-pub mod adopter;
 #[path = "../../../src/workspace/ids.rs"]
 pub mod ids;
 #[path = "../../../src/workspace/layout.rs"]

@@ -27,7 +27,7 @@ use crate::daemon::voice::{
 use crate::errors::{CliError, CliErrorKind};
 #[cfg(target_os = "macos")]
 use crate::sandbox;
-use crate::workspace::adopter::AdoptionOutcome;
+use crate::session::adopter::AdoptionOutcome;
 
 use super::frames::{error_response, error_response_with_payload};
 use super::mutations::{cli_error_response, dispatch_query_result};
