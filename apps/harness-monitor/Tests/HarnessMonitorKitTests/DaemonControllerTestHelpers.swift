@@ -165,6 +165,19 @@ struct DaemonBinaryStampFixture: Codable, Equatable {
   let inode: UInt64
   let fileSize: UInt64
   let modificationTimeIntervalSince1970: Double
+
+  /// The daemon writes `modification_time_interval_since_1970`, but
+  /// `.convertToSnakeCase` inserts no separator before a digit run and emits
+  /// `..._since1970`, so a fixture relying on it wrote a key the manifest
+  /// decoder could not find. Spell every key out rather than leave one
+  /// property depending on the strategy.
+  enum CodingKeys: String, CodingKey {
+    case helperPath = "helper_path"
+    case deviceIdentifier = "device_identifier"
+    case inode
+    case fileSize = "file_size"
+    case modificationTimeIntervalSince1970 = "modification_time_interval_since_1970"
+  }
 }
 
 struct DaemonAuditEventFixture: Codable, Equatable {
