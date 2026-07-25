@@ -116,7 +116,7 @@ impl ProviderItemIndex {
         {
             let alias = qualified_alias_key(project, legacy_suffix(&reference.external_id));
             if alias != canonical_key
-                && let Some(alias_claim) = self.claims.get(&(provider, alias.clone()))
+                && let Some(alias_claim) = self.claims.get(&(provider, alias))
             {
                 return self.resolve_preferred_claim(alias_claim, canonical_claim, class);
             }

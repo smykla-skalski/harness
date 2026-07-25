@@ -200,6 +200,41 @@ fn add_github_clients(
     Ok(())
 }
 
+/// What the pull loop reads before it starts: the tasks left once known
+/// create markers are suppressed, and the board as it stands behind them.
+struct PullInputs {
+    tasks: Vec<ExternalTask>,
+    recovered_create: bool,
+    board_items: Vec<TaskBoardItem>,
+    provider_item_index: ProviderItemIndex,
+}
+
+async fn prepare_pull_inputs(
+    board: &dyn TaskBoardSyncStore,
+    client: &dyn ExternalSyncClient,
+    tasks: Vec<ExternalTask>,
+    operations: &mut Vec<ExternalSyncOperation>,
+    follow_ups: &mut Vec<TaskBoardExternalCreateIntent>,
+    dry_run: bool,
+) -> Result<PullInputs, CliError> {
+    let (tasks, recovered_create) = create_recovery::suppress_known_create_markers(
+        board, client, tasks, operations, follow_ups, dry_run,
+    )
+    .await?;
+    let snapshots = board.list_item_snapshots_including_deleted().await?;
+    let board_items: Vec<TaskBoardItem> = snapshots
+        .iter()
+        .filter(|snapshot| !snapshot.item.is_deleted())
+        .map(|snapshot| snapshot.item.clone())
+        .collect();
+    Ok(PullInputs {
+        tasks,
+        recovered_create,
+        board_items,
+        provider_item_index: ProviderItemIndex::build(snapshots),
+    })
+}
+
 #[expect(
     clippy::cognitive_complexity,
     reason = "pull reconciliation keeps existing, dry-run, and create branches explicit"
@@ -213,22 +248,12 @@ async fn pull_provider_tasks(
     follow_ups: &mut Vec<TaskBoardExternalCreateIntent>,
     ambiguous_references: &mut Vec<String>,
 ) -> Result<bool, CliError> {
-    let (tasks, recovered_create) = create_recovery::suppress_known_create_markers(
-        board,
-        client,
+    let PullInputs {
         tasks,
-        operations,
-        follow_ups,
-        options.dry_run,
-    )
-    .await?;
-    let snapshots = board.list_item_snapshots_including_deleted().await?;
-    let board_items: Vec<TaskBoardItem> = snapshots
-        .iter()
-        .filter(|snapshot| !snapshot.item.is_deleted())
-        .map(|snapshot| snapshot.item.clone())
-        .collect();
-    let provider_item_index = ProviderItemIndex::build(snapshots);
+        recovered_create,
+        board_items,
+        provider_item_index,
+    } = prepare_pull_inputs(board, client, tasks, operations, follow_ups, options.dry_run).await?;
     for task in tasks.iter().cloned() {
         let resolved_parent_item_id = resolve_parent_item_id(&provider_item_index, &task);
         let matched =
