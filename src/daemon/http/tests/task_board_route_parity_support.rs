@@ -432,6 +432,16 @@ pub(super) fn normalized_planning_response(value: &Value) -> Value {
     let mut value = value.clone();
     value["transition"]["board_item_id"] = json!("normalized-item");
     value["item"]["id"] = json!("normalized-item");
+    // The HTTP and WS legs each stamp `updated_at` from their own `utc_now()`
+    // call a moment apart, so it can tick over a second boundary under load
+    // even though the two responses are otherwise structurally equivalent.
+    // Only overwrite it when present, so a leg that dropped the field
+    // entirely still shows up as a real mismatch instead of being masked.
+    if let Some(item) = value["item"].as_object_mut()
+        && item.contains_key("updated_at")
+    {
+        item["updated_at"] = json!("normalized-timestamp");
+    }
     value
 }
 

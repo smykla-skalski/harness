@@ -142,7 +142,6 @@ impl From<AgentTuiInputRequest> for RawAgentTuiInputRequest {
 // but crates that include this file without serving HTTP never reach it.
 #[allow(dead_code)]
 #[derive(serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
-#[allow(dead_code)]
 pub struct AgentTuiInputRequestSchema {
     #[serde(default)]
     pub input: Option<AgentTuiInput>,

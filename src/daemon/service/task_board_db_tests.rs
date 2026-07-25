@@ -40,8 +40,11 @@ async fn a_requested_status_creates_the_item_in_that_lane() {
     assert_eq!(created.status, TaskBoardStatus::InReview);
 }
 
-/// Omitting the status keeps the historical default, so an older client that
-/// never learned the field still creates a usable item.
+/// Omitting the status still creates through the triage path (unlike an
+/// explicit status, which suppresses it), so an older client that never
+/// learned the field still creates a usable item -- one placed by the same
+/// BuiltInV1 rules as any other label-less create, which demote it to
+/// Backlog.
 #[tokio::test]
 async fn an_omitted_status_still_lands_in_the_default_lane() {
     let directory = tempdir().expect("tempdir");
@@ -54,7 +57,7 @@ async fn an_omitted_status_still_lands_in_the_default_lane() {
         .await
         .expect("create item");
 
-    assert_eq!(created.status, TaskBoardStatus::Todo);
+    assert_eq!(created.status, TaskBoardStatus::Backlog);
 }
 
 /// Automatic triage promotes a labelled Backlog item to Todo. A caller that

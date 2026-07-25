@@ -229,9 +229,7 @@ fn run_probe_command(descriptor: &AcpAgentDescriptor) -> io::Result<Output> {
 }
 
 fn probe_home() -> PathBuf {
-    normalized_env_value(PROBE_HOME_ENV)
-        .map(PathBuf::from)
-        .unwrap_or_else(default_probe_home)
+    normalized_env_value(PROBE_HOME_ENV).map_or_else(default_probe_home, PathBuf::from)
 }
 
 // Package caches belong to the OS account, so this deliberately skips
