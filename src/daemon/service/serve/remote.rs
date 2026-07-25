@@ -174,7 +174,7 @@ fn prepare_remote_daemon_environment(config: &DaemonServeConfig) -> Result<(), C
     let legacy_migration_report = state::migrate_legacy_daemon_root_for_current_process()?;
     log_legacy_daemon_root_migration(&legacy_migration_report);
     state::ensure_daemon_dirs()?;
-    super::local_listener::resolve_daemon_identity()?;
+    super::identity::resolve_daemon_identity()?;
     cleanup_abandoned_sessions()?;
     Ok(())
 }

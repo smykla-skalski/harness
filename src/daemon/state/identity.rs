@@ -7,6 +7,7 @@
 
 use std::fs::File;
 use std::path::Path;
+use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -23,8 +24,11 @@ use super::{ensure_daemon_dirs, identity_path};
 /// [`set_daemon_name`]. Deployments that template a unit file set this instead
 /// of running a second command after install.
 pub const DAEMON_NAME_ENV: &str = "HARNESS_DAEMON_NAME";
-/// Overrides the host signal the identity is bound to. Exists for hosts that
-/// expose no machine identifier of their own, and for tests.
+/// Overrides the host signal the identity is bound to. Set this per host where
+/// the daemon cannot read a machine identifier of its own - notably a
+/// sandboxed macOS daemon, which cannot spawn `ioreg` - because without it
+/// that host cannot tell a restored copy from its own directory. Any value
+/// that differs between machines and survives a restart will do.
 pub const DAEMON_HOST_FINGERPRINT_ENV: &str = "HARNESS_DAEMON_HOST_FINGERPRINT";
 
 const FALLBACK_DAEMON_NAME: &str = "harness-daemon";
@@ -142,8 +146,12 @@ fn current_or_minted(
 }
 
 /// A record only fails the check when both sides know their host and disagree.
+///
 /// A host that offers no machine identifier cannot prove the directory is its
-/// own, and rejecting on that would mint a new id on every read.
+/// own, and rejecting on that would mint a new id on every read - so restore
+/// detection is off there, and a copied directory keeps answering with the id
+/// it was copied with. [`DAEMON_HOST_FINGERPRINT_ENV`] is how such a host opts
+/// back in.
 fn belongs_to_host(record: &PersistedDaemonIdentity, current: Option<&str>) -> bool {
     match (record.host_fingerprint.as_deref(), current) {
         (Some(stored), Some(current)) => stored == current,
@@ -209,7 +217,7 @@ fn normalize_daemon_name(name: &str) -> Result<String, CliError> {
 
 fn default_daemon_name() -> String {
     normalized_env_value(DAEMON_NAME_ENV)
-        .or_else(host_display_name)
+        .or_else(|| HOST_DISPLAY_NAME.clone())
         .and_then(|value| normalize_daemon_name(&value).ok())
         .unwrap_or_else(|| FALLBACK_DAEMON_NAME.to_owned())
 }
@@ -221,14 +229,21 @@ fn host_fingerprint() -> Option<String> {
 }
 
 fn host_machine_id() -> Option<String> {
-    if let Some(value) = normalized_env_value(DAEMON_HOST_FINGERPRINT_ENV) {
-        return Some(value);
-    }
+    normalized_env_value(DAEMON_HOST_FINGERPRINT_ENV).or_else(|| HOST_MACHINE_ID.clone())
+}
+
+/// Asking the host who it is costs a subprocess on macOS, and an unnamed
+/// daemon resolves its default name on every health report. Neither answer
+/// changes while the process runs, so both are read once. The environment
+/// overrides stay live in front of these.
+static HOST_MACHINE_ID: LazyLock<Option<String>> = LazyLock::new(|| {
     MACHINE_ID_FILES
         .iter()
         .find_map(|path| read_trimmed_file(Path::new(path)))
         .or_else(platform_machine_id)
-}
+});
+
+static HOST_DISPLAY_NAME: LazyLock<Option<String>> = LazyLock::new(host_display_name);
 
 #[cfg(target_os = "macos")]
 fn platform_machine_id() -> Option<String> {
