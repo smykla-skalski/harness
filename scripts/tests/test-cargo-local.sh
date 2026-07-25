@@ -101,6 +101,15 @@ print_cargo_env_with_pool_key() {
   # in-repo TMPDIR base, and the scenarios below need to own that path.
   local scratch="$SANDBOX/pool-tmp"
   mkdir -p "$scratch"
+  # Start the supervisor up front so the run under test only has to attach to a
+  # pool that already answers. Folding daemon startup into the assertion made
+  # this flaky on a loaded host, where spawning it can outrun the wait.
+  local cpu budget
+  cpu="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.logicalcpu)"
+  budget=$((cpu - 1))
+  (( budget < 1 )) && budget=1
+  python3 "$ROOT/scripts/harness-jobserver.py" ensure \
+    --repo-root "$pool_key" --budget "$budget" >/dev/null 2>&1 || true
   (
     unset SCCACHE_SERVER_UDS SCCACHE_SERVER_PORT SCCACHE_NO_DAEMON
     unset SCCACHE_BASEDIRS SCCACHE_IDLE_TIMEOUT SCCACHE_CACHE_SIZE SCCACHE_VERSION

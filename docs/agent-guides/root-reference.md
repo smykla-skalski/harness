@@ -145,32 +145,13 @@ Avoid mocks; tests use real filesystem state.
 
 ## Rust build concurrency
 
-`scripts/cargo-local.sh` sizes `CARGO_BUILD_JOBS` and `NEXTEST_TEST_THREADS` two
-different ways, and `--print-env` reports which one is live as `JOBSERVER=pool`
-or `JOBSERVER=reserve`.
+`scripts/cargo-local.sh` sizes `CARGO_BUILD_JOBS` and `NEXTEST_TEST_THREADS` two different ways, and `--print-env` reports which one is live as `JOBSERVER=pool` or `JOBSERVER=reserve`.
 
-Under `pool`, `scripts/harness-jobserver.py` supervises one token pool per
-repository, holding a GNU make jobserver FIFO plus a Unix socket under
-`/tmp/harness-jobserver-<user>/<repo-hash>/`. Cargo attaches through `MAKEFLAGS`
-and renegotiates its own width for as long as it runs, so `CARGO_BUILD_JOBS`
-stays at the full CPU count and the pool does the limiting. The budget is one
-below the CPU count because every cargo may run a single job without holding a
-token; two builds sharing a four-token pool therefore peak at six concurrent
-`rustc`, not four.
+Under `pool`, `scripts/harness-jobserver.py` supervises one token pool per repository, holding a GNU make jobserver FIFO plus a Unix socket under `/tmp/harness-jobserver-<user>/<repo-hash>/`. Cargo attaches through `MAKEFLAGS` and renegotiates its own width for as long as it runs, so `CARGO_BUILD_JOBS` stays at the full CPU count and the pool does the limiting. The budget is one below the CPU count because every cargo may run a single job without holding a token; two builds sharing a four-token pool therefore peak at six concurrent `rustc`, not four.
 
-nextest cannot speak the protocol and upstream has declined to add it, so a
-`nextest` invocation instead takes a block from the same budget through the
-socket and holds it for the whole run, build phase included. The socket exists
-because a FIFO token is anonymous: a killed client would drain the pool forever,
-which is why the published system-wide jobservers need CUSE that macOS lacks. A
-socket grant returns when the kernel closes the dead client's fd.
+nextest cannot speak the protocol and upstream has declined to add it, so a `nextest` invocation instead takes a block from the same budget through the socket and holds it for the whole run, build phase included. The socket exists because a FIFO token is anonymous: a killed client would drain the pool forever, which is why the published system-wide jobservers need CUSE that macOS lacks. A socket grant returns when the kernel closes the dead client's fd.
 
-Under `reserve` the older static split applies: each agent session divides the
-CPU count by `AGENT_BUILD_SHARE`, assuming that many agents may arrive, because
-the lease count is sampled once and cannot be renegotiated. This is the fallback
-whenever the pool cannot be reached, and it is what `HARNESS_JOBSERVER=0`
-selects. Reaching a pool is never required - a stale or empty FIFO makes cargo
-build serially through its implicit slot rather than block.
+Under `reserve` the older static split applies: each agent session divides the CPU count by `AGENT_BUILD_SHARE`, assuming that many agents may arrive, because the lease count is sampled once and cannot be renegotiated. This is the fallback whenever the pool cannot be reached, and it is what `HARNESS_JOBSERVER=0` selects. Reaching a pool is never required - a stale or empty FIFO makes cargo build serially through its implicit slot rather than block.
 
 | Variable | Effect |
 | --- | --- |

@@ -225,8 +225,19 @@ def supervise(repo_root: str, budget: int) -> int:
     return 0
 
 
-def ensure(repo_root: str, budget: int, timeout: float = 5.0) -> tuple[str, int] | None:
+def _startup_timeout() -> float:
+    # A loaded host can take seconds just to get the interpreter up, and timing
+    # out here silently demotes the whole build to the static reserve.
+    try:
+        return max(1.0, float(os.environ.get("HARNESS_JOBSERVER_TIMEOUT", "15")))
+    except ValueError:
+        return 15.0
+
+
+def ensure(repo_root: str, budget: int, timeout: float | None = None) -> tuple[str, int] | None:
     """Start the supervisor if absent and return (fifo_path, budget)."""
+    if timeout is None:
+        timeout = _startup_timeout()
     directory = pool_dir(repo_root)
     if len(os.path.join(directory, "sock")) > MAX_SOCKET_PATH:
         return None
