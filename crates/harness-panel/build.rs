@@ -15,6 +15,9 @@ use std::process::Command;
 /// only useful for compiling and testing the Rust side.
 const SKIP_ENV: &str = "HARNESS_PANEL_SKIP_FRONTEND_BUILD";
 
+/// Overrides the npm the build script shells out to.
+const NPM_ENV: &str = "HARNESS_PANEL_NPM";
+
 /// Written next to the bundle so the asset handler and `healthz` can tell a
 /// real build from the placeholder without guessing from the markup.
 const PLACEHOLDER_MARKER: &str = ".harness-panel-placeholder";
@@ -26,7 +29,11 @@ fn main() {
     let frontend = manifest_dir.join("frontend");
     let dist = frontend.join("dist");
 
+    // Both are read below, and a build script that declares any rerun-if
+    // directive is rerun for those inputs alone, so an undeclared one looks
+    // like an override that does nothing until something else changes.
     println!("cargo:rerun-if-env-changed={SKIP_ENV}");
+    println!("cargo:rerun-if-env-changed={NPM_ENV}");
     for input in [
         "src",
         "tests",
@@ -97,7 +104,7 @@ fn run_npm(frontend: &Path, args: &[&str]) {
 }
 
 fn npm_binary() -> String {
-    env::var("HARNESS_PANEL_NPM").unwrap_or_else(|_| "npm".to_owned())
+    env::var(NPM_ENV).unwrap_or_else(|_| "npm".to_owned())
 }
 
 /// Write a stand-in bundle that answers every route a real one does.

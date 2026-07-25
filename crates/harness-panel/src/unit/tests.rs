@@ -152,6 +152,40 @@ fn a_control_character_in_the_secret_path_is_refused() {
     assert!(error.to_string().contains("control characters"), "{error}");
 }
 
+/// `StateDirectory=` is a space-separated list and `%S/{unit}` is emitted as a
+/// bare `ExecStart` word, so a name with a space quietly becomes two of each.
+/// A separator or `..` would point the state directory out of the tree systemd
+/// created for it.
+#[test]
+fn a_unit_name_that_would_not_survive_systemd_is_refused() {
+    for unit in [
+        "harness panel",
+        "../../etc/systemd/system/evil",
+        "harness/panel",
+        ".hidden",
+        "harness..panel",
+        "harness\npanel",
+        "harness%panel",
+        "harness$panel",
+        "",
+    ] {
+        assert!(
+            render_unit(unit, Path::new("/usr/local/bin/harness-panel"), &args()).is_err(),
+            "{unit:?} should be refused"
+        );
+    }
+}
+
+#[test]
+fn an_ordinary_unit_name_is_accepted() {
+    for unit in ["harness-panel", "harness_panel", "panel.service", "p1"] {
+        assert!(
+            render_unit(unit, Path::new("/usr/local/bin/harness-panel"), &args()).is_ok(),
+            "{unit:?} should be accepted"
+        );
+    }
+}
+
 /// The two specifiers the panel builds deliberately mean what they say, so
 /// escaping them alongside operator input would break the paths.
 #[test]

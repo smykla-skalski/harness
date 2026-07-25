@@ -23,12 +23,17 @@ use crate::error::PanelError;
 /// file stay root-only and still satisfy the panel's permission check.
 const CREDENTIAL_NAME: &str = "github-client-secret";
 
+/// systemd's own ceiling on a unit name.
+const MAX_UNIT_NAME_CHARS: usize = 255;
+
 /// Render a unit that starts `binary_path` with these flags.
 ///
 /// # Errors
-/// Returns [`PanelError::Config`] when a flag would not survive systemd's
+/// Returns [`PanelError::Config`] when the unit name is not one systemd would
+/// read back as a single name, when a flag would not survive systemd's
 /// `ExecStart` parsing, or when the mount point is not a usable subtree.
 pub fn render_unit(unit: &str, binary_path: &Path, args: &PanelArgs) -> Result<String, PanelError> {
+    validate_unit_name(unit)?;
     let exec_start = render_exec_start(&serve_command(unit, binary_path, args)?);
     // The secret path is the one operator value that never reaches `ExecStart`,
     // because the command points at the credential systemd re-exposes instead.
@@ -93,6 +98,41 @@ fn refuse_control_characters(label: &str, value: &str) -> Result<(), PanelError>
     if value.chars().any(char::is_control) {
         return Err(PanelError::config(format!(
             "{label} contains control characters: {value:?}"
+        )));
+    }
+    Ok(())
+}
+
+/// Refuse a unit name that would not survive the two places it is used.
+///
+/// [`refuse_control_characters`] already covers the newline that would end a
+/// directive. This is the rest: the name lands in `StateDirectory=`, which
+/// systemd reads as a space-separated list, and inside `%S/{unit}`, which the
+/// renderer emits as a bare `ExecStart` word so the specifier survives. A space
+/// therefore silently becomes two state directories and two arguments, and a
+/// separator or `..` points the state directory outside the tree systemd just
+/// created for it. The rule is stricter than a full unit name read back from
+/// `systemctl`, because this is a name the panel composes paths from.
+fn validate_unit_name(unit: &str) -> Result<(), PanelError> {
+    if unit.is_empty() {
+        return Err(PanelError::config("--unit must not be blank"));
+    }
+    if unit.chars().count() > MAX_UNIT_NAME_CHARS {
+        return Err(PanelError::config(format!(
+            "--unit must be at most {MAX_UNIT_NAME_CHARS} characters"
+        )));
+    }
+    if !unit
+        .chars()
+        .all(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.'))
+    {
+        return Err(PanelError::config(format!(
+            "--unit must contain only ASCII letters, digits, '-', '_', and '.', got {unit:?}"
+        )));
+    }
+    if unit.starts_with('.') || unit.contains("..") {
+        return Err(PanelError::config(format!(
+            "--unit must not start with '.' or contain '..', got {unit:?}"
         )));
     }
     Ok(())
