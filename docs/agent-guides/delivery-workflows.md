@@ -93,17 +93,38 @@ Immediately request Copilot review, and use the same command for every re-reques
 gh api --method POST repos/smykla-skalski/harness/pulls/<PR_NUMBER>/requested_reviewers -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
 ```
 
+A review arrives in two halves and the loop below needs both. Read them with these, which are read-only and safe to rerun at any point in the loop:
+
+```bash
+gh api --paginate repos/smykla-skalski/harness/pulls/<PR_NUMBER>/reviews --jq '.[] | select(.user.id == 175728472) | {commit: .commit_id, state: .state, body: .body}'
+gh api --paginate repos/smykla-skalski/harness/pulls/<PR_NUMBER>/comments --jq '.[] | {user: .user.login, path, line, original_line, body}'
+```
+
+Keep `--paginate` on both. `gh api` returns only the first page otherwise, so a PR that accumulates more than thirty reviews or inline comments over a long loop starts hiding its older ones behind a result that still looks complete.
+
+Keep the author and both line fields on the comments query. That endpoint returns human, Copilot, and other bot comments in one list, so dropping `.user.login` leaves each finding unattributable, and a comment the branch has moved past reports `line: null` while its position survives only in `original_line`.
+
+Select the reviewer by numeric id rather than by name, because this bot's login is not stable across endpoints. `reviews[].user.login` calls it `copilot-pull-request-reviewer[bot]`, while `requested_reviewers`, `comments[].user.login`, and the users API all call it `Copilot`. A filter written from the name one endpoint showed then matches nothing on another and reads as a review that never arrived, which is the same silence as a review that has not run yet. The id is identical everywhere and also keeps other bot reviewers, such as `smyklot[bot]`, out of the result. Treat `175728472` as current rather than permanent, and re-derive it whenever a filter that should match comes back empty:
+
+```bash
+gh api 'users/copilot-pull-request-reviewer%5Bbot%5D' --jq '.id'
+```
+
 1. Wait for a Copilot review whose reviewed commit carries the current tree; a review of an older tree does not count. A review still counts when the head SHA moved but the tree did not, as after a rebase or a commit-message or sign-off rewrite; confirm with `git rev-parse <reviewed-sha>^{tree}` against `git rev-parse <head-sha>^{tree}`.
-2. Inspect every remark and unresolved conversation. Implement valid fixes, run affected validation, commit the explicit paths with signing and sign-off, and push.
-3. After each fix push, resolve only the conversations that push addressed. A fix needs no reply.
-4. Answer an incorrect finding before resuming other work, then resolve the thread. Give the evidence, not the verdict: the command that proves it and the mechanism behind it. Write one or two plain sentences, and drop the polite filler, bullets, and trailing period. Never silently resolve a wrong finding, because a silent resolve reads as a real defect quietly ignored and leaves the next reader no record of why nothing changed.
-5. Re-request Copilot and repeat without a fixed round limit until it reviews the current tree and reports no new comments.
-6. If the tree, feedback, or required checks change, invalidate the prior result and resume the loop. Editing the PR title or body never invalidates a review, because the review covers the code change and not the metadata around it. Escalate only a genuine impasse, a recurring already-addressed finding, or persistent Copilot or API failure; keep the PR draft while blocked.
+2. Read the review body as well as the inline comments, because the two carry different findings. Copilot withholds anything it is unsure of from the inline threads and collects it in a collapsed `Comments suppressed due to low confidence (N)` block in the body instead, where each entry is a `**<path>:<line>**` heading followed by the finding. Those entries never appear in the review-comments API, so a run that only counts inline threads reads a review that raised real defects as a clean one.
+3. Triage every suppressed finding exactly as you would a posted one, and never treat the block as advisory. Low confidence describes how sure Copilot is that the remark belongs in review, not how small the defect is, and genuine correctness bugs land there. Confirm or refute each entry against the code, fix what is real, and answer what is wrong.
+4. Implement every valid fix the inline remarks, the suppressed findings, and any unresolved conversation call for, run affected validation, commit the explicit paths with signing and sign-off, and push.
+5. After each fix push, resolve only the conversations that push addressed. A fix needs no reply.
+6. Answer an incorrect finding before resuming other work, then resolve the thread. Give the evidence, not the verdict: the command that proves it and the mechanism behind it. Write one or two plain sentences, and drop the polite filler, bullets, and trailing period. Never silently resolve a wrong finding, because a silent resolve reads as a real defect quietly ignored and leaves the next reader no record of why nothing changed.
+7. A suppressed finding has no thread to resolve, so answer a wrong one in a single PR comment that names its file and line and gives the same evidence. Fixing a real one needs no reply, because the pushed commit is the record.
+8. Re-request Copilot and repeat without a fixed round limit until it reviews the current tree, posts no new comments, and either raises no suppressed findings or raises only ones this loop already fixed or answered.
+9. If the tree or the feedback changes, invalidate the prior result and resume the loop. Editing the PR title or body never invalidates a review, because the review covers the code change and not the metadata around it. Escalate only a genuine impasse, a recurring already-addressed finding, or persistent Copilot or API failure; keep the PR draft while blocked.
 
 ### Ready and merge
 
-1. Require an accurate PR body in the shape above, a current-tree Copilot review with no new comments, zero unresolved conversations, and green required checks.
-2. Mark the PR ready for review only after every gate passes, notify the user, and monitor until the user merges or closes it. Never merge the PR as the agent.
+1. Require an accurate PR body in the shape above, a current-tree Copilot review that clears the loop above, and zero unresolved conversations. Those are the whole gate.
+2. Do not add GitHub Actions checks to it. Once Copilot clears, mark the PR ready; never poll `gh pr checks`, `gh run list`, or the status-check API, never wait on a workflow, and never report a missing, disabled, or pending check as a blocker. Delivery here is gated on the Copilot loop and the user's merge, and a run that goes hunting for checks after Copilot has cleared stalls the handoff over state that does not gate anything.
+3. Mark the PR ready for review only after every gate passes, notify the user, and monitor until the user merges or closes it. Never merge the PR as the agent.
 
 ### Close out
 
