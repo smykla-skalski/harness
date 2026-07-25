@@ -1,8 +1,10 @@
-use super::{WorkerPromptContext, plan_worker_prompt, render_worker_prompt};
+use super::{WorkerPromptContext, optional_facts, plan_worker_prompt, render_worker_prompt};
 use crate::task_board::prompt_catalog::{
     prompt_catalog_test_lock, PromptCatalog, scoped_prompt_catalog,
 };
-use crate::task_board::{TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
+use crate::task_board::{
+    ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardPriority, TaskBoardStatus,
+};
 
 /// Byte-for-byte what `render_worker_prompt` produced for an item with none of
 /// the optional sections and no session to report into.
@@ -54,6 +56,60 @@ fn an_item_without_optional_facts_renders_the_shipped_bytes() {
     let prompt = render_worker_prompt(&bare_item(), &bare_context()).expect("render worker prompt");
 
     assert_eq!(prompt, BARE_GOLDEN);
+}
+
+/// `project_id_section` and `planning_summary_section` reached no golden, and a
+/// hand-written list of sections would go stale the next time a fact lands. Walk
+/// the renderer's own fact set instead, so a new fact fails here until the
+/// fixture supplies it, and pin each section's bytes and its place in the order.
+#[test]
+fn every_optional_fact_renders_its_shipped_section_in_order() {
+    let item = populated_item();
+    let context = populated_context();
+
+    let prompt = render_worker_prompt(&item, &context).expect("render worker prompt");
+
+    let mut searched = 0;
+    for fact in optional_facts(&item, &context) {
+        let value = fact
+            .value
+            .unwrap_or_else(|| panic!("the fixture must populate {}", fact.name));
+        let section = format!("\n\n{}:\n{value}", fact.section_title);
+        let offset = prompt[searched..]
+            .find(&section)
+            .unwrap_or_else(|| panic!("{} is missing or out of order in:\n{prompt}", fact.name));
+        searched += offset + section.len();
+    }
+}
+
+fn populated_item() -> TaskBoardItem {
+    let mut item = TaskBoardItem::new(
+        "board-3".into(),
+        "Full item".into(),
+        "Implement the whole thing".into(),
+        "2026-07-25T00:00:00Z".into(),
+    );
+    item.project_id = Some("project-7".into());
+    item.tags = vec!["backend".into(), "urgent".into()];
+    item.external_refs = vec![ExternalRef {
+        provider: ExternalRefProvider::GitHub,
+        external_id: "example/harness#9".into(),
+        url: Some("https://github.com/example/harness/pull/9".into()),
+        sync_state: None,
+    }];
+    item.planning.summary = Some("Split the change in two".into());
+    item
+}
+
+fn populated_context() -> WorkerPromptContext<'static> {
+    WorkerPromptContext {
+        board_item_id: "board-3",
+        work_item_id: "task-3",
+        worktree: Some("/tmp/full-worktree"),
+        session_id: Some("session-full"),
+        managed_run_id: Some("run-full"),
+        status: TaskBoardStatus::InProgress,
+    }
 }
 
 #[test]

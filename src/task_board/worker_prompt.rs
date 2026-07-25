@@ -44,68 +44,83 @@ pub(crate) fn render_worker_prompt(
             lifecycle_section(context.session_id, context.work_item_id),
         ),
     ]);
-    let tags = (!item.tags.is_empty()).then(|| item.tags.join(", "));
-    let external_refs = render_external_refs(&item.external_refs);
-    let facts: [Fact<'_>; 8] = [
-        Fact::new(
-            "project_id",
-            "project_id_section",
-            "Project",
-            item.project_id.as_deref(),
-        ),
-        Fact::new("worktree", "worktree_section", "Worktree", context.worktree),
-        Fact::new(
-            "session_id",
-            "session_id_section",
-            "Session id",
-            context.session_id,
-        ),
-        Fact::new(
-            "managed_run_id",
-            "managed_run_id_section",
-            "Managed run id",
-            context.managed_run_id,
-        ),
-        Fact::new("tags", "tags_section", "Tags", tags.as_deref()),
-        Fact::new(
-            "external_refs",
-            "external_refs_section",
-            "External refs",
-            external_refs.as_deref(),
-        ),
-        Fact::new(
-            "planning_summary",
-            "planning_summary_section",
-            "Planning summary",
-            item.planning.summary.as_deref(),
-        ),
-        Fact::new(
-            "task_body",
-            "task_body_section",
-            "Task body",
-            non_empty(item.body.as_str()),
-        ),
-    ];
-    for fact in facts {
+    for fact in optional_facts(item, context) {
         fact.push_into(&mut variables);
     }
     render_prompt(PromptId::Worker, &variables)
 }
 
+/// Every optional fact, in the order the shipped prompt lists its sections.
+///
+/// Kept as one function so the byte goldens can walk the same set the renderer
+/// does, instead of a second list that goes stale the next time a fact lands.
+fn optional_facts(item: &TaskBoardItem, context: &WorkerPromptContext<'_>) -> [Fact; 8] {
+    [
+        Fact::new(
+            "project_id",
+            "project_id_section",
+            "Project",
+            item.project_id.clone(),
+        ),
+        Fact::new(
+            "worktree",
+            "worktree_section",
+            "Worktree",
+            context.worktree.map(str::to_owned),
+        ),
+        Fact::new(
+            "session_id",
+            "session_id_section",
+            "Session id",
+            context.session_id.map(str::to_owned),
+        ),
+        Fact::new(
+            "managed_run_id",
+            "managed_run_id_section",
+            "Managed run id",
+            context.managed_run_id.map(str::to_owned),
+        ),
+        Fact::new(
+            "tags",
+            "tags_section",
+            "Tags",
+            (!item.tags.is_empty()).then(|| item.tags.join(", ")),
+        ),
+        Fact::new(
+            "external_refs",
+            "external_refs_section",
+            "External refs",
+            render_external_refs(&item.external_refs),
+        ),
+        Fact::new(
+            "planning_summary",
+            "planning_summary_section",
+            "Planning summary",
+            item.planning.summary.clone(),
+        ),
+        Fact::new(
+            "task_body",
+            "task_body_section",
+            "Task body",
+            non_empty(item.body.as_str()).map(str::to_owned),
+        ),
+    ]
+}
+
 /// One optional item fact and the section the shipped prompt wrapped it in.
-struct Fact<'a> {
+struct Fact {
     name: &'static str,
     section_name: &'static str,
     section_title: &'static str,
-    value: Option<&'a str>,
+    value: Option<String>,
 }
 
-impl<'a> Fact<'a> {
-    const fn new(
+impl Fact {
+    fn new(
         name: &'static str,
         section_name: &'static str,
         section_title: &'static str,
-        value: Option<&'a str>,
+        value: Option<String>,
     ) -> Self {
         Self {
             name,
@@ -124,7 +139,7 @@ impl<'a> Fact<'a> {
             self.section_name,
             format!("\n\n{}:\n{value}", self.section_title),
         );
-        variables.insert(self.name, value.to_string());
+        variables.insert(self.name, value);
     }
 }
 
