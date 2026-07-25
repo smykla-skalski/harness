@@ -176,7 +176,29 @@ harness-daemon remote pair create --role pairing-broker
 
 The output carries a `harness://pair?payload=…` link. Its payload holds the one-time code and `server_spki_sha256`; pass the code to the panel once, as `--daemon-pair-code`, and the pin as `--daemon-spki-pin`. The pin is the daemon's certificate, not a secret, and it stays the same until the certificate is renewed with a new key.
 
-The panel claims the code on its next start and stores the credential. Drop `--daemon-pair-code` afterwards: leaving it in the unit makes every restart try to spend a code the daemon has already consumed. Pass it again only to re-pair after revoking the panel's client.
+Write the code to a file only the service user can read, then claim it once. Claiming is its own command, not part of `serve`: a one-time code left in a unit file would be spent on the first start and refused on every restart afterwards.
+
+```bash
+sudo install -d -m 0700 /etc/harness-panel
+printf '%s' "$PAIR_CODE" | sudo tee /etc/harness-panel/daemon-pair-code >/dev/null
+sudo chmod 0400 /etc/harness-panel/daemon-pair-code
+
+sudo harness-panel pair \
+  --public-origin https://harness.example.com \
+  --state-dir /var/lib/harness-panel \
+  --github-client-id Iv1.abc123 \
+  --github-client-secret-file /etc/harness-panel/github-client-secret \
+  --owner-login your-github-login \
+  --daemon-endpoint https://harness.example.com \
+  --daemon-spki-pin sha256/BASE64 \
+  --code-file /etc/harness-panel/daemon-pair-code
+
+sudo rm /etc/harness-panel/daemon-pair-code
+```
+
+The code is a credential in transit, which is why it goes in a file rather than a flag value: any local process can read a command line out of `/proc`. `pair` refuses a code file that group or other can read, and refuses a credential the daemon issues with any role but `pairing_broker`, rather than storing one that fails later for whoever first tries to generate a link.
+
+Re-pair the same way after revoking the panel's client on the daemon.
 
 ## Checking it
 
@@ -194,7 +216,9 @@ Then open `https://harness.example.com/panel/` and sign in. The owner also sees 
 
 Everyone starts unable to pair, including the owner. The owner approves an account from the roster, and that account can then generate its own link from its page. The link is shown once: it carries a one-time code, so the panel keeps only the pairing id, the role, and the timestamps, and never the link itself.
 
-The role and lifetime of every link come from `--pair-link-role` and `--pair-link-ttl-seconds`, never from whoever asked. An approved account cannot choose what its link grants.
+The role and lifetime of every link come from `--pair-link-role` and `--pair-link-ttl-seconds`, never from whoever asked. An approved account cannot choose what its link grants. Only `operator` and `viewer` may be minted: the panel holds a credential whose one power is minting, and the daemon does not check that a requested role is at or below the caller's own, so anything more would let an approved account end up with more authority than the panel itself has.
+
+An account may hold five unexpired links at once. A revoke cannot reach a link already minted, so without a cap one approved account, or whoever took its session, could leave a pile of live credentials to hunt down one at a time.
 
 ### What a revoke reaches
 
@@ -382,7 +406,7 @@ The outer `remote_was_active` value survives a failed update and makes the rollb
 
 ## Where its state lives
 
-One SQLite database under the state directory, holding accounts, sessions, sign-ins in flight, approval decisions, the credential the panel authenticates to the daemon with, and a record of which links it minted. The directory is created mode 0700 and the database stores only the SHA-256 of a session token, so a copy of it is not a set of working sessions. The daemon credential is the one secret held in the clear, because the panel has to replay it on every mint; anyone who can read it can already read the sessions beside it. Deleting the database signs everyone out and forgets who has signed in; it costs nothing else.
+One SQLite database under the state directory, holding accounts, sessions, sign-ins in flight, approval decisions, the credential the panel authenticates to the daemon with, and a record of which links it minted. The directory is created mode 0700 and the database stores only the SHA-256 of a session token, so a copy of it is not a set of working sessions. The daemon credential is the one secret held in the clear, because the panel has to replay it on every mint. That makes the database credential-bearing where it previously was not: the sessions beside it are only hashes, but a copy of this row mints pairing links for any identity its holder names. Treat a backup as a secret, and revoke the panel's client on the daemon if one leaks. Deleting the database signs everyone out and forgets who has signed in; it costs nothing else.
 
 ## Developing
 
