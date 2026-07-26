@@ -4083,7 +4083,7 @@
         "tags": [
           "pairing"
         ],
-        "description": "List pairing links and the devices they became. Requires the pair_manage scope, which shows the caller the links it minted; a caller that also holds admin sees every pairing. Beyond the shared middleware causes, this route answers 503 when the pairing store is unavailable",
+        "description": "List pairing links and the devices they became, alongside the version of the daemon answering. Requires the pair_manage scope, which shows the caller the links it minted; a caller that also holds admin sees every pairing. Beyond the shared middleware causes, this route answers 503 when the pairing store is unavailable",
         "operationId": "get_remote_pairings",
         "responses": {
           "200": {
@@ -23255,9 +23255,14 @@
       "RemotePairingListResponse": {
         "type": "object",
         "required": [
+          "daemon_version",
           "pairings"
         ],
         "properties": {
+          "daemon_version": {
+            "type": "string",
+            "description": "Version of the daemon answering, so a client that already has to reach\nthis route can report which daemon it is talking to without holding the\nbroader `read` scope that `/v1/health` needs."
+          },
           "pairings": {
             "type": "array",
             "items": {

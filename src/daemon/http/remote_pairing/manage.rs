@@ -44,6 +44,10 @@ pub(in crate::daemon::http) fn remote_pairing_manage_routes() -> OpenApiRouter<D
 
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub(crate) struct RemotePairingListResponse {
+    /// Version of the daemon answering, so a client that already has to reach
+    /// this route can report which daemon it is talking to without holding the
+    /// broader `read` scope that `/v1/health` needs.
+    daemon_version: String,
     pairings: Vec<RemotePairingInventoryEntry>,
 }
 
@@ -71,7 +75,7 @@ fn sees_every_pairing(client: Option<&RemoteStoredClient>) -> bool {
     get,
     path = "/v1/remote/pairings",
     tag = "pairing",
-    description = "List pairing links and the devices they became. Requires the pair_manage scope, which shows the caller the links it minted; a caller that also holds admin sees every pairing. Beyond the shared middleware causes, this route answers 503 when the pairing store is unavailable",
+    description = "List pairing links and the devices they became, alongside the version of the daemon answering. Requires the pair_manage scope, which shows the caller the links it minted; a caller that also holds admin sees every pairing. Beyond the shared middleware causes, this route answers 503 when the pairing store is unavailable",
     responses(
         (status = 200, description = "Pairings the caller may see", body = RemotePairingListResponse),
         (status = 503, description = "Pairing store unavailable", body = DaemonErrorBody),
@@ -123,7 +127,10 @@ fn list_pairings(
         .map_err(RemotePairingManageError::Store)?;
     drop(db);
 
-    Ok(RemotePairingListResponse { pairings })
+    Ok(RemotePairingListResponse {
+        daemon_version: env!("CARGO_PKG_VERSION").to_owned(),
+        pairings,
+    })
 }
 
 #[utoipa::path(
