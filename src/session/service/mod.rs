@@ -18,7 +18,6 @@ use crate::agents::service as agents_service;
 use crate::daemon::client::DaemonClient;
 use crate::daemon::index as daemon_index;
 use crate::daemon::ordering::sort_session_tasks;
-use crate::daemon::protocol;
 use crate::session::wire;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;

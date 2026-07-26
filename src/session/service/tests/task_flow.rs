@@ -125,7 +125,7 @@ fn drop_task_queues_for_busy_worker() {
         drop_task(
             "00000000-0000-4002-8000-00000000000d",
             &queued.task_id,
-            &protocol::TaskDropTarget::Agent {
+            &wire::TaskDropTarget::Agent {
                 agent_id: worker_id.clone(),
             },
             TaskQueuePolicy::Locked,
@@ -229,7 +229,7 @@ fn reassignable_drop_starts_on_free_worker() {
         drop_task(
             "00000000-0000-4002-8000-00000000000e",
             &task.task_id,
-            &protocol::TaskDropTarget::Agent {
+            &wire::TaskDropTarget::Agent {
                 agent_id: busy_worker,
             },
             TaskQueuePolicy::ReassignWhenFree,
@@ -392,7 +392,7 @@ fn locked_queue_advances_when_worker_finishes_current_task() {
         drop_task(
             "00000000-0000-4002-8000-00000000000a",
             &queued.task_id,
-            &protocol::TaskDropTarget::Agent {
+            &wire::TaskDropTarget::Agent {
                 agent_id: worker_id.clone(),
             },
             TaskQueuePolicy::Locked,
@@ -468,7 +468,7 @@ fn task_start_signal_acceptance_marks_task_in_progress() {
         drop_task(
             "00000000-0000-4002-8000-000000000009",
             &task.task_id,
-            &protocol::TaskDropTarget::Agent {
+            &wire::TaskDropTarget::Agent {
                 agent_id: worker_id.clone(),
             },
             TaskQueuePolicy::Locked,

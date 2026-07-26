@@ -44,7 +44,7 @@ fn expired_task_start_signal_reopens_task_and_clears_assignment() {
         drop_task(
             "00000000-0000-4002-8000-00000000000b",
             &task.task_id,
-            &protocol::TaskDropTarget::Agent {
+            &wire::TaskDropTarget::Agent {
                 agent_id: worker_id.clone(),
             },
             TaskQueuePolicy::Locked,

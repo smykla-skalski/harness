@@ -176,7 +176,7 @@ fn run_case(prev: PrevAssignee, target: TargetBusyState, expected: ExpectedOutco
         drop_task(
             session_id,
             &primary.task_id,
-            &protocol::TaskDropTarget::Agent {
+            &wire::TaskDropTarget::Agent {
                 agent_id: target_id.clone(),
             },
             TaskQueuePolicy::Locked,

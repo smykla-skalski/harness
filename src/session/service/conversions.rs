@@ -2,8 +2,12 @@ use std::path::PathBuf;
 
 use super::{
     BTreeMap, CURRENT_VERSION, CliError, DaemonClient, ResolvedRuntimeSessionAgent, SessionState,
-    protocol,
 };
+
+// The only remaining daemon edge in this module tree: SessionSummary and
+// SessionDetail are daemon-owned aggregates in summaries.rs. Imported here
+// rather than in the parent so a sibling cannot reach back through super::.
+use crate::daemon::protocol;
 use crate::session::types::SessionPolicy;
 
 pub(crate) fn detail_to_session_state(detail: &protocol::SessionDetail) -> SessionState {

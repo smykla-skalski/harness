@@ -75,7 +75,7 @@ fn arbitration_blocked_task_rejects_generic_mutation_paths() {
         let drop = drop_task(
             "00000000-0000-4002-8000-000000000001",
             &task.task_id,
-            &protocol::TaskDropTarget::Agent {
+            &wire::TaskDropTarget::Agent {
                 agent_id: worker_id,
             },
             TaskQueuePolicy::Locked,
