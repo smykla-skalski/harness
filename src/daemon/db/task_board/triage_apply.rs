@@ -4,11 +4,12 @@ use super::dispatch_intents::helpers::has_active_dispatch_reservation_in_tx;
 use super::lane_order::{LaneTransitionKind, load_lane_entries_in_tx};
 use super::triage_cause::triage_cause;
 use super::triage_decisions::{current_triage_decision_in_tx, record_triage_decision_in_tx};
+use super::triage_retained::retained_effect_outcome_in_tx;
 use crate::daemon::db::{CliError, db_error};
 use crate::task_board::{
     BUILTIN_V1_EVALUATOR_IDENTITY, BUILTIN_V1_EVALUATOR_VERSION, OVERRIDE_PLACEMENT_PRODUCER,
     TaskBoardItem, TaskBoardLaneOrigin, TaskBoardStatus, TaskBoardTriageDecision,
-    TaskBoardTriageOverride, TriageVerdict, evaluate_builtin_v1, evidence_fingerprint,
+    TaskBoardTriageOverride, TriageCause, TriageVerdict, evaluate_builtin_v1, evidence_fingerprint,
     sort_task_board_items, suppress_placement_for_override,
 };
 
@@ -101,51 +102,40 @@ pub(super) async fn apply_builtin_v1_triage_in_tx(
         BUILTIN_V1_EVALUATOR_IDENTITY,
         BUILTIN_V1_EVALUATOR_VERSION,
     ) else {
-        // Nothing new to decide (same evaluator, same evidence). A genuinely
-        // unchanged item is a true no-op, but an out-of-band mutation in
-        // this same call (a provider-exclusion restore resetting status
-        // independent of triage, for example) can leave the item's
-        // placement out of sync with the existing, unchanged decision.
-        // Reapply that decision's placement without appending a new history
-        // generation, so a restore never strands a prior Todo verdict
-        // unranked or in Backlog; a genuinely unchanged item still reports
-        // no decision at all.
-        return match existing {
-            // The retained decision's own evaluator identity is the correct
-            // placement producer here, not this call's active evaluator --
-            // a retained `AGENT_V1` decision must re-apply placement under
-            // `AGENT_V1`, or every later touch churns it back through
-            // `BuiltInV1`'s identity (the #334 F1 lesson, generalized).
-            Some(existing)
-                if !placement_matches_verdict(item, existing.verdict, &existing.evaluator_identity) =>
-            {
-                let manually_placed = item
-                    .lane_origin
-                    .as_ref()
-                    .is_some_and(TaskBoardLaneOrigin::is_manual);
-                if manually_placed || suppress_placement || override_active {
-                    // The desync is real, but a manual anchor or a direct
-                    // human/provider effect this same call means the effect
-                    // never actually runs -- reporting `RetainedEffect` here
-                    // would audit something that did not happen. The
-                    // enclosing mutation still gets its own ordinary audit.
-                    Ok(None)
-                } else {
-                    let producer = existing.evaluator_identity.clone();
-                    apply_placement_effect_in_tx(
-                        transaction,
-                        item,
-                        existing.verdict,
-                        decided_at,
-                        &producer,
-                    )
-                    .await?;
-                    Ok(Some(TriageOutcome::RetainedEffect(existing)))
-                }
-            }
-            _ => Ok(None),
-        };
+        return retained_effect_outcome_in_tx(
+            transaction,
+            item,
+            existing,
+            decided_at,
+            suppress_placement,
+            override_active,
+        )
+        .await;
     };
+    record_builtin_v1_decision_in_tx(
+        transaction,
+        item,
+        &fingerprint,
+        cause,
+        decided_at,
+        suppress_placement,
+        override_active,
+    )
+    .await
+}
+
+/// Append a fresh `BuiltInV1` decision generation and, unless this same
+/// mutation is manually anchored or otherwise suppresses placement, apply
+/// that verdict's placement effect under `BuiltInV1`'s own identity.
+async fn record_builtin_v1_decision_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    item: &mut TaskBoardItem,
+    fingerprint: &str,
+    cause: TriageCause,
+    decided_at: &str,
+    suppress_placement: bool,
+    override_active: bool,
+) -> Result<Option<TriageOutcome>, CliError> {
     let outcome = evaluate_builtin_v1(item);
     let decision = record_triage_decision_in_tx(
         transaction,
@@ -155,7 +145,7 @@ pub(super) async fn apply_builtin_v1_triage_in_tx(
         outcome.reason_detail.as_deref(),
         BUILTIN_V1_EVALUATOR_IDENTITY,
         BUILTIN_V1_EVALUATOR_VERSION,
-        &fingerprint,
+        fingerprint,
         cause,
         decided_at,
     )
