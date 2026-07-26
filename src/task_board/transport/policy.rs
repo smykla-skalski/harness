@@ -2,7 +2,7 @@ use clap::{ArgAction, Args, Subcommand};
 use serde::Serialize;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::daemon::protocol::{
+use crate::task_board::wire::{
     PolicyApprovalGrantResolveRequest, PolicyApprovalGrantRevokeRequest,
     PolicyApprovalGrantsListResponse, PolicyCanvasSetSpawnKillSwitchRequest,
     PolicyCanvasSetSpawnRequiresLivePolicyRequest, PolicyCanvasWorkspaceResponse,

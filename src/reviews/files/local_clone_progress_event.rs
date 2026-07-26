@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 use tracing::warn;
 
-use crate::daemon::protocol::StreamEvent;
+use harness_protocol::daemon::StreamEvent;
 
 use super::local_clone_runtime::{LocalCloneOperation, LocalCloneProgress, LocalCloneProgressSink};
 

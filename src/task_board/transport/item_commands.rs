@@ -1,5 +1,5 @@
 use crate::app::command_context::{AppContext, Execute};
-use crate::daemon::protocol::{
+use crate::task_board::wire::{
     TaskBoardAuditRequest, TaskBoardCreateItemRequest, TaskBoardListItemsRequest,
     TaskBoardUpdateEstimateClears, TaskBoardUpdateIdentityClears, TaskBoardUpdateItemRequest,
     TaskBoardUpdateStateClears,

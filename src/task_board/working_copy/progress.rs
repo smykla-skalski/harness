@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 use tracing::warn;
 
-use crate::daemon::protocol::StreamEvent;
+use harness_protocol::daemon::StreamEvent;
 
 /// WS push-event name for working-copy obtain progress. Snake-case with a
 /// `task_board_` prefix so subscribers can filter by prefix, matching the

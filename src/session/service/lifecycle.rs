@@ -7,7 +7,7 @@ use super::{
     apply_remove_agent, apply_transfer_leader, clear_pending_leader_transfer,
     create_initial_session, ensure_known_runtime, log_agent_joined, log_agent_removed,
     log_role_changed, log_session_ended, log_session_started, prepare_end_session_leave_signals,
-    prepare_remove_agent_leave_signal, protocol, refresh_session, release_agent_tasks,
+    prepare_remove_agent_leave_signal, wire, refresh_session, release_agent_tasks,
     require_active, require_removable_agent, resolve_join_role, resolve_registered_runtime,
     resolve_session_project_dir, slice, storage, utc_now, validate_explicit_session_id,
     validate_policy_preset, write_prepared_leave_signals,
@@ -41,7 +41,7 @@ pub fn start_session_with_policy(
     validate_explicit_session_id(session_id)?;
 
     if let Some(client) = DaemonClient::try_connect() {
-        return client.start_session(&protocol::SessionStartRequest {
+        return client.start_session(&wire::SessionStartRequest {
             title: title.to_string(),
             context: context.to_string(),
             session_id: session_id.map(ToString::to_string),
@@ -116,7 +116,7 @@ pub fn join_session_with_fallback(
     if let Some(client) = DaemonClient::try_connect() {
         return client.join_session(
             session_id,
-            &protocol::SessionJoinRequest {
+            &wire::SessionJoinRequest {
                 runtime: runtime_name.to_string(),
                 role,
                 fallback_role,
@@ -181,7 +181,7 @@ pub fn end_session(session_id: &str, actor_id: &str, project_dir: &Path) -> Resu
     if let Some(client) = DaemonClient::try_connect() {
         let _ = client.end_session(
             session_id,
-            &protocol::SessionEndRequest {
+            &wire::SessionEndRequest {
                 actor: actor_id.to_string(),
             },
         )?;
@@ -221,7 +221,7 @@ pub fn assign_role(
         let _ = client.assign_role(
             session_id,
             agent_id,
-            &protocol::RoleChangeRequest {
+            &wire::RoleChangeRequest {
                 actor: actor_id.to_string(),
                 role,
                 reason: reason.map(ToString::to_string),
@@ -263,7 +263,7 @@ pub fn remove_agent(
         let _ = client.remove_agent(
             session_id,
             agent_id,
-            &protocol::AgentRemoveRequest {
+            &wire::AgentRemoveRequest {
                 actor: actor_id.to_string(),
             },
         )?;
@@ -304,7 +304,7 @@ pub fn transfer_leader(
     if let Some(client) = DaemonClient::try_connect() {
         let _ = client.transfer_leader(
             session_id,
-            &protocol::LeaderTransferRequest {
+            &wire::LeaderTransferRequest {
                 actor: actor_id.to_string(),
                 new_leader_id: new_leader_id.to_string(),
                 reason: reason.map(ToString::to_string),
@@ -370,7 +370,7 @@ pub fn leave_session(session_id: &str, agent_id: &str, project_dir: &Path) -> Re
     if let Some(client) = DaemonClient::try_connect() {
         let _ = client.leave_session(
             session_id,
-            &protocol::SessionLeaveRequest {
+            &wire::SessionLeaveRequest {
                 agent_id: agent_id.to_string(),
             },
         )?;
@@ -405,7 +405,7 @@ pub fn update_session_title(
     if let Some(client) = DaemonClient::try_connect() {
         return client.update_session_title(
             session_id,
-            &protocol::SessionTitleRequest {
+            &wire::SessionTitleRequest {
                 title: title.to_string(),
             },
         );

@@ -3,7 +3,7 @@ use super::{
     SessionSignalRecord, SessionSignalStatus, SessionTransition, SignalAck,
     apply_send_signal_state, apply_signal_ack_result, build_signal, load_signal_record_for_agent,
     load_state_or_err, log_signal_acknowledged, log_signal_sent, log_task_assigned,
-    normalize_signal_ack_result, protocol, read_pending_signals, reconcile_expired_pending_signals,
+    normalize_signal_ack_result, wire, read_pending_signals, reconcile_expired_pending_signals,
     refresh_session, resolve_runtime_session_via_daemon, runtime, runtime_session_matches_agent,
     signal_context_root, signal_dirs_for_agent_in_context_root, signal_records_for_dirs, storage,
     utc_now, write_signal_ack,
@@ -26,7 +26,7 @@ pub fn send_signal(
     if let Some(client) = DaemonClient::try_connect() {
         let detail = client.send_signal(
             session_id,
-            &protocol::SignalSendRequest {
+            &wire::SignalSendRequest {
                 actor: actor_id.to_string(),
                 agent_id: agent_id.to_string(),
                 command: command.to_string(),
@@ -115,7 +115,7 @@ pub fn cancel_signal(
     if let Some(client) = DaemonClient::try_connect() {
         client.cancel_signal(
             session_id,
-            &protocol::SignalCancelRequest {
+            &wire::SignalCancelRequest {
                 actor: actor_id.to_string(),
                 agent_id: agent_id.to_string(),
                 signal_id: signal_id.to_string(),
@@ -282,7 +282,7 @@ pub fn record_signal_acknowledgment(
     if let Some(client) = DaemonClient::try_connect() {
         return client.record_signal_ack(
             session_id,
-            &protocol::SignalAckRequest {
+            &wire::SignalAckRequest {
                 agent_id: agent_id.to_string(),
                 signal_id: signal_id.to_string(),
                 result,

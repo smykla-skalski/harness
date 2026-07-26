@@ -1,7 +1,7 @@
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::daemon::protocol::{
+use harness_protocol::managed_agents::codex::{
     CodexApprovalDecision, CodexApprovalDecisionRequest, CodexSteerRequest,
 };
 use harness_kernel::errors::CliError;

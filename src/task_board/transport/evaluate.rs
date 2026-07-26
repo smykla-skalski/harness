@@ -1,7 +1,7 @@
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::daemon::protocol::TaskBoardEvaluateRequest;
+use crate::task_board::wire::TaskBoardEvaluateRequest;
 use harness_kernel::errors::CliError;
 use crate::task_board::transport::{daemon_client, print_json};
 use crate::task_board::types::TaskBoardStatus;

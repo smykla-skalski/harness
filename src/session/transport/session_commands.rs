@@ -4,7 +4,7 @@ use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::client::DaemonClient;
-use crate::daemon::protocol::{AdoptSessionRequest, ObserveSessionRequest};
+use crate::session::wire::{AdoptSessionRequest, ObserveSessionRequest};
 use harness_kernel::errors::CliError;
 use crate::hooks::adapters::HookAgent;
 use crate::session::types::SessionRole;

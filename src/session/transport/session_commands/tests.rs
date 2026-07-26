@@ -65,7 +65,7 @@ fn session_title_execute_updates_active_session_via_daemon_client() {
                     .expect("request capture")
                     .push(request.clone());
                 let body =
-                    serde_json::to_string(&crate::daemon::protocol::SessionMutationResponse {
+                    serde_json::to_string(&crate::session::wire::SessionMutationResponse {
                         state: build_new_session_with_policy(
                             "daemon title context",
                             "renamed title",

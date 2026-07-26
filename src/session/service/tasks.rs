@@ -4,7 +4,7 @@ use super::{
     apply_advance_queued_tasks, apply_assign_task, apply_create_task, apply_delete_task,
     apply_drop_task, apply_record_checkpoint, apply_update_task, apply_update_task_queue_policy,
     ensure_valid_progress, generate_checkpoint_id, load_state_or_err, log_checkpoint_recorded,
-    log_task_assigned, log_task_created, log_task_deleted, log_task_status_changed, protocol,
+    log_task_assigned, log_task_created, log_task_deleted, log_task_status_changed, wire,
     reconcile_expired_pending_signals, refresh_session, sort_session_tasks, started_task_signals,
     storage, utc_now, write_prepared_task_start_signals,
 };
@@ -45,7 +45,7 @@ pub fn create_task_with_source(
     if let Some(client) = DaemonClient::try_connect() {
         let detail = client.create_task(
             session_id,
-            &protocol::TaskCreateRequest {
+            &wire::TaskCreateRequest {
                 actor: actor_id.to_string(),
                 title: spec.title.to_string(),
                 context: spec.context.map(ToString::to_string),
@@ -98,7 +98,7 @@ pub fn assign_task(
         let _ = client.assign_task(
             session_id,
             task_id,
-            &protocol::TaskAssignRequest {
+            &wire::TaskAssignRequest {
                 actor: actor_id.to_string(),
                 agent_id: agent_id.to_string(),
             },
@@ -136,7 +136,7 @@ pub fn assign_task(
 pub fn drop_task(
     session_id: &str,
     task_id: &str,
-    target: &protocol::TaskDropTarget,
+    target: &wire::TaskDropTarget,
     queue_policy: TaskQueuePolicy,
     actor_id: &str,
     project_dir: &Path,
@@ -145,7 +145,7 @@ pub fn drop_task(
         let _ = client.drop_task(
             session_id,
             task_id,
-            &protocol::TaskDropRequest {
+            &wire::TaskDropRequest {
                 actor: actor_id.to_string(),
                 target: target.clone(),
                 queue_policy,
@@ -241,7 +241,7 @@ pub fn delete_task(
         let _ = client.delete_task(
             session_id,
             task_id,
-            &protocol::TaskDeleteRequest {
+            &wire::TaskDeleteRequest {
                 actor: actor_id.to_string(),
             },
         )?;
@@ -306,7 +306,7 @@ pub fn update_task(
         let _ = client.update_task(
             session_id,
             task_id,
-            &protocol::TaskUpdateRequest {
+            &wire::TaskUpdateRequest {
                 actor: actor_id.to_string(),
                 status,
                 note: note.map(ToString::to_string),
@@ -358,7 +358,7 @@ pub fn record_task_checkpoint(
         let _ = client.checkpoint_task(
             session_id,
             task_id,
-            &protocol::TaskCheckpointRequest {
+            &wire::TaskCheckpointRequest {
                 actor: actor_id.to_string(),
                 summary: summary.to_string(),
                 progress,
