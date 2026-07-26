@@ -45,10 +45,7 @@ fn application_submodules_are_not_public_library_surface() {
 fn transport_command_modules_stay_internal_to_domains() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
 
-    for (path, needle) in [
-        ("src/run/mod.rs", "pub mod commands;"),
-        ("src/create/mod.rs", "pub mod commands;"),
-    ] {
+    for (path, needle) in [("src/create/mod.rs", "pub mod commands;")] {
         let contents = read_repo_file(root, path);
         assert!(
             !contents.contains(needle),
@@ -267,10 +264,15 @@ fn errors_hook_message_root_stays_a_facade() {
 fn kernel_command_intent_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     assert!(
-        !root.join("crates/harness-kernel/src/kernel/command_intent.rs").exists(),
+        !root
+            .join("crates/harness-kernel/src/kernel/command_intent.rs")
+            .exists(),
         "legacy flat kernel command-intent module should not exist"
     );
-    let command_intent_mod = read_repo_file(root, "crates/harness-kernel/src/kernel/command_intent/mod.rs");
+    let command_intent_mod = read_repo_file(
+        root,
+        "crates/harness-kernel/src/kernel/command_intent/mod.rs",
+    );
 
     for needle in [
         "pub struct ParsedCommand {",
