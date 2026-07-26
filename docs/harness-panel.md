@@ -60,7 +60,7 @@ Pass `/` to both flags to reach the panel at `https://harness.example.com/` with
 The one thing that changes is the session cookie, which is scoped to `/` instead of `/panel` and so is offered to the daemon's own API as well. That daemon is the same process that already reads the cookie on every request it forwards to the panel, and it authenticates by bearer token rather than by cookie, so the cookie grants nothing there. Do not put a third service on this origin.
 
 ```bash
-sudo harness-systemd daemon remote-systemd install \
+sudo /usr/local/bin/harness-systemd install \
   --reconfigure \
   --binary-path /usr/local/bin/harness-daemon \
   --domain harness.example.com \
