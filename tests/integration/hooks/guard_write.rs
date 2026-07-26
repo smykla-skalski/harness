@@ -6,12 +6,11 @@ use harness::hooks::guard_write;
 
 use super::super::helpers::*;
 
+/// With no create state there is no suite surface to restrict writes to, so
+/// even a path well outside the workspace is allowed through.
 #[test]
-fn guard_write_denies_external_create() {
-    // Without any create state, writes to external paths are allowed
-    // because there's no suite context to restrict to
+fn guard_write_allows_external_path_without_create_state() {
     let ctx = make_hook_context("suite:create", make_write_payload("/etc/passwd"));
     let r = guard_write::execute(&ctx).unwrap();
-    // Without create state, suite:create allows any path (no suite context)
     assert_allow(&r);
 }

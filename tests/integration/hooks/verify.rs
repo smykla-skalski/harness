@@ -1,5 +1,6 @@
-// Tests for the verify-write and verify-question hooks.
-// These post-tool-use hooks validate write results and question responses.
+// Tests for the verify-question hook, which validates question responses
+// after the tool call. Verify-write's surviving amendments check is covered by
+// its own unit tests in src/hooks/verify_write/tests.rs.
 
 use harness::hooks::hook_result::Decision;
 use harness::hooks::verify_question;
