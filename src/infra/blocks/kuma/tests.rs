@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::infra::blocks::{FakeContainerRuntime, FakeHttpClient, FakeProcessExecutor};
+use crate::infra::blocks::{FakeHttpClient, FakeProcessExecutor};
 
 use super::*;
 
@@ -8,7 +8,6 @@ fn block() -> KumaControlPlane {
     KumaControlPlane::new(
         Arc::new(FakeProcessExecutor::new(vec![])),
         Arc::new(FakeHttpClient::new(vec![])),
-        Arc::new(FakeContainerRuntime::new()),
     )
 }
 

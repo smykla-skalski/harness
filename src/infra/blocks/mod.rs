@@ -1,6 +1,5 @@
 mod build;
 mod clock;
-mod docker;
 mod error;
 mod http;
 mod kubernetes;
@@ -10,11 +9,6 @@ mod registry;
 
 pub use build::{BuildSystem, BuildTarget, ProcessBuildSystem};
 pub use clock::{Clock, SystemClock};
-pub use docker::{
-    BollardContainerRuntime, ContainerConfig, ContainerPort, ContainerRuntime,
-    ContainerRuntimeBackend, ContainerSnapshot, DockerContainerRuntime, container_backend_from_env,
-    container_runtime_from_env,
-};
 pub use error::BlockError;
 pub use http::{HttpClient, HttpMethod, HttpResponse, ReqwestHttpClient};
 #[cfg(feature = "k3d")]
@@ -36,8 +30,6 @@ pub use registry::BlockRequirement;
 pub use build::FakeBuildSystem;
 #[cfg(test)]
 pub use clock::FakeClock;
-#[cfg(test)]
-pub use docker::FakeContainerRuntime;
 #[cfg(test)]
 pub use http::FakeHttpClient;
 #[cfg(test)]

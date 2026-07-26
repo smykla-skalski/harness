@@ -1,4 +1,3 @@
-mod docker;
 mod http;
 mod output_filter;
 mod result;
@@ -11,11 +10,6 @@ mod tests;
 
 pub(crate) use runtime::RUNTIME;
 
-pub use docker::{
-    cluster_exists, container_running, docker_exec_cmd, docker_exec_detached, docker_inspect_ip,
-    docker_network_create, docker_network_rm, docker_rm, docker_rm_by_label, docker_run_detached,
-    docker_write_file, extract_admin_token,
-};
 pub use http::{HttpMethod, cp_api_json, cp_api_text, wait_for_http};
 pub(crate) use output_filter::filter_progress_line;
 pub use result::CommandResult;

@@ -72,22 +72,6 @@ fn run_command_streaming_preserves_stdout_without_trailing_newline() {
 }
 
 #[test]
-fn docker_run_detached_builds_correct_args() {
-    let env = [("KUMA_MODE", "zone")];
-    let ports = [(5681_u16, 5681_u16)];
-    let result = docker_run_detached(
-        "kuma-cp:latest",
-        "test-cp",
-        "harness-net",
-        &env,
-        &ports,
-        &[],
-        &[],
-    );
-    assert!(result.is_err());
-}
-
-#[test]
 fn filter_progress_empty_string() {
     assert!(filter_progress_line("").is_none());
 }
@@ -256,15 +240,6 @@ fn filter_progress_docker_buildkit_layer() {
         filter_progress_line("#9 [6/6] COPY /tools/releases/templates/group /etc/group").is_none()
     );
     assert!(filter_progress_line("#12 extracting sha256:abc123").is_none());
-}
-
-#[test]
-fn docker_rm_by_label_returns_empty_for_no_matches() {
-    if let Ok(names) =
-        docker_rm_by_label("io.harness.test.418cf829-6691-5fc0-92b1-8e5013efa2cb=true")
-    {
-        assert!(names.is_empty());
-    }
 }
 
 #[test]

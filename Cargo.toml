@@ -50,7 +50,6 @@ harness-systemd-protocol = { path = "crates/harness-systemd-protocol", version =
 harness-telemetry = { path = "crates/harness-telemetry", version = "51.1.0" }
 harness-workspace = { path = "crates/harness-workspace", version = "51.1.0" }
 arc-swap = "1.9.1"
-bollard = "0.21.0"
 bytes = "1.10.1"
 caseless = "0.2.2"
 clap = { version = "4.6.0", features = ["derive", "env"] }
@@ -104,7 +103,6 @@ pathdiff = "0.2.3"
 rcgen = { version = "0.14.8", default-features = false, features = ["pem", "ring", "x509-parser"], optional = true }
 x509-parser = { version = "=0.18.1", optional = true }
 gray_matter = { version = "0.3.2", default-features = false, features = ["yaml"] }
-tar = "0.4.44"
 user_dirs = "0.2.0"
 walkdir = "2.5.0"
 similar = "3.0"
