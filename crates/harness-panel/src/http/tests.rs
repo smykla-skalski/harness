@@ -207,9 +207,12 @@ impl Harness {
     }
 
     async fn post(&self, path: &str, session: Option<&str>) -> (StatusCode, String) {
-        let mut request = Request::builder().method("POST").uri(path);
+        let mut request = Self::request().method(Method::POST).uri(path);
         if let Some(token) = session {
-            request = request.header(header::COOKIE, format!("{SESSION_COOKIE}={token}"));
+            request = request.header(
+                header::COOKIE,
+                format!("{}={token}", session_cookie_name(&self.state)),
+            );
         }
         let response = router(self.state.clone())
             .oneshot(request.body(Body::empty()).expect("request"))
@@ -225,9 +228,12 @@ impl Harness {
     /// The `Cache-Control` a POST answered with, for a body that must never be
     /// cached.
     async fn post_response(&self, path: &str, session: Option<&str>) -> Option<String> {
-        let mut request = Request::builder().method("POST").uri(path);
+        let mut request = Self::request().method(Method::POST).uri(path);
         if let Some(token) = session {
-            request = request.header(header::COOKIE, format!("{SESSION_COOKIE}={token}"));
+            request = request.header(
+                header::COOKIE,
+                format!("{}={token}", session_cookie_name(&self.state)),
+            );
         }
         let response = router(self.state.clone())
             .oneshot(request.body(Body::empty()).expect("request"))

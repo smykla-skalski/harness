@@ -142,6 +142,7 @@ pub(crate) struct ValidatedPanelArgs {
     token_url: Url,
     api_url: Url,
     session_ttl: Duration,
+    daemon: daemon::DaemonConfig,
 }
 
 impl PanelArgs {
@@ -171,6 +172,7 @@ impl PanelArgs {
                 api_url: validated.api_url,
             },
             session_ttl: validated.session_ttl,
+            daemon: validated.daemon,
         })
     }
 

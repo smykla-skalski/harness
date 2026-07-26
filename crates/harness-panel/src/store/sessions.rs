@@ -7,7 +7,7 @@
 
 use chrono::{DateTime, Duration, Utc};
 
-use super::accounts::{Account, AccountIdentity, account_from_row, upsert_account_with};
+use super::accounts::{Account, AccountIdentity, upsert_account_with};
 use super::token::{OpaqueToken, hash_token};
 use super::{Store, from_unix_seconds, to_unix_seconds};
 use crate::error::PanelError;

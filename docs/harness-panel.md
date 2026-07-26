@@ -174,7 +174,7 @@ The panel mints links through the daemon, so it needs a credential of its own. C
 harness-daemon remote pair create --role pairing-broker
 ```
 
-The output carries a `harness://pair?payload=…` link. Its payload holds the one-time code and `server_spki_sha256`; pass the code to the panel once, as `--daemon-pair-code`, and the pin as `--daemon-spki-pin`. The pin is the daemon's certificate, not a secret, and it stays the same until the certificate is renewed with a new key.
+The output carries a `harness://pair?payload=…` link. Its payload holds the one-time code and `server_spki_sha256`; the code goes to `harness-panel pair` once, through the file below, and the pin becomes `--daemon-spki-pin`. The pin is the daemon's certificate, not a secret, and it stays the same until the certificate is renewed with a new key.
 
 Write the code to a file only the service user can read, then claim it once. Claiming is its own command, not part of `serve`: a one-time code left in a unit file would be spent on the first start and refused on every restart afterwards.
 

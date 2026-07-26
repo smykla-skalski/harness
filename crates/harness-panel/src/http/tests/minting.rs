@@ -137,14 +137,27 @@ async fn the_request_carries_the_panels_own_terms() {
     let seen = Arc::new(Mutex::new(Seen::default()));
     let (harness, owner) = ready(Arc::clone(&seen)).await;
 
+    let owner_id = harness.account_id("ada").await;
+
     harness.post("/panel/api/pair-links", Some(&owner)).await;
 
+    let account = harness
+        .state
+        .store
+        .account_by_id(&owner_id)
+        .await
+        .expect("account")
+        .expect("the owner signed in");
     let seen = seen.lock().expect("stub lock");
     let body = seen.body.as_ref().expect("a mint request");
     assert_eq!(body["role"], "operator");
     assert_eq!(body["ttl_seconds"], 600);
-    assert_eq!(body["subject"]["provider"], "github");
-    assert_eq!(body["subject"]["subject_id"], "ada");
+    // Compared against the stored account rather than a literal, because the
+    // point is that both sides file the person under one spelling: the provider
+    // is qualified by the GitHub installation, and an audit row the operator
+    // cannot match back to a panel account is worth little.
+    assert_eq!(body["subject"]["provider"], account.provider);
+    assert_eq!(body["subject"]["subject_id"], account.subject_id);
     assert!(
         body.get("scopes").is_none(),
         "scopes are the role's: {body}"

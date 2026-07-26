@@ -192,6 +192,11 @@ mod tests {
                 "rate_limited",
             ),
             (
+                ApiError::NotFound("no such account"),
+                StatusCode::NOT_FOUND,
+                "not_found",
+            ),
+            (
                 ApiError::BadRequest("missing code".to_owned()),
                 StatusCode::BAD_REQUEST,
                 "bad_request",
