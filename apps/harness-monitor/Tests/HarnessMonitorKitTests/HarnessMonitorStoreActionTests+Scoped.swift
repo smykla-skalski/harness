@@ -36,7 +36,7 @@ extension HarnessMonitorStoreActionTests {
         severity: .low
       )
     }
-    await Task.yield()
+    _ = await waitUntil { store.isSessionActionInFlight }
 
     #expect(store.isSessionActionInFlight)
     #expect(store.isBusy)

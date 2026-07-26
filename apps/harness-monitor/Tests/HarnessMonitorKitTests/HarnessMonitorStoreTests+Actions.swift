@@ -40,7 +40,7 @@ extension HarnessMonitorStoreTests {
     let refreshTask = Task {
       await store.refresh()
     }
-    await Task.yield()
+    _ = await waitUntil { store.isRefreshing }
 
     #expect(store.isRefreshing)
 

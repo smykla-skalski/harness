@@ -133,8 +133,7 @@ struct HarnessMonitorStoreRemoveSessionTests {
 
     store.requestRemoveSessionConfirmation(sessionID: PreviewFixtures.summary.sessionId)
     await store.confirmPendingAction()
-    await Task.yield()
-    await Task.yield()
+    _ = await waitUntil { store.sessions.isEmpty && store.selectedSessionID == nil }
 
     #expect(store.sessions.isEmpty)
     #expect(store.projects.isEmpty)

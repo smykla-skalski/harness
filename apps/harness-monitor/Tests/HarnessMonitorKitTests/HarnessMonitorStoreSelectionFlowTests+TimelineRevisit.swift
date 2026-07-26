@@ -108,8 +108,9 @@ extension HarnessMonitorStoreSelectionFlowTests {
 
     await selectionTask.value
     clock.advance(by: .milliseconds(500))
-    await Task.yield()
-    await Task.yield()
+    // The gate is parked in the fake clock's sleep and has to be scheduled
+    // before it can notice the advance, which two yields do not guarantee.
+    _ = await waitUntil { store.contentUI.sessionDetail.isTimelineLoading == false }
 
     #expect(store.contentUI.sessionDetail.isTimelineLoading == false)
   }
@@ -144,8 +145,11 @@ extension HarnessMonitorStoreSelectionFlowTests {
         == Set(PreviewFixtures.timeline.map(\.entryId))
     )
 
-    clock.advance(by: .milliseconds(500))
-    await Task.yield()
+    // Asserting the floor was never armed, so give the advance real time to
+    // arm it wrongly instead of a single yield.
+    _ = await waitUntil(timeout: .milliseconds(200)) {
+      store.contentUI.sessionDetail.isTimelineLoading
+    }
     #expect(store.contentUI.sessionDetail.isTimelineLoading == false)
 
     await selectionTask.value

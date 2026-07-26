@@ -116,9 +116,11 @@ final class HarnessMonitorStoreAcpDecisionLifecycleTests: XCTestCase {
     try await assertPendingTerminalResolutionStopsWithoutMutatingDecisionStore(reason: .shutdown)
   }
 
+  /// Callers assert different things after this, so there is no single
+  /// condition to poll. Spend real time instead of two scheduling offers a
+  /// loaded machine can burn through before the observation callback runs.
   private func settleObservation() async {
-    await Task.yield()
-    await Task.yield()
+    try? await Task.sleep(for: .milliseconds(50))
   }
 
   private func assertPendingTerminalResolutionStopsWithoutMutatingDecisionStore(

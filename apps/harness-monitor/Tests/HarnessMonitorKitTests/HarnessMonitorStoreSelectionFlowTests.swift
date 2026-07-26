@@ -16,7 +16,7 @@ struct HarnessMonitorStoreSelectionFlowTests {
     let refreshTask = Task {
       await store.refreshDiagnostics()
     }
-    await Task.yield()
+    _ = await waitUntil { store.isDiagnosticsRefreshInFlight }
 
     #expect(store.isDiagnosticsRefreshInFlight)
     #expect(store.isBusy == false)

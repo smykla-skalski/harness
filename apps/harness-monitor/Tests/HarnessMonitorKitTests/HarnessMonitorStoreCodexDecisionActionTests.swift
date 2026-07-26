@@ -99,9 +99,11 @@ final class HarnessMonitorStoreCodexDecisionActionTests: XCTestCase {
     return string
   }
 
+  /// Callers assert different things after this, so there is no single
+  /// condition to poll. Spend real time instead of two scheduling offers a
+  /// loaded machine can burn through before the observation callback runs.
   private func settleObservation() async {
-    await Task.yield()
-    await Task.yield()
+    try? await Task.sleep(for: .milliseconds(50))
   }
 
   private func waitUntil(
@@ -109,12 +111,12 @@ final class HarnessMonitorStoreCodexDecisionActionTests: XCTestCase {
     poll: Duration = .milliseconds(50),
     condition: @escaping @MainActor () -> Bool
   ) async {
-    let deadline = ContinuousClock.now.advanced(by: timeout)
-    while ContinuousClock.now < deadline {
-      if condition() {
-        return
-      }
-      try? await Task.sleep(for: poll)
+    if await HarnessMonitorKitTests.waitUntil(
+      timeout: timeout,
+      pollInterval: poll,
+      condition
+    ) {
+      return
     }
     XCTAssertTrue(condition())
   }
