@@ -327,6 +327,9 @@ struct TaskBoardStepFlowRecoveryTests {
     )
     let client = RecordingHarnessClient()
     client.configureTaskBoardItems([held])
+    // Delivery asks the daemon what it is actually holding before claiming, so
+    // a held set given only to the view reads as never reserved.
+    client.configureHeldTaskBoardDispatches([held.id])
     let store = await makeBootstrappedStore(client: client)
     let view = railView(
       store: store,
