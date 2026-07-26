@@ -299,7 +299,7 @@ impl IntoResponse for RemotePairingManageError {
             Self::Authentication(response) => *response,
             Self::StoreUnavailable => manage_error(
                 StatusCode::SERVICE_UNAVAILABLE,
-                "pairing_store_unavailable",
+                "REMOTE_PAIRING_STORE",
                 "pairing store is unavailable",
             ),
             // One answer covers a pairing minted by somebody else and an id
@@ -309,19 +309,23 @@ impl IntoResponse for RemotePairingManageError {
             // which ids do.
             Self::NotYours => manage_error(
                 StatusCode::FORBIDDEN,
-                "pairing_not_available",
+                "REMOTE_PAIRING_NOT_AVAILABLE",
                 "no pairing with that id is available to this client",
             ),
             Self::NotFound => manage_error(
                 StatusCode::NOT_FOUND,
-                "pairing_not_found",
+                "REMOTE_PAIRING_NOT_FOUND",
                 "no such pairing",
             ),
+            // Deliberately the same answer as `StoreUnavailable`: one means no
+            // store is configured and the other that a call into it failed,
+            // and which of the two it was is the daemon's business. They part
+            // company in the log, which is where an operator looks.
             Self::Store(error) => {
                 tracing::error!(%error, "remote pairing management failed");
                 manage_error(
                     StatusCode::SERVICE_UNAVAILABLE,
-                    "pairing_store_unavailable",
+                    "REMOTE_PAIRING_STORE",
                     "pairing store is unavailable",
                 )
             }

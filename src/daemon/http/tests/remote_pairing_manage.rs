@@ -229,6 +229,10 @@ async fn a_broker_cannot_revoke_a_link_it_did_not_mint() {
     let (status, body) = revoke_as(&base_url, BROKER, &theirs).await;
 
     assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+    // Pinned because a client branches on the code, not the prose: this is the
+    // answer that has to stay indistinguishable from the one for an id that
+    // never existed, and a rename here would quietly split the two apart.
+    assert_eq!(body["error"]["code"], "REMOTE_PAIRING_NOT_AVAILABLE");
     server.abort();
 }
 
@@ -241,7 +245,10 @@ async fn an_attempt_on_a_missing_pairing_is_still_recorded() {
     let db = state.db.get().expect("db slot").clone();
     let (base_url, server) = serve_http(state).await;
 
-    revoke_as(&base_url, ADMIN, "pairing-does-not-exist").await;
+    let (status, body) = revoke_as(&base_url, ADMIN, "pairing-does-not-exist").await;
+
+    assert_eq!(status, StatusCode::NOT_FOUND, "{body}");
+    assert_eq!(body["error"]["code"], "REMOTE_PAIRING_NOT_FOUND");
 
     let (recorded, outcome): (i64, String) = db
         .lock()
