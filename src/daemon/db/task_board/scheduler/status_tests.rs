@@ -116,6 +116,7 @@ async fn snapshot_counts_live_workflow_queue_without_double_counting_cleanup() {
         ("draining", "planning", "draining"),
         ("cleanup-pending", "cleanup", "pending"),
         ("cleanup-human", "cleanup", "human_required"),
+        ("terminal-human-live", "terminal", "human_required"),
         ("terminal", "cleanup", "completed"),
     ] {
         seed_queue_execution(&db, id, phase, state).await;
@@ -141,7 +142,7 @@ async fn snapshot_counts_live_workflow_queue_without_double_counting_cleanup() {
             starting: 1,
             active: 1,
             draining: 1,
-            cleanup_required: 2,
+            cleanup_required: 3,
         }
     );
 }

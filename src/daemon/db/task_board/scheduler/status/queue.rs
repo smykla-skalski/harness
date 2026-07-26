@@ -51,7 +51,7 @@ pub(super) async fn load(
             END), 0)
                 AS draining,
             COALESCE(SUM(CASE
-                WHEN phase = 'cleanup'
+                WHEN (phase = 'cleanup' OR state = 'human_required')
                     AND state NOT IN ('completed', 'failed', 'cancelled')
                     THEN 1 ELSE 0
             END), 0) AS cleanup_required
