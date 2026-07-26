@@ -146,11 +146,21 @@ pub(crate) async fn run_task_board_github_automation_async(
             .await
         {
             Ok(Some(branch)) if !branch.trim().is_empty() => config.default_branch = branch,
-            // One unreachable repository must not stall the other twenty-nine.
-            Ok(_) | Err(_) => {
+            // One unreachable repository must not stall every other one, but the
+            // reason has to reach the log or an auth or network fault is
+            // indistinguishable from a repository that simply reports no branch.
+            Ok(_) => {
                 tracing::warn!(
                     %repository,
-                    "skipping task-board GitHub automation: could not detect the default branch"
+                    "skipping task-board GitHub automation: repository reported no default branch"
+                );
+                continue;
+            }
+            Err(error) => {
+                tracing::warn!(
+                    %repository,
+                    %error,
+                    "skipping task-board GitHub automation: default-branch lookup failed"
                 );
                 continue;
             }

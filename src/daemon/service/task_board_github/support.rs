@@ -18,7 +18,6 @@ use crate::task_board::github::{
     GitHubAutomation, GitHubAutomationClient, GitHubCreatePullRequest, GitHubProjectConfig,
     GitHubPullRequestHandle,
 };
-use crate::task_board::normalize_repository_slug;
 #[cfg(test)]
 use crate::task_board::policy_graph::resolve_gate_policy;
 use crate::task_board::policy_graph::{RecordedPolicyDecision, record_policy_decision};
@@ -27,6 +26,7 @@ use crate::task_board::{
     PolicyGate, PolicyGraph, PolicyInput, PolicyPipelineMode, PolicySubject, TaskBoardItem,
     TaskBoardOrchestratorSettings, TaskBoardWorkflowState,
 };
+use crate::task_board::{normalize_repository_slug, task_board_read_only_execution_repository};
 use harness_kernel::errors::CliError;
 #[cfg(test)]
 use harness_kernel::errors::CliErrorKind;
@@ -321,11 +321,16 @@ fn pull_request_body(item: &TaskBoardItem, config: &GitHubProjectConfig) -> Stri
         lines.push(String::new());
         lines.push(summary.to_string());
     }
-    // `project_id` keeps GitHub's casing while the publication slug is
-    // normalized, so `Owner/Repo` and `owner/repo` are the same repository
-    // and a raw string compare would drop the `Closes` line.
+    // Resolve the item's repository the same way dispatch does rather than
+    // reading `project_id`: a GitHub import leaves that field null and puts the
+    // slug in `execution_repository`, so keying off it alone drops the `Closes`
+    // line for nearly every imported item. Casing differs between the two
+    // fields as well, hence normalizing both sides.
     let publication = normalize_repository_slug(Some(&config.repository_slug()));
-    let item_repository = normalize_repository_slug(item.project_id.as_deref());
+    let item_repository = task_board_read_only_execution_repository(item)
+        .ok()
+        .flatten()
+        .and_then(|repository| normalize_repository_slug(Some(&repository)));
     if let Some(issue_number) = item.external_refs.iter().find_map(|reference| {
         (reference.provider == ExternalRefProvider::GitHub
             && item_repository.is_some()
@@ -337,3 +342,7 @@ fn pull_request_body(item: &TaskBoardItem, config: &GitHubProjectConfig) -> Stri
     }
     lines.join("\n")
 }
+
+#[cfg(test)]
+#[path = "support_tests.rs"]
+mod support_tests;
