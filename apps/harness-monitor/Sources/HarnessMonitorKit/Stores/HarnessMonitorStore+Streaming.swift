@@ -4,7 +4,7 @@ extension HarnessMonitorStore {
   static let streamReconnectDelays: [Duration] = [
     .milliseconds(500), .seconds(1), .seconds(2), .seconds(4), .seconds(8),
   ]
-  private static let streamReconnectMaxAttempts = 6
+  static let streamReconnectMaxAttempts = 6
 
   func startGlobalStream(using client: any HarnessMonitorClientProtocol) {
     stopGlobalStream()
@@ -12,64 +12,22 @@ extension HarnessMonitorStore {
       return
     }
     globalStreamTask = Task { @MainActor [weak self] in
-      guard let self else {
-        return
-      }
-
-      var attempt = 0
-      var hasSeenReady = false
+      var state = GlobalStreamPassState()
       while !Task.isCancelled {
-        do {
-          for try await event in await client.globalStream() {
-            recordReconnectRecovery(detail: "Global stream restored")
-            attempt = 0
-            recordStreamEvent(countedInTraffic: true)
-            guard
-              await processGlobalStreamEvent(
-                event,
-                using: client,
-                hasSeenReady: &hasSeenReady
-              )
-            else {
-              return
-            }
-          }
-        } catch {
-          if Task.isCancelled {
-            return
-          }
-          recordReconnectAttempt(scope: "global stream", nextAttempt: attempt + 1, error: error)
-          // The WebSocket receive loop already released its task (see
-          // `releaseDeadWebSocketTask`), so every retry against this
-          // transport will throw `connectionClosed` again until the manifest
-          // watcher rebuilds the client. Skip the full 6-attempt backoff
-          // and re-bootstrap directly — saves ~15 s and ~7 log lines per
-          // daemon-flap cycle.
-          if Self.isTransportClosedError(error) {
-            appendConnectionEvent(
-              kind: .reconnecting,
-              detail: "Transport closed, re-bootstrapping global stream"
-            )
-            scheduleReconnectAfterConnectionFailure()
-            return
-          }
-        }
-
-        if Task.isCancelled {
+        // The store is taken for one pass and let go again before the backoff.
+        // These loops re-bootstrap the connection for as long as they run, and
+        // the recovery they schedule starts them again, so a reference held
+        // across the wait would keep a store nobody owns any more reconnecting
+        // for the life of the process.
+        let outcome: StreamPassOutcome
+        if let store = self {
+          outcome = await store.runGlobalStreamPass(using: client, state: &state)
+        } else {
           return
         }
-
-        if attempt >= Self.streamReconnectMaxAttempts {
-          appendConnectionEvent(
-            kind: .reconnecting,
-            detail: "Global stream failed \(attempt) times, re-bootstrapping"
-          )
-          scheduleReconnectAfterConnectionFailure()
+        guard case .retry(let delay) = outcome else {
           return
         }
-
-        let delay = reconnectDelay(for: attempt)
-        attempt += 1
         try? await Task.sleep(for: delay)
       }
     }
@@ -83,57 +41,21 @@ extension HarnessMonitorStore {
     subscribedSessionIDs = [sessionID]
     stopSessionStream(resetSubscriptions: false)
     sessionStreamTask = Task { @MainActor [weak self] in
-      guard let self else {
-        return
-      }
-
       var attempt = 0
       while !Task.isCancelled {
-        do {
-          for try await event in await client.sessionStream(sessionID: sessionID) {
-            recordReconnectRecovery(detail: "Session stream restored")
-            attempt = 0
-            let countedInTraffic = activeTransport == .httpSSE
-            recordStreamEvent(countedInTraffic: countedInTraffic)
-            if case .ready = event.kind {
-              await recoverSelectedSessionPushOnlyState(
-                using: client,
-                sessionID: sessionID
-              )
-              continue
-            }
-            await applySessionPushEventFromStream(event)
-          }
-        } catch {
-          if Task.isCancelled {
-            return
-          }
-          recordReconnectAttempt(scope: "session stream", nextAttempt: attempt + 1, error: error)
-          if Self.isTransportClosedError(error) {
-            appendConnectionEvent(
-              kind: .reconnecting,
-              detail: "Transport closed, re-bootstrapping session stream"
-            )
-            scheduleReconnectAfterConnectionFailure()
-            return
-          }
-        }
-
-        if Task.isCancelled {
-          return
-        }
-
-        if attempt >= Self.streamReconnectMaxAttempts {
-          appendConnectionEvent(
-            kind: .reconnecting,
-            detail: "Session stream failed \(attempt) times, re-bootstrapping"
+        let outcome: StreamPassOutcome
+        if let store = self {
+          outcome = await store.runSessionStreamPass(
+            using: client,
+            sessionID: sessionID,
+            attempt: &attempt
           )
-          scheduleReconnectAfterConnectionFailure()
+        } else {
           return
         }
-
-        let delay = reconnectDelay(for: attempt)
-        attempt += 1
+        guard case .retry(let delay) = outcome else {
+          return
+        }
         try? await Task.sleep(for: delay)
       }
     }
@@ -294,7 +216,7 @@ extension HarnessMonitorStore {
     applyGlobalPushEvent(event)
   }
 
-  private func applySessionPushEventFromStream(_ event: DaemonPushEvent) async {
+  func applySessionPushEventFromStream(_ event: DaemonPushEvent) async {
     if await applyManagedAgentPushEventFromStream(event) {
       scheduleSupervisorTick(reason: "session-managed-agent")
       return

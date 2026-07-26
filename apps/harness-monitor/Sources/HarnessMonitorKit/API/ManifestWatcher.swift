@@ -89,6 +89,25 @@ final class ManifestWatcher: Sendable {
     )
   }
 
+  /// A resumed source belongs to libdispatch, not to whoever created it, so
+  /// dropping the watcher without this leaves the source armed on a directory
+  /// nobody watches any more and holds its descriptor until the process exits.
+  /// One process is a whole test run, and every connected store starts a
+  /// watcher.
+  /// True while a resumed source is watching the directory.
+  var isWatching: Bool {
+    state.withLock { $0.source != nil }
+  }
+
+  /// A resumed source belongs to libdispatch rather than to whoever created it,
+  /// so dropping the watcher without this leaves the source armed on a directory
+  /// nobody watches any more, holding its descriptor until the process exits.
+  /// One process is a whole test run, and every store that bootstraps starts a
+  /// watcher.
+  deinit {
+    stop()
+  }
+
   func start() {
     stop()
     let path = directoryPath
