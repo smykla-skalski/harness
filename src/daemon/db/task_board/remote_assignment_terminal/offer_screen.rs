@@ -90,19 +90,19 @@ pub(super) async fn screen_offer_response_in_tx<'c>(
     authenticated_principal: &str,
     labels: &OfferScreenLabels,
 ) -> Result<OfferScreen<'c>, CliError> {
-    let validate = response.validate(record.require_offer()?);
+    let offer = record.require_offer()?;
+    let validate = response.validate(offer);
     validate.map_err(|error| db_error(format!("{}: {error}", labels.validate)))?;
-    if source_offer_is_abandoned_in_tx(&mut transaction, record.require_offer()?).await? {
+    if source_offer_is_abandoned_in_tx(&mut transaction, offer).await? {
         commit_noop(transaction, labels.abandoned).await?;
         return Ok(OfferScreen::Settled(TaskBoardRemoteMutationOutcome::Stale(
             record,
         )));
     }
-    let receipts =
-        load_offer_receipt_collisions_in_tx(&mut transaction, record.require_offer()?).await?;
+    let receipts = load_offer_receipt_collisions_in_tx(&mut transaction, offer).await?;
     if !receipts.is_empty() {
         if receipts.len() == 1
-            && receipts[0].is_exact_replay(record.require_offer()?, authenticated_principal)
+            && receipts[0].is_exact_replay(offer, authenticated_principal)
             && receipts[0].response()? == *response
         {
             commit_noop(transaction, labels.replayed).await?;
