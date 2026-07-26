@@ -1,5 +1,4 @@
 use std::env;
-use std::path::Path;
 use std::path::PathBuf;
 
 use crate::create::{CreateWorkflowState, read_create_state};
@@ -12,40 +11,26 @@ use crate::workspace::canonical_checkout_root;
 #[derive(Debug, Clone, Default)]
 pub(super) struct HydratedHookState {
     pub(super) run_dir: Option<PathBuf>,
-    pub(super) run: Option<RunContext>,
     pub(super) create_state: Option<CreateWorkflowState>,
 }
 
 impl HydratedHookState {
     pub(super) fn from_skill(skill: &SkillContext) -> Self {
         let mut state = Self::default();
-        state.load_run_context();
+        state.load_current_run_dir();
         state.load_create_state(skill);
         state
     }
 
-    fn load_run_context(&mut self) {
-        if let Some(run_directory) = self.run_dir.clone() {
-            self.load_run_context_from_dir(&run_directory);
-            return;
+    fn load_current_run_dir(&mut self) {
+        if let Ok(Some(run_context)) = RunContext::from_current() {
+            self.run_dir = Some(run_context.layout.run_dir());
         }
-        self.load_current_run_context();
     }
 
     fn load_create_state(&mut self, skill: &SkillContext) {
         if skill.is_create() {
             self.read_create_state();
-        }
-    }
-
-    fn load_run_context_from_dir(&mut self, run_directory: &Path) {
-        self.run = RunContext::from_run_dir(run_directory).ok();
-    }
-
-    fn load_current_run_context(&mut self) {
-        if let Ok(Some(run_context)) = RunContext::from_current() {
-            self.run_dir = Some(run_context.layout.run_dir());
-            self.run = Some(run_context);
         }
     }
 

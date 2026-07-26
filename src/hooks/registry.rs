@@ -6,36 +6,6 @@ use harness_kernel::errors::CliError;
 
 use super::HookType;
 
-/// A composable guard in the hook engine chain-of-responsibility.
-#[cfg(test)]
-pub trait Guard: Send + Sync {
-    fn check(&self, ctx: &GuardContext) -> Option<NormalizedHookResult>;
-}
-
-/// Ordered collection of guards that stops at the first denial/warning.
-#[cfg(test)]
-pub struct GuardChain {
-    guards: Vec<Box<dyn Guard>>,
-}
-
-#[cfg(test)]
-impl GuardChain {
-    #[must_use]
-    pub fn new(guards: Vec<Box<dyn Guard>>) -> Self {
-        Self { guards }
-    }
-
-    #[must_use]
-    pub fn evaluate(&self, ctx: &GuardContext) -> NormalizedHookResult {
-        for guard in &self.guards {
-            if let Some(result) = guard.check(ctx) {
-                return result;
-            }
-        }
-        NormalizedHookResult::allow()
-    }
-}
-
 /// Trait-based hook registration used by the engine.
 pub trait Hook: Send + Sync {
     fn name(&self) -> &str;

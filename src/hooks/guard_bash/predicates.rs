@@ -1,17 +1,12 @@
 use std::collections::BTreeSet;
-use std::path::Path;
 use std::sync::OnceLock;
 
-use harness_kernel::errors::HookMessage;
 use crate::hooks::protocol::hook_result::HookResult;
 use crate::hooks::runner_policy::managed_cluster_binaries;
-use crate::hooks::runner_policy::{
-    AdminEndpointHint, LegacyScript, PythonBinary, RunnerBinary, TaskOutputPattern,
-    TrackedHarnessSubcommand,
-};
+use crate::hooks::runner_policy::{AdminEndpointHint, PythonBinary, SuiteMutationBinary};
+use harness_kernel::errors::HookMessage;
 use harness_kernel::kernel::command_intent::{
-    contains_subshell_pattern, is_env_assignment, is_shell_control_op, normalized_binary_name,
-    semantic_harness_subcommand, semantic_harness_tail, significant_words,
+    command_heads, contains_subshell_pattern, normalized_binary_name, path_like_words,
 };
 
 fn denied_cluster_binaries() -> &'static BTreeSet<String> {
@@ -23,24 +18,8 @@ fn is_denied_cluster_binary(name: &str) -> bool {
     denied_cluster_binaries().contains(name)
 }
 
-pub(crate) fn is_run_scope_flag(s: &str) -> bool {
-    matches!(s, "--run-dir" | "--run-id" | "--run-root")
-        || s.starts_with("--run-dir=")
-        || s.starts_with("--run-id=")
-        || s.starts_with("--run-root=")
-}
-
-pub(crate) fn deny_runner_flow(details: &str) -> HookResult {
-    HookMessage::runner_flow_required("run this command", details.to_string()).into_result()
-}
-
 pub(crate) fn is_harness_head(heads: &[String]) -> bool {
     !heads.is_empty() && heads.iter().all(|h| h == "harness")
-}
-
-pub(crate) fn is_tracked_harness_command(words: &[String]) -> bool {
-    let sig = significant_words(words);
-    semantic_harness_subcommand(&sig).is_some_and(TrackedHarnessSubcommand::is_tracked)
 }
 
 pub(crate) fn has_denied_cluster_binary(heads: &[String]) -> bool {
@@ -51,18 +30,6 @@ pub(crate) fn has_denied_cluster_binary_anywhere(words: &[String]) -> bool {
     words
         .iter()
         .any(|w| is_denied_cluster_binary(&normalized_binary_name(w)))
-}
-
-pub(crate) fn has_denied_runner_binary(heads: &[String]) -> bool {
-    heads.iter().any(|h| RunnerBinary::is_denied(h))
-}
-
-pub(crate) fn has_task_output_access(words: &[String], command_text: Option<&str>) -> bool {
-    let command = command_text.unwrap_or("");
-    if TaskOutputPattern::matches_any(command) {
-        return true;
-    }
-    words.iter().any(|w| TaskOutputPattern::matches_any(w))
 }
 
 pub(crate) fn has_admin_endpoint_hint(words: &[String]) -> bool {
@@ -91,44 +58,26 @@ pub(crate) fn deny_python() -> HookResult {
     .into_result()
 }
 
-pub(crate) fn has_denied_legacy_script(words: &[String]) -> bool {
-    words.iter().any(|w| {
-        let name = Path::new(w)
-            .file_name()
-            .map_or("", |n| n.to_str().unwrap_or(""));
-        LegacyScript::is_denied(name)
-    })
-}
-
-pub(crate) fn make_target(words: &[String]) -> Option<&str> {
-    let mut seen_make = false;
-    for word in words {
-        let name = Path::new(word)
-            .file_name()
-            .map_or("", |n| n.to_str().unwrap_or(""));
-        if name == "make" {
-            seen_make = true;
-            continue;
-        }
-        if !seen_make || word.starts_with('-') || word.contains('=') {
-            continue;
-        }
-        return Some(word);
-    }
-    None
-}
-
-pub(crate) fn allows_wrapped_envoy_admin(words: &[String]) -> bool {
-    let sig: Vec<&str> = words
+pub(crate) fn deny_create_suite_storage_mutation(words: &[String]) -> HookResult {
+    let heads = command_heads(words);
+    if !heads
         .iter()
-        .filter(|w| !is_shell_control_op(w) && !is_env_assignment(w))
-        .map(String::as_str)
-        .collect();
-    let Some(tail) = semantic_harness_tail(&sig) else {
-        return false;
-    };
-    semantic_harness_subcommand(&sig) == Some("record")
-        || (tail.len() >= 2 && tail[0] == "envoy" && tail[1] == "capture")
+        .any(|h| SuiteMutationBinary::is_mutation_binary(&normalized_binary_name(h)))
+    {
+        return HookResult::allow();
+    }
+    let path_words = path_like_words(words);
+    for word in &path_words {
+        if word.contains("/suites/") || word.starts_with("suites/") {
+            return HookMessage::approval_required(
+                "mutate suite storage",
+                "do not delete or overwrite existing suite directories; \
+                 use `harness create begin` which handles conflicts",
+            )
+            .into_result();
+        }
+    }
+    HookResult::allow()
 }
 
 /// Scan raw command text for subshell substitution patterns that contain

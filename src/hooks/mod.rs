@@ -8,8 +8,6 @@ mod effects;
 pub mod guard_bash;
 pub mod guard_question;
 pub mod guard_write;
-#[cfg(test)]
-pub(crate) mod guards;
 pub mod protocol;
 pub(crate) mod registry;
 pub(crate) mod runner_policy;
@@ -21,7 +19,6 @@ mod tool_dispatch;
 pub mod tool_guard;
 pub mod tool_result;
 mod transport;
-pub mod verify_bash;
 pub mod verify_question;
 pub mod verify_write;
 mod write_surface;

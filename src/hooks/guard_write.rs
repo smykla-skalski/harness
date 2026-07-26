@@ -60,16 +60,11 @@ fn guard_suite_create(ctx: &HookContext, paths: &[&Path]) -> HookResult {
 
 fn guard_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookResult {
     let run_dir = ctx.effective_run_dir();
-    let suite_dir = ctx.suite_dir();
-    let suite_dir_norm = suite_dir.as_ref().map(|sd| normalize_path(sd));
 
     // Check each path against the centralised write-surface policy first
     if let Some(rd) = run_dir.as_deref() {
         let denied = DeniedBinaries::from(managed_cluster_binaries());
-        let mut policy_ctx = WriteSurfaceContext::new(rd);
-        if let Some(sd) = suite_dir.as_deref() {
-            policy_ctx = policy_ctx.with_suite_dir(sd);
-        }
+        let policy_ctx = WriteSurfaceContext::new(rd);
         for raw_path in paths {
             if let Some(result) = check_policy_decision(raw_path, &policy_ctx, &denied) {
                 return result;
@@ -78,12 +73,7 @@ fn guard_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookResult {
     }
 
     for raw_path in paths {
-        if let Some(result) = evaluate_runner_path(
-            raw_path,
-            run_dir.as_deref(),
-            suite_dir.as_deref(),
-            suite_dir_norm.as_deref(),
-        ) {
+        if let Some(result) = evaluate_runner_path(raw_path, run_dir.as_deref()) {
             return result;
         }
     }
@@ -151,34 +141,18 @@ fn deny_control_file(path: &Path) -> HookResult {
     .into_result()
 }
 
-fn evaluate_runner_path(
-    raw_path: &Path,
-    run_dir: Option<&Path>,
-    suite_dir: Option<&Path>,
-    suite_dir_norm: Option<&Path>,
-) -> Option<HookResult> {
+fn evaluate_runner_path(raw_path: &Path, run_dir: Option<&Path>) -> Option<HookResult> {
     let path = normalize_path(raw_path);
+    let rd = run_dir?;
 
-    if let Some(rd) = run_dir {
-        if is_command_owned_run_file(&path, rd) {
-            return Some(deny_control_file(&path));
-        }
-        if allowed_suite_runner_path(&path, rd) {
-            return None;
-        }
+    if is_command_owned_run_file(&path, rd) {
+        return Some(deny_control_file(&path));
     }
-
-    if let Some(sdn) = suite_dir_norm
-        && path.starts_with(sdn)
-    {
+    if allowed_suite_runner_path(&path, rd) {
         return None;
     }
 
-    if run_dir.is_some() || suite_dir.is_some() {
-        return Some(HookMessage::write_outside_run(raw_path.display().to_string()).into_result());
-    }
-
-    None
+    Some(HookMessage::write_outside_run(raw_path.display().to_string()).into_result())
 }
 
 fn allowed_suite_runner_path(path: &Path, run_dir: &Path) -> bool {

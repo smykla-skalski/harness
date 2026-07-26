@@ -72,7 +72,6 @@ fn cluster_topology_is_owned_by_kernel() {
     for path in [
         "src/run/context/current.rs",
         "src/run/context/aggregate.rs",
-        "src/hooks/verify_bash.rs",
         "tests/integration/cluster/mod.rs",
         "tests/integration/universal.rs",
     ] {

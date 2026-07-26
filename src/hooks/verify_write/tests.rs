@@ -2,7 +2,6 @@ use super::*;
 use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::Decision;
 use crate::hooks::protocol::payloads::HookEnvelopePayload;
-use crate::run::context::RunContext;
 use crate::run::test_support::build_test_run_dir;
 
 #[test]
@@ -24,7 +23,9 @@ fn verify_suite_create_nonempty_amendments_allows() {
     assert_eq!(result.decision, Decision::Allow);
 }
 
-fn suite_write_context(run_dir: &Path, paths: &[&Path]) -> HookContext {
+/// `observe` is the skill that still confirms a session and therefore still
+/// reaches the non-create branch.
+fn run_write_context(run_dir: &Path, paths: &[&Path]) -> HookContext {
     let payload = HookEnvelopePayload {
         tool_name: "Write".to_string(),
         tool_input: serde_json::json!({
@@ -39,32 +40,31 @@ fn suite_write_context(run_dir: &Path, paths: &[&Path]) -> HookContext {
         stop_hook_active: false,
         raw_keys: vec![],
     };
-    let mut context = HookContext::from_test_envelope("suite:run", payload);
+    let mut context = HookContext::from_test_envelope("observe", payload);
     context.run_dir = Some(run_dir.to_path_buf());
-    context.run = Some(RunContext::from_run_dir(run_dir).unwrap());
     context
 }
 
 #[test]
-fn verify_suite_runner_requires_amendment_for_suite_source_writes() {
+fn denies_writes_to_command_owned_run_files() {
     let tempdir = tempfile::tempdir().unwrap();
-    let (run_dir, suite_dir) = build_test_run_dir(tempdir.path(), "r01");
-    let suite_manifest = suite_dir.join("suite.md");
+    let (run_dir, _) = build_test_run_dir(tempdir.path(), "r01");
+    let command_log = run_dir.join("commands").join("command-log.md");
 
-    let context = suite_write_context(&run_dir, &[suite_manifest.as_path()]);
+    let context = run_write_context(&run_dir, &[command_log.as_path()]);
+    assert!(context.skill_active, "case must reach the guard body");
 
     let outcome = execute(&context).unwrap();
-    assert_eq!(outcome.to_hook_result().decision, Decision::Warn);
+    assert_eq!(outcome.to_hook_result().decision, Decision::Deny);
 }
 
 #[test]
-fn verify_suite_runner_allows_amendments_write() {
+fn allows_writes_to_ordinary_run_artifacts() {
     let tempdir = tempfile::tempdir().unwrap();
-    let (run_dir, suite_dir) = build_test_run_dir(tempdir.path(), "r01");
-    let amendments = suite_dir.join("amendments.md");
-    fs::write(&amendments, "changes\n").unwrap();
+    let (run_dir, _) = build_test_run_dir(tempdir.path(), "r01");
+    let artifact = run_dir.join("artifacts").join("output.json");
 
-    let context = suite_write_context(&run_dir, &[amendments.as_path()]);
+    let context = run_write_context(&run_dir, &[artifact.as_path()]);
 
     let outcome = execute(&context).unwrap();
     assert_eq!(outcome.to_hook_result().decision, Decision::Allow);
