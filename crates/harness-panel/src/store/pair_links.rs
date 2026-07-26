@@ -154,13 +154,39 @@ impl Store {
     /// stand for links the daemon never confirmed, carry an id no pairing will
     /// ever have, and would only ever match nothing.
     ///
+    /// `only` narrows to one account, for a reader entitled to nothing else.
+    /// Two statements rather than one taking a nullable parameter, because
+    /// `?1 IS NULL OR account_id = ?1` is a disjunction over a parameter and
+    /// `SQLite` serves every value of it from a single plan. Measured on this
+    /// schema, the narrowed statement is a `SEARCH` through
+    /// `pair_links_account_id` where the nullable form is a `SCAN`, which is
+    /// the whole of what narrowing buys.
+    ///
     /// # Errors
     /// Returns [`sqlx::Error`] when the query fails.
-    pub async fn pair_link_accounts(&self) -> Result<HashMap<String, String>, sqlx::Error> {
-        let rows = sqlx::query("SELECT id, account_id FROM pair_links WHERE id NOT LIKE ?1")
-            .bind(format!("{RESERVATION_PREFIX}%"))
-            .fetch_all(self.pool())
-            .await?;
+    pub async fn pair_link_accounts(
+        &self,
+        only: Option<&str>,
+    ) -> Result<HashMap<String, String>, sqlx::Error> {
+        let reservations = format!("{RESERVATION_PREFIX}%");
+        let rows = match only {
+            Some(account_id) => {
+                sqlx::query(
+                    "SELECT id, account_id FROM pair_links \
+                     WHERE account_id = ?1 AND id NOT LIKE ?2",
+                )
+                .bind(account_id)
+                .bind(reservations)
+                .fetch_all(self.pool())
+                .await?
+            }
+            None => {
+                sqlx::query("SELECT id, account_id FROM pair_links WHERE id NOT LIKE ?1")
+                    .bind(reservations)
+                    .fetch_all(self.pool())
+                    .await?
+            }
+        };
 
         Ok(rows
             .iter()

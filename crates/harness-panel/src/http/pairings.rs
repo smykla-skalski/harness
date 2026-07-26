@@ -59,7 +59,16 @@ pub async fn list(
     // little of it this person may see. Asking it to narrow further is not on
     // offer: it has never been told which account any of them belongs to.
     let pairings = state.daemon.client.pairings(&credential).await?;
-    let accounts = state.store.pair_link_accounts().await?;
+    // The owner is entitled to every row, so their map covers everyone. Anyone
+    // else can only ever match their own, and a pairing missing from a narrowed
+    // map fails `visible_to` exactly as another account's id would, so the
+    // verdict is unchanged and the query becomes a seek rather than a scan.
+    let attribution = if viewer.is_owner {
+        None
+    } else {
+        Some(viewer.account.id.as_str())
+    };
+    let accounts = state.store.pair_link_accounts(attribution).await?;
 
     let pairings = pairings
         .into_iter()

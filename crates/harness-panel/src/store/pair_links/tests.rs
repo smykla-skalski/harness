@@ -244,13 +244,71 @@ async fn every_recorded_link_names_the_account_it_was_minted_for() {
         .await
         .expect("second");
 
-    let accounts = store.pair_link_accounts().await.expect("attribution");
+    let accounts = store.pair_link_accounts(None).await.expect("attribution");
 
     assert_eq!(accounts.get("pair-1"), Some(&ada.id));
     assert_eq!(accounts.get("pair-2"), Some(&grace.id));
     assert_eq!(
-        store.pair_link_account("pair-1").await.expect("one link"),
-        Some(ada.id)
+        store
+            .pair_link_account("pair-1")
+            .await
+            .expect("one link")
+            .as_ref(),
+        Some(&ada.id)
+    );
+}
+
+/// A reader entitled to nothing but their own rows gets a map holding nothing
+/// but their own rows. The filter above it reaches the same verdict either way,
+/// because a pairing missing from the map fails the comparison exactly as
+/// another account's id would; narrowing only stops the panel reading a table
+/// that grows for as long as it has been minting.
+#[tokio::test]
+async fn narrowing_the_attribution_leaves_only_that_accounts_links() {
+    let store = Store::open_in_memory().await.expect("store");
+    let ada = account(&store, "ada", "4242").await;
+    let grace = account(&store, "grace", "99").await;
+    store
+        .record_pair_link(&record("pair-1", &ada.id, 11))
+        .await
+        .expect("first");
+    store
+        .record_pair_link(&record("pair-2", &grace.id, 12))
+        .await
+        .expect("second");
+
+    let narrowed = store
+        .pair_link_accounts(Some(&grace.id))
+        .await
+        .expect("attribution");
+
+    assert_eq!(narrowed.len(), 1, "{narrowed:?}");
+    assert_eq!(narrowed.get("pair-2"), Some(&grace.id));
+    assert_eq!(
+        narrowed.get("pair-1"),
+        None,
+        "another account's link must not be in a narrowed map"
+    );
+}
+
+/// The reservation guard has to survive the narrowing, or a slot the panel is
+/// holding would read as one of the account's pairings.
+#[tokio::test]
+async fn a_narrowed_map_leaves_the_accounts_own_reservations_out_too() {
+    let store = Store::open_in_memory().await.expect("store");
+    let ada = account(&store, "ada", "4242").await;
+    let held = format!("{RESERVATION_PREFIX}held");
+    store
+        .reserve_pair_link(&record(&held, &ada.id, 11), 5, at(11))
+        .await
+        .expect("reservation");
+
+    assert!(
+        store
+            .pair_link_accounts(Some(&ada.id))
+            .await
+            .expect("attribution")
+            .is_empty()
     );
 }
 
@@ -270,7 +328,7 @@ async fn a_reservation_is_never_attributed_to_anyone() {
 
     assert!(
         store
-            .pair_link_accounts()
+            .pair_link_accounts(None)
             .await
             .expect("attribution")
             .is_empty()
