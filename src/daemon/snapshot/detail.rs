@@ -1,5 +1,4 @@
 use super::super::index::{self, ResolvedSession};
-use super::super::ordering::{sort_session_agents, sort_session_tasks};
 use super::super::protocol::{AgentToolActivitySummary, SessionDetail, SessionExtensionsPayload};
 use super::activity::load_agent_activity_for;
 use super::observer::load_observer_summary;
@@ -9,6 +8,7 @@ use tokio::task::spawn_blocking;
 
 use crate::daemon::db::DaemonDb;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::session::ordering::{sort_session_agents, sort_session_tasks};
 use crate::session::types::{AgentRegistration, SessionSignalRecord, SessionState, WorkItem};
 
 /// Build a rich session detail snapshot, then persist it into the daemon cache.

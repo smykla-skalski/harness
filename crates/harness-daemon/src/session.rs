@@ -2,6 +2,8 @@
 pub mod adopter;
 #[path = "../../../src/session/observe/mod.rs"]
 pub mod observe;
+#[path = "../../../src/session/ordering.rs"]
+pub mod ordering;
 #[path = "../../../src/session/persona.rs"]
 pub mod persona;
 #[path = "../../../src/session/roles.rs"]

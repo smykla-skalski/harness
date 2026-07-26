@@ -7,8 +7,7 @@ use nix::unistd::Pid;
 use tokio::sync::mpsc;
 
 use crate::agents::acp::connection::SupervisorEventSink;
-use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
-use crate::daemon::timeline::{TimelinePayloadScope, conversation_entry};
+use crate::agents::runtime::event::ConversationEventKind;
 
 use super::super::{AcpSessionSupervisor, SupervisionConfig, WatchdogEventEmitter, WatchdogState};
 use super::support::spawn_sleep_child;
@@ -174,7 +173,10 @@ async fn supervisor_event_sink_carries_terminal_transition_through_mpsc() {
     assert_eq!(batch.events.len(), 1);
     let event = &batch.events[0];
     assert_eq!(event.agent, "agent-test");
-    let supervisor_sequence = event.sequence;
+    assert_eq!(
+        event.sequence, 0,
+        "the synthetic counter is disjoint from the transcript sequence, so it starts at 0",
+    );
     match &event.kind {
         ConversationEventKind::WatchdogState { from, to, reason } => {
             assert_eq!(from, "paused");
@@ -183,50 +185,6 @@ async fn supervisor_event_sink_carries_terminal_transition_through_mpsc() {
         }
         other => panic!("unexpected kind: {other:?}"),
     }
-
-    let supervisor_entry = conversation_entry(
-        "session-test",
-        "agent-test",
-        "acp",
-        event,
-        TimelinePayloadScope::Full,
-    )
-    .expect("conversation_entry should succeed for WatchdogState")
-    .expect("WatchdogState maps to Some(TimelineEntry)");
-    assert_eq!(
-        supervisor_entry.entry_id,
-        format!("acp-agent-test-agent_watchdog_state-{supervisor_sequence}"),
-        "watchdog entry_id encodes (agent, kind, sequence)",
-    );
-    assert_eq!(supervisor_entry.kind, "agent_watchdog_state");
-    assert_eq!(
-        supervisor_entry.summary,
-        "agent-test watchdog paused -> fired (watchdog timeout)"
-    );
-
-    let transcript_collision = ConversationEvent {
-        timestamp: Some("2026-05-04T23:00:00Z".to_string()),
-        sequence: supervisor_sequence,
-        kind: ConversationEventKind::AssistantText {
-            content: "hello".to_string(),
-            message_id: None,
-        },
-        agent: "agent-test".to_string(),
-        session_id: "session-test".to_string(),
-    };
-    let transcript_entry = conversation_entry(
-        "session-test",
-        "agent-test",
-        "acp",
-        &transcript_collision,
-        TimelinePayloadScope::Full,
-    )
-    .expect("conversation_entry should succeed for AssistantText")
-    .expect("AssistantText maps to Some(TimelineEntry)");
-    assert_ne!(
-        supervisor_entry.entry_id, transcript_entry.entry_id,
-        "disjoint entry_kind keeps the (kind, sequence) space collision-free even when sequences match",
-    );
 
     #[cfg(unix)]
     let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);
