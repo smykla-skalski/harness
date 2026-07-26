@@ -17,19 +17,19 @@ final class TaskBoardSyncAvailabilityTests: XCTestCase {
     )
 
     XCTAssertFalse(availability.canRun)
-    XCTAssertEqual(
-      availability.warning,
-      "Configure a GitHub repository or inbox repository before running sync"
-    )
+    XCTAssertEqual(availability.warning, "Add a monitored repository before running sync")
   }
 
-  func testProjectRepositoryEnablesSync() {
+  /// Publication targets whatever repository an item names, so a single
+  /// `githubProject` owner/repo says nothing about what sync can reach. Only the
+  /// monitored list does.
+  func testProjectRepositoryAloneDoesNotEnableSync() {
     let settings = TaskBoardOrchestratorSettings(
       githubProject: TaskBoardGitHubProjectConfig(owner: "example", repo: "project"),
       policyVersion: "test"
     )
 
-    XCTAssertTrue(TaskBoardGitHubSyncAvailability(settings: settings).canRun)
+    XCTAssertFalse(TaskBoardGitHubSyncAvailability(settings: settings).canRun)
   }
 
   func testInboxRepositoryEnablesSync() {

@@ -200,7 +200,7 @@ struct TaskBoardGitHubSyncAvailability: Equatable {
       warning = nil
       return
     }
-    warning = "Configure a GitHub repository or inbox repository before running sync"
+    warning = "Add a monitored repository before running sync"
   }
 
   var canRun: Bool {
