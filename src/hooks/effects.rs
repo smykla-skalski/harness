@@ -1,18 +1,11 @@
-use crate::hooks::application::GuardContext;
+use crate::hooks::audit::{AuditAppendRequest, append_audit_entry};
 use crate::hooks::protocol::hook_result::HookResult;
 use crate::hooks::protocol::result::NormalizedHookResult;
-use crate::run::audit::{AuditAppendRequest, append_audit_entry};
-use crate::run::workflow::{self as runner_wf, RunnerWorkflowState};
-use harness_kernel::errors::CliError;
 
 /// Explicit side effects emitted by hook handlers and applied by the engine.
 #[derive(Debug, Clone)]
 pub enum HookEffect {
     Decide(NormalizedHookResult),
-    WriteRunnerState {
-        expected_transition_count: u32,
-        state: RunnerWorkflowState,
-    },
     AppendAudit(AuditAppendRequest),
     InjectContext(String),
 }
@@ -70,28 +63,15 @@ impl HookOutcome {
             .iter()
             .find_map(|effect| match effect {
                 HookEffect::Decide(result) => Some(result),
-                HookEffect::WriteRunnerState { .. }
-                | HookEffect::AppendAudit(_)
-                | HookEffect::InjectContext(_) => None,
+                HookEffect::AppendAudit(_) | HookEffect::InjectContext(_) => None,
             })
             .expect("hook outcomes must include a Decide effect")
-    }
-
-    pub fn state_transitions(&self) -> impl Iterator<Item = &RunnerWorkflowState> {
-        self.effects.iter().filter_map(|effect| match effect {
-            HookEffect::WriteRunnerState { state, .. } => Some(state),
-            HookEffect::Decide(_) | HookEffect::AppendAudit(_) | HookEffect::InjectContext(_) => {
-                None
-            }
-        })
     }
 
     pub fn injected_contexts(&self) -> impl Iterator<Item = &str> {
         self.effects.iter().filter_map(|effect| match effect {
             HookEffect::InjectContext(text) => Some(text.as_str()),
-            HookEffect::Decide(_)
-            | HookEffect::WriteRunnerState { .. }
-            | HookEffect::AppendAudit(_) => None,
+            HookEffect::Decide(_) | HookEffect::AppendAudit(_) => None,
         })
     }
 
@@ -115,32 +95,10 @@ impl HookOutcome {
     }
 }
 
-pub(crate) fn persist_runner_state(
-    ctx: &GuardContext,
-    expected_transition_count: u32,
-    state: &RunnerWorkflowState,
-) -> Result<bool, CliError> {
-    let Some(run_dir) = ctx.effective_run_dir() else {
-        return Ok(false);
-    };
-    runner_wf::write_runner_state_if_current(run_dir.as_ref(), expected_transition_count, state)?;
-    Ok(true)
-}
-
-pub(crate) fn apply_effects(
-    ctx: &GuardContext,
-    result: &mut NormalizedHookResult,
-    effects: &[HookEffect],
-) -> Result<(), CliError> {
+pub(crate) fn apply_effects(result: &mut NormalizedHookResult, effects: &[HookEffect]) {
     for effect in effects {
         match effect {
             HookEffect::Decide(_) | HookEffect::InjectContext(_) => {}
-            HookEffect::WriteRunnerState {
-                expected_transition_count,
-                state,
-            } => {
-                let _ = persist_runner_state(ctx, *expected_transition_count, state)?;
-            }
             HookEffect::AppendAudit(request) => {
                 if let Err(error) = append_audit_entry(request.clone()) {
                     *result = NormalizedHookResult::warn(
@@ -151,5 +109,4 @@ pub(crate) fn apply_effects(
             }
         }
     }
-    Ok(())
 }

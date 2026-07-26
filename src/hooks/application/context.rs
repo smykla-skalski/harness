@@ -7,9 +7,8 @@ use crate::hooks::protocol::context::{
     AgentContext, NormalizedEvent, NormalizedHookContext, SessionContext, SkillContext, SkillKind,
 };
 use crate::hooks::protocol::payloads::{AskUserAnswer, AskUserQuestionPrompt, HookEnvelopePayload};
-use harness_kernel::kernel::tooling::ToolContext;
 use crate::run::context::RunContext;
-use crate::run::workflow::RunnerWorkflowState;
+use harness_kernel::kernel::tooling::ToolContext;
 
 mod hydration;
 mod interaction;
@@ -38,7 +37,6 @@ pub struct GuardContext {
     pub skill_active: bool,
     pub run_dir: Option<PathBuf>,
     pub run: Option<RunContext>,
-    pub runner_state: Option<RunnerWorkflowState>,
     pub create_state: Option<CreateWorkflowState>,
     interaction: HookInteraction,
 }
@@ -60,7 +58,6 @@ impl GuardContext {
             skill_active,
             run_dir: hydrated.run_dir,
             run: hydrated.run,
-            runner_state: hydrated.runner_state,
             create_state: hydrated.create_state,
             interaction,
         }
@@ -86,7 +83,6 @@ impl GuardContext {
             skill_active: normalized.skill.active,
             run_dir: None,
             run: None,
-            runner_state: None,
             create_state: None,
             interaction,
         }
@@ -183,7 +179,7 @@ impl GuardContext {
 /// kinds pass through unconditionally.
 fn session_confirms_skill(skill: &SkillContext, hydrated: &HydratedHookState) -> bool {
     match skill.kind {
-        SkillKind::Runner => hydrated.run.is_some() || hydrated.runner_state.is_some(),
+        SkillKind::Runner => hydrated.run.is_some(),
         SkillKind::Create => hydrated.create_state.is_some(),
         // Observe and None pass through - observe checks are gated separately,
         // and None means no skill was claimed.

@@ -1,7 +1,4 @@
-use super::{
-    classify_canonical_gate, is_install_prompt, is_manifest_fix_prompt,
-    matches_kubectl_validate_question, matches_manifest_fix_question,
-};
+use super::{classify_canonical_gate, is_install_prompt, matches_kubectl_validate_question};
 use crate::create::{COPY_GATE, POSTWRITE_GATE, PREWRITE_GATE, ReviewGate};
 use crate::hooks::protocol::payloads::{AskUserQuestionOption, AskUserQuestionPrompt};
 
@@ -18,27 +15,6 @@ fn prompt(question: &str, options: &[&str]) -> AskUserQuestionPrompt {
             .collect(),
         multi_select: false,
     }
-}
-
-#[test]
-fn manifest_fix_prompt_matches_gate() {
-    let prompt = prompt(
-        "suite:run/manifest-fix: how should this failure be handled?",
-        &[
-            "Fix for this run only",
-            "Fix in suite and this run",
-            "Skip this step",
-            "Stop run",
-        ],
-    );
-    assert!(is_manifest_fix_prompt(&prompt));
-}
-
-#[test]
-fn manifest_fix_question_matches_gate() {
-    assert!(matches_manifest_fix_question(
-        "suite:run/manifest-fix: how should this failure be handled?"
-    ));
 }
 
 #[test]

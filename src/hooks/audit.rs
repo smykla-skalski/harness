@@ -1,8 +1,15 @@
-use harness_kernel::errors::CliError;
 use crate::hooks::application::GuardContext as HookContext;
-use crate::run::audit::build_hook_audit_request;
+use harness_kernel::errors::CliError;
 
 use super::effects::{HookEffect, HookOutcome};
+
+mod append;
+mod summarize;
+mod types;
+
+pub use append::{append_audit_entry, build_hook_audit_request};
+pub use summarize::{normalize_tool_output, summarize_tool_input};
+pub use types::{AuditAppendRequest, AuditEntry};
 
 /// Execute the audit hook.
 ///

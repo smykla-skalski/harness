@@ -1,12 +1,11 @@
 use std::fs;
 use std::path::Path;
 
-use harness_kernel::errors::{CliError, HookMessage};
 use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
-use crate::run::workflow::RunnerWorkflowState;
+use harness_kernel::errors::{CliError, HookMessage};
 
-use super::effects::{HookEffect, HookOutcome};
+use super::effects::HookOutcome;
 
 use super::{control_file_hint, is_command_owned_run_file, normalize_path};
 
@@ -83,17 +82,6 @@ fn check_runner_path_violation(
     None
 }
 
-/// Try to advance the suite-fix state machine for a single write path.
-/// Returns the updated state when a transition occurred.
-fn try_track_suite_fix(
-    path: &Path,
-    suite_root: &Path,
-    current_state: &RunnerWorkflowState,
-) -> Option<RunnerWorkflowState> {
-    let tracked_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-    current_state.record_suite_fix_write(&tracked_path, suite_root)
-}
-
 /// Check whether this path needs an amendment log entry.
 /// Returns true for suite source files that are not `amendments.md` and not
 /// inside the run directory.
@@ -108,11 +96,8 @@ fn needs_amendment(
 
 fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookOutcome {
     let run_dir = ctx.effective_run_dir();
-    let suite_dir = ctx.suite_dir();
-    let suite_dir_norm = suite_dir.as_ref().map(|sd| normalize_path(sd));
+    let suite_dir_norm = ctx.suite_dir().map(|sd| normalize_path(&sd));
     let run_dir_norm = run_dir.as_ref().map(|rd| normalize_path(rd));
-    let mut next_state = ctx.runner_state.clone();
-    let mut tracked_state: Option<RunnerWorkflowState> = None;
     let mut amendment_needed: Option<String> = None;
     for raw_path in paths {
         let path = normalize_path(raw_path);
@@ -124,29 +109,12 @@ fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookOutcome {
         {
             amendment_needed = Some(raw_path.display().to_string());
         }
-        if let Some(suite_root) = suite_dir.as_deref()
-            && let Some(current_state) = next_state.as_ref()
-            && let Some(updated) = try_track_suite_fix(&path, suite_root, current_state)
-        {
-            next_state = Some(updated.clone());
-            tracked_state = Some(updated);
-        }
     }
-    let mut outcome = if let Some(path) = amendment_needed {
+    if let Some(path) = amendment_needed {
         HookOutcome::from_hook_result(HookMessage::suite_amendment_required(path).into_result())
     } else {
         HookOutcome::allow()
-    };
-    if let Some(state) = tracked_state {
-        outcome = outcome.with_effect(HookEffect::WriteRunnerState {
-            expected_transition_count: ctx
-                .runner_state
-                .as_ref()
-                .map_or(0, |runner_state| runner_state.transition_count),
-            state,
-        });
     }
-    outcome
 }
 
 /// Returns true when `path` is inside the suite directory but not inside the run

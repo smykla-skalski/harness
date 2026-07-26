@@ -1,11 +1,10 @@
 use crate::create::{ApprovalMode, can_request_gate};
-use harness_kernel::errors::{CliError, HookMessage};
 use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
 use crate::hooks::protocol::payloads::AskUserQuestionPrompt;
 use crate::hooks::runner_policy as runner_rules;
 use crate::platform::kubectl_validate::kubectl_validate_prompt_required;
-use crate::run::workflow::{RunnerPhase, RunnerWorkflowState};
+use harness_kernel::errors::{CliError, HookMessage};
 
 /// Execute the guard-question hook.
 ///
@@ -18,29 +17,9 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     }
     super::dispatch_by_skill(
         ctx,
-        |ctx| Ok(guard_suite_runner(ctx, &prompts)),
+        |_ctx| Ok(HookResult::allow()),
         |ctx| guard_suite_create(ctx, &prompts),
     )
-}
-
-fn guard_suite_runner(ctx: &HookContext, prompts: &[AskUserQuestionPrompt]) -> HookResult {
-    for prompt in prompts {
-        if !runner_rules::is_manifest_fix_prompt(prompt) {
-            continue;
-        }
-        if let Some(ref state) = ctx.runner_state {
-            let (allowed, reason) = can_ask_manifest_fix(state);
-            if !allowed {
-                return HookMessage::runner_flow_required(
-                    "ask the suite-fix gate",
-                    reason.unwrap_or("enter failure triage before asking how to repair the suite"),
-                )
-                .into_result();
-            }
-        }
-        return HookResult::allow();
-    }
-    HookResult::allow()
 }
 
 fn guard_suite_create(
@@ -84,19 +63,6 @@ fn guard_suite_create(
         return Ok(HookResult::allow());
     }
     Ok(HookResult::allow())
-}
-
-fn can_ask_manifest_fix(state: &RunnerWorkflowState) -> (bool, Option<&'static str>) {
-    if state.phase() != RunnerPhase::Triage {
-        return (
-            false,
-            Some("enter failure triage before asking how to repair the suite"),
-        );
-    }
-    if state.failure().is_none() {
-        return (false, Some("no failure recorded for triage"));
-    }
-    (true, None)
 }
 
 #[cfg(test)]

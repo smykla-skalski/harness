@@ -1,48 +1,36 @@
 use super::*;
-use crate::run::workflow::{
-    FailureKind, FailureState, PreflightState, PreflightStatus, RunnerWorkflowState,
-};
+use crate::hooks::protocol::hook_result::Decision;
+use crate::hooks::protocol::payloads::HookEnvelopePayload;
 
-fn base_state(phase: RunnerPhase) -> RunnerWorkflowState {
-    RunnerWorkflowState {
-        phase,
-        preflight: PreflightState {
-            status: PreflightStatus::Pending,
+fn ctx_with_questions(skill: &str, questions: &serde_json::Value) -> HookContext {
+    HookContext::from_envelope(
+        skill,
+        HookEnvelopePayload {
+            tool_name: "AskUserQuestion".to_string(),
+            tool_input: serde_json::json!({ "questions": questions }),
+            tool_response: serde_json::Value::Null,
+            last_assistant_message: None,
+            transcript_path: None,
+            stop_hook_active: false,
+            raw_keys: vec![],
         },
-        failure: None,
-        suite_fix: None,
-        updated_at: String::new(),
-        transition_count: 0,
-        last_event: None,
-        history: Vec::new(),
-    }
+    )
 }
 
 #[test]
-fn triage_with_failure_allows_manifest_fix() {
-    let mut state = base_state(RunnerPhase::Triage);
-    state.failure = Some(FailureState {
-        kind: FailureKind::Manifest,
-        suite_target: None,
-        message: None,
-    });
-    let (allowed, reason) = can_ask_manifest_fix(&state);
-    assert!(allowed);
-    assert!(reason.is_none());
+fn allows_context_without_prompts() {
+    let ctx = ctx_with_questions("suite:run", &serde_json::json!([]));
+    assert_eq!(execute(&ctx).unwrap().decision, Decision::Allow);
 }
 
 #[test]
-fn execution_phase_denies_manifest_fix() {
-    let state = base_state(RunnerPhase::Execution);
-    let (allowed, reason) = can_ask_manifest_fix(&state);
-    assert!(!allowed);
-    assert!(reason.is_some());
-}
-
-#[test]
-fn triage_without_failure_denies_manifest_fix() {
-    let state = base_state(RunnerPhase::Triage);
-    let (allowed, reason) = can_ask_manifest_fix(&state);
-    assert!(!allowed);
-    assert!(reason.unwrap().contains("no failure"));
+fn allows_suite_runner_prompts() {
+    let ctx = ctx_with_questions(
+        "suite:run",
+        &serde_json::json!([{
+            "question": "how should this failure be handled?",
+            "options": [],
+        }]),
+    );
+    assert_eq!(execute(&ctx).unwrap().decision, Decision::Allow);
 }

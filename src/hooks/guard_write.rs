@@ -2,10 +2,10 @@ use std::path::Path;
 
 use crate::agents::policy::{DeniedBinaries, WriteDecision, WriteSurfaceContext, evaluate_write};
 use crate::create::{can_write, suite_create_path_allowed};
-use harness_kernel::errors::{CliError, HookMessage};
 use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
 use crate::hooks::runner_policy::managed_cluster_binaries;
+use harness_kernel::errors::{CliError, HookMessage};
 use harness_kernel::kernel::run_surface::{RunDir, RunFile};
 
 use super::{control_file_hint, is_command_owned_run_file, normalize_path};
@@ -77,10 +77,8 @@ fn guard_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookResult {
         }
     }
 
-    // Context-aware checks (suite_fix state, etc.)
     for raw_path in paths {
         if let Some(result) = evaluate_runner_path(
-            ctx,
             raw_path,
             run_dir.as_deref(),
             suite_dir.as_deref(),
@@ -153,14 +151,7 @@ fn deny_control_file(path: &Path) -> HookResult {
     .into_result()
 }
 
-fn suite_fix_required(ctx: &HookContext) -> bool {
-    ctx.runner_state
-        .as_ref()
-        .is_some_and(|state| state.suite_fix().is_none())
-}
-
 fn evaluate_runner_path(
-    ctx: &HookContext,
     raw_path: &Path,
     run_dir: Option<&Path>,
     suite_dir: Option<&Path>,
@@ -180,15 +171,6 @@ fn evaluate_runner_path(
     if let Some(sdn) = suite_dir_norm
         && path.starts_with(sdn)
     {
-        if suite_fix_required(ctx) {
-            return Some(
-                HookMessage::runner_flow_required(
-                    "edit suite files",
-                    "approved suite repair is required before editing suite files",
-                )
-                .into_result(),
-            );
-        }
         return None;
     }
 

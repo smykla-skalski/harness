@@ -1,15 +1,13 @@
-use harness_kernel::errors::{CliError, HookMessage};
 use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
 use crate::hooks::runner_policy as runner_rules;
-use crate::run::workflow::RunnerPhase;
+use harness_kernel::errors::{CliError, HookMessage};
 
 /// Execute the verify-question hook.
 ///
 /// Processes `AskUserQuestion` answers and validates them against workflow
-/// state. For suite:run, validates manifest-fix decisions. For
-/// suite:create, validates kubectl-validate install and canonical gate
-/// answers.
+/// state. For suite:create, validates kubectl-validate install and canonical
+/// gate answers.
 ///
 /// # Errors
 /// Returns `CliError` on failure.
@@ -22,29 +20,9 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
         return Ok(HookResult::allow());
     }
     if ctx.is_suite_runner() {
-        return Ok(handle_suite_runner(ctx));
+        return Ok(HookResult::allow());
     }
     Ok(handle_suite_author(ctx))
-}
-
-fn handle_suite_runner(ctx: &HookContext) -> HookResult {
-    let answers = ctx.question_answers();
-    let is_manifest_fix = answers
-        .iter()
-        .any(|a| runner_rules::matches_manifest_fix_question(&a.question));
-    if !is_manifest_fix {
-        return HookResult::allow();
-    }
-    if let Some(ref state) = ctx.runner_state
-        && state.phase() != RunnerPhase::Triage
-    {
-        return HookMessage::runner_flow_required(
-            "apply the suite-fix answer",
-            "manifest-fix answers are only valid during failure triage",
-        )
-        .into_result();
-    }
-    HookResult::allow()
 }
 
 fn handle_suite_author(ctx: &HookContext) -> HookResult {

@@ -1,8 +1,8 @@
+use std::fs;
+
 use super::*;
 use crate::run::workflow::{PreflightState, PreflightStatus};
 use crate::run::{RunCounts, Verdict};
-
-use summarize::summarize_answers;
 
 fn sample_status(run_id: &str, suite_id: &str) -> RunStatus {
     RunStatus {
@@ -50,57 +50,6 @@ fn resolve_phase_context_keeps_group_only_for_execution() {
 }
 
 #[test]
-fn normalize_tool_output_formats_bash() {
-    let output = normalize_tool_output(
-        "Bash",
-        &serde_json::json!({
-            "stdout": "ok",
-            "stderr": "warn",
-            "exit_code": 7,
-        }),
-    );
-    assert_eq!(
-        output,
-        "exit code: 7\n--- STDOUT ---\nok\n--- STDERR ---\nwarn"
-    );
-}
-
-fn assert_audit_entry_fields(entry: &AuditEntry) {
-    assert_eq!(entry.tool_name, "Read");
-    assert_eq!(entry.tool_input, "suite.md");
-    assert_eq!(entry.output_summary, "file contents");
-    assert_eq!(entry.group_id.as_deref(), Some("g01"));
-}
-
-fn assert_audit_log_contains_entry(layout: &RunLayout) {
-    let log_contents = fs::read_to_string(layout.audit_log_path()).unwrap();
-    assert!(log_contents.contains("\"tool_name\":\"Read\""));
-    assert!(log_contents.contains("\"group_id\":\"g01\""));
-}
-
-#[test]
-fn append_audit_entry_writes_jsonl_and_artifact() {
-    let tempdir = tempfile::tempdir().unwrap();
-    let run_dir = tempdir.path().join("r01");
-    let layout = RunLayout::from_run_dir(&run_dir);
-    layout.ensure_dirs().unwrap();
-
-    let entry = append_audit_entry(AuditAppendRequest {
-        run_dir: run_dir.clone(),
-        tool_name: "Read".to_string(),
-        tool_input: "suite.md".to_string(),
-        full_output: "file contents".to_string(),
-        phase: "execution".to_string(),
-        group_id: Some("g01".to_string()),
-    })
-    .unwrap();
-
-    assert_audit_entry_fields(&entry);
-    assert!(run_dir.join(&entry.artifact_path).exists());
-    assert_audit_log_contains_entry(&layout);
-}
-
-#[test]
 fn append_runner_state_audit_records_runner_state_write() {
     let tempdir = tempfile::tempdir().unwrap();
     let run_dir = tempdir.path().join("r01");
@@ -130,74 +79,4 @@ fn append_runner_state_audit_records_runner_state_write() {
     let log_contents = fs::read_to_string(layout.audit_log_path()).unwrap();
     assert!(log_contents.contains("\"tool_name\":\"RunnerStateWrite\""));
     assert!(log_contents.contains("\"group_id\":\"g03\""));
-}
-
-#[test]
-fn summarize_tool_input_handles_questions() {
-    let summary = summarize_tool_input(
-        "AskUserQuestion",
-        &serde_json::json!({
-            "questions": [
-                {"question": "Proceed?\nMore detail", "options": []}
-            ]
-        }),
-    );
-    assert_eq!(summary, "Proceed?");
-}
-
-#[test]
-fn summarize_answers_prefers_question_answer_lines() {
-    let summary = summarize_answers(&serde_json::json!({
-        "answers": [
-            {"question": "Proceed?\nMore detail", "answer": "Yes"}
-        ]
-    }));
-    assert_eq!(summary, "Proceed? => Yes");
-}
-
-#[cfg(unix)]
-#[test]
-fn audit_log_file_has_restricted_permissions() {
-    use std::os::unix::fs::PermissionsExt;
-
-    let tempdir = tempfile::tempdir().unwrap();
-    let run_dir = tempdir.path().join("r01");
-    let layout = RunLayout::from_run_dir(&run_dir);
-    layout.ensure_dirs().unwrap();
-
-    append_audit_entry(AuditAppendRequest {
-        run_dir,
-        tool_name: "Read".to_string(),
-        tool_input: "test.md".to_string(),
-        full_output: "contents".to_string(),
-        phase: "execution".to_string(),
-        group_id: None,
-    })
-    .unwrap();
-
-    let log_metadata = fs::metadata(layout.audit_log_path()).unwrap();
-    let log_mode = log_metadata.permissions().mode() & 0o777;
-    assert_eq!(log_mode, 0o600, "audit log expected 0600, got {log_mode:o}");
-}
-
-#[test]
-fn append_audit_entry_scrubs_secrets_from_artifact() {
-    let tempdir = tempfile::tempdir().unwrap();
-    let run_dir = tempdir.path().join("r01");
-    let layout = RunLayout::from_run_dir(&run_dir);
-    layout.ensure_dirs().unwrap();
-
-    let entry = append_audit_entry(AuditAppendRequest {
-        run_dir: run_dir.clone(),
-        tool_name: "Bash".to_string(),
-        tool_input: "harness run kuma token dataplane".to_string(),
-        full_output: "token: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0.Signature1234567890abcdef".to_string(),
-        phase: "execution".to_string(),
-        group_id: None,
-    })
-    .unwrap();
-
-    let artifact_content = fs::read_to_string(run_dir.join(&entry.artifact_path)).unwrap();
-    assert!(artifact_content.contains("[REDACTED:JWT]"));
-    assert!(!artifact_content.contains("eyJhbGciOiJSUzI1NiI"));
 }
