@@ -3676,6 +3676,7 @@ dependencies = [
  "harness-systemd-protocol",
  "harness-telemetry",
  "harness-testkit",
+ "harness-workspace",
  "hex",
  "hickory-resolver",
  "hmac 0.13.0",
@@ -3757,6 +3758,7 @@ dependencies = [
  "harness-kernel",
  "harness-protocol",
  "harness-telemetry",
+ "harness-workspace",
  "hex",
  "libc",
  "nix 0.31.3",
@@ -3818,6 +3820,7 @@ dependencies = [
  "harness-protocol",
  "harness-systemd-protocol",
  "harness-telemetry",
+ "harness-workspace",
  "hex",
  "hickory-resolver",
  "hmac 0.13.0",
@@ -3901,6 +3904,7 @@ dependencies = [
  "harness-kernel",
  "harness-protocol",
  "harness-telemetry",
+ "harness-workspace",
  "hex",
  "rayon",
  "regex",
@@ -3925,11 +3929,14 @@ dependencies = [
 name = "harness-kernel"
 version = "51.0.1"
 dependencies = [
+ "fs-err",
+ "gray_matter",
  "insta",
  "regex",
  "serde",
  "serde_json",
  "shell-words",
+ "tempfile",
  "thiserror 2.0.19",
 ]
 
@@ -4035,6 +4042,35 @@ version = "51.0.1"
 dependencies = [
  "temp-env",
  "tempfile",
+]
+
+[[package]]
+name = "harness-workspace"
+version = "51.0.1"
+dependencies = [
+ "base64 0.23.0",
+ "chrono",
+ "core-foundation 0.10.1",
+ "fs-err",
+ "fs2",
+ "gix",
+ "harness-kernel",
+ "harness-testkit",
+ "hex",
+ "libc",
+ "pathdiff",
+ "rayon",
+ "serde",
+ "serde_json",
+ "sha1 0.11.0",
+ "sha2 0.11.0",
+ "temp-env",
+ "tempfile",
+ "thiserror 2.0.19",
+ "tracing",
+ "user_dirs",
+ "uuid",
+ "uzers",
 ]
 
 [[package]]

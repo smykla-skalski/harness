@@ -1,0 +1,141 @@
+use std::env;
+use std::io;
+use std::path::{Path, PathBuf};
+
+pub use harness_kernel::kernel::naming::HARNESS_PREFIX;
+
+#[allow(
+    dead_code,
+    reason = "shared facade crates do not all use host-home resolution"
+)]
+const HARNESS_HOST_HOME_ENV: &str = "HARNESS_HOST_HOME";
+
+fn fallback_home_dir() -> PathBuf {
+    env::temp_dir().join(format!("{HARNESS_PREFIX}{}", uzers::get_current_uid()))
+}
+
+/// Return current UTC time as ISO 8601 with Z suffix and no microseconds.
+#[must_use]
+pub fn utc_now() -> String {
+    chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
+}
+
+#[must_use]
+pub fn dirs_home() -> PathBuf {
+    user_dirs::home_dir().unwrap_or_else(|_| fallback_home_dir())
+}
+
+#[must_use]
+#[allow(
+    dead_code,
+    reason = "shared facade crates do not all use host-home resolution"
+)]
+pub fn host_home_dir() -> PathBuf {
+    if let Some(value) = normalized_env_value(HARNESS_HOST_HOME_ENV) {
+        return PathBuf::from(value);
+    }
+    account_home_dir()
+        .or_else(|| normalized_env_value("HOME").map(PathBuf::from))
+        .unwrap_or_else(dirs_home)
+}
+
+#[cfg(unix)]
+#[must_use]
+#[allow(
+    dead_code,
+    reason = "shared facade crates do not all use host-home resolution"
+)]
+pub fn account_home_dir() -> Option<PathBuf> {
+    use uzers::os::unix::UserExt as _;
+
+    uzers::get_user_by_uid(uzers::get_current_uid()).map(|user| user.home_dir().to_path_buf())
+}
+
+#[cfg(not(unix))]
+#[allow(
+    dead_code,
+    reason = "shared facade crates do not all use host-home resolution"
+)]
+pub fn account_home_dir() -> Option<PathBuf> {
+    None
+}
+
+#[must_use]
+pub fn normalized_env_value(name: &str) -> Option<String> {
+    let value = env::var(name).unwrap_or_default();
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if trimmed.starts_with("${") && trimmed.ends_with('}') {
+        return None;
+    }
+    if trimmed.eq_ignore_ascii_case("unset") {
+        return None;
+    }
+    Some(trimmed.to_string())
+}
+
+/// Harness data root: `data_root/harness`.
+#[must_use]
+pub fn harness_data_root() -> PathBuf {
+    super::session::data_root().join("harness")
+}
+
+/// Marker filename Spotlight honors to skip an entire directory subtree.
+pub const NON_INDEXABLE_MARKER_NAME: &str = ".metadata_never_index";
+
+/// Create `root` (if missing) and drop an empty `.metadata_never_index`
+/// marker at its top level so Spotlight (mdworker, spotlightknowledged)
+/// does not index anything below it.
+///
+/// Idempotent: safe to call on every daemon/session bootstrap.
+///
+/// # Errors
+/// Returns [`io::Error`] on filesystem failures.
+pub fn ensure_non_indexable(root: &Path) -> io::Result<()> {
+    fs_err::create_dir_all(root)?;
+    let marker = root.join(NON_INDEXABLE_MARKER_NAME);
+    if !marker.exists() {
+        fs_err::OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(&marker)?;
+    }
+    Ok(())
+}
+
+/// Legacy macOS data root used before the App Sandbox migration.
+///
+/// Returns `~/Library/Application Support/harness`.
+#[cfg(target_os = "macos")]
+#[must_use]
+pub fn legacy_macos_root() -> PathBuf {
+    host_home_dir()
+        .join("Library")
+        .join("Application Support")
+        .join("harness")
+}
+
+/// Shorten an absolute path for human-readable terminal output.
+///
+/// Paths under the harness data root become `~harness/<rest>`.
+/// Other paths under `$HOME` get the home prefix replaced with `~`.
+/// Everything else is returned unchanged.
+#[must_use]
+pub fn shorten_path(path: &Path) -> String {
+    let hdr = harness_data_root();
+    if let Ok(rel) = path.strip_prefix(&hdr) {
+        return format!("~harness/{}", rel.display());
+    }
+    let home = dirs_home();
+    if let Ok(rel) = path.strip_prefix(&home) {
+        return format!("~/{}", rel.display());
+    }
+    path.display().to_string()
+}
+
+#[cfg(test)]
+#[path = "paths/tests.rs"]
+mod tests;

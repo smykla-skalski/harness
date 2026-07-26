@@ -83,7 +83,9 @@ fn observe_maintenance_root_stays_a_facade() {
 #[test]
 fn workspace_compact_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let compact_mod = fs::read_to_string(root.join("src/workspace/compact/mod.rs")).unwrap();
+    let compact_mod =
+        fs::read_to_string(root.join("crates/harness-workspace/src/workspace/compact/mod.rs"))
+            .unwrap();
 
     for needle in [
         "pub fn compact_project_dir(",
@@ -95,15 +97,15 @@ fn workspace_compact_root_stays_a_facade() {
     ] {
         assert!(
             !compact_mod.contains(needle),
-            "src/workspace/compact/mod.rs should stay a thin facade instead of owning `{needle}`"
+            "crates/harness-workspace/src/workspace/compact/mod.rs should stay a thin facade instead of owning `{needle}`"
         );
     }
 
     for path in [
-        "src/workspace/compact/history.rs",
-        "src/workspace/compact/paths.rs",
-        "src/workspace/compact/storage.rs",
-        "src/workspace/compact/tests.rs",
+        "crates/harness-workspace/src/workspace/compact/history.rs",
+        "crates/harness-workspace/src/workspace/compact/paths.rs",
+        "crates/harness-workspace/src/workspace/compact/storage.rs",
+        "crates/harness-workspace/src/workspace/compact/tests.rs",
     ] {
         assert!(
             root.join(path).exists(),
@@ -115,7 +117,9 @@ fn workspace_compact_root_stays_a_facade() {
 #[test]
 fn workspace_compact_storage_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let storage_mod = fs::read_to_string(root.join("src/workspace/compact/storage.rs")).unwrap();
+    let storage_mod =
+        fs::read_to_string(root.join("crates/harness-workspace/src/workspace/compact/storage.rs"))
+            .unwrap();
 
     for needle in [
         "fn trim_history(",
@@ -125,12 +129,13 @@ fn workspace_compact_storage_root_stays_prod_only() {
     ] {
         assert!(
             !storage_mod.contains(needle),
-            "src/workspace/compact/storage.rs should stay focused on handoff persistence instead of owning `{needle}`"
+            "crates/harness-workspace/src/workspace/compact/storage.rs should stay focused on handoff persistence instead of owning `{needle}`"
         );
     }
 
     assert!(
-        root.join("src/workspace/compact/history.rs").exists(),
+        root.join("crates/harness-workspace/src/workspace/compact/history.rs")
+            .exists(),
         "workspace compact history split module should exist"
     );
 }

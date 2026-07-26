@@ -1,0 +1,61 @@
+[package]
+name = "harness-workspace"
+version = "51.0.1"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+
+[features]
+# Forwarded from the root crate so the test modules gated on it stay gated the
+# same way once these sources compile here instead of there.
+standalone-worker = []
+
+[dependencies]
+harness-kernel = { path = "../harness-kernel", version = "51.0.1" }
+base64 = "0.23.0"
+chrono = { version = "0.4.44", features = ["serde"] }
+fs-err = "3.3.0"
+fs2 = "0.4.3"
+gix = { version = "0.86.0", features = [
+    "progress-tree",
+    "status",
+    "worktree-mutation",
+    "index",
+    "blocking-http-transport-reqwest-rust-tls",
+] }
+hex = "0.4.3"
+libc = "0.2"
+pathdiff = "0.2.3"
+rayon = "1.11.0"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+sha1 = "0.11.0"
+sha2 = "0.11.0"
+tempfile = "3.27.0"
+thiserror = "2.0.18"
+tracing = "0.1.41"
+user_dirs = "0.2.0"
+uuid = { version = "1.18.1", features = ["serde", "v4"] }
+uzers = { version = "0.12.2", default-features = false }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.10"
+
+[dev-dependencies]
+harness-testkit = { path = "../../testkit" }
+temp-env = { version = "=0.3.6", features = ["async_closure"] }
+
+# Matches the root crate's lint set rather than the lighter one the facade
+# crates carry, for the same reason harness-kernel does: a crate extracted from
+# src/ keeps the rules its sources were written under.
+[lints.clippy]
+pedantic = { level = "deny", priority = 1 }
+absolute_paths = { level = "deny", priority = 2 }
+cognitive_complexity = { level = "deny", priority = 2 }
+needless_pass_by_value = { level = "deny", priority = 2 }
+ptr_arg = { level = "deny", priority = 2 }
+redundant_clone = { level = "deny", priority = 2 }
+unnecessary_to_owned = { level = "deny", priority = 2 }
+
+[lints.rust]
+unused = { level = "deny", priority = 1 }
