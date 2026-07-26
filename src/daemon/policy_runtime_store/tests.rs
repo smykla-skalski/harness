@@ -2,13 +2,13 @@ use std::sync::Arc;
 
 use tempfile::tempdir;
 
-use super::executor::PolicyRuntimeExecutor;
-use super::models::{
-    PolicyRunRequest, PolicyRunStatus, PolicyRunStep, PolicyRunSubject, PolicyRunTrigger,
-};
-use super::providers::PolicyProviderRegistry;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::policy_graph::PolicyWaitCondition;
+use crate::task_board::policy_runtime::executor::PolicyRuntimeExecutor;
+use crate::task_board::policy_runtime::models::{
+    PolicyRunRequest, PolicyRunStatus, PolicyRunStep, PolicyRunSubject, PolicyRunTrigger,
+};
+use crate::task_board::policy_runtime::providers::PolicyProviderRegistry;
 
 #[tokio::test]
 async fn executor_starts_and_resumes_the_same_database_run() {

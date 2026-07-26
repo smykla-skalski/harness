@@ -3,16 +3,16 @@ use std::env;
 use clap::{ArgAction, Args, Subcommand, ValueEnum};
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::daemon::protocol::{
-    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
-};
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::types::TaskBoardStatus;
 use crate::task_board::{
     TaskBoardAutomationPolicy, TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig,
     TaskBoardGitRuntimeProfile, TaskBoardGitSigningConfig, TaskBoardGitSigningMode,
     TaskBoardOrchestratorStatus, normalize_repository_slug, validate_task_board_policy,
 };
+use crate::task_board::{
+    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
+};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::orchestrator_tokens::TaskBoardOrchestratorGithubTokensArgs;
 use super::{daemon_client, print_json};

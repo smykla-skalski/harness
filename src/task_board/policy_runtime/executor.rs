@@ -4,7 +4,6 @@ use std::sync::Arc;
 use chrono::Utc;
 use tracing::{info, warn};
 
-use crate::daemon::db::AsyncDaemonDb;
 use harness_kernel::errors::CliError;
 
 use super::models::{
@@ -14,6 +13,7 @@ use super::providers::{PolicyExecutionContext, PolicyProviderRegistry};
 use super::repository::BeginRunOutcome;
 #[cfg(test)]
 use super::repository::PolicyRuntimeRepository;
+use super::store::PolicyRunStore;
 
 pub struct PolicyRuntimeExecutor {
     storage: PolicyRunStorage,
@@ -23,7 +23,7 @@ pub struct PolicyRuntimeExecutor {
 enum PolicyRunStorage {
     #[cfg(test)]
     LegacyFile(PolicyRuntimeRepository),
-    Database(Arc<AsyncDaemonDb>),
+    Database(Arc<dyn PolicyRunStore>),
 }
 
 impl PolicyRunStorage {
@@ -35,11 +35,7 @@ impl PolicyRunStorage {
         match self {
             #[cfg(test)]
             Self::LegacyFile(repository) => repository.begin_run(run, trigger, Utc::now()),
-            Self::Database(database) => {
-                database
-                    .begin_policy_workflow_run(run, trigger, Utc::now())
-                    .await
-            }
+            Self::Database(database) => database.begin_run(run, trigger, Utc::now()).await,
         }
     }
 
@@ -51,7 +47,7 @@ impl PolicyRunStorage {
         match self {
             #[cfg(test)]
             Self::LegacyFile(repository) => repository.claim_waiting_run(run_id, trigger),
-            Self::Database(database) => database.claim_waiting_policy_run(run_id, trigger).await,
+            Self::Database(database) => database.claim_waiting_run(run_id, trigger).await,
         }
     }
 
@@ -59,7 +55,7 @@ impl PolicyRunStorage {
         match self {
             #[cfg(test)]
             Self::LegacyFile(repository) => repository.save(run),
-            Self::Database(database) => database.save_policy_workflow_run(run).await.map(|_| ()),
+            Self::Database(database) => database.save_run(run).await,
         }
     }
 }
@@ -75,8 +71,12 @@ impl PolicyRuntimeExecutor {
     }
 
     #[must_use]
-    pub(crate) fn new_database(
-        database: Arc<AsyncDaemonDb>,
+    // Generic over the store rather than taking `Arc<dyn PolicyRunStore>`, so
+    // an `Arc::clone(&db)` argument still infers its own concrete type at the
+    // call site instead of being pinned to the trait object and failing to
+    // coerce.
+    pub(crate) fn new_database<S: PolicyRunStore + 'static>(
+        database: Arc<S>,
         providers: PolicyProviderRegistry,
     ) -> Self {
         Self {

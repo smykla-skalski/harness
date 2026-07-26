@@ -9,10 +9,8 @@ pub mod notification;
 pub mod providers;
 pub mod repository;
 pub mod scheduler;
+pub(crate) mod store;
 pub mod task_creation;
 
 #[cfg(test)]
 mod tests;
-
-#[cfg(test)]
-mod tests_database;
