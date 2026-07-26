@@ -177,7 +177,14 @@ acquire_sccache_lock() {
 
   while (( waited < 100 )); do
     if mkdir "$lock" 2>/dev/null; then
-      printf '%s\n' "$$" >"$lock/pid" 2>/dev/null || true
+      # A held lock with no pid inside is one every later build reads as stale
+      # and reclaims while this one still holds it, so a pid that cannot be
+      # written means handing the lock straight back rather than holding one
+      # that offers no serialisation.
+      if ! printf '%s\n' "$$" >"$lock/pid" 2>/dev/null; then
+        rm -rf "$lock" 2>/dev/null || true
+        return 1
+      fi
       return 0
     fi
     # Not before a second has passed: a lock taken moments ago has no pid file

@@ -1050,8 +1050,9 @@ scenario_live_socket_survives_the_sweep() {
   mkdir -p "$fake_bin" "$socket_dir"
   write_fake_sccache "$fake_bin/sccache" "0.16.0"
   # lsof 4.95 prints the name field as "<path> type=STREAM"; 4.91 printed the
-  # path alone. Reading only the first shape unlinked every live socket, and the
-  # next client then found no server and started a second one.
+  # path alone. Reading only the older shape matched nothing on a modern lsof,
+  # so every live socket was unlinked and the next client then found no server
+  # and started a second one.
   cat >"$fake_bin/lsof" <<EOF
 #!/usr/bin/env bash
 printf 'p1\n'
