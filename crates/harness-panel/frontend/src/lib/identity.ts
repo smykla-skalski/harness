@@ -74,13 +74,21 @@ export function monogram(displayName: string, login: string): string {
   return `${first}${last}`.toLocaleUpperCase();
 }
 
+/**
+ * Built once and reused. Constructing a segmenter resolves a locale and builds an
+ * ICU break iterator, which measures around fifty times the cost of the rest of
+ * this module's work, and a monogram is recomputed on every roster render. Held
+ * lazily so a runtime without `Intl.Segmenter` never tries.
+ */
+let graphemes: Intl.Segmenter | null = null;
+
 function firstGrapheme(value: string): string {
   if (value === '') {
     return '';
   }
   if (typeof Intl.Segmenter === 'function') {
-    const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
-    for (const { segment } of segmenter.segment(value)) {
+    graphemes ??= new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+    for (const { segment } of graphemes.segment(value)) {
       return segment;
     }
     return '';
