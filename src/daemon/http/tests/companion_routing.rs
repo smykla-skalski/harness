@@ -5,15 +5,18 @@
 //! the private loopback credential, and keeps the daemon API authenticated.
 
 use axum::http::StatusCode;
+use futures_util::StreamExt as _;
 use serde_json::Value;
 use tokio::time::{Duration, timeout};
+use tokio_tungstenite::connect_async;
+use tokio_tungstenite::tungstenite::Message;
 
 use crate::daemon::protocol::http_paths;
 
 use super::companion_routing_support::{
     COMPANION_TOKEN, closed_loopback_origin, header, spawn_body_stalled_companion_upstream,
-    spawn_companion_upstream, spawn_stalled_companion_upstream, state_with_companion,
-    state_with_companion_limits, state_with_root_companion,
+    spawn_companion_upstream, spawn_companion_websocket_upstream, spawn_stalled_companion_upstream,
+    state_with_companion, state_with_companion_limits, state_with_root_companion,
 };
 use super::remote_limits_support::{remote_state_with_viewer, send_remote_health, serve_remote};
 
@@ -407,22 +410,73 @@ async fn a_root_companion_forwards_everything_except_the_daemon_api() {
     upstream_server.abort();
 }
 
+/// The companion is the only thing that can push to a browser on this origin,
+/// and the daemon is the only thing on it, so a handshake that stopped here
+/// would leave the companion unable to say anything it was not asked.
 #[tokio::test(flavor = "multi_thread")]
-async fn protocol_upgrades_under_the_prefix_are_refused() {
+async fn a_websocket_under_the_prefix_reaches_the_companion() {
+    let (upstream, upstream_server) = spawn_companion_websocket_upstream().await;
+    let (base_url, server) = serve_remote(state_with_companion(&upstream)).await;
+    let socket_url = format!("{}/panel/socket", base_url.replace("http://", "ws://"));
+
+    let (mut socket, response) = connect_async(socket_url)
+        .await
+        .expect("the daemon must relay the handshake");
+
+    assert_eq!(response.status(), StatusCode::SWITCHING_PROTOCOLS);
+    let Some(Ok(Message::Text(presented))) = socket.next().await else {
+        panic!("the relayed socket must carry the companion's own frames");
+    };
+    assert_eq!(
+        presented.as_str(),
+        format!("Bearer {COMPANION_TOKEN}"),
+        "the handshake must arrive wearing the daemon's companion credential"
+    );
+
+    server.abort();
+    upstream_server.abort();
+}
+
+/// Websocket alone. Tunnelling a protocol the daemon cannot reason about would
+/// turn a scoped companion prefix into a general way off the public listener.
+#[tokio::test(flavor = "multi_thread")]
+async fn no_other_protocol_upgrade_under_the_prefix_is_relayed() {
+    let (upstream, upstream_server) = spawn_companion_upstream().await;
+    let (base_url, server) = serve_remote(state_with_companion(&upstream)).await;
+
+    for upgrade in ["h2c", "TLS/1.2"] {
+        let response = reqwest::Client::new()
+            .get(format!("{base_url}/panel/socket"))
+            .header("connection", "Upgrade")
+            .header("upgrade", upgrade)
+            .send()
+            .await
+            .expect("upgrade request");
+
+        assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED, "{upgrade}");
+        let body: Value = response.json().await.expect("error body");
+        assert_eq!(body["error"]["code"].as_str(), Some("COMPANION_UPSTREAM"));
+    }
+
+    server.abort();
+    upstream_server.abort();
+}
+
+/// A `GET` carrying only half a handshake is not one, and forwarding it would
+/// make the companion refuse on the daemon's behalf.
+#[tokio::test(flavor = "multi_thread")]
+async fn half_a_handshake_under_the_prefix_is_refused() {
     let (upstream, upstream_server) = spawn_companion_upstream().await;
     let (base_url, server) = serve_remote(state_with_companion(&upstream)).await;
 
     let response = reqwest::Client::new()
         .get(format!("{base_url}/panel/socket"))
-        .header("connection", "Upgrade")
         .header("upgrade", "websocket")
         .send()
         .await
         .expect("upgrade request");
 
     assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
-    let body: Value = response.json().await.expect("error body");
-    assert_eq!(body["error"]["code"].as_str(), Some("COMPANION_UPSTREAM"));
     server.abort();
     upstream_server.abort();
 }
