@@ -1364,6 +1364,41 @@ def _setup_dep_info_freshness_layout(tmp_dir: Path) -> dict[str, Path | str]:
     }
 
 
+class IdentityFilterSigpipeTests(unittest.TestCase):
+    """The filter has to drain its producer. Stopping at the match closes the
+    pipe, and `pipefail` turns the producer's SIGPIPE into the caller's exit
+    status even though the identity was read successfully."""
+
+    # Comfortably past the pipe buffer, so the producer is still writing when a
+    # filter that quits early would close on it.
+    PRODUCER = (
+        '{ printf \'  1) HASH "Apple Development: Someone (ABC123)"\\n\'; '
+        "for i in $(seq 1 20000); do "
+        "printf '  %s) HASH \"Developer ID Application: Someone (X)\"\\n' \"$i\"; "
+        "done; }"
+    )
+
+    def test_filter_survives_a_producer_that_keeps_writing(self) -> None:
+        script = (
+            f"unset BASH_ENV; set -euo pipefail; source {HELPER_PATH}; "
+            f'value="$({self.PRODUCER} | first_apple_development_identity)"; '
+            "printf 'identity=%s\\n' \"$value\""
+        )
+
+        completed = subprocess.run(
+            ["bash", "-c", script],
+            capture_output=True,
+            text=True,
+            env=_isolated_subprocess_env(),
+            timeout=60,
+        )
+
+        self.assertEqual(completed.returncode, 0, msg=completed.stderr)
+        self.assertEqual(
+            completed.stdout.strip(), "identity=Apple Development: Someone (ABC123)"
+        )
+
+
 class UnsealablePluginTests(unittest.TestCase):
     """`build-for-testing` plants the app-hosted test bundle in the host app's
     PlugIns before this phase runs and leaves it a skeleton until the test

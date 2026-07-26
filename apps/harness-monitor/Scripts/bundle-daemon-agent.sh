@@ -160,7 +160,7 @@ bundle_stamp_path="${SCRIPT_OUTPUT_FILE_8:-${DERIVED_FILE_DIR:-$TARGET_BUILD_DIR
 codesign_identity="${EXPANDED_CODE_SIGN_IDENTITY:-}"
 if [ -z "$codesign_identity" ] || [ "$codesign_identity" = "-" ]; then
   codesign_identity="$(/usr/bin/security find-identity -v -p codesigning 2>/dev/null \
-    | /usr/bin/awk -F'"' '/Apple Development:/ { print $2; exit }')"
+    | first_apple_development_identity)"
 fi
 timestamp_flag="ad-hoc"
 if [ -n "$codesign_identity" ]; then
@@ -273,7 +273,10 @@ for legacy_plist_name in \
   fi
 done
 
-if ! /usr/bin/otool -l "$daemon_target_staging" | /usr/bin/grep -q "__info_plist"; then
+# Matched on a captured string rather than through `grep -q`, which stops
+# reading at the first hit and leaves otool holding a closed pipe.
+daemon_load_commands="$(/usr/bin/otool -l "$daemon_target_staging")"
+if [[ "$daemon_load_commands" != *__info_plist* ]]; then
   printf 'Harness daemon helper is missing embedded Info.plist metadata: %s\n' "$daemon_target_staging" >&2
   exit 1
 fi
