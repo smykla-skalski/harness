@@ -2,7 +2,6 @@ use std::path::Path;
 
 use tokio::task::spawn_blocking;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::git::GitRepository;
 use crate::task_board::github::{
     GitHubAutomationClient, GitHubBranchState, GitHubProjectConfig, GitHubPullRequestHandle,
@@ -11,6 +10,7 @@ use crate::task_board::{
     TaskBoardAttemptResultArtifact, TaskBoardPullRequestHeadIdentity, TaskBoardPullRequestIdentity,
     TaskBoardWorkflowExecutionRecord, normalize_repository_slug,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::invalid_transition;
 

@@ -3,7 +3,6 @@ use std::slice;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::state::overlay_task_board_git_runtime_secrets;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::github::{
     GitHubApiAutomationClient, GitHubAutomationClient, GitHubProjectConfig,
 };
@@ -12,6 +11,7 @@ use crate::task_board::{
     TaskBoardOrchestratorSettings, TaskBoardPullRequestHeadIdentity, TaskBoardPullRequestIdentity,
     TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind, normalize_repository_slug,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::DatabaseAutomationRequest;
 use super::support::{

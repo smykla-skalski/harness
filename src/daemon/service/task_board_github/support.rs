@@ -14,9 +14,6 @@ use crate::daemon::db::DaemonDb;
 #[cfg(test)]
 use crate::daemon::service::session_detail_core;
 use crate::daemon::service::session_detail_core_async;
-use harness_kernel::errors::CliError;
-#[cfg(test)]
-use harness_kernel::errors::CliErrorKind;
 use crate::task_board::github::{
     GitHubAutomation, GitHubAutomationClient, GitHubCreatePullRequest, GitHubProjectConfig,
     GitHubPullRequestHandle,
@@ -29,6 +26,9 @@ use crate::task_board::{
     PolicyGate, PolicyGraph, PolicyInput, PolicyPipelineMode, PolicySubject, TaskBoardItem,
     TaskBoardOrchestratorSettings, TaskBoardWorkflowState,
 };
+use harness_kernel::errors::CliError;
+#[cfg(test)]
+use harness_kernel::errors::CliErrorKind;
 
 #[derive(Clone, Copy)]
 pub(super) enum AutomationPolicy<'a> {

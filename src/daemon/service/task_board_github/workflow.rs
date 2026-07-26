@@ -1,6 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use harness_kernel::errors::CliErrorKind;
 use crate::task_board::github::{
     GitHubAutomation, GitHubAutomationClient, GitHubMergeEvidence, GitHubProjectConfig,
     GitHubPullRequestHandle, build_auto_merge_policy_input,
@@ -9,6 +8,7 @@ use crate::task_board::{
     PolicyAction, PolicyDecision, PolicyReasonCode, TaskBoardItem, TaskBoardStatus,
     TaskBoardWorkflowState,
 };
+use harness_kernel::errors::CliErrorKind;
 
 #[cfg(test)]
 use super::AutomationRequest;
