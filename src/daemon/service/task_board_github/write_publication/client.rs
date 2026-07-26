@@ -91,8 +91,8 @@ async fn stamp_repository(
     };
     let token = github_token_for_repository(Some(&repository)).ok_or_else(|| {
         CliError::from(CliErrorKind::workflow_io(format!(
-            "write workflow publication has no GitHub token for '{repository}': add a repository \
-             token in Settings > Secrets"
+            "write workflow publication has no GitHub token for '{repository}': add a global or \
+             repository token in Settings > Secrets"
         )))
     })?;
     let (owner, repo) = repository.split_once('/').ok_or_else(|| {

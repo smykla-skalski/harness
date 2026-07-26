@@ -87,6 +87,10 @@ pub(crate) fn run_task_board_github_automation(
     overlay_task_board_git_runtime_secrets(&mut runtime_config);
     for (repository, grouped) in group_items_by_repository(items) {
         let Some(token) = github_token_for_repository(Some(&repository)) else {
+            tracing::warn!(
+                %repository,
+                "skipping task-board GitHub automation: no token for this repository"
+            );
             continue;
         };
         let config = repository_automation_config(&defaults, &repository);
