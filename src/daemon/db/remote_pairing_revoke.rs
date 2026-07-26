@@ -8,7 +8,7 @@ use sqlx::{Row, Sqlite, Transaction, query};
 
 use super::remote_identity::INSERT_REMOTE_AUDIT_EVENT_SQL;
 use super::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::remote_identity::RemoteAuditEvent;
+use crate::daemon::remote_identity::{RemoteAuditEvent, RemoteAuditOutcome};
 
 /// What revoking did, and when the revocation it reports actually happened.
 ///
@@ -79,7 +79,10 @@ impl AsyncDaemonDb {
             // Recorded rather than rolled back: an attempt to revoke an id that
             // does not exist is exactly what probing looks like, and the trail
             // is the only place it would show.
-            record_revoke_audit(&mut transaction, audit).await?;
+            // A failure, because nothing was revoked. Recording it as a
+            // success would put an entry in the trail claiming a revocation
+            // that never had a target.
+            record_revoke_audit(&mut transaction, audit, RemoteAuditOutcome::Failure).await?;
             transaction.commit().await.map_err(|error| {
                 db_error(format!("commit missing remote pairing revoke: {error}"))
             })?;
@@ -160,7 +163,7 @@ impl AsyncDaemonDb {
             }
         };
 
-        record_revoke_audit(&mut transaction, audit).await?;
+        record_revoke_audit(&mut transaction, audit, RemoteAuditOutcome::Success).await?;
 
         transaction
             .commit()
@@ -179,7 +182,11 @@ impl AsyncDaemonDb {
 async fn record_revoke_audit(
     transaction: &mut Transaction<'_, Sqlite>,
     audit: &RemoteAuditEvent,
+    outcome: RemoteAuditOutcome,
 ) -> Result<(), CliError> {
+    // The outcome is only known here, inside the transaction that decides it,
+    // so it is applied rather than taken from the event the caller built.
+    let audit = audit.clone().with_outcome(outcome);
     query(INSERT_REMOTE_AUDIT_EVENT_SQL)
         .bind(&audit.event_id)
         .bind(&audit.recorded_at)

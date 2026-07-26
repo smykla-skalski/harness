@@ -210,19 +210,22 @@ async fn an_attempt_on_a_missing_pairing_is_still_recorded() {
 
     revoke_as(&base_url, ADMIN, "pairing-does-not-exist").await;
 
-    let recorded: i64 = db
+    let (recorded, outcome): (i64, String) = db
         .lock()
         .expect("db lock")
         .connection()
         .query_row(
-            "SELECT COUNT(*) FROM remote_audit_events
+            "SELECT COUNT(*), COALESCE(MAX(outcome), '') FROM remote_audit_events
              WHERE route_or_method = 'remote.pairing.revoke'",
             [],
-            |row| row.get(0),
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .expect("audit count");
 
     assert_eq!(recorded, 1);
+    // Recorded as a failure: nothing was revoked, and a success here would put
+    // an entry in the trail for a revocation that never had a target.
+    assert_eq!(outcome, "failure");
     server.abort();
 }
 

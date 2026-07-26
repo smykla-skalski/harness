@@ -4,6 +4,12 @@
 //! caller's own entries: the links it minted. Seeing or touching everyone
 //! else's additionally needs `admin`, so a broker credential that leaks can
 //! only reach the links that broker issued.
+//!
+//! A pairing minted before the owner was recorded has none stored, so it reads
+//! as the host's and only an `admin` caller sees it. That is the safe direction
+//! and the only honest one: the daemon never wrote down which broker minted
+//! those, and attributing them to whichever broker asks would hand one broker
+//! another's links.
 
 use std::time::Instant;
 
@@ -61,16 +67,6 @@ fn sees_every_pairing(client: Option<&RemoteStoredClient>) -> bool {
     client.is_none_or(|client| client.scopes.contains(&RemoteAccessScope::Admin))
 }
 
-/// A pairing minted before this field was recorded has no owner stored, so it
-/// reads as the host's and only an `admin` caller sees it. That is the safe
-/// direction and the only honest one: the daemon never wrote down which broker
-/// minted those, and attributing them to whichever broker happens to ask would
-/// hand one broker another's links. Such a link expires within a day; a device
-/// already claimed from one stays revocable from the host.
-fn owned_by(entry: &RemotePairingInventoryEntry, client_id: &str) -> bool {
-    entry.minted_by.as_deref() == Some(client_id)
-}
-
 #[utoipa::path(
     get,
     path = "/v1/remote/pairings",
@@ -113,19 +109,18 @@ fn list_pairings(
         .lock()
         .map_err(|_| RemotePairingManageError::StoreUnavailable)?;
     let now = utc_now();
-    let all = db
-        .list_remote_pairing_inventory(now.as_str())
+    // The narrowing is the query's, not a filter applied after reading every
+    // link the daemon has ever issued.
+    let owner = if sees_every_pairing(client.as_ref()) {
+        None
+    } else {
+        Some(client.map(|client| client.client_id).unwrap_or_default())
+    };
+    let pairings = db
+        .list_remote_pairing_inventory(now.as_str(), owner.as_deref())
         .map_err(RemotePairingManageError::Store)?;
     drop(db);
 
-    let pairings = if sees_every_pairing(client.as_ref()) {
-        all
-    } else {
-        let client_id = client.map(|client| client.client_id).unwrap_or_default();
-        all.into_iter()
-            .filter(|entry| owned_by(entry, client_id.as_str()))
-            .collect()
-    };
     Ok(RemotePairingListResponse { pairings })
 }
 
@@ -134,7 +129,7 @@ fn list_pairings(
     path = "/v1/remote/pairings/{pairing_id}/revoke",
     tag = "pairing",
     params(("pairing_id" = String, Path, description = "Pairing to revoke")),
-    description = "Revoke a pairing that is not the caller's own. A claimed link cuts off the device it became; an unclaimed one can no longer be claimed. Requires the pair_manage scope, and the caller must have minted the pairing unless it also holds admin. Beyond the shared middleware causes, this route answers 503 when the pairing store is unavailable",
+    description = "Revoke a pairing, cutting off somebody else's device rather than the caller's own credential. A claimed link cuts off the device it became; an unclaimed one can no longer be claimed. Requires the pair_manage scope, and the caller must have minted the pairing unless it also holds admin. Beyond the shared middleware causes, this route answers 503 when the pairing store is unavailable",
     responses(
         (status = 200, description = "Pairing revoked", body = RemotePairingRevokeResponse),
         (status = 403, description = "Pairing belongs to another caller", body = DaemonErrorBody),

@@ -4129,7 +4129,7 @@
         "tags": [
           "pairing"
         ],
-        "description": "Revoke a pairing that is not the caller's own. A claimed link cuts off the device it became; an unclaimed one can no longer be claimed. Requires the pair_manage scope, and the caller must have minted the pairing unless it also holds admin. Beyond the shared middleware causes, this route answers 503 when the pairing store is unavailable",
+        "description": "Revoke a pairing, cutting off somebody else's device rather than the caller's own credential. A claimed link cuts off the device it became; an unclaimed one can no longer be claimed. Requires the pair_manage scope, and the caller must have minted the pairing unless it also holds admin. Beyond the shared middleware causes, this route answers 503 when the pairing store is unavailable",
         "operationId": "post_remote_pairing_revoke",
         "parameters": [
           {
@@ -23234,7 +23234,7 @@
           },
           "state": {
             "$ref": "#/components/schemas/RemotePairingState",
-            "description": "The enum rather than its label, so the schema enumerates what a reader\nmay receive. The wire value is the same snake_case string either way."
+            "description": "The enum rather than its label, so the schema enumerates what a reader\nmay receive. The wire value is the same `snake_case` string either way."
           }
         }
       },

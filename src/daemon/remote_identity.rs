@@ -347,6 +347,16 @@ impl RemoteAuditEvent {
         self
     }
 
+    /// Set the outcome once it is known.
+    ///
+    /// For a route whose result is only decided inside the transaction that
+    /// writes the event, the caller cannot know it when building the event.
+    #[must_use]
+    pub fn with_outcome(mut self, outcome: RemoteAuditOutcome) -> Self {
+        self.outcome = outcome;
+        self
+    }
+
     #[must_use]
     pub fn error_detail(&self) -> Option<&str> {
         self.error_detail.as_deref()

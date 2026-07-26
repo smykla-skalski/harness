@@ -25,6 +25,7 @@ SELECT p.pairing_id,
        c.revoked_at
 FROM remote_pairing_codes p
 LEFT JOIN remote_clients c ON c.client_id = p.claimed_client_id
+WHERE ?1 IS NULL OR json_extract(p.metadata_json, '$.minted_by') = ?1
 ORDER BY p.created_at DESC, p.pairing_id DESC";
 
 /// Who a pairing belongs to.
@@ -69,23 +70,25 @@ impl DaemonDb {
             .map_or(RemotePairingOwner::Host, RemotePairingOwner::Client))
     }
 
-    /// Every pairing, newest first, with the device each one became.
+    /// Pairings, newest first, with the device each one became.
     ///
-    /// Ownership is not filtered here. The caller decides what it is entitled
-    /// to see, because that depends on scopes this layer does not know about.
+    /// `minted_by` narrows the answer to one client's links. Filtering in the
+    /// query rather than afterwards keeps a broker's listing proportional to
+    /// what it minted instead of to everything the daemon has ever issued.
     ///
     /// # Errors
     /// Returns [`CliError`] when a row or its metadata cannot be read.
     pub(crate) fn list_remote_pairing_inventory(
         &self,
         now: &str,
+        minted_by: Option<&str>,
     ) -> Result<Vec<RemotePairingInventoryEntry>, CliError> {
         let mut statement = self
             .conn
             .prepare(SELECT_REMOTE_PAIRING_INVENTORY_SQL)
             .map_err(|error| db_error(format!("prepare remote pairing inventory: {error}")))?;
         let rows = statement
-            .query_map([], |row| Ok(read_inventory_columns(row)))
+            .query_map([minted_by], |row| Ok(read_inventory_columns(row)))
             .map_err(|error| db_error(format!("query remote pairing inventory: {error}")))?;
 
         let mut entries = Vec::new();
