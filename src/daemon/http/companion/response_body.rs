@@ -121,30 +121,68 @@ async fn pump_upstream<B>(
     B: HttpBody<Data = Bytes> + Send + Unpin + 'static,
     B::Error: Into<BoxError> + Send + 'static,
 {
-    loop {
-        let next = tokio::select! {
-            () = sender.closed() => break,
-            next = timeout_at(deadline, upstream.frame()) => next,
-        };
-        let frame = match next {
-            Ok(Some(frame)) => frame.map_err(Into::into),
-            Ok(None) => break,
-            Err(_) => {
-                record_timeout(&timed_out, &upstream_origin);
-                break;
-            }
-        };
-        let failed = frame.is_err();
-        match timeout_at(deadline, sender.send(frame)).await {
-            Ok(Ok(())) if !failed => {}
-            Ok(Ok(()) | Err(_)) => break,
-            Err(_) => {
-                record_timeout(&timed_out, &upstream_origin);
-                break;
-            }
+    while let Some(frame) = next_frame(
+        &mut upstream,
+        &sender,
+        deadline,
+        &timed_out,
+        &upstream_origin,
+    )
+    .await
+    {
+        if !forward_frame(&sender, frame, deadline, &timed_out, &upstream_origin).await {
+            break;
         }
     }
     lease.finish();
+}
+
+/// Returns None when the upstream is done, hung up, or outran the deadline,
+/// which ends the pump. A frame carrying an upstream error is still yielded so
+/// the receiver observes it.
+async fn next_frame<B>(
+    upstream: &mut B,
+    sender: &mpsc::Sender<PumpItem>,
+    deadline: Instant,
+    timed_out: &AtomicBool,
+    upstream_origin: &str,
+) -> Option<PumpItem>
+where
+    B: HttpBody<Data = Bytes> + Send + Unpin + 'static,
+    B::Error: Into<BoxError> + Send + 'static,
+{
+    let next = tokio::select! {
+        () = sender.closed() => return None,
+        next = timeout_at(deadline, upstream.frame()) => next,
+    };
+    match next {
+        Ok(Some(frame)) => Some(frame.map_err(Into::into)),
+        Ok(None) => None,
+        Err(_) => {
+            record_timeout(timed_out, upstream_origin);
+            None
+        }
+    }
+}
+
+/// Returns false when the pump must stop: the receiver hung up, the frame
+/// itself carried an upstream error, or the send outran the deadline.
+async fn forward_frame(
+    sender: &mpsc::Sender<PumpItem>,
+    frame: PumpItem,
+    deadline: Instant,
+    timed_out: &AtomicBool,
+    upstream_origin: &str,
+) -> bool {
+    let failed = frame.is_err();
+    match timeout_at(deadline, sender.send(frame)).await {
+        Ok(Ok(())) if !failed => true,
+        Ok(Ok(()) | Err(_)) => false,
+        Err(_) => {
+            record_timeout(timed_out, upstream_origin);
+            false
+        }
+    }
 }
 
 fn record_timeout(timed_out: &AtomicBool, upstream_origin: &str) {

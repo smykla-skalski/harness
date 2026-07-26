@@ -109,20 +109,31 @@ fn warn_protocol_error(error: &AcpError) {
 
 pub(super) fn disconnect_reason_from_error(error: &AcpError) -> DisconnectReason {
     if matches!(error.code, ErrorCode::AuthRequired) {
-        DisconnectReason::AuthRequired
-    } else if matches!(error.code, ErrorCode::Other(ACP_DEADLINE_EXCEEDED))
-        && error.message.contains("session/initialize")
-    {
-        DisconnectReason::InitializeTimeout
-    } else if matches!(error.code, ErrorCode::Other(ACP_DEADLINE_EXCEEDED))
-        && error.message.contains("session/prompt")
-    {
-        DisconnectReason::PromptTimeout
-    } else if is_transport_closed_error(error) {
+        return DisconnectReason::AuthRequired;
+    }
+    if let Some(reason) = deadline_disconnect_reason(error) {
+        return reason;
+    }
+    if is_transport_closed_error(error) {
         DisconnectReason::TransportClosed
     } else {
         DisconnectReason::StdioClosed
     }
+}
+
+/// A deadline is only attributable when the message names the phase that
+/// exceeded it; anything else falls through to the transport classification.
+fn deadline_disconnect_reason(error: &AcpError) -> Option<DisconnectReason> {
+    if !matches!(error.code, ErrorCode::Other(ACP_DEADLINE_EXCEEDED)) {
+        return None;
+    }
+    if error.message.contains("session/initialize") {
+        return Some(DisconnectReason::InitializeTimeout);
+    }
+    if error.message.contains("session/prompt") {
+        return Some(DisconnectReason::PromptTimeout);
+    }
+    None
 }
 
 fn is_transport_closed_error(error: &AcpError) -> bool {
