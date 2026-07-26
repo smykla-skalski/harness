@@ -407,8 +407,8 @@ async fn an_account_cannot_hold_more_live_links_than_the_cap() {
     let seen = Arc::new(Mutex::new(Seen::default()));
     let (harness, owner) = ready(Arc::clone(&seen)).await;
 
-    // The stub answers with the same pairing id every time, so each attempt
-    // after the first replaces nothing; drive the cap with distinct rows.
+    // Seeded directly rather than minted, so the cap is reached without
+    // depending on how many links the stub is willing to issue.
     for index in 0..5 {
         harness
             .state

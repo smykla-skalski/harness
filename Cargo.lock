@@ -3932,7 +3932,7 @@ dependencies = [
 
 [[package]]
 name = "harness-kernel"
-version = "51.0.1"
+version = "51.1.0"
 dependencies = [
  "fs-err",
  "gray_matter",
@@ -4084,7 +4084,7 @@ dependencies = [
 
 [[package]]
 name = "harness-workspace"
-version = "51.0.1"
+version = "51.1.0"
 dependencies = [
  "base64 0.23.0",
  "chrono",

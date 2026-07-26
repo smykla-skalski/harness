@@ -22,8 +22,8 @@ crossterm = "0.29.0"
 fs2 = "0.4.3"
 fs-err = "3.3.0"
 harness-hook = { path = "../harness-hook", version = "51.1.0" }
-harness-kernel = { path = "../harness-kernel", version = "51.0.1" }
-harness-workspace = { path = "../harness-workspace", version = "51.0.1" }
+harness-kernel = { path = "../harness-kernel", version = "51.1.0" }
+harness-workspace = { path = "../harness-workspace", version = "51.1.0" }
 harness-protocol = { path = "../harness-protocol", version = "51.1.0" }
 harness-telemetry = { path = "../harness-telemetry", version = "51.1.0" }
 hex = "0.4.3"
