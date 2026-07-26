@@ -1,4 +1,4 @@
-# `setup` and `create` references
+# `setup` references
 
 ## `setup` command map
 
@@ -31,29 +31,3 @@ Sources: `cargo run --quiet -- setup bootstrap --help`; `cargo run --quiet -- se
 | Bootstrap without Gemini/Copilot runtime hooks | `harness setup bootstrap --skip-runtime-hooks gemini,copilot` |
 
 Sources: `cargo run --quiet -- setup bootstrap --help`.
-
-## `create` command map
-
-| Command | Purpose | Key surface |
-| --- | --- | --- |
-| `create begin` | Begin a `suite:create` workspace session | `--repo-root`, `--feature`, `--mode`, `--suite-dir`, `--suite-name` |
-| `create save` | Save a `suite:create` payload | `--kind`, `--payload`, `--input` |
-| `create show` | Show saved `suite:create` payloads | `--kind` |
-| `create reset` | Reset the `suite:create` workspace | No extra flags |
-| `create validate` | Validate authored manifests against local CRDs | `--path`, `--repo-root` |
-| `create approval-begin` | Begin the `suite:create` approval flow | `--mode`, `--suite-dir` |
-
-Sources: `cargo run --quiet -- create --help`; `src/app/cli.rs:70-80`; `src/create/commands/begin.rs:19-55`; `src/create/commands/save.rs:13-36`; `src/create/commands/show.rs:13-39`; `src/create/commands/reset.rs:13-23`; `src/create/commands/validate.rs:13-33`; `src/create/commands/approval.rs:17-37`.
-
-## `create` key help surface
-
-| Command | Flags | Notes |
-| --- | --- | --- |
-| `harness create begin` | `--repo-root`, `--feature`, `--mode`, `--suite-dir`, `--suite-name` | `--mode` values: `interactive`, `bypass` |
-| `harness create save` | `--kind`, `--payload`, `--input` | Help exposes kinds: `inventory`, `coverage`, `variants`, `schema`, `proposal`, `edit-request` |
-| `harness create show` | `--kind` | Reads a saved payload kind |
-| `harness create reset` | none | Clears the workspace/session state |
-| `harness create validate` | `--path`, `--repo-root` | `--path` is repeatable and required |
-| `harness create approval-begin` | `--mode`, `--suite-dir` | `--mode` values: `interactive`, `bypass` |
-
-Sources: `cargo run --quiet -- create begin --help`; `cargo run --quiet -- create save --help`; `cargo run --quiet -- create show --help`; `cargo run --quiet -- create reset --help`; `cargo run --quiet -- create validate --help`; `cargo run --quiet -- create approval-begin --help`.

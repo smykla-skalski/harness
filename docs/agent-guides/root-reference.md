@@ -2,15 +2,9 @@
 
 Load this file only when the repo-root `AGENTS.md` routes the current task here. The root `AGENTS.md` contains the mandatory contract; this file keeps the longer reference material out of the default prompt path.
 
-## Workflow systems
-
-`suite:run` lives in `src/workflow/runner.rs`. It orchestrates test runs through `bootstrap -> ready -> approved -> running -> verdict`. State is persisted as versioned JSON through `VersionedJsonRepository`, using tmp-file then rename saves.
-
-`suite:create` lives in `src/workflow/create.rs`. It manages interactive suite creation with multi-step proposals and manifest validation.
-
 ## Hook system
 
-Hooks intercept Codex tool usage. The constants are classified in `src/cli.rs`:
+Hooks intercept agent tool usage. The hook commands are defined in `crates/harness-hook/src/main.rs`:
 
 - Unified tool lifecycle: `tool-guard` and `tool-result`, plus the `audit-turn` shim.
 
@@ -20,17 +14,15 @@ Repo-policy/manual-task enforcement belongs to `aff`. Use harness setup tasks fo
 
 ## Key modules
 
-- `errors.rs` - unified error and hook-message system with placeholder substitution.
-- `schema.rs` - custom frontmatter parser for suite/run YAML metadata.
-- `context.rs` - run lifecycle types such as `RunLayout`, `RunMetadata`, and `CommandEnv`.
-- `prepared_suite.rs` - suite artifact types.
-- `compact.rs` - file fingerprinting with SHA256 and mtime.
-- `core_defs.rs` - build info, timestamps, XDG paths, and session scope.
-- `rules.rs` - declarative denied-binary lists and repo policy rules.
-- `commands/` - CLI command handlers.
-- `session/` - multi-agent orchestration types, roles, storage, service, transport, and observation.
-- `task_board/` - cross-project board state, planning gates, dispatch/evaluate reconciliation, orchestrator state, external sync, and policy pipeline graph evaluation. See `docs/agent-guides/task-board-workflow.md` for operator behavior.
-- `agents/runtime/` - runtime adapters, conversation events, signal protocol, and liveness detection.
+Paths are relative to the repository root.
+
+- `crates/harness-kernel/` - unified error and hook-message system, XDG paths, build info, and skill constants.
+- `src/app/cli.rs` - the top-level command tree and its dispatch.
+- `src/hooks/` - tool lifecycle hook handlers, guards, and hook protocol types.
+- `src/workspace/compact/` - file fingerprinting with SHA256 and mtime.
+- `src/session/` - multi-agent orchestration types, roles, storage, service, transport, and observation.
+- `src/task_board/` - cross-project board state, planning gates, dispatch/evaluate reconciliation, orchestrator state, external sync, and policy pipeline graph evaluation. See `docs/agent-guides/task-board-workflow.md` for operator behavior.
+- `src/agents/runtime/` - runtime adapters, conversation events, signal protocol, and liveness detection.
 
 ## Facade-crate src includes
 
@@ -68,8 +60,7 @@ A start can replace the descriptor's command with a remote endpoint: `--endpoint
 
 ## Data directories
 
-- `$XDG_DATA_HOME/harness/suites/` - suite library.
-- `$XDG_DATA_HOME/harness/runs/` - run directories with artifacts, commands, state, manifests, and reports.
+- `$XDG_DATA_HOME/harness/sessions/` - session workspaces.
 - `$XDG_DATA_HOME/harness/contexts/{session-hash}/` - session context.
 - `$XDG_DATA_HOME/harness/projects/project-{digest}/orchestration/` - multi-agent session state.
 - `$XDG_DATA_HOME/harness/projects/project-{digest}/agents/signals/` - file-based agent signaling.

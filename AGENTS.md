@@ -101,15 +101,16 @@ mise run setup:bootstrap
 
 ## Architecture
 
-Harness is a test orchestration framework for Kubernetes/Kuma. It enforces tracked, user-story-first testing through state machines and hook-based guardrails.
+Harness is a local control plane for running multiple AI coding agents as a coordinated swarm. A daemon owns session, agent, and task-board state; the macOS Harness Monitor and the CLI are its clients; hooks intercept agent tool use.
 
 Core areas:
 
-- `src/workflow/` owns `suite:run` and `suite:create`.
-- `src/hooks/` and `src/cli.rs` own tool lifecycle hooks and hook dispatch.
+- `src/app/cli.rs` owns the top-level command tree and its dispatch.
+- `src/hooks/` owns tool lifecycle hooks, guards, and the hook protocol.
 - `src/session/` owns multi-agent orchestration state, roles, service logic, transport, storage, and observation.
 - `src/agents/runtime/` owns runtime adapters for Claude, Codex, Gemini, Copilot, Vibe, and OpenCode.
-- `src/commands/` owns CLI command handlers.
+- `src/daemon/` owns the local daemon: HTTP routes, storage, and the task-board service.
+- `src/observe/` owns session log scanning and issue classification.
 - Harness Monitor UI-triggered real work must leave the main thread through the global generic async work queue. Use `HarnessMonitorAsyncWorkQueue.shared` instead of route-local or action-specific queues; workers scale to the active CPU count, and UI state/toasts should hop back to the MainActor only for completion updates.
 
 Detailed module and data-directory notes live in `docs/agent-guides/root-reference.md`.
@@ -175,7 +176,7 @@ Harness Monitor xcodebuild lane internals and fsmonitor cleanup details live in 
 
 ## Gotchas
 
-- `tool-guard` denies direct use of `kubectl`, `kumactl`, `helm`, `docker`, and `k3d`; see `rules.rs`.
+- `tool-guard` currently denies nothing. Every generated registration claims `--skill suite:run` (`src/setup/wrapper/registrations.rs`), and `guard_bash::execute` returns `allow` unless `ctx.skill_active`, which for that skill needs a run pointer or runner state the retired suite-run flow created. The cluster-binary list in `src/hooks/guard_bash/predicates.rs` is therefore unreachable in an ordinary session. Do not rely on it as an enforcement boundary.
 - `VersionedJsonRepository` saves atomically with tmp-file rename. Use the repository `load()` path instead of reading state files during saves.
 - Use the installed XcodeBuildMCP skill before XcodeBuildMCP tools. Monitor app work needs a full worktree plus explicit `HARNESS_MONITOR_BUILD_LANE` and `HARNESS_MONITOR_RUNTIME_LANE`.
 - Harness Monitor enables MCP accessibility tracking on normal app paths. In tracked-element hot paths, do not call `accessibilityFrame()` or republish on every `NSWindow.didUpdateNotification`; dense windows such as Settings can become visibly sluggish. Prefer clip-aware AppKit geometry conversion plus a throttled `didUpdate` refresh path.
