@@ -154,6 +154,7 @@ Derived surfaces maintained by `mise run version:*`:
 
 Additional version notes:
 
+- `INDEPENDENT_PACKAGE_NAMES` in `scripts/version.sh` names the members that ship on their own cadence and keep the version in their own manifest; `harness-panel` is on it. Their lock entry and any requirement on them still has to match that manifest, so the exemption is from the root version and not from being consistent. `harness-codex-acp` and `harness-openrouter-agent` need no entry: they declare their own `[workspace]` and are not members of this one.
 - `src/observe/output.rs` reads SARIF `driver.version` from `env!("CARGO_PKG_VERSION")`.
 - `src/cli.rs` uses Clap's derived version.
 
