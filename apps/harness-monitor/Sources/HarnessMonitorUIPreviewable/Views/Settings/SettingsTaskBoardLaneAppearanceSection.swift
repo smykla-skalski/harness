@@ -90,7 +90,7 @@ struct SettingsTaskBoardLaneAppearanceSection: View {
   }
 }
 
-private struct SettingsTaskBoardLaneAppearancePopover: View {
+struct SettingsTaskBoardLaneAppearancePopover: View {
   let lane: TaskBoardInboxLane
   @Binding var rawValue: String
   @Environment(\.fontScale)

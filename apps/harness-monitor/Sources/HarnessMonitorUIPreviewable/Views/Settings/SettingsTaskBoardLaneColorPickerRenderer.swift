@@ -2,11 +2,11 @@ import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
-/// Headless renderer for the lane color picker. Draws the picker off-screen
-/// (no window, no focus change) so the popover layout can be reviewed from the
-/// command line across appearance and text size. The PreviewHost executable
-/// invokes this when `HARNESS_LANE_COLOR_PICKER_DUMP` is set, then exits before
-/// any scene is shown.
+/// Headless renderer for the lane appearance popover and its color picker.
+/// Draws them off-screen (no window, no focus change) so the layout can be
+/// reviewed from the command line across appearance and text size. The
+/// PreviewHost executable invokes this when `HARNESS_LANE_COLOR_PICKER_DUMP` is
+/// set, then exits before any scene is shown.
 @MainActor
 public enum SettingsTaskBoardLaneColorPickerRenderer {
   /// Matches the width the appearance popover gives its content.
@@ -22,8 +22,16 @@ public enum SettingsTaskBoardLaneColorPickerRenderer {
     }
   }
 
+  private enum Surface {
+    /// The color section on its own, for reviewing preset and custom states.
+    case colorPicker
+    /// The whole popover the Customize button opens, symbol grid included.
+    case popover
+  }
+
   private struct Fixture {
     let name: String
+    let surface: Surface
     let rawValue: String
     let themeMode: HarnessMonitorThemeMode
     let textSizeIndex: Int
@@ -39,26 +47,53 @@ public enum SettingsTaskBoardLaneColorPickerRenderer {
     let defaultText = HarnessMonitorTextSize.defaultIndex
     let largestText = HarnessMonitorTextSize.scales.count - 1
     return [
-      Fixture(name: "preset-dark", rawValue: preset, themeMode: .dark, textSizeIndex: defaultText),
-      Fixture(
-        name: "preset-light", rawValue: preset, themeMode: .light, textSizeIndex: defaultText),
-      Fixture(name: "custom-dark", rawValue: custom, themeMode: .dark, textSizeIndex: defaultText),
-      Fixture(
-        name: "custom-light", rawValue: custom, themeMode: .light, textSizeIndex: defaultText),
-      Fixture(
-        name: "preset-dark-largest-text",
-        rawValue: preset,
-        themeMode: .dark,
-        textSizeIndex: largestText
-      ),
+      fixture("preset-dark", .colorPicker, preset, .dark, defaultText),
+      fixture("preset-light", .colorPicker, preset, .light, defaultText),
+      fixture("custom-dark", .colorPicker, custom, .dark, defaultText),
+      fixture("custom-light", .colorPicker, custom, .light, defaultText),
+      fixture("preset-dark-largest-text", .colorPicker, preset, .dark, largestText),
+      fixture("popover-preset-dark", .popover, preset, .dark, defaultText),
+      fixture("popover-preset-light", .popover, preset, .light, defaultText),
+      fixture("popover-custom-dark", .popover, custom, .dark, defaultText),
+      fixture("popover-preset-dark-largest-text", .popover, preset, .dark, largestText),
     ]
+  }
+
+  private static func fixture(
+    _ name: String,
+    _ surface: Surface,
+    _ rawValue: String,
+    _ themeMode: HarnessMonitorThemeMode,
+    _ textSizeIndex: Int
+  ) -> Fixture {
+    Fixture(
+      name: name,
+      surface: surface,
+      rawValue: rawValue,
+      themeMode: themeMode,
+      textSizeIndex: textSizeIndex
+    )
+  }
+
+  @ViewBuilder
+  private static func surfaceView(_ fixture: Fixture) -> some View {
+    switch fixture.surface {
+    case .colorPicker:
+      SettingsTaskBoardLaneColorPicker(lane: .inProgress, rawValue: .constant(fixture.rawValue))
+        .padding(HarnessMonitorTheme.spacingMD)
+        .frame(width: width)
+    case .popover:
+      // Already carries the popover's own width and padding.
+      SettingsTaskBoardLaneAppearancePopover(
+        lane: .inProgress,
+        rawValue: .constant(fixture.rawValue)
+      )
+    }
   }
 
   private static func render(_ fixture: Fixture) -> NSBitmapImageRep? {
     let root =
-      SettingsTaskBoardLaneColorPicker(lane: .inProgress, rawValue: .constant(fixture.rawValue))
-      .padding(HarnessMonitorTheme.spacingMD)
-      .frame(width: width)
+      surfaceView(fixture)
       // Stands in for the popover chrome. Without it the capture is
       // transparent and secondary text reads as invisible against whatever
       // the viewer happens to composite it onto.
@@ -74,11 +109,12 @@ public enum SettingsTaskBoardLaneColorPickerRenderer {
     hostingView.appearance = NSAppearance(
       named: fixture.themeMode == .light ? .aqua : .darkAqua
     )
+    let fittingSize = hostingView.fittingSize
     hostingView.frame = NSRect(
       x: 0,
       y: 0,
-      width: width,
-      height: hostingView.fittingSize.height
+      width: max(width, fittingSize.width),
+      height: fittingSize.height
     )
     hostingView.layoutSubtreeIfNeeded()
 
