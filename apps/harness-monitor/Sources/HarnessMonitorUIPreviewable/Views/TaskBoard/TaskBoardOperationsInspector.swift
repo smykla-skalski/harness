@@ -97,12 +97,13 @@ struct TaskBoardOperationsInspector: View {
 
   private var resizeHandle: some View {
     Color.clear
-      .frame(width: 12)
+      .frame(width: 24)
       .contentShape(.rect)
       .gesture(resizeGesture)
       .accessibilityElement()
       .accessibilityLabel("Task Board Operations inspector width")
       .accessibilityValue("\(Int(displayedWidth)) points")
+      .accessibilityHint("Drag horizontally or use adjustments to resize the inspector")
       .accessibilityAdjustableAction { direction in
         adjustWidth(for: direction)
       }

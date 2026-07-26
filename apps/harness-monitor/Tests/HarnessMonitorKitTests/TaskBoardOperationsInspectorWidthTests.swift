@@ -86,6 +86,12 @@ func expectPersistentResizableInspectorSource(_ source: String) {
   #expect(source.contains("DragGesture(minimumDistance: 0)"))
   #expect(source.contains(".updating($resizeTranslation)"))
   #expect(source.contains(".onEnded { value in"))
+  #expect(source.contains(".frame(width: 24)"))
+  #expect(
+    source.contains(
+      ".accessibilityHint(\"Drag horizontally or use adjustments to resize the inspector\")"
+    )
+  )
   #expect(source.contains(".accessibilityAdjustableAction"))
   #expect(!source.contains("@objc"))
   #expect(!source.contains(": NSObject"))
