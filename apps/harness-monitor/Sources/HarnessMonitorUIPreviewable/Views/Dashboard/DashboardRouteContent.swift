@@ -7,6 +7,8 @@ struct DashboardRouteContent: View, Equatable {
   let store: HarnessMonitorStore
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   let sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
+  let operationsInspectorVisible: Bool
+  let operationsInspectorDispatcher: TaskBoardOperationsInspectorFocusDispatcher
   @State private var reviewsSearchAutomationCommand = AppSearchAutomationCommand.idle
   @State private var auditHasBeenMounted = false
   @State private var diagnosticsHasBeenMounted = false
@@ -23,6 +25,8 @@ struct DashboardRouteContent: View, Equatable {
       && lhs.store === rhs.store
       && lhs.dashboardUI === rhs.dashboardUI
       && lhs.sessionCatalog === rhs.sessionCatalog
+      && lhs.operationsInspectorVisible == rhs.operationsInspectorVisible
+      && lhs.operationsInspectorDispatcher === rhs.operationsInspectorDispatcher
   }
 
   private var isTaskBoardVisible: Bool { route == .taskBoard }
@@ -44,7 +48,9 @@ struct DashboardRouteContent: View, Equatable {
         store: store,
         dashboardUI: dashboardUI,
         sessionCatalog: sessionCatalog,
-        isRouteVisible: isTaskBoardVisible
+        isRouteVisible: isTaskBoardVisible,
+        operationsInspectorVisible: operationsInspectorVisible,
+        operationsInspectorDispatcher: operationsInspectorDispatcher
       )
       .layoutValue(key: DashboardRetainedRouteKey.self, value: .taskBoard)
       .opacity(isTaskBoardVisible ? 1 : 0)
@@ -166,15 +172,13 @@ struct DashboardTaskBoardRouteView: View {
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   let sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
   let isRouteVisible: Bool
-  @AppStorage(TaskBoardOperationsInspectorVisibility.storageKey)
-  private var operationsInspectorVisible = TaskBoardOperationsInspectorVisibility.defaultValue
+  let operationsInspectorVisible: Bool
+  let operationsInspectorDispatcher: TaskBoardOperationsInspectorFocusDispatcher
   @State private var taskBoardInboxSnapshot = TaskBoardInboxSnapshot(
     generatedAt: nil,
     isFromCache: true
   )
   @State private var perfScrollPosition = ScrollPosition()
-  @State private var operationsInspectorDispatcher =
-    TaskBoardOperationsInspectorFocusDispatcher()
   @State private var policyWorkspaceLoadState = TaskBoardPolicyWorkspaceLoadState()
   private let perfScrollHookEnabled = HarnessMonitorPerfDashboardScrollBus.isActiveAtLaunch
 
@@ -198,53 +202,43 @@ struct DashboardTaskBoardRouteView: View {
 
   var body: some View {
     let _ = HarnessMonitorPerfTrace.countBodyEval("DashboardTaskBoardRouteView")
-    HStack(spacing: 0) {
-      taskBoardMainContent
-      TaskBoardOperationsInspector(
-        store: store,
-        taskBoardItems: dashboardUI.taskBoardItems,
-        isVisible: operationsInspectorVisible && isRouteVisible
-      )
-    }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .onAppear {
-      guard perfScrollHookEnabled else { return }
-      HarnessMonitorPerfDashboardScrollBus.recordTrigger(edge: "view.appear")
-    }
-    .task(id: taskBoardInboxSessionIDs) {
-      await refreshVisibleTaskBoardInboxSnapshot()
-    }
-    .onChange(of: isRouteVisible, initial: true) {
-      updatePolicyWorkspaceLoad()
-    }
-    .onChange(of: dashboardUI.connectionState, initial: true) {
-      updatePolicyWorkspaceLoad()
-    }
-    .onAppear {
-      operationsInspectorDispatcher.toggleInspector = toggleOperationsInspector
-    }
-    .onReceive(
-      NotificationCenter.default.publisher(
-        for: HarnessMonitorPerfDashboardScrollBus.scrollToBottom
-      )
-    ) { _ in
-      guard perfScrollHookEnabled else { return }
-      HarnessMonitorPerfDashboardScrollBus.recordTrigger(edge: "bottom")
-      withAnimation(.easeOut(duration: 0.6)) {
-        perfScrollPosition = ScrollPosition(edge: .bottom)
+    taskBoardMainContent
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .onAppear {
+        guard perfScrollHookEnabled else { return }
+        HarnessMonitorPerfDashboardScrollBus.recordTrigger(edge: "view.appear")
       }
-    }
-    .onReceive(
-      NotificationCenter.default.publisher(
-        for: HarnessMonitorPerfDashboardScrollBus.scrollToTop
-      )
-    ) { _ in
-      guard perfScrollHookEnabled else { return }
-      HarnessMonitorPerfDashboardScrollBus.recordTrigger(edge: "top")
-      withAnimation(.easeOut(duration: 0.6)) {
-        perfScrollPosition = ScrollPosition(edge: .top)
+      .task(id: taskBoardInboxSessionIDs) {
+        await refreshVisibleTaskBoardInboxSnapshot()
       }
-    }
+      .onChange(of: isRouteVisible, initial: true) {
+        updatePolicyWorkspaceLoad()
+      }
+      .onChange(of: dashboardUI.connectionState, initial: true) {
+        updatePolicyWorkspaceLoad()
+      }
+      .onReceive(
+        NotificationCenter.default.publisher(
+          for: HarnessMonitorPerfDashboardScrollBus.scrollToBottom
+        )
+      ) { _ in
+        guard perfScrollHookEnabled else { return }
+        HarnessMonitorPerfDashboardScrollBus.recordTrigger(edge: "bottom")
+        withAnimation(.easeOut(duration: 0.6)) {
+          perfScrollPosition = ScrollPosition(edge: .bottom)
+        }
+      }
+      .onReceive(
+        NotificationCenter.default.publisher(
+          for: HarnessMonitorPerfDashboardScrollBus.scrollToTop
+        )
+      ) { _ in
+        guard perfScrollHookEnabled else { return }
+        HarnessMonitorPerfDashboardScrollBus.recordTrigger(edge: "top")
+        withAnimation(.easeOut(duration: 0.6)) {
+          perfScrollPosition = ScrollPosition(edge: .top)
+        }
+      }
   }
 
   @ViewBuilder private var taskBoardMainContent: some View {
@@ -339,10 +333,5 @@ struct DashboardTaskBoardRouteView: View {
         }
       }
     )
-  }
-
-  @MainActor
-  private func toggleOperationsInspector() {
-    operationsInspectorVisible.toggle()
   }
 }

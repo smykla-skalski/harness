@@ -14,6 +14,8 @@ public struct DashboardWindowView: View {
   var persistedColumnVisibilityRaw = SessionColumnVisibilityCodec.encode(.doubleColumn)
   @SceneStorage("dashboard.sidebarWidth")
   var persistedSidebarWidth = 220.0
+  @AppStorage(TaskBoardOperationsInspectorVisibility.storageKey)
+  private var operationsInspectorVisible = TaskBoardOperationsInspectorVisibility.defaultValue
   @Environment(\.openWindow)
   var openWindow
   @State private var handledHistoryRestoreRequestID = 0
@@ -28,6 +30,8 @@ public struct DashboardWindowView: View {
   /// under the column-toggle animation and showed up as `find1<A>` +
   /// `propagate_dirty` cost in the live-daemon trace top-offenders.
   @State private var navigationStateStorage = WindowNavigationState()
+  @State private var operationsInspectorDispatcher =
+    TaskBoardOperationsInspectorFocusDispatcher()
 
   public init(
     store: HarnessMonitorStore,
@@ -161,16 +165,28 @@ public struct DashboardWindowView: View {
           statusModel: dashboardStatusSummaryModel(route: route)
         )
       } detail: {
-        DashboardBannerStack(store: store) {
-          DashboardRouteContent(
-            route: route,
-            selectedRoute: selectedRouteBinding,
+        ZStack(alignment: .trailing) {
+          DashboardBannerStack(store: store) {
+            DashboardRouteContent(
+              route: route,
+              selectedRoute: selectedRouteBinding,
+              store: store,
+              dashboardUI: dashboardUI,
+              sessionCatalog: sessionCatalog,
+              operationsInspectorVisible: operationsInspectorVisible,
+              operationsInspectorDispatcher: operationsInspectorDispatcher
+            )
+            .equatable()
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+          }
+          TaskBoardOperationsInspector(
             store: store,
-            dashboardUI: dashboardUI,
-            sessionCatalog: sessionCatalog
+            taskBoardItems: dashboardUI.taskBoardItems,
+            isVisible: operationsInspectorVisible && route == .taskBoard
           )
-          .equatable()
-          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .onAppear {
+          operationsInspectorDispatcher.toggleInspector = toggleOperationsInspector
         }
         .navigationTitle(route.navigationTitle)
         .navigationSubtitle(route.navigationSubtitle)
@@ -235,6 +251,11 @@ public struct DashboardWindowView: View {
         )
       )
     }
+  }
+
+  @MainActor
+  private func toggleOperationsInspector() {
+    operationsInspectorVisible.toggle()
   }
 
   @MainActor

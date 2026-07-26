@@ -241,11 +241,15 @@ struct TaskBoardRouteContentSourceTests {
     #expect(dashboardSource.contains(".accessibilityHidden(!isPolicyCanvasVisible)"))
   }
 
-  @Test("Dashboard task board moves operations into a collapsed retained inspector")
-  func dashboardTaskBoardMovesOperationsIntoCollapsedRetainedInspector() throws {
+  @Test("Dashboard task board uses a persistent resizable retained inspector")
+  func dashboardTaskBoardUsesPersistentResizableRetainedInspector() throws {
     let dashboardSource = try previewableSourceFile(
       domain: "Dashboard",
       named: "DashboardRouteContent.swift"
+    )
+    let dashboardWindowSource = try previewableSourceFile(
+      domain: "Dashboard",
+      named: "DashboardWindowView.swift"
     )
     let overviewHostSource = try taskBoardSourceFile(named: "TaskBoardOverviewHost.swift")
     let overviewChromeSource = try taskBoardSourceFile(named: "TaskBoardOverviewView+Chrome.swift")
@@ -257,44 +261,42 @@ struct TaskBoardRouteContentSourceTests {
 
     #expect(dashboardSource.contains("isRouteVisible: isTaskBoardVisible"))
     #expect(
-      dashboardSource.contains(
+      dashboardWindowSource.contains(
         "@AppStorage(TaskBoardOperationsInspectorVisibility.storageKey)"
       )
     )
     #expect(
-      dashboardSource.contains(
+      dashboardWindowSource.contains(
         "private var operationsInspectorVisible = TaskBoardOperationsInspectorVisibility.defaultValue"
       )
     )
-    #expect(dashboardSource.contains("TaskBoardOperationsInspector("))
+    #expect(dashboardWindowSource.contains("TaskBoardOperationsInspector("))
+    #expect(dashboardWindowSource.contains("ZStack(alignment: .trailing) {"))
+    #expect(!dashboardSource.contains("HSplitView {"))
+    #expect(!dashboardSource.contains("GeometryReader { geometry in"))
+    #expect(!dashboardSource.contains("geometry.safeAreaInsets.top"))
+    #expect(!dashboardSource.contains(".ignoresSafeArea(.container, edges: .top)"))
     #expect(!dashboardSource.contains("if operationsInspectorVisible {"))
     #expect(
-      dashboardSource.contains(
-        "isVisible: operationsInspectorVisible && isRouteVisible"
+      dashboardWindowSource.contains(
+        "isVisible: operationsInspectorVisible && route == .taskBoard"
       )
     )
-    #expect(dashboardSource.contains("taskBoardItems: dashboardUI.taskBoardItems"))
+    #expect(dashboardWindowSource.contains("taskBoardItems: dashboardUI.taskBoardItems"))
     #expect(dashboardSource.contains("showsOperationsPanel: false"))
     #expect(dashboardSource.contains("isCommandFocusActive: isRouteVisible"))
     #expect(dashboardSource.contains("operationsInspectorFocus: operationsInspectorFocus"))
     #expect(
-      dashboardSource.contains(
+      dashboardWindowSource.contains(
         "operationsInspectorDispatcher.toggleInspector = toggleOperationsInspector"
       )
     )
-    #expect(dashboardSource.contains(".onAppear {"))
-    #expect(dashboardSource.contains("operationsInspectorVisible.toggle()"))
+    #expect(dashboardWindowSource.contains(".onAppear {"))
+    #expect(dashboardWindowSource.contains("operationsInspectorVisible.toggle()"))
     #expect(overviewHostSource.contains("showsOperationsPanel: Bool = true"))
     #expect(overviewChromeSource.contains("if taskBoardSessionID == nil, showsOperationsPanel"))
     #expect(inspectorSource.contains("static let defaultValue = false"))
-    #expect(inspectorSource.contains("private static let width: CGFloat = 380"))
-    #expect(inspectorSource.contains("ScrollView(.vertical)"))
-    #expect(inspectorSource.contains("TaskBoardOperationsPanel("))
-    #expect(inspectorSource.contains("taskBoardItems: isVisible ? taskBoardItems : []"))
-    #expect(inspectorSource.contains("isActive: isVisible"))
-    #expect(inspectorSource.contains(".frame(width: isVisible ? Self.width : 0"))
-    #expect(inspectorSource.contains(".allowsHitTesting(isVisible)"))
-    #expect(inspectorSource.contains(".accessibilityHidden(!isVisible)"))
+    expectPersistentResizableInspectorSource(inspectorSource)
     #expect(operationsPanelSource.contains("isActive: Bool = true"))
     #expect(operationsPanelSource.contains(".task(id: isActive)"))
     #expect(operationsPanelSource.contains("catch is CancellationError"))
