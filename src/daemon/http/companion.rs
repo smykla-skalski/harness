@@ -32,6 +32,7 @@ mod response_body;
 mod router;
 #[cfg(test)]
 mod tests;
+mod upgrade;
 
 pub(crate) use response_body::bind_response_permits;
 pub(super) use router::companion_routes;

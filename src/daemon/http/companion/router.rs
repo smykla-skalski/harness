@@ -12,7 +12,7 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 use super::super::{DaemonConnectInfo, DaemonHttpState};
 use super::{
-    CompanionRouteConfig, MAX_CONCURRENT_COMPANION_REQUESTS, client, forward, rate_limit,
+    CompanionRouteConfig, MAX_CONCURRENT_COMPANION_REQUESTS, client, forward, rate_limit, upgrade,
 };
 
 /// Live companion routing: the validated target plus the pooled client used to
@@ -118,12 +118,26 @@ async fn proxy_request(
             return rate_limit::rate_limited_response(retry_after_seconds);
         }
     }
+    // Taken before the handshake rather than after, so a daemon already at its
+    // socket ceiling refuses the upgrade instead of establishing one it has no
+    // room for. The permit outlives this handler: the relay holds it for as long
+    // as the connection is open.
+    let websocket_permit =
+        if upgrade::requests_websocket_upgrade(request.method(), request.headers()) {
+            match super::super::remote_limits::take_remote_websocket_permit(&state) {
+                Ok(permit) => permit,
+                Err(response) => return *response,
+            }
+        } else {
+            None
+        };
     let client = companion.inner.clients.for_version(request.version());
     forward::forward_to_companion(
         &companion.inner.config,
         client,
         peer_addr,
         request,
+        websocket_permit,
     )
     .await
 }

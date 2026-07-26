@@ -23,15 +23,17 @@ use axum::response::{IntoResponse, Response};
 use hyper::body::Incoming;
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::client::legacy::{Client, Error as ClientError};
+use tokio::sync::OwnedSemaphorePermit;
 use tokio::time::{Instant, timeout_at};
 
 use crate::daemon::remote_auth::REMOTE_CLIENT_ID_HEADER;
 
 use super::CompanionRouteConfig;
 use super::response_body::stream_upstream_body;
+use super::upgrade;
 
 const COMPANION_ERROR_CODE: &str = "COMPANION_UPSTREAM";
-const COMPANION_UPSTREAM_TIMEOUT: Duration = Duration::from_mins(1);
+pub(super) const COMPANION_UPSTREAM_TIMEOUT: Duration = Duration::from_mins(1);
 
 /// Headers that describe one hop and must never be forwarded to the next one.
 const HOP_BY_HOP_HEADERS: &[HeaderName] = &[
@@ -74,9 +76,14 @@ pub(super) async fn forward_to_companion(
     client: &Client<HttpConnector, Body>,
     peer_addr: SocketAddr,
     request: Request<Body>,
+    websocket_permit: Option<OwnedSemaphorePermit>,
 ) -> Response {
     if requests_protocol_upgrade(request.method(), request.headers()) {
-        return upgrade_unsupported_response();
+        if !upgrade::requests_websocket_upgrade(request.method(), request.headers()) {
+            return upgrade_unsupported_response();
+        }
+        return upgrade::relay_websocket(config, client, peer_addr, request, websocket_permit)
+            .await;
     }
     let upstream_request = match build_upstream_request(config, peer_addr, request) {
         Ok(request) => request,
@@ -99,7 +106,7 @@ pub(super) async fn forward_to_companion(
     }
 }
 
-fn build_upstream_request(
+pub(super) fn build_upstream_request(
     config: &CompanionRouteConfig,
     peer_addr: SocketAddr,
     request: Request<Body>,
@@ -218,12 +225,10 @@ fn connection_listed_headers(headers: &HeaderMap) -> Vec<HeaderName> {
 /// Answering `501` is honest; silently stripping the upgrade would leave the
 /// caller waiting on a handshake that can never complete.
 fn requests_protocol_upgrade(method: &Method, headers: &HeaderMap) -> bool {
-    if method == Method::CONNECT {
-        return true;
-    }
-    if headers.contains_key(UPGRADE) {
-        return true;
-    }
+    method == Method::CONNECT || headers.contains_key(UPGRADE) || connection_names_upgrade(headers)
+}
+
+pub(super) fn connection_names_upgrade(headers: &HeaderMap) -> bool {
     headers
         .get_all(CONNECTION)
         .iter()
@@ -257,7 +262,7 @@ fn companion_error_response(status: StatusCode, message: &str) -> Response {
         .into_response()
 }
 
-fn upstream_unreachable_response() -> Response {
+pub(super) fn upstream_unreachable_response() -> Response {
     companion_error_response(StatusCode::BAD_GATEWAY, "companion service did not answer")
 }
 
@@ -275,10 +280,10 @@ fn upstream_uri_invalid_response() -> Response {
     )
 }
 
-fn upgrade_unsupported_response() -> Response {
+pub(super) fn upgrade_unsupported_response() -> Response {
     companion_error_response(
         StatusCode::NOT_IMPLEMENTED,
-        "companion routing does not relay protocol upgrades",
+        "companion routing relays only websocket upgrades",
     )
 }
 
