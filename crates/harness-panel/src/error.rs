@@ -197,6 +197,11 @@ mod tests {
                 "not_found",
             ),
             (
+                ApiError::Unavailable("not paired yet"),
+                StatusCode::SERVICE_UNAVAILABLE,
+                "unavailable",
+            ),
+            (
                 ApiError::BadRequest("missing code".to_owned()),
                 StatusCode::BAD_REQUEST,
                 "bad_request",
@@ -210,6 +215,22 @@ mod tests {
             let (actual_status, actual_code, _) = error.parts();
             assert_eq!(actual_status, status);
             assert_eq!(actual_code, code);
+        }
+    }
+
+    /// Adding a variant breaks this match, which is the reminder to add it to
+    /// the list above as well. The compiler cannot check that the list is
+    /// complete, only that somebody was made to look at it.
+    fn _every_variant_is_accounted_for(error: &ApiError) {
+        match error {
+            ApiError::Unauthenticated
+            | ApiError::Forbidden(_)
+            | ApiError::RateLimited(_)
+            | ApiError::NotFound(_)
+            | ApiError::Unavailable(_)
+            | ApiError::BadRequest(_)
+            | ApiError::SignInFailed(_)
+            | ApiError::Internal(_) => {}
         }
     }
 
