@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn readiness_auto_detects_repo_root_and_marks_profiles_ready() {
+fn readiness_auto_detects_repo_root() {
     let tmp = tempfile::tempdir().unwrap();
     let (home_dir, repo_root, project_dir) = prepare_nested_kuma_project(tmp.path());
 
@@ -18,7 +18,6 @@ fn readiness_auto_detects_repo_root_and_marks_profiles_ready() {
         Some(repo_root.to_str().unwrap())
     );
     assert!(report.readiness.create.ready);
-    assert_ready_profiles(&report);
 }
 
 #[test]
@@ -48,87 +47,6 @@ fn readiness_keeps_create_ready_when_project_plugin_is_missing() {
             .checks
             .iter()
             .any(|check| check.code.contains("plugin"))
-    );
-}
-
-#[test]
-fn readiness_blocks_platforms_when_docker_is_missing() {
-    let tmp = tempfile::tempdir().unwrap();
-    let home = tmp.path().join("home");
-    let repo_root = tmp.path().join("repo-root");
-    let project_dir = tmp.path().join("project");
-    fs::create_dir_all(&home).unwrap();
-    fs::create_dir_all(home.join("bin")).unwrap();
-    fs::create_dir_all(&project_dir).unwrap();
-    write_current_kuma_contract(&repo_root);
-
-    let report = with_data_root(tmp.path(), || {
-        with_vars([("HARNESS_CONTAINER_RUNTIME", Some("docker-cli"))], || {
-            build_report(
-                Some(project_dir.to_str().unwrap()),
-                Some(repo_root.to_str().unwrap()),
-                &FakeProbe::ready(&home).without_command("docker"),
-            )
-        })
-    });
-
-    assert!(report.readiness.create.ready);
-    assert!(!report.readiness.platforms["kubernetes"].ready);
-    assert!(!report.readiness.platforms["universal"].ready);
-    assert!(
-        report.readiness.platforms["kubernetes"]
-            .blocking_checks
-            .contains(&"docker_binary_present".to_string())
-    );
-    assert!(
-        report.readiness.platforms["universal"]
-            .blocking_checks
-            .is_empty()
-    );
-    assert_eq!(
-        report
-            .readiness
-            .checks
-            .iter()
-            .find(|check| check.code == "docker_running")
-            .unwrap()
-            .status,
-        ReadinessStatus::Skipped
-    );
-}
-
-#[test]
-fn readiness_keeps_universal_ready_with_bollard_when_docker_cli_is_missing() {
-    let tmp = tempfile::tempdir().unwrap();
-    let home = tmp.path().join("home");
-    let repo_root = tmp.path().join("repo-root");
-    let project_dir = tmp.path().join("project");
-    fs::create_dir_all(&home).unwrap();
-    fs::create_dir_all(home.join("bin")).unwrap();
-    fs::create_dir_all(&project_dir).unwrap();
-    write_current_kuma_contract(&repo_root);
-
-    let report = with_data_root(tmp.path(), || {
-        with_vars([("HARNESS_CONTAINER_RUNTIME", Some("bollard"))], || {
-            build_report(
-                Some(project_dir.to_str().unwrap()),
-                Some(repo_root.to_str().unwrap()),
-                &FakeProbe::ready(&home).without_command("docker"),
-            )
-        })
-    });
-
-    assert!(!report.readiness.platforms["kubernetes"].ready);
-    assert!(report.readiness.platforms["universal"].ready);
-    assert_eq!(
-        report
-            .readiness
-            .checks
-            .iter()
-            .find(|check| check.code == "docker_running")
-            .unwrap()
-            .status,
-        ReadinessStatus::Pass
     );
 }
 
@@ -163,153 +81,21 @@ fn readiness_marks_repo_contract_unready_when_targets_are_missing() {
         )
     });
 
-    assert!(!report.readiness.platforms["kubernetes"].ready);
-    assert!(
-        report.readiness.platforms["kubernetes"]
-            .blocking_checks
-            .contains(&"repo_make_contract_present".to_string())
-    );
-    assert!(
-        report.readiness.providers["remote"]
-            .blocking_checks
-            .contains(&"repo_remote_publish_contract_present".to_string())
-            || report.readiness.providers["remote"]
-                .blocking_checks
-                .contains(&"repo_make_contract_present".to_string())
-    );
-}
-
-#[test]
-fn readiness_distinguishes_platform_specific_features() {
-    let tmp = tempfile::tempdir().unwrap();
-    let home = tmp.path().join("home");
-    let repo_root = tmp.path().join("repo-root");
-    let project_dir = tmp.path().join("project");
-    fs::create_dir_all(&home).unwrap();
-    fs::create_dir_all(home.join("bin")).unwrap();
-    fs::create_dir_all(&project_dir).unwrap();
-    write_current_kuma_contract(&repo_root);
-
-    let probe = FakeProbe::ready(&home)
-        .without_command("k3d")
-        .without_command("kubectl")
-        .without_command("helm")
-        .without_command("make");
-    let report = with_data_root(tmp.path(), || {
-        build_report(
-            Some(project_dir.to_str().unwrap()),
-            Some(repo_root.to_str().unwrap()),
-            &probe,
-        )
-    });
-
-    assert!(!report.readiness.platforms["kubernetes"].ready);
-    assert!(report.readiness.platforms["universal"].ready);
-    assert!(!report.readiness.features[&Feature::GatewayApi].ready);
-    assert!(report.readiness.features[&Feature::DataplaneTokens].ready);
-    assert!(report.readiness.features[&Feature::ManifestApply].ready);
-}
-
-#[test]
-fn readiness_keeps_remote_provider_ready_when_k3d_is_missing() {
-    let tmp = tempfile::tempdir().unwrap();
-    let home = tmp.path().join("home");
-    let repo_root = tmp.path().join("repo-root");
-    let project_dir = tmp.path().join("project");
-    fs::create_dir_all(&home).unwrap();
-    fs::create_dir_all(home.join("bin")).unwrap();
-    fs::create_dir_all(&project_dir).unwrap();
-    write_current_kuma_contract(&repo_root);
-
-    let probe = FakeProbe::ready(&home).without_command("k3d");
-    let report = with_data_root(tmp.path(), || {
-        build_report(
-            Some(project_dir.to_str().unwrap()),
-            Some(repo_root.to_str().unwrap()),
-            &probe,
-        )
-    });
-
-    assert!(!report.readiness.providers["k3d"].ready);
-    assert!(report.readiness.providers["remote"].ready);
-    assert!(report.readiness.platforms["kubernetes"].ready);
-    assert!(
+    let status = |code: &str| {
         report
             .readiness
-            .profiles
+            .checks
             .iter()
-            .any(|profile| profile.name == "single-zone"
-                && profile.provider == ClusterProvider::Remote
-                && profile.ready)
+            .find(|check| check.code == code)
+            .map(|check| check.status)
+    };
+
+    assert_eq!(
+        status("repo_make_contract_present"),
+        Some(ReadinessStatus::Fail)
     );
-}
-
-#[test]
-fn readiness_keeps_kubernetes_ready_with_native_runtime_when_kubectl_is_missing() {
-    let tmp = tempfile::tempdir().unwrap();
-    let (home_dir, project_dir) = prepare_project_root_with_contract(tmp.path());
-
-    let report = with_data_root(tmp.path(), || {
-        build_report(
-            Some(project_dir.to_str().unwrap()),
-            None,
-            &FakeProbe::ready(&home_dir).without_command("kubectl"),
-        )
-    });
-
-    assert!(report.readiness.platforms["kubernetes"].ready);
-    assert!(report.readiness.providers["k3d"].ready);
-    assert!(report.readiness.providers["remote"].ready);
-
-    let kubectl_check = report
-        .readiness
-        .checks
-        .iter()
-        .find(|check| check.code == "kubectl_binary_present")
-        .unwrap();
-    assert_eq!(kubectl_check.status, ReadinessStatus::Fail);
-
-    let runtime_check = report
-        .readiness
-        .checks
-        .iter()
-        .find(|check| check.code == "kubernetes_runtime_ready")
-        .unwrap();
-    assert_eq!(runtime_check.status, ReadinessStatus::Pass);
-}
-
-#[test]
-fn readiness_blocks_kubernetes_when_kubectl_cli_backend_is_selected_without_kubectl() {
-    let tmp = tempfile::tempdir().unwrap();
-    let (home_dir, project_dir) = prepare_project_root_with_contract(tmp.path());
-
-    let report = with_data_root(tmp.path(), || {
-        with_vars(
-            [("HARNESS_KUBERNETES_RUNTIME", Some("kubectl-cli"))],
-            || {
-                build_report(
-                    Some(project_dir.to_str().unwrap()),
-                    None,
-                    &FakeProbe::ready(&home_dir).without_command("kubectl"),
-                )
-            },
-        )
-    });
-
-    assert!(!report.readiness.platforms["kubernetes"].ready);
-    assert!(!report.readiness.providers["k3d"].ready);
-    assert!(!report.readiness.providers["remote"].ready);
-    assert!(
-        report.readiness.platforms["kubernetes"]
-            .blocking_checks
-            .contains(&"kubernetes_runtime_ready".to_string())
+    assert_eq!(
+        status("repo_remote_publish_contract_present"),
+        Some(ReadinessStatus::Fail)
     );
-
-    let runtime_check = report
-        .readiness
-        .checks
-        .iter()
-        .find(|check| check.code == "kubernetes_runtime_ready")
-        .unwrap();
-    assert_eq!(runtime_check.status, ReadinessStatus::Fail);
 }

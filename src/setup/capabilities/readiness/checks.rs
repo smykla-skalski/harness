@@ -3,10 +3,6 @@ use std::path::Path;
 
 use fs_err as fs;
 
-use crate::infra::blocks::{
-    ContainerRuntimeBackend, KubernetesRuntimeBackend, container_backend_from_env,
-    kubernetes_backend_from_env,
-};
 use crate::setup::capabilities::model::{ReadinessCheck, ReadinessCheckScope, ReadinessStatus};
 use crate::setup::wrapper::choose_install_dir_with_home;
 use crate::workspace::harness_data_root;
@@ -25,11 +21,6 @@ pub(super) fn build_checks(
     let path_env = probe.path_env();
     let home_dir = probe.home_dir();
     let data_root = harness_data_root();
-    let backend = container_backend_from_env().unwrap_or(ContainerRuntimeBackend::Bollard);
-    let kubernetes_backend =
-        kubernetes_backend_from_env().unwrap_or(KubernetesRuntimeBackend::Kube);
-    let docker_present = probe.command_on_path("docker");
-    let kubectl_present = probe.command_on_path("kubectl");
     let repo_exists = repo_root.is_some_and(Path::is_dir);
     let repo_is_kuma = repo_root
         .filter(|path| path.is_dir())
@@ -40,15 +31,6 @@ pub(super) fn build_checks(
         check_project_dir_exists(project_dir),
         check_wrapper_install_target(&path_env, &home_dir),
         check_binary_present(
-            "docker_binary_present",
-            "Docker CLI is available.",
-            "Docker CLI is missing.",
-            "Install Docker Desktop or another Docker-compatible runtime and ensure `docker` is on PATH.",
-            "docker",
-            probe,
-        ),
-        check_docker_running(docker_present, backend, probe),
-        check_binary_present(
             "make_binary_present",
             "`make` is available.",
             "`make` is missing.",
@@ -56,32 +38,6 @@ pub(super) fn build_checks(
             "make",
             probe,
         ),
-        check_binary_present(
-            "k3d_binary_present",
-            "k3d is available.",
-            "k3d is missing.",
-            "Install `k3d` and ensure it is on PATH for Kubernetes profile setup.",
-            "k3d",
-            probe,
-        ),
-        check_binary_present(
-            "kubectl_binary_present",
-            "kubectl is available.",
-            "kubectl is missing.",
-            "Install `kubectl` and ensure it is on PATH for Kubernetes profile setup.",
-            "kubectl",
-            probe,
-        ),
-        check_kubernetes_runtime_ready(kubectl_present, kubernetes_backend),
-        check_binary_present(
-            "helm_binary_present",
-            "Helm is available.",
-            "Helm is missing.",
-            "Install `helm` and ensure it is on PATH for Kubernetes profile setup.",
-            "helm",
-            probe,
-        ),
-        check_docker_compose_available(docker_present, backend, probe),
         check_repo_root_resolved(repo_root),
         check_repo_root_exists(repo_root),
         check_repo_is_kuma_checkout(repo_root, repo_exists),
@@ -177,132 +133,6 @@ fn check_binary_present(
             failure,
             None,
             Some(hint),
-        )
-    }
-}
-
-fn check_kubernetes_runtime_ready(
-    kubectl_present: bool,
-    backend: KubernetesRuntimeBackend,
-) -> ReadinessCheck {
-    match backend {
-        KubernetesRuntimeBackend::Kube => pass(
-            "kubernetes_runtime_ready",
-            ReadinessCheckScope::Machine,
-            "Native Kubernetes runtime is available.",
-            None,
-            None,
-        ),
-        KubernetesRuntimeBackend::KubectlCli if kubectl_present => pass(
-            "kubernetes_runtime_ready",
-            ReadinessCheckScope::Machine,
-            "kubectl-backed Kubernetes runtime is available.",
-            None,
-            None,
-        ),
-        KubernetesRuntimeBackend::KubectlCli => fail(
-            "kubernetes_runtime_ready",
-            ReadinessCheckScope::Machine,
-            "kubectl-backed Kubernetes runtime is unavailable because kubectl is missing.",
-            None,
-            Some("Install `kubectl` or switch HARNESS_KUBERNETES_RUNTIME to `kube`."),
-        ),
-    }
-}
-
-fn check_docker_running(
-    docker_present: bool,
-    backend: ContainerRuntimeBackend,
-    probe: &dyn CapabilityProbe,
-) -> ReadinessCheck {
-    if backend == ContainerRuntimeBackend::DockerCli && !docker_present {
-        return skipped(
-            "docker_running",
-            ReadinessCheckScope::Machine,
-            "Docker daemon check skipped because the Docker CLI is missing.",
-            None,
-            Some("Install Docker first, then rerun capabilities."),
-        );
-    }
-
-    let daemon_ready = match backend {
-        ContainerRuntimeBackend::DockerCli => probe.run_command_success("docker", &["info"]),
-        ContainerRuntimeBackend::Bollard => probe.docker_engine_reachable(),
-    };
-
-    if daemon_ready {
-        pass(
-            "docker_running",
-            ReadinessCheckScope::Machine,
-            "Docker daemon is reachable.",
-            None,
-            None,
-        )
-    } else {
-        fail(
-            "docker_running",
-            ReadinessCheckScope::Machine,
-            "Docker daemon is not reachable.",
-            None,
-            Some("Start Docker Desktop or the local Docker daemon."),
-        )
-    }
-}
-
-fn check_docker_compose_available(
-    docker_present: bool,
-    backend: ContainerRuntimeBackend,
-    probe: &dyn CapabilityProbe,
-) -> ReadinessCheck {
-    if backend == ContainerRuntimeBackend::DockerCli && !docker_present {
-        return skipped(
-            "docker_compose_available",
-            ReadinessCheckScope::Machine,
-            "Docker Compose check skipped because the Docker CLI is missing.",
-            None,
-            Some("Install Docker first, then rerun capabilities."),
-        );
-    }
-
-    let compose_ready = match backend {
-        ContainerRuntimeBackend::DockerCli => {
-            probe.run_command_success("docker", &["compose", "version"])
-        }
-        ContainerRuntimeBackend::Bollard => probe.docker_engine_reachable(),
-    };
-
-    if compose_ready {
-        pass(
-            "docker_compose_available",
-            ReadinessCheckScope::Machine,
-            match backend {
-                ContainerRuntimeBackend::DockerCli => "Docker Compose is available.",
-                ContainerRuntimeBackend::Bollard => {
-                    "Harness compose runtime is available through the Docker Engine API."
-                }
-            },
-            None,
-            None,
-        )
-    } else {
-        fail(
-            "docker_compose_available",
-            ReadinessCheckScope::Machine,
-            match backend {
-                ContainerRuntimeBackend::DockerCli => "Docker Compose is unavailable.",
-                ContainerRuntimeBackend::Bollard => {
-                    "Harness compose runtime cannot reach the Docker Engine API."
-                }
-            },
-            None,
-            Some(match backend {
-                ContainerRuntimeBackend::DockerCli => {
-                    "Install Docker Compose support for universal profile setup."
-                }
-                ContainerRuntimeBackend::Bollard => {
-                    "Start Docker Desktop or the local Docker daemon."
-                }
-            }),
         )
     }
 }
