@@ -1,10 +1,11 @@
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+use serde::Deserialize;
 
 use crate::feature_flags::RuntimeHookFlags;
 use crate::hooks::adapters::HookAgent;
 use crate::infra::io::read_json_typed;
-use crate::run::context::CurrentRunPointer;
 use crate::setup::wrapper::planned_agent_bootstrap_files;
 use crate::workspace::compact::{handoff_version, load_latest_compact_handoff};
 
@@ -73,6 +74,29 @@ pub(super) fn check_runtime_bootstrap_contract(project_dir: &Path) -> Vec<Doctor
     checks
 }
 
+/// The part of the on-disk current-run pointer this check actually reads.
+///
+/// Doctor inspects this file without writing it, so it deserializes the shape it
+/// needs rather than the writer's type. Serde ignores every other field, which
+/// keeps an unrelated change to the pointer payload from reporting each run as
+/// a corrupt pointer.
+#[derive(Deserialize)]
+struct CurrentRunPointerFile {
+    layout: CurrentRunPointerLayout,
+}
+
+#[derive(Deserialize)]
+struct CurrentRunPointerLayout {
+    run_root: String,
+    run_id: String,
+}
+
+impl CurrentRunPointerFile {
+    fn run_dir(&self) -> PathBuf {
+        Path::new(&self.layout.run_root).join(&self.layout.run_id)
+    }
+}
+
 pub(super) fn check_current_run_pointer(pointer_path: &Path) -> DoctorCheck {
     if !pointer_path.exists() {
         return ok_check(
@@ -83,9 +107,9 @@ pub(super) fn check_current_run_pointer(pointer_path: &Path) -> DoctorCheck {
         );
     }
 
-    match read_json_typed::<CurrentRunPointer>(pointer_path) {
+    match read_json_typed::<CurrentRunPointerFile>(pointer_path) {
         Ok(pointer) => {
-            let run_dir = pointer.layout.run_dir();
+            let run_dir = pointer.run_dir();
             if run_dir.is_dir() {
                 ok_check(
                     "observe_current_run_pointer",
@@ -106,7 +130,7 @@ pub(super) fn check_current_run_pointer(pointer_path: &Path) -> DoctorCheck {
                     ),
                     Some(pointer_path),
                     true,
-                    Some("Use `harness run repair` or remove the stale pointer."),
+                    Some("Remove the stale pointer file."),
                 )
             }
         }
@@ -116,7 +140,7 @@ pub(super) fn check_current_run_pointer(pointer_path: &Path) -> DoctorCheck {
             format!("Current run pointer is unreadable: {error}"),
             Some(pointer_path),
             true,
-            Some("Use `harness run repair` or remove the corrupt pointer."),
+            Some("Remove the corrupt pointer file."),
         ),
     }
 }
