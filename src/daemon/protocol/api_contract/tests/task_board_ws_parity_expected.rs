@@ -484,19 +484,19 @@ pub(super) fn expected_task_board_ws_parity() -> Vec<(HttpRouteMethod, &'static 
             HttpRouteMethod::Get,
             http_paths::TASK_BOARD_ORCHESTRATOR_RUNS,
             ws_methods::TASK_BOARD_ORCHESTRATOR_RUNS,
-            false,
+            true,
         ),
         (
             HttpRouteMethod::Get,
             http_paths::TASK_BOARD_ORCHESTRATOR_RUN_DETAIL,
             ws_methods::TASK_BOARD_ORCHESTRATOR_RUN_DETAIL,
-            false,
+            true,
         ),
         (
             HttpRouteMethod::Get,
             http_paths::TASK_BOARD_ORCHESTRATOR_METRICS,
             ws_methods::TASK_BOARD_ORCHESTRATOR_METRICS,
-            false,
+            true,
         ),
         (
             HttpRouteMethod::Post,
