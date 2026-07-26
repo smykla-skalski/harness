@@ -77,7 +77,9 @@ pub(super) async fn spawn_companion_websocket_upstream() -> (String, JoinHandle<
         .await
         .expect("bind companion upstream");
     let address = listener.local_addr().expect("companion upstream address");
-    let app = Router::new().route("/panel/socket", get(companion_socket));
+    let app = Router::new()
+        .route("/panel/socket", get(companion_socket))
+        .route("/panel/socket-refused", get(refuse_socket));
     let server = tokio::spawn(async move {
         axum::serve(listener, app)
             .await
@@ -95,6 +97,19 @@ async fn companion_socket(headers: HeaderMap, ws: WebSocketUpgrade) -> Response<
     ws.on_upgrade(move |mut socket| async move {
         let _ = socket.send(Message::Text(authorization.into())).await;
     })
+}
+
+/// A companion that will not upgrade this caller, answering the way the panel
+/// answers a browser with no session.
+async fn refuse_socket() -> Response<Body> {
+    Response::builder()
+        .status(401)
+        .header("www-authenticate", "Bearer")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"error":{"code":"unauthenticated","message":"sign in"}}"#,
+        ))
+        .expect("a refusal")
 }
 
 /// A port nothing is listening on: bind, read the address, then drop the

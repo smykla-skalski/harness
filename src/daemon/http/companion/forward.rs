@@ -184,7 +184,7 @@ fn apply_forwarded_headers(
     }
 }
 
-fn upstream_response(
+pub(super) fn upstream_response(
     response: HttpResponse<Incoming>,
     deadline: Instant,
     upstream: &str,
@@ -297,8 +297,8 @@ pub(super) fn companion_unconfigured_response() -> Response {
 #[cfg(test)]
 mod tests {
     use super::{
-        AUTHORIZATION, HOST, HeaderMap, HeaderName, HeaderValue, Method, SocketAddr, X_FORWARDED_FOR,
-        X_FORWARDED_HOST, X_FORWARDED_PROTO, apply_companion_authorization,
+        AUTHORIZATION, HOST, HeaderMap, HeaderName, HeaderValue, Method, SocketAddr,
+        X_FORWARDED_FOR, X_FORWARDED_HOST, X_FORWARDED_PROTO, apply_companion_authorization,
         apply_forwarded_headers, connection_listed_headers, original_host,
         requests_protocol_upgrade, strip_daemon_credentials, strip_hop_by_hop_headers,
         upstream_uri,
@@ -477,9 +477,6 @@ mod tests {
             &Method::CONNECT,
             &HeaderMap::new()
         ));
-        assert!(!requests_protocol_upgrade(
-            &Method::GET,
-            &HeaderMap::new()
-        ));
+        assert!(!requests_protocol_upgrade(&Method::GET, &HeaderMap::new()));
     }
 }

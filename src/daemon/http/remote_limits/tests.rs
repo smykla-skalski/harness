@@ -4,7 +4,7 @@ use std::time::Duration;
 use axum::Router;
 use axum::body::Body;
 use axum::extract::Extension;
-use axum::http::{Method, Request, StatusCode};
+use axum::http::{HeaderValue, Method, Request, StatusCode};
 use axum::middleware;
 use axum::routing::get;
 use serde_json::Value;

@@ -15,7 +15,7 @@ use std::net::SocketAddr;
 
 use axum::body::Body;
 use axum::http::header::{CONNECTION, UPGRADE};
-use axum::http::{HeaderMap, HeaderValue, Method, Request, Response as HttpResponse, StatusCode};
+use axum::http::{HeaderMap, HeaderValue, Method, Request, StatusCode};
 use axum::response::Response;
 use hyper_util::rt::TokioIo;
 use tokio::io::copy_bidirectional;
@@ -26,7 +26,7 @@ use super::CompanionRouteConfig;
 use super::client::CompanionClient;
 use super::forward::{
     COMPANION_UPSTREAM_TIMEOUT, build_upstream_request, connection_names_upgrade,
-    upstream_unreachable_response,
+    upstream_response, upstream_unreachable_response,
 };
 
 /// Whether this request is the one upgrade the daemon relays.
@@ -82,10 +82,11 @@ pub(super) async fn relay_websocket(
 
     if response.status() != StatusCode::SWITCHING_PROTOCOLS {
         // The companion looked at the handshake and said no — an unauthenticated
-        // browser, or a path it does not serve a socket on. Its own answer is
-        // the useful one, so it goes back as it came, minus the body: a refusal
-        // to upgrade carries its reason in the status.
-        return refusal(&response);
+        // browser, or a path it does not serve a socket on. That is an ordinary
+        // answer and goes back the ordinary way, headers and body intact: a
+        // `WWW-Authenticate` or an error envelope is the companion telling the
+        // caller what to do about it, and this path has no better guess.
+        return upstream_response(response, deadline, config.upstream_origin());
     }
 
     let upstream = hyper::upgrade::on(&mut response);
@@ -135,13 +136,6 @@ fn report_incomplete_upgrade(error: &hyper::Error) {
 )]
 fn report_relay_end(error: &std::io::Error) {
     tracing::debug!(%error, "companion websocket relay ended");
-}
-
-/// The refusal the companion gave, with its body dropped.
-fn refusal<B>(response: &HttpResponse<B>) -> Response {
-    let mut refused = Response::new(Body::empty());
-    *refused.status_mut() = response.status();
-    refused
 }
 
 fn upstream_unreachable(

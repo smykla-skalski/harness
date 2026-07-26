@@ -477,6 +477,41 @@ async fn half_a_handshake_under_the_prefix_is_refused() {
         .expect("upgrade request");
 
     assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
+    let body: Value = response.json().await.expect("error body");
+    assert_eq!(body["error"]["code"].as_str(), Some("COMPANION_UPSTREAM"));
+    server.abort();
+    upstream_server.abort();
+}
+
+/// A companion that declines the handshake is answering the caller, not the
+/// daemon, so its status, its headers, and its body all have to survive the hop.
+/// A bare status would leave a browser with nothing to act on and would drop a
+/// `WWW-Authenticate` that says what to do about it.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_handshake_the_companion_declines_comes_back_whole() {
+    let (upstream, upstream_server) = spawn_companion_websocket_upstream().await;
+    let (base_url, server) = serve_remote(state_with_companion(&upstream)).await;
+
+    let response = reqwest::Client::new()
+        .get(format!("{base_url}/panel/socket-refused"))
+        .header("connection", "Upgrade")
+        .header("upgrade", "websocket")
+        .header("sec-websocket-version", "13")
+        .header("sec-websocket-key", "dGhlIHNhbXBsZSBub25jZQ==")
+        .send()
+        .await
+        .expect("upgrade request");
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    let challenge = response
+        .headers()
+        .get("www-authenticate")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    assert_eq!(challenge.as_deref(), Some("Bearer"));
+    let body: Value = response.json().await.expect("refusal body");
+    assert_eq!(body["error"]["code"].as_str(), Some("unauthenticated"));
+
     server.abort();
     upstream_server.abort();
 }

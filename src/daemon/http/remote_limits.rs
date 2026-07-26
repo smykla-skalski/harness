@@ -5,7 +5,7 @@ use std::time::Duration;
 use axum::body::Body;
 use axum::extract::ws::WebSocketUpgrade;
 use axum::extract::{MatchedPath, State};
-use axum::http::{HeaderValue, Request, StatusCode, header::CONTENT_LENGTH};
+use axum::http::{Request, StatusCode, header::CONTENT_LENGTH};
 use axum::middleware::Next;
 use axum::response::Response;
 use http_body_util::{BodyExt as _, Limited};
