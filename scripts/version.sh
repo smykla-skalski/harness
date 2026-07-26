@@ -8,44 +8,22 @@ source "$ROOT/apps/harness-monitor/Scripts/lib/swift-tool-env.sh"
 source "$ROOT/apps/harness-monitor/Scripts/lib/xcode-version.sh"
 sanitize_xcode_only_swift_environment
 CARGO_TOML="$ROOT/Cargo.toml"
-TESTKIT_CARGO_TOML="$ROOT/testkit/Cargo.toml"
-AFF_CARGO_TOML="$ROOT/aff/Cargo.toml"
-# Every crate that moves with the root version. `harness-codex-acp` and
-# `harness-openrouter-agent` are deliberately absent: they carry their own
-# versions and are not part of this release set. A crate extracted from the
-# root belongs here, and one added without it goes stale silently, because the
-# check below only compares what these arrays name.
-CORE_PACKAGE_MANIFESTS=(
-  "$ROOT/crates/harness-command/Cargo.toml"
-  "$ROOT/crates/harness-daemon-client/Cargo.toml"
-  "$ROOT/crates/harness-daemon/Cargo.toml"
-  "$ROOT/crates/harness-bridge/Cargo.toml"
-  "$ROOT/crates/harness-mcp/Cargo.toml"
-  "$ROOT/crates/harness-hook/Cargo.toml"
-  "$ROOT/crates/harness-panel/Cargo.toml"
-  "$ROOT/crates/harness-protocol/Cargo.toml"
-  "$ROOT/crates/harness-systemd/Cargo.toml"
-  "$ROOT/crates/harness-systemd-protocol/Cargo.toml"
-  "$ROOT/crates/harness-telemetry/Cargo.toml"
-  "$ROOT/crates/harness-kernel/Cargo.toml"
-  "$ROOT/crates/harness-workspace/Cargo.toml"
-)
-CORE_PACKAGE_NAMES=(
-  "harness-command"
-  "harness-daemon-client"
-  "harness-daemon"
-  "harness-bridge"
-  "harness-mcp"
-  "harness-hook"
-  "harness-panel"
-  "harness-protocol"
-  "harness-systemd"
-  "harness-systemd-protocol"
-  "harness-telemetry"
-  "harness-kernel"
-  "harness-workspace"
-)
 CARGO_LOCK="$ROOT/Cargo.lock"
+MISSING_VERSION="<missing>"
+# Read from the [workspace] members list rather than kept here. A list written
+# out by hand bumps and checks whatever it happened to name the day it was last
+# edited, so a crate added afterwards keeps the old version and no gate notices.
+WORKSPACE_MANIFESTS=()
+WORKSPACE_NAMES=()
+WORKSPACE_VERSIONS=()
+# Members that ship on their own cadence and keep the version in their own
+# manifest. This one names crates to leave alone, so a crate nobody remembered
+# to list moves with the root and says so, rather than going stale in silence.
+# `harness-codex-acp` and `harness-openrouter-agent` need no entry: they declare
+# their own [workspace] and are not members of this one.
+INDEPENDENT_PACKAGE_NAMES=(
+  "harness-panel"
+)
 MONITOR_APP_ROOT="$ROOT/apps/harness-monitor"
 MONITOR_BUILD_SETTINGS="$ROOT/apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift"
 MONITOR_DAEMON_INFO_PLIST="$ROOT/apps/harness-monitor/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist"
@@ -92,62 +70,127 @@ canonical_version() {
   ' "$CARGO_TOML"
 }
 
-manifest_package_version() {
-  local manifest="$1"
-  local package_name="$2"
-  PACKAGE_NAME="$package_name" perl -0ne '
-    if (/\[package\]\s*name = "\Q$ENV{PACKAGE_NAME}\E"\s*version = "([^"]+)"/s) {
-      print "$1\n";
+workspace_member_directories() {
+  perl -0ne '
+    unless (/^members\s*=\s*\[(.*?)\]/ms) {
+      die "failed to read the [workspace] members list from $ARGV\n";
+    }
+    my $members = $1;
+    print "$1\n" while $members =~ /"([^"]+)"/g;
+  ' "$CARGO_TOML"
+}
+
+manifest_package_identity() {
+  perl -0ne '
+    if (/\[package\]\s*name = "([^"]+)"\s*version = "([^"]+)"/s) {
+      print "$1\t$2\n";
       exit 0;
     }
     exit 1;
-  ' "$manifest"
+  ' "$1"
 }
 
-manifest_harness_dependency_versions() {
-  local manifest="$1"
-  perl -ne '
-    if (/^(harness-[A-Za-z0-9-]+)\s*=\s*\{([^}]*)\}/) {
-      my ($name, $attributes) = ($1, $2);
-      my $version = $attributes =~ /\bversion\s*=\s*"([^"]+)"/
-        ? $1
-        : "<missing>";
-      print "$name\t$version\n";
-    }
-  ' "$manifest"
+load_workspace_members() {
+  local member manifest name version
+  WORKSPACE_MANIFESTS=()
+  WORKSPACE_NAMES=()
+  WORKSPACE_VERSIONS=()
+  while IFS= read -r member; do
+    if [ "$member" = "." ]; then
+      manifest="$CARGO_TOML"
+    else
+      manifest="$ROOT/${member%/}/Cargo.toml"
+    fi
+    [ -f "$manifest" ] || die "workspace member $member has no Cargo.toml"
+    IFS=$'\t' read -r name version < <(manifest_package_identity "$manifest") ||
+      die "failed to read the [package] name and version from $manifest"
+    WORKSPACE_MANIFESTS+=("$manifest")
+    WORKSPACE_NAMES+=("$name")
+    WORKSPACE_VERSIONS+=("$version")
+  done < <(workspace_member_directories)
+  [ "${#WORKSPACE_NAMES[@]}" -gt 0 ] || die "the [workspace] members list is empty"
 }
 
-is_core_package_name() {
+is_workspace_package_name() {
   local candidate="$1"
   local package_name
-  for package_name in "${CORE_PACKAGE_NAMES[@]}"; do
+  for package_name in "${WORKSPACE_NAMES[@]}"; do
     [ "$candidate" = "$package_name" ] && return 0
   done
   return 1
 }
 
-manifest_has_dependency() {
-  local manifest="$1"
-  local dependency_name="$2"
-  DEPENDENCY_NAME="$dependency_name" perl -ne '
-    BEGIN { $found = 0; }
-    if (/^\Q$ENV{DEPENDENCY_NAME}\E\s*=/) {
-      $found = 1;
-      last;
+# The version every surface naming this package has to carry: the root version,
+# or the package's own when it versions independently. An independent package is
+# still held to one version across its manifest, the lock, and any requirement
+# on it; it just is not the root's.
+package_target_version() {
+  local candidate="$1"
+  local canonical="$2"
+  local package_name index
+  # The list is expected to shrink back to empty one day, and expanding an empty
+  # array is an unbound variable under `set -u` in the bash 3.2 macOS ships.
+  if [ "${#INDEPENDENT_PACKAGE_NAMES[@]}" -gt 0 ]; then
+    for package_name in "${INDEPENDENT_PACKAGE_NAMES[@]}"; do
+      [ "$candidate" = "$package_name" ] || continue
+      for index in "${!WORKSPACE_NAMES[@]}"; do
+        if [ "${WORKSPACE_NAMES[$index]}" = "$candidate" ]; then
+          printf '%s' "${WORKSPACE_VERSIONS[$index]}"
+          return 0
+        fi
+      done
+      die "$candidate is listed as independent but is not a workspace member"
+    done
+  fi
+  printf '%s' "$canonical"
+}
+
+# Reports the dependencies that name a version, plus the ones written in a shape
+# the in-place rewrite cannot reach, so the caller can tell a stale requirement
+# from an unreadable one. The unreachable shapes are reported rather than passed
+# over, because passing over a declaration is how the version surfaces drifted
+# apart to begin with. A path-only dependency yields nothing on purpose: it
+# states no version, so there is none to hold in sync.
+manifest_dependency_declarations() {
+  perl -ne '
+    if (/^\s*\[/) {
+      $section = "";
+      if (/^\s*\[([^\[\]]+)\]\s*$/) {
+        $section = $1;
+        if (my ($named) = $section =~ /(?:^|\.)(?:dev-|build-)?dependencies\.([A-Za-z0-9_-]+)$/) {
+          print "opaque\t$named\tdeclared as its own [$section] table\n";
+        }
+      }
+      next;
     }
-    END { exit($found ? 0 : 1); }
-  ' "$manifest"
+    next unless defined $section && $section =~ /(?:^|\.)(?:dev-|build-)?dependencies$/;
+    next unless /^([A-Za-z0-9_-]+)\s*=\s*(.*?)\s*$/;
+    my ($name, $value) = ($1, $2);
+    if ($value =~ /^"([^"]*)"$/) {
+      print "version\t$name\t$1\n";
+    } elsif ($value =~ /^\{(.*)\}$/) {
+      my $attributes = $1;
+      if (my ($renamed) = $attributes =~ /\bpackage\s*=\s*"([^"]+)"/) {
+        print "opaque\t$renamed\trenamed to $name\n";
+      }
+      if (my ($version) = $attributes =~ /\bversion\s*=\s*"([^"]+)"/) {
+        print "version\t$name\t$version\n";
+      }
+    } elsif ($value =~ /^\{/) {
+      print "opaque\t$name\twritten in a shape this script cannot rewrite in place\n";
+    }
+  ' "$1"
 }
 
 lock_package_version() {
   local lockfile="$1"
   local package_name="$2"
-  PACKAGE_NAME="$package_name" perl -0ne '
+  PACKAGE_NAME="$package_name" MISSING_VERSION="$MISSING_VERSION" perl -0ne '
     if (/\[\[package\]\]\s*name = "\Q$ENV{PACKAGE_NAME}\E"\s*version = "([^"]+)"/s) {
       print "$1\n";
       exit 0;
     }
-    exit 1;
+    print "$ENV{MISSING_VERSION}\n";
   ' "$lockfile"
 }
 
@@ -281,6 +324,7 @@ set_manifest_dependency_version() {
 
   DEPENDENCY_NAME="$dependency_name" NEW_VERSION="$version" perl -0pi -e '
     my $count = s/(^\Q$ENV{DEPENDENCY_NAME}\E\s*=\s*\{[^}\n]*\bversion\s*=\s*")[^"]+(")/$1.$ENV{NEW_VERSION}.$2/gme;
+    $count += s/(^\Q$ENV{DEPENDENCY_NAME}\E\s*=\s*")[^"]+(")/$1.$ENV{NEW_VERSION}.$2/gme;
     die "failed to update $ENV{DEPENDENCY_NAME} dependency version in $ARGV\n" unless $count;
   ' "$manifest"
 }
@@ -369,23 +413,18 @@ validate_semver() {
 }
 
 check_sync() {
-  local version testkit_version aff_version
-  local lock_harness_version lock_testkit_version lock_aff_version
+  local version
   local marketing_version current_version daemon_version daemon_build_version
   local openapi_version
   local generated_marketing_version generated_current_version
   local -a generated_marketing_versions=()
   local -a generated_current_versions=()
   local -a errors=()
-  local index package_name package_version lock_package_version_value
-  local dependency_manifest dependency_name dependency_version
+  local index manifest package_name package_version target_version lock_version
+  local kind dependency_name detail
 
   version="$(canonical_version)"
-  testkit_version="$(manifest_package_version "$TESTKIT_CARGO_TOML" "harness-testkit")"
-  aff_version="$(manifest_package_version "$AFF_CARGO_TOML" "aff")"
-  lock_harness_version="$(lock_package_version "$CARGO_LOCK" "harness")"
-  lock_testkit_version="$(lock_package_version "$CARGO_LOCK" "harness-testkit")"
-  lock_aff_version="$(lock_package_version "$CARGO_LOCK" "aff")"
+  load_workspace_members
   openapi_version="$(openapi_document_version)"
   marketing_version="$(build_settings_marketing_version)"
   current_version="$(build_settings_current_version)"
@@ -396,24 +435,26 @@ check_sync() {
     echo "version: skipping daemon plist version check off macOS"
   fi
 
-  [ "$testkit_version" = "$version" ] || errors+=("testkit/Cargo.toml version $testkit_version != Cargo.toml version $version")
-  [ "$aff_version" = "$version" ] || errors+=("aff/Cargo.toml version $aff_version != Cargo.toml version $version")
-  [ "$lock_harness_version" = "$version" ] || errors+=("Cargo.lock harness version $lock_harness_version != Cargo.toml version $version")
-  [ "$lock_testkit_version" = "$version" ] || errors+=("Cargo.lock harness-testkit version $lock_testkit_version != Cargo.toml version $version")
-  [ "$lock_aff_version" = "$version" ] || errors+=("Cargo.lock aff version $lock_aff_version != Cargo.toml version $version")
   [ "$openapi_version" = "$version" ] || errors+=("docs/api/openapi.json version $openapi_version != Cargo.toml version $version")
-  for index in "${!CORE_PACKAGE_MANIFESTS[@]}"; do
-    package_name="${CORE_PACKAGE_NAMES[$index]}"
-    package_version="$(manifest_package_version "${CORE_PACKAGE_MANIFESTS[$index]}" "$package_name")"
-    lock_package_version_value="$(lock_package_version "$CARGO_LOCK" "$package_name")"
-    [ "$package_version" = "$version" ] || errors+=("${CORE_PACKAGE_MANIFESTS[$index]#"$ROOT/"} version $package_version != Cargo.toml version $version")
-    [ "$lock_package_version_value" = "$version" ] || errors+=("Cargo.lock $package_name version $lock_package_version_value != Cargo.toml version $version")
+  for index in "${!WORKSPACE_MANIFESTS[@]}"; do
+    manifest="${WORKSPACE_MANIFESTS[$index]}"
+    package_name="${WORKSPACE_NAMES[$index]}"
+    package_version="${WORKSPACE_VERSIONS[$index]}"
+    target_version="$(package_target_version "$package_name" "$version")"
+    lock_version="$(lock_package_version "$CARGO_LOCK" "$package_name")"
+    [ "$package_version" = "$target_version" ] || errors+=("${manifest#"$ROOT/"} $package_name version $package_version != expected version $target_version")
+    [ "$lock_version" = "$target_version" ] || errors+=("Cargo.lock $package_name version $lock_version != expected version $target_version")
   done
-  for dependency_manifest in "$CARGO_TOML" "${CORE_PACKAGE_MANIFESTS[@]}"; do
-    while IFS=$'\t' read -r dependency_name dependency_version; do
-      is_core_package_name "$dependency_name" || continue
-      [ "$dependency_version" = "$version" ] || errors+=("${dependency_manifest#"$ROOT/"} $dependency_name dependency version $dependency_version != Cargo.toml version $version")
-    done < <(manifest_harness_dependency_versions "$dependency_manifest")
+  for manifest in "${WORKSPACE_MANIFESTS[@]}"; do
+    while IFS=$'\t' read -r kind dependency_name detail; do
+      is_workspace_package_name "$dependency_name" || continue
+      target_version="$(package_target_version "$dependency_name" "$version")"
+      if [ "$kind" = "version" ]; then
+        [ "$detail" = "$target_version" ] || errors+=("${manifest#"$ROOT/"} $dependency_name dependency version $detail != expected version $target_version")
+      else
+        errors+=("${manifest#"$ROOT/"} $dependency_name dependency is $detail")
+      fi
+    done < <(manifest_dependency_declarations "$manifest")
   done
   [ "$marketing_version" = "$version" ] || errors+=("apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift MARKETING_VERSION $marketing_version != Cargo.toml version $version")
   [ "$current_version" = "$version" ] || errors+=("apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift CURRENT_PROJECT_VERSION $current_version != Cargo.toml version $version")
@@ -462,26 +503,24 @@ check_sync() {
 
 sync_all() {
   local version="$1"
-  local dependency_manifest dependency_name index package_name
+  local index manifest package_name target_version kind dependency_name detail
 
-  set_manifest_package_version "$TESTKIT_CARGO_TOML" "harness-testkit" "$version"
-  set_manifest_package_version "$AFF_CARGO_TOML" "aff" "$version"
-  for index in "${!CORE_PACKAGE_MANIFESTS[@]}"; do
-    package_name="${CORE_PACKAGE_NAMES[$index]}"
-    set_manifest_package_version "${CORE_PACKAGE_MANIFESTS[$index]}" "$package_name" "$version"
-    set_lock_package_version "$package_name" "$version"
+  load_workspace_members
+  for index in "${!WORKSPACE_MANIFESTS[@]}"; do
+    package_name="${WORKSPACE_NAMES[$index]}"
+    target_version="$(package_target_version "$package_name" "$version")"
+    set_manifest_package_version "${WORKSPACE_MANIFESTS[$index]}" "$package_name" "$target_version"
+    set_lock_package_version "$package_name" "$target_version"
   done
-  for dependency_manifest in "$CARGO_TOML" "${CORE_PACKAGE_MANIFESTS[@]}"; do
-    for dependency_name in "${CORE_PACKAGE_NAMES[@]}"; do
-      if manifest_has_dependency "$dependency_manifest" "$dependency_name"; then
-        set_manifest_dependency_version \
-          "$dependency_manifest" "$dependency_name" "$version"
-      fi
-    done
+  for manifest in "${WORKSPACE_MANIFESTS[@]}"; do
+    while IFS=$'\t' read -r kind dependency_name detail; do
+      is_workspace_package_name "$dependency_name" || continue
+      [ "$kind" = "version" ] ||
+        die "${manifest#"$ROOT/"} $dependency_name dependency is $detail"
+      target_version="$(package_target_version "$dependency_name" "$version")"
+      set_manifest_dependency_version "$manifest" "$dependency_name" "$target_version"
+    done < <(manifest_dependency_declarations "$manifest")
   done
-  set_lock_package_version "harness" "$version"
-  set_lock_package_version "harness-testkit" "$version"
-  set_lock_package_version "aff" "$version"
   sync_monitor "$version"
   set_openapi_document_version "$version"
 }

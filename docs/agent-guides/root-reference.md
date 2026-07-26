@@ -146,13 +146,15 @@ Canonical harness version source:
 
 Derived surfaces maintained by `mise run version:*`:
 
-- `testkit/Cargo.toml`.
-- `Cargo.lock` package entries for `harness` and `harness-testkit`.
+- Every `[workspace]` member: its `[package]` version, its `Cargo.lock` entry, and any version requirement another member declares on it. A path-only dependency names no version, so there is nothing to hold in sync and nothing is reported. The set is read from the members list rather than named anywhere, so a crate is covered the day it joins the workspace.
+- `docs/api/openapi.json`, the `info.version` field only.
 - `apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift`.
 - `apps/harness-monitor/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist`.
+- `apps/harness-monitor/HarnessMonitor.xcodeproj/project.pbxproj`, when the generated project is present.
 
 Additional version notes:
 
+- `INDEPENDENT_PACKAGE_NAMES` in `scripts/version.sh` names the members that ship on their own cadence and keep the version in their own manifest; `harness-panel` is on it. Their lock entry and any requirement on them still has to match that manifest, so the exemption is from the root version and not from being consistent. `harness-codex-acp` and `harness-openrouter-agent` need no entry: they declare their own `[workspace]` and are not members of this one.
 - `src/observe/output.rs` reads SARIF `driver.version` from `env!("CARGO_PKG_VERSION")`.
 - `src/cli.rs` uses Clap's derived version.
 
