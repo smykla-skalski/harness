@@ -101,23 +101,6 @@ fn append_audit_entry_writes_jsonl_and_artifact() {
 }
 
 #[test]
-fn write_run_status_with_audit_records_status_write() {
-    let tempdir = tempfile::tempdir().unwrap();
-    let run_dir = tempdir.path().join("r01");
-    let layout = RunLayout::from_run_dir(&run_dir);
-    layout.ensure_dirs().unwrap();
-
-    let status = sample_status("r01", "suite");
-
-    write_run_status_with_audit(&run_dir, &status, None, Some("bootstrap"), None).unwrap();
-
-    let log_contents = fs::read_to_string(layout.audit_log_path()).unwrap();
-    assert!(log_contents.contains("\"tool_name\":\"RunStatusWrite\""));
-    assert!(log_contents.contains("\"phase\":\"bootstrap\""));
-    assert!(layout.status_path().exists());
-}
-
-#[test]
 fn append_runner_state_audit_records_runner_state_write() {
     let tempdir = tempfile::tempdir().unwrap();
     let run_dir = tempdir.path().join("r01");
@@ -127,7 +110,7 @@ fn append_runner_state_audit_records_runner_state_write() {
     let mut status = sample_status("r01", "suite");
     status.last_completed_group = Some("g02".to_string());
     status.next_planned_group = Some("g03".to_string());
-    write_run_status_with_audit(&run_dir, &status, None, Some("execution"), Some("g03")).unwrap();
+    status.save(&layout.status_path()).unwrap();
 
     let state = RunnerWorkflowState {
         phase: RunnerPhase::Execution,

@@ -91,39 +91,6 @@ pub fn append_audit_entry(request: AuditAppendRequest) -> Result<AuditEntry, Cli
     Ok(entry)
 }
 
-/// Write `run-status.json` and append a matching audit entry.
-///
-/// # Errors
-/// Returns `CliError` on write or audit failure.
-pub fn write_run_status_with_audit(
-    run_dir: &Path,
-    status: &RunStatus,
-    runner_state: Option<&RunnerWorkflowState>,
-    explicit_phase: Option<&str>,
-    explicit_group_id: Option<&str>,
-) -> Result<(), CliError> {
-    let layout = RunLayout::from_run_dir(run_dir);
-    let serialized = serialize_json(status, "run status")?;
-    let content = format!("{serialized}\n");
-    status.save(&layout.status_path())?;
-
-    let phase_context = resolve_phase_context(
-        runner_state,
-        Some(status),
-        explicit_phase,
-        explicit_group_id,
-    );
-    append_audit_entry(AuditAppendRequest {
-        run_dir: run_dir.to_path_buf(),
-        tool_name: "RunStatusWrite".to_string(),
-        tool_input: "run-status.json".to_string(),
-        full_output: content,
-        phase: phase_context.phase,
-        group_id: phase_context.group_id,
-    })?;
-    Ok(())
-}
-
 /// Append an audit entry after `suite-run-state.json` is written.
 ///
 /// # Errors

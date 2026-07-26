@@ -24,7 +24,6 @@ pub(crate) mod github_api;
 pub mod hooks;
 pub mod infra;
 pub use harness_kernel::kernel;
-pub(crate) mod manifests;
 #[cfg(feature = "mcp-runtime")]
 pub use harness_mcp::mcp;
 pub mod observe;
@@ -36,7 +35,6 @@ pub use harness_workspace::sandbox;
 #[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
 pub mod session;
 pub mod setup;
-pub(crate) mod suite_defaults;
 #[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
 pub mod task_board;
 pub mod telemetry {
