@@ -1,15 +1,11 @@
 // Tests for the guard-bash hook.
 // Verifies denial of direct cluster binary usage (kubectl, kumactl, helm, docker, k3d),
 // legacy scripts, shell operators, suite root creation, make targets, github sidequests,
-// control file mutation, harness command chaining/looping, admin endpoint access,
-// and phase-gated command restrictions after run completion.
+// control file mutation, harness command chaining/looping, and admin endpoint access.
 
 use harness::hooks::guard_bash;
 use harness::hooks::hook_result::HookResult;
 use harness::run::Verdict;
-use harness::run::workflow::{
-    self as runner_workflow, PreflightState, PreflightStatus, RunnerPhase, RunnerWorkflowState,
-};
 
 use super::super::helpers::*;
 
@@ -276,50 +272,4 @@ fn guard_bash_denies_github_sidequest_with_active_run() {
     let r = guard_bash::execute(&ctx).unwrap();
     assert_deny(&r);
     assert!(r.message.contains("GitHub workflows"));
-}
-
-#[test]
-fn guard_bash_completed_state_blocks_commands() {
-    let tmp = tempfile::tempdir().unwrap();
-    let run_dir = init_run(tmp.path(), "run-1", "single-zone");
-    let state = RunnerWorkflowState {
-        phase: RunnerPhase::Completed,
-        preflight: PreflightState {
-            status: PreflightStatus::Complete,
-        },
-        failure: None,
-        suite_fix: None,
-        updated_at: "2026-03-14T00:00:00Z".to_string(),
-        transition_count: 5,
-        last_event: Some("RunCompleted".to_string()),
-        history: Vec::new(),
-    };
-    runner_workflow::write_runner_state(&run_dir, &state).unwrap();
-    let payload = make_bash_payload("harness run apply --manifest test.yaml");
-    let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-#[test]
-fn guard_bash_completed_allows_closeout() {
-    let tmp = tempfile::tempdir().unwrap();
-    let run_dir = init_run(tmp.path(), "run-1", "single-zone");
-    let state = RunnerWorkflowState {
-        phase: RunnerPhase::Completed,
-        preflight: PreflightState {
-            status: PreflightStatus::Complete,
-        },
-        failure: None,
-        suite_fix: None,
-        updated_at: "2026-03-14T00:00:00Z".to_string(),
-        transition_count: 5,
-        last_event: Some("RunCompleted".to_string()),
-        history: Vec::new(),
-    };
-    runner_workflow::write_runner_state(&run_dir, &state).unwrap();
-    let payload = make_bash_payload("harness closeout");
-    let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_allow(&r);
 }

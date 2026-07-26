@@ -1,8 +1,8 @@
-use harness_kernel::errors::CliError;
 use crate::hooks::application::GuardContext;
 use crate::hooks::effects::{HookOutcome, apply_effects};
 use crate::hooks::protocol::context::NormalizedHookContext;
 use crate::hooks::protocol::result::NormalizedHookResult;
+use harness_kernel::errors::CliError;
 
 use super::HookType;
 
@@ -73,7 +73,7 @@ impl HookEngine {
         let guard_context = GuardContext::from_normalized(normalized);
         let outcome = hook.execute(&guard_context)?;
         let mut result = outcome.normalized_result();
-        apply_effects(&guard_context, &mut result, outcome.effects())?;
+        apply_effects(&mut result, outcome.effects());
         Ok(result)
     }
 }

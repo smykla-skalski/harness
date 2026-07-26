@@ -1,12 +1,11 @@
 use std::fs;
 use std::path::Path;
 
-use harness_kernel::errors::{CliError, HookMessage};
 use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
-use harness_kernel::kernel::topology::ClusterMode;
 use crate::run::context::RunContext;
-use crate::run::workflow::{PreflightStatus, RunnerPhase, RunnerWorkflowState, SuiteFixState};
+use harness_kernel::errors::{CliError, HookMessage};
+use harness_kernel::kernel::topology::ClusterMode;
 
 /// Parsed harness context: (subcommand, command label, words, run context).
 type HarnessAppContext<'a> = (&'a str, String, &'a [String], &'a RunContext);
@@ -21,14 +20,6 @@ fn subcommand_artifacts(subcommand: &str) -> Option<&'static [&'static str]> {
     }
 }
 
-/// Error code patterns that indicate a harness command failure requiring user
-/// triage via the bug-found gate.
-const FAILURE_ERROR_CODES: &[&str] = &["KSRCLI004", "KSRCLI014"];
-
-/// Freeform patterns in command output that signal an apply or validation
-/// failure even when a structured error code is absent.
-const FAILURE_OUTPUT_PATTERNS: &[&str] = &["command failed", "apply failed", "validation failed"];
-
 /// Execute the verify-bash hook.
 ///
 /// # Errors
@@ -37,19 +28,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     let Some((subcommand, command_label, words, run)) = extract_harness_context(ctx)? else {
         return Ok(HookResult::allow());
     };
-    if let Some(result) = check_bug_found_gate(ctx, &command_label) {
-        return Ok(result);
-    }
-    if let Some(result) = check_preflight_gate(ctx, subcommand) {
-        return Ok(result);
-    }
-    Ok(verify_artifacts(
-        ctx,
-        subcommand,
-        &command_label,
-        words,
-        run,
-    ))
+    Ok(verify_artifacts(subcommand, &command_label, words, run))
 }
 
 /// Extract the harness subcommand, words, and run context from the hook
@@ -79,104 +58,19 @@ fn extract_harness_context(ctx: &HookContext) -> Result<Option<HarnessAppContext
 }
 
 fn verify_artifacts(
-    ctx: &HookContext,
     subcommand: &str,
     command_label: &str,
     words: &[String],
     run: &RunContext,
 ) -> HookResult {
     if subcommand == "cluster" {
-        let result = check_cluster(words, run);
-        if !result.is_denial() {
-            maybe_resume_suite_fix(ctx, words);
-        }
-        return result;
+        return check_cluster(words, run);
     }
     if subcommand_artifacts(subcommand).is_none() || artifact_ready(subcommand, run) {
-        maybe_resume_suite_fix(ctx, words);
         return HookResult::allow();
     }
     let target = missing_target(subcommand, run);
     HookMessage::missing_artifact(command_label.to_string(), target).into_result()
-}
-
-/// Check the command response for failure patterns during test execution.
-///
-/// Returns `Some(HookResult)` with a blocking deny when a harness command
-/// failure is detected and the runner is in a phase that requires user
-/// triage. Returns `None` when no gate is needed.
-fn check_bug_found_gate(ctx: &HookContext, command_label: &str) -> Option<HookResult> {
-    let state = ctx.runner_state.as_ref()?;
-
-    // Only enforce during execution and closeout phases. Bootstrap and
-    // preflight failures are handled by their own dedicated flows. Triage
-    // means the runner is already handling a failure.
-    if !matches!(
-        state.phase(),
-        RunnerPhase::Execution | RunnerPhase::Closeout
-    ) {
-        return None;
-    }
-
-    // If a failure is already being triaged, don't block again.
-    if state.failure().is_some() {
-        return None;
-    }
-
-    let response = ctx.response_text();
-    if response.is_empty() {
-        return None;
-    }
-
-    if !response_contains_failure(&response) {
-        return None;
-    }
-
-    Some(HookMessage::bug_found_gate_required(command_label.to_string()).into_result())
-}
-
-/// Block `harness apply` when the runner has not completed preflight.
-///
-/// Returns `Some(HookResult)` with a deny when `harness apply` is called
-/// while the runner phase is Bootstrap or Preflight with a non-complete
-/// status. Returns `None` when no gate is needed.
-fn check_preflight_gate(ctx: &HookContext, subcommand: &str) -> Option<HookResult> {
-    if subcommand != "apply" {
-        return None;
-    }
-    let state = ctx.runner_state.as_ref()?;
-    let blocked = match state.phase() {
-        RunnerPhase::Bootstrap => true,
-        RunnerPhase::Preflight => state.preflight_status() != PreflightStatus::Complete,
-        _ => false,
-    };
-    if !blocked {
-        return None;
-    }
-    Some(
-        HookMessage::runner_flow_required(
-            "harness run apply",
-            "Run `harness run preflight` before applying manifests. \
-             Preflight materializes baselines and group YAML into prepared manifests.",
-        )
-        .into_result(),
-    )
-}
-
-/// Returns `true` when the response text contains any known failure indicator.
-fn response_contains_failure(response: &str) -> bool {
-    for code in FAILURE_ERROR_CODES {
-        if response.contains(code) {
-            return true;
-        }
-    }
-    let lower = response.to_lowercase();
-    for pattern in FAILURE_OUTPUT_PATTERNS {
-        if lower.contains(pattern) {
-            return true;
-        }
-    }
-    false
 }
 
 fn artifact_ready(subcommand: &str, run: &RunContext) -> bool {
@@ -249,35 +143,6 @@ fn cluster_mode(words: &[String]) -> Option<&str> {
         let mode: ClusterMode = w.parse().ok()?;
         mode.is_up().then_some(w.as_str())
     })
-}
-
-fn maybe_resume_suite_fix(ctx: &HookContext, words: &[String]) {
-    let Some(ref state) = ctx.runner_state else {
-        return;
-    };
-    if words.len() < 2 {
-        return;
-    }
-    let head = Path::new(&words[0])
-        .file_name()
-        .map_or("", |n| n.to_str().unwrap_or(""));
-    if head != "harness" || words[1] == "runner-state" {
-        return;
-    }
-    if ready_to_resume(state) {
-        // The actual state transition is handled by the runner-state command.
-        // This hook just validates artifacts; the resume write is deferred to
-        // the CLI command layer.
-    }
-}
-
-fn ready_to_resume(state: &RunnerWorkflowState) -> bool {
-    if state.phase() != RunnerPhase::Triage {
-        return false;
-    }
-    state
-        .suite_fix()
-        .is_some_and(SuiteFixState::ready_to_resume)
 }
 
 #[cfg(test)]

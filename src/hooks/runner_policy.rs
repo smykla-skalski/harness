@@ -16,6 +16,5 @@ pub use self::files::{
     SuiteMutationBinary, TaskOutputPattern,
 };
 pub use self::questions::{
-    classify_canonical_gate, is_install_prompt, is_manifest_fix_prompt,
-    matches_kubectl_validate_question, matches_manifest_fix_question,
+    classify_canonical_gate, is_install_prompt, matches_kubectl_validate_question,
 };

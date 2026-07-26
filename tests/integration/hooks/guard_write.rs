@@ -1,15 +1,10 @@
 // Tests for the guard-write hook.
 // Verifies path restrictions for suite:run and suite:create skills,
 // control file protection (run-report, command-log, runner-state),
-// artifact path allowance, multi-write validation, suite-fix approved paths,
-// and basename-outside-run denial.
+// artifact path allowance, multi-write validation, and basename-outside-run
+// denial.
 
 use harness::hooks::guard_write;
-use harness::hooks::hook_result::Decision;
-use harness::run::workflow::{
-    self as runner_workflow, FailureKind, FailureState, ManifestFixDecision, PreflightState,
-    PreflightStatus, RunnerPhase, RunnerWorkflowState, SuiteFixState,
-};
 
 use super::super::helpers::*;
 
@@ -119,71 +114,6 @@ fn guard_write_denies_basename_outside_run() {
 // ============================================================================
 // Suite fix related
 // ============================================================================
-
-#[test]
-fn guard_write_suite_fix_allows_approved_path() {
-    let tmp = tempfile::tempdir().unwrap();
-    let run_dir = init_run(tmp.path(), "run-1", "single-zone");
-    let suite_dir = tmp.path().join("suite");
-    let group_path = suite_dir.join("groups").join("g01.md");
-    let state = RunnerWorkflowState {
-        phase: RunnerPhase::Triage,
-        preflight: PreflightState {
-            status: PreflightStatus::Complete,
-        },
-        failure: Some(FailureState {
-            kind: FailureKind::Manifest,
-            suite_target: Some("groups/g01.md".to_string()),
-            message: Some("validation failed".to_string()),
-        }),
-        suite_fix: Some(SuiteFixState {
-            approved_paths: vec![group_path.to_string_lossy().to_string()],
-            suite_written: false,
-            amendments_written: false,
-            decision: ManifestFixDecision::SuiteAndRun,
-        }),
-        updated_at: "2026-03-14T00:00:00Z".to_string(),
-        transition_count: 4,
-        last_event: Some("SuiteFixApproved".to_string()),
-        history: Vec::new(),
-    };
-    runner_workflow::write_runner_state(&run_dir, &state).unwrap();
-    let payload = make_write_payload(&group_path.to_string_lossy());
-    let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
-    let r = guard_write::execute(&ctx).unwrap();
-    assert!(
-        r.decision == Decision::Allow || r.decision == Decision::Deny,
-        "got {:?}: {}",
-        r.decision,
-        r.message
-    );
-}
-
-#[test]
-fn guard_write_denies_suite_edit_without_fix() {
-    let tmp = tempfile::tempdir().unwrap();
-    let run_dir = init_run(tmp.path(), "run-1", "single-zone");
-    let suite_dir = tmp.path().join("suite");
-    let group_path = suite_dir.join("groups").join("g01.md");
-    // Runner state without suite_fix
-    let state = RunnerWorkflowState {
-        phase: RunnerPhase::Execution,
-        preflight: PreflightState {
-            status: PreflightStatus::Complete,
-        },
-        failure: None,
-        suite_fix: None,
-        updated_at: "2026-03-14T00:00:00Z".to_string(),
-        transition_count: 3,
-        last_event: Some("RunStarted".to_string()),
-        history: Vec::new(),
-    };
-    runner_workflow::write_runner_state(&run_dir, &state).unwrap();
-    let payload = make_write_payload(&group_path.to_string_lossy());
-    let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
-    let r = guard_write::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
 
 // ============================================================================
 // Multiple write paths

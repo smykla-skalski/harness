@@ -4,18 +4,6 @@ use crate::create::{
 };
 use crate::hooks::protocol::payloads::AskUserQuestionPrompt;
 
-use super::cluster::MANIFEST_FIX_GATE;
-
-#[must_use]
-pub fn is_manifest_fix_prompt(prompt: &AskUserQuestionPrompt) -> bool {
-    MANIFEST_FIX_GATE.matches(prompt.question_head(), &prompt.option_labels())
-}
-
-#[must_use]
-pub fn matches_manifest_fix_question(question: &str) -> bool {
-    question == MANIFEST_FIX_GATE.question
-}
-
 #[must_use]
 pub fn is_install_prompt(prompts: &[AskUserQuestionPrompt]) -> bool {
     prompts

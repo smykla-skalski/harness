@@ -4,11 +4,10 @@ use crate::hooks::protocol::hook_result::HookResult;
 use harness_kernel::kernel::command_intent::{
     semantic_harness_subcommand, semantic_harness_tail, significant_words,
 };
-use crate::run::workflow::{RunnerPhase, RunnerWorkflowState};
 
 #[must_use]
 pub(crate) fn has_tracked_run_context(ctx: &HookContext) -> bool {
-    ctx.run.is_some() || ctx.runner_state.is_some() || ctx.effective_run_dir().is_some()
+    ctx.run.is_some() || ctx.effective_run_dir().is_some()
 }
 
 pub(crate) fn guard_runner_phase(ctx: &HookContext, words: &[String]) -> HookResult {
@@ -21,12 +20,6 @@ pub(crate) fn guard_runner_phase(ctx: &HookContext, words: &[String]) -> HookRes
             "{reason}. Start a new run with \
              `harness run init --run-id <new-run-id> ...` first"
         ));
-    }
-    if let Some(ref state) = ctx.runner_state {
-        let (allowed, reason) = allowed_command(state, words);
-        if !allowed {
-            return deny_runner_flow(reason.unwrap_or("runner state does not allow this command"));
-        }
     }
     HookResult::allow()
 }
@@ -78,30 +71,4 @@ fn cluster_mode_is_teardown(significant: &[&str]) -> bool {
 fn has_explicit_run_scope(words: &[String]) -> bool {
     let sig = significant_words(words);
     sig.iter().any(|word| is_run_scope_flag(word))
-}
-
-fn allowed_command(state: &RunnerWorkflowState, words: &[String]) -> (bool, Option<&'static str>) {
-    let sig = significant_words(words);
-    let Some(subcommand) = semantic_harness_subcommand(&sig) else {
-        return (true, None);
-    };
-    match state.phase() {
-        RunnerPhase::Completed | RunnerPhase::Aborted => match subcommand {
-            "closeout" | "runner-state" | "report" | "session-stop" => (true, None),
-            _ => (
-                false,
-                Some("the run has reached a final state; only closeout commands are allowed"),
-            ),
-        },
-        RunnerPhase::Triage => {
-            if matches!(subcommand, "runner-state" | "report" | "closeout") {
-                return (true, None);
-            }
-            if state.suite_fix().is_some() {
-                return (true, None);
-            }
-            (true, None)
-        }
-        _ => (true, None),
-    }
 }

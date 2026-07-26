@@ -4,7 +4,6 @@ use harness::hooks::GuardContext;
 use harness::hooks::hook_result::{Decision, HookResult};
 use harness::hooks::payloads::{AskUserQuestionOption, AskUserQuestionPrompt, HookEnvelopePayload};
 use harness::run::RunContext;
-use harness::run::workflow as runner_workflow;
 
 /// Builds `HookEnvelopePayload` for hook tests.
 #[derive(Default)]
@@ -112,9 +111,6 @@ fn attach_run_context(
 ) -> GuardContext {
     context.run_dir = Some(run_dir.to_path_buf());
     if let Ok(run_context) = RunContext::from_run_dir(run_dir) {
-        context.runner_state = runner_workflow::read_runner_state(&run_context.layout.run_dir())
-            .ok()
-            .flatten();
         context.run = Some(run_context);
         if activate_skill {
             context.skill_active = true;

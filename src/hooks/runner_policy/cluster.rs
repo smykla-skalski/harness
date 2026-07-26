@@ -3,17 +3,6 @@ use std::fmt;
 use std::str::FromStr;
 
 use crate::infra::blocks::BlockRequirement;
-use harness_kernel::kernel::gate::Gate;
-
-pub const MANIFEST_FIX_GATE: Gate = Gate {
-    question: "suite:run/manifest-fix: how should this failure be handled?",
-    options: &[
-        "Fix for this run only",
-        "Fix in suite and this run",
-        "Skip this step",
-        "Stop run",
-    ],
-};
 
 #[must_use]
 pub fn managed_cluster_binaries() -> BTreeSet<String> {
