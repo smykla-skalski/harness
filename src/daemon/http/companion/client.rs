@@ -13,6 +13,8 @@ pub(super) struct CompanionClients {
 
 impl CompanionClients {
     pub(super) fn new() -> Self {
+        // Plain HttpConnector cannot advertise HTTP/2 through ALPN, so the
+        // automatic client remains HTTP/1 on this cleartext loopback hop.
         let http1 = Client::builder(TokioExecutor::new()).build(HttpConnector::new());
         let mut http2_builder = Client::builder(TokioExecutor::new());
         http2_builder.http2_only(true);
