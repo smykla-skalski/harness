@@ -63,18 +63,18 @@ fn publication_target_is_normalized_before_use() {
         let runtime = tokio::runtime::Runtime::new().expect("runtime");
         runtime.block_on(async {
             let db = database(temp.path()).await;
-            seed_tokens(&["owner/beta"]);
+            seed_tokens(&["example/mixed-case"]);
 
             let publication = publication_client_for_repository(
                 &db,
                 &TaskBoardOrchestratorSettings::default(),
                 TaskBoardWorkflowKind::DefaultTask,
-                Some("Owner/Beta"),
+                Some("Example/Mixed-Case"),
             )
             .await
             .expect("publication client");
 
-            assert_eq!(publication.repository, "owner/beta");
+            assert_eq!(publication.repository, "example/mixed-case");
         });
     });
 }

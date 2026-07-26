@@ -37,10 +37,10 @@ struct DefaultBranchRef {
 
 /// Read a repository's default branch.
 ///
-/// A board fed from many repositories has no single answer here - `owner/alpha`
-/// branches from `master` while `owner/beta` branches from `main` - so the
-/// base is asked for rather than configured. Default branches change close to
-/// never, hence the generous cache window.
+/// A board fed from many repositories has no single answer here - some branch
+/// from `master` and the rest from `main` - so the base is asked for rather
+/// than configured. Default branches change close to never, hence the generous
+/// cache window.
 ///
 /// # Errors
 /// Returns provider or transport errors surfaced by the GitHub client.

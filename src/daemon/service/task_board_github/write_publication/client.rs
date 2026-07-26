@@ -47,9 +47,9 @@ pub(super) async fn publication_client_for_repository(
 /// Replace the configured base branch with the one the repository actually uses.
 ///
 /// A single configured value cannot be right for a board spanning many
-/// repositories - `owner/alpha` branches from `master`, `owner/beta` from
-/// `main`. Refusing beats guessing: a wrong base branch surfaces much later as
-/// an unrelated-looking "branch is not visible" failure.
+/// repositories, where some branch from `master` and the rest from `main`.
+/// Refusing beats guessing: a wrong base branch surfaces much later as an
+/// unrelated-looking "branch is not visible" failure.
 pub(super) async fn resolve_base_branch(
     publication: &mut PublicationClient,
 ) -> Result<(), CliError> {

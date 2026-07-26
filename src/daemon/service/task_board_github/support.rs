@@ -113,8 +113,8 @@ pub(super) fn resolve_worktree(
         })
     // There used to be a `config.checkout_path` fallback here. It held one
     // path for the whole board, so once items publish to their own
-    // repositories it would hand an item another repository's checkout. Reporting a
-    // missing worktree beats working in the wrong one.
+    // repositories it would hand an item another repository's checkout.
+    // Reporting a missing worktree beats working in the wrong one.
 }
 
 pub(super) fn managed_branch_name(
@@ -322,8 +322,8 @@ fn pull_request_body(item: &TaskBoardItem, config: &GitHubProjectConfig) -> Stri
         lines.push(summary.to_string());
     }
     // `project_id` keeps GitHub's casing while the publication slug is
-    // normalized, so `Owner/beta` and `owner/beta` are the same
-    // repository and a raw string compare would drop the `Closes` line.
+    // normalized, so `Owner/Repo` and `owner/repo` are the same repository
+    // and a raw string compare would drop the `Closes` line.
     let publication = normalize_repository_slug(Some(&config.repository_slug()));
     let item_repository = normalize_repository_slug(item.project_id.as_deref());
     if let Some(issue_number) = item.external_refs.iter().find_map(|reference| {
