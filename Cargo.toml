@@ -76,7 +76,6 @@ serde_urlencoded = { version = "0.7.1", optional = true }
 rustls = { version = "0.23.37", features = ["ring"] }
 rustls-platform-verifier = "0.7.0"
 notify = "8.2.0"
-minijinja = "2.17.1"
 noyalib = { version = "0.0.16", default-features = false, features = ["std", "compat-serde-yaml"] }
 rayon = "1.11.0"
 base64 = "0.23.0"
@@ -146,8 +145,7 @@ tracing-opentelemetry = { version = "=0.33.0", default-features = false }
 tracing-subscriber = { version = "=0.3.23", features = ["chrono", "env-filter", "json"] }
 
 [features]
-default = ["all-adapters"]
-all-adapters = ["kuma"]
+default = []
 bridge-runtime = [
   "dep:agent-client-protocol",
   "dep:nix",
@@ -181,7 +179,6 @@ standalone-daemon = []
 standalone-worker = ["harness-kernel/standalone-worker"]
 full-runtime = ["daemon-runtime", "mcp-runtime"]
 mcp-runtime = ["dep:harness-mcp"]
-kuma = []
 remote-systemd-e2e-faults = []
 tokio-console = ["harness-telemetry/tokio-console"]
 
