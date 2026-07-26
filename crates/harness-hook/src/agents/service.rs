@@ -3,12 +3,12 @@ use std::path::{Path, PathBuf};
 
 use tokio::task;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::{HookAgent, adapter_for};
 use crate::hooks::protocol::context::{NormalizedEvent, NormalizedHookContext};
 use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::session::service as orchestration_service;
-use crate::workspace::{compact, current_run_context_path, utc_now};
+use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::workspace::{compact, utc_now};
 
 use super::storage;
 
@@ -52,11 +52,11 @@ pub async fn session_start(
     .map_err(join_error("session-start"))?
 }
 
-/// Stop tracking an agent runtime session and clear its current-run state.
+/// Stop tracking an agent runtime session.
 ///
 /// # Errors
-/// Returns [`CliError`] when the blocking task cannot be joined or session
-/// markers and current-run state cannot be updated.
+/// Returns [`CliError`] when the blocking task cannot be joined or the session
+/// markers cannot be updated.
 pub async fn session_stop(
     agent: HookAgent,
     project_dir: PathBuf,
@@ -72,7 +72,6 @@ pub async fn session_stop(
             .unwrap_or_else(|| default_session_id(agent));
         storage::append_session_marker(&project_dir, agent, &session_id, "session_stop")?;
         storage::clear_current_session_id(&project_dir, agent)?;
-        clear_current_run_pointer()?;
         Ok(())
     })
     .await
@@ -353,17 +352,6 @@ fn restore_compact_handoff(project_dir: &Path) -> Result<Option<String>, CliErro
     let context = compact::render_hydration_context(&handoff, &diverged);
     let _ = compact::consume_compact_handoff(project_dir, handoff);
     Ok(Some(context))
-}
-
-fn clear_current_run_pointer() -> Result<(), CliError> {
-    let path = current_run_context_path()?;
-    match fs_err::remove_file(path) {
-        Ok(()) => Ok(()),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(error) => {
-            Err(CliErrorKind::workflow_io(format!("clear current run context: {error}")).into())
-        }
-    }
 }
 
 fn join_error(operation: &'static str) -> impl FnOnce(tokio::task::JoinError) -> CliError {

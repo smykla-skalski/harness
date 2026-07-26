@@ -6,7 +6,6 @@ use serde::Serialize;
 use harness_kernel::errors::CliError;
 use crate::hooks::adapters::HookAgent;
 use crate::workspace::compact::compact_latest_path;
-use crate::workspace::current_run_context_path_for_project;
 
 mod checks;
 
@@ -15,7 +14,6 @@ struct DoctorTarget {
     project_dir: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     repo_root: Option<String>,
-    current_run_pointer: String,
     compact_handoff: String,
 }
 
@@ -80,7 +78,6 @@ fn resolve_project_dir(raw: Option<&str>) -> Result<PathBuf, CliError> {
 
 fn build_report(project_dir: &Path) -> DoctorReport {
     let repo_root = checks::auto_detect_kuma_repo_root(project_dir);
-    let pointer_path = current_run_context_path_for_project(project_dir);
     let compact_path = compact_latest_path(project_dir);
 
     let mut checks = vec![];
@@ -88,7 +85,6 @@ fn build_report(project_dir: &Path) -> DoctorReport {
     checks.extend(checks::check_lifecycle_contract(project_dir));
     checks.extend(checks::check_runtime_bootstrap_contract(project_dir));
     checks.extend(checks::check_repo_provider_contract(repo_root.as_deref()));
-    checks.push(checks::check_current_run_pointer(&pointer_path));
     checks.push(checks::check_compact_handoff(project_dir, &compact_path));
 
     let remaining_findings: Vec<DoctorCheck> = checks
@@ -103,7 +99,6 @@ fn build_report(project_dir: &Path) -> DoctorReport {
         target: DoctorTarget {
             project_dir: project_dir.display().to_string(),
             repo_root: repo_root.as_ref().map(|path| path.display().to_string()),
-            current_run_pointer: pointer_path.display().to_string(),
             compact_handoff: compact_path.display().to_string(),
         },
         checks,
@@ -118,7 +113,6 @@ fn render_human(report: &DoctorReport) {
     if let Some(repo_root) = &report.target.repo_root {
         println!("repo: {repo_root}");
     }
-    println!("pointer: {}", report.target.current_run_pointer);
     println!("compact: {}", report.target.compact_handoff);
     for check in &report.checks {
         println!(

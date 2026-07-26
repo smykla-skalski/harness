@@ -7,7 +7,6 @@ fn application_submodules_are_not_public_library_surface() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
 
     for (path, needle) in [
-        ("src/run/mod.rs", "pub mod application;"),
         ("src/create/mod.rs", "pub mod application;"),
         ("src/hooks/mod.rs", "pub mod application;"),
     ] {

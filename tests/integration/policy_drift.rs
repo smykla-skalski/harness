@@ -1,10 +1,10 @@
 // Policy drift integration test.
 //
 // Catches divergence between the free-function write-surface policy
-// (`agents::policy::evaluate_write`), the TUI hook handler (`hooks::guard_write`),
-// and the ACP `Client::write_text_file` handler. All call sites must produce
-// identical decisions for the same inputs; when they diverge, either the policy
-// needs updating or one call site has drifted off the shared function.
+// (`agents::policy::evaluate_write`) and the ACP `Client::write_text_file`
+// handler. Both call sites must produce identical decisions for the same
+// inputs; when they diverge, either the policy needs updating or one call site
+// has drifted off the shared function.
 //
 // Fixture set: the nasty-input cases that tend to expose policy drift:
 // - `..` traversal
@@ -23,8 +23,6 @@ use agent_client_protocol::schema::v1::WriteTextFileRequest;
 use harness::agents::acp::client::{ClientCallCancel, HarnessAcpClient};
 use harness::agents::acp::permission::PermissionMode;
 use harness::agents::policy::{DeniedBinaries, WriteDecision, WriteSurfaceContext, evaluate_write};
-use harness::hooks::guard_write;
-use harness::hooks::hook_result::Decision;
 
 use super::helpers::*;
 
@@ -217,19 +215,6 @@ fn test_policy(
     );
 }
 
-/// Test the hook handler and verify it agrees with the policy.
-fn test_hook(path: &Path, run_dir: &Path, expected_allow: bool, fixture_name: &str) {
-    let payload = make_write_payload(&path.to_string_lossy());
-    let ctx = make_hook_context_with_run("suite:run", payload, run_dir);
-    let result = guard_write::execute(&ctx).expect("hook execute");
-    let is_allow = result.decision == Decision::Allow;
-    assert_eq!(
-        is_allow, expected_allow,
-        "hook drift: fixture '{fixture_name}' expected allow={expected_allow}, got {:?}: {}",
-        result.decision, result.message
-    );
-}
-
 /// Test the ACP handler and verify it agrees with the policy.
 fn test_acp_client(path: &Path, run_dir: &Path, expected_allow: bool, fixture_name: &str) {
     let client = acp_client(run_dir);
@@ -242,7 +227,7 @@ fn test_acp_client(path: &Path, run_dir: &Path, expected_allow: bool, fixture_na
     );
 }
 
-/// Run policy, hook, and ACP handler against the same fixture, assert agreement.
+/// Run the policy and the ACP handler against the same fixture, assert agreement.
 fn assert_no_drift(
     fixture: &DriftFixture,
     run_dir: &Path,
@@ -263,15 +248,12 @@ fn assert_no_drift(
         fixture.name,
     );
 
-    // Test hook handler
-    test_hook(&fixture.path, run_dir, fixture.expected_allow, fixture.name);
-
     // Test ACP handler
     test_acp_client(&fixture.path, run_dir, fixture.expected_allow, fixture.name);
 }
 
 #[test]
-fn policy_hook_and_acp_produce_identical_decisions() {
+fn policy_and_acp_produce_identical_decisions() {
     let tmp = tempfile::tempdir().expect("create temp dir");
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
     let outside = tmp.path().join("outside");
@@ -287,7 +269,7 @@ fn policy_hook_and_acp_produce_identical_decisions() {
 
 #[cfg(unix)]
 #[test]
-fn policy_hook_and_acp_agree_on_symlink_escape() {
+fn policy_and_acp_agree_on_symlink_escape() {
     let tmp = tempfile::tempdir().expect("create temp dir");
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
     let outside = tmp.path().join("outside");

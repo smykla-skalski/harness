@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde_json::Value;
 
@@ -19,8 +19,6 @@ use self::interaction::{
 };
 #[path = "context/command.rs"]
 mod command;
-#[path = "context/view.rs"]
-mod view;
 
 /// Guard-facing context derived from the normalized adapter context.
 ///
@@ -34,7 +32,6 @@ pub struct GuardContext {
     pub agent: Option<AgentContext>,
     pub skill: SkillContext,
     pub skill_active: bool,
-    pub run_dir: Option<PathBuf>,
     pub create_state: Option<CreateWorkflowState>,
     interaction: HookInteraction,
 }
@@ -54,7 +51,6 @@ impl GuardContext {
             agent: normalized.agent,
             skill: normalized.skill,
             skill_active,
-            run_dir: hydrated.run_dir,
             create_state: hydrated.create_state,
             interaction,
         }
@@ -78,7 +74,6 @@ impl GuardContext {
             agent: normalized.agent.clone(),
             skill: normalized.skill.clone(),
             skill_active: normalized.skill.active,
-            run_dir: None,
             create_state: None,
             interaction,
         }

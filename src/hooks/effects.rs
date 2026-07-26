@@ -1,4 +1,3 @@
-use crate::hooks::audit::{AuditAppendRequest, append_audit_entry};
 use crate::hooks::protocol::hook_result::HookResult;
 use crate::hooks::protocol::result::NormalizedHookResult;
 
@@ -6,7 +5,6 @@ use crate::hooks::protocol::result::NormalizedHookResult;
 #[derive(Debug, Clone)]
 pub enum HookEffect {
     Decide(NormalizedHookResult),
-    AppendAudit(AuditAppendRequest),
     InjectContext(String),
 }
 
@@ -34,27 +32,6 @@ impl HookOutcome {
         Self::decide(NormalizedHookResult::from_hook_result(result))
     }
 
-    #[must_use]
-    pub fn with_effect(mut self, effect: HookEffect) -> Self {
-        self.effects.push(effect);
-        self
-    }
-
-    #[must_use]
-    pub fn append_non_decision_effects(mut self, effects: &[HookEffect]) -> Self {
-        self.effects
-            .extend(effects.iter().filter_map(|effect| match effect {
-                HookEffect::Decide(_) => None,
-                other => Some(other.clone()),
-            }));
-        self
-    }
-
-    #[must_use]
-    pub fn effects(&self) -> &[HookEffect] {
-        &self.effects
-    }
-
     /// # Panics
     /// Panics when the outcome contains no `Decide` effect.
     #[must_use]
@@ -63,7 +40,7 @@ impl HookOutcome {
             .iter()
             .find_map(|effect| match effect {
                 HookEffect::Decide(result) => Some(result),
-                HookEffect::AppendAudit(_) | HookEffect::InjectContext(_) => None,
+                HookEffect::InjectContext(_) => None,
             })
             .expect("hook outcomes must include a Decide effect")
     }
@@ -71,7 +48,7 @@ impl HookOutcome {
     pub fn injected_contexts(&self) -> impl Iterator<Item = &str> {
         self.effects.iter().filter_map(|effect| match effect {
             HookEffect::InjectContext(text) => Some(text.as_str()),
-            HookEffect::Decide(_) | HookEffect::AppendAudit(_) => None,
+            HookEffect::Decide(_) => None,
         })
     }
 
@@ -92,21 +69,5 @@ impl HookOutcome {
     #[must_use]
     pub fn to_hook_result(&self) -> HookResult {
         self.normalized_result().to_hook_result()
-    }
-}
-
-pub(crate) fn apply_effects(result: &mut NormalizedHookResult, effects: &[HookEffect]) {
-    for effect in effects {
-        match effect {
-            HookEffect::Decide(_) | HookEffect::InjectContext(_) => {}
-            HookEffect::AppendAudit(request) => {
-                if let Err(error) = append_audit_entry(request.clone()) {
-                    *result = NormalizedHookResult::warn(
-                        "KSR006",
-                        format!("audit log write failed: {error}"),
-                    );
-                }
-            }
-        }
     }
 }

@@ -1,6 +1,5 @@
 pub(crate) mod adapters;
 pub(crate) mod application;
-pub mod audit;
 mod catalog;
 #[cfg(test)]
 pub(crate) mod debug;
@@ -32,6 +31,4 @@ pub use self::transport::{AuditTurnArgs, HookArgs, HookCommand, HookType};
 
 pub use self::runtime::run_hook_command;
 pub(crate) use self::runtime::{dispatch_by_skill, dispatch_outcome_by_skill};
-pub(crate) use self::write_surface::{
-    control_file_hint, is_command_owned_run_file, normalize_path,
-};
+pub(crate) use self::write_surface::normalize_path;

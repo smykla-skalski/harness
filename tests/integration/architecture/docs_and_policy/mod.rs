@@ -15,18 +15,13 @@ fn setup_does_not_mutate_run_repository_directly() {
         &root.join("src/setup"),
         root,
         None,
-        &[
-            "RunRepository",
-            "current_pointer_path(",
-            "RunLayout::current_pointer",
-            "write_json_pretty(",
-        ],
+        &["RunRepository", "write_json_pretty("],
         |path, needle| format!("{path} still reaches into run-owned persistence via `{needle}`"),
     );
 
     assert!(
         hits.is_empty(),
-        "setup should go through run application helpers for current-run persistence:\n{}",
+        "setup should not reach into run-owned persistence:\n{}",
         hits.join("\n")
     );
 }
@@ -43,8 +38,6 @@ fn setup_session_transport_stays_transport_only() {
             "pending_compact_handoff(",
             "render_hydration_context(",
             "consume_compact_handoff(",
-            "RunApplication::current_run_dir(",
-            "RunApplication::clear_current_pointer(",
         ],
     );
 
@@ -55,7 +48,6 @@ fn setup_session_transport_stays_transport_only() {
         &[
             "fn bootstrap_project_wrapper(",
             "fn restore_compact_handoff(",
-            "fn cleanup_current_run_context(",
         ],
     );
 }

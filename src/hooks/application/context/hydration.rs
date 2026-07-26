@@ -5,27 +5,18 @@ use crate::create::{CreateWorkflowState, read_create_state};
 use crate::hooks::protocol::context::{
     NormalizedEvent, NormalizedHookContext, SessionContext, SkillContext,
 };
-use crate::run::context::RunContext;
 use crate::workspace::canonical_checkout_root;
 
 #[derive(Debug, Clone, Default)]
 pub(super) struct HydratedHookState {
-    pub(super) run_dir: Option<PathBuf>,
     pub(super) create_state: Option<CreateWorkflowState>,
 }
 
 impl HydratedHookState {
     pub(super) fn from_skill(skill: &SkillContext) -> Self {
         let mut state = Self::default();
-        state.load_current_run_dir();
         state.load_create_state(skill);
         state
-    }
-
-    fn load_current_run_dir(&mut self) {
-        if let Ok(Some(run_context)) = RunContext::from_current() {
-            self.run_dir = Some(run_context.layout.run_dir());
-        }
     }
 
     fn load_create_state(&mut self, skill: &SkillContext) {

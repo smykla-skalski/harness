@@ -4,7 +4,6 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_text, write_json_pretty};
 use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use harness_kernel::kernel::skills::dirs as skill_dirs;
-use crate::run::audit::append_runner_state_audit;
 
 use super::types::{PreflightState, PreflightStatus, RunnerPhase, RunnerWorkflowState};
 
@@ -96,9 +95,7 @@ pub(super) fn make_initial_state(occurred_at: &str) -> RunnerWorkflowState {
 pub(super) fn save_state(run_dir: &Path, state: &RunnerWorkflowState) -> Result<(), CliError> {
     with_runner_lock(run_dir, || {
         save_runner_state_file(&runner_state_path(run_dir), state)
-    })?;
-    append_runner_state_audit(run_dir, state)?;
-    Ok(())
+    })
 }
 
 /// Initialize runner state for a new run.
@@ -165,9 +162,6 @@ pub fn write_runner_state_if_current(
         Ok(Some(desired.clone()))
     })?;
 
-    if updated.is_some() {
-        append_runner_state_audit(run_dir, state)?;
-    }
     Ok(updated.is_some())
 }
 

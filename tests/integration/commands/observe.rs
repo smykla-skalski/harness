@@ -7,8 +7,6 @@ use std::path::Path;
 
 use harness::app::cli::Command;
 use harness::observe::{ObserveArgs, ObserveFilterArgs, ObserveMode};
-use harness::run::context::{CurrentRunRecord, RunLayout};
-use harness::workspace::current_run_context_path_for_project;
 
 use super::super::helpers::*;
 
@@ -242,7 +240,7 @@ fn observe_doctor_accepts_current_project_wiring() {
 }
 
 #[test]
-fn observe_doctor_reports_legacy_lifecycle_and_stale_pointer() {
+fn observe_doctor_reports_legacy_lifecycle() {
     let tmp = tempfile::tempdir().unwrap();
     let project_dir = tmp.path().join("project");
     write_doctor_project(&project_dir, true);
@@ -259,26 +257,6 @@ fn observe_doctor_reports_legacy_lifecycle_and_stale_pointer() {
             ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
         ],
         || {
-            let pointer_path = current_run_context_path_for_project(&project_dir);
-            fs::create_dir_all(pointer_path.parent().unwrap()).unwrap();
-            let pointer = CurrentRunRecord {
-                layout: RunLayout::from_run_dir(&tmp.path().join("runs").join("missing-run")),
-                profile: Some("single-zone".into()),
-                repo_root: None,
-                suite_dir: None,
-                suite_id: None,
-                suite_path: None,
-                cluster: None,
-                keep_clusters: false,
-                user_stories: vec![],
-                requires: vec![],
-            };
-            fs::write(
-                pointer_path,
-                serde_json::to_string_pretty(&pointer).unwrap(),
-            )
-            .unwrap();
-
             let cmd = Command::Observe(Box::new(observe_args(ObserveMode::Doctor {
                 json: true,
                 project_dir: Some(project_dir.to_string_lossy().to_string()),

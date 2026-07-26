@@ -2,7 +2,6 @@ use std::env;
 use std::path::Path;
 
 use harness_kernel::errors::CliError;
-use crate::run::application::RunApplication;
 use crate::setup::wrapper;
 use crate::workspace::compact;
 
@@ -21,13 +20,4 @@ pub(crate) fn restore_compact_handoff(project_dir: &Path) -> Result<Option<Strin
     let context = compact::render_hydration_context(&handoff, &diverged);
     let _ = compact::consume_compact_handoff(project_dir, handoff);
     Ok(Some(context))
-}
-
-pub(crate) fn cleanup_current_run_context() -> Result<(), CliError> {
-    if RunApplication::current_run_dir()?.is_none() {
-        return Ok(());
-    }
-
-    let _ = RunApplication::clear_current_pointer();
-    Ok(())
 }

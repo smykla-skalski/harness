@@ -78,8 +78,7 @@ fn signal_managed_terminal_readiness(tui_id: &str) {
 /// Stop the active agent session for a project.
 ///
 /// # Errors
-/// Returns `CliError` when the shared agent session ledger cannot be updated or
-/// the current run context cannot be cleaned up.
+/// Returns `CliError` when the shared agent session ledger cannot be updated.
 pub async fn session_stop(
     agent: HookAgent,
     project_dir: PathBuf,
@@ -95,7 +94,6 @@ pub async fn session_stop(
             .unwrap_or_else(|| default_session_id(agent));
         storage::append_session_marker(&project_dir, agent, &session_id, "session_stop")?;
         storage::clear_current_session_id(&project_dir, agent)?;
-        session_service::cleanup_current_run_context()?;
         Ok(())
     })
     .await

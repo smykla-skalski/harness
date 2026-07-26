@@ -28,11 +28,11 @@ pub enum HookCommand {
     ToolGuard,
     /// Process tool results after execution.
     ToolResult,
-    /// Audit a Codex turn-complete notification.
+    /// Process a Codex turn-complete notification.
     AuditTurn(AuditTurnArgs),
 }
 
-/// Arguments for the Codex notify-based audit shim.
+/// Arguments for the Codex notify shim.
 #[derive(Debug, Clone, Default, Args)]
 pub struct AuditTurnArgs {
     /// Raw Codex notify payload passed as `argv[1]`.

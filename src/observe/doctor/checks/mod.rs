@@ -25,10 +25,6 @@ pub(super) fn check_compact_handoff(project_dir: &Path, compact_path: &Path) -> 
     runtime::check_compact_handoff(project_dir, compact_path)
 }
 
-pub(super) fn check_current_run_pointer(pointer_path: &Path) -> DoctorCheck {
-    runtime::check_current_run_pointer(pointer_path)
-}
-
 pub(super) fn check_runtime_bootstrap_contract(project_dir: &Path) -> Vec<DoctorCheck> {
     runtime::check_runtime_bootstrap_contract(project_dir)
 }

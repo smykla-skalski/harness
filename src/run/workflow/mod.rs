@@ -6,7 +6,6 @@ use std::fmt;
 use std::path::Path;
 
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::run::audit::append_runner_state_audit;
 
 pub use persistence::{
     initialize_runner_state, read_runner_state, runner_state_path, write_runner_state,
@@ -63,7 +62,6 @@ where
     let Some(state) = updated else {
         unreachable!("runner updates always persist a state");
     };
-    append_runner_state_audit(run_dir, &state)?;
     Ok(state)
 }
 
@@ -88,9 +86,6 @@ pub fn ensure_execution_phase(run_dir: &Path) -> Result<bool, CliError> {
         }
         Ok(None)
     })?;
-    if let Some(state) = updated.as_ref() {
-        append_runner_state_audit(run_dir, state)?;
-    }
     Ok(updated.is_some())
 }
 

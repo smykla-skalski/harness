@@ -3751,7 +3751,6 @@ dependencies = [
  "harness-telemetry",
  "harness-workspace",
  "hex",
- "rayon",
  "regex",
  "serde",
  "serde_json",

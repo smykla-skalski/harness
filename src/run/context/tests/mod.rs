@@ -1,20 +1,13 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, PoisonError};
 
 use harness_kernel::kernel::topology::{ClusterSpec, Platform};
 use crate::run::{RunCounts, RunStatus, Verdict};
 
-use super::{
-    ArtifactSnapshot, CommandEnv, CurrentRunRecord, PreflightArtifact, RunContext, RunLayout,
-    RunMetadata,
-};
+use super::{ArtifactSnapshot, CommandEnv, PreflightArtifact, RunContext, RunLayout, RunMetadata};
 
 mod loading;
-
-/// Mutex for tests that modify environment variables (`XDG_DATA_HOME`, `CLAUDE_SESSION_ID`).
-static ENV_MUTEX: Mutex<()> = Mutex::new(());
 
 fn sample_layout() -> RunLayout {
     RunLayout::new("/tmp/runs", "run-1")
@@ -213,14 +206,6 @@ fn run_layout_ensure_dirs_is_idempotent() {
     layout.ensure_dirs().unwrap();
     layout.ensure_dirs().unwrap();
     assert!(layout.run_dir().is_dir());
-}
-
-#[test]
-fn run_layout_serialization_roundtrip() {
-    let layout = sample_layout();
-    let json = serde_json::to_string(&layout).unwrap();
-    let back: RunLayout = serde_json::from_str(&json).unwrap();
-    assert_eq!(layout, back);
 }
 
 #[test]

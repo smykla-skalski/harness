@@ -28,6 +28,10 @@ mod run;
     reason = "the daemon integration target uses none of these testkit re-exports"
 )]
 pub use harness_testkit::*;
+#[allow(
+    unused_imports,
+    reason = "the daemon integration target uses none of these hook helpers"
+)]
 pub use hook::*;
 pub use port_lease::*;
 pub use run::*;

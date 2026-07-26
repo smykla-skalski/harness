@@ -26,66 +26,6 @@ fn normalize_path_preserves_absolute() {
 }
 
 #[test]
-fn is_command_owned_run_report() {
-    assert!(is_command_owned_run_file(
-        Path::new("/runs/run-1/run-report.md"),
-        Path::new("/runs/run-1")
-    ));
-}
-
-#[test]
-fn is_command_owned_run_status() {
-    assert!(is_command_owned_run_file(
-        Path::new("/runs/run-1/run-status.json"),
-        Path::new("/runs/run-1")
-    ));
-}
-
-#[test]
-fn is_command_owned_runner_state() {
-    assert!(is_command_owned_run_file(
-        Path::new("/runs/run-1/suite-run-state.json"),
-        Path::new("/runs/run-1")
-    ));
-}
-
-#[test]
-fn is_command_owned_command_log() {
-    assert!(is_command_owned_run_file(
-        Path::new("/runs/run-1/commands/command-log.md"),
-        Path::new("/runs/run-1")
-    ));
-}
-
-#[test]
-fn is_not_command_owned_artifact() {
-    assert!(!is_command_owned_run_file(
-        Path::new("/runs/run-1/artifacts/state.json"),
-        Path::new("/runs/run-1")
-    ));
-}
-
-#[test]
-fn is_not_command_owned_different_run() {
-    assert!(!is_command_owned_run_file(
-        Path::new("/runs/run-2/run-report.md"),
-        Path::new("/runs/run-1")
-    ));
-}
-
-#[test]
-fn control_file_hint_command_log() {
-    let hint = control_file_hint(Path::new("commands/command-log.md"));
-    assert!(hint.contains("harness run record"));
-}
-
-#[test]
-fn control_file_hint_other() {
-    let hint = control_file_hint(Path::new("run-report.md"));
-    assert!(hint.contains("harness run report group"));
-}
-
-#[test]
 fn hook_names_are_unique() {
     let mut names: Vec<&str> = all_hooks().iter().map(|hook| hook.name()).collect();
     names.sort_unstable();
