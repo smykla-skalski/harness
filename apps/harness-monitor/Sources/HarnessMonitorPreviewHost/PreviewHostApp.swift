@@ -13,6 +13,11 @@ struct PreviewHostApp: App {
       DashboardReviewFileDiffLabRenderer.dumpFixtures(toDirectory: dumpDirectory)
       exit(0)
     }
+    if let dumpDirectory = ProcessInfo.processInfo.environment["HARNESS_LANE_COLOR_PICKER_DUMP"] {
+      NSApplication.shared.setActivationPolicy(.prohibited)
+      SettingsTaskBoardLaneColorPickerRenderer.dumpFixtures(toDirectory: dumpDirectory)
+      exit(0)
+    }
     for _ in Self.forceLoadedSymbolReferences {}
   }
 
