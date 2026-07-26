@@ -6,7 +6,8 @@ use crate::errors::CliError;
 
 use super::super::remote_systemd_lifecycle::RemoteSystemdCommandOutput;
 use super::automation::{
-    arm_recovery_automation, finish_recovery_automation, load_recovery_arm, update_recovery_phase,
+    RecoveryTransaction, arm_recovery_automation, finish_recovery_automation, load_recovery_arm,
+    update_recovery_phase,
 };
 use super::binary::{acquire_with_trusted_controller, inspect_binary};
 use super::capacity::{reserve_generation_restore_capacity, validate_restore_filesystems};
@@ -15,7 +16,8 @@ use super::files::{
     remove_tree_if_exists, sha256_bytes, sha256_file, sync_directory, validate_candidate,
 };
 use super::generation::{
-    activate_candidate, promote_pending_generation, restart_existing_service, snapshot_generation,
+    ActivationCandidate, activate_candidate, promote_pending_generation, restart_existing_service,
+    snapshot_generation,
 };
 use super::model::{
     CANDIDATE_FILE, FileMetadata, GenerationManifest, MANIFEST_VERSION, RecoveryArm,
@@ -117,7 +119,7 @@ where
     run_changed_upgrade(
         &plan.operation,
         staged,
-        &lifecycle,
+        lifecycle,
         run_systemctl,
         verify_health,
     )
@@ -257,11 +259,13 @@ where
     let mut arm = arm_recovery_automation(
         operation,
         &operation.controller_path,
-        &staged.transaction_id,
-        RecoveryOperation::Upgrade,
-        &staged.previous.sha256,
-        &staged.candidate_sha256,
-        staged.target_unit_sha256.as_deref(),
+        &RecoveryTransaction {
+            transaction_id: &staged.transaction_id,
+            operation: RecoveryOperation::Upgrade,
+            before_sha256: &staged.previous.sha256,
+            target_sha256: &staged.candidate_sha256,
+            target_unit_sha256: staged.target_unit_sha256.as_deref(),
+        },
         run_systemctl,
     )?;
     let manifest = match stop_and_snapshot(operation, &staged, run_systemctl) {
@@ -406,10 +410,12 @@ where
 {
     let activation = activate_candidate(
         operation,
-        &context.staged.candidate_path,
-        &context.staged.candidate_sha256,
-        context.staged.desired_unit_contents.as_deref(),
-        context.manifest.unit_metadata,
+        &ActivationCandidate {
+            staged_candidate: &context.staged.candidate_path,
+            candidate_sha256: &context.staged.candidate_sha256,
+            desired_unit_contents: context.staged.desired_unit_contents.as_deref(),
+            previous_unit_metadata: context.manifest.unit_metadata,
+        },
         lifecycle,
         run_systemctl,
         verify_health,
