@@ -22,20 +22,6 @@ TEST_USER="${SOCKET_TMPDIR##*/}"
 PASS_COUNT=0
 FAIL_COUNT=0
 
-cleanup() {
-  # Before the directories go, because a server is found through the socket it
-  # listens on. A leak this suite cannot see is one the developer inherits for
-  # the whole idle timeout, so stop rather than only assert.
-  stop_leaked_sccache_servers
-  rm -rf "$SANDBOX" "$SOCKET_TMPDIR" "/tmp/harness-sccache-$TEST_USER"
-  # Guarded rather than passed as a second argument: this runs from an EXIT trap
-  # that fires before the assignment too, and rm on an empty path fails.
-  if [[ -n "${PRESTART_TMPDIR:-}" ]]; then
-    rm -rf "$PRESTART_TMPDIR"
-  fi
-}
-trap cleanup EXIT
-
 # Defined above the trap that calls it, since cleanup runs on any exit path,
 # including one taken before the scenarios start.
 stop_leaked_sccache_servers() {
@@ -49,6 +35,20 @@ stop_leaked_sccache_servers() {
     SCCACHE_SERVER_UDS="$socket" "$sccache_bin" --stop-server >/dev/null 2>&1 || true
   done < <(reachable_sockets_in_test_roots)
 }
+
+cleanup() {
+  # Before the directories go, because a server is found through the socket it
+  # listens on. A leak this suite cannot see is one the developer inherits for
+  # the whole idle timeout, so stop rather than only assert.
+  stop_leaked_sccache_servers
+  rm -rf "$SANDBOX" "$SOCKET_TMPDIR" "/tmp/harness-sccache-$TEST_USER"
+  # Guarded rather than passed as a second argument: this runs from an EXIT trap
+  # that fires before the assignment too, and rm on an empty path fails.
+  if [[ -n "${PRESTART_TMPDIR:-}" ]]; then
+    rm -rf "$PRESTART_TMPDIR"
+  fi
+}
+trap cleanup EXIT
 
 fail() {
   FAIL_COUNT=$((FAIL_COUNT + 1))
@@ -1115,6 +1115,13 @@ scenario_live_socket_survives_the_sweep() {
     sleep 0.05
     waited=$((waited + 1))
   done
+  # Without this the scenario would go on to assert about a socket nothing ever
+  # bound, and report the sweep as broken for a holder that never started.
+  if [[ ! -S "$live_socket" ]]; then
+    stop_prestart_servers "$pid_file"
+    fail "the socket holder never bound $live_socket"
+    return
+  fi
   : >"$stale_socket"
   # Older than the sweep's window, or it would survive on its age alone and this
   # scenario would pass without ever asking whether anything was listening.
@@ -1682,12 +1689,12 @@ for root in sys.argv[1:]:
             if not name.endswith(".sock"):
                 continue
             candidate = os.path.join(dirpath, name)
-            probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            probe.settimeout(2)
-            try:
-                probe.connect(candidate)
-            except OSError:
-                continue
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as probe:
+                probe.settimeout(2)
+                try:
+                    probe.connect(candidate)
+                except OSError:
+                    continue
             print(candidate)
 PY
 }
