@@ -21,14 +21,21 @@ if [ ! -x "${BUILD_FOR_TESTING_SCRIPT}" ]; then
   exit 1
 fi
 
+# Each check reads the whole document into a string first. Piping plutil into
+# `grep -q` lets grep stop at the first hit, and under `set -o pipefail` the
+# producer's SIGPIPE becomes the pipeline's status, so a key that is present
+# reads as a failed check.
+entitlements_xml() {
+  /usr/bin/plutil -convert xml1 -o - "$1"
+}
+
 require_entitlement() {
   local entitlements_path="$1"
   local subject="$2"
   local short_key="$3"
   local full_key="com.apple.security.files.$short_key"
 
-  if ! /usr/bin/plutil -convert xml1 -o - "$entitlements_path" \
-    | /usr/bin/grep -q "<key>$full_key</key>"; then
+  if [[ "$(entitlements_xml "$entitlements_path")" != *"<key>$full_key</key>"* ]]; then
     echo "missing ${subject} entitlement: ${short_key}" >&2
     exit 1
   fi
@@ -39,8 +46,7 @@ require_exact_entitlement() {
   local message="$2"
   local entitlement_key="$3"
 
-  if ! /usr/bin/plutil -convert xml1 -o - "$entitlements_path" \
-    | /usr/bin/grep -q "<key>$entitlement_key</key>"; then
+  if [[ "$(entitlements_xml "$entitlements_path")" != *"<key>$entitlement_key</key>"* ]]; then
     echo "$message" >&2
     exit 1
   fi
@@ -51,8 +57,7 @@ ensure_entitlement_absent() {
   local message="$2"
   local entitlement_key="$3"
 
-  if /usr/bin/plutil -convert xml1 -o - "$entitlements_path" \
-    | /usr/bin/grep -q "<key>$entitlement_key</key>"; then
+  if [[ "$(entitlements_xml "$entitlements_path")" == *"<key>$entitlement_key</key>"* ]]; then
     echo "$message" >&2
     exit 1
   fi

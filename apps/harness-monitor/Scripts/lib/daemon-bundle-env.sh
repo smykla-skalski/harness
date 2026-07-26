@@ -54,6 +54,35 @@ default_cargo_target_dir() {
   printf '%s/harness-monitor-xcode-daemon\n' "$cache_root"
 }
 
+# Reads `security find-identity` output on stdin and prints the first Apple
+# Development identity. Deliberately consumes all of it rather than stopping at
+# the match: under `set -o pipefail` an early `exit` here closes the pipe, the
+# producer dies with SIGPIPE, and the 141 becomes the whole pipeline's status.
+# With `set -e` on top, the caller then dies silently, having already captured
+# the identity it wanted.
+first_apple_development_identity() {
+  /usr/bin/awk -F'"' '/Apple Development:/ && !found { print $2; found = 1 }'
+}
+
+# `build-for-testing` copies the app-hosted test bundle into the host app's
+# PlugIns before the host app's own build phases run, and leaves it an empty
+# skeleton until the test target itself builds. codesign walks every embedded
+# bundle, so sealing the app while one is a skeleton fails the whole build with
+# "bundle format unrecognized, invalid, or unsuitable". Names the first such
+# plug-in, or returns 1 when every one of them is complete.
+first_unsealable_plugin() {
+  local app_bundle="$1"
+  local plugin
+  for plugin in "$app_bundle"/Contents/PlugIns/*/; do
+    [ -d "$plugin" ] || continue
+    if [ ! -f "${plugin}Contents/Info.plist" ]; then
+      printf '%s\n' "$(/usr/bin/basename "${plugin%/}")"
+      return 0
+    fi
+  done
+  return 1
+}
+
 resolve_cargo_target_dir() {
   if [ -n "${HARNESS_MONITOR_DAEMON_CARGO_TARGET_DIR:-}" ]; then
     printf '%s\n' "$HARNESS_MONITOR_DAEMON_CARGO_TARGET_DIR"

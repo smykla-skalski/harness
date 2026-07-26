@@ -122,6 +122,10 @@ file_stat_signature() {
   /usr/bin/stat -f '%m:%z' "$path"
 }
 
+app_bundle="$TARGET_BUILD_DIR/$WRAPPER_NAME"
+# Resolved before the stamp so a build that had to defer the reseal cannot be
+# short-circuited by a later one that could have done it.
+unsealable_plugin="$(first_unsealable_plugin "$app_bundle" || true)"
 helpers_dir="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers"
 launch_agents_dir="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Library/LaunchAgents"
 daemon_target="$helpers_dir/harness-daemon"
@@ -156,7 +160,7 @@ bundle_stamp_path="${SCRIPT_OUTPUT_FILE_8:-${DERIVED_FILE_DIR:-$TARGET_BUILD_DIR
 codesign_identity="${EXPANDED_CODE_SIGN_IDENTITY:-}"
 if [ -z "$codesign_identity" ] || [ "$codesign_identity" = "-" ]; then
   codesign_identity="$(/usr/bin/security find-identity -v -p codesigning 2>/dev/null \
-    | /usr/bin/awk -F'"' '/Apple Development:/ { print $2; exit }')"
+    | first_apple_development_identity)"
 fi
 timestamp_flag="ad-hoc"
 if [ -n "$codesign_identity" ]; then
@@ -183,6 +187,7 @@ bundle_stamp_contents="$(
     printf 'legacy_plist_sha=%s\n' \
       "$(file_sha256 "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.plist")"
     printf 'entitlements_sha=%s\n' "$(file_sha256 "$PROJECT_DIR/HarnessMonitorDaemon.entitlements")"
+    printf 'unsealable_plugin=%s\n' "${unsealable_plugin:--}"
   }
 )"
 
@@ -268,7 +273,10 @@ for legacy_plist_name in \
   fi
 done
 
-if ! /usr/bin/otool -l "$daemon_target_staging" | /usr/bin/grep -q "__info_plist"; then
+# Matched on a captured string rather than through `grep -q`, which stops
+# reading at the first hit and leaves otool holding a closed pipe.
+daemon_load_commands="$(/usr/bin/otool -l "$daemon_target_staging")"
+if [[ "$daemon_load_commands" != *__info_plist* ]]; then
   printf 'Harness daemon helper is missing embedded Info.plist metadata: %s\n' "$daemon_target_staging" >&2
   exit 1
 fi
@@ -317,8 +325,16 @@ fi
 # Contents/Info.plist and Contents/MacOS/<name>. The Xcode UI build path that
 # enables this sandbox also signs the bundle itself via the standard signing
 # phase, so the manifest still ends up correct there.
-if [ "${ENABLE_USER_SCRIPT_SANDBOXING:-}" != "YES" ]; then
-  app_bundle="$TARGET_BUILD_DIR/$WRAPPER_NAME"
+#
+# Skipped again while an embedded plug-in is still a skeleton: `build-for-
+# testing` plants the app-hosted .xctest before this phase runs, and codesign
+# refuses the parent bundle over it. The seal is only read by SMAppService in
+# the dev run flow, so deferring it to a build where the plug-in is complete
+# costs nothing, while failing here would take the whole build down.
+if [ -n "$unsealable_plugin" ]; then
+  printf 'Deferring the app bundle reseal: %s is not a complete bundle yet\n' \
+    "$unsealable_plugin" >&2
+elif [ "${ENABLE_USER_SCRIPT_SANDBOXING:-}" != "YES" ]; then
   bundle_identity="$codesign_identity"
   if [ -z "$bundle_identity" ]; then
     bundle_identity="-"

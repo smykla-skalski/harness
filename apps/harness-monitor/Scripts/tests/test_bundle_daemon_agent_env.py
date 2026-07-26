@@ -105,6 +105,7 @@ def _bundle_stamp_lines(daemon_source: Path) -> list[str]:
         "legacy_managed_plist_sha=missing",
         "legacy_plist_sha=missing",
         "entitlements_sha=missing",
+        "unsealable_plugin=-",
     ]
 
 
@@ -1008,56 +1009,63 @@ class BundleStampShortcutTests(unittest.TestCase):
     SCRIPTS_DIR = Path(__file__).resolve().parents[1]
     BUNDLE_SCRIPT = SCRIPTS_DIR / "bundle-daemon-agent.sh"
 
+    def _sealed_stamp_layout(self, root: Path) -> tuple[dict, Path]:
+        """A bundled product whose stamp matches, so the script exits before it
+        mutates anything."""
+        repo_root = root / "repo"
+        project_dir = repo_root / "apps" / "harness-monitor"
+        target_build_dir = root / "build"
+        derived_dir = root / "derived"
+        daemon_source = root / "daemon-source"
+        daemon_target = target_build_dir / "Contents" / "Helpers" / "harness-daemon"
+        plist_target = (
+            target_build_dir
+            / "Contents"
+            / "Library"
+            / "LaunchAgents"
+            / "Q498EB36N4.io.harnessmonitor.daemon.plist"
+        )
+        bundle_stamp_path = derived_dir / "HarnessMonitor-bundle-daemon-agent.stamp"
+
+        (repo_root / ".git").mkdir(parents=True)
+        project_dir.mkdir(parents=True, exist_ok=True)
+        daemon_target.parent.mkdir(parents=True, exist_ok=True)
+        plist_target.parent.mkdir(parents=True, exist_ok=True)
+        derived_dir.mkdir(parents=True, exist_ok=True)
+
+        daemon_source.write_text("#!/bin/bash\nexit 0\n")
+        daemon_source.chmod(0o755)
+        daemon_target.write_text("bundled\n")
+        daemon_target.chmod(0o755)
+        plist_target.write_text("plist\n")
+
+        bundle_stamp_path.write_text(
+            "\n".join(_bundle_stamp_lines(daemon_source)) + "\n"
+        )
+
+        env = {
+            "HOME": tempfile.gettempdir(),
+            "PATH": "/usr/bin:/bin",
+            "PROJECT_DIR": str(project_dir),
+            "TARGET_BUILD_DIR": str(target_build_dir),
+            "CONTENTS_FOLDER_PATH": "Contents",
+            "DERIVED_FILE_DIR": str(derived_dir),
+            "TARGET_NAME": "HarnessMonitor",
+            "HARNESS_MONITOR_DAEMON_BINARY": str(daemon_source),
+            "HARNESS_MONITOR_RUNTIME_LANE": "test-lane",
+            "HARNESS_DAEMON_DATA_HOME": "/tmp/test-daemon-home",
+            "HARNESS_CODEX_WS_PORT": "4242",
+            "HARNESS_APP_GROUP_ID": "test.group",
+            "EXPANDED_CODE_SIGN_IDENTITY": "fake-identity",
+            "MARKETING_VERSION": "1.2.3",
+            "WRAPPER_NAME": "Harness Monitor.app",
+        }
+        return env, daemon_source
+
     def test_matching_stamp_exits_before_bundle_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            repo_root = root / "repo"
-            project_dir = repo_root / "apps" / "harness-monitor"
-            target_build_dir = root / "build"
-            derived_dir = root / "derived"
-            daemon_source = root / "daemon-source"
-            daemon_target = target_build_dir / "Contents" / "Helpers" / "harness-daemon"
-            plist_target = (
-                target_build_dir
-                / "Contents"
-                / "Library"
-                / "LaunchAgents"
-                / "Q498EB36N4.io.harnessmonitor.daemon.plist"
-            )
-            bundle_stamp_path = derived_dir / "HarnessMonitor-bundle-daemon-agent.stamp"
+            env, _ = self._sealed_stamp_layout(Path(tmp_dir))
 
-            (repo_root / ".git").mkdir(parents=True)
-            project_dir.mkdir(parents=True, exist_ok=True)
-            daemon_target.parent.mkdir(parents=True, exist_ok=True)
-            plist_target.parent.mkdir(parents=True, exist_ok=True)
-            derived_dir.mkdir(parents=True, exist_ok=True)
-
-            daemon_source.write_text("#!/bin/bash\nexit 0\n")
-            daemon_source.chmod(0o755)
-            daemon_target.write_text("bundled\n")
-            daemon_target.chmod(0o755)
-            plist_target.write_text("plist\n")
-
-            bundle_stamp_path.write_text(
-                "\n".join(_bundle_stamp_lines(daemon_source)) + "\n"
-            )
-
-            env = {
-                "HOME": tempfile.gettempdir(),
-                "PATH": "/usr/bin:/bin",
-                "PROJECT_DIR": str(project_dir),
-                "TARGET_BUILD_DIR": str(target_build_dir),
-                "CONTENTS_FOLDER_PATH": "Contents",
-                "DERIVED_FILE_DIR": str(derived_dir),
-                "TARGET_NAME": "HarnessMonitor",
-                "HARNESS_MONITOR_DAEMON_BINARY": str(daemon_source),
-                "HARNESS_MONITOR_RUNTIME_LANE": "test-lane",
-                "HARNESS_DAEMON_DATA_HOME": "/tmp/test-daemon-home",
-                "HARNESS_CODEX_WS_PORT": "4242",
-                "HARNESS_APP_GROUP_ID": "test.group",
-                "EXPANDED_CODE_SIGN_IDENTITY": "fake-identity",
-                "MARKETING_VERSION": "1.2.3",
-            }
             completed = subprocess.run(
                 ["bash", str(self.BUNDLE_SCRIPT)],
                 env=env,
@@ -1067,6 +1075,38 @@ class BundleStampShortcutTests(unittest.TestCase):
             )
 
             self.assertEqual(completed.returncode, 0, msg=completed.stderr)
+
+    def test_a_skeleton_plugin_invalidates_a_sealed_stamp(self) -> None:
+        """A build that had to defer the reseal must not let the next one
+        short-circuit on its stamp, or the app never gets sealed at all."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            env, daemon_source = self._sealed_stamp_layout(root)
+            skeleton = (
+                root
+                / "build"
+                / "Harness Monitor.app"
+                / "Contents"
+                / "PlugIns"
+                / "HarnessMonitorAppTests.xctest"
+                / "Contents"
+                / "MacOS"
+            )
+            skeleton.mkdir(parents=True)
+
+            completed = subprocess.run(
+                ["bash", str(self.BUNDLE_SCRIPT)],
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+
+            self.assertNotEqual(
+                completed.returncode,
+                0,
+                msg="the stamp shortcut ignored the deferred reseal",
+            )
 
     def test_pre_action_ready_stamp_avoids_bundle_state_recompute(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1175,6 +1215,7 @@ class BundleStampShortcutTests(unittest.TestCase):
                     "HARNESS_MONITOR_RUNTIME_LANE": "test-lane",
                     "TARGET_BUILD_DIR": str(target_build_dir),
                     "TARGET_NAME": "HarnessMonitor",
+                    "WRAPPER_NAME": "Harness Monitor.app",
                 }
             )
 
@@ -1321,6 +1362,86 @@ def _setup_dep_info_freshness_layout(tmp_dir: Path) -> dict[str, Path | str]:
             f'export CARGO_TARGET_DIR="{target_dir}"; '
         ),
     }
+
+
+class IdentityFilterSigpipeTests(unittest.TestCase):
+    """The filter has to drain its producer. Stopping at the match closes the
+    pipe, and `pipefail` turns the producer's SIGPIPE into the caller's exit
+    status even though the identity was read successfully."""
+
+    # Comfortably past the pipe buffer, so the producer is still writing when a
+    # filter that quits early would close on it.
+    PRODUCER = (
+        '{ printf \'  1) HASH "Apple Development: Someone (ABC123)"\\n\'; '
+        "for i in $(seq 1 20000); do "
+        "printf '  %s) HASH \"Developer ID Application: Someone (X)\"\\n' \"$i\"; "
+        "done; }"
+    )
+
+    def test_filter_survives_a_producer_that_keeps_writing(self) -> None:
+        script = (
+            f"unset BASH_ENV; set -euo pipefail; source {HELPER_PATH}; "
+            f'value="$({self.PRODUCER} | first_apple_development_identity)"; '
+            "printf 'identity=%s\\n' \"$value\""
+        )
+
+        completed = subprocess.run(
+            ["bash", "-c", script],
+            capture_output=True,
+            text=True,
+            env=_isolated_subprocess_env(),
+            timeout=60,
+        )
+
+        self.assertEqual(completed.returncode, 0, msg=completed.stderr)
+        self.assertEqual(
+            completed.stdout.strip(), "identity=Apple Development: Someone (ABC123)"
+        )
+
+
+class UnsealablePluginTests(unittest.TestCase):
+    """`build-for-testing` plants the app-hosted test bundle in the host app's
+    PlugIns before this phase runs and leaves it a skeleton until the test
+    target builds, which makes codesign reject the whole app."""
+
+    def _app_bundle(self, root: Path, plugins: dict[str, bool]) -> Path:
+        app = root / "Harness Monitor.app"
+        for name, complete in plugins.items():
+            contents = app / "Contents" / "PlugIns" / name / "Contents"
+            (contents / "MacOS").mkdir(parents=True)
+            if complete:
+                (contents / "Info.plist").write_text("<plist/>\n")
+        return app
+
+    def test_skeleton_test_bundle_is_named(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            app = self._app_bundle(
+                Path(tmp_dir), {"HarnessMonitorAppTests.xctest": False}
+            )
+
+            self.assertEqual(
+                run_helper(f'first_unsealable_plugin "{app}" || true'),
+                "HarnessMonitorAppTests.xctest",
+            )
+
+    def test_complete_plugins_leave_the_bundle_sealable(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            app = self._app_bundle(
+                Path(tmp_dir),
+                {
+                    "HarnessMonitorWidgets.appex": True,
+                    "HarnessMonitorIntentsExtension.appex": True,
+                },
+            )
+
+            self.assertEqual(run_helper(f'first_unsealable_plugin "{app}" || true'), "")
+
+    def test_app_without_plugins_is_sealable(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            app = Path(tmp_dir) / "Harness Monitor.app"
+            (app / "Contents" / "MacOS").mkdir(parents=True)
+
+            self.assertEqual(run_helper(f'first_unsealable_plugin "{app}" || true'), "")
 
 
 if __name__ == "__main__":
