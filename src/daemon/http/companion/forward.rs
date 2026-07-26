@@ -65,6 +65,10 @@ const X_FORWARDED_FOR: HeaderName = HeaderName::from_static("x-forwarded-for");
 const X_FORWARDED_PROTO: HeaderName = HeaderName::from_static("x-forwarded-proto");
 const X_FORWARDED_HOST: HeaderName = HeaderName::from_static("x-forwarded-host");
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "forwards a companion request upstream and maps its upgrade, build, unreachable, and timeout outcomes; the one inline tracing::warn! for a timed-out request costs 7 of its 11 points, leaving structural 4"
+)]
 pub(super) async fn forward_to_companion(
     config: &CompanionRouteConfig,
     client: &Client<HttpConnector, Body>,
